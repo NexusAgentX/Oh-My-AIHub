@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+

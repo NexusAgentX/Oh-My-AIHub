@@ -1,0 +1,39 @@
+[tools]
+go = "1.27.0"
+node = "24.20.0"
+
+[tasks.install]
+description = "Install frontend dependencies"
+run = "npm --prefix frontend ci"
+
+[tasks.dev-frontend]
+description = "Run the frontend development server"
+run = "npm --prefix frontend run dev"
+
+[tasks.dev-backend]
+description = "Run the backend development server"
+run = "go -C backend run ./cmd/server"
+
+[tasks.test]
+description = "Run all tests"
+run = [
+  "npm --prefix frontend run build",
+  "go -C backend test ./...",
+]
+
+[tasks.build]
+description = "Build frontend and backend"
+run = [
+  "npm --prefix frontend run build",
+  "mkdir -p backend/bin",
+  "go -C backend build -o bin/server ./cmd/server",
+]
+
+[tasks.up]
+description = "Build and start the Docker stack"
+run = "docker compose up --build"
+
+[tasks.down]
+description = "Stop the Docker stack"
+run = "docker compose down"
+
