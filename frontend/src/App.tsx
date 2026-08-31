@@ -40,4 +40,3 @@ export function App() {
     </main>
   )
 }
-

@@ -11,4 +11,3 @@ COPY --from=build /server /usr/local/bin/server
 USER app
 EXPOSE 8080
 CMD ["server"]
-

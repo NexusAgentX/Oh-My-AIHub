@@ -36,4 +36,3 @@ run = "docker compose up --build"
 [tasks.down]
 description = "Stop the Docker stack"
 run = "docker compose down"
-

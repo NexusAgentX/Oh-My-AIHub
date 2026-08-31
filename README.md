@@ -43,4 +43,3 @@ Open <http://localhost:3000>. Stop the stack with `mise run down`.
 mise run test
 docker compose config --quiet
 ```
-
