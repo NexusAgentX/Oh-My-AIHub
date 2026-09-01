@@ -419,6 +419,10 @@ components:
 
 - `DESIGN.md` 是视觉规则的事实来源；代码中的设计 Token 应由本文档映射，不能形成另一套相互冲突的值。
 - 开始任何 UI Issue 前先阅读本文档，并在 Acceptance 中加入视觉一致性、响应式和无障碍验证。
+- OpenPencil 是主要 UI/UX 设计工具。具体设计的权威源文件保存在 `design/sources/*.op`，同名 PNG 预览保存在 `design/previews/`；详细规则见 `design/README.md` 和 ADR-0003。
+- 设计必须由 Agent 直接通过 OpenPencil MCP 创建、读取、修改、保存、lint 和导出，不能降级到 `op` CLI，也不能手写 `.op` JSON 冒充专业工具产物。MCP 不可用时应停止设计工作并请维护者修复或重载会话。
+- 影响用户流程、交互或视觉结果时，设计源文件、预览和实现必须在同一个 Issue、分支和 Pull Request 中同步更新；实现反馈改变设计时也要回写源文件。
+- 设计文件使用稳定名称，由 Git 表达历史版本；不得使用日期、`final`、`new`、`v2` 等后缀代替版本管理。
 - 原始十六进制颜色只能出现在 Token 定义或必要的图形资源中，组件样式必须引用语义 Token。
 - 产品需求由 `PRODUCT.md` 决定，视觉规则由本文档决定，系统实现边界由 `ARCHITECTURE.md` 和 ADR 决定。
 - 若现有 UI 与本文档不一致，新工作默认向本文档收敛；大规模迁移应单独建立 Issue。

@@ -1,0 +1,1035 @@
+{
+  "version": "0.8.4",
+  "children": [
+    {
+      "type": "frame",
+      "id": "op-skeleton-1788225583516328000-root-1",
+      "name": "AI Native Product Loop",
+      "width": 1440.0,
+      "height": 900.0,
+      "layout": "vertical",
+      "gap": 32.0,
+      "padding": [
+        48.0,
+        64.0
+      ],
+      "justifyContent": "space_between",
+      "clipContent": true,
+      "fill": [
+        {
+          "type": "solid",
+          "color": "#0B0E11"
+        }
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788225583516332000-section-2",
+          "name": "Header",
+          "role": "hero",
+          "width": "fill_container",
+          "height": 150.0,
+          "layout": "vertical",
+          "gap": 12.0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "n1",
+              "name": "Eyebrow",
+              "role": "badge",
+              "width": "fit_content",
+              "height": "fit_content",
+              "layout": "horizontal",
+              "padding": [
+                6.0,
+                10.0
+              ],
+              "cornerRadius": 4.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#FCD535"
+                }
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n2",
+                  "role": "label",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "OPERATING MODEL  /  01",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 12.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.4,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#181A20"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n3",
+              "name": "Title",
+              "role": "heading",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "AI 原生产品研发闭环",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 44.0,
+              "fontWeight": 700,
+              "letterSpacing": 0.0,
+              "lineHeight": 1.2,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n4",
+              "name": "Subtitle",
+              "role": "subheading",
+              "width": 920.0,
+              "height": "fit_content",
+              "content": "人类把控用户价值与方向，AI 驱动专业工具完成发现、设计、交付与学习。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16.0,
+              "fontWeight": 400,
+              "letterSpacing": 0.0,
+              "lineHeight": 1.5,
+              "textGrowth": "fixed-width",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#929AA5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788225583516340000-section-3",
+          "name": "Divider",
+          "role": "divider",
+          "width": "fill_container",
+          "height": 1.0,
+          "layout": "vertical",
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#2B3139"
+            }
+          ],
+          "children": []
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788225583516347000-section-4",
+          "name": "Five Stage Loop",
+          "role": "feature-grid",
+          "width": "fill_container",
+          "height": 300.0,
+          "layout": "horizontal",
+          "gap": 16.0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "n6",
+              "name": "01 Direction",
+              "role": "card",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 16.0,
+              "padding": 24.0,
+              "cornerRadius": 12.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#1E2329"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#2B3139"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n16",
+                  "name": "01 Badge",
+                  "role": "badge",
+                  "width": 40.0,
+                  "height": 40.0,
+                  "layout": "horizontal",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FCD535"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n17",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "01",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14.0,
+                      "fontWeight": 700,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#181A20"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n18",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "方向与结果",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 20.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.35,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n19",
+                  "role": "body-text",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "content": "明确目标用户、核心问题与期望结果。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n20",
+                  "name": "01 Owner",
+                  "role": "tag",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    6.0,
+                    10.0
+                  ],
+                  "cornerRadius": 4.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n21",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "人类负责",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12.0,
+                      "fontWeight": 600,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#EAECEF"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n7",
+              "name": "02 Discovery",
+              "role": "card",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 16.0,
+              "padding": 24.0,
+              "cornerRadius": 12.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#1E2329"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#2B3139"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n28",
+                  "name": "02 Badge",
+                  "role": "badge",
+                  "width": 40.0,
+                  "height": 40.0,
+                  "layout": "horizontal",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n29",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "02",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14.0,
+                      "fontWeight": 700,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#FCD535"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n30",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "发现与证据",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 20.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.35,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n31",
+                  "role": "body-text",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "content": "收集场景、替代方案、假设与风险证据。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n32",
+                  "name": "02 Owner",
+                  "role": "tag",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    6.0,
+                    10.0
+                  ],
+                  "cornerRadius": 4.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n33",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "AI 研究",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12.0,
+                      "fontWeight": 600,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#EAECEF"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n8",
+              "name": "03 Design",
+              "role": "card",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 16.0,
+              "padding": 24.0,
+              "cornerRadius": 12.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#1E2329"
+                }
+              ],
+              "stroke": {
+                "thickness": 2.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#FCD535"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n22",
+                  "name": "03 Badge",
+                  "role": "badge",
+                  "width": 40.0,
+                  "height": 40.0,
+                  "layout": "horizontal",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FCD535"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n23",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "03",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14.0,
+                      "fontWeight": 700,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#181A20"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n24",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "专业工具设计",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 20.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.35,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n25",
+                  "role": "body-text",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "content": "生成可编辑方案、关键状态与原型。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n26",
+                  "name": "03 Owner",
+                  "role": "tag",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    6.0,
+                    10.0
+                  ],
+                  "cornerRadius": 4.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FCD535"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n27",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "OpenPencil",
+                      "fontFamily": "Inter",
+                      "fontSize": 12.0,
+                      "fontWeight": 600,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#181A20"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n9",
+              "name": "04 Delivery",
+              "role": "card",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 16.0,
+              "padding": 24.0,
+              "cornerRadius": 12.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#1E2329"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#2B3139"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n40",
+                  "name": "04 Badge",
+                  "role": "badge",
+                  "width": 40.0,
+                  "height": 40.0,
+                  "layout": "horizontal",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n41",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "04",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14.0,
+                      "fontWeight": 700,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#FCD535"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n42",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "小批量交付",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 20.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.35,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n43",
+                  "role": "body-text",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "content": "同步设计、代码、测试、文档与证据。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n44",
+                  "name": "04 Owner",
+                  "role": "tag",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    6.0,
+                    10.0
+                  ],
+                  "cornerRadius": 4.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n45",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "AI 工程",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12.0,
+                      "fontWeight": 600,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#EAECEF"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n10",
+              "name": "05 Learn",
+              "role": "card",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 16.0,
+              "padding": 24.0,
+              "cornerRadius": 12.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#1E2329"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#2B3139"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n34",
+                  "name": "05 Badge",
+                  "role": "badge",
+                  "width": 40.0,
+                  "height": 40.0,
+                  "layout": "horizontal",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n35",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "05",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14.0,
+                      "fontWeight": 700,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#FCD535"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n36",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "发布与学习",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 20.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.35,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n37",
+                  "role": "body-text",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "content": "观察真实使用，再决定继续、调整或停止。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n38",
+                  "name": "05 Owner",
+                  "role": "tag",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    6.0,
+                    10.0
+                  ],
+                  "cornerRadius": 4.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#2B3139"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n39",
+                      "role": "label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "人与 AI 共判",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12.0,
+                      "fontWeight": 600,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.4,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "#EAECEF"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788225583516354000-section-5",
+          "name": "Learning Signal",
+          "role": "section",
+          "width": "fill_container",
+          "height": 96.0,
+          "layout": "horizontal",
+          "gap": 24.0,
+          "padding": [
+            24.0,
+            28.0
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "cornerRadius": 12.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#2B3139"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n11",
+              "name": "Learning Copy",
+              "width": "fit_content",
+              "height": "fit_content",
+              "layout": "vertical",
+              "gap": 6.0,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n12",
+                  "role": "heading",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "真实用户证据 → 下一轮方向",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18.0,
+                  "fontWeight": 600,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.4,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n13",
+                  "role": "body-text",
+                  "width": 760.0,
+                  "height": "fit_content",
+                  "content": "代码合并代表 Done；只有结果证据支持假设，才是 Validated。",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 13.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.5,
+                  "textGrowth": "fixed-width",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#929AA5"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n14",
+              "name": "Learning Badge",
+              "role": "badge",
+              "width": "fit_content",
+              "height": "fit_content",
+              "layout": "horizontal",
+              "padding": [
+                10.0,
+                16.0
+              ],
+              "cornerRadius": 6.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#FCD535"
+                }
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n15",
+                  "role": "label",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "LEARN → ITERATE",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13.0,
+                  "fontWeight": 700,
+                  "lineHeight": 1.4,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#181A20"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788225583516359000-section-6",
+          "name": "Footnote",
+          "role": "footer",
+          "width": "fill_container",
+          "height": 18.0,
+          "layout": "horizontal",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "n5",
+              "role": "caption",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "工具链验证画布 · 非产品界面 · 可编辑源文件由 Git 管理",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12.0,
+              "fontWeight": 500,
+              "letterSpacing": 0.0,
+              "lineHeight": 1.4,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#707A8A"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editorMeta": {
+    "activePageIndex": 0,
+    "preserveAuthoredGeometry": false
+  }
+}

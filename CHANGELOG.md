@@ -17,6 +17,11 @@
 - 建立人类定向、AI 执行的持续产品研发模型，将发现、专业工具设计、交付和上线学习纳入统一治理。
 - 为 Feature/Epic Issue 模板补充用户问题、设计、结果验证和 Ready/Done/Validated 证据要求。
 - 记录 AI 原生持续产品研发模型的 ADR-0002。
+- 安装并验证 OpenPencil 桌面端、`op` CLI、Codex Skill 与 MCP 接入。
+- 建立 `design/` 一等资产目录，提交 OpenPencil 可编辑源文件和同名 Git 评审预览。
+- 新增设计资产命名、同步、安全与可移植性规则，以及 `mise run check-design` 聚焦检查。
+- 规定 Agent 的 OpenPencil 设计操作只允许使用 MCP；MCP 不可用时暂停，不降级到 CLI。
+- 记录将 OpenPencil 可编辑设计源文件纳入 Git 的 ADR-0003。
 
 ### 变更
 

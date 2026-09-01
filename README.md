@@ -6,6 +6,7 @@ Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经�
 
 - [产品说明](PRODUCT.md)：产品目标、用户、范围与需求。
 - [设计系统](DESIGN.md)：视觉 Token、组件、交互、响应式与无障碍规则。
+- [设计资产](design/README.md)：OpenPencil 源文件、预览与 Git 工作流。
 - [架构说明](ARCHITECTURE.md)：当前系统结构、边界与技术决策。
 - [变更日志](CHANGELOG.md)：面向版本与使用者的重要变化。
 - [Agent 协作说明](AGENTS.md)：所有 Agent 在本仓库中的工作规则。
@@ -29,6 +30,19 @@ Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经�
 - 高不确定产品能力先用发现或原型 Feature 降低风险，再进入小批量交付；纯技术或已知小改动保持单个 Feature 的轻量流程。
 
 完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，视觉规则维护在 `DESIGN.md`。
+
+## 设计工作流
+
+项目使用 [OpenPencil](https://github.com/ZSeven-W/openpencil) 作为主要 UI/UX 设计工具。AI Agent 只通过 OpenPencil MCP 执行设计；MCP 不可用时暂停并由维护者修复或重载，不降级到 CLI。人类负责目标用户、产品方向和关键方案选择。可编辑 `.op` 源文件与同名 PNG 预览都提交到 `design/`，并与对应代码处于同一个 Issue、分支和 Pull Request。
+
+安装桌面端和 `op` CLI 后执行：
+
+```bash
+op install --target codex
+op --version
+```
+
+重载 Codex 会话后验证 OpenPencil MCP 已进入工具清单。目录、命名、安全、导出和评审规则见 `design/README.md`；任何视觉任务还必须遵守 `DESIGN.md`。
 
 ## 当前工程组成
 
@@ -82,6 +96,7 @@ mise run down
 ## 验证
 
 ```bash
+mise run check-design
 mise run test
 docker compose config --quiet
 ```
@@ -91,7 +106,9 @@ docker compose config --quiet
 ```text
 .
 ├── backend/       Go 后端
+├── design/        OpenPencil 设计源文件与预览
 ├── frontend/      React 前端
+├── scripts/       仓库聚焦检查脚本
 ├── docs/adr/      架构决策记录
 ├── compose.yaml   容器编排配置
 └── mise.toml      工具版本与常用任务
