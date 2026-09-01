@@ -29,7 +29,7 @@
 - **状态**：Done；#17、#28、#30 与 #32 已形成完整的首版专业工具原型基线。
 - **关联任务**：[Epic #16](https://github.com/NexusAgentX/Oh-My-AIHub/issues/16)、[Feature #17](https://github.com/NexusAgentX/Oh-My-AIHub/issues/17)、[Feature #28](https://github.com/NexusAgentX/Oh-My-AIHub/issues/28)、[Feature #30](https://github.com/NexusAgentX/Oh-My-AIHub/issues/30)、[Feature #32](https://github.com/NexusAgentX/Oh-My-AIHub/issues/32)。
 - **期望结果**：消费者、共享者和管理员能够在可编辑原型中理解并完成首版核心任务，后续实现不需要猜测信息架构、关键交互或异常状态。
-- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`core-workflows.op` 已用 OpenPencil MCP 形成 48 个可点击桌面页面、四角色流程图、五块评审总览和三档响应式说明，并导出同名 Git 预览；#17 覆盖首轮核心流程，#28 覆盖 API 市场、详情内评分和市场状态，#30 覆盖账号凭据、改密与跨模块关键状态，#32 收口密集总览、Key 与渠道统一配置器、资源编辑删除、钱包不足以及 C2C 支付信息和全量布局。
+- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`product-experience.op` 已用 OpenPencil MCP 形成 48 个可点击桌面页面、四角色流程图、统一评审总览、三档响应式说明，以及桌面与移动公开落地页，并导出同名 Git 预览；#17 覆盖首轮核心流程，#28 覆盖 API 市场、详情内评分和市场状态，#30 覆盖账号凭据、改密与跨模块关键状态，#32 收口密集总览、Key 与渠道统一配置器、资源编辑删除、钱包不足以及 C2C 支付信息和全量布局。
 - **剩余未知项**：真实目标用户能否无协助理解并完成这些任务，仍需在可运行版本中验证。
 - **达成证据**：OpenPencil 源文件和同名预览覆盖四类核心任务、权限边界、凭据生命周期与关键恢复状态，Feature #17、#28、#30 和 #32 均记录交付证据。
 
