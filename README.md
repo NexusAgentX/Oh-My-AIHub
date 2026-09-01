@@ -5,6 +5,7 @@ Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经�
 ## 文档导航
 
 - [产品说明](PRODUCT.md)：产品目标、用户、范围与需求。
+- [产品路线图](ROADMAP.md)：面向用户结果的优先级、证据视野与推进顺序。
 - [设计系统](DESIGN.md)：视觉 Token、组件、交互、响应式与无障碍规则。
 - [设计资产](design/README.md)：OpenPencil 源文件、预览与 Git 工作流。
 - [架构说明](ARCHITECTURE.md)：当前系统结构、边界与技术决策。
@@ -29,7 +30,7 @@ Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经�
 - 任务区分 Ready、Done 和 Validated，代码合并或功能上线不自动等于用户结果已经成立。
 - 高不确定产品能力先用发现或原型 Feature 降低风险，再进入小批量交付；纯技术或已知小改动保持单个 Feature 的轻量流程。
 
-完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，视觉规则维护在 `DESIGN.md`。
+完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，结果优先级与推进顺序维护在 `ROADMAP.md`，视觉规则维护在 `DESIGN.md`。
 
 ## 设计工作流
 
