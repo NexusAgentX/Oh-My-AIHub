@@ -4,7 +4,7 @@
 
 ## 项目与架构
 
-Oh-My-AIHub 目前是产品定义前的全栈工程骨架：
+Oh-My-AIHub 目前是产品方向已确认、业务能力尚未交付的全栈工程骨架：
 
 - `frontend/`：React、TypeScript 与 Vite 单页应用。
 - `backend/`：Go HTTP 服务。
@@ -13,7 +13,7 @@ Oh-My-AIHub 目前是产品定义前的全栈工程骨架：
 - `compose.yaml`：前后端容器编排。
 - `mise.toml`：工具版本及安装、开发、测试、构建、运行任务。
 
-开发环境中，浏览器访问 Vite，`/api` 由 Vite 代理到 Go 后端；Compose 环境中，浏览器访问 Nginx，`/api` 由 Nginx 代理到后端容器。当前只实现 `/api/health` 健康检查，尚未确定产品功能和领域模型。
+开发环境中，浏览器访问 Vite，`/api` 由 Vite 代理到 Go 后端；Compose 环境中，浏览器访问 Nginx，`/api` 由 Nginx 代理到后端容器。当前只实现 `/api/health` 健康检查；已确认的 API 共享、积分清算与 C2C 产品目标记录在 `PRODUCT.md`，尚未作为代码交付。
 
 ## 开发指南
 

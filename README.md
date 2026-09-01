@@ -1,6 +1,8 @@
 # Oh-My-AIHub
 
-Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经建立 React 前端、Go 后端、Docker Compose 运行环境与 mise 开发任务；产品定位、目标用户和核心功能尚待补充。
+Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在双边 C2C 市场出售所得积分。
+
+产品方向和首版边界已经确认，当前代码仍处于工程骨架阶段：仓库已经建立 React 前端、Go 后端、Docker Compose 运行环境与 mise 开发任务，业务能力尚未实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
 
 ## 文档导航
 
@@ -52,7 +54,7 @@ op --version
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 请求。
 
-当前前后端仅实现 `/api/health` 健康检查链路，不代表产品功能已经确定。
+当前前后端仅实现 `/api/health` 健康检查链路，不代表 `PRODUCT.md` 中的业务能力已经交付。
 
 ## 环境要求
 
