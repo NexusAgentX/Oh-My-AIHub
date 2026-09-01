@@ -12,6 +12,8 @@
 - 建立 mise 工具版本和常用开发任务。
 - 建立产品、架构、安全、Agent 协作和架构决策文档体系。
 - 建立 Feature/Epic Issue 模板和 Issue 驱动的 Agent 开发工作流。
+- 建立 Binance 风格的中文设计系统，并将其设为后续 UI 工作的规范性来源。
+- 记录采用 Binance 风格设计语言的 ADR-0001。
 
 ### 变更
 

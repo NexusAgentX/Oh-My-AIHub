@@ -32,5 +32,4 @@
 
 ## 索引
 
-当前尚无正式架构决策记录。
-
+- [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已通过
