@@ -33,3 +33,4 @@
 ## 索引
 
 - [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已通过
+- [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过
