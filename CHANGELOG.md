@@ -22,6 +22,7 @@
 - 新增设计资产命名、同步、安全与可移植性规则，以及 `mise run check-design` 聚焦检查。
 - 规定 Agent 的 OpenPencil 设计操作只允许使用 MCP；MCP 不可用时暂停，不降级到 CLI。
 - 记录将 OpenPencil 可编辑设计源文件纳入 Git 的 ADR-0003。
+- 建立结果导向的 `ROADMAP.md`，以 Now / Next / Later 区分产品结果的当前、后续和远期证据视野。
 
 ### 变更
 
