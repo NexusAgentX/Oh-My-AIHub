@@ -15,11 +15,16 @@ description = "Run the backend development server"
 run = "go -C backend run ./cmd/server"
 
 [tasks.test]
-description = "Run all tests"
+description = "Run all tests and asset checks"
 run = [
+  "node scripts/check-design-assets.mjs",
   "npm --prefix frontend run build",
   "go -C backend test ./...",
 ]
+
+[tasks.check-design]
+description = "Validate versioned design sources and previews"
+run = "node scripts/check-design-assets.mjs"
 
 [tasks.build]
 description = "Build frontend and backend"
