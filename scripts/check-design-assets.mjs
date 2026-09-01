@@ -56,6 +56,15 @@ function validatePortableContent(filePath, source) {
   }
 }
 
+function hasEditableNodes(document) {
+  if (Array.isArray(document.children) && document.children.length > 0) {
+    return true;
+  }
+
+  return Array.isArray(document.pages)
+    && document.pages.some((page) => Array.isArray(page?.children) && page.children.length > 0);
+}
+
 async function validatePng(filePath) {
   const data = await readFile(filePath);
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -96,7 +105,7 @@ for (const sourceFile of sourceFiles) {
   if (typeof document.version !== "string" || document.version.length === 0) {
     errors.push(`${relative(sourceFile)}: 缺少 OpenPencil version`);
   }
-  if (!Array.isArray(document.children) || document.children.length === 0) {
+  if (!hasEditableNodes(document)) {
     errors.push(`${relative(sourceFile)}: 缺少可编辑设计节点`);
   }
 
