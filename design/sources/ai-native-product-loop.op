@@ -1,108 +1,524 @@
 {
   "version": "0.8.4",
+  "themes": {
+    "appearance": [
+      "Default"
+    ]
+  },
+  "variables": {
+    "color.body": {
+      "type": "color",
+      "value": "#333840"
+    },
+    "color.border.strong": {
+      "type": "color",
+      "value": "#9297a0"
+    },
+    "color.canvas": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "color.hairline": {
+      "type": "color",
+      "value": "#dddddd"
+    },
+    "color.info": {
+      "type": "color",
+      "value": "#254fad"
+    },
+    "color.info.border": {
+      "type": "color",
+      "value": "#458fff"
+    },
+    "color.ink": {
+      "type": "color",
+      "value": "#181d26"
+    },
+    "color.link": {
+      "type": "color",
+      "value": "#1b61c9"
+    },
+    "color.link.active": {
+      "type": "color",
+      "value": "#1a3866"
+    },
+    "color.muted": {
+      "type": "color",
+      "value": "#41454d"
+    },
+    "color.on.dark": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "color.on.primary": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "color.pricing.ink": {
+      "type": "color",
+      "value": "#1d1f25"
+    },
+    "color.primary": {
+      "type": "color",
+      "value": "#181d26"
+    },
+    "color.primary.active": {
+      "type": "color",
+      "value": "#0d1218"
+    },
+    "color.signature.coral": {
+      "type": "color",
+      "value": "#aa2d00"
+    },
+    "color.signature.cream": {
+      "type": "color",
+      "value": "#f5e9d4"
+    },
+    "color.signature.forest": {
+      "type": "color",
+      "value": "#0a2e0e"
+    },
+    "color.signature.mint": {
+      "type": "color",
+      "value": "#a8d8c4"
+    },
+    "color.signature.mustard": {
+      "type": "color",
+      "value": "#d9a441"
+    },
+    "color.signature.peach": {
+      "type": "color",
+      "value": "#fcab79"
+    },
+    "color.signature.yellow": {
+      "type": "color",
+      "value": "#f4d35e"
+    },
+    "color.success": {
+      "type": "color",
+      "value": "#006400"
+    },
+    "color.success.border": {
+      "type": "color",
+      "value": "#39bf45"
+    },
+    "color.surface.dark": {
+      "type": "color",
+      "value": "#181d26"
+    },
+    "color.surface.dark.elevated": {
+      "type": "color",
+      "value": "#1d1f25"
+    },
+    "color.surface.soft": {
+      "type": "color",
+      "value": "#f8fafc"
+    },
+    "color.surface.strong": {
+      "type": "color",
+      "value": "#e0e2e6"
+    }
+  },
   "children": [
     {
       "type": "frame",
-      "id": "op-skeleton-1788225583516328000-root-1",
-      "name": "AI Native Product Loop",
+      "id": "op-skeleton-1788230707237405000-root-8",
+      "name": "Airtable Product Loop System",
       "width": 1440.0,
-      "height": 900.0,
+      "height": 1100.0,
       "layout": "vertical",
-      "gap": 32.0,
-      "padding": [
-        48.0,
-        64.0
-      ],
-      "justifyContent": "space_between",
-      "clipContent": true,
+      "gap": 0.0,
+      "padding": 0.0,
       "fill": [
         {
           "type": "solid",
-          "color": "#0B0E11"
+          "color": "$color.canvas"
         }
       ],
       "children": [
         {
           "type": "frame",
-          "id": "op-skeleton-1788225583516332000-section-2",
-          "name": "Header",
-          "role": "hero",
+          "id": "op-skeleton-1788230707237408000-section-9",
+          "name": "Top Navigation",
+          "role": "navigation",
           "width": "fill_container",
-          "height": 150.0,
-          "layout": "vertical",
-          "gap": 12.0,
+          "height": 64.0,
+          "layout": "horizontal",
+          "gap": 24.0,
+          "padding": [
+            0.0,
+            64.0
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.canvas"
+            }
+          ],
           "children": [
             {
               "type": "frame",
               "id": "n1",
-              "name": "Eyebrow",
-              "role": "badge",
+              "name": "Project Identity",
               "width": "fit_content",
               "height": "fit_content",
               "layout": "horizontal",
-              "padding": [
-                6.0,
-                10.0
-              ],
-              "cornerRadius": 4.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#FCD535"
-                }
-              ],
+              "gap": 10.0,
+              "alignItems": "center",
               "children": [
                 {
-                  "type": "text",
+                  "type": "frame",
                   "id": "n2",
-                  "role": "label",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "OPERATING MODEL  /  01",
-                  "fontFamily": "IBM Plex Sans",
-                  "fontSize": 12.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.4,
+                  "name": "Project Mark",
+                  "width": 30.0,
+                  "height": 30.0,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "cornerRadius": 6.0,
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#181A20"
+                      "color": "$color.primary"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n3",
+                      "name": "Mark Letter",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "O",
+                      "fontFamily": "Inter",
+                      "fontSize": 15.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.0,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.primary"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n4",
+                  "name": "Project Name",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "Oh-My-AIHub",
+                  "fontFamily": "Inter",
+                  "fontSize": 18.0,
+                  "fontWeight": 500,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.2,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.ink"
                     }
                   ]
                 }
               ]
             },
             {
-              "type": "text",
-              "id": "n3",
-              "name": "Title",
-              "role": "heading",
+              "type": "frame",
+              "id": "n5",
+              "name": "Loop Navigation",
               "width": "fit_content",
               "height": "fit_content",
-              "content": "AI 原生产品研发闭环",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 44.0,
-              "fontWeight": 700,
+              "layout": "horizontal",
+              "gap": 28.0,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n6",
+                  "name": "Nav 1",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "方向",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.25,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.body"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n7",
+                  "name": "Nav 2",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "发现",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.25,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.body"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n8",
+                  "name": "Nav 3",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "设计",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.25,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.body"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n9",
+                  "name": "Nav 4",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "交付",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.25,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.body"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n10",
+                  "name": "Nav 5",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "学习",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14.0,
+                  "fontWeight": 400,
+                  "letterSpacing": 0.0,
+                  "lineHeight": 1.25,
+                  "textGrowth": "auto",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.body"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n11",
+              "name": "Navigation Actions",
+              "width": "fit_content",
+              "height": "fit_content",
+              "layout": "horizontal",
+              "gap": 12.0,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n12",
+                  "name": "Secondary Button",
+                  "role": "button",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    12.0,
+                    18.0
+                  ],
+                  "alignItems": "center",
+                  "cornerRadius": 12.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": 1.0,
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n13",
+                      "name": "Secondary Label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "设计规范",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.2,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.ink"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n14",
+                  "name": "Primary Button",
+                  "role": "button",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "layout": "horizontal",
+                  "padding": [
+                    12.0,
+                    18.0
+                  ],
+                  "alignItems": "center",
+                  "cornerRadius": 12.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.primary"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n15",
+                      "name": "Primary Label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "确认方向",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.2,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.primary"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788230707237415000-section-10",
+          "name": "Editorial Hero",
+          "role": "hero",
+          "width": "fill_container",
+          "height": 284.0,
+          "layout": "vertical",
+          "gap": 16.0,
+          "padding": [
+            44.0,
+            64.0
+          ],
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.canvas"
+            }
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "n16",
+              "name": "Hero Eyebrow",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "HUMAN DIRECTION · AI EXECUTION",
+              "fontFamily": "Inter",
+              "fontSize": 13.0,
+              "fontWeight": 500,
               "letterSpacing": 0.0,
-              "lineHeight": 1.2,
+              "lineHeight": 1.3,
+              "textGrowth": "auto",
               "fill": [
                 {
                   "type": "solid",
-                  "color": "#FFFFFF"
+                  "color": "$color.muted"
                 }
               ]
             },
             {
               "type": "text",
-              "id": "n4",
-              "name": "Subtitle",
-              "role": "subheading",
-              "width": 920.0,
+              "id": "n17",
+              "name": "Hero Title",
+              "width": 760.0,
               "height": "fit_content",
-              "content": "人类把控用户价值与方向，AI 驱动专业工具完成发现、设计、交付与学习。",
+              "content": "AI 原生产品研发闭环",
               "fontFamily": "Noto Sans SC",
-              "fontSize": 16.0,
+              "fontSize": 40.0,
+              "fontWeight": 400,
+              "letterSpacing": 0.0,
+              "lineHeight": 1.2,
+              "textGrowth": "fixed-width",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.ink"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n18",
+              "name": "Hero Subtitle",
+              "width": 820.0,
+              "height": "fit_content",
+              "content": "人类负责用户价值、产品方向和关键取舍；AI 使用专业工具完成发现、设计、交付与学习，并让证据随 Git 版本持续演进。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14.0,
               "fontWeight": 400,
               "letterSpacing": 0.0,
               "lineHeight": 1.5,
@@ -110,766 +526,110 @@
               "fill": [
                 {
                   "type": "solid",
-                  "color": "#929AA5"
+                  "color": "$color.body"
                 }
               ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "op-skeleton-1788225583516340000-section-3",
-          "name": "Divider",
-          "role": "divider",
-          "width": "fill_container",
-          "height": 1.0,
-          "layout": "vertical",
-          "fill": [
-            {
-              "type": "solid",
-              "color": "#2B3139"
-            }
-          ],
-          "children": []
-        },
-        {
-          "type": "frame",
-          "id": "op-skeleton-1788225583516347000-section-4",
-          "name": "Five Stage Loop",
-          "role": "feature-grid",
-          "width": "fill_container",
-          "height": 300.0,
-          "layout": "horizontal",
-          "gap": 16.0,
-          "children": [
+            },
             {
               "type": "frame",
-              "id": "n6",
-              "name": "01 Direction",
-              "role": "card",
-              "width": "fill_container",
-              "height": "fill_container",
-              "layout": "vertical",
-              "gap": 16.0,
-              "padding": 24.0,
-              "cornerRadius": 12.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#1E2329"
-                }
-              ],
-              "stroke": {
-                "thickness": 1.0,
-                "fill": [
-                  {
-                    "type": "solid",
-                    "color": "#2B3139"
-                  }
-                ]
-              },
+              "id": "n19",
+              "name": "Hero Actions",
+              "width": "fit_content",
+              "height": "fit_content",
+              "layout": "horizontal",
+              "gap": 12.0,
+              "alignItems": "center",
               "children": [
                 {
                   "type": "frame",
-                  "id": "n16",
-                  "name": "01 Badge",
-                  "role": "badge",
-                  "width": 40.0,
-                  "height": 40.0,
-                  "layout": "horizontal",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "cornerRadius": 6.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FCD535"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n17",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "01",
-                      "fontFamily": "IBM Plex Sans",
-                      "fontSize": 14.0,
-                      "fontWeight": 700,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#181A20"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n18",
-                  "role": "heading",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "方向与结果",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 20.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.35,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FFFFFF"
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n19",
-                  "role": "body-text",
-                  "width": "fill_container",
-                  "height": "fit_content",
-                  "content": "明确目标用户、核心问题与期望结果。",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 14.0,
-                  "fontWeight": 400,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
-                  "textGrowth": "fixed-width",
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#929AA5"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
                   "id": "n20",
-                  "name": "01 Owner",
-                  "role": "tag",
+                  "name": "Hero Primary",
+                  "role": "button",
                   "width": "fit_content",
                   "height": "fit_content",
                   "layout": "horizontal",
                   "padding": [
-                    6.0,
-                    10.0
+                    13.0,
+                    22.0
                   ],
-                  "cornerRadius": 4.0,
+                  "alignItems": "center",
+                  "cornerRadius": 12.0,
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#2B3139"
+                      "color": "$color.primary"
                     }
                   ],
                   "children": [
                     {
                       "type": "text",
                       "id": "n21",
-                      "role": "label",
+                      "name": "Hero Primary Label",
                       "width": "fit_content",
                       "height": "fit_content",
-                      "content": "人类负责",
+                      "content": "查看闭环",
                       "fontFamily": "Noto Sans SC",
-                      "fontSize": 12.0,
-                      "fontWeight": 600,
+                      "fontSize": 16.0,
+                      "fontWeight": 500,
                       "letterSpacing": 0.0,
                       "lineHeight": 1.4,
+                      "textGrowth": "auto",
                       "fill": [
                         {
                           "type": "solid",
-                          "color": "#EAECEF"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "n7",
-              "name": "02 Discovery",
-              "role": "card",
-              "width": "fill_container",
-              "height": "fill_container",
-              "layout": "vertical",
-              "gap": 16.0,
-              "padding": 24.0,
-              "cornerRadius": 12.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#1E2329"
-                }
-              ],
-              "stroke": {
-                "thickness": 1.0,
-                "fill": [
-                  {
-                    "type": "solid",
-                    "color": "#2B3139"
-                  }
-                ]
-              },
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "n28",
-                  "name": "02 Badge",
-                  "role": "badge",
-                  "width": 40.0,
-                  "height": 40.0,
-                  "layout": "horizontal",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "cornerRadius": 6.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n29",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "02",
-                      "fontFamily": "IBM Plex Sans",
-                      "fontSize": 14.0,
-                      "fontWeight": 700,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#FCD535"
+                          "color": "$color.on.primary"
                         }
                       ]
                     }
                   ]
                 },
                 {
-                  "type": "text",
-                  "id": "n30",
-                  "role": "heading",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "发现与证据",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 20.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.35,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FFFFFF"
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n31",
-                  "role": "body-text",
-                  "width": "fill_container",
-                  "height": "fit_content",
-                  "content": "收集场景、替代方案、假设与风险证据。",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 14.0,
-                  "fontWeight": 400,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
-                  "textGrowth": "fixed-width",
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#929AA5"
-                    }
-                  ]
-                },
-                {
                   "type": "frame",
-                  "id": "n32",
-                  "name": "02 Owner",
-                  "role": "tag",
+                  "id": "n22",
+                  "name": "Hero Secondary",
+                  "role": "button",
                   "width": "fit_content",
                   "height": "fit_content",
                   "layout": "horizontal",
                   "padding": [
-                    6.0,
-                    10.0
+                    13.0,
+                    22.0
                   ],
-                  "cornerRadius": 4.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n33",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "AI 研究",
-                      "fontFamily": "Noto Sans SC",
-                      "fontSize": 12.0,
-                      "fontWeight": 600,
-                      "letterSpacing": 0.0,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#EAECEF"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "n8",
-              "name": "03 Design",
-              "role": "card",
-              "width": "fill_container",
-              "height": "fill_container",
-              "layout": "vertical",
-              "gap": 16.0,
-              "padding": 24.0,
-              "cornerRadius": 12.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#1E2329"
-                }
-              ],
-              "stroke": {
-                "thickness": 2.0,
-                "fill": [
-                  {
-                    "type": "solid",
-                    "color": "#FCD535"
-                  }
-                ]
-              },
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "n22",
-                  "name": "03 Badge",
-                  "role": "badge",
-                  "width": 40.0,
-                  "height": 40.0,
-                  "layout": "horizontal",
-                  "justifyContent": "center",
                   "alignItems": "center",
-                  "cornerRadius": 6.0,
+                  "cornerRadius": 12.0,
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#FCD535"
+                      "color": "$color.canvas"
                     }
                   ],
+                  "stroke": {
+                    "thickness": 1.0,
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
                   "children": [
                     {
                       "type": "text",
                       "id": "n23",
-                      "role": "label",
+                      "name": "Hero Secondary Label",
                       "width": "fit_content",
                       "height": "fit_content",
-                      "content": "03",
-                      "fontFamily": "IBM Plex Sans",
-                      "fontSize": 14.0,
-                      "fontWeight": 700,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#181A20"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n24",
-                  "role": "heading",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "专业工具设计",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 20.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.35,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FFFFFF"
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n25",
-                  "role": "body-text",
-                  "width": "fill_container",
-                  "height": "fit_content",
-                  "content": "生成可编辑方案、关键状态与原型。",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 14.0,
-                  "fontWeight": 400,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
-                  "textGrowth": "fixed-width",
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#929AA5"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "n26",
-                  "name": "03 Owner",
-                  "role": "tag",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "layout": "horizontal",
-                  "padding": [
-                    6.0,
-                    10.0
-                  ],
-                  "cornerRadius": 4.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FCD535"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n27",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "OpenPencil",
-                      "fontFamily": "Inter",
-                      "fontSize": 12.0,
-                      "fontWeight": 600,
-                      "letterSpacing": 0.0,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#181A20"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "n9",
-              "name": "04 Delivery",
-              "role": "card",
-              "width": "fill_container",
-              "height": "fill_container",
-              "layout": "vertical",
-              "gap": 16.0,
-              "padding": 24.0,
-              "cornerRadius": 12.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#1E2329"
-                }
-              ],
-              "stroke": {
-                "thickness": 1.0,
-                "fill": [
-                  {
-                    "type": "solid",
-                    "color": "#2B3139"
-                  }
-                ]
-              },
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "n40",
-                  "name": "04 Badge",
-                  "role": "badge",
-                  "width": 40.0,
-                  "height": 40.0,
-                  "layout": "horizontal",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "cornerRadius": 6.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n41",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "04",
-                      "fontFamily": "IBM Plex Sans",
-                      "fontSize": 14.0,
-                      "fontWeight": 700,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#FCD535"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n42",
-                  "role": "heading",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "小批量交付",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 20.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.35,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FFFFFF"
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n43",
-                  "role": "body-text",
-                  "width": "fill_container",
-                  "height": "fit_content",
-                  "content": "同步设计、代码、测试、文档与证据。",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 14.0,
-                  "fontWeight": 400,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
-                  "textGrowth": "fixed-width",
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#929AA5"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "n44",
-                  "name": "04 Owner",
-                  "role": "tag",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "layout": "horizontal",
-                  "padding": [
-                    6.0,
-                    10.0
-                  ],
-                  "cornerRadius": 4.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n45",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "AI 工程",
+                      "content": "检查证据",
                       "fontFamily": "Noto Sans SC",
-                      "fontSize": 12.0,
-                      "fontWeight": 600,
+                      "fontSize": 16.0,
+                      "fontWeight": 500,
                       "letterSpacing": 0.0,
                       "lineHeight": 1.4,
+                      "textGrowth": "auto",
                       "fill": [
                         {
                           "type": "solid",
-                          "color": "#EAECEF"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "n10",
-              "name": "05 Learn",
-              "role": "card",
-              "width": "fill_container",
-              "height": "fill_container",
-              "layout": "vertical",
-              "gap": 16.0,
-              "padding": 24.0,
-              "cornerRadius": 12.0,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#1E2329"
-                }
-              ],
-              "stroke": {
-                "thickness": 1.0,
-                "fill": [
-                  {
-                    "type": "solid",
-                    "color": "#2B3139"
-                  }
-                ]
-              },
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "n34",
-                  "name": "05 Badge",
-                  "role": "badge",
-                  "width": 40.0,
-                  "height": 40.0,
-                  "layout": "horizontal",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "cornerRadius": 6.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n35",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "05",
-                      "fontFamily": "IBM Plex Sans",
-                      "fontSize": 14.0,
-                      "fontWeight": 700,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#FCD535"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n36",
-                  "role": "heading",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "content": "发布与学习",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 20.0,
-                  "fontWeight": 600,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.35,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#FFFFFF"
-                    }
-                  ]
-                },
-                {
-                  "type": "text",
-                  "id": "n37",
-                  "role": "body-text",
-                  "width": "fill_container",
-                  "height": "fit_content",
-                  "content": "观察真实使用，再决定继续、调整或停止。",
-                  "fontFamily": "Noto Sans SC",
-                  "fontSize": 14.0,
-                  "fontWeight": 400,
-                  "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
-                  "textGrowth": "fixed-width",
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#929AA5"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "n38",
-                  "name": "05 Owner",
-                  "role": "tag",
-                  "width": "fit_content",
-                  "height": "fit_content",
-                  "layout": "horizontal",
-                  "padding": [
-                    6.0,
-                    10.0
-                  ],
-                  "cornerRadius": 4.0,
-                  "fill": [
-                    {
-                      "type": "solid",
-                      "color": "#2B3139"
-                    }
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "n39",
-                      "role": "label",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "人与 AI 共判",
-                      "fontFamily": "Noto Sans SC",
-                      "fontSize": 12.0,
-                      "fontWeight": 600,
-                      "letterSpacing": 0.0,
-                      "lineHeight": 1.4,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "#EAECEF"
+                          "color": "$color.ink"
                         }
                       ]
                     }
@@ -881,72 +641,1032 @@
         },
         {
           "type": "frame",
-          "id": "op-skeleton-1788225583516354000-section-5",
-          "name": "Learning Signal",
+          "id": "op-skeleton-1788230707237425000-section-11",
+          "name": "Signature Workflow",
           "role": "section",
           "width": "fill_container",
-          "height": 96.0,
-          "layout": "horizontal",
-          "gap": 24.0,
+          "height": 606.0,
+          "layout": "vertical",
+          "gap": 20.0,
           "padding": [
-            24.0,
-            28.0
+            0.0,
+            64.0,
+            40.0,
+            64.0
           ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "cornerRadius": 12.0,
           "fill": [
             {
               "type": "solid",
-              "color": "#2B3139"
+              "color": "$color.canvas"
             }
           ],
           "children": [
             {
               "type": "frame",
-              "id": "n11",
-              "name": "Learning Copy",
-              "width": "fit_content",
+              "id": "n24",
+              "name": "Signature Row",
+              "width": "fill_container",
+              "height": 330.0,
+              "layout": "horizontal",
+              "gap": 20.0,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n25",
+                  "name": "Direction Signature Coral",
+                  "role": "card",
+                  "width": 820.0,
+                  "height": "fill_container",
+                  "layout": "horizontal",
+                  "gap": 36.0,
+                  "padding": 48.0,
+                  "alignItems": "center",
+                  "cornerRadius": 12.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.signature.coral"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n26",
+                      "name": "Direction Copy",
+                      "width": 320.0,
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 14.0,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n27",
+                          "name": "Direction Label",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "01 · 人类检查点",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.35,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.on.primary"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n28",
+                          "name": "Direction Title",
+                          "width": 320.0,
+                          "height": "fit_content",
+                          "content": "方向由人类确认",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 32.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.2,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.on.primary"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n29",
+                          "name": "Direction Body",
+                          "width": 300.0,
+                          "height": "fit_content",
+                          "content": "确认目标用户、核心问题、期望结果与风险边界。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.45,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.on.primary"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n30",
+                          "name": "Coral Secondary Button",
+                          "role": "button",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "padding": [
+                            12.0,
+                            18.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 12.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.canvas"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n31",
+                              "name": "Coral Button Label",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "Human checkpoint",
+                              "fontFamily": "Inter",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.3,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n32",
+                      "name": "Direction Evidence Panel",
+                      "width": "fill_container",
+                      "height": 234.0,
+                      "layout": "vertical",
+                      "gap": 2.0,
+                      "padding": 16.0,
+                      "cornerRadius": 10.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.canvas"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n33",
+                          "name": "Evidence Panel Title",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "方向确认记录",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 16.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.35,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n34",
+                          "name": "User",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "padding": [
+                            8.0,
+                            0.0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n35",
+                              "name": "User Index",
+                              "width": 26.0,
+                              "height": 26.0,
+                              "layout": "vertical",
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n36",
+                                  "name": "User Index Text",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "01",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11.0,
+                                  "fontWeight": 500,
+                                  "letterSpacing": 0.0,
+                                  "lineHeight": 1.0,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n37",
+                              "name": "User Label",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "目标用户与核心问题",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.35,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n38",
+                          "name": "Outcome",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "padding": [
+                            8.0,
+                            0.0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n39",
+                              "name": "Outcome Index",
+                              "width": 26.0,
+                              "height": 26.0,
+                              "layout": "vertical",
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n40",
+                                  "name": "Outcome Index Text",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "02",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11.0,
+                                  "fontWeight": 500,
+                                  "letterSpacing": 0.0,
+                                  "lineHeight": 1.0,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n41",
+                              "name": "Outcome Label",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "期望结果与成功信号",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.35,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n42",
+                          "name": "Boundary",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "padding": [
+                            8.0,
+                            0.0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n43",
+                              "name": "Boundary Index",
+                              "width": 26.0,
+                              "height": 26.0,
+                              "layout": "vertical",
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n44",
+                                  "name": "Boundary Index Text",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "03",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11.0,
+                                  "fontWeight": 500,
+                                  "letterSpacing": 0.0,
+                                  "lineHeight": 1.0,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n45",
+                              "name": "Boundary Label",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "范围、非目标与风险边界",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.35,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n46",
+                  "name": "Discovery Design Stack",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 20.0,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n47",
+                      "name": "Discovery Mint Card",
+                      "role": "card",
+                      "width": "fill_container",
+                      "height": 150.0,
+                      "layout": "vertical",
+                      "gap": 10.0,
+                      "padding": 24.0,
+                      "cornerRadius": 10.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.signature.mint"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n48",
+                          "name": "Discovery Label",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "02 · 发现",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 16.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.35,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n49",
+                          "name": "Discovery Body",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "整理证据、替代方案、假设与主要风险。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.45,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.body"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n50",
+                          "name": "Discovery Progress",
+                          "width": "fill_container",
+                          "height": 8.0,
+                          "layout": "horizontal",
+                          "gap": 6.0,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n51",
+                              "name": "Discovery Progress 1",
+                              "width": "fill_container",
+                              "height": 8.0,
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.primary"
+                                }
+                              ],
+                              "children": []
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n52",
+                              "name": "Discovery Progress 2",
+                              "width": 72.0,
+                              "height": 8.0,
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n53",
+                      "name": "Design Cream Card",
+                      "role": "card",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10.0,
+                      "padding": 24.0,
+                      "cornerRadius": 10.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.signature.cream"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n54",
+                          "name": "Design Label",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "03 · 设计",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 16.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.35,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n55",
+                          "name": "Design Body",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "专业工具形成可编辑方案、关键状态与预览。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.45,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.body"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n56",
+                          "name": "Design File",
+                          "width": "fill_container",
+                          "height": 44.0,
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "padding": [
+                            10.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.canvas"
+                            }
+                          ],
+                          "stroke": {
+                            "thickness": 1.0,
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n57",
+                              "name": "Design File Icon",
+                              "iconFontName": "file-pen-line",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n58",
+                              "name": "Design File Name",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "ai-native-product-loop.op",
+                              "fontFamily": "Inter",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.3,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n59",
+              "name": "Delivery Learning Row",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "horizontal",
+              "gap": 20.0,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n60",
+                  "name": "Delivery Forest Card",
+                  "role": "card",
+                  "width": 420.0,
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 14.0,
+                  "padding": 32.0,
+                  "cornerRadius": 12.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.signature.forest"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n61",
+                      "name": "Delivery Label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "04 · 交付",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.35,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "n62",
+                      "name": "Delivery Title",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "content": "证据随交付同步",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 24.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.3,
+                      "textGrowth": "fixed-width",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "n63",
+                      "name": "Delivery Body",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "content": "设计、代码、测试、文档与发布准备保持可追溯。",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.45,
+                      "textGrowth": "fixed-width",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n64",
+                  "name": "Learning Peach Card",
+                  "role": "card",
+                  "width": 360.0,
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12.0,
+                  "padding": 24.0,
+                  "cornerRadius": 10.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.signature.peach"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n65",
+                      "name": "Learning Label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "05 · 学习",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 16.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.35,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.ink"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "n66",
+                      "name": "Learning Body",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "content": "真实反馈与行为信号决定下一轮方向。",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.45,
+                      "textGrowth": "fixed-width",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.body"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n67",
+                      "name": "Learning Bars",
+                      "width": "fill_container",
+                      "height": 52.0,
+                      "layout": "horizontal",
+                      "gap": 8.0,
+                      "alignItems": "end",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n68",
+                          "name": "Bar 1",
+                          "width": "fill_container",
+                          "height": 22.0,
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.signature.cream"
+                            }
+                          ],
+                          "children": []
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n69",
+                          "name": "Bar 2",
+                          "width": "fill_container",
+                          "height": 36.0,
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.signature.yellow"
+                            }
+                          ],
+                          "children": []
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n70",
+                          "name": "Bar 3",
+                          "width": "fill_container",
+                          "height": 52.0,
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.primary"
+                            }
+                          ],
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n71",
+                  "name": "Validation Dark Card",
+                  "role": "card",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 14.0,
+                  "padding": 32.0,
+                  "cornerRadius": 12.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.surface.dark"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n72",
+                      "name": "Validation Label",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "LEARNING SIGNAL",
+                      "fontFamily": "Inter",
+                      "fontSize": 13.0,
+                      "fontWeight": 500,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.3,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "n73",
+                      "name": "Validation Title",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "content": "Done ≠ Validated",
+                      "fontFamily": "Inter",
+                      "fontSize": 28.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.2,
+                      "textGrowth": "fixed-width",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "n74",
+                      "name": "Validation Body",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "content": "完成交付不等于用户结果成立。",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.45,
+                      "textGrowth": "fixed-width",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.on.dark"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "op-skeleton-1788230707237432000-section-12",
+          "name": "Light CTA Footer",
+          "role": "footer",
+          "width": "fill_container",
+          "height": 146.0,
+          "layout": "horizontal",
+          "gap": 24.0,
+          "padding": [
+            32.0,
+            64.0
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.surface.strong"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n75",
+              "name": "Footer Copy",
+              "width": "fill_container",
               "height": "fit_content",
               "layout": "vertical",
               "gap": 6.0,
               "children": [
                 {
                   "type": "text",
-                  "id": "n12",
-                  "role": "heading",
-                  "width": "fit_content",
+                  "id": "n76",
+                  "name": "Footer Title",
+                  "width": "fill_container",
                   "height": "fit_content",
-                  "content": "真实用户证据 → 下一轮方向",
+                  "content": "设计、Issue、代码与 Git 历史保持一致",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 18.0,
-                  "fontWeight": 600,
+                  "fontSize": 28.0,
+                  "fontWeight": 400,
                   "letterSpacing": 0.0,
-                  "lineHeight": 1.4,
+                  "lineHeight": 1.2,
+                  "textGrowth": "fixed-width",
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#FFFFFF"
+                      "color": "$color.ink"
                     }
                   ]
                 },
                 {
                   "type": "text",
-                  "id": "n13",
-                  "role": "body-text",
-                  "width": 760.0,
+                  "id": "n77",
+                  "name": "Footer Caption",
+                  "width": "fill_container",
                   "height": "fit_content",
-                  "content": "代码合并代表 Done；只有结果证据支持假设，才是 Validated。",
+                  "content": "流程与设计系统验证画布 · 非产品功能定义",
                   "fontFamily": "Noto Sans SC",
-                  "fontSize": 13.0,
+                  "fontSize": 14.0,
                   "fontWeight": 400,
                   "letterSpacing": 0.0,
-                  "lineHeight": 1.5,
+                  "lineHeight": 1.35,
                   "textGrowth": "fixed-width",
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#929AA5"
+                      "color": "$color.body"
                     }
                   ]
                 }
@@ -954,72 +1674,44 @@
             },
             {
               "type": "frame",
-              "id": "n14",
-              "name": "Learning Badge",
-              "role": "badge",
+              "id": "n78",
+              "name": "Footer Primary",
+              "role": "button",
               "width": "fit_content",
               "height": "fit_content",
               "layout": "horizontal",
               "padding": [
-                10.0,
-                16.0
+                13.0,
+                22.0
               ],
-              "cornerRadius": 6.0,
+              "alignItems": "center",
+              "cornerRadius": 12.0,
               "fill": [
                 {
                   "type": "solid",
-                  "color": "#FCD535"
+                  "color": "$color.primary"
                 }
               ],
               "children": [
                 {
                   "type": "text",
-                  "id": "n15",
-                  "role": "label",
+                  "id": "n79",
+                  "name": "Footer Primary Label",
                   "width": "fit_content",
                   "height": "fit_content",
-                  "content": "LEARN → ITERATE",
-                  "fontFamily": "IBM Plex Sans",
-                  "fontSize": 13.0,
-                  "fontWeight": 700,
+                  "content": "查看交付证据",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 16.0,
+                  "fontWeight": 500,
+                  "letterSpacing": 0.0,
                   "lineHeight": 1.4,
+                  "textGrowth": "auto",
                   "fill": [
                     {
                       "type": "solid",
-                      "color": "#181A20"
+                      "color": "$color.on.primary"
                     }
                   ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "op-skeleton-1788225583516359000-section-6",
-          "name": "Footnote",
-          "role": "footer",
-          "width": "fill_container",
-          "height": 18.0,
-          "layout": "horizontal",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "n5",
-              "role": "caption",
-              "width": "fit_content",
-              "height": "fit_content",
-              "content": "工具链验证画布 · 非产品界面 · 可编辑源文件由 Git 管理",
-              "fontFamily": "Noto Sans SC",
-              "fontSize": 12.0,
-              "fontWeight": 500,
-              "letterSpacing": 0.0,
-              "lineHeight": 1.4,
-              "fill": [
-                {
-                  "type": "solid",
-                  "color": "#707A8A"
                 }
               ]
             }
@@ -1028,6 +1720,116 @@
       ]
     }
   ],
+  "designMd": {
+    "raw": "---\nversion: alpha\nname: Airtable-design-analysis\ndescription: A sober, editorial workflow-software interface anchored on white canvas and dark-ink type, where brand voltage comes from full-bleed signature cards in coral, dark green, peach, and dark navy that punctuate long-scroll explainer pages. Primary actions use a near-black pill CTA; secondary actions sit in a white outlined button. Type runs Haas Grotesk in modest weights — never bold for its own sake.\n\ncolors:\n  primary: \"#181d26\"\n  primary-active: \"#0d1218\"\n  ink: \"#181d26\"\n  body: \"#333840\"\n  muted: \"#41454d\"\n  hairline: \"#dddddd\"\n  border-strong: \"#9297a0\"\n  canvas: \"#ffffff\"\n  surface-soft: \"#f8fafc\"\n  surface-strong: \"#e0e2e6\"\n  surface-dark: \"#181d26\"\n  surface-dark-elevated: \"#1d1f25\"\n  signature-coral: \"#aa2d00\"\n  signature-forest: \"#0a2e0e\"\n  signature-cream: \"#f5e9d4\"\n  signature-peach: \"#fcab79\"\n  signature-mint: \"#a8d8c4\"\n  signature-yellow: \"#f4d35e\"\n  signature-mustard: \"#d9a441\"\n  on-primary: \"#ffffff\"\n  on-dark: \"#ffffff\"\n  link: \"#1b61c9\"\n  link-active: \"#1a3866\"\n  info: \"#254fad\"\n  info-border: \"#458fff\"\n  success: \"#006400\"\n  success-border: \"#39bf45\"\n  pricing-ink: \"#1d1f25\"\n\ntypography:\n  display-xl:\n    fontFamily: \"Haas Groot Disp, Haas, sans-serif\"\n    fontSize: 48px\n    fontWeight: 500\n    lineHeight: 1.1\n    letterSpacing: 0\n  display-lg:\n    fontFamily: \"Haas Groot Disp, Haas, sans-serif\"\n    fontSize: 40px\n    fontWeight: 400\n    lineHeight: 1.2\n    letterSpacing: 0\n  display-md:\n    fontFamily: \"Haas Groot Disp, Haas, sans-serif\"\n    fontSize: 32px\n    fontWeight: 400\n    lineHeight: 1.2\n    letterSpacing: 0\n  title-lg:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 24px\n    fontWeight: 400\n    lineHeight: 1.35\n    letterSpacing: 0.12px\n  title-md:\n    fontFamily: \"Haas Groot Disp, Haas, sans-serif\"\n    fontSize: 20px\n    fontWeight: 400\n    lineHeight: 1.5\n    letterSpacing: 0\n  title-sm:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 18px\n    fontWeight: 500\n    lineHeight: 1.4\n    letterSpacing: 0\n  label-md:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 16px\n    fontWeight: 500\n    lineHeight: 1.4\n    letterSpacing: 0\n  button:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 16px\n    fontWeight: 500\n    lineHeight: 1.4\n    letterSpacing: 0\n  body-md:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 14px\n    fontWeight: 400\n    lineHeight: 1.25\n    letterSpacing: 0\n  caption:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 14px\n    fontWeight: 500\n    lineHeight: 1.35\n    letterSpacing: 0.16px\n  legal:\n    fontFamily: \"Haas, sans-serif\"\n    fontSize: 13.12px\n    fontWeight: 600\n    lineHeight: 1.2\n    letterSpacing: 0\n  pricing-display:\n    fontFamily: \"Inter Display, system-ui, sans-serif\"\n    fontSize: 44.8px\n    fontWeight: 475\n    lineHeight: 1.1\n    letterSpacing: 0\n  pricing-section:\n    fontFamily: \"Inter Display, system-ui, sans-serif\"\n    fontSize: 28px\n    fontWeight: 475\n    lineHeight: 1.2\n    letterSpacing: 0\n  pricing-card-title:\n    fontFamily: \"Inter Display, system-ui, sans-serif\"\n    fontSize: 20px\n    fontWeight: 475\n    lineHeight: 1.3\n    letterSpacing: 0\n\nrounded:\n  xs: 2px\n  sm: 6px\n  md: 10px\n  lg: 12px\n  pill: 9999px\n  full: 9999px\n\nspacing:\n  xxs: 4px\n  xs: 8px\n  sm: 12px\n  md: 16px\n  lg: 24px\n  xl: 32px\n  xxl: 48px\n  section: 96px\n\ncomponents:\n  button-primary:\n    backgroundColor: \"{colors.primary}\"\n    textColor: \"{colors.on-primary}\"\n    typography: \"{typography.button}\"\n    rounded: \"{rounded.lg}\"\n    padding: 16px 24px\n  button-primary-active:\n    backgroundColor: \"{colors.primary-active}\"\n    textColor: \"{colors.on-primary}\"\n    rounded: \"{rounded.lg}\"\n  button-secondary:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.button}\"\n    rounded: \"{rounded.lg}\"\n    padding: 16px 24px\n  button-secondary-on-dark:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.button}\"\n    rounded: \"{rounded.lg}\"\n    padding: 16px 24px\n  button-legal:\n    backgroundColor: \"{colors.link}\"\n    textColor: \"{colors.on-primary}\"\n    typography: \"{typography.legal}\"\n    rounded: \"{rounded.xs}\"\n    padding: 12px 10px\n  button-icon-circular:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    rounded: \"{rounded.full}\"\n    size: 40px\n  button-pricing-pill:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.pricing-ink}\"\n    typography: \"{typography.button}\"\n    rounded: \"{rounded.pill}\"\n    padding: 12px 24px\n  text-link:\n    backgroundColor: transparent\n    textColor: \"{colors.link}\"\n    typography: \"{typography.body-md}\"\n  top-nav:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.body-md}\"\n    height: 64px\n  hero-band:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.display-lg}\"\n    padding: 96px\n  signature-coral-card:\n    backgroundColor: \"{colors.signature-coral}\"\n    textColor: \"{colors.on-primary}\"\n    typography: \"{typography.display-md}\"\n    rounded: \"{rounded.lg}\"\n    padding: 48px\n  signature-forest-card:\n    backgroundColor: \"{colors.signature-forest}\"\n    textColor: \"{colors.on-primary}\"\n    typography: \"{typography.display-md}\"\n    rounded: \"{rounded.lg}\"\n    padding: 48px\n  hero-card-dark:\n    backgroundColor: \"{colors.surface-dark}\"\n    textColor: \"{colors.on-dark}\"\n    typography: \"{typography.display-md}\"\n    rounded: \"{rounded.lg}\"\n    padding: 48px\n  feature-card-tabbed:\n    backgroundColor: \"{colors.surface-soft}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.title-lg}\"\n    rounded: \"{rounded.lg}\"\n    padding: 32px\n  cream-callout-card:\n    backgroundColor: \"{colors.signature-cream}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.title-lg}\"\n    rounded: \"{rounded.md}\"\n    padding: 24px\n  demo-grid-card:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.label-md}\"\n    rounded: \"{rounded.md}\"\n    padding: 16px\n  logo-strip:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.muted}\"\n    typography: \"{typography.body-md}\"\n    padding: 32px\n  article-card:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.title-sm}\"\n    rounded: \"{rounded.md}\"\n    padding: 16px\n  topic-filter-rail:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.body}\"\n    typography: \"{typography.body-md}\"\n    width: 240px\n  text-input:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.body-md}\"\n    rounded: \"{rounded.sm}\"\n    padding: 12px 16px\n    height: 44px\n  text-input-focus:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.ink}\"\n    rounded: \"{rounded.sm}\"\n  pricing-tier-card:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.pricing-ink}\"\n    typography: \"{typography.pricing-card-title}\"\n    rounded: \"{rounded.md}\"\n    padding: 32px\n  pricing-tier-card-featured:\n    backgroundColor: \"{colors.surface-soft}\"\n    textColor: \"{colors.pricing-ink}\"\n    typography: \"{typography.pricing-card-title}\"\n    rounded: \"{rounded.md}\"\n    padding: 32px\n  pricing-comparison-row:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.body}\"\n    typography: \"{typography.body-md}\"\n    padding: 12px\n  cta-band-light:\n    backgroundColor: \"{colors.surface-strong}\"\n    textColor: \"{colors.ink}\"\n    typography: \"{typography.display-md}\"\n    rounded: \"{rounded.lg}\"\n    padding: 48px\n  footer:\n    backgroundColor: \"{colors.canvas}\"\n    textColor: \"{colors.body}\"\n    typography: \"{typography.body-md}\"\n    padding: 64px\n---\n\n## Overview\n\nAirtable's marketing surfaces are quietly editorial. The base atmosphere is white canvas, dark ink type, generous whitespace, and a near-black pill CTA — nothing is fighting for attention until a section needs to. The brand voltage doesn't come from gradient washes or accent walls; it comes from **full-bleed signature cards** in `{colors.signature-coral}`, `{colors.signature-forest}`, and `{colors.surface-dark}` that punctuate long-scroll explainer pages every two or three screens. Between those signature bands, the page reads like a print magazine: a headline, supporting copy, a small image cluster, then breathing room.\n\nType voice is Haas Grotesk at modest weights (400 for display, 500 for sub-titles and buttons). Display headlines never go bolder than 500 — emphasis comes from size and color contrast, not from weight. Body copy stays at 14px / 400 throughout. The pricing surface runs its own dialect: **Inter Display** at unusual mid-weights (475 / 575) and **pill-shaped buttons** (`{rounded.pill}`) that don't appear on any other page — a deliberate sub-system signaling \"this page is about commercial precision.\"\n\n**Key Characteristics:**\n- Primary CTA is `{colors.primary}` (near-black ink) with white text and a `{rounded.lg}` (12px) corner — it reads as confident and final, never decorative.\n- Secondary CTA is a `{colors.canvas}` button with `{colors.ink}` text and a hairline outline. The two together form Airtable's signature button pair.\n- Hero is white canvas. There is no atmospheric gradient, no mesh, no background flourish. The brand strength comes from the type and the buttons sitting in clean whitespace.\n- Brand voltage lives in **signature surface cards**: `{colors.signature-coral}`, `{colors.signature-forest}`, and `{colors.surface-dark}` carry full-bleed product callouts every few screens.\n- Demo-card grids carry product UI fragments on `{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-cream}` and other warm pastel surfaces.\n- Section rhythm: white canvas → coral signature card → white body → cream callout band → dark navy CTA → light gray CTA banner → footer. The canvas resets between every signature surface.\n- Border radius is hierarchical: `{rounded.lg}` (12px) for primary CTAs and large signature cards, `{rounded.md}` (10px) for content cards and demo grids, `{rounded.sm}` (6px) for inputs, `{rounded.full}` for icon buttons. Pricing buttons jump to `{rounded.pill}` to mark themselves as a separate dialect.\n- Vertical rhythm is `{spacing.section}` (96px) between major bands — universal across every page.\n\n## Colors\n\n### Brand & Accent\n- **Primary** (`{colors.primary}` — #181d26): The dominant brand color. Used for the primary CTA background, h1/h2 display type, and the `{component.surface-dark}` band. Not \"blue, then black\" — black IS the primary throughout the marketing system.\n- **Primary Active** (`{colors.primary-active}` — #0d1218): The press state on primary buttons.\n\n### Surface\n- **Canvas** (`{colors.canvas}` — #ffffff): The default page surface; the floor of every editorial body.\n- **Surface Soft** (`{colors.surface-soft}` — #f8fafc): Tabbed feature cards and the featured pricing tier.\n- **Surface Strong** (`{colors.surface-strong}` — #e0e2e6): The light gray \"Start building with Airtable\" CTA banner near the footer.\n- **Surface Dark** (`{colors.surface-dark}` — #181d26): The dark navy CTA cards used mid-page (for example \"The path to 10× every person in your organization\").\n- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #1d1f25): The articles-page hero base behind the rainbow-stripe overlay.\n- **Hairline** (`{colors.hairline}` — #dddddd): The 1px border tone for input outlines, table dividers, secondary-button outlines.\n\n### Text\n- **Ink** (`{colors.ink}` — #181d26): The strongest text — h1/h2 display type and primary button text-on-light. Same hex as `{colors.primary}` because they are the same role expressed at type and button layers.\n- **Body** (`{colors.body}` — #333840): The default running-text color.\n- **Muted** (`{colors.muted}` — #41454d): Footer links, breadcrumbs, captions.\n- **Border Strong** (`{colors.border-strong}` — #9297a0): The 1px outline color on disabled secondary buttons.\n- **On Primary / On Dark** (`{colors.on-primary}` — #ffffff): The text color on primary buttons and dark surfaces.\n\n### Signature Card Surfaces\nThese are the colors that carry Airtable's brand voltage. They appear as full-bleed, full-card surfaces — never as accents on a small element.\n- **Coral** (`{colors.signature-coral}` — #aa2d00): The largest signature card on the homepage (\"Production apps in prototype speed\"). Full-bleed dark coral with white type.\n- **Forest** (`{colors.signature-forest}` — #0a2e0e): A deep-green signature card used in the homepage demo-grid cluster.\n- **Cream** (`{colors.signature-cream}` — #f5e9d4): The cream callout band (\"The path to 10× every person in your organization\") — a soft beige surface holding dark type and product UI fragments.\n- **Peach** (`{colors.signature-peach}` — #fcab79), **Mint** (`{colors.signature-mint}` — #a8d8c4), **Yellow** (`{colors.signature-yellow}` — #f4d35e), **Mustard** (`{colors.signature-mustard}` — #d9a441): Demo-card surfaces that carry small product UI fragments inside the multi-card grid sections.\n\n### Semantic\n- **Link** (`{colors.link}` — #1b61c9): Inline body links and anchor text. Darker on press to `{colors.link-active}` (#1a3866). Despite the `--theme_button-background-primary` CSS-variable name, this color is **not** the primary button color — it is the link color.\n- **Info** (`{colors.info}` — #254fad) and **Info Border** (`{colors.info-border}` — #458fff): Inline info badges and focused-input outline.\n- **Success** (`{colors.success}` — #006400) and **Success Border** (`{colors.success-border}` — #39bf45): Confirmation states.\n\n## Typography\n\n### Font Family\nThe system runs **Haas / Haas Groot Disp** (Airtable's licensed display + text type). Haas Groot Disp covers display sizes (h1 / h2); Haas Grotesk covers everything 24px and below. The fallback stack walks `-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Fira Sans\", \"Droid Sans\", \"Helvetica Neue\", sans-serif`.\n\nThe pricing surface runs a separate **Inter Display** stack at mid-weights (475 / 575) — a deliberate sub-system signaling commercial precision.\n\n### Hierarchy\n\n| Token | Size | Weight | Line Height | Letter Spacing | Use |\n|---|---|---|---|---|---|\n| `{typography.display-xl}` | 48px | 500 | 1.1 | 0 | Articles page h2 — second-tier editorial headline |\n| `{typography.display-lg}` | 40px | 400 | 1.2 | 0 | Homepage h1 hero |\n| `{typography.display-md}` | 32px | 400 | 1.2 | 0 | Platform-page h2 — feature-section headlines |\n| `{typography.title-lg}` | 24px | 400 | 1.35 | 0.12px | Section titles |\n| `{typography.title-md}` | 20px | 400 | 1.5 | 0 | Sub-section titles in tabbed feature cards |\n| `{typography.title-sm}` | 18px | 500 | 1.4 | 0 | Article-card titles |\n| `{typography.label-md}` | 16px | 500 | 1.4 | 0 | Demo-card titles, list labels |\n| `{typography.button}` | 16px | 500 | 1.4 | 0 | Standard CTA button labels |\n| `{typography.body-md}` | 14px | 400 | 1.25 | 0 | Body copy, footer links, top-nav items |\n| `{typography.caption}` | 14px | 500 | 1.35 | 0.16px | Light captions and meta text |\n| `{typography.legal}` | 13.12px | 600 | 1.2 | 0 | Cookie/legal CTA buttons |\n| `{typography.pricing-display}` | 44.8px | 475 | 1.1 | 0 | Pricing-page h1 |\n| `{typography.pricing-section}` | 28px | 475 | 1.2 | 0 | Pricing-page section heads |\n| `{typography.pricing-card-title}` | 20px | 475 | 1.3 | 0 | Pricing tier card plan name |\n\n### Principles\nThe Haas system prefers weight 400 for display sizes — a 40px h1 is **not** bold. Visual emphasis is delegated to size, color contrast, and the signature surface cards. Where the system does want weight, it pivots to 500 (sub-titles, buttons, article titles), never 600 or 700 in the editorial body. The only true bold (600) lives in `{typography.legal}` — a sign that boldness is reserved for terms-of-service surfaces, not marketing.\n\nThe pricing-page sub-system uses Inter Display at `font-weight: 475` — a custom mid-weight between regular (400) and medium (500), shipped as a variable font.\n\n### Note on Font Substitutes\nIf Haas Groot Disp and Haas Grotesk are unavailable, **Inter Display** (variable) is the closest open-source substitute for both — adjust line-height down by ~5% to match Haas's tighter cap-height. For the pricing sub-system, use Inter Display directly. On macOS / iOS, **system-ui** is sufficient; on Windows, the chain falls through to Segoe UI, which is a usable but slightly cooler substitute.\n\n## Layout\n\n### Spacing System\n- **Base unit:** 4px (all spacing snaps to 4-multiples).\n- **Tokens:** `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 16px · `{spacing.lg}` 24px · `{spacing.xl}` 32px · `{spacing.xxl}` 48px · `{spacing.section}` 96px.\n- **Section padding (vertical):** `{spacing.section}` (96px) is the universal vertical rhythm constant — every major editorial band on every page uses 96px top + 96px bottom internal padding.\n- **Card internal padding:** `{spacing.xl}` (32px) for tabbed feature cards and pricing tier cards; `{spacing.xxl}` (48px) inside signature coral / forest / dark cards; `{spacing.lg}` (24px) for cream callouts and demo-grid cards.\n- **Gutters:** `{spacing.lg}` (24px) between cards in 3-up grids; `{spacing.md}` (16px) inside denser logo strips and footer column gutters.\n\n### Grid & Container\n- **Max content width:** ~1280px centered, with `{spacing.xxl}` (48px) horizontal breathing room.\n- **Editorial body:** Single 8/12-column at large breakpoints, collapsing to single-column on mobile.\n- **Demo-card grids:** 3 or 4 columns at desktop, 2 at tablet, 1 at mobile. Card sizes are deliberately uneven within the grid to dodge a uniform \"spec sheet\" feel.\n- **Logo strip:** 6 monochrome partner logos in a single row at desktop; wraps to 3-up on mobile.\n\n### Whitespace Philosophy\nAirtable uses whitespace as the dominant atmospheric tool. Hero sections sit in 96px+ of pure whitespace above and below the headline + sub-headline pair, with no decoration in that whitespace. The hero is intentionally calm — there is no gradient, no aurora, no atmospheric mesh behind the type. The system trusts whitespace alone to do the framing.\n\n## Elevation & Depth\n\n| Level | Treatment | Use |\n|---|---|---|\n| Flat | No shadow, no border | Body sections, top nav, footer |\n| Soft hairline | 1px `{colors.hairline}` border | Inputs, sub-nav rails, comparison-table dividers, secondary buttons |\n| Button rest | Soft drop with subtle blue-tinted glow at low alpha | Primary CTA buttons (the blue tint is a holdover from the link color and reads as a faint accent under the dark button) |\n| Button focus | Outer 2px blue ring at higher alpha | Keyboard focus state on primary buttons |\n| Card flat | No shadow; relies on color contrast against the surface band | Signature coral / forest / dark cards, cream callouts, demo-grid cards |\n\nThe elevation philosophy is **color-block first, shadow second**. Shadows are minimal; depth is delegated to the contrast between white canvas and signature surface cards. There is no soft-glow / atmospheric-shadow / heavy-elevation language anywhere in the marketing system.\n\n### Decorative Depth\n- **Vertical rainbow stripes** appear on the articles hero only — multi-color vertical bands sitting on `{colors.surface-dark-elevated}`. This is a single-page treatment, not a system-wide signature.\n- **Photography-as-depth** in the demo-card grid: every card carries a real product UI screenshot or mockup, contributing depth through legible artifact density rather than decorative effects.\n\n## Shapes\n\n### Border Radius Scale\n\n| Token | Value | Use |\n|---|---|---|\n| `{rounded.xs}` | 2px | Cookie-consent and legal CTA buttons — system-required surfaces |\n| `{rounded.sm}` | 6px | Text inputs, small inline buttons |\n| `{rounded.md}` | 10px | Secondary content cards, article cards, cream callouts |\n| `{rounded.lg}` | 12px | Primary CTA buttons, signature surface cards, tabbed feature cards |\n| `{rounded.pill}` | 9999px | Pricing-page CTA buttons (sub-system only) |\n| `{rounded.full}` | 9999px / 50% | Circular icon buttons, avatar surfaces |\n\n### Photography Geometry\nProduct UI screenshots inside demo-card grids retain native aspect ratios (typically 4:3 or 16:10) and crop into `{rounded.md}` containers. Hero illustrations bleed full-width with no rounding. Article-card thumbnails use 16:9 with `{rounded.md}` corners. Avatars in testimonials use `{rounded.full}` (perfect circles). Pricing comparison table images stay rectangular with no rounding.\n\n## Components\n\n> **No hover states documented.** Per the global no-hover policy (Step 6), every component spec below documents only Default and Active/Pressed states. Variants live as separate entries in the `components:` front matter.\n\n**`top-nav`** — A 64px-tall white bar pinned to the top of every page. Airtable wordmark sits at left; primary horizontal menu (Platform, Solutions, Resources, Enterprise, Pricing) sits center-left in `{typography.body-md}`; the right cluster carries a \"Book Demo\" outline link, \"Sign up for free\" `{component.button-primary}`, and \"Log In\" text link. The nav stays light on every page — Airtable does not invert the nav over dark sections.\n\n### Buttons\n\n**`button-primary`** — The signature primary CTA. Background `{colors.primary}` (near-black), text `{colors.on-primary}`, type `{typography.button}`, padding 16px × 24px, rounded `{rounded.lg}` (12px). This is the \"Get started for free\" / \"Sign up for free\" button visible on every hero. It reads as confident and final — not decorative — which is why the system uses it sparingly (one per viewport).\n- Active state: `button-primary-active` darkens to `{colors.primary-active}` (#0d1218).\n\n**`button-secondary`** — White outline button (e.g. \"Book demo\"). Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.button}`, rounded `{rounded.lg}` (12px), 1px hairline outline. Sits next to `{component.button-primary}` as the \"less-committed\" choice.\n\n**`button-secondary-on-dark`** — Same shape as `{component.button-secondary}` but used on signature coral / forest / dark surfaces. Background `{colors.canvas}`, text `{colors.ink}` — the white button stays white over dark surfaces because the system never inverts to a translucent on-dark style on the marketing site.\n\n**`button-pricing-pill`** — The pricing-page CTA family. Background `{colors.canvas}`, text `{colors.pricing-ink}`, rounded `{rounded.pill}` (9999px), padding 12px × 24px. The only place pill-shape appears in the marketing system. Treat it as part of the pricing sub-system signaling.\n\n**`button-legal`** — Cookie-consent and legal-banner CTAs. Background `{colors.link}`, text `{colors.on-primary}`, type `{typography.legal}` (13.12px / 600), rounded `{rounded.xs}` (2px), padding 12px × 10px. The 2px corner radius and 600 weight signal \"this is a required system surface,\" not a designed brand surface.\n\n**`button-icon-circular`** — 40px × 40px circular button with `{colors.canvas}` background, hairline border, and `{colors.ink}` icon. Used for carousel controls, \"share\", and \"back\" affordances.\n\n**`text-link`** — Inline body links in `{colors.link}` (#1b61c9, the actual link blue). No underline by default. Type inherits `{typography.body-md}`.\n\n### Cards & Containers\n\n**`hero-band`** — The full-page-width white-canvas hero. No surface card, no border, no shadow, no atmospheric gradient — just the headline, sub-headline, and primary + secondary button pair sitting in 96px of whitespace. Vertical padding `{spacing.section}` (96px).\n\n**`signature-coral-card`** — The large full-bleed coral card on the homepage (\"Production apps in prototype speed\"). Background `{colors.signature-coral}` (#aa2d00, a dark coral / oxide red), text `{colors.on-primary}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xxl}` (48px). Carries an h2 in `{typography.display-md}`, supporting copy in `{typography.body-md}`, and `{component.button-secondary-on-dark}` as the CTA.\n\n**`signature-forest-card`** — A deep green signature card (`{colors.signature-forest}` — #0a2e0e) used as a demo-grid sibling to the coral card on the homepage.\n\n**`hero-card-dark`** — The dark navy mid-page CTA card (e.g. \"The path to 10× every person in your organization\"). Background `{colors.surface-dark}` (#181d26), text `{colors.on-dark}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xxl}` (48px). The same color as `{colors.primary}` because the system uses ink as both type color and signature dark surface.\n\n**`feature-card-tabbed`** — Light-cream cards (e.g. the \"Coke / Pelosi / Conde Nast / Time Inc\" tabbed feature card on the homepage). Background `{colors.surface-soft}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xl}` (32px). Left rail carries vertically-stacked tab labels in `{typography.title-md}`; right pane shows the active tab's content (illustration + body copy + small CTA).\n\n**`cream-callout-card`** — Beige callout cards (`{colors.signature-cream}`). Rounded `{rounded.md}` (10px), internal padding `{spacing.lg}` (24px). Carry product UI fragments or stat callouts — softer than the dark/coral signature cards but still a deliberate brand surface.\n\n**`demo-grid-card`** — Used in multi-card grids that punctuate every page. Background `{colors.canvas}` or one of the demo-grid surfaces (`{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-yellow}`, `{colors.signature-mustard}`), rounded `{rounded.md}` (10px), internal padding `{spacing.md}` (16px). Each card frames a product UI fragment. Card heights vary deliberately to dodge a uniform \"spec sheet\" feel.\n\n**`logo-strip`** — Horizontal monochrome partner-logo row (HBO, Netflix, Amazon, Time, Conde Nast). Logos render in `{colors.muted}`, surface is `{colors.canvas}`, vertical padding `{spacing.xl}` (32px). 6 logos at desktop, 3 at mobile.\n\n**`article-card`** — The trending-stories grid on the articles page. Background `{colors.canvas}`, rounded `{rounded.md}` (10px), internal padding `{spacing.md}` (16px). Each card carries a colorful illustrated thumbnail (16:9), a small uppercase category tag, an `{typography.title-sm}` title, and a meta line. 3-up at desktop.\n\n**`topic-filter-rail`** — The left rail on the articles page. 240px wide, `{colors.canvas}` background, `{typography.body-md}`, vertically grouped category headings (\"Marketing\", \"Product\", \"Project management\", \"Operations\") with sub-bullets. Active item carries a small numeric count badge.\n\n### Inputs & Forms\n\n**`text-input`** — Standard text input. Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body-md}`, rounded `{rounded.sm}` (6px), padding 12px × 16px, height 44px. 1px hairline border in `{colors.hairline}`.\n\n**`text-input-focus`** — Focus state. Border thickens or recolors to `{colors.info-border}`.\n\n### Pricing Sub-System\n\n**`pricing-tier-card`** — Standard tier card. Background `{colors.canvas}`, text `{colors.pricing-ink}`, type `{typography.pricing-card-title}` for the plan name, rounded `{rounded.md}` (10px), internal padding `{spacing.xl}` (32px). Carries the plan name, a price block in `{typography.pricing-display}` (44.8px / 475), feature checklist, and a `{component.button-pricing-pill}` at the bottom.\n\n**`pricing-tier-card-featured`** — The featured tier (typically \"Team\" or \"Business\"). Background shifts to `{colors.surface-soft}`. No accent border, no badge — the background tone shift is the only signal.\n\n**`pricing-comparison-row`** — Each row of the long comparison table at the bottom of the pricing page. Labels in the left column; checkmarks or values across 4 plan columns. 12px vertical padding per row, hairline divider between rows.\n\n### Navigation Variants\n\n**`footer`** — Light surface (`{colors.canvas}`), 6-column link list at desktop covering Platform / Solutions / Resources / Learn / Company sub-trees. Vertical padding `{spacing.section}` divided across upper link block and lower legal row. Type `{typography.body-md}`.\n\n**`cta-band-light`** — The light gray \"Start building with Airtable\" CTA strip near the footer. Background `{colors.surface-strong}` (#e0e2e6), text `{colors.ink}`, rounded `{rounded.lg}` (12px), padding `{spacing.xxl}` (48px). Carries an h2 in `{typography.display-md}` and a `{component.button-primary}`.\n\n### Signature Components\n\n**Articles Vertical Rainbow Stripe Hero** — The articles-page hero treatment. Multi-color vertical bands at varying widths sitting on `{colors.surface-dark-elevated}`. The h1 + sub-head + CTA cluster sits center-left on top of the stripes. This is a single-page hero treatment, not a system-wide signature — do not promote it to a multi-page pattern.\n\n## Do's and Don'ts\n\n### Do\n- Keep `{component.button-primary}` near-black. The brand's primary CTA is `{colors.primary}`, not the link blue. Mixing them up turns a confident hero into a confused one.\n- Reserve `{component.button-primary}` for one primary action per viewport. The system is designed for scarcity at the brand-action layer.\n- Use `{component.button-secondary}` (white with hairline outline) as the natural pair with `{component.button-primary}`. The two together form Airtable's signature button row.\n- Trust whitespace as the hero atmosphere. Hero bands are intentionally calm — no gradient, no mesh, no atmospheric backdrop. Going against this reads as off-brand.\n- Use `{component.signature-coral-card}`, `{component.signature-forest-card}`, and `{component.hero-card-dark}` to break editorial monotony. These are the brand's voltage moments.\n- Keep `{component.demo-grid-card}` heights uneven within a grid. Uniform heights feel like a spec sheet.\n- Treat the pricing surface as its own dialect: keep `{typography.pricing-display}`, `{typography.pricing-card-title}`, and `{component.button-pricing-pill}` together. Mixing them with Haas Grotesk button type breaks the sub-system's voice.\n- Anchor every editorial band with `{spacing.section}` (96px) vertical padding.\n\n### Don't\n- Don't make `{colors.link}` (#1b61c9) the primary button color. It is the link color. The primary button is `{colors.primary}` (#181d26, near-black). Treating link-blue as the brand action is the most common mistake when reading Airtable's CSS variables.\n- Don't add a gradient backdrop to the hero. Airtable's hero is white, full stop. Mesh, aurora, spotlight gradients all read as \"another SaaS template\" — not Airtable.\n- Don't bold display-weight type. `{typography.display-xl}` and `{typography.display-lg}` are intentionally weight 400 / 500 — going to 700 reads as marketing-page-template.\n- Don't use `{rounded.pill}` outside the pricing surface. It's a sub-system signal, not a general radius option.\n- Don't repeat the same surface mode in two consecutive bands. The editorial pacing depends on rhythm: white → signature card → white → cream → dark → white. Two whites in a row read as a typography blog.\n- Don't add hover state styling beyond what the system already encodes. The system documents Default and Active/Pressed only.\n- Don't introduce additional accent colors beyond the documented signature card palette. The system's voltage already uses coral, forest, dark navy, cream, peach, mint, yellow, and mustard.\n\n## Responsive Behavior\n\n### Breakpoints\n\n| Name | Width | Key Changes |\n|---|---|---|\n| Mobile | < 768px | Single-column body; top nav collapses to hamburger; demo-grid drops to 1-up; signature cards stay full-bleed; logo strip wraps to 2 rows; footer collapses to single-column |\n| Tablet | 768–1024px | 2-up demo-grid; top nav stays horizontal but tightens; cream-callout cards stack 2-up; pricing comparison table becomes horizontally scrollable |\n| Desktop | 1024–1440px | 3-up demo-grid (and 4-up for tighter content); full top-nav with all menu items visible; pricing tier cards render 4-across |\n| Wide | > 1440px | Same as Desktop with more outer breathing room; max content width caps at ~1280px and the page adds outer margin rather than scaling type up |\n\n### Touch Targets\n- `{component.button-primary}` and siblings render at 48 × 48px minimum (16px vertical padding + 16px line-height) — comfortably above WCAG AAA's 44 × 44.\n- `{component.button-icon-circular}` is exactly 40 × 40px — slightly under WCAG's recommended 44, but the centered icon and dot-radius compensate visually.\n- `{component.text-input}` height is 44px.\n\n### Collapsing Strategy\n- Top nav collapses to a hamburger at < 768px; the menu opens as a full-screen sheet rather than a dropdown.\n- Card grids reduce columns rather than scaling cards down.\n- The `{component.feature-card-tabbed}` re-stacks the tab rail above the content pane on mobile.\n- The pricing comparison table converts to horizontally-scrollable swipe at < 1024px; the four plan headers stay visible while body rows scroll.\n\n### Image Behavior\n- Demo-card UI screenshots crop to fit their container rather than scaling up.\n- Hero illustrations bleed full-width on mobile, losing horizontal margin.\n- Signature card images (inside coral / forest / dark cards) compress to their card width without cropping.\n\n## Iteration Guide\n\n1. Focus on ONE component at a time. Reference its YAML key directly (`{component.button-primary}`, `{component.signature-coral-card}`).\n2. When adding a new component, decide first which sub-system it belongs to: the main editorial system (Haas, `{rounded.lg}`/`{rounded.md}`) or the pricing sub-system (Inter Display, `{rounded.pill}`).\n3. Variants of an existing component (`-active`, `-disabled`, `-focus`) live as separate entries in `components:` — never as nested state objects.\n4. Use `{token.refs}` everywhere prose mentions a color, a radius, a typography role, or a spacing value. Hex codes appear at most once next to the reference.\n5. Never document hover. The system documents Default and Active/Pressed states only.\n6. Run `npx @google/design.md lint DESIGN.md` after edits — `broken-ref`, `contrast-ratio`, and `orphaned-tokens` warnings flag issues automatically.\n7. When in doubt about emphasis: bigger type before bolder type, signature surface card before solid accent.\n\n## Known Gaps\n\n- The exact hex values of pastel demo-grid surfaces (`{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-yellow}`, `{colors.signature-mustard}`) are inferred from screenshot pixel sampling. Some product launches may swap these surfaces seasonally.\n- Hover behavior across all components is not documented (per global no-hover policy).\n- Animation and transition timings are not in scope.\n- Form validation states beyond `text-input-focus` are not extracted — error and success states for inputs would need a dedicated form page to confirm.\n- The pricing comparison table's checkmark glyph and column-divider widths are described structurally but not formalized as tokens.\n- The CSS variable `--theme_button-background-primary: #1b61c9` exists at `:root` but is not used as the primary CTA color anywhere on the marketing site. It maps to the link/info color role instead. Documented here so future extractions don't re-trip over the misleading variable name.\n",
+    "colorPalette": [
+      {
+        "name": "Primary",
+        "hex": "#181D26",
+        "role": "The dominant brand color. Used for the primary CTA background, h1/h2 display type, and the `{component.surface-dark}` band. Not \"blue, then black\" — black IS the primary throughout the marketing system."
+      },
+      {
+        "name": "Primary Active",
+        "hex": "#0D1218",
+        "role": "The press state on primary buttons."
+      },
+      {
+        "name": "Canvas",
+        "hex": "#FFFFFF",
+        "role": "The default page surface; the floor of every editorial body."
+      },
+      {
+        "name": "Surface Soft",
+        "hex": "#F8FAFC",
+        "role": "Tabbed feature cards and the featured pricing tier."
+      },
+      {
+        "name": "Surface Strong",
+        "hex": "#E0E2E6",
+        "role": "The light gray \"Start building with Airtable\" CTA banner near the footer."
+      },
+      {
+        "name": "Surface Dark",
+        "hex": "#181D26",
+        "role": "The dark navy CTA cards used mid-page (for example \"The path to 10× every person in your organization\")."
+      },
+      {
+        "name": "Surface Dark Elevated",
+        "hex": "#1D1F25",
+        "role": "The articles-page hero base behind the rainbow-stripe overlay."
+      },
+      {
+        "name": "Hairline",
+        "hex": "#DDDDDD",
+        "role": "The 1px border tone for input outlines, table dividers, secondary-button outlines."
+      },
+      {
+        "name": "Ink",
+        "hex": "#181D26",
+        "role": "The strongest text — h1/h2 display type and primary button text-on-light. Same hex as `{colors.primary}` because they are the same role expressed at type and button layers."
+      },
+      {
+        "name": "Body",
+        "hex": "#333840",
+        "role": "The default running-text color."
+      },
+      {
+        "name": "Muted",
+        "hex": "#41454D",
+        "role": "Footer links, breadcrumbs, captions."
+      },
+      {
+        "name": "Border Strong",
+        "hex": "#9297A0",
+        "role": "The 1px outline color on disabled secondary buttons."
+      },
+      {
+        "name": "On Primary / On Dark",
+        "hex": "#FFFFFF",
+        "role": "The text color on primary buttons and dark surfaces."
+      },
+      {
+        "name": "Coral",
+        "hex": "#AA2D00",
+        "role": "The largest signature card on the homepage (\"Production apps in prototype speed\"). Full-bleed dark coral with white type."
+      },
+      {
+        "name": "Forest",
+        "hex": "#0A2E0E",
+        "role": "A deep-green signature card used in the homepage demo-grid cluster."
+      },
+      {
+        "name": "Cream",
+        "hex": "#F5E9D4",
+        "role": "The cream callout band (\"The path to 10× every person in your organization\") — a soft beige surface holding dark type and product UI fragments."
+      },
+      {
+        "name": "Peach",
+        "hex": "#FCAB79",
+        "role": ", **Mint** (`{colors.signature-mint}` — #a8d8c4), **Yellow** (`{colors.signature-yellow}` — #f4d35e), **Mustard** (`{colors.signature-mustard}` — #d9a441): Demo-card surfaces that carry small product UI fragments inside the multi-card grid sections."
+      },
+      {
+        "name": "Link",
+        "hex": "#1B61C9",
+        "role": "Inline body links and anchor text. Darker on press to `{colors.link-active}` (#1a3866). Despite the `--theme_button-background-primary` CSS-variable name, this color is **not** the primary button color — it is the link color."
+      },
+      {
+        "name": "Info",
+        "hex": "#254FAD",
+        "role": "and **Info Border** (`{colors.info-border}` — #458fff): Inline info badges and focused-input outline."
+      },
+      {
+        "name": "Success",
+        "hex": "#006400",
+        "role": "and **Success Border** (`{colors.success-border}` — #39bf45): Confirmation states."
+      }
+    ],
+    "typography": {
+      "scale": "### Font Family\nThe system runs **Haas / Haas Groot Disp** (Airtable's licensed display + text type). Haas Groot Disp covers display sizes (h1 / h2); Haas Grotesk covers everything 24px and below. The fallback stack walks `-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Fira Sans\", \"Droid Sans\", \"Helvetica Neue\", sans-serif`.\n\nThe pricing surface runs a separate **Inter Display** stack at mid-weights (475 / 575) — a deliberate sub-system signaling commercial precision.\n\n### Hierarchy\n\n| Token | Size | Weight | Line Height | Letter Spacing | Use |\n|---|---|---|---|---|---|\n| `{typography.display-xl}` | 48px | 500 | 1.1 | 0 | Articles page h2 — second-tier editorial headline |\n| `{typography.display-lg}` | 40px | 400 | 1.2 | 0 | Homepage h1 hero |\n| `{typography.display-md}` | 32px | 400 | 1.2 | 0 | Platform-page h2 — feature-section headlines |\n| `{typography.title-lg}` | 24px | 400 | 1.35 | 0.12px | Section titles |\n| `{typography.title-md}` | 20px | 400 | 1.5 | 0 | Sub-section titles in tabbed feature cards |\n| `{typography.title-sm}` | 18px | 500 | 1.4 | 0 | Article-card titles |\n| `{typography.label-md}` | 16px | 500 | 1.4 | 0 | Demo-card titles, list labels |\n| `{typography.button}` | 16px | 500 | 1.4 | 0 | Standard CTA button labels |\n| `{typography.body-md}` | 14px | 400 | 1.25 | 0 | Body copy, footer links, top-nav items |\n| `{typography.caption}` | 14px | 500 | 1.35 | 0.16px | Light captions and meta text |\n| `{typography.legal}` | 13.12px | 600 | 1.2 | 0 | Cookie/legal CTA buttons |\n| `{typography.pricing-display}` | 44.8px | 475 | 1.1 | 0 | Pricing-page h1 |\n| `{typography.pricing-section}` | 28px | 475 | 1.2 | 0 | Pricing-page section heads |\n| `{typography.pricing-card-title}` | 20px | 475 | 1.3 | 0 | Pricing tier card plan name |\n\n### Principles\nThe Haas system prefers weight 400 for display sizes — a 40px h1 is **not** bold. Visual emphasis is delegated to size, color contrast, and the signature surface cards. Where the system does want weight, it pivots to 500 (sub-titles, buttons, article titles), never 600 or 700 in the editorial body. The only true bold (600) lives in `{typography.legal}` — a sign that boldness is reserved for terms-of-service surfaces, not marketing.\n\nThe pricing-page sub-system uses Inter Display at `font-weight: 475` — a custom mid-weight between regular (400) and medium (500), shipped as a variable font.\n\n### Note on Font Substitutes\nIf Haas Groot Disp and Haas Grotesk are unavailable, **Inter Display** (variable) is the closest open-source substitute for both — adjust line-height down by ~5% to match Haas's tighter cap-height. For the pricing sub-system, use Inter Display directly. On macOS / iOS, **system-ui** is sufficient; on Windows, the chain falls through to Segoe UI, which is a usable but slightly cooler substitute."
+    },
+    "componentStyles": "Airtable's marketing surfaces are quietly editorial. The base atmosphere is white canvas, dark ink type, generous whitespace, and a near-black pill CTA — nothing is fighting for attention until a section needs to. The brand voltage doesn't come from gradient washes or accent walls; it comes from **full-bleed signature cards** in `{colors.signature-coral}`, `{colors.signature-forest}`, and `{colors.surface-dark}` that punctuate long-scroll explainer pages every two or three screens. Between those signature bands, the page reads like a print magazine: a headline, supporting copy, a small image cluster, then breathing room.\n\nType voice is Haas Grotesk at modest weights (400 for display, 500 for sub-titles and buttons). Display headlines never go bolder than 500 — emphasis comes from size and color contrast, not from weight. Body copy stays at 14px / 400 throughout. The pricing surface runs its own dialect: **Inter Display** at unusual mid-weights (475 / 575) and **pill-shaped buttons** (`{rounded.pill}`) that don't appear on any other page — a deliberate sub-system signaling \"this page is about commercial precision.\"\n\n**Key Characteristics:**\n- Primary CTA is `{colors.primary}` (near-black ink) with white text and a `{rounded.lg}` (12px) corner — it reads as confident and final, never decorative.\n- Secondary CTA is a `{colors.canvas}` button with `{colors.ink}` text and a hairline outline. The two together form Airtable's signature button pair.\n- Hero is white canvas. There is no atmospheric gradient, no mesh, no background flourish. The brand strength comes from the type and the buttons sitting in clean whitespace.\n- Brand voltage lives in **signature surface cards**: `{colors.signature-coral}`, `{colors.signature-forest}`, and `{colors.surface-dark}` carry full-bleed product callouts every few screens.\n- Demo-card grids carry product UI fragments on `{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-cream}` and other warm pastel surfaces.\n- Section rhythm: white canvas → coral signature card → white body → cream callout band → dark navy CTA → light gray CTA banner → footer. The canvas resets between every signature surface.\n- Border radius is hierarchical: `{rounded.lg}` (12px) for primary CTAs and large signature cards, `{rounded.md}` (10px) for content cards and demo grids, `{rounded.sm}` (6px) for inputs, `{rounded.full}` for icon buttons. Pricing buttons jump to `{rounded.pill}` to mark themselves as a separate dialect.\n- Vertical rhythm is `{spacing.section}` (96px) between major bands — universal across every page.\n\n| Level | Treatment | Use |\n|---|---|---|\n| Flat | No shadow, no border | Body sections, top nav, footer |\n| Soft hairline | 1px `{colors.hairline}` border | Inputs, sub-nav rails, comparison-table dividers, secondary buttons |\n| Button rest | Soft drop with subtle blue-tinted glow at low alpha | Primary CTA buttons (the blue tint is a holdover from the link color and reads as a faint accent under the dark button) |\n| Button focus | Outer 2px blue ring at higher alpha | Keyboard focus state on primary buttons |\n| Card flat | No shadow; relies on color contrast against the surface band | Signature coral / forest / dark cards, cream callouts, demo-grid cards |\n\nThe elevation philosophy is **color-block first, shadow second**. Shadows are minimal; depth is delegated to the contrast between white canvas and signature surface cards. There is no soft-glow / atmospheric-shadow / heavy-elevation language anywhere in the marketing system.\n\n### Decorative Depth\n- **Vertical rainbow stripes** appear on the articles hero only — multi-color vertical bands sitting on `{colors.surface-dark-elevated}`. This is a single-page treatment, not a system-wide signature.\n- **Photography-as-depth** in the demo-card grid: every card carries a real product UI screenshot or mockup, contributing depth through legible artifact density rather than decorative effects.\n\n### Border Radius Scale\n\n| Token | Value | Use |\n|---|---|---|\n| `{rounded.xs}` | 2px | Cookie-consent and legal CTA buttons — system-required surfaces |\n| `{rounded.sm}` | 6px | Text inputs, small inline buttons |\n| `{rounded.md}` | 10px | Secondary content cards, article cards, cream callouts |\n| `{rounded.lg}` | 12px | Primary CTA buttons, signature surface cards, tabbed feature cards |\n| `{rounded.pill}` | 9999px | Pricing-page CTA buttons (sub-system only) |\n| `{rounded.full}` | 9999px / 50% | Circular icon buttons, avatar surfaces |\n\n### Photography Geometry\nProduct UI screenshots inside demo-card grids retain native aspect ratios (typically 4:3 or 16:10) and crop into `{rounded.md}` containers. Hero illustrations bleed full-width with no rounding. Article-card thumbnails use 16:9 with `{rounded.md}` corners. Avatars in testimonials use `{rounded.full}` (perfect circles). Pricing comparison table images stay rectangular with no rounding.\n\n> **No hover states documented.** Per the global no-hover policy (Step 6), every component spec below documents only Default and Active/Pressed states. Variants live as separate entries in the `components:` front matter.\n\n**`top-nav`** — A 64px-tall white bar pinned to the top of every page. Airtable wordmark sits at left; primary horizontal menu (Platform, Solutions, Resources, Enterprise, Pricing) sits center-left in `{typography.body-md}`; the right cluster carries a \"Book Demo\" outline link, \"Sign up for free\" `{component.button-primary}`, and \"Log In\" text link. The nav stays light on every page — Airtable does not invert the nav over dark sections.\n\n### Buttons\n\n**`button-primary`** — The signature primary CTA. Background `{colors.primary}` (near-black), text `{colors.on-primary}`, type `{typography.button}`, padding 16px × 24px, rounded `{rounded.lg}` (12px). This is the \"Get started for free\" / \"Sign up for free\" button visible on every hero. It reads as confident and final — not decorative — which is why the system uses it sparingly (one per viewport).\n- Active state: `button-primary-active` darkens to `{colors.primary-active}` (#0d1218).\n\n**`button-secondary`** — White outline button (e.g. \"Book demo\"). Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.button}`, rounded `{rounded.lg}` (12px), 1px hairline outline. Sits next to `{component.button-primary}` as the \"less-committed\" choice.\n\n**`button-secondary-on-dark`** — Same shape as `{component.button-secondary}` but used on signature coral / forest / dark surfaces. Background `{colors.canvas}`, text `{colors.ink}` — the white button stays white over dark surfaces because the system never inverts to a translucent on-dark style on the marketing site.\n\n**`button-pricing-pill`** — The pricing-page CTA family. Background `{colors.canvas}`, text `{colors.pricing-ink}`, rounded `{rounded.pill}` (9999px), padding 12px × 24px. The only place pill-shape appears in the marketing system. Treat it as part of the pricing sub-system signaling.\n\n**`button-legal`** — Cookie-consent and legal-banner CTAs. Background `{colors.link}`, text `{colors.on-primary}`, type `{typography.legal}` (13.12px / 600), rounded `{rounded.xs}` (2px), padding 12px × 10px. The 2px corner radius and 600 weight signal \"this is a required system surface,\" not a designed brand surface.\n\n**`button-icon-circular`** — 40px × 40px circular button with `{colors.canvas}` background, hairline border, and `{colors.ink}` icon. Used for carousel controls, \"share\", and \"back\" affordances.\n\n**`text-link`** — Inline body links in `{colors.link}` (#1b61c9, the actual link blue). No underline by default. Type inherits `{typography.body-md}`.\n\n### Cards & Containers\n\n**`hero-band`** — The full-page-width white-canvas hero. No surface card, no border, no shadow, no atmospheric gradient — just the headline, sub-headline, and primary + secondary button pair sitting in 96px of whitespace. Vertical padding `{spacing.section}` (96px).\n\n**`signature-coral-card`** — The large full-bleed coral card on the homepage (\"Production apps in prototype speed\"). Background `{colors.signature-coral}` (#aa2d00, a dark coral / oxide red), text `{colors.on-primary}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xxl}` (48px). Carries an h2 in `{typography.display-md}`, supporting copy in `{typography.body-md}`, and `{component.button-secondary-on-dark}` as the CTA.\n\n**`signature-forest-card`** — A deep green signature card (`{colors.signature-forest}` — #0a2e0e) used as a demo-grid sibling to the coral card on the homepage.\n\n**`hero-card-dark`** — The dark navy mid-page CTA card (e.g. \"The path to 10× every person in your organization\"). Background `{colors.surface-dark}` (#181d26), text `{colors.on-dark}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xxl}` (48px). The same color as `{colors.primary}` because the system uses ink as both type color and signature dark surface.\n\n**`feature-card-tabbed`** — Light-cream cards (e.g. the \"Coke / Pelosi / Conde Nast / Time Inc\" tabbed feature card on the homepage). Background `{colors.surface-soft}`, rounded `{rounded.lg}` (12px), internal padding `{spacing.xl}` (32px). Left rail carries vertically-stacked tab labels in `{typography.title-md}`; right pane shows the active tab's content (illustration + body copy + small CTA).\n\n**`cream-callout-card`** — Beige callout cards (`{colors.signature-cream}`). Rounded `{rounded.md}` (10px), internal padding `{spacing.lg}` (24px). Carry product UI fragments or stat callouts — softer than the dark/coral signature cards but still a deliberate brand surface.\n\n**`demo-grid-card`** — Used in multi-card grids that punctuate every page. Background `{colors.canvas}` or one of the demo-grid surfaces (`{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-yellow}`, `{colors.signature-mustard}`), rounded `{rounded.md}` (10px), internal padding `{spacing.md}` (16px). Each card frames a product UI fragment. Card heights vary deliberately to dodge a uniform \"spec sheet\" feel.\n\n**`logo-strip`** — Horizontal monochrome partner-logo row (HBO, Netflix, Amazon, Time, Conde Nast). Logos render in `{colors.muted}`, surface is `{colors.canvas}`, vertical padding `{spacing.xl}` (32px). 6 logos at desktop, 3 at mobile.\n\n**`article-card`** — The trending-stories grid on the articles page. Background `{colors.canvas}`, rounded `{rounded.md}` (10px), internal padding `{spacing.md}` (16px). Each card carries a colorful illustrated thumbnail (16:9), a small uppercase category tag, an `{typography.title-sm}` title, and a meta line. 3-up at desktop.\n\n**`topic-filter-rail`** — The left rail on the articles page. 240px wide, `{colors.canvas}` background, `{typography.body-md}`, vertically grouped category headings (\"Marketing\", \"Product\", \"Project management\", \"Operations\") with sub-bullets. Active item carries a small numeric count badge.\n\n### Inputs & Forms\n\n**`text-input`** — Standard text input. Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body-md}`, rounded `{rounded.sm}` (6px), padding 12px × 16px, height 44px. 1px hairline border in `{colors.hairline}`.\n\n**`text-input-focus`** — Focus state. Border thickens or recolors to `{colors.info-border}`.\n\n### Pricing Sub-System\n\n**`pricing-tier-card`** — Standard tier card. Background `{colors.canvas}`, text `{colors.pricing-ink}`, type `{typography.pricing-card-title}` for the plan name, rounded `{rounded.md}` (10px), internal padding `{spacing.xl}` (32px). Carries the plan name, a price block in `{typography.pricing-display}` (44.8px / 475), feature checklist, and a `{component.button-pricing-pill}` at the bottom.\n\n**`pricing-tier-card-featured`** — The featured tier (typically \"Team\" or \"Business\"). Background shifts to `{colors.surface-soft}`. No accent border, no badge — the background tone shift is the only signal.\n\n**`pricing-comparison-row`** — Each row of the long comparison table at the bottom of the pricing page. Labels in the left column; checkmarks or values across 4 plan columns. 12px vertical padding per row, hairline divider between rows.\n\n### Navigation Variants\n\n**`footer`** — Light surface (`{colors.canvas}`), 6-column link list at desktop covering Platform / Solutions / Resources / Learn / Company sub-trees. Vertical padding `{spacing.section}` divided across upper link block and lower legal row. Type `{typography.body-md}`.\n\n**`cta-band-light`** — The light gray \"Start building with Airtable\" CTA strip near the footer. Background `{colors.surface-strong}` (#e0e2e6), text `{colors.ink}`, rounded `{rounded.lg}` (12px), padding `{spacing.xxl}` (48px). Carries an h2 in `{typography.display-md}` and a `{component.button-primary}`.\n\n### Signature Components\n\n**Articles Vertical Rainbow Stripe Hero** — The articles-page hero treatment. Multi-color vertical bands at varying widths sitting on `{colors.surface-dark-elevated}`. The h1 + sub-head + CTA cluster sits center-left on top of the stripes. This is a single-page hero treatment, not a system-wide signature — do not promote it to a multi-page pattern.\n\n### Do\n- Keep `{component.button-primary}` near-black. The brand's primary CTA is `{colors.primary}`, not the link blue. Mixing them up turns a confident hero into a confused one.\n- Reserve `{component.button-primary}` for one primary action per viewport. The system is designed for scarcity at the brand-action layer.\n- Use `{component.button-secondary}` (white with hairline outline) as the natural pair with `{component.button-primary}`. The two together form Airtable's signature button row.\n- Trust whitespace as the hero atmosphere. Hero bands are intentionally calm — no gradient, no mesh, no atmospheric backdrop. Going against this reads as off-brand.\n- Use `{component.signature-coral-card}`, `{component.signature-forest-card}`, and `{component.hero-card-dark}` to break editorial monotony. These are the brand's voltage moments.\n- Keep `{component.demo-grid-card}` heights uneven within a grid. Uniform heights feel like a spec sheet.\n- Treat the pricing surface as its own dialect: keep `{typography.pricing-display}`, `{typography.pricing-card-title}`, and `{component.button-pricing-pill}` together. Mixing them with Haas Grotesk button type breaks the sub-system's voice.\n- Anchor every editorial band with `{spacing.section}` (96px) vertical padding.\n\n### Don't\n- Don't make `{colors.link}` (#1b61c9) the primary button color. It is the link color. The primary button is `{colors.primary}` (#181d26, near-black). Treating link-blue as the brand action is the most common mistake when reading Airtable's CSS variables.\n- Don't add a gradient backdrop to the hero. Airtable's hero is white, full stop. Mesh, aurora, spotlight gradients all read as \"another SaaS template\" — not Airtable.\n- Don't bold display-weight type. `{typography.display-xl}` and `{typography.display-lg}` are intentionally weight 400 / 500 — going to 700 reads as marketing-page-template.\n- Don't use `{rounded.pill}` outside the pricing surface. It's a sub-system signal, not a general radius option.\n- Don't repeat the same surface mode in two consecutive bands. The editorial pacing depends on rhythm: white → signature card → white → cream → dark → white. Two whites in a row read as a typography blog.\n- Don't add hover state styling beyond what the system already encodes. The system documents Default and Active/Pressed only.\n- Don't introduce additional accent colors beyond the documented signature card palette. The system's voltage already uses coral, forest, dark navy, cream, peach, mint, yellow, and mustard.\n\n### Breakpoints\n\n| Name | Width | Key Changes |\n|---|---|---|\n| Mobile | < 768px | Single-column body; top nav collapses to hamburger; demo-grid drops to 1-up; signature cards stay full-bleed; logo strip wraps to 2 rows; footer collapses to single-column |\n| Tablet | 768–1024px | 2-up demo-grid; top nav stays horizontal but tightens; cream-callout cards stack 2-up; pricing comparison table becomes horizontally scrollable |\n| Desktop | 1024–1440px | 3-up demo-grid (and 4-up for tighter content); full top-nav with all menu items visible; pricing tier cards render 4-across |\n| Wide | > 1440px | Same as Desktop with more outer breathing room; max content width caps at ~1280px and the page adds outer margin rather than scaling type up |\n\n### Touch Targets\n- `{component.button-primary}` and siblings render at 48 × 48px minimum (16px vertical padding + 16px line-height) — comfortably above WCAG AAA's 44 × 44.\n- `{component.button-icon-circular}` is exactly 40 × 40px — slightly under WCAG's recommended 44, but the centered icon and dot-radius compensate visually.\n- `{component.text-input}` height is 44px.\n\n### Collapsing Strategy\n- Top nav collapses to a hamburger at < 768px; the menu opens as a full-screen sheet rather than a dropdown.\n- Card grids reduce columns rather than scaling cards down.\n- The `{component.feature-card-tabbed}` re-stacks the tab rail above the content pane on mobile.\n- The pricing comparison table converts to horizontally-scrollable swipe at < 1024px; the four plan headers stay visible while body rows scroll.\n\n### Image Behavior\n- Demo-card UI screenshots crop to fit their container rather than scaling up.\n- Hero illustrations bleed full-width on mobile, losing horizontal margin.\n- Signature card images (inside coral / forest / dark cards) compress to their card width without cropping.\n\n1. Focus on ONE component at a time. Reference its YAML key directly (`{component.button-primary}`, `{component.signature-coral-card}`).\n2. When adding a new component, decide first which sub-system it belongs to: the main editorial system (Haas, `{rounded.lg}`/`{rounded.md}`) or the pricing sub-system (Inter Display, `{rounded.pill}`).\n3. Variants of an existing component (`-active`, `-disabled`, `-focus`) live as separate entries in `components:` — never as nested state objects.\n4. Use `{token.refs}` everywhere prose mentions a color, a radius, a typography role, or a spacing value. Hex codes appear at most once next to the reference.\n5. Never document hover. The system documents Default and Active/Pressed states only.\n6. Run `npx @google/design.md lint DESIGN.md` after edits — `broken-ref`, `contrast-ratio`, and `orphaned-tokens` warnings flag issues automatically.\n7. When in doubt about emphasis: bigger type before bolder type, signature surface card before solid accent.\n\n- The exact hex values of pastel demo-grid surfaces (`{colors.signature-peach}`, `{colors.signature-mint}`, `{colors.signature-yellow}`, `{colors.signature-mustard}`) are inferred from screenshot pixel sampling. Some product launches may swap these surfaces seasonally.\n- Hover behavior across all components is not documented (per global no-hover policy).\n- Animation and transition timings are not in scope.\n- Form validation states beyond `text-input-focus` are not extracted — error and success states for inputs would need a dedicated form page to confirm.\n- The pricing comparison table's checkmark glyph and column-divider widths are described structurally but not formalized as tokens.\n- The CSS variable `--theme_button-background-primary: #1b61c9` exists at `:root` but is not used as the primary CTA color anywhere on the marketing site. It maps to the link/info color role instead. Documented here so future extractions don't re-trip over the misleading variable name.",
+    "layoutPrinciples": "### Spacing System\n- **Base unit:** 4px (all spacing snaps to 4-multiples).\n- **Tokens:** `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 16px · `{spacing.lg}` 24px · `{spacing.xl}` 32px · `{spacing.xxl}` 48px · `{spacing.section}` 96px.\n- **Section padding (vertical):** `{spacing.section}` (96px) is the universal vertical rhythm constant — every major editorial band on every page uses 96px top + 96px bottom internal padding.\n- **Card internal padding:** `{spacing.xl}` (32px) for tabbed feature cards and pricing tier cards; `{spacing.xxl}` (48px) inside signature coral / forest / dark cards; `{spacing.lg}` (24px) for cream callouts and demo-grid cards.\n- **Gutters:** `{spacing.lg}` (24px) between cards in 3-up grids; `{spacing.md}` (16px) inside denser logo strips and footer column gutters.\n\n### Grid & Container\n- **Max content width:** ~1280px centered, with `{spacing.xxl}` (48px) horizontal breathing room.\n- **Editorial body:** Single 8/12-column at large breakpoints, collapsing to single-column on mobile.\n- **Demo-card grids:** 3 or 4 columns at desktop, 2 at tablet, 1 at mobile. Card sizes are deliberately uneven within the grid to dodge a uniform \"spec sheet\" feel.\n- **Logo strip:** 6 monochrome partner logos in a single row at desktop; wraps to 3-up on mobile.\n\n### Whitespace Philosophy\nAirtable uses whitespace as the dominant atmospheric tool. Hero sections sit in 96px+ of pure whitespace above and below the headline + sub-headline pair, with no decoration in that whitespace. The hero is intentionally calm — there is no gradient, no aurora, no atmospheric mesh behind the type. The system trusts whitespace alone to do the framing."
+  },
   "editorMeta": {
     "activePageIndex": 0,
     "preserveAuthoredGeometry": false

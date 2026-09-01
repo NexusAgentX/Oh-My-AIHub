@@ -12,8 +12,8 @@
 - 建立 mise 工具版本和常用开发任务。
 - 建立产品、架构、安全、Agent 协作和架构决策文档体系。
 - 建立 Feature/Epic Issue 模板和 Issue 驱动的 Agent 开发工作流。
-- 建立 Binance 风格的中文设计系统，并将其设为后续 UI 工作的规范性来源。
-- 记录采用 Binance 风格设计语言的 ADR-0001。
+- 原样引入固定上游版本的 Airtable 设计分析，作为全部界面的唯一视觉规范。
+- 记录原样采用 Airtable 设计分析的 ADR-0004，并将原 Binance 风格 ADR-0001 标记为已取代。
 - 建立人类定向、AI 执行的持续产品研发模型，将发现、专业工具设计、交付和上线学习纳入统一治理。
 - 为 Feature/Epic Issue 模板补充用户问题、设计、结果验证和 Ready/Done/Validated 证据要求。
 - 记录 AI 原生持续产品研发模型的 ADR-0002。
@@ -27,6 +27,7 @@
 
 - 将 mise 项目配置统一命名为 `mise.toml`。
 - 所有仓库改动统一从 `origin/main` 创建独立分支和 worktree，主工作区固定保持同步的 `main`；补充并行 Feature、PR 主动合并、Issue 关闭及分支/worktree 清理闭环。
+- 将默认视觉方向从 Binance 风格调整为固定版本的 Airtable 设计分析；移除未通过审阅的 Clay 混合方案和项目自定义视觉覆盖。
 
 ### 修复
 

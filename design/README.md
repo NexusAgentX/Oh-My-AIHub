@@ -6,14 +6,17 @@
 
 ```text
 design/
-├── sources/    OpenPencil 可编辑源文件，设计事实来源
-└── previews/   从同名源文件导出的 PNG，供 GitHub 和代码评审查看
+├── sources/      OpenPencil 可编辑源文件，设计事实来源
+├── previews/     从同名源文件导出的 PNG，供 GitHub 和代码评审查看
+└── references/   固定上游设计参考的许可等随附文件
 ```
 
 - `sources/<name>.op` 是权威设计源文件。截图、云端链接和口头描述不能替代它。
 - `previews/<name>.png` 是派生预览，必须与同名 `.op` 同步更新。
 - `DESIGN.md` 决定视觉 Token 和通用规则，`.op` 决定某个具体设计的结构和状态，产品范围仍由 `PRODUCT.md` 决定。
-- 当前的 `ai-native-product-loop` 仅验证工具链和研发流程，不是产品页面或产品功能定义。
+- 当前的 `ai-native-product-loop` 用于验证工具链、研发流程和当前设计系统的视觉一致性，不是产品页面或产品功能定义。
+- 当前 `DESIGN.md` 原样来自 [VoltAgent/awesome-design-md 的 Airtable 设计分析](https://github.com/VoltAgent/awesome-design-md/blob/e06a96660396d741d0c106c8972172254dafbdc2/design-md/airtable/DESIGN.md)，不得由 Agent 局部改写或增加本地视觉覆盖；上游许可保存在 `references/airtable-design-analysis/LICENSE`。
+- OpenPencil 0.8.4 重新载入含变量的源文件时需要主题轴才能正确解析颜色；当前 `.op` 因此只保留单值 `appearance: Default` 技术轴，它不代表额外视觉主题，不得改回 `Warm` 或增加本地视觉变体。
 
 ## 工具
 
