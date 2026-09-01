@@ -1,6 +1,6 @@
 # 产品路线图
 
-> 状态：首个产品方向已确认；API 市场设计补充评审中，首版交付进入 Now
+> 状态：首个产品方向与 API 市场设计已确认；首版原型闭环收口与实现并行推进
 
 本文档是 Oh-My-AIHub 产品结果优先级与推进顺序的主要依据。路线图描述需要验证的用户结果及其证据门槛，不是固定日期承诺、功能愿望池或第二套任务清单。
 
@@ -26,20 +26,20 @@
 
 ### 设计并验证首版核心工作流
 
-- **状态**：首轮 Done，API 市场补充评审中；#17 已确认，#28 等待维护者从用户视角确认。
-- **关联任务**：[Epic #16](https://github.com/NexusAgentX/Oh-My-AIHub/issues/16)、[Feature #17](https://github.com/NexusAgentX/Oh-My-AIHub/issues/17)、[Feature #28](https://github.com/NexusAgentX/Oh-My-AIHub/issues/28)。
+- **状态**：首轮与 API 市场切片 Done；#17、#28 已确认，#30 继续收口跨模块权限、凭据和关键状态。
+- **关联任务**：[Epic #16](https://github.com/NexusAgentX/Oh-My-AIHub/issues/16)、[Feature #17](https://github.com/NexusAgentX/Oh-My-AIHub/issues/17)、[Feature #28](https://github.com/NexusAgentX/Oh-My-AIHub/issues/28)、[Feature #30](https://github.com/NexusAgentX/Oh-My-AIHub/issues/30)。
 - **期望结果**：消费者、共享者和管理员能够在可编辑原型中理解并完成首版核心任务，后续实现不需要猜测信息架构、关键交互或异常状态。
-- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`core-workflows.op` 已用 OpenPencil MCP 形成 28 个可点击桌面页面、四角色流程图、五块评审总览和三档响应式说明，并导出同名 Git 预览；#17 的导航、模型协议池、渠道信息密度、账本表达和 C2C 状态机方向已经确认，#28 新增的 API 市场列表、公开渠道详情和加入模型池切片等待确认。
+- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`core-workflows.op` 已用 OpenPencil MCP 形成 32 个可点击桌面页面、四角色流程图、五块评审总览和三档响应式说明，并导出同名 Git 预览；#17 的首轮核心流程与 #28 的 API 市场、评分、无匹配、暂停和不可加入状态均已确认。
 - **剩余未知项**：真实目标用户能否无协助理解并完成这些任务，仍需在可运行版本中验证。
-- **达成证据**：OpenPencil 源文件和同名预览覆盖四类核心任务及关键状态，Feature #17 已记录首轮交付证据；Feature #28 经维护者确认后形成最新实现基线。
+- **达成证据**：OpenPencil 源文件和同名预览覆盖四类核心任务及关键状态，Feature #17 与 #28 已记录交付证据；#30 完成后形成实现前的完整原型基线。
 
 ## Now
 
 ### 交付可运行的 API 共享与结算闭环
 
-- **状态**：Ready；#17 的设计依赖已满足，API 市场相关切片等待 #28 确认后分批实现。
+- **状态**：Ready；#17 与 #28 的设计依赖已满足，#30 收口的高风险界面需在对应实现前同步完成。
 - **关联任务**：[Feature #21](https://github.com/NexusAgentX/Oh-My-AIHub/issues/21)、[Feature #18](https://github.com/NexusAgentX/Oh-My-AIHub/issues/18)、[Feature #19](https://github.com/NexusAgentX/Oh-My-AIHub/issues/19)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)。
-- **进入条件**：#17 与 #28 的对应设计切片已经确认；实现时仍须让账本和凭据等高风险边界具备可验证方案。
+- **进入条件**：#17 与 #28 的对应设计切片已经确认；账户、凭据和关键异常状态按 #30 的最新设计实现。
 - **预期结果**：管理员能够准备账户与模型目录，共享者能够安全上架真实渠道，消费者能够用平台 Key 配置模型协议池并完成有序回退和零和结算。
 - **预计证据**：设计与实现一致、聚焦自动化测试、真实受控上游回退、真实客户端调用、价格与费率快照、凭据不回显及账本恒等式。
 - **退出条件**：四个关联 Feature 的交付类 Acceptance 完成，并能在受控环境完成一次非自有渠道成功调用与可解释结算；此时只能称为 `Done`。
