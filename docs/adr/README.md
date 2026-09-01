@@ -32,6 +32,7 @@
 
 ## 索引
 
-- [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已通过
+- [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已取代（由 ADR-0004 取代）
 - [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过
 - [ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产](0003-version-openpencil-design-assets-in-git.md) — 已通过
+- [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) — 已通过

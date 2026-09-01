@@ -1,6 +1,7 @@
 # ADR-0001：采用 Binance 风格设计语言
 
-- 状态：已通过
+- 状态：已取代
+- 已由：[ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) 取代
 - 日期：2026-09-01
 - 决策者：项目维护者
 - 关联内容：Issue #2、`DESIGN.md`
@@ -71,5 +72,4 @@
 
 ## 替代关系
 
-无。
-
+由 [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) 取代。
