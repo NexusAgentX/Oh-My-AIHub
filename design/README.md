@@ -15,8 +15,18 @@ design/
 - `previews/<name>.png` 是派生预览，必须与同名 `.op` 同步更新。
 - `DESIGN.md` 决定视觉 Token 和通用规则，`.op` 决定某个具体设计的结构和状态，产品范围仍由 `PRODUCT.md` 决定。
 - 当前的 `ai-native-product-loop` 用于验证工具链、研发流程和当前设计系统的视觉一致性，不是产品页面或产品功能定义。
+- 当前的 `core-workflows` 是首版产品交互基线：源文件包含可点击原型、四角色流程图、评审总览和响应式说明四页；同名 PNG 是从“评审总览”页导出的 Git 评审入口。
 - 当前 `DESIGN.md` 原样来自 [VoltAgent/awesome-design-md 的 Airtable 设计分析](https://github.com/VoltAgent/awesome-design-md/blob/e06a96660396d741d0c106c8972172254dafbdc2/design-md/airtable/DESIGN.md)，不得由 Agent 局部改写或增加本地视觉覆盖；上游许可保存在 `references/airtable-design-analysis/LICENSE`。
 - OpenPencil 0.8.4 重新载入含变量的源文件时需要主题轴才能正确解析颜色；当前 `.op` 因此只保留单值 `appearance: Default` 技术轴，它不代表额外视觉主题，不得改回 `Warm` 或增加本地视觉变体。
+
+## 当前产品原型
+
+| 资产 | 内容 | 评审用途 |
+| --- | --- | --- |
+| `sources/core-workflows.op` | 25 个可点击桌面页面，以及流程、状态和响应式说明 | 在 OpenPencil 中编辑、跳转和检查完整交互 |
+| `previews/core-workflows.png` | 消费者、共享者、C2C 与管理员四块评审总览 | 在 GitHub Issue 和 Pull Request 中快速确认方向 |
+
+可点击页面覆盖平台 Key 与模型协议池、顺序渠道回退、渠道上架与模型倍率、调用与账本分录、C2C 买卖挂单和部分成交、付款与放行、取消、超时、争议、管理员账户与信用额度、模型目录及运营指标。源文件中的名称、地址、金额和指标均为原型示例，不是生产数据。
 
 ## 工具
 
