@@ -26,6 +26,7 @@
 ### 变更
 
 - 将 mise 项目配置统一命名为 `mise.toml`。
+- 所有仓库改动统一从 `origin/main` 创建独立分支和 worktree，主工作区固定保持同步的 `main`；补充并行 Feature、PR 主动合并、Issue 关闭及分支/worktree 清理闭环。
 
 ### 修复
 
