@@ -14,6 +14,9 @@
 - 建立 Feature/Epic Issue 模板和 Issue 驱动的 Agent 开发工作流。
 - 建立 Binance 风格的中文设计系统，并将其设为后续 UI 工作的规范性来源。
 - 记录采用 Binance 风格设计语言的 ADR-0001。
+- 建立人类定向、AI 执行的持续产品研发模型，将发现、专业工具设计、交付和上线学习纳入统一治理。
+- 为 Feature/Epic Issue 模板补充用户问题、设计、结果验证和 Ready/Done/Validated 证据要求。
+- 记录 AI 原生持续产品研发模型的 ADR-0002。
 
 ### 变更
 

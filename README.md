@@ -18,6 +18,18 @@ Oh-My-AIHub 目前处于产品定义前的工程初始化阶段。仓库已经�
 
 开发任务通过 GitHub Issue 管理：小任务使用单个 Feature Issue，大任务使用 Epic Issue 拆分多个 Feature Issue。每个 Issue 的最新 Spec、Plan、Tasks 和 Acceptance 都维护在 body 中。具体工作方式见 `AGENTS.md`。
 
+## 产品研发方式
+
+项目采用“人类定向、AI 执行”的持续产品研发模型：
+
+- 人类从用户视角负责目标用户、核心问题、产品方向、关键取舍和发布判断。
+- AI 负责研究、假设整理、驱动专业工具设计、工程实现、测试、文档、发布准备与反馈归纳。
+- 工作按方向与结果、发现、设计、交付、发布与学习形成闭环；设计不是开发前的一次性附件。
+- 任务区分 Ready、Done 和 Validated，代码合并或功能上线不自动等于用户结果已经成立。
+- 高不确定产品能力先用发现或原型 Feature 降低风险，再进入小批量交付；纯技术或已知小改动保持单个 Feature 的轻量流程。
+
+完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，视觉规则维护在 `DESIGN.md`。
+
 ## 当前工程组成
 
 - 前端：React 19、TypeScript、Vite。
