@@ -26,29 +26,29 @@
 
 ### 设计并验证首版核心工作流
 
-- **状态**：Done；#17、#28 与 #30 已形成完整的首版专业工具原型基线。
-- **关联任务**：[Epic #16](https://github.com/NexusAgentX/Oh-My-AIHub/issues/16)、[Feature #17](https://github.com/NexusAgentX/Oh-My-AIHub/issues/17)、[Feature #28](https://github.com/NexusAgentX/Oh-My-AIHub/issues/28)、[Feature #30](https://github.com/NexusAgentX/Oh-My-AIHub/issues/30)。
+- **状态**：Done；#17、#28、#30 与 #32 已形成完整的首版专业工具原型基线。
+- **关联任务**：[Epic #16](https://github.com/NexusAgentX/Oh-My-AIHub/issues/16)、[Feature #17](https://github.com/NexusAgentX/Oh-My-AIHub/issues/17)、[Feature #28](https://github.com/NexusAgentX/Oh-My-AIHub/issues/28)、[Feature #30](https://github.com/NexusAgentX/Oh-My-AIHub/issues/30)、[Feature #32](https://github.com/NexusAgentX/Oh-My-AIHub/issues/32)。
 - **期望结果**：消费者、共享者和管理员能够在可编辑原型中理解并完成首版核心任务，后续实现不需要猜测信息架构、关键交互或异常状态。
-- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`core-workflows.op` 已用 OpenPencil MCP 形成 49 个可点击桌面页面、四角色流程图、五块评审总览和三档响应式说明，并导出同名 Git 预览；#17 覆盖首轮核心流程，#28 覆盖 API 市场、用户评分和市场状态，#30 覆盖账号凭据、改密、Key 与渠道生命周期、C2C 角色状态、调用失败和管理后台闭环。
+- **当前证据**：Feature #6 已由维护者确认目标用户和产品边界；`core-workflows.op` 已用 OpenPencil MCP 形成 48 个可点击桌面页面、四角色流程图、五块评审总览和三档响应式说明，并导出同名 Git 预览；#17 覆盖首轮核心流程，#28 覆盖 API 市场、详情内评分和市场状态，#30 覆盖账号凭据、改密与跨模块关键状态，#32 收口密集总览、Key 与渠道统一配置器、资源编辑删除、钱包不足以及 C2C 支付信息和全量布局。
 - **剩余未知项**：真实目标用户能否无协助理解并完成这些任务，仍需在可运行版本中验证。
-- **达成证据**：OpenPencil 源文件和同名预览覆盖四类核心任务、权限边界、凭据生命周期与关键恢复状态，Feature #17、#28 和 #30 均记录交付证据。
+- **达成证据**：OpenPencil 源文件和同名预览覆盖四类核心任务、权限边界、凭据生命周期与关键恢复状态，Feature #17、#28、#30 和 #32 均记录交付证据。
 
 ## Now
 
 ### 交付可运行的 API 共享与结算闭环
 
-- **状态**：Ready；#17、#28 与 #30 的设计依赖已满足。
+- **状态**：Ready；#17、#28、#30 与 #32 的设计依赖已满足。
 - **关联任务**：[Feature #21](https://github.com/NexusAgentX/Oh-My-AIHub/issues/21)、[Feature #18](https://github.com/NexusAgentX/Oh-My-AIHub/issues/18)、[Feature #19](https://github.com/NexusAgentX/Oh-My-AIHub/issues/19)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)。
-- **进入条件**：#17、#28 与 #30 的对应设计切片已经确认；实现必须保持账户、凭据、评分、权限和关键异常状态与原型一致。
+- **进入条件**：#17、#28、#30 与 #32 的对应设计切片已经确认；实现必须保持账户、凭据、评分、资源配置、权限、C2C 支付信息和关键异常状态与原型一致。
 - **预期结果**：管理员能够准备账户与模型目录，共享者能够安全上架真实渠道，消费者能够用平台 Key 配置模型协议池并完成有序回退和零和结算。
 - **预计证据**：设计与实现一致、聚焦自动化测试、真实受控上游回退、真实客户端调用、价格与费率快照、凭据不回显及账本恒等式。
 - **退出条件**：四个关联 Feature 的交付类 Acceptance 完成，并能在受控环境完成一次非自有渠道成功调用与可解释结算；此时只能称为 `Done`。
 
 ### 交付可部分成交的 C2C 双边市场
 
-- **状态**：Ready；#17 与 #30 的 C2C 双角色和管理员仲裁设计已经确认，仍依赖账本冻结原语。
+- **状态**：Ready；#17、#30 与 #32 的 C2C 双角色、支付信息和管理员仲裁设计已经确认，仍依赖账本冻结原语。
 - **关联任务**：[Feature #23](https://github.com/NexusAgentX/Oh-My-AIHub/issues/23)。
-- **进入条件**：#17 与 #30 的 C2C 设计方向已经确认；实现仍依赖 #18 提供原子冻结、解冻和转账能力。
+- **进入条件**：#17、#30 与 #32 的 C2C 设计方向已经确认；实现仍依赖 #18 提供原子冻结、解冻和转账能力。
 - **预期结果**：用户可以发布买单或卖单，由多个对手方分别承接部分数量，并通过外部付款确认完成积分划转或进入人工争议处理。
 - **预计证据**：并发与幂等测试、挂单和交易状态机、冻结数量恒等式、设计实现一致性和端到端浏览器验收。
 - **退出条件**：Feature #23 的交付类 Acceptance 完成，受控流程能够完成一次部分成交；真实市场结果仍待 Next 阶段验证。
