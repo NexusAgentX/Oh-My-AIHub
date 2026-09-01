@@ -2404,7 +2404,7 @@
                                           "id": "n7537",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "0.18",
+                                          "content": "0.02",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 500,
@@ -2848,7 +2848,7 @@
                                       "id": "n7566",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "API Key 与模型池",
+                                      "content": "API Key 与模型协议池",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 18.0,
                                       "fontWeight": 500,
@@ -2977,7 +2977,7 @@
                                           "id": "n7572",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "3 个模型池 · 6 个渠道",
+                                          "content": "3 个模型协议池 · 6 个渠道",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -3109,7 +3109,7 @@
                                           "id": "n7579",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "2 个模型池 · 3 个渠道",
+                                          "content": "2 个模型协议池 · 3 个渠道",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -3241,7 +3241,7 @@
                                           "id": "n7586",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "1 个模型池 · 1 个渠道",
+                                          "content": "1 个模型协议池 · 1 个渠道",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -5144,7 +5144,7 @@
                                   "id": "n212",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "模型池",
+                                  "content": "模型协议池",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -7286,7 +7286,7 @@
                                           "id": "n7659",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "每个模型自动形成独立协议池",
+                                          "content": "同一模型可添加多个格式池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 400,
@@ -7440,7 +7440,7 @@
                                               "id": "n7668",
                                               "width": "fit_content",
                                               "height": "fit_content",
-                                              "content": "官方价 ¥21 / ¥105",
+                                              "content": "平台基准价 21 / 105 积分",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 11.0,
                                               "fontWeight": 500,
@@ -7586,7 +7586,7 @@
                                               "id": "n7676",
                                               "width": "fit_content",
                                               "height": "fit_content",
-                                              "content": "官方价 ¥18 / ¥72",
+                                              "content": "平台基准价 18 / 72 积分",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 11.0,
                                               "fontWeight": 500,
@@ -7755,7 +7755,7 @@
                                           "id": "n7685",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "3 · 调用格式",
+                                          "content": "3 · 模型协议池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 17.0,
                                           "fontWeight": 500,
@@ -7773,7 +7773,7 @@
                                           "id": "n7686",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "为每个模型选择平台接收的原生格式",
+                                          "content": "按模型 + 原生格式创建一个或多个协议池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 400,
@@ -7896,7 +7896,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7693",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -8003,7 +8003,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7699",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -8013,15 +8013,15 @@
                                       "fill": [
                                         {
                                           "type": "solid",
-                                          "color": "$color.canvas"
+                                          "color": "$color.signature.cream"
                                         }
                                       ],
                                       "stroke": {
-                                        "thickness": 1.0,
+                                        "thickness": 2.0,
                                         "fill": [
                                           {
                                             "type": "solid",
-                                            "color": "$color.hairline"
+                                            "color": "$color.primary"
                                           }
                                         ]
                                       },
@@ -8059,23 +8059,40 @@
                                               "id": "n7702",
                                               "width": 20.0,
                                               "height": 20.0,
+                                              "layout": "horizontal",
+                                              "justifyContent": "center",
+                                              "alignItems": "center",
                                               "cornerRadius": 999.0,
                                               "fill": [
                                                 {
                                                   "type": "solid",
-                                                  "color": "$color.canvas"
+                                                  "color": "$color.primary"
                                                 }
                                               ],
                                               "stroke": {
-                                                "thickness": 1.0,
+                                                "thickness": 0.0,
                                                 "fill": [
                                                   {
                                                     "type": "solid",
-                                                    "color": "$color.hairline"
+                                                    "color": "$color.primary"
                                                   }
                                                 ]
                                               },
-                                              "children": []
+                                              "children": [
+                                                {
+                                                  "type": "icon_font",
+                                                  "id": "n10595",
+                                                  "iconFontName": "check",
+                                                  "width": 13.0,
+                                                  "height": 13.0,
+                                                  "fill": [
+                                                    {
+                                                      "type": "solid",
+                                                      "color": "$color.on.primary"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
                                             }
                                           ]
                                         },
@@ -8102,7 +8119,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7704",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -8246,7 +8263,7 @@
                                           "id": "n7712",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "创建后为各模型池添加渠道",
+                                          "content": "创建后为每个协议池添加渠道",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 500,
@@ -8264,7 +8281,7 @@
                                           "id": "n7713",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "同一模型按优先级依次回退",
+                                          "content": "每个池仅按同协议优先级回退",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 400,
@@ -8663,7 +8680,7 @@
                                       "id": "n7734",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "模型池",
+                                      "content": "模型协议池",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 13.0,
                                       "fontWeight": 400,
@@ -8681,7 +8698,7 @@
                                       "id": "n7735",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "2",
+                                      "content": "3",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -15864,7 +15881,7 @@
                                   "id": "n643",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "0.18018",
+                                  "content": "0.01737",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 400,
@@ -18774,7 +18791,7 @@
                                   "id": "n805",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "调整模型池",
+                                  "content": "调整模型协议池",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -24064,7 +24081,7 @@
                                       "id": "n8196",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "3 · 容量与可见性",
+                                      "content": "3 · 容量与发布",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 17.0,
                                       "fontWeight": 500,
@@ -24177,7 +24194,7 @@
                                           "id": "n8203",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "公开市场",
+                                          "content": "发布状态",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -24193,7 +24210,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8204",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -24206,7 +24223,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -24224,7 +24241,7 @@
                                               "id": "n8205",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "展示并允许加入模型池",
+                                              "content": "校验通过后发布",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -24254,7 +24271,7 @@
                                           "id": "n8207",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "失败退款",
+                                          "content": "计费规则",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -24270,7 +24287,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8208",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -24283,7 +24300,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -24301,7 +24318,7 @@
                                               "id": "n8209",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "自动退还未完成调用",
+                                              "content": "未成功不计费",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -28359,7 +28376,7 @@
                               "id": "n1322",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "0.18018 积分",
+                              "content": "0.01737 积分",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 26.0,
                               "fontWeight": 400,
@@ -28378,7 +28395,7 @@
                               "id": "n1323",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "0.18000 + 0.00018 手续费",
+                              "content": "0.01735 + 0.00002 手续费",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 400,
@@ -29009,7 +29026,7 @@
                                   "id": "n1358",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "−0.18018",
+                                  "content": "−0.01737",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -29069,7 +29086,7 @@
                                   "id": "n1361",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "+0.18000",
+                                  "content": "+0.01735",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -29129,7 +29146,7 @@
                                   "id": "n1364",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "+0.00018",
+                                  "content": "+0.00002",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -29245,7 +29262,7 @@
                                   "id": "n1370",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "输入 0.0030 × 1,284 · 输出 0.0150 × 612 · 缓存创建 0.00375 × 0 · 缓存读取 0.0003 × 8,192 · 倍率 1.12 · 手续费 0.1%",
+                                  "content": "输入 0.0030 / 1K × 1,284 · 输出 0.0150 / 1K × 612 · 缓存创建 0.00375 / 1K × 0 · 缓存读取 0.0003 / 1K × 8,192 · 倍率 1.12 · 手续费 0.1%",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 400,
@@ -30834,7 +30851,7 @@
                                       "id": "n1457",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "−0.18018",
+                                      "content": "−0.01737",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 400,
@@ -62041,7 +62058,7 @@
                               "id": "n4344",
                               "width": "fit_content",
                               "height": "fit_content",
-                              "content": "加入模型池",
+                              "content": "加入模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 500,
@@ -65828,7 +65845,7 @@
                               "id": "n4490",
                               "width": "fit_content",
                               "height": "fit_content",
-                              "content": "加入模型池",
+                              "content": "加入模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 28.0,
                               "fontWeight": 400,
@@ -66709,7 +66726,7 @@
                               "id": "n4536",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "目标模型池",
+                              "content": "目标模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 18.0,
                               "fontWeight": 500,
@@ -67417,7 +67434,7 @@
                                       "id": "n4569",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "加入模型池",
+                                      "content": "加入模型协议池",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -74040,7 +74057,7 @@
                               "id": "n5215",
                               "width": "fit_content",
                               "height": "fit_content",
-                              "content": "加入模型池",
+                              "content": "加入模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 28.0,
                               "fontWeight": 400,
@@ -74921,7 +74938,7 @@
                               "id": "n5261",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "模型池状态",
+                              "content": "模型协议池状态",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 18.0,
                               "fontWeight": 500,
@@ -75893,7 +75910,7 @@
                           "id": "n5359",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "账号",
+                          "content": "用户名",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -79579,9 +79596,9 @@
                       "name": "Create Account Modal",
                       "role": "dialog",
                       "x": 330.0,
-                      "y": 86.0,
+                      "y": 148.0,
                       "width": 532.0,
-                      "height": 724.0,
+                      "height": 600.0,
                       "layout": "vertical",
                       "gap": 16.0,
                       "padding": 24.0,
@@ -79799,7 +79816,7 @@
                               "id": "n9254",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "登录邮箱",
+                              "content": "用户名",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 500,
@@ -79847,7 +79864,7 @@
                                   "id": "n9256",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "user@example.com",
+                                  "content": "例如 yelan",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -80021,262 +80038,6 @@
                                         {
                                           "type": "solid",
                                           "color": "$color.ink"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n9266",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 8.0,
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n9267",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "账户能力",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 500,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n9268",
-                              "width": "fill_container",
-                              "height": 86.0,
-                              "layout": "horizontal",
-                              "gap": 10.0,
-                              "children": [
-                                {
-                                  "type": "frame",
-                                  "id": "n9269",
-                                  "role": "checkbox",
-                                  "width": "fill_container",
-                                  "height": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 5.0,
-                                  "padding": 12.0,
-                                  "cornerRadius": 8.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.signature.cream"
-                                    }
-                                  ],
-                                  "stroke": {
-                                    "thickness": 2.0,
-                                    "fill": [
-                                      {
-                                        "type": "solid",
-                                        "color": "$color.primary"
-                                      }
-                                    ]
-                                  },
-                                  "children": [
-                                    {
-                                      "type": "icon_font",
-                                      "id": "n9270",
-                                      "iconFontName": "check",
-                                      "width": 15.0,
-                                      "height": 15.0,
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n9271",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "API 消费",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 13.0,
-                                      "fontWeight": 500,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n9272",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "创建 Key 与调用",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 11.0,
-                                      "fontWeight": 400,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "n9273",
-                                  "role": "checkbox",
-                                  "width": "fill_container",
-                                  "height": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 5.0,
-                                  "padding": 12.0,
-                                  "cornerRadius": 8.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.signature.cream"
-                                    }
-                                  ],
-                                  "stroke": {
-                                    "thickness": 2.0,
-                                    "fill": [
-                                      {
-                                        "type": "solid",
-                                        "color": "$color.primary"
-                                      }
-                                    ]
-                                  },
-                                  "children": [
-                                    {
-                                      "type": "icon_font",
-                                      "id": "n9274",
-                                      "iconFontName": "check",
-                                      "width": 15.0,
-                                      "height": 15.0,
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n9275",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "渠道共享",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 13.0,
-                                      "fontWeight": 500,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n9276",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "上架与收益",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 11.0,
-                                      "fontWeight": 400,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "n9277",
-                                  "role": "checkbox",
-                                  "width": "fill_container",
-                                  "height": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 5.0,
-                                  "padding": 12.0,
-                                  "cornerRadius": 8.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.canvas"
-                                    }
-                                  ],
-                                  "stroke": {
-                                    "thickness": 1.0,
-                                    "fill": [
-                                      {
-                                        "type": "solid",
-                                        "color": "$color.hairline"
-                                      }
-                                    ]
-                                  },
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "n9278",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "C2C 交易",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 13.0,
-                                      "fontWeight": 500,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n9279",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "默认启用",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 11.0,
-                                      "fontWeight": 400,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
                                         }
                                       ]
                                     }
@@ -83182,7 +82943,7 @@
                                           "id": "n7772",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "每个模型自动形成独立协议池",
+                                          "content": "同一模型可添加多个格式池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 400,
@@ -83336,7 +83097,7 @@
                                               "id": "n7781",
                                               "width": "fit_content",
                                               "height": "fit_content",
-                                              "content": "官方价 ¥21 / ¥105",
+                                              "content": "平台基准价 21 / 105 积分",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 11.0,
                                               "fontWeight": 500,
@@ -83482,7 +83243,7 @@
                                               "id": "n7789",
                                               "width": "fit_content",
                                               "height": "fit_content",
-                                              "content": "官方价 ¥18 / ¥72",
+                                              "content": "平台基准价 18 / 72 积分",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 11.0,
                                               "fontWeight": 500,
@@ -83659,7 +83420,7 @@
                                           "id": "n7799",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "3 · 调用格式",
+                                          "content": "3 · 模型协议池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 17.0,
                                           "fontWeight": 500,
@@ -83677,7 +83438,7 @@
                                           "id": "n7800",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "为每个模型选择平台接收的原生格式",
+                                          "content": "按模型 + 原生格式创建一个或多个协议池",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 400,
@@ -83830,7 +83591,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7809",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -83937,7 +83698,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7815",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -83947,15 +83708,15 @@
                                       "fill": [
                                         {
                                           "type": "solid",
-                                          "color": "$color.canvas"
+                                          "color": "$color.signature.cream"
                                         }
                                       ],
                                       "stroke": {
-                                        "thickness": 1.0,
+                                        "thickness": 2.0,
                                         "fill": [
                                           {
                                             "type": "solid",
-                                            "color": "$color.hairline"
+                                            "color": "$color.primary"
                                           }
                                         ]
                                       },
@@ -83993,23 +83754,40 @@
                                               "id": "n7818",
                                               "width": 20.0,
                                               "height": 20.0,
+                                              "layout": "horizontal",
+                                              "justifyContent": "center",
+                                              "alignItems": "center",
                                               "cornerRadius": 999.0,
                                               "fill": [
                                                 {
                                                   "type": "solid",
-                                                  "color": "$color.canvas"
+                                                  "color": "$color.primary"
                                                 }
                                               ],
                                               "stroke": {
-                                                "thickness": 1.0,
+                                                "thickness": 0.0,
                                                 "fill": [
                                                   {
                                                     "type": "solid",
-                                                    "color": "$color.hairline"
+                                                    "color": "$color.primary"
                                                   }
                                                 ]
                                               },
-                                              "children": []
+                                              "children": [
+                                                {
+                                                  "type": "icon_font",
+                                                  "id": "n10596",
+                                                  "iconFontName": "check",
+                                                  "width": 13.0,
+                                                  "height": 13.0,
+                                                  "fill": [
+                                                    {
+                                                      "type": "solid",
+                                                      "color": "$color.on.primary"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
                                             }
                                           ]
                                         },
@@ -84036,7 +83814,7 @@
                                     {
                                       "type": "frame",
                                       "id": "n7820",
-                                      "role": "radio",
+                                      "role": "checkbox",
                                       "width": "fill_container",
                                       "height": "fill_container",
                                       "layout": "vertical",
@@ -84180,7 +83958,7 @@
                                           "id": "n7828",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "当前 3 个模型池已配置渠道",
+                                          "content": "当前 4 个模型协议池已配置渠道",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 500,
@@ -84679,7 +84457,7 @@
                                       "id": "n7855",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "模型池",
+                                      "content": "模型协议池",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 13.0,
                                       "fontWeight": 400,
@@ -84697,7 +84475,7 @@
                                       "id": "n7856",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "3",
+                                      "content": "4",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -88573,7 +88351,7 @@
                                       "id": "n8330",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "3 · 容量与可见性",
+                                      "content": "3 · 容量与发布",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 17.0,
                                       "fontWeight": 500,
@@ -88686,7 +88464,7 @@
                                           "id": "n8337",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "公开市场",
+                                          "content": "发布状态",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -88702,7 +88480,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8338",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -88715,7 +88493,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -88733,7 +88511,7 @@
                                               "id": "n8339",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "展示并允许加入模型池",
+                                              "content": "已发布 · 市场可用",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -88763,7 +88541,7 @@
                                           "id": "n8341",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "失败退款",
+                                          "content": "计费规则",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -88779,7 +88557,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8342",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -88792,7 +88570,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -88810,7 +88588,7 @@
                                               "id": "n8343",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "自动退还未完成调用",
+                                              "content": "未成功不计费",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -91968,7 +91746,7 @@
                                       "id": "n8467",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "3 · 容量与可见性",
+                                      "content": "3 · 容量与发布",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 17.0,
                                       "fontWeight": 500,
@@ -92081,7 +91859,7 @@
                                           "id": "n8474",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "公开市场",
+                                          "content": "发布状态",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -92097,7 +91875,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8475",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -92110,7 +91888,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -92128,7 +91906,7 @@
                                               "id": "n8476",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "展示并允许加入模型池",
+                                              "content": "校验通过后发布",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -92158,7 +91936,7 @@
                                           "id": "n8478",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "失败退款",
+                                          "content": "计费规则",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 12.0,
                                           "fontWeight": 500,
@@ -92174,7 +91952,7 @@
                                         {
                                           "type": "frame",
                                           "id": "n8479",
-                                          "role": "textbox",
+                                          "role": "status",
                                           "width": "fill_container",
                                           "height": 42.0,
                                           "layout": "horizontal",
@@ -92187,7 +91965,7 @@
                                           "fill": [
                                             {
                                               "type": "solid",
-                                              "color": "$color.canvas"
+                                              "color": "$color.surface.soft"
                                             }
                                           ],
                                           "stroke": {
@@ -92205,7 +91983,7 @@
                                               "id": "n8480",
                                               "width": "fill_container",
                                               "height": "fit_content",
-                                              "content": "自动退还未完成调用",
+                                              "content": "未成功不计费",
                                               "fontFamily": "Inter Display, system-ui, sans-serif",
                                               "fontSize": 13.0,
                                               "fontWeight": 400,
@@ -94068,7 +93846,14 @@
                                             }
                                           ]
                                         }
-                                      ]
+                                      ],
+                                      "events": {
+                                        "onTap": [
+                                          {
+                                            "push": "\"/c2c/orders/new?side=buy\""
+                                          }
+                                        ]
+                                      }
                                     }
                                   ]
                                 },
@@ -110564,7 +110349,7 @@
                           "id": "n9714",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "删除后，该渠道会从所有模型池移除，历史结算记录仍会保留。",
+                          "content": "删除后，该渠道会从所有模型协议池移除，历史结算记录仍会保留。",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 13.0,
                           "fontWeight": 400,
@@ -110752,6 +110537,2453 @@
             }
           ],
           "screen": "/channels/aurora-relay/settings?modal=delete"
+        },
+        {
+          "type": "frame",
+          "id": "n10597",
+          "name": "49 · 发布买单",
+          "x": 1540.0,
+          "y": 10800.0,
+          "width": 1440.0,
+          "height": 960.0,
+          "layout": "horizontal",
+          "clipContent": true,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.canvas"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n10598",
+              "name": "Global Sidebar",
+              "width": 248.0,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 24.0,
+              "padding": [
+                24.0,
+                16.0
+              ],
+              "justifyContent": "space_between",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.surface.soft"
+                }
+              ],
+              "stroke": {
+                "thickness": {
+                  "right": 1.0
+                },
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "$color.hairline"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n10599",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "layout": "vertical",
+                  "gap": 24.0,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n10600",
+                      "width": "fill_container",
+                      "height": 48.0,
+                      "layout": "horizontal",
+                      "gap": 12.0,
+                      "padding": [
+                        0.0,
+                        8.0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n10601",
+                          "width": 32.0,
+                          "height": 32.0,
+                          "layout": "horizontal",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.primary"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n10602",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "O",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 18.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.on.primary"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10603",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 0.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n10604",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "Oh My AIHub",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 15.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10605",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "共享网络",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n10606",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 4.0,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n10607",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10608",
+                              "iconFontName": "layout-dashboard",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10609",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "总览",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10610",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10611",
+                              "iconFontName": "key",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10612",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "API Keys",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/keys\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10613",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10614",
+                              "iconFontName": "activity",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10615",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "调用记录",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/calls\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10616",
+                          "name": "API Market Navigation",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10617",
+                              "iconFontName": "store",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10618",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "API 市场",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/market\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10619",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10620",
+                              "iconFontName": "radio",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10621",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "我的渠道",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/channels\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10622",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10623",
+                              "iconFontName": "wallet",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10624",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "积分钱包",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/wallet\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10625",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.surface.strong"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10626",
+                              "iconFontName": "arrow-left-right",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10627",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "C2C 市场",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/c2c\""
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n10628",
+                  "role": "button",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "gap": 12.0,
+                  "padding": [
+                    8.0,
+                    12.0
+                  ],
+                  "alignItems": "center",
+                  "cornerRadius": 10.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": 1.0,
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n10629",
+                      "width": 36.0,
+                      "height": 36.0,
+                      "layout": "horizontal",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "cornerRadius": 9999.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.signature.cream"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n10630",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "林",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n10631",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 0.0,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n10632",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "林墨",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n10633",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "消费者 · 共享者",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "events": {
+                    "onTap": [
+                      {
+                        "push": "\"/account\""
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n10634",
+              "name": "Workspace",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.canvas"
+                }
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n10635",
+                  "role": "navbar",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "padding": [
+                    0.0,
+                    40.0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1.0
+                    },
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n10636",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "受邀实例 · Singapore",
+                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.5,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.muted"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n10637",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "layout": "horizontal",
+                      "gap": 16.0,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n10638",
+                          "role": "badge",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "padding": [
+                            4.0,
+                            8.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.signature.mint"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n10639",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "账本平衡 0",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n10640",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "可用 102.40 积分",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n10641",
+                  "name": "Page Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 18.0,
+                  "padding": [
+                    28.0,
+                    32.0
+                  ],
+                  "clipContent": true,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n10642",
+                      "width": "fill_container",
+                      "height": 66.0,
+                      "layout": "horizontal",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n10643",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 2.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n10644",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "发布买单",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 30.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10645",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "设置价格、数量和联系信息",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10646",
+                          "role": "button",
+                          "width": "fit_content",
+                          "height": 42.0,
+                          "layout": "horizontal",
+                          "gap": 8.0,
+                          "padding": [
+                            0.0,
+                            17.0
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.canvas"
+                            }
+                          ],
+                          "stroke": {
+                            "thickness": 1.0,
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n10647",
+                              "iconFontName": "arrow-left",
+                              "width": 16.0,
+                              "height": 16.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n10648",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "返回市场",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "push": "\"/c2c\""
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n10649",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 18.0,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n10650",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 14.0,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n10651",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "vertical",
+                              "gap": 12.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10652",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "1 · 挂单配置",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 17.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10653",
+                                  "role": "tablist",
+                                  "width": "fill_container",
+                                  "height": 46.0,
+                                  "layout": "horizontal",
+                                  "gap": 4.0,
+                                  "padding": 4.0,
+                                  "cornerRadius": 9.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.soft"
+                                    }
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "n10654",
+                                      "role": "tab",
+                                      "width": "fill_container",
+                                      "height": "fill_container",
+                                      "layout": "horizontal",
+                                      "justifyContent": "center",
+                                      "alignItems": "center",
+                                      "cornerRadius": 7.0,
+                                      "fill": [],
+                                      "stroke": {
+                                        "thickness": 0.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10655",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "卖出积分",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 13.0,
+                                          "fontWeight": 400,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.body"
+                                            }
+                                          ]
+                                        }
+                                      ],
+                                      "events": {
+                                        "onTap": [
+                                          {
+                                            "push": "\"/c2c/orders/new\""
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10656",
+                                      "role": "tab",
+                                      "width": "fill_container",
+                                      "height": "fill_container",
+                                      "layout": "horizontal",
+                                      "justifyContent": "center",
+                                      "alignItems": "center",
+                                      "cornerRadius": 7.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.canvas"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 1.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10657",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "买入积分",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 13.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10658",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "layout": "horizontal",
+                                  "gap": 12.0,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "n10659",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "layout": "vertical",
+                                      "gap": 6.0,
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10660",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "content": "单价（CNY / 积分）",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "fixed-width",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.body"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "n10661",
+                                          "role": "textbox",
+                                          "width": "fill_container",
+                                          "height": 42.0,
+                                          "layout": "horizontal",
+                                          "padding": [
+                                            0.0,
+                                            12.0
+                                          ],
+                                          "alignItems": "center",
+                                          "cornerRadius": 6.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.canvas"
+                                            }
+                                          ],
+                                          "stroke": {
+                                            "thickness": 1.0,
+                                            "fill": [
+                                              {
+                                                "type": "solid",
+                                                "color": "$color.hairline"
+                                              }
+                                            ]
+                                          },
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10662",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "1.00",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 13.0,
+                                              "fontWeight": 400,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.ink"
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10663",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "layout": "vertical",
+                                      "gap": 6.0,
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10664",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "content": "总量（积分）",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "fixed-width",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.body"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "n10665",
+                                          "role": "textbox",
+                                          "width": "fill_container",
+                                          "height": 42.0,
+                                          "layout": "horizontal",
+                                          "padding": [
+                                            0.0,
+                                            12.0
+                                          ],
+                                          "alignItems": "center",
+                                          "cornerRadius": 6.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.canvas"
+                                            }
+                                          ],
+                                          "stroke": {
+                                            "thickness": 1.0,
+                                            "fill": [
+                                              {
+                                                "type": "solid",
+                                                "color": "$color.hairline"
+                                              }
+                                            ]
+                                          },
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10666",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "1,000",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 13.0,
+                                              "fontWeight": 400,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.ink"
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10667",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "layout": "horizontal",
+                                  "gap": 12.0,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "n10668",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "layout": "vertical",
+                                      "gap": 6.0,
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10669",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "content": "单笔最小",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "fixed-width",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.body"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "n10670",
+                                          "role": "textbox",
+                                          "width": "fill_container",
+                                          "height": 42.0,
+                                          "layout": "horizontal",
+                                          "padding": [
+                                            0.0,
+                                            12.0
+                                          ],
+                                          "alignItems": "center",
+                                          "cornerRadius": 6.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.canvas"
+                                            }
+                                          ],
+                                          "stroke": {
+                                            "thickness": 1.0,
+                                            "fill": [
+                                              {
+                                                "type": "solid",
+                                                "color": "$color.hairline"
+                                              }
+                                            ]
+                                          },
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10671",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "20",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 13.0,
+                                              "fontWeight": 400,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.ink"
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10672",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "layout": "vertical",
+                                      "gap": 6.0,
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10673",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "content": "单笔最大",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "fixed-width",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.body"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "n10674",
+                                          "role": "textbox",
+                                          "width": "fill_container",
+                                          "height": 42.0,
+                                          "layout": "horizontal",
+                                          "padding": [
+                                            0.0,
+                                            12.0
+                                          ],
+                                          "alignItems": "center",
+                                          "cornerRadius": 6.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.canvas"
+                                            }
+                                          ],
+                                          "stroke": {
+                                            "thickness": 1.0,
+                                            "fill": [
+                                              {
+                                                "type": "solid",
+                                                "color": "$color.hairline"
+                                              }
+                                            ]
+                                          },
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10675",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "200",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 13.0,
+                                              "fontWeight": 400,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.ink"
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10676",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 12.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10677",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "2 · 联系方式",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 17.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10678",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "layout": "horizontal",
+                                  "gap": 8.0,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "n10679",
+                                      "role": "checkbox",
+                                      "width": "fit_content",
+                                      "height": 34.0,
+                                      "layout": "horizontal",
+                                      "gap": 6.0,
+                                      "padding": [
+                                        0.0,
+                                        11.0
+                                      ],
+                                      "alignItems": "center",
+                                      "cornerRadius": 999.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.signature.cream"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 2.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.primary"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "icon_font",
+                                          "id": "n10680",
+                                          "iconFontName": "check",
+                                          "width": 13.0,
+                                          "height": 13.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "n10681",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "微信联系",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10682",
+                                      "role": "checkbox",
+                                      "width": "fit_content",
+                                      "height": 34.0,
+                                      "layout": "horizontal",
+                                      "gap": 6.0,
+                                      "padding": [
+                                        0.0,
+                                        11.0
+                                      ],
+                                      "alignItems": "center",
+                                      "cornerRadius": 999.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.signature.cream"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 2.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.primary"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "icon_font",
+                                          "id": "n10683",
+                                          "iconFontName": "check",
+                                          "width": 13.0,
+                                          "height": 13.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "n10684",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "支付宝联系",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10685",
+                                      "role": "checkbox",
+                                      "width": "fit_content",
+                                      "height": 34.0,
+                                      "layout": "horizontal",
+                                      "gap": 6.0,
+                                      "padding": [
+                                        0.0,
+                                        11.0
+                                      ],
+                                      "alignItems": "center",
+                                      "cornerRadius": 999.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.canvas"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 1.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "n10686",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "手机号",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10687",
+                                  "width": "fill_container",
+                                  "height": 148.0,
+                                  "layout": "horizontal",
+                                  "gap": 12.0,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "n10688",
+                                      "role": "textbox",
+                                      "width": 164.0,
+                                      "height": "fill_container",
+                                      "layout": "vertical",
+                                      "gap": 8.0,
+                                      "justifyContent": "center",
+                                      "alignItems": "center",
+                                      "cornerRadius": 8.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.canvas"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 1.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        {
+                                          "type": "icon_font",
+                                          "id": "n10689",
+                                          "iconFontName": "message-circle",
+                                          "width": 30.0,
+                                          "height": 30.0,
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "n10690",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "微信号",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 12.0,
+                                          "fontWeight": 500,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.ink"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "n10691",
+                                          "width": "fit_content",
+                                          "height": "fit_content",
+                                          "content": "zhouqi_01",
+                                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                                          "fontSize": 11.0,
+                                          "fontWeight": 400,
+                                          "lineHeight": 1.5,
+                                          "textGrowth": "auto",
+                                          "fill": [
+                                            {
+                                              "type": "solid",
+                                              "color": "$color.muted"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n10692",
+                                      "width": "fill_container",
+                                      "height": "fill_container",
+                                      "layout": "vertical",
+                                      "gap": 12.0,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "n10693",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "layout": "vertical",
+                                          "gap": 6.0,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10694",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "手机号",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 12.0,
+                                              "fontWeight": 500,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.body"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "n10695",
+                                              "role": "textbox",
+                                              "width": "fill_container",
+                                              "height": 42.0,
+                                              "layout": "horizontal",
+                                              "padding": [
+                                                0.0,
+                                                12.0
+                                              ],
+                                              "alignItems": "center",
+                                              "cornerRadius": 6.0,
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.canvas"
+                                                }
+                                              ],
+                                              "stroke": {
+                                                "thickness": 1.0,
+                                                "fill": [
+                                                  {
+                                                    "type": "solid",
+                                                    "color": "$color.hairline"
+                                                  }
+                                                ]
+                                              },
+                                              "children": [
+                                                {
+                                                  "type": "text",
+                                                  "id": "n10696",
+                                                  "width": "fill_container",
+                                                  "height": "fit_content",
+                                                  "content": "138 0000 1234",
+                                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                                  "fontSize": 13.0,
+                                                  "fontWeight": 400,
+                                                  "lineHeight": 1.5,
+                                                  "textGrowth": "fixed-width",
+                                                  "fill": [
+                                                    {
+                                                      "type": "solid",
+                                                      "color": "$color.ink"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "n10697",
+                                          "width": "fill_container",
+                                          "height": "fit_content",
+                                          "layout": "vertical",
+                                          "gap": 6.0,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n10698",
+                                              "width": "fill_container",
+                                              "height": "fit_content",
+                                              "content": "联系说明",
+                                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                                              "fontSize": 12.0,
+                                              "fontWeight": 500,
+                                              "lineHeight": 1.5,
+                                              "textGrowth": "fixed-width",
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.body"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "n10699",
+                                              "role": "textbox",
+                                              "width": "fill_container",
+                                              "height": 42.0,
+                                              "layout": "horizontal",
+                                              "padding": [
+                                                0.0,
+                                                12.0
+                                              ],
+                                              "alignItems": "center",
+                                              "cornerRadius": 6.0,
+                                              "fill": [
+                                                {
+                                                  "type": "solid",
+                                                  "color": "$color.canvas"
+                                                }
+                                              ],
+                                              "stroke": {
+                                                "thickness": 1.0,
+                                                "fill": [
+                                                  {
+                                                    "type": "solid",
+                                                    "color": "$color.hairline"
+                                                  }
+                                                ]
+                                              },
+                                              "children": [
+                                                {
+                                                  "type": "text",
+                                                  "id": "n10700",
+                                                  "width": "fill_container",
+                                                  "height": "fit_content",
+                                                  "content": "承接前请先联系",
+                                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                                  "fontSize": 13.0,
+                                                  "fontWeight": 400,
+                                                  "lineHeight": 1.5,
+                                                  "textGrowth": "fixed-width",
+                                                  "fill": [
+                                                    {
+                                                      "type": "solid",
+                                                      "color": "$color.ink"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n10701",
+                          "role": "card",
+                          "width": 344.0,
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 15.0,
+                          "padding": 20.0,
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.surface.dark"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n10702",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "挂单摘要",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 18.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.on.dark"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10703",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "vertical",
+                              "gap": 5.0,
+                              "padding": [
+                                0.0,
+                                0.0,
+                                14.0,
+                                0.0
+                              ],
+                              "stroke": {
+                                "thickness": {
+                                  "bottom": 1.0
+                                },
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.border.strong"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10704",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "买入",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.strong"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n10705",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "1,000 积分",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 28.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.dark"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n10706",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "单价 ¥1.00",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.strong"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10707",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "horizontal",
+                              "justifyContent": "space_between",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10708",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "人民币托管",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.strong"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n10709",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "不托管",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.dark"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10710",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "horizontal",
+                              "justifyContent": "space_between",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10711",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "成交区间",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.strong"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n10712",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "20 – 200",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.dark"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10713",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "horizontal",
+                              "justifyContent": "space_between",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n10714",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "联系方式",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.surface.strong"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n10715",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "微信 · 手机号",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.dark"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10716",
+                              "width": "fill_container",
+                              "height": 68.0,
+                              "layout": "horizontal",
+                              "gap": 10.0,
+                              "padding": 12.0,
+                              "alignItems": "center",
+                              "cornerRadius": 8.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.dark.elevated"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n10717",
+                                  "iconFontName": "lock-keyhole",
+                                  "width": 20.0,
+                                  "height": 20.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.signature.mint"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10718",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "layout": "vertical",
+                                  "gap": 1.0,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "n10719",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "content": "买单不冻结人民币",
+                                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                                      "fontSize": 13.0,
+                                      "fontWeight": 500,
+                                      "lineHeight": 1.5,
+                                      "textGrowth": "fixed-width",
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.on.dark"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "n10720",
+                                      "width": "fill_container",
+                                      "height": "fit_content",
+                                      "content": "未成交部分可撤回",
+                                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                                      "fontSize": 11.0,
+                                      "fontWeight": 400,
+                                      "lineHeight": 1.5,
+                                      "textGrowth": "fixed-width",
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.surface.strong"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n10721",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 10.0,
+                              "justifyContent": "end",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "n10722",
+                                  "role": "button",
+                                  "width": "fit_content",
+                                  "height": 42.0,
+                                  "layout": "horizontal",
+                                  "gap": 8.0,
+                                  "padding": [
+                                    0.0,
+                                    17.0
+                                  ],
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "cornerRadius": 10.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.primary"
+                                    }
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "icon_font",
+                                      "id": "n10723",
+                                      "iconFontName": "send",
+                                      "width": 16.0,
+                                      "height": 16.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.on.primary"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "n10724",
+                                      "width": "fit_content",
+                                      "height": "fit_content",
+                                      "content": "发布买单",
+                                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                                      "fontSize": 14.0,
+                                      "fontWeight": 500,
+                                      "lineHeight": 1.5,
+                                      "textGrowth": "auto",
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.on.primary"
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "events": {
+                                    "onTap": [
+                                      {
+                                        "push": "\"/c2c\""
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n10725",
+                                  "role": "button",
+                                  "width": "fit_content",
+                                  "height": 42.0,
+                                  "layout": "horizontal",
+                                  "gap": 8.0,
+                                  "padding": [
+                                    0.0,
+                                    17.0
+                                  ],
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "cornerRadius": 10.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.canvas"
+                                    }
+                                  ],
+                                  "stroke": {
+                                    "thickness": 1.0,
+                                    "fill": [
+                                      {
+                                        "type": "solid",
+                                        "color": "$color.hairline"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "n10726",
+                                      "width": "fit_content",
+                                      "height": "fit_content",
+                                      "content": "取消",
+                                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                                      "fontSize": 14.0,
+                                      "fontWeight": 500,
+                                      "lineHeight": 1.5,
+                                      "textGrowth": "auto",
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.ink"
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "events": {
+                                    "onTap": [
+                                      {
+                                        "push": "\"/c2c\""
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "screen": "/c2c/orders/new?side=buy"
         }
       ]
     },
@@ -110846,7 +113078,7 @@
                       "id": "n2968",
                       "width": "fill_container",
                       "height": "fit_content",
-                      "content": "专业工具原型 · 48 个可点击桌面页面 · 4 条角色泳道",
+                      "content": "专业工具原型 · 49 个可点击桌面页面 · 4 条角色泳道",
                       "fontFamily": "Inter Display, system-ui, sans-serif",
                       "fontSize": 14.0,
                       "fontWeight": 400,
@@ -112047,7 +114279,7 @@
                       "id": "n3025",
                       "width": "fill_container",
                       "height": "fit_content",
-                      "content": "受邀登录，管理 Key 与模型池，在市场比较并评分渠道",
+                      "content": "受邀登录，管理 Key 与模型协议池，在市场比较并评分渠道",
                       "fontFamily": "Inter Display, system-ui, sans-serif",
                       "fontSize": 14.0,
                       "fontWeight": 400,
@@ -112366,7 +114598,7 @@
                           "id": "n3042",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "配置 Key 与模型池",
+                          "content": "配置 Key 与模型协议池",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 16.0,
                           "fontWeight": 500,
@@ -112400,7 +114632,7 @@
                       "id": "n3044",
                       "width": "fill_container",
                       "height": "fit_content",
-                      "content": "独立启停、轮换 Key，并为模型池维护顺序渠道。",
+                      "content": "独立启停、轮换 Key，并为模型协议池维护顺序渠道。",
                       "fontFamily": "Inter Display, system-ui, sans-serif",
                       "fontSize": 14.0,
                       "fontWeight": 400,
@@ -115984,7 +118216,7 @@
                           "id": "n3240",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "48",
+                          "content": "49",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 30.0,
                           "fontWeight": 500,
@@ -123208,7 +125440,7 @@
                           "id": "n10591",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "模型池",
+                          "content": "模型协议池",
                           "fontFamily": "Inter, Noto Sans SC, system-ui, sans-serif",
                           "fontSize": 10.0,
                           "fontWeight": 600,
@@ -130295,7 +132527,7 @@
                           "role": "body-text",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "按 Key 独立配置模型池",
+                          "content": "按 Key 独立配置模型协议池",
                           "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                           "fontSize": 11.0,
                           "fontWeight": 400,
@@ -131869,7 +134101,7 @@
                       "role": "body-text",
                       "width": 390.0,
                       "height": "fit_content",
-                      "content": "价格、性能和稳定性分别展示。先看事实，再决定把谁加入模型池。",
+                      "content": "价格、性能和稳定性分别展示。先看事实，再决定把谁加入模型协议池。",
                       "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                       "fontSize": 16.0,
                       "fontWeight": 400,
@@ -132058,7 +134290,7 @@
                               "role": "body-text",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "综合推荐",
+                              "content": "成功率优先",
                               "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 600,
@@ -132572,7 +134804,7 @@
                                       "role": "body-text",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "最稳定",
+                                      "content": "成功率最高",
                                       "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 500,
@@ -132624,7 +134856,7 @@
                                       "role": "body-text",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "响应最快",
+                                      "content": "TTFT 最快",
                                       "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 500,
@@ -132676,7 +134908,7 @@
                                       "role": "body-text",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "输出最快",
+                                      "content": "TPS 最高",
                                       "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 500,
@@ -134552,7 +136784,7 @@
                           "role": "body-text",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "组合模型池",
+                          "content": "组合模型协议池",
                           "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                           "fontSize": 20.0,
                           "fontWeight": 700,
@@ -139775,7 +142007,7 @@
                           "role": "body-text",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "按 Key 配置模型池",
+                          "content": "按 Key 配置模型协议池",
                           "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                           "fontSize": 10.0,
                           "fontWeight": 400,
@@ -142305,7 +144537,7 @@
                               "role": "body-text",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "02 · 组合模型池",
+                              "content": "02 · 组合模型协议池",
                               "fontFamily": "Haas, Noto Sans SC, Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 700,
@@ -145564,7 +147796,7 @@
     "layoutPrinciples": "### Spacing System\n- **Base unit:** 4px (all spacing snaps to 4-multiples).\n- **Tokens:** `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 16px · `{spacing.lg}` 24px · `{spacing.xl}` 32px · `{spacing.xxl}` 48px · `{spacing.section}` 96px.\n- **Section padding (vertical):** `{spacing.section}` (96px) is the universal vertical rhythm constant — every major editorial band on every page uses 96px top + 96px bottom internal padding.\n- **Card internal padding:** `{spacing.xl}` (32px) for tabbed feature cards and pricing tier cards; `{spacing.xxl}` (48px) inside signature coral / forest / dark cards; `{spacing.lg}` (24px) for cream callouts and demo-grid cards.\n- **Gutters:** `{spacing.lg}` (24px) between cards in 3-up grids; `{spacing.md}` (16px) inside denser logo strips and footer column gutters.\n\n### Grid & Container\n- **Max content width:** ~1280px centered, with `{spacing.xxl}` (48px) horizontal breathing room.\n- **Editorial body:** Single 8/12-column at large breakpoints, collapsing to single-column on mobile.\n- **Demo-card grids:** 3 or 4 columns at desktop, 2 at tablet, 1 at mobile. Card sizes are deliberately uneven within the grid to dodge a uniform \"spec sheet\" feel.\n- **Logo strip:** 6 monochrome partner logos in a single row at desktop; wraps to 3-up on mobile.\n\n### Whitespace Philosophy\nAirtable uses whitespace as the dominant atmospheric tool. Hero sections sit in 96px+ of pure whitespace above and below the headline + sub-headline pair, with no decoration in that whitespace. The hero is intentionally calm — there is no gradient, no aurora, no atmospheric mesh behind the type. The system trusts whitespace alone to do the framing."
   },
   "editorMeta": {
-    "activePageIndex": 2,
+    "activePageIndex": 0,
     "preserveAuthoredGeometry": false
   }
 }
