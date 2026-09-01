@@ -1007,25 +1007,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n53",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "同一个账户同时消费、共享渠道与参与积分交易。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -1152,25 +1133,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n60",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "正余额，可高于信用额度",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -1421,7 +1383,7 @@
                               "id": "n72",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "已排除自有渠道调用",
+                              "content": "不含自有调用",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -1509,31 +1471,12 @@
                               "id": "n77",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "一把 Key，三个模型协议池",
+                              "content": "3 个模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 28.0,
                               "fontWeight": 400,
                               "letterSpacing": 0.0,
                               "lineHeight": 1.35,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n78",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "每个池按优先级尝试原生兼容渠道，输出开始前失败才继续回退。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
                               "textGrowth": "fixed-width",
                               "fill": [
                                 {
@@ -3685,25 +3628,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n195",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "每把 Key 独立授权模型，并维护自己的模型协议池。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -3753,148 +3677,6 @@
                             "onTap": [
                               {
                                 "push": "\"/keys/new\""
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n198",
-                      "width": "fill_container",
-                      "height": 104.0,
-                      "layout": "horizontal",
-                      "gap": 20.0,
-                      "padding": [
-                        20.0,
-                        24.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.signature.cream"
-                        }
-                      ],
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n199",
-                          "iconFontName": "layers",
-                          "width": 28.0,
-                          "height": 28.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.ink"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n200",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 4.0,
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n201",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "池的唯一键是“模型 + API 格式”",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 18.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n202",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "平台不做格式转换，只会加入原生支持相同组合的渠道。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n203",
-                          "role": "button",
-                          "width": "fit_content",
-                          "height": 44.0,
-                          "layout": "horizontal",
-                          "gap": 8.0,
-                          "padding": [
-                            0.0,
-                            18.0
-                          ],
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "cornerRadius": 12.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.canvas"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "$color.hairline"
-                              }
-                            ]
-                          },
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n204",
-                              "width": "fit_content",
-                              "height": "fit_content",
-                              "content": "查看配置示例",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "auto",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            }
-                          ],
-                          "events": {
-                            "onTap": [
-                              {
-                                "push": "\"/keys/pool\""
                               }
                             ]
                           }
@@ -4661,228 +4443,6 @@
                               }
                             ]
                           }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n250",
-                      "width": "fill_container",
-                      "height": "fit_content",
-                      "layout": "horizontal",
-                      "gap": 16.0,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "n251",
-                          "name": "密钥安全",
-                          "role": "card",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 16.0,
-                          "padding": 20.0,
-                          "clipContent": true,
-                          "cornerRadius": 10.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.surface.soft"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "$color.hairline"
-                              }
-                            ]
-                          },
-                          "children": [
-                            {
-                              "type": "icon_font",
-                              "id": "n252",
-                              "iconFontName": "shield-check",
-                              "width": 22.0,
-                              "height": 22.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.info"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n253",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "完整 Key 只显示一次",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 16.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n254",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "之后只能查看前缀、轮换或撤销，不能重新显示。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n255",
-                          "name": "空配置恢复",
-                          "role": "card",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 16.0,
-                          "padding": 20.0,
-                          "clipContent": true,
-                          "cornerRadius": 10.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.canvas"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "$color.hairline"
-                              }
-                            ]
-                          },
-                          "children": [
-                            {
-                              "type": "icon_font",
-                              "id": "n256",
-                              "iconFontName": "circle-dashed",
-                              "width": 22.0,
-                              "height": 22.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n257",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "experiment-lab 还没有模型池",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 16.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n258",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "添加至少一个模型协议池后才可调用。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n259",
-                              "role": "button",
-                              "width": "fit_content",
-                              "height": 44.0,
-                              "layout": "horizontal",
-                              "gap": 8.0,
-                              "padding": [
-                                0.0,
-                                18.0
-                              ],
-                              "justifyContent": "center",
-                              "alignItems": "center",
-                              "cornerRadius": 12.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.primary"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n260",
-                                  "width": "fit_content",
-                                  "height": "fit_content",
-                                  "content": "继续配置",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 14.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "auto",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.on.primary"
-                                    }
-                                  ]
-                                }
-                              ],
-                              "events": {
-                                "onTap": [
-                                  {
-                                    "push": "\"/keys/new\""
-                                  }
-                                ]
-                              }
-                            }
-                          ]
                         }
                       ]
                     }
@@ -5776,25 +5336,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n309",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "先定义用途和可访问模型，下一步再为每个协议池排列渠道。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -5906,25 +5447,6 @@
                                   },
                                   "effects": [],
                                   "cornerRadius": 6.0
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n316",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "只用于在平台内识别，不会发送给上游。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.muted"
-                                    }
-                                  ]
                                 }
                               ]
                             },
@@ -6549,62 +6071,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.on.dark"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n346",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 8.0,
-                              "padding": 16.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.signature.cream"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n347",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "调用前置检查",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n348",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "平台先校验 Key、模型、协议、权限、余额和信用；失败时不访问上游。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
                                     }
                                   ]
                                 }
@@ -7510,7 +6976,7 @@
                               "id": "n397",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "Key：research-cli · 每个池只接受原生兼容的启用渠道。",
+                              "content": "research-cli",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 400,
@@ -7763,25 +7229,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n409",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "仅在输出开始前失败时继续下一渠道；流式输出中断不会切换。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
                                 }
                               ]
                             }
@@ -8433,7 +7880,7 @@
                               "id": "n444",
                               "width": "fit_content",
                               "height": "fit_content",
-                              "content": "Orchid Hub 不支持 Anthropic 格式，已自动排除",
+                              "content": "不兼容，已排除",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -9461,25 +8908,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n498",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "完整凭据仅在这个页面显示一次。关闭后无法再次查看。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -9628,7 +9056,7 @@
                               "id": "n507",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "请保存到密码管理器。平台之后只保留不可逆摘要与前缀。",
+                              "content": "立即复制并保存",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -10280,7 +9708,7 @@
                           "id": "n544",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "不要把平台 Key 提交到 Git、聊天记录或设计资产。若怀疑泄露，请立即轮换。",
+                          "content": "疑似泄露？立即轮换",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 13.0,
                           "fontWeight": 500,
@@ -11243,25 +10671,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n595",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "不保存请求或响应正文；保留用量、延迟、结果、错误码与原始错误消息。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -13065,60 +12474,6 @@
                           }
                         }
                       ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n696",
-                      "width": "fill_container",
-                      "height": 72.0,
-                      "layout": "horizontal",
-                      "gap": 12.0,
-                      "padding": [
-                        14.0,
-                        18.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.surface.soft"
-                        }
-                      ],
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n697",
-                          "iconFontName": "shield-check",
-                          "width": 20.0,
-                          "height": 20.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.info"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n698",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "错误消息与普通统计指标按同一规则保存，但平台代码不得主动拼接凭据或正文。",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 13.0,
-                          "fontWeight": 400,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.body"
-                            }
-                          ]
-                        }
-                      ]
                     }
                   ]
                 }
@@ -14090,25 +13445,6 @@
                                   "color": "$color.on.dark"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n752",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "因为已经向消费者输出内容，系统不会切换到下一渠道，避免重复或混合响应。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -14495,7 +13831,7 @@
                               "id": "n771",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "记录尝试但不向消费者收费",
+                              "content": "未计费",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -14903,7 +14239,7 @@
                               "id": "n791",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "消费者可采取的操作",
+                              "content": "下一步",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 18.0,
                               "fontWeight": 500,
@@ -14972,7 +14308,7 @@
                                   "id": "n795",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "检查客户端是否支持断线重试",
+                                  "content": "检查客户端重试",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -15043,7 +14379,7 @@
                                   "id": "n799",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "确认请求幂等性后重新发起",
+                                  "content": "确认幂等后重试",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -15114,7 +14450,7 @@
                                   "id": "n803",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "若重复出现，调整该池的渠道优先级",
+                                  "content": "调整渠道顺序",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -16072,25 +15408,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n854",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "托管中转站 Base URL 与 Key，按模型声明原生协议和价格倍率。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -17598,148 +16915,6 @@
                           }
                         }
                       ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n940",
-                      "width": "fill_container",
-                      "height": 84.0,
-                      "layout": "horizontal",
-                      "gap": 14.0,
-                      "padding": [
-                        16.0,
-                        20.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.surface.dark"
-                        }
-                      ],
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n941",
-                          "iconFontName": "lock-keyhole",
-                          "width": 22.0,
-                          "height": 22.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.on.dark"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n942",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 3.0,
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n943",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "凭据写入后不再回显",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 15.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n944",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "页面只展示渠道名称、Base URL 主机和 Key 指纹；完整 Key 仅能轮换。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n945",
-                          "role": "button",
-                          "width": "fit_content",
-                          "height": 44.0,
-                          "layout": "horizontal",
-                          "gap": 8.0,
-                          "padding": [
-                            0.0,
-                            18.0
-                          ],
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "cornerRadius": 12.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.canvas"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "$color.hairline"
-                              }
-                            ]
-                          },
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n946",
-                              "width": "fit_content",
-                              "height": "fit_content",
-                              "content": "了解安全边界",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "auto",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            }
-                          ],
-                          "events": {
-                            "onTap": [
-                              {
-                                "push": "\"/channels/new\""
-                              }
-                            ]
-                          }
-                        }
-                      ]
                     }
                   ]
                 }
@@ -18631,25 +17806,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n995",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "先验证安全边界和连接，再配置支持模型与倍率。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -18815,25 +17971,6 @@
                                   },
                                   "effects": [],
                                   "cornerRadius": 6.0
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1005",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "必须为 HTTPS；将检查 DNS、目标 IP、重定向和官方端点禁用清单。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.muted"
-                                    }
-                                  ]
                                 }
                               ]
                             },
@@ -18888,25 +18025,6 @@
                                   },
                                   "effects": [],
                                   "cornerRadius": 6.0
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1009",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "创建后不再回显完整值。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.muted"
-                                    }
-                                  ]
                                 }
                               ]
                             },
@@ -18943,7 +18061,7 @@
                                   "width": "fill_container",
                                   "height": 36.0,
                                   "checked": true,
-                                  "label": "允许平台执行最小化连通性测试",
+                                  "label": "允许连通性测试",
                                   "fill": [
                                     {
                                       "type": "solid",
@@ -18968,7 +18086,7 @@
                                   "width": "fill_container",
                                   "height": 36.0,
                                   "checked": true,
-                                  "label": "我确认这不是 OpenAI 官方 API 端点",
+                                  "label": "非 OpenAI 官方端点",
                                   "fill": [
                                     {
                                       "type": "solid",
@@ -19393,25 +18511,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1038",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "下一步只声明渠道真正原生支持的 Chat Completions、Responses、Anthropic 或 Gemini。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
                                     }
                                   ]
                                 }
@@ -20311,149 +19410,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1087",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "Aurora Relay · 从公开模型目录选择模型，设置原生协议与统一倍率。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n1088",
-                      "width": "fill_container",
-                      "height": 92.0,
-                      "layout": "horizontal",
-                      "gap": 16.0,
-                      "padding": [
-                        16.0,
-                        20.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.signature.mint"
-                        }
-                      ],
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n1089",
-                          "iconFontName": "database",
-                          "width": 22.0,
-                          "height": 22.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.ink"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n1090",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 3.0,
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n1091",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "倍率统一作用于四类基准价",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 15.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1092",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "输入、输出、缓存创建、缓存读取价格都按调用发生时的目录价 × 倍率保存快照。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n1093",
-                          "role": "badge",
-                          "width": "fit_content",
-                          "height": "fit_content",
-                          "layout": "horizontal",
-                          "padding": [
-                            4.0,
-                            8.0
-                          ],
-                          "alignItems": "center",
-                          "cornerRadius": 6.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.canvas"
-                            }
-                          ],
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n1094",
-                              "width": "fit_content",
-                              "height": "fit_content",
-                              "content": "目录版本 2026-09-01",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "auto",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -21243,7 +20199,7 @@
                               "id": "n1136",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "Gemini 2.5 Pro 的倍率无效，发布前必须修正。",
+                              "content": "倍率必须大于 0",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 500,
@@ -23362,25 +22318,6 @@
                                           "color": "$color.ink"
                                         }
                                       ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n1251",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "可排除自己的调用，但底层仍保留两条分录。",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 12.0,
-                                      "fontWeight": 400,
-                                      "letterSpacing": 0.0,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
-                                        }
-                                      ]
                                     }
                                   ]
                                 },
@@ -23469,7 +22406,7 @@
                                   "id": "n1256",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "自有调用收入 0.56 · 自有消费 −0.56 · 手续费 0",
+                                  "content": "自有消费 −0.56 · 自有收入 +0.56 · 手续费 0",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 400,
@@ -24644,7 +23581,7 @@
                               "id": "n1318",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "3 次尝试，最终由 Orchid Hub 完成",
+                              "content": "3 次尝试 · Orchid Hub 成功",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 20.0,
                               "fontWeight": 400,
@@ -24730,7 +23667,7 @@
                               "id": "n1323",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "实际费用 0.18000 + 手续费 0.00018",
+                              "content": "0.18000 + 0.00018 手续费",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 11.0,
                               "fontWeight": 400,
@@ -25597,7 +24534,7 @@
                                   "id": "n1370",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "基准价 × 1.12 倍率 · 手续费率 0.1%",
+                                  "content": "基准价 × 1.12 · 手续费 0.1%",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 400,
@@ -25608,25 +24545,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.body"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1371",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "请求正文与响应正文：未保存",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
                                     }
                                   ]
                                 }
@@ -26532,7 +25450,7 @@
                               "id": "n1420",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "积分只用于内部清算；1 积分 ≈ 1 元是参考单位，不是平台兑付承诺。",
+                              "content": "参考价 ≈ ¥1 · 平台不兑付",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 400,
@@ -27840,279 +26758,6 @@
                               ]
                             }
                           ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n1496",
-                          "name": "余额构成",
-                          "role": "card",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "layout": "vertical",
-                          "gap": 16.0,
-                          "padding": 20.0,
-                          "clipContent": true,
-                          "cornerRadius": 10.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.surface.soft"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "$color.hairline"
-                              }
-                            ]
-                          },
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "n1497",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "同一账户的三种数量",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 18.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1498",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 4.0,
-                              "padding": 14.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.canvas"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n1499",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "总余额",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1500",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "全部已提交平衡分录的净额",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1501",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 4.0,
-                              "padding": 14.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.canvas"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n1502",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "冻结",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1503",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "仍属于你，但暂时不能消费或转移",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1504",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 4.0,
-                              "padding": 14.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.canvas"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n1505",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "可用",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1506",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "总余额减冻结，可继续消费或挂单",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1507",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 5.0,
-                              "padding": 14.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.signature.mint"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n1508",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "信用不是赠送积分",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1509",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "它只允许余额暂时为负；正积分始终对应其他账户的负余额。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
                         }
                       ]
                     }
@@ -29006,25 +27651,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1558",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "预计费用超出可用余额与信用下限，没有访问任何渠道。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -29092,7 +27718,7 @@
                               "id": "n1563",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "当前余额 −9.80，信用下限 −10.00，本次预计需要 0.42 积分。",
+                              "content": "可用 0.20 · 预计 0.42",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 400,
@@ -29557,25 +28183,6 @@
                           ]
                         },
                         {
-                          "type": "text",
-                          "id": "n1585",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "买入积分后，余额可以从负数直接变成较大的正数，不受信用额度上限限制。",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 13.0,
-                          "fontWeight": 400,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.body"
-                            }
-                          ]
-                        },
-                        {
                           "type": "frame",
                           "id": "n1586",
                           "width": "fill_container",
@@ -29648,7 +28255,7 @@
                                   "id": "n1590",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "人民币直接付给卖家，平台只划转积分。",
+                                  "content": "人民币直付卖家",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 400,
@@ -29771,25 +28378,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1596",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "额度调整必须保留审计，不是自动赠送积分。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
                                     }
                                   ]
                                 }
@@ -30689,25 +29277,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1645",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "买卖双方直接结算人民币；平台托管和划转积分。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -30920,7 +29489,7 @@
                           "id": "n1656",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "平台不做市、不承诺流动性",
+                          "content": "平台不做市",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 12.0,
                           "fontWeight": 400,
@@ -33360,25 +31929,6 @@
                               ]
                             },
                             {
-                              "type": "text",
-                              "id": "n1792",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "你不需要买下整张卖单。成交后，父卖单剩余数量会从 900 变为 800。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
-                            },
-                            {
                               "type": "frame",
                               "id": "n1793",
                               "width": "fill_container",
@@ -33468,7 +32018,7 @@
                                   "id": "n1798",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "该卖单允许单笔 20 – 200 积分。",
+                                  "content": "单笔 20–200 积分",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 400,
@@ -33553,7 +32103,7 @@
                                   "id": "n1803",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "平台不收 C2C 手续费。人民币直接支付给卖家。",
+                                  "content": "0 手续费 · 线下支付",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 400,
@@ -33575,7 +32125,7 @@
                               "width": "fill_container",
                               "height": 36.0,
                               "checked": true,
-                              "label": "我理解平台只能冻结和划转积分，不能确认微信款项到账",
+                              "label": "我确认线下支付",
                               "fill": [
                                 {
                                   "type": "solid",
@@ -33774,25 +32324,6 @@
                               ]
                             },
                             {
-                              "type": "text",
-                              "id": "n1813",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "创建交易单后",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 20.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
-                            },
-                            {
                               "type": "frame",
                               "id": "n1814",
                               "width": "fill_container",
@@ -33839,7 +32370,7 @@
                                   "id": "n1816",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "100 积分从父挂单转为交易中",
+                                  "content": "冻结 100",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -33902,7 +32433,7 @@
                                   "id": "n1819",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "900 → 800 可继续被其他人承接",
+                                  "content": "900 → 800",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -33965,7 +32496,7 @@
                                   "id": "n1822",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "人民币在平台外完成",
+                                  "content": "线下支付",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -34028,7 +32559,7 @@
                                   "id": "n1825",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "确认到账后平台原子划转",
+                                  "content": "到账后放行",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 400,
@@ -35021,25 +33552,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1879",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "倒计时结束前未声明付款，交易将超时，积分恢复到父卖单。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -35432,7 +33944,7 @@
                                   "id": "n1900",
                                   "width": "fill_container",
                                   "height": 96.0,
-                                  "placeholder": "不要填写凭据或私人内容",
+                                  "placeholder": "付款备注（可选）",
                                   "value": "已通过微信转账，备注 T-2841",
                                   "maxVisibleLines": 4,
                                   "fill": [
@@ -35461,7 +33973,7 @@
                               "width": "fill_container",
                               "height": 36.0,
                               "checked": true,
-                              "label": "我已经在支付工具中完成 ¥100.00 转账",
+                              "label": "我已转账 ¥100.00",
                               "fill": [
                                 {
                                   "type": "solid",
@@ -35597,204 +34109,6 @@
                                       }
                                     ]
                                   }
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n1907",
-                          "width": 360.0,
-                          "height": "fill_container",
-                          "layout": "vertical",
-                          "gap": 18.0,
-                          "padding": 24.0,
-                          "cornerRadius": 12.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.signature.cream"
-                            }
-                          ],
-                          "children": [
-                            {
-                              "type": "icon_font",
-                              "id": "n1908",
-                              "iconFontName": "image-off",
-                              "width": 28.0,
-                              "height": 28.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1909",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "截图不会自动放行",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 20.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1910",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "“我已付款”只是你的声明。卖家必须亲自在支付工具中确认实际到账。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 13.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1911",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "horizontal",
-                              "gap": 8.0,
-                              "alignItems": "center",
-                              "children": [
-                                {
-                                  "type": "icon_font",
-                                  "id": "n1912",
-                                  "iconFontName": "check",
-                                  "width": 16.0,
-                                  "height": 16.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.success"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1913",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "截图可以伪造或重复使用",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1914",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "horizontal",
-                              "gap": 8.0,
-                              "alignItems": "center",
-                              "children": [
-                                {
-                                  "type": "icon_font",
-                                  "id": "n1915",
-                                  "iconFontName": "check",
-                                  "width": 16.0,
-                                  "height": 16.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.success"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1916",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "转账发起不代表已经到账",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n1917",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "horizontal",
-                              "gap": 8.0,
-                              "alignItems": "center",
-                              "children": [
-                                {
-                                  "type": "icon_font",
-                                  "id": "n1918",
-                                  "iconFontName": "check",
-                                  "width": 16.0,
-                                  "height": 16.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.success"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n1919",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "正常放行权由实际收款的卖家掌握",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
                                 }
                               ]
                             }
@@ -36772,25 +35086,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n1973",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "买方声明不能触发自动放行；卖家确认后平台才原子划转积分。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.body"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -37566,7 +35861,7 @@
                               "id": "n2016",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "仅在支付工具中亲自确认实际到账后放行。",
+                              "content": "确认到账后放行",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 400,
@@ -37694,7 +35989,7 @@
                               "id": "n2021",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "争议期间积分继续冻结，等待管理员人工仲裁。",
+                              "content": "未到账？发起争议",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 11.0,
                               "fontWeight": 400,
@@ -38668,25 +36963,6 @@
                           "fontWeight": 400,
                           "letterSpacing": 0.0,
                           "lineHeight": 1.35,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.on.dark"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n2074",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "卖家已确认 ¥100.00 到账，平台将冻结的 100 积分原子划转给买家。",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 13.0,
-                          "fontWeight": 400,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
                           "textGrowth": "fixed-width",
                           "fill": [
                             {
@@ -40691,25 +38967,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2182",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "取消和付款超时都不会划转积分；交易数量恢复到父挂单。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         }
@@ -40776,7 +39033,7 @@
                                   "id": "n2186",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "状态：已取消",
+                                  "content": "已取消",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 500,
@@ -40829,7 +39086,7 @@
                               "id": "n2189",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "交易 #T-2841 不再有效，没有人民币或积分成交。",
+                              "content": "未成交 · 数量已恢复",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 400,
@@ -41188,7 +39445,7 @@
                                   "id": "n2206",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "状态：已超时",
+                                  "content": "已超时",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 500,
@@ -41241,7 +39498,7 @@
                               "id": "n2209",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "系统自动结束子交易，并将数量和冻结恢复到父挂单。",
+                              "content": "数量与冻结已恢复",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 400,
@@ -42519,25 +40776,6 @@
                                   "color": "$color.on.dark"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2277",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "管理员可以放给买家、退回卖家、延长核实或限制账户。",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -42734,7 +40972,7 @@
                                   "id": "n2288",
                                   "width": "fill_container",
                                   "height": 96.0,
-                                  "placeholder": "只陈述订单、时间、金额和实际到账情况",
+                                  "placeholder": "时间、金额与到账情况",
                                   "value": "14:21 已转账，卖家仍未确认到账。",
                                   "maxVisibleLines": 4,
                                   "fill": [
@@ -42763,7 +41001,7 @@
                               "width": "fill_container",
                               "height": 36.0,
                               "checked": true,
-                              "label": "我确认提交内容不包含 API Key 或请求正文",
+                              "label": "不含 API Key 或请求正文",
                               "fill": [
                                 {
                                   "type": "solid",
@@ -43105,7 +41343,7 @@
                                   "id": "n2305",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "仍由双方自行核实",
+                                  "content": "双方核实",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 12.0,
                                   "fontWeight": 500,
@@ -43202,7 +41440,7 @@
                                   "id": "n2310",
                                   "width": "fill_container",
                                   "height": "fit_content",
-                                  "content": "截图仅作为辅助证据",
+                                  "content": "截图仅作证据",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 13.0,
                                   "fontWeight": 500,
@@ -43213,25 +41451,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n2311",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "系统不会使用截图或 AI 识别结果自动释放积分。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
                                     }
                                   ]
                                 }
@@ -44131,25 +42350,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2360",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "用零和恒等式监控账本，集中处理渠道异常、逾期信用与 C2C 争议",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -44725,7 +42925,7 @@
                               "id": "n2386",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "参考 1 积分 ≈ ¥1",
+                              "content": "≈ ¥1 / 积分",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -46336,72 +44536,6 @@
                                   ]
                                 }
                               ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n2477",
-                              "role": "note",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "layout": "vertical",
-                              "gap": 8.0,
-                              "padding": 16.0,
-                              "cornerRadius": 10.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.signature.cream"
-                                }
-                              ],
-                              "stroke": {
-                                "thickness": 1.0,
-                                "fill": [
-                                  {
-                                    "type": "solid",
-                                    "color": "$color.hairline"
-                                  }
-                                ]
-                              },
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "n2478",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "错误观测",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 13.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n2479",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "保存统计指标、错误码与原始错误消息；不保存请求或响应正文。",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.body"
-                                    }
-                                  ]
-                                }
-                              ]
                             }
                           ]
                         }
@@ -47297,25 +45431,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2528",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "首版必须可观察、可恢复的空态、加载态、失败态与交易状态",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -47543,25 +45658,6 @@
                               ]
                             }
                           ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n2540",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "点击任一状态跳到对应原型页面",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 12.0,
-                          "fontWeight": 400,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.muted"
-                            }
-                          ]
                         }
                       ]
                     },
@@ -47640,25 +45736,6 @@
                                     {
                                       "type": "solid",
                                       "color": "$color.ink"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n2545",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "每种结果都给用户明确原因与下一步",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 400,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.muted"
                                     }
                                   ]
                                 }
@@ -47774,7 +45851,7 @@
                                           "id": "n2553",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "用户结果",
+                                          "content": "结果",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 500,
@@ -47894,7 +45971,7 @@
                                           "id": "n2560",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "保留骨架，不阻断导航",
+                                          "content": "保持导航",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48021,7 +46098,7 @@
                                           "id": "n2567",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "解释价值并给唯一主动作",
+                                          "content": "唯一主操作",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48148,7 +46225,7 @@
                                           "id": "n2574",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "字段旁指出原因并保留输入",
+                                          "content": "保留输入",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48275,7 +46352,7 @@
                                           "id": "n2581",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "上游前拒绝，可去 C2C 买入",
+                                          "content": "转到 C2C",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48402,7 +46479,7 @@
                                           "id": "n2588",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "顺序回退并记录每次尝试",
+                                          "content": "顺序回退",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48529,7 +46606,7 @@
                                           "id": "n2595",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "不再回退，不收费并标注中断",
+                                          "content": "中断 · 不收费",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48656,7 +46733,7 @@
                                           "id": "n2602",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "一次性展示密钥与下一步",
+                                          "content": "显示密钥",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 13.0,
                                           "fontWeight": 400,
@@ -48736,7 +46813,7 @@
                               "id": "n2605",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "平台只托管积分；人民币始终在平台外转账",
+                              "content": "线下支付",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -48894,7 +46971,7 @@
                                       "id": "n2614",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "买家声明付款，卖家核实到账",
+                                      "content": "等待卖家",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 400,
@@ -48985,7 +47062,7 @@
                                       "id": "n2619",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "冻结积分原子划给买家",
+                                      "content": "原子划转",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 400,
@@ -49076,7 +47153,7 @@
                                       "id": "n2624",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "订单额度回到父挂单",
+                                      "content": "恢复父挂单",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 400,
@@ -49167,7 +47244,7 @@
                                       "id": "n2629",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "自动取消并解冻",
+                                      "content": "自动取消 · 解冻",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 400,
@@ -49258,7 +47335,7 @@
                                       "id": "n2634",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "双方提交证据，管理员裁决",
+                                      "content": "管理员裁决",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 11.0,
                                       "fontWeight": 400,
@@ -49295,70 +47372,6 @@
                                   }
                                 ]
                               }
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n2636",
-                      "role": "note",
-                      "width": "fill_container",
-                      "height": 52.0,
-                      "layout": "horizontal",
-                      "gap": 12.0,
-                      "padding": [
-                        0.0,
-                        16.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.surface.soft"
-                        }
-                      ],
-                      "stroke": {
-                        "thickness": 1.0,
-                        "fill": [
-                          {
-                            "type": "solid",
-                            "color": "$color.hairline"
-                          }
-                        ]
-                      },
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n2637",
-                          "iconFontName": "shield-check",
-                          "width": 18.0,
-                          "height": 18.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.success"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n2638",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "跨状态不变量：不保存请求/响应正文；每次余额变化有对手方；官方 OpenAI API 端点被拒绝；密钥仅创建时展示一次。",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 12.0,
-                          "fontWeight": 500,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.ink"
                             }
                           ]
                         }
@@ -50254,25 +48267,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2687",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "管理员创建账号并手动管理信用额度；所有账户初始余额为 0",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -50580,25 +48574,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2701",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "全部由管理员创建",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -50665,25 +48640,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2705",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "信用容量，不是财富",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -51930,7 +49886,7 @@
                               "id": "n2778",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "不开放自由注册；临时凭据只展示一次",
+                              "content": "仅管理员创建 · 凭据仅显示一次",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 12.0,
                               "fontWeight": 400,
@@ -52169,7 +50125,7 @@
                                       "id": "n2790",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "最低允许余额 -10.00",
+                                      "content": "最低余额 −10.00",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 12.0,
                                       "fontWeight": 400,
@@ -52193,7 +50149,7 @@
                               "width": "fill_container",
                               "height": 36.0,
                               "checked": true,
-                              "label": "创建后要求首次登录改密",
+                              "label": "首次登录改密",
                               "fill": [
                                 {
                                   "type": "solid",
@@ -53300,25 +51256,6 @@
                                   "color": "$color.ink"
                                 }
                               ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n2848",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "管理员维护公开元数据和平台基准价；渠道只能选择目录中的模型",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 14.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
-                                }
-                              ]
                             }
                           ]
                         },
@@ -53550,70 +51487,6 @@
                               }
                             ]
                           }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n2858",
-                      "role": "alert",
-                      "width": "fill_container",
-                      "height": 48.0,
-                      "layout": "horizontal",
-                      "gap": 12.0,
-                      "padding": [
-                        0.0,
-                        16.0
-                      ],
-                      "alignItems": "center",
-                      "cornerRadius": 10.0,
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.signature.cream"
-                        }
-                      ],
-                      "stroke": {
-                        "thickness": 1.0,
-                        "fill": [
-                          {
-                            "type": "solid",
-                            "color": "$color.hairline"
-                          }
-                        ]
-                      },
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n2859",
-                          "iconFontName": "info",
-                          "width": 18.0,
-                          "height": 18.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.ink"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n2860",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "价格是版本化快照；渠道倍率按请求发生时的目录版本结算。下列数值仅为原型示例。",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 13.0,
-                          "fontWeight": 400,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.ink"
-                            }
-                          ]
                         }
                       ]
                     },
@@ -54561,25 +52434,6 @@
                                         {
                                           "type": "solid",
                                           "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n2916",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "元数据用于目录展示、定价和渠道配置",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 12.0,
-                                      "fontWeight": 400,
-                                      "letterSpacing": 0.0,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
                                         }
                                       ]
                                     }
@@ -60586,7 +58440,7 @@
                       "id": "n3236",
                       "width": "fill_container",
                       "height": "fit_content",
-                      "content": "首版核心工作流 · 设计评审总览",
+                      "content": "核心工作流",
                       "fontFamily": "Inter Display, system-ui, sans-serif",
                       "fontSize": 24.0,
                       "fontWeight": 400,
@@ -60597,25 +58451,6 @@
                         {
                           "type": "solid",
                           "color": "$color.on.dark"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "n3237",
-                      "width": "fill_container",
-                      "height": "fit_content",
-                      "content": "熟人小圈子的 API 共享、聚合访问、积分结算与 C2C 市场",
-                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                      "fontSize": 14.0,
-                      "fontWeight": 400,
-                      "letterSpacing": 0.0,
-                      "lineHeight": 1.5,
-                      "textGrowth": "fixed-width",
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.signature.mint"
                         }
                       ]
                     }
@@ -60931,7 +58766,7 @@
                               "id": "n3255",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "消费者 · 模型协议池",
+                              "content": "模型协议池",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 20.0,
                               "fontWeight": 500,
@@ -60942,25 +58777,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3256",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "每把 Key 独立配置模型与原生协议，池内按优先级顺序回退",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 11.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -61327,7 +59143,7 @@
                                       "id": "n3276",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "gpt-5.4 · Responses 模型池",
+                                      "content": "GPT-5.4 · Responses",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 20.0,
                                       "fontWeight": 500,
@@ -61338,25 +59154,6 @@
                                         {
                                           "type": "solid",
                                           "color": "$color.ink"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "n3277",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "失败只在首个输出前继续；开始流式输出后不切换渠道",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 12.0,
-                                      "fontWeight": 400,
-                                      "letterSpacing": 0.0,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.muted"
                                         }
                                       ]
                                     }
@@ -61515,7 +59312,7 @@
                                           "id": "n3286",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "原生 responses · 健康检查通过",
+                                          "content": "Responses · 健康",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 11.0,
                                           "fontWeight": 400,
@@ -61695,7 +59492,7 @@
                                           "id": "n3295",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "原生 responses · 健康检查通过",
+                                          "content": "Responses · 健康",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 11.0,
                                           "fontWeight": 400,
@@ -61875,7 +59672,7 @@
                                           "id": "n3304",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "原生 responses · 健康检查通过",
+                                          "content": "Responses · 健康",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 11.0,
                                           "fontWeight": 400,
@@ -61954,60 +59751,6 @@
                                   ]
                                 }
                               ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "n3308",
-                              "width": "fill_container",
-                              "height": 54.0,
-                              "layout": "horizontal",
-                              "gap": 10.0,
-                              "padding": [
-                                0.0,
-                                14.0
-                              ],
-                              "alignItems": "center",
-                              "cornerRadius": 8.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.surface.dark"
-                                }
-                              ],
-                              "children": [
-                                {
-                                  "type": "icon_font",
-                                  "id": "n3309",
-                                  "iconFontName": "shield-check",
-                                  "width": 18.0,
-                                  "height": 18.0,
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.signature.mint"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "n3310",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "content": "不做格式转换 · 不保存请求/响应正文 · 错误与指标可追溯",
-                                  "fontFamily": "Inter Display, system-ui, sans-serif",
-                                  "fontSize": 12.0,
-                                  "fontWeight": 500,
-                                  "letterSpacing": 0.0,
-                                  "lineHeight": 1.5,
-                                  "textGrowth": "fixed-width",
-                                  "fill": [
-                                    {
-                                      "type": "solid",
-                                      "color": "$color.on.dark"
-                                    }
-                                  ]
-                                }
-                              ]
                             }
                           ]
                         }
@@ -62080,7 +59823,7 @@
                               "id": "n3314",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "共享者 · 渠道发布",
+                              "content": "渠道发布",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 20.0,
                               "fontWeight": 500,
@@ -62091,25 +59834,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3315",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "平台托管并代理访问上游密钥",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 11.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -62225,7 +59949,7 @@
                               "id": "n3321",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "https://relay.example.test/v1 · 密钥已安全保存，不再展示",
+                              "content": "relay.example.test · Key 已保存",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 11.0,
                               "fontWeight": 400,
@@ -62905,7 +60629,7 @@
                               "id": "n3355",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "C2C · 真实挂单与部分成交",
+                              "content": "C2C 市场",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 20.0,
                               "fontWeight": 500,
@@ -62916,25 +60640,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3356",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "买单和卖单都可承接部分数量；人民币始终在平台外流转",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 11.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -64820,7 +62525,7 @@
                               "id": "n3463",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "管理员 · 零和账本",
+                              "content": "运营与账本",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 20.0,
                               "fontWeight": 500,
@@ -64831,25 +62536,6 @@
                                 {
                                   "type": "solid",
                                   "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3464",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "账号、信用额度、模型目录与仲裁",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 11.0,
-                              "fontWeight": 400,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.muted"
                                 }
                               ]
                             }
@@ -65131,65 +62817,11 @@
                           ]
                         },
                         {
-                          "type": "frame",
-                          "id": "n3478",
-                          "width": "fill_container",
-                          "height": 52.0,
-                          "layout": "horizontal",
-                          "gap": 10.0,
-                          "padding": [
-                            0.0,
-                            16.0
-                          ],
-                          "alignItems": "center",
-                          "cornerRadius": 8.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.surface.dark"
-                            }
-                          ],
-                          "children": [
-                            {
-                              "type": "icon_font",
-                              "id": "n3479",
-                              "iconFontName": "check-circle",
-                              "width": 18.0,
-                              "height": 18.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.signature.mint"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3480",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "每笔余额变化有对手方 · 手续费进入平台激励账户",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 12.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.on.dark"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
                           "type": "text",
                           "id": "n3481",
                           "width": "fill_container",
                           "height": "fit_content",
-                          "content": "当前运营信号",
+                          "content": "运营信号",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 13.0,
                           "fontWeight": 500,
@@ -65442,60 +63074,6 @@
                               ]
                             }
                           ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "n3494",
-                          "width": "fill_container",
-                          "height": 48.0,
-                          "layout": "horizontal",
-                          "gap": 10.0,
-                          "padding": [
-                            0.0,
-                            14.0
-                          ],
-                          "alignItems": "center",
-                          "cornerRadius": 8.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.signature.cream"
-                            }
-                          ],
-                          "children": [
-                            {
-                              "type": "icon_font",
-                              "id": "n3495",
-                              "iconFontName": "eye-off",
-                              "width": 18.0,
-                              "height": 18.0,
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "text",
-                              "id": "n3496",
-                              "width": "fill_container",
-                              "height": "fit_content",
-                              "content": "保存指标、错误码与原始错误消息；不保存请求或响应正文",
-                              "fontFamily": "Inter Display, system-ui, sans-serif",
-                              "fontSize": 11.0,
-                              "fontWeight": 500,
-                              "letterSpacing": 0.0,
-                              "lineHeight": 1.5,
-                              "textGrowth": "fixed-width",
-                              "fill": [
-                                {
-                                  "type": "solid",
-                                  "color": "$color.ink"
-                                }
-                              ]
-                            }
-                          ]
                         }
                       ]
                     }
@@ -65542,7 +63120,7 @@
                       "id": "n3499",
                       "width": "fit_content",
                       "height": "fit_content",
-                      "content": "关键状态覆盖",
+                      "content": "关键状态",
                       "fontFamily": "Inter Display, system-ui, sans-serif",
                       "fontSize": 18.0,
                       "fontWeight": 500,
@@ -65553,25 +63131,6 @@
                         {
                           "type": "solid",
                           "color": "$color.ink"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "n3500",
-                      "width": "fit_content",
-                      "height": "fit_content",
-                      "content": "空态 · 加载 · 校验 · 失败 · 成功 · 取消 · 超时 · 争议",
-                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                      "fontSize": 12.0,
-                      "fontWeight": 400,
-                      "letterSpacing": 0.0,
-                      "lineHeight": 1.5,
-                      "textGrowth": "auto",
-                      "fill": [
-                        {
-                          "type": "solid",
-                          "color": "$color.muted"
                         }
                       ]
                     }
@@ -66037,92 +63596,6 @@
                           "width": "fill_container",
                           "height": "fit_content",
                           "content": "移动 390",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 11.0,
-                          "fontWeight": 500,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.body"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n3528",
-                      "width": "fill_container",
-                      "height": 38.0,
-                      "layout": "horizontal",
-                      "gap": 8.0,
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n3529",
-                          "iconFontName": "check",
-                          "width": 15.0,
-                          "height": 15.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.success"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n3530",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "Airtable 原始设计语言",
-                          "fontFamily": "Inter Display, system-ui, sans-serif",
-                          "fontSize": 11.0,
-                          "fontWeight": 500,
-                          "letterSpacing": 0.0,
-                          "lineHeight": 1.5,
-                          "textGrowth": "fixed-width",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.body"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "n3531",
-                      "width": "fill_container",
-                      "height": 38.0,
-                      "layout": "horizontal",
-                      "gap": 8.0,
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "n3532",
-                          "iconFontName": "check",
-                          "width": 15.0,
-                          "height": 15.0,
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "$color.success"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "n3533",
-                          "width": "fill_container",
-                          "height": "fit_content",
-                          "content": "可编辑 .op 与同名 PNG 纳入 Git",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 11.0,
                           "fontWeight": 500,
@@ -71361,7 +68834,7 @@
     "layoutPrinciples": "### Spacing System\n- **Base unit:** 4px (all spacing snaps to 4-multiples).\n- **Tokens:** `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 16px · `{spacing.lg}` 24px · `{spacing.xl}` 32px · `{spacing.xxl}` 48px · `{spacing.section}` 96px.\n- **Section padding (vertical):** `{spacing.section}` (96px) is the universal vertical rhythm constant — every major editorial band on every page uses 96px top + 96px bottom internal padding.\n- **Card internal padding:** `{spacing.xl}` (32px) for tabbed feature cards and pricing tier cards; `{spacing.xxl}` (48px) inside signature coral / forest / dark cards; `{spacing.lg}` (24px) for cream callouts and demo-grid cards.\n- **Gutters:** `{spacing.lg}` (24px) between cards in 3-up grids; `{spacing.md}` (16px) inside denser logo strips and footer column gutters.\n\n### Grid & Container\n- **Max content width:** ~1280px centered, with `{spacing.xxl}` (48px) horizontal breathing room.\n- **Editorial body:** Single 8/12-column at large breakpoints, collapsing to single-column on mobile.\n- **Demo-card grids:** 3 or 4 columns at desktop, 2 at tablet, 1 at mobile. Card sizes are deliberately uneven within the grid to dodge a uniform \"spec sheet\" feel.\n- **Logo strip:** 6 monochrome partner logos in a single row at desktop; wraps to 3-up on mobile.\n\n### Whitespace Philosophy\nAirtable uses whitespace as the dominant atmospheric tool. Hero sections sit in 96px+ of pure whitespace above and below the headline + sub-headline pair, with no decoration in that whitespace. The hero is intentionally calm — there is no gradient, no aurora, no atmospheric mesh behind the type. The system trusts whitespace alone to do the framing."
   },
   "editorMeta": {
-    "activePageIndex": 1,
+    "activePageIndex": 0,
     "preserveAuthoredGeometry": false
   }
 }
