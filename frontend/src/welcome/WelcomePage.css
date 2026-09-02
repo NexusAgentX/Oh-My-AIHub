@@ -33,6 +33,10 @@
   text-decoration: none;
 }
 
+.welcome-page strong {
+  color: inherit;
+}
+
 .welcome-page a:focus-visible {
   outline: 3px solid #458fff;
   outline-offset: 4px;
