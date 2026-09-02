@@ -134,3 +134,144 @@ export type ModelInput = Omit<
   CatalogModel,
   'price_unit' | 'version' | 'created_at' | 'updated_at' | 'price_updated_at'
 >
+
+export type ChannelStatus = 'draft' | 'published' | 'paused' | 'deleted'
+export type ChannelOfferStatus = 'active' | 'disabled' | 'deleted'
+export type ChannelProtocol =
+  | 'openai_chat_completions'
+  | 'openai_responses'
+  | 'anthropic_messages'
+  | 'google_gemini_generate_content'
+export type ValidationStatus = 'in_progress' | 'passed' | 'failed'
+
+export type ValidationSummary = {
+  id: string
+  validation_version: number
+  attempt_seq: number
+  status: ValidationStatus
+  error_category: string
+  http_status: number | null
+  duration_milliseconds: number
+  started_at: string
+  completed_at: string | null
+}
+
+export type AuthorizedValidationAttempt = ValidationSummary & {
+  actor_account_id: string
+  raw_error: string
+  raw_error_truncated: boolean
+}
+
+export type ChannelOffer = {
+  id: string
+  model_id: string
+  model_name: string
+  model_provider: string
+  protocol: ChannelProtocol
+  upstream_model_id?: string
+  multiplier: string
+  status: ChannelOfferStatus
+  validation_version: number
+  version?: number
+  eligible: boolean
+  ineligible_reason: string
+  input_price?: string | null
+  output_price?: string | null
+  cache_write_price?: string | null
+  cache_read_price?: string | null
+  latest_validation: ValidationSummary | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type Channel = {
+  id: string
+  owner_account_id: string
+  owner_display_name: string
+  display_name: string
+  base_url?: string
+  credential_configured: boolean
+  credential_version: number
+  credential_updated_at: string | null
+  status: ChannelStatus
+  version: number
+  offers: ChannelOffer[]
+  average_rating: string | null
+  rating_count: number
+  current_user_rating?: number | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type MarketOffer = {
+  offer_id: string
+  channel_id: string
+  channel_display_name: string
+  owner_account_id: string
+  owner_display_name: string
+  model_id: string
+  model_name: string
+  model_provider: string
+  protocol: ChannelProtocol
+  multiplier: string
+  input_price: string
+  output_price: string
+  cache_write_price: string
+  cache_read_price: string
+  validation_status: ValidationStatus
+  last_tested_at: string | null
+  average_rating: string | null
+  rating_count: number
+  call_success_rate: string | null
+  ttft_milliseconds: number | null
+  tokens_per_second: string | null
+  call_count: number | null
+}
+
+export type MarketChannel = {
+  id: string
+  display_name: string
+  owner_account_id: string
+  owner_display_name: string
+  status: 'published' | 'paused'
+  offers: MarketOffer[]
+  average_rating: string | null
+  rating_count: number
+  current_user_rating: number | null
+}
+
+export type AdminChannelOffer = {
+  id: string
+  model_id: string
+  model_name: string
+  model_provider: string
+  protocol: ChannelProtocol
+  multiplier: string
+  status: ChannelOfferStatus
+  validation_version: number
+  latest_validation: ValidationSummary | null
+}
+
+export type AdminChannel = {
+  id: string
+  owner_account_id: string
+  owner_display_name: string
+  display_name: string
+  credential_configured: boolean
+  credential_version: number
+  credential_updated_at: string | null
+  status: ChannelStatus
+  version: number
+  offers: AdminChannelOffer[]
+  average_rating: string | null
+  rating_count: number
+  created_at: string
+  updated_at: string
+}
+
+export type ChannelOfferInput = {
+  model_id: string
+  protocol: ChannelProtocol
+  upstream_model_id: string
+  multiplier: string
+}

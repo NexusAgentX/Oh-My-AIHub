@@ -1,9 +1,17 @@
 import type {
   Account,
   AccountStatus,
+  AdminChannel,
+  AuthorizedValidationAttempt,
   CatalogModel,
+  Channel,
+  ChannelOffer,
+  ChannelOfferInput,
+  ChannelProtocol,
   LedgerEntry,
   LedgerMetrics,
+  MarketChannel,
+  MarketOffer,
   ModelInput,
   Wallet,
   WalletRecoveryAction,
@@ -52,6 +60,23 @@ export function ledgerEntriesPath(
   const query = new URLSearchParams({ limit: String(limit) })
   if (before) query.set('before', before)
   return `${path}?${query.toString()}`
+}
+
+export function marketOffersPath(input: {
+  modelID?: string
+  protocol?: ChannelProtocol | ''
+  owner?: string
+  sort?: 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'rating'
+  after?: string
+  limit?: number
+} = {}) {
+  const query = new URLSearchParams({ limit: String(input.limit ?? 20) })
+  if (input.modelID) query.set('model_id', input.modelID)
+  if (input.protocol) query.set('protocol', input.protocol)
+  if (input.owner) query.set('owner', input.owner)
+  if (input.sort) query.set('sort', input.sort)
+  if (input.after) query.set('after', input.after)
+  return `/api/market/offers?${query.toString()}`
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -233,5 +258,210 @@ export const api = {
         body: JSON.stringify({ ...input, expected_version: expectedVersion }),
       })
     ).model
+  },
+  async channels() {
+    return (await request<{ channels: Channel[] }>('/api/channels')).channels
+  },
+  async channel(channelID: string) {
+    return (
+      await request<{ channel: Channel }>(
+        `/api/channels/${encodeURIComponent(channelID)}`,
+      )
+    ).channel
+  },
+  async createChannel(input: {
+    display_name: string
+    base_url: string
+    credential: string
+    offers: ChannelOfferInput[]
+  }) {
+    return (
+      await request<{ channel: Channel }>('/api/channels', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+    ).channel
+  },
+  async updateChannel(
+    channelID: string,
+    input: {
+      display_name: string
+      base_url: string
+      credential?: string
+      expected_version: number
+    },
+  ) {
+    return (
+      await request<{ channel: Channel }>(
+        `/api/channels/${encodeURIComponent(channelID)}`,
+        { method: 'PATCH', body: JSON.stringify(input) },
+      )
+    ).channel
+  },
+  async setChannelStatus(
+    channelID: string,
+    action: 'publish' | 'pause',
+    expectedVersion: number,
+    reason = '',
+  ) {
+    return (
+      await request<{ channel: Channel }>(
+        `/api/channels/${encodeURIComponent(channelID)}/${action}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expected_version: expectedVersion, reason }),
+        },
+      )
+    ).channel
+  },
+  async deleteChannel(channelID: string, expectedVersion: number, reason = '') {
+    return (
+      await request<{ channel: Channel }>(
+        `/api/channels/${encodeURIComponent(channelID)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ expected_version: expectedVersion, reason }),
+        },
+      )
+    ).channel
+  },
+  async revokeChannelCredential(channelID: string, expectedVersion: number) {
+    return (
+      await request<{ channel: Channel }>(
+        `/api/channels/${encodeURIComponent(channelID)}/credential-revoke`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expected_version: expectedVersion }),
+        },
+      )
+    ).channel
+  },
+  async addChannelOffer(
+    channelID: string,
+    expectedChannelVersion: number,
+    input: ChannelOfferInput,
+  ) {
+    return (
+      await request<{ offer: ChannelOffer }>(
+        `/api/channels/${encodeURIComponent(channelID)}/offers`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...input,
+            expected_version: expectedChannelVersion,
+          }),
+        },
+      )
+    ).offer
+  },
+  async updateChannelOffer(
+    offerID: string,
+    expectedVersion: number,
+    upstreamModelID: string,
+    multiplier: string,
+  ) {
+    return (
+      await request<{ offer: ChannelOffer }>(
+        `/api/channel-offers/${encodeURIComponent(offerID)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            expected_version: expectedVersion,
+            upstream_model_id: upstreamModelID,
+            multiplier,
+          }),
+        },
+      )
+    ).offer
+  },
+  async setChannelOfferStatus(
+    offerID: string,
+    action: 'disable' | 'resume',
+    expectedVersion: number,
+  ) {
+    return (
+      await request<{ offer: ChannelOffer }>(
+        `/api/channel-offers/${encodeURIComponent(offerID)}/${action}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expected_version: expectedVersion }),
+        },
+      )
+    ).offer
+  },
+  async deleteChannelOffer(offerID: string, expectedVersion: number) {
+    return (
+      await request<{ offer: ChannelOffer }>(
+        `/api/channel-offers/${encodeURIComponent(offerID)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ expected_version: expectedVersion }),
+        },
+      )
+    ).offer
+  },
+  async validateChannelOffer(offerID: string, admin = false) {
+    const prefix = admin ? '/api/admin/channel-offers' : '/api/channel-offers'
+    return (
+      await request<{ validation: AuthorizedValidationAttempt }>(
+        `${prefix}/${encodeURIComponent(offerID)}/validation-attempts`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ confirmed_upstream_cost: true }),
+        },
+      )
+    ).validation
+  },
+  async channelValidationAttempts(offerID: string, admin = false, limit = 50) {
+    const prefix = admin ? '/api/admin/channel-offers' : '/api/channel-offers'
+    return (
+      await request<{ validation_attempts: AuthorizedValidationAttempt[] }>(
+        `${prefix}/${encodeURIComponent(offerID)}/validation-attempts?limit=${limit}`,
+      )
+    ).validation_attempts
+  },
+  marketOffers(input: Parameters<typeof marketOffersPath>[0] = {}) {
+    return request<{ offers: MarketOffer[]; next_after: string }>(
+      marketOffersPath(input),
+    )
+  },
+  async marketChannel(channelID: string) {
+    return (
+      await request<{ channel: MarketChannel }>(
+        `/api/market/channels/${encodeURIComponent(channelID)}`,
+      )
+    ).channel
+  },
+  async rateChannel(channelID: string, score: number) {
+    return (
+      await request<{ channel: MarketChannel }>(
+        `/api/market/channels/${encodeURIComponent(channelID)}/rating`,
+        { method: 'PUT', body: JSON.stringify({ score }) },
+      )
+    ).channel
+  },
+  async adminChannels() {
+    return (await request<{ channels: AdminChannel[] }>('/api/admin/channels')).channels
+  },
+  async adminChannel(channelID: string) {
+    return (
+      await request<{ channel: AdminChannel }>(
+        `/api/admin/channels/${encodeURIComponent(channelID)}`,
+      )
+    ).channel
+  },
+  async adminSetChannelStatus(
+    channelID: string,
+    action: 'pause' | 'delete',
+    expectedVersion: number,
+    reason: string,
+  ) {
+    const path = `/api/admin/channels/${encodeURIComponent(channelID)}${action === 'pause' ? '/pause' : ''}`
+    return (
+      await request<{ channel: AdminChannel }>(path, {
+        method: action === 'delete' ? 'DELETE' : 'POST',
+        body: JSON.stringify({ expected_version: expectedVersion, reason }),
+      })
+    ).channel
   },
 }

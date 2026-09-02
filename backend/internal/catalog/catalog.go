@@ -17,6 +17,11 @@ type Status string
 const (
 	StatusActive   Status = "active"
 	StatusDisabled Status = "disabled"
+
+	// MaxPriceNanoPerMillion is the public catalog ceiling. Combined with the
+	// channel multiplier ceiling of 1000x, the displayed per-million price is
+	// always representable by money.Amount.
+	MaxPriceNanoPerMillion money.Amount = 100_000 * money.Amount(money.Scale)
 )
 
 var (
@@ -150,7 +155,10 @@ func validate(model Model) error {
 	if model.Status != StatusActive && model.Status != StatusDisabled {
 		return ErrInvalidInput
 	}
-	if model.InputPrice < 0 || model.OutputPrice < 0 || model.CacheWritePrice < 0 || model.CacheReadPrice < 0 {
+	if model.InputPrice < 0 || model.InputPrice > MaxPriceNanoPerMillion ||
+		model.OutputPrice < 0 || model.OutputPrice > MaxPriceNanoPerMillion ||
+		model.CacheWritePrice < 0 || model.CacheWritePrice > MaxPriceNanoPerMillion ||
+		model.CacheReadPrice < 0 || model.CacheReadPrice > MaxPriceNanoPerMillion {
 		return ErrInvalidInput
 	}
 	return nil

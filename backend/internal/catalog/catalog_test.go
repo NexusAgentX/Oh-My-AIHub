@@ -1,6 +1,10 @@
 package catalog
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+)
 
 func TestValidateModelIDRejectsAmbiguousPathSegments(t *testing.T) {
 	base := Model{
@@ -25,5 +29,21 @@ func TestValidateModelIDRejectsAmbiguousPathSegments(t *testing.T) {
 		if err := validate(model); err != nil {
 			t.Fatalf("validate model ID %q: %v", id, err)
 		}
+	}
+}
+
+func TestValidateModelPriceCeilingProtectsChannelPriceProjection(t *testing.T) {
+	base := Model{
+		ID: "provider/model", Name: "Test Model", Provider: "Provider", ContextWindow: 1,
+		InputModalities: []string{"text"}, OutputModalities: []string{"text"}, Status: StatusActive,
+		InputPrice: MaxPriceNanoPerMillion, OutputPrice: MaxPriceNanoPerMillion,
+		CacheWritePrice: MaxPriceNanoPerMillion, CacheReadPrice: MaxPriceNanoPerMillion,
+	}
+	if err := validate(base); err != nil {
+		t.Fatalf("maximum catalog price was rejected: %v", err)
+	}
+	base.InputPrice = money.FromNano(MaxPriceNanoPerMillion.Nano() + 1)
+	if err := validate(base); err == nil {
+		t.Fatal("catalog price above the representable channel ceiling was accepted")
 	}
 }
