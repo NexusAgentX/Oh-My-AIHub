@@ -1,20 +1,506 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-func NewHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", health)
-	return mux
+const defaultSessionCookie = "oma_session"
+
+type Dependencies struct {
+	Identity          *identity.Service
+	Catalog           *catalog.Service
+	DatabaseReady     func(context.Context) error
+	CookieSecure      bool
+	TrustedProxyCIDRs []netip.Prefix
 }
 
-func health(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+type app struct {
+	identity             *identity.Service
+	catalog              *catalog.Service
+	databaseReady        func(context.Context) error
+	cookieSecure         bool
+	cookieName           string
+	loginLimiter         *loginLimiter
+	loginIPLimiter       *loginLimiter
+	loginAttempts        *loginLimiter
+	loginIPAttempts      *loginLimiter
+	passwordChanges      *loginLimiter
+	passwordChangeIPs    *loginLimiter
+	loginPasswordSlots   chan struct{}
+	accountPasswordSlots chan struct{}
+	trustedProxyCIDRs    []netip.Prefix
+}
+
+func NewHandler(dependencies Dependencies) http.Handler {
+	application := &app{
+		identity:             dependencies.Identity,
+		catalog:              dependencies.Catalog,
+		databaseReady:        dependencies.DatabaseReady,
+		cookieSecure:         dependencies.CookieSecure,
+		cookieName:           defaultSessionCookie,
+		loginLimiter:         newLoginLimiter(8, 15*time.Minute, 10_000),
+		loginIPLimiter:       newLoginLimiter(32, 15*time.Minute, 10_000),
+		loginAttempts:        newLoginLimiter(20, 15*time.Minute, 10_000),
+		loginIPAttempts:      newLoginLimiter(60, 15*time.Minute, 10_000),
+		passwordChanges:      newLoginLimiter(8, 15*time.Minute, 10_000),
+		passwordChangeIPs:    newLoginLimiter(32, 15*time.Minute, 10_000),
+		loginPasswordSlots:   make(chan struct{}, 2),
+		accountPasswordSlots: make(chan struct{}, 2),
+		trustedProxyCIDRs:    append([]netip.Prefix(nil), dependencies.TrustedProxyCIDRs...),
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", application.health)
+	mux.HandleFunc("POST /api/auth/login", application.login)
+	mux.HandleFunc("POST /api/auth/logout", application.logout)
+	mux.Handle("GET /api/auth/session", application.requireSession(http.HandlerFunc(application.session)))
+	mux.Handle("PUT /api/account/password", application.requireSession(http.HandlerFunc(application.changePassword)))
+	mux.Handle("GET /api/account", application.requireReadyAccount(http.HandlerFunc(application.currentAccount)))
+	mux.Handle("GET /api/models", application.requireReadyAccount(http.HandlerFunc(application.listPublicModels)))
+	mux.Handle("GET /api/models/{modelID...}", application.requireReadyAccount(http.HandlerFunc(application.getPublicModel)))
+	mux.Handle("GET /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.listAccounts)))
+	mux.Handle("POST /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.createAccount)))
+	mux.Handle("PATCH /api/admin/accounts/{accountID}", application.requireAdmin(http.HandlerFunc(application.updateAccount)))
+	mux.Handle("GET /api/admin/models", application.requireAdmin(http.HandlerFunc(application.listAdminModels)))
+	mux.Handle("POST /api/admin/models", application.requireAdmin(http.HandlerFunc(application.createModel)))
+	mux.Handle("GET /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.getAdminModel)))
+	mux.Handle("PUT /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.updateModel)))
+
+	return securityHeaders(application.requireSameOrigin(mux))
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *app) requireSameOrigin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			origin := r.Header.Get("Origin")
+			parsed, err := url.Parse(origin)
+			if origin == "" || err != nil || parsed.Scheme == "" || !strings.EqualFold(parsed.Scheme, a.requestScheme(r)) || !strings.EqualFold(parsed.Host, r.Host) {
+				writeError(w, http.StatusForbidden, "cross_origin_request", "跨站请求已被拒绝")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *app) requestScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if a.trustsProxy(r) {
+		forwarded := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")))
+		if forwarded == "http" || forwarded == "https" {
+			return forwarded
+		}
+	}
+	return "http"
+}
+
+func (a *app) trustsProxy(r *http.Request) bool {
+	remoteIP, ok := requestRemoteIP(r)
+	if !ok {
+		return false
+	}
+	for _, prefix := range a.trustedProxyCIDRs {
+		if prefix.Contains(remoteIP) {
+			return true
+		}
+	}
+	return false
+}
+
+func requestRemoteIP(r *http.Request) (netip.Addr, bool) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	remoteIP, err := netip.ParseAddr(strings.Trim(host, "[]"))
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	return remoteIP.Unmap(), true
+}
+
+func (a *app) loginLimitKey(r *http.Request, username string) string {
+	return a.loginClientIP(r) + "\x00" + identity.NormalizeUsername(username)
+}
+
+func (a *app) loginClientIP(r *http.Request) string {
+	if a.trustsProxy(r) {
+		if forwardedIP, err := netip.ParseAddr(strings.TrimSpace(r.Header.Get("X-Real-IP"))); err == nil {
+			return forwardedIP.Unmap().String()
+		}
+	}
+	if remoteIP, ok := requestRemoteIP(r); ok {
+		return remoteIP.String()
+	}
+	return "unknown"
+}
+
+func (a *app) allowLoginAttempt(ipKey, pairKey string) bool {
+	return a.loginIPAttempts.take(ipKey) && a.loginAttempts.take(pairKey)
+}
+
+func (a *app) allowPasswordChangeAttempt(ipKey, accountID string) bool {
+	return a.passwordChangeIPs.take(ipKey) && a.passwordChanges.take(accountID)
+}
+
+type loginAttempt struct {
+	failures []time.Time
+}
+
+type loginLimiter struct {
+	mu         sync.Mutex
+	attempts   map[string]loginAttempt
+	limit      int
+	window     time.Duration
+	maxEntries int
+	now        func() time.Time
+}
+
+func newLoginLimiter(limit int, window time.Duration, maxEntries int) *loginLimiter {
+	return &loginLimiter{
+		attempts:   make(map[string]loginAttempt),
+		limit:      limit,
+		window:     window,
+		maxEntries: maxEntries,
+		now:        time.Now,
+	}
+}
+
+func (l *loginLimiter) allowed(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	if len(l.attempts) >= l.maxEntries {
+		for existingKey, attempt := range l.attempts {
+			if len(recentFailures(attempt.failures, now.Add(-l.window))) == 0 {
+				delete(l.attempts, existingKey)
+			}
+		}
+	}
+	attempt, exists := l.attempts[key]
+	if !exists && len(l.attempts) >= l.maxEntries {
+		return false
+	}
+	attempt.failures = recentFailures(attempt.failures, now.Add(-l.window))
+	if len(attempt.failures) == 0 {
+		delete(l.attempts, key)
+	} else {
+		l.attempts[key] = attempt
+	}
+	return len(attempt.failures) < l.limit
+}
+
+func (l *loginLimiter) failure(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	attempt := l.attempts[key]
+	attempt.failures = append(recentFailures(attempt.failures, l.now().Add(-l.window)), l.now())
+	l.attempts[key] = attempt
+}
+
+func (l *loginLimiter) success(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.attempts, key)
+}
+
+func (l *loginLimiter) take(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	if len(l.attempts) >= l.maxEntries {
+		for existingKey, attempt := range l.attempts {
+			if len(recentFailures(attempt.failures, now.Add(-l.window))) == 0 {
+				delete(l.attempts, existingKey)
+			}
+		}
+	}
+	attempt, exists := l.attempts[key]
+	if !exists && len(l.attempts) >= l.maxEntries {
+		return false
+	}
+	attempt.failures = recentFailures(attempt.failures, now.Add(-l.window))
+	if len(attempt.failures) >= l.limit {
+		l.attempts[key] = attempt
+		return false
+	}
+	attempt.failures = append(attempt.failures, now)
+	l.attempts[key] = attempt
+	return true
+}
+
+func recentFailures(failures []time.Time, cutoff time.Time) []time.Time {
+	firstRecent := 0
+	for firstRecent < len(failures) && failures[firstRecent].Before(cutoff) {
+		firstRecent++
+	}
+	return failures[firstRecent:]
+}
+
+func acquirePasswordSlot(slots chan struct{}) bool {
+	select {
+	case slots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *app) health(w http.ResponseWriter, r *http.Request) {
+	if a.databaseReady != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
+		if err := a.databaseReady(ctx); err != nil {
+			writeError(w, http.StatusServiceUnavailable, "database_unavailable", "服务暂不可用")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
 		"service": "oh-my-aihub-backend",
 		"status":  "ok",
 	})
+}
+
+type contextKey string
+
+const accountContextKey contextKey = "authenticated-account"
+
+func accountFromContext(ctx context.Context) identity.Account {
+	account, _ := ctx.Value(accountContextKey).(identity.Account)
+	return account
+}
+
+func (a *app) requireSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(a.cookieName)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "authentication_required", "请先登录")
+			return
+		}
+		account, err := a.identity.Authenticate(r.Context(), cookie.Value)
+		if err != nil {
+			if errors.Is(err, identity.ErrInvalidCredentials) {
+				a.clearSessionCookie(w)
+				writeError(w, http.StatusUnauthorized, "authentication_required", "请先登录")
+				return
+			}
+			writeDomainError(w, err)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), accountContextKey, account)))
+	})
+}
+
+func (a *app) requireReadyAccount(next http.Handler) http.Handler {
+	return a.requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if accountFromContext(r.Context()).MustChangePassword {
+			writeError(w, http.StatusForbidden, "password_change_required", "首次登录必须修改密码")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
+func (a *app) requireAdmin(next http.Handler) http.Handler {
+	return a.requireReadyAccount(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !accountFromContext(r.Context()).IsAdmin {
+			writeError(w, http.StatusForbidden, "administrator_required", "没有管理员权限")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
+func (a *app) setSessionCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     a.cookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int((24 * time.Hour).Seconds()),
+		HttpOnly: true,
+		Secure:   a.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (a *app) clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     a.cookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   a.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body must contain one JSON object")
+		}
+		return err
+	}
+	return nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{
+		"error": map[string]string{
+			"code":    code,
+			"message": message,
+		},
+	})
+}
+
+func writeDomainError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, identity.ErrInvalidCredentials):
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	case errors.Is(err, identity.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
+	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict):
+		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
+	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, money.ErrInvalidAmount):
+		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")
+	}
+}
+
+func accountResponse(account identity.Account) map[string]any {
+	return map[string]any{
+		"id":                   account.ID,
+		"username":             account.Username,
+		"display_name":         account.DisplayName,
+		"is_admin":             account.IsAdmin,
+		"status":               account.Status,
+		"must_change_password": account.MustChangePassword,
+		"version":              account.Version,
+		"credit_limit":         account.CreditLimit.String(),
+		"balance":              "0",
+		"frozen_balance":       "0",
+		"available_credit":     account.CreditLimit.String(),
+		"created_at":           account.CreatedAt,
+		"updated_at":           account.UpdatedAt,
+		"password_changed_at":  account.PasswordChangedAt,
+	}
+}
+
+func modelResponse(model catalog.Model) map[string]any {
+	return map[string]any{
+		"id":                         model.ID,
+		"name":                       model.Name,
+		"provider":                   model.Provider,
+		"context_window":             model.ContextWindow,
+		"parameter_info":             model.ParameterInfo,
+		"input_modalities":           model.InputModalities,
+		"output_modalities":          model.OutputModalities,
+		"supports_tools":             model.SupportsTools,
+		"supports_structured_output": model.SupportsStructuredOutput,
+		"supports_vision":            model.SupportsVision,
+		"input_price":                model.InputPrice.String(),
+		"output_price":               model.OutputPrice.String(),
+		"cache_write_price":          model.CacheWritePrice.String(),
+		"cache_read_price":           model.CacheReadPrice.String(),
+		"price_unit":                 "points_per_million_tokens",
+		"status":                     model.Status,
+		"version":                    model.Version,
+		"created_at":                 model.CreatedAt,
+		"updated_at":                 model.UpdatedAt,
+		"price_updated_at":           model.PriceUpdatedAt,
+	}
+}
+
+var modelPricePattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})(\.[0-9]{1,9})?$`)
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func parseModelPrice(value string) (money.Amount, error) {
+	value = strings.TrimSpace(value)
+	if !modelPricePattern.MatchString(value) {
+		return 0, money.ErrInvalidAmount
+	}
+	amount, err := money.Parse(value)
+	if err != nil || amount > money.Amount(100_000*money.Scale) {
+		return 0, money.ErrInvalidAmount
+	}
+	return amount, nil
+}
+
+func parseModelRequest(request modelRequest) (catalog.Model, error) {
+	inputPrice, err := parseModelPrice(request.InputPrice)
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	outputPrice, err := parseModelPrice(request.OutputPrice)
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	cacheWritePrice, err := parseModelPrice(request.CacheWritePrice)
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	cacheReadPrice, err := parseModelPrice(request.CacheReadPrice)
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	return catalog.Model{
+		ID:                       strings.TrimSpace(request.ID),
+		Name:                     request.Name,
+		Provider:                 request.Provider,
+		ContextWindow:            request.ContextWindow,
+		ParameterInfo:            request.ParameterInfo,
+		InputModalities:          request.InputModalities,
+		OutputModalities:         request.OutputModalities,
+		SupportsTools:            request.SupportsTools,
+		SupportsStructuredOutput: request.SupportsStructuredOutput,
+		SupportsVision:           request.SupportsVision,
+		InputPrice:               inputPrice,
+		OutputPrice:              outputPrice,
+		CacheWritePrice:          cacheWritePrice,
+		CacheReadPrice:           cacheReadPrice,
+		Status:                   catalog.Status(request.Status),
+	}, nil
 }

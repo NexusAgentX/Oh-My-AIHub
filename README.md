@@ -2,7 +2,7 @@
 
 Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在双边 C2C 市场出售所得积分。
 
-产品方向和首版边界已经确认，当前代码仍处于工程骨架阶段：仓库已经建立 React 前端、Go 后端、Docker Compose 运行环境与 mise 开发任务，业务能力尚未实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
+产品方向和首版边界已经确认。当前代码已经交付受邀账户、首次改密、管理员账户管理和公开模型目录，API 共享、积分账本、路由结算与 C2C 仍按 Epic #16 继续实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
 
 ## 文档导航
 
@@ -49,12 +49,13 @@ op --version
 
 ## 当前工程组成
 
-- 前端：React 19、TypeScript、Vite。
-- 后端：Go HTTP 服务。
+- 前端：React 19、TypeScript、Vite 与 React Router。
+- 后端：Go HTTP 服务、受邀账户与模型目录 API。
+- 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
 - 本地工具链：mise。
-- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 请求。
+- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 请求，迁移完成后再启动后端。
 
-当前前后端仅实现 `/api/health` 健康检查链路，不代表 `PRODUCT.md` 中的业务能力已经交付。
+当前可运行能力包括用户名登录、首次强制改密、账户设置、管理员创建与停用账户、管理员权限与信用额度维护，以及公开模型目录的新增、查询、编辑与启停。余额、API 渠道、平台 Key、代理调用、结算和 C2C 尚未交付；接口中的余额字段只是后续账本接入前的临时投影。
 
 ## 环境要求
 
@@ -70,6 +71,20 @@ mise install
 mise run install
 ```
 
+启动数据库并执行迁移：
+
+```bash
+mise run dev-database
+```
+
+首次运行时，在交互终端创建唯一的初始管理员：
+
+```bash
+mise run bootstrap-admin -- --username admin --display-name "管理员"
+```
+
+若数据库使用自定义密码，在运行命令时传入同一个 `POSTGRES_PASSWORD`；任务会通过 `PGPASSWORD` 传递密码，不会把密码拼入连接 URL。
+
 启动后端：
 
 ```bash
@@ -84,13 +99,27 @@ mise run dev-frontend
 
 前端开发服务器位于 <http://localhost:5173>，并将 `/api` 请求代理到 <http://localhost:8080>。
 
+本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
+
 ## Docker Compose 运行
 
+本机 HTTP 开发使用显式开发入口：
+
 ```bash
-mise run up
+mise run up-dev
 ```
 
-访问 <http://localhost:3000>。停止服务：
+访问 <http://localhost:3000>。面向 HTTPS 环境使用 `mise run up`，该入口不会关闭 Secure Cookie，并强制要求显式提供独立的 `POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR` 与 `BACKEND_TRUSTED_PROXY_CIDRS`。Compose 只把前端绑定到宿主机回环地址 `127.0.0.1:${FRONTEND_PORT:-3000}`；唯一公网入口应是同机 TLS 反向代理，不要另行暴露该明文端口。
+
+`TRUSTED_PROXY_CIDR` 必须填写前端容器实际观察到的 TLS 代理源地址，而不是想当然地使用 `127.0.0.1/32`；Docker NAT 后该地址会因运行环境而异。可以先在受限环境以 `mise run up-dev` 启动，让同机代理发起一次请求，再从 `docker compose logs frontend` 的访问日志首列取得源 IP，并以最窄的 CIDR（通常为单地址 `/32` 或 `/128`）配置安全入口。
+
+`BACKEND_TRUSTED_PROXY_CIDRS` 应填写当前 Compose 项目网络的实际子网。可先运行 `docker compose create` 只创建容器与网络，再通过 `docker inspect` 取得前端容器所连接的 Network ID，并用 `docker network inspect` 读取其 IPAM 子网；不要硬编码假定的 `172.16.0.0/12`。安全栈启动后运行以下自检；返回 `proxy trust check passed` 才说明“宿主 TLS 代理 → Nginx → Go”整条 HTTPS `Origin` 写入链路可用：
+
+```bash
+mise run check-proxy-trust
+```
+
+数据库密码通过 `PGPASSWORD` 传给客户端，可以包含 URL 保留字符，无需手动 URI 编码；仓库默认值只用于本机开发。停止服务：
 
 ```bash
 mise run down
@@ -101,7 +130,9 @@ mise run down
 ```bash
 mise run check-design
 mise run test
+mise run test-backend-integration
 docker compose config --quiet
+mise run check-proxy-trust # 需要已按上文启动安全栈
 ```
 
 ## 目录结构

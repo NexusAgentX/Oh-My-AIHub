@@ -12,12 +12,48 @@ run = "npm --prefix frontend run dev"
 
 [tasks.dev-backend]
 description = "Run the backend development server"
-run = "go -C backend run ./cmd/server"
+run = '''
+AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
+DATABASE_URL="${DATABASE_URL:-postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable}" \
+PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
+go -C backend run ./cmd/server
+'''
+env = { COOKIE_SECURE = "false" }
+
+[tasks.dev-database]
+description = "Start PostgreSQL and apply pending migrations"
+run = [
+  "docker compose up -d database",
+  "docker compose run --rm migration",
+]
+
+[tasks.bootstrap-admin]
+description = "Interactively create the first administrator"
+run = '''
+AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
+DATABASE_URL="${DATABASE_URL:-postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable}" \
+PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
+go -C backend run ./cmd/bootstrap-admin
+'''
+
+[tasks.test-backend-integration]
+description = "Run PostgreSQL-backed backend integration tests"
+run = [
+  "docker compose up -d database",
+  "docker compose run --rm migration",
+  '''
+AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
+PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
+TEST_DATABASE_URL="postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable" \
+go -C backend test -count=1 ./internal/postgres
+''',
+]
 
 [tasks.test]
 description = "Run all tests and asset checks"
 run = [
   "node scripts/check-design-assets.mjs",
+  "npm --prefix frontend test",
   "npm --prefix frontend run build",
   "go -C backend test ./...",
 ]
@@ -35,8 +71,43 @@ run = [
 ]
 
 [tasks.up]
-description = "Build and start the Docker stack"
+description = "Build and start the secure Docker stack"
+run = '''
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for the secure stack}"
+: "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR must match the TLS proxy source as seen by the frontend container}"
+: "${BACKEND_TRUSTED_PROXY_CIDRS:?BACKEND_TRUSTED_PROXY_CIDRS must match the Compose network used by the frontend proxy}"
+docker compose up --build
+'''
+
+[tasks.up-dev]
+description = "Build and start the Docker stack for local HTTP development"
 run = "docker compose up --build"
+env = { COOKIE_SECURE = "false", TRUSTED_PROXY_CIDR = "127.0.0.1/32" }
+
+[tasks.check-proxy-trust]
+description = "Verify the running stack trusts the configured host TLS proxy source"
+run = '''
+AIHUB_SMOKE_BODY="$(mktemp)"
+trap 'rm -f "$AIHUB_SMOKE_BODY"' EXIT
+AIHUB_FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+AIHUB_SMOKE_STATUS="$(curl --silent --show-error \
+  --output "$AIHUB_SMOKE_BODY" \
+  --write-out '%{http_code}' \
+  --request POST \
+  --header 'Host: proxy-smoke.invalid' \
+  --header 'Origin: https://proxy-smoke.invalid' \
+  --header 'X-Forwarded-Proto: https' \
+  --header 'X-Forwarded-For: 198.51.100.10' \
+  --header 'Content-Type: application/json' \
+  --data '{"username":"proxy-smoke","password":"proxy-smoke-password"}' \
+  "http://127.0.0.1:${AIHUB_FRONTEND_PORT}/api/auth/login")"
+if [ "$AIHUB_SMOKE_STATUS" != "401" ] || ! grep -q '"invalid_credentials"' "$AIHUB_SMOKE_BODY"; then
+  echo "proxy trust check failed with HTTP $AIHUB_SMOKE_STATUS" >&2
+  cat "$AIHUB_SMOKE_BODY" >&2
+  exit 1
+fi
+echo "proxy trust check passed"
+'''
 
 [tasks.down]
 description = "Stop the Docker stack"

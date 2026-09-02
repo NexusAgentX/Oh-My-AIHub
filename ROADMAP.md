@@ -37,7 +37,7 @@
 
 ### 交付可运行的 API 共享与结算闭环
 
-- **状态**：Ready；#17、#28、#30、#32 与 #36 的设计和实现契约依赖已满足。
+- **状态**：进行中；#21 已交付受邀账户、身份会话和模型目录基础，#18、#19 与 #20 继续完成账本、渠道和代理结算。
 - **关联任务**：[Feature #21](https://github.com/NexusAgentX/Oh-My-AIHub/issues/21)、[Feature #18](https://github.com/NexusAgentX/Oh-My-AIHub/issues/18)、[Feature #19](https://github.com/NexusAgentX/Oh-My-AIHub/issues/19)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)。
 - **进入条件**：#17、#28、#30、#32 与 #36 的对应设计切片已经确认；实现必须保持用户名、统一账户能力、凭据、评分、资源配置、模型协议池、固定失败计费、C2C 支付信息和关键异常状态与原型一致。
 - **预期结果**：管理员能够准备账户与模型目录，共享者能够安全上架真实渠道，消费者能够用平台 Key 配置模型协议池并完成有序回退和零和结算。
