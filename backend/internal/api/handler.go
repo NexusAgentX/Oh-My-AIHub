@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -25,6 +26,7 @@ const defaultSessionCookie = "oma_session"
 type Dependencies struct {
 	Identity          *identity.Service
 	Catalog           *catalog.Service
+	Channels          *channel.Service
 	Ledger            *ledger.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
@@ -34,6 +36,7 @@ type Dependencies struct {
 type app struct {
 	identity             *identity.Service
 	catalog              *catalog.Service
+	channels             *channel.Service
 	ledger               *ledger.Service
 	databaseReady        func(context.Context) error
 	cookieSecure         bool
@@ -53,6 +56,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	application := &app{
 		identity:             dependencies.Identity,
 		catalog:              dependencies.Catalog,
+		channels:             dependencies.Channels,
 		ledger:               dependencies.Ledger,
 		databaseReady:        dependencies.DatabaseReady,
 		cookieSecure:         dependencies.CookieSecure,
@@ -79,6 +83,24 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/models/{modelID...}", application.requireReadyAccount(http.HandlerFunc(application.getPublicModel)))
 	mux.Handle("GET /api/wallet", application.requireReadyAccount(http.HandlerFunc(application.wallet)))
 	mux.Handle("GET /api/wallet/entries", application.requireReadyAccount(http.HandlerFunc(application.walletEntries)))
+	mux.Handle("GET /api/channels", application.requireReadyAccount(http.HandlerFunc(application.listChannels)))
+	mux.Handle("POST /api/channels", application.requireReadyAccount(http.HandlerFunc(application.createChannel)))
+	mux.Handle("GET /api/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.getChannel)))
+	mux.Handle("PATCH /api/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.updateChannel)))
+	mux.Handle("POST /api/channels/{channelID}/publish", application.requireReadyAccount(http.HandlerFunc(application.publishChannel)))
+	mux.Handle("POST /api/channels/{channelID}/pause", application.requireReadyAccount(http.HandlerFunc(application.pauseChannel)))
+	mux.Handle("DELETE /api/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.deleteChannel)))
+	mux.Handle("POST /api/channels/{channelID}/credential-revoke", application.requireReadyAccount(http.HandlerFunc(application.revokeChannelCredential)))
+	mux.Handle("POST /api/channels/{channelID}/offers", application.requireReadyAccount(http.HandlerFunc(application.addChannelOffer)))
+	mux.Handle("PATCH /api/channel-offers/{offerID}", application.requireReadyAccount(http.HandlerFunc(application.updateChannelOffer)))
+	mux.Handle("POST /api/channel-offers/{offerID}/disable", application.requireReadyAccount(http.HandlerFunc(application.disableChannelOffer)))
+	mux.Handle("POST /api/channel-offers/{offerID}/resume", application.requireReadyAccount(http.HandlerFunc(application.resumeChannelOffer)))
+	mux.Handle("DELETE /api/channel-offers/{offerID}", application.requireReadyAccount(http.HandlerFunc(application.deleteChannelOffer)))
+	mux.Handle("POST /api/channel-offers/{offerID}/validation-attempts", application.requireReadyAccount(http.HandlerFunc(application.validateChannelOffer)))
+	mux.Handle("GET /api/channel-offers/{offerID}/validation-attempts", application.requireReadyAccount(http.HandlerFunc(application.listOfferValidationAttempts)))
+	mux.Handle("GET /api/market/offers", application.requireReadyAccount(http.HandlerFunc(application.listMarketOffers)))
+	mux.Handle("GET /api/market/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.getMarketChannel)))
+	mux.Handle("PUT /api/market/channels/{channelID}/rating", application.requireReadyAccount(http.HandlerFunc(application.rateMarketChannel)))
 	mux.Handle("GET /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.listAccounts)))
 	mux.Handle("POST /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.createAccount)))
 	mux.Handle("PATCH /api/admin/accounts/{accountID}", application.requireAdmin(http.HandlerFunc(application.updateAccount)))
@@ -93,6 +115,13 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemEntries)))
 	mux.Handle("POST /api/admin/ledger/adjustments", application.requireAdmin(http.HandlerFunc(application.adminLedgerAdjustment)))
 	mux.Handle("POST /api/admin/ledger/bad-debts", application.requireAdmin(http.HandlerFunc(application.adminBadDebtTransfer)))
+	mux.Handle("GET /api/admin/channels", application.requireAdmin(http.HandlerFunc(application.listAdminChannels)))
+	mux.Handle("GET /api/admin/channels/{channelID}", application.requireAdmin(http.HandlerFunc(application.getAdminChannel)))
+	mux.Handle("POST /api/admin/channels/{channelID}/pause", application.requireAdmin(http.HandlerFunc(application.adminPauseChannel)))
+	mux.Handle("DELETE /api/admin/channels/{channelID}", application.requireAdmin(http.HandlerFunc(application.adminDeleteChannel)))
+	mux.Handle("POST /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.validateChannelOffer)))
+	mux.Handle("GET /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.listOfferValidationAttempts)))
+	mux.Handle("POST /api/admin/channel-credentials/reencrypt", application.requireAdmin(http.HandlerFunc(application.reencryptChannelCredentials)))
 
 	return securityHeaders(application.requireSameOrigin(mux))
 }
@@ -412,9 +441,9 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
-	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound):
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, channel.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
-	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict):
+	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict), errors.Is(err, channel.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
 	case errors.Is(err, ledger.ErrConflict), errors.Is(err, ledger.ErrHoldClosed), errors.Is(err, ledger.ErrHoldAmountExceeded):
 		writeError(w, http.StatusConflict, "ledger_conflict", "账本操作与当前状态冲突")
@@ -422,7 +451,13 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "insufficient_spendable_capacity", "可消费额度不足")
 	case errors.Is(err, ledger.ErrCreditFrozen):
 		writeError(w, http.StatusForbidden, "credit_frozen", "账户信用已冻结")
-	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount):
+	case errors.Is(err, channel.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, channel.ErrUnavailable):
+		writeError(w, http.StatusUnprocessableEntity, "channel_unavailable", "至少需要一个通过当前验证的可用报价")
+	case errors.Is(err, channel.ErrUnsafeUpstream):
+		writeError(w, http.StatusUnprocessableEntity, "unsafe_upstream", "Base URL 无法通过安全解析")
+	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, channel.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")
@@ -496,7 +531,7 @@ func parseModelPrice(value string) (money.Amount, error) {
 		return 0, money.ErrInvalidAmount
 	}
 	amount, err := money.Parse(value)
-	if err != nil || amount > money.Amount(100_000*money.Scale) {
+	if err != nil || amount > catalog.MaxPriceNanoPerMillion {
 		return 0, money.ErrInvalidAmount
 	}
 	return amount, nil

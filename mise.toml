@@ -24,7 +24,7 @@ env = { COOKIE_SECURE = "false" }
 description = "Start PostgreSQL and apply pending migrations"
 run = [
   "docker compose up -d database",
-  "docker compose run --rm migration",
+  "docker compose run --rm --build migration",
 ]
 
 [tasks.bootstrap-admin]
@@ -40,7 +40,7 @@ go -C backend run ./cmd/bootstrap-admin
 description = "Run PostgreSQL-backed backend integration tests"
 run = [
   "docker compose up -d database",
-  "docker compose run --rm migration",
+  "docker compose run --rm --build migration",
   '''
 AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
 PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
@@ -76,12 +76,18 @@ run = '''
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for the secure stack}"
 : "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR must match the TLS proxy source as seen by the frontend container}"
 : "${BACKEND_TRUSTED_PROXY_CIDRS:?BACKEND_TRUSTED_PROXY_CIDRS must match the Compose network used by the frontend proxy}"
+: "${UPSTREAM_CREDENTIAL_KEYRING:?UPSTREAM_CREDENTIAL_KEYRING must contain the versioned upstream credential encryption keys}"
+: "${UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID:?UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID is required}"
 docker compose up --build
 '''
 
 [tasks.up-dev]
 description = "Build and start the Docker stack for local HTTP development"
-run = "docker compose up --build"
+run = '''
+: "${UPSTREAM_CREDENTIAL_KEYRING:?UPSTREAM_CREDENTIAL_KEYRING must contain the versioned upstream credential encryption keys}"
+: "${UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID:?UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID is required}"
+docker compose up --build
+'''
 env = { COOKIE_SECURE = "false", TRUSTED_PROXY_CIDR = "127.0.0.1/32" }
 
 [tasks.check-proxy-trust]

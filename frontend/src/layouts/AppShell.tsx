@@ -17,7 +17,8 @@ type NavigationItem = {
 const productNavigation: NavigationItem[] = [
   { label: '账户设置', to: '/account', icon: 'account' },
   { label: 'API Key', icon: 'key' },
-  { label: '渠道市场', icon: 'database' },
+  { label: '渠道市场', to: '/market', icon: 'database' },
+  { label: '我的渠道', to: '/channels', icon: 'settings' },
   { label: '积分钱包', to: '/wallet', icon: 'wallet' },
 ]
 
@@ -25,6 +26,7 @@ const adminNavigation: NavigationItem[] = [
   { label: '运营总览', to: '/admin/ops', icon: 'settings' },
   { label: '账户与信用', to: '/admin/accounts', icon: 'users' },
   { label: '模型目录', to: '/admin/models', icon: 'database' },
+  { label: '渠道治理', to: '/admin/channels', icon: 'settings' },
 ]
 
 export function AppShell({

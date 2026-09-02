@@ -17,6 +17,13 @@ import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
 import { AdminModelsPage } from './models/AdminModelsPage'
 import { LoadingState } from './ui/FormControls'
 import { WelcomePage } from './welcome/WelcomePage'
+import { AdminChannelPage } from './channels/AdminChannelPage'
+import { AdminChannelsPage } from './channels/AdminChannelsPage'
+import { ChannelDetailPage } from './channels/ChannelDetailPage'
+import { ChannelEditorPage } from './channels/ChannelEditorPage'
+import { ChannelsPage } from './channels/ChannelsPage'
+import { MarketChannelPage } from './channels/MarketChannelPage'
+import { MarketPage } from './channels/MarketPage'
 import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
 import { AdminLedgerPage } from './ledger/AdminLedgerPage'
 import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
@@ -84,6 +91,12 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<UpcomingC2CPage />} path="/c2c" />
         <Route element={<UpcomingC2CPage />} path="/c2c/orders/new" />
         <Route element={<UpcomingC2CPage />} path="/c2c/me" />
+        <Route element={<MarketPage />} path="/market" />
+        <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
+        <Route element={<ChannelsPage />} path="/channels" />
+        <Route element={<ChannelEditorPage />} path="/channels/new" />
+        <Route element={<ChannelDetailPage />} path="/channels/:channelID" />
+        <Route element={<ChannelEditorPage />} path="/channels/:channelID/settings" />
         <Route element={<RequireAdministrator />}>
           <Route element={<AdminLedgerPage />} path="/admin/ops" />
           <Route element={<AdminAccountsPage />} path="/admin/accounts" />
@@ -92,6 +105,8 @@ export const appRoutes = createRoutesFromElements(
             path="/admin/accounts/created"
           />
           <Route element={<AdminModelsPage />} path="/admin/models" />
+          <Route element={<AdminChannelsPage />} path="/admin/channels" />
+          <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
           <Route
             element={<AdminAccountLedgerPage />}
             path="/admin/ledger/accounts/:accountID"

@@ -15,6 +15,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -42,6 +43,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	credentialKeyring, err := channel.ParseKeyring(
+		os.Getenv("UPSTREAM_CREDENTIAL_KEYRING"),
+		os.Getenv("UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	outboundPolicy, err := channel.NewOutboundPolicy(
+		parseCommaSeparated(os.Getenv("UPSTREAM_ALLOWED_PORTS")),
+		parseCommaSeparated(os.Getenv("UPSTREAM_BLOCKED_HOSTS")),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	startupContext, cancelStartup := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelStartup()
@@ -55,12 +70,43 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	channelService, err := channel.NewService(store, credentialKeyring, outboundPolicy)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := channelService.ValidateCredentialInventory(startupContext); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := channelService.RecoverAbandonedValidations(startupContext); err != nil {
+		log.Fatal(err)
+	}
+	maintenanceContext, cancelMaintenance := context.WithCancel(context.Background())
+	defer cancelMaintenance()
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-maintenanceContext.Done():
+				return
+			case <-ticker.C:
+				recoveryContext, cancelRecovery := context.WithTimeout(maintenanceContext, 5*time.Second)
+				if recovered, recoveryErr := channelService.RecoverAbandonedValidations(recoveryContext); recoveryErr != nil {
+					log.Printf("recover abandoned channel validations: %v", recoveryErr)
+				} else if recovered > 0 {
+					log.Printf("recovered %d abandoned channel validation attempts", recovered)
+				}
+				cancelRecovery()
+			}
+		}
+	}()
 
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
 			Identity:          identityService,
 			Catalog:           catalog.NewService(store),
+			Channels:          channelService,
 			Ledger:            ledger.NewService(store),
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
@@ -93,6 +139,20 @@ func main() {
 			log.Printf("graceful shutdown failed: %v", err)
 		}
 	}
+}
+
+func parseCommaSeparated(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func parseTrustedProxyCIDRs(value string) ([]netip.Prefix, error) {
