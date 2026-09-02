@@ -37,3 +37,5 @@
 - [ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产](0003-version-openpencil-design-assets-in-git.md) — 已通过
 - [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) — 已通过
 - [ADR-0005：采用中心化零和复式账本作为积分清算核心](0005-adopt-centralized-zero-sum-ledger.md) — 已通过
+- [ADR-0006：采用 PostgreSQL、Goose 与九位定点金额](0006-adopt-postgresql-goose-and-fixed-point-amounts.md) — 已通过
+- [ADR-0007：采用受邀身份与服务器端 Cookie 会话](0007-adopt-invited-identity-and-server-sessions.md) — 已通过

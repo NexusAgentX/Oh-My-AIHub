@@ -1,42 +1,91 @@
-import { useEffect, useState } from 'react'
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+} from 'react-router-dom'
+import { AdminAccountsPage } from './accounts/AdminAccountsPage'
+import { CreatedCredentialPage } from './accounts/CreatedCredentialPage'
+import { EphemeralCredentialProvider } from './accounts/EphemeralCredentialProvider'
+import { AccountSettingsPage } from './auth/AccountSettingsPage'
+import { AuthProvider, useAuth } from './auth/AuthProvider'
+import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
+import { LoginPage } from './auth/LoginPage'
+import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
+import { AdminModelsPage } from './models/AdminModelsPage'
+import { LoadingState } from './ui/FormControls'
 
-type HealthResponse = {
-  service: string
-  status: string
+function RequireSession() {
+  const { account, loading } = useAuth()
+  if (loading) return <FullPageLoading />
+  if (!account) return <Navigate replace to="/login" />
+  return <Outlet />
 }
 
-export function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null)
-  const [error, setError] = useState(false)
+function RequireReadyAccount() {
+  const { account } = useAuth()
+  if (account?.must_change_password) {
+    return <Navigate replace to="/account/password?first=1" />
+  }
+  return <Outlet />
+}
 
-  useEffect(() => {
-    fetch('/api/health')
-      .then((response) => {
-        if (!response.ok) throw new Error('Backend request failed')
-        return response.json() as Promise<HealthResponse>
-      })
-      .then(setHealth)
-      .catch(() => setError(true))
-  }, [])
+function RequireAdministrator() {
+  const { account } = useAuth()
+  if (!canEnterAdmin(account)) return <Navigate replace to="/account" />
+  return <Outlet />
+}
 
+function RootRedirect() {
+  const { account, loading } = useAuth()
+  if (loading) return <FullPageLoading />
+  return <Navigate replace to={defaultDestination(account)} />
+}
+
+function FullPageLoading() {
   return (
-    <main className="shell">
-      <section className="card">
-        <p className="eyebrow">NexusAgentX</p>
-        <h1>Oh-My-AIHub</h1>
-        <p className="intro">
-          React and Go are connected. This clean foundation is ready for the
-          first AI workflow.
-        </p>
-        <div className="status" aria-live="polite">
-          <span className={`dot ${health ? 'online' : error ? 'offline' : ''}`} />
-          {health
-            ? `${health.service}: ${health.status}`
-            : error
-              ? 'Backend unavailable'
-              : 'Checking backend…'}
-        </div>
-      </section>
+    <main className="route-loading">
+      <LoadingState />
     </main>
   )
+}
+
+function AppProviders() {
+  return (
+    <EphemeralCredentialProvider>
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    </EphemeralCredentialProvider>
+  )
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppProviders />}>
+      <Route element={<LoginPage />} path="/login" />
+      <Route element={<RequireSession />}>
+        <Route element={<FirstPasswordChangePage />} path="/account/password" />
+        <Route element={<RequireReadyAccount />}>
+          <Route element={<AccountSettingsPage />} path="/account" />
+          <Route element={<RequireAdministrator />}>
+            <Route element={<AdminAccountsPage />} path="/admin/accounts" />
+            <Route
+              element={<CreatedCredentialPage />}
+              path="/admin/accounts/created"
+            />
+            <Route element={<AdminModelsPage />} path="/admin/models" />
+          </Route>
+        </Route>
+      </Route>
+      <Route element={<RootRedirect />} path="/" />
+      <Route element={<RootRedirect />} path="*" />
+    </Route>,
+  ),
+)
+
+export function App() {
+  return <RouterProvider router={router} />
 }

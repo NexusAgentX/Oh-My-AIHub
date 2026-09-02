@@ -1,9 +1,45 @@
 services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: oh_my_aihub
+      POSTGRES_USER: oh_my_aihub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oh-my-aihub-development}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oh_my_aihub -d oh_my_aihub"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - database-data:/var/lib/postgresql
+    restart: unless-stopped
+
+  migration:
+    build:
+      context: ./backend
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgres://oh_my_aihub@database:5432/oh_my_aihub?sslmode=disable
+      PGPASSWORD: ${POSTGRES_PASSWORD:-oh-my-aihub-development}
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
   backend:
     build:
       context: ./backend
     environment:
       PORT: "8080"
+      DATABASE_URL: postgres://oh_my_aihub@database:5432/oh_my_aihub?sslmode=disable
+      PGPASSWORD: ${POSTGRES_PASSWORD:-oh-my-aihub-development}
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
+      TRUSTED_PROXY_CIDRS: "${BACKEND_TRUSTED_PROXY_CIDRS:-}"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
       interval: 5s
@@ -17,6 +53,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:-127.0.0.1/32}"
     ports:
-      - "3000:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
     restart: unless-stopped
+
+volumes:
+  database-data:
