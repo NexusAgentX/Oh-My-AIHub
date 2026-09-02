@@ -33,6 +33,10 @@ type Account struct {
 	PasswordVersion    int64
 	Version            int64
 	CreditLimit        money.Amount
+	CreditFrozen       bool
+	PostedBalance      money.Amount
+	AssetReserved      money.Amount
+	SpendAuthorized    money.Amount
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	PasswordChangedAt  *time.Time
@@ -65,6 +69,7 @@ type AccountUpdate struct {
 	ExpectedVersion int64
 	Status          *Status
 	CreditLimit     *money.Amount
+	CreditFrozen    *bool
 	IsAdmin         *bool
 }
 

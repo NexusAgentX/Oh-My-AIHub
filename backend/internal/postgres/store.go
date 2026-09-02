@@ -27,20 +27,22 @@ type scanner interface {
 	Scan(...any) error
 }
 
-const accountColumns = `
-	id::text, username, display_name, is_admin, status, must_change_password,
-	password_version, version, credit_limit_nano, created_at, updated_at, password_changed_at`
+type rowQueryer interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
 
 const accountColumnsAliased = `
-	a.id::text, a.username, a.display_name, a.is_admin, a.status, a.must_change_password,
-	a.password_version, a.version, a.credit_limit_nano, a.created_at, a.updated_at, a.password_changed_at`
+		a.id::text, a.username, a.display_name, a.is_admin, a.status, a.must_change_password,
+		a.password_version, a.version, a.credit_limit_nano, a.credit_frozen,
+		la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano,
+		a.created_at, a.updated_at, a.password_changed_at`
 
-const accountWithPasswordColumns = accountColumns + `, password_hash`
+const accountWithPasswordColumnsAliased = accountColumnsAliased + `, a.password_hash`
 
 func scanAccount(row scanner) (identity.Account, error) {
 	var account identity.Account
 	var status string
-	var creditLimit int64
+	var creditLimit, posted, assetReserved, spendAuthorized int64
 	err := row.Scan(
 		&account.ID,
 		&account.Username,
@@ -51,19 +53,26 @@ func scanAccount(row scanner) (identity.Account, error) {
 		&account.PasswordVersion,
 		&account.Version,
 		&creditLimit,
+		&account.CreditFrozen,
+		&posted,
+		&assetReserved,
+		&spendAuthorized,
 		&account.CreatedAt,
 		&account.UpdatedAt,
 		&account.PasswordChangedAt,
 	)
 	account.Status = identity.Status(status)
 	account.CreditLimit = money.FromNano(creditLimit)
+	account.PostedBalance = money.FromNano(posted)
+	account.AssetReserved = money.FromNano(assetReserved)
+	account.SpendAuthorized = money.FromNano(spendAuthorized)
 	return account, mapIdentityError(err)
 }
 
 func scanAccountWithPassword(row scanner) (identity.AccountWithPassword, error) {
 	var account identity.AccountWithPassword
 	var status string
-	var creditLimit int64
+	var creditLimit, posted, assetReserved, spendAuthorized int64
 	err := row.Scan(
 		&account.ID,
 		&account.Username,
@@ -74,6 +83,10 @@ func scanAccountWithPassword(row scanner) (identity.AccountWithPassword, error) 
 		&account.PasswordVersion,
 		&account.Version,
 		&creditLimit,
+		&account.CreditFrozen,
+		&posted,
+		&assetReserved,
+		&spendAuthorized,
 		&account.CreatedAt,
 		&account.UpdatedAt,
 		&account.PasswordChangedAt,
@@ -81,22 +94,39 @@ func scanAccountWithPassword(row scanner) (identity.AccountWithPassword, error) 
 	)
 	account.Status = identity.Status(status)
 	account.CreditLimit = money.FromNano(creditLimit)
+	account.PostedBalance = money.FromNano(posted)
+	account.AssetReserved = money.FromNano(assetReserved)
+	account.SpendAuthorized = money.FromNano(spendAuthorized)
 	return account, mapIdentityError(err)
 }
 
+func accountByID(ctx context.Context, queryer rowQueryer, id string) (identity.Account, error) {
+	return scanAccount(queryer.QueryRow(ctx, `
+		SELECT `+accountColumnsAliased+`
+		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
+		WHERE a.id = $1`, id))
+}
+
 func (s *Store) FindAccountByUsername(ctx context.Context, username string) (identity.AccountWithPassword, error) {
-	return scanAccountWithPassword(s.pool.QueryRow(ctx, `SELECT `+accountWithPasswordColumns+` FROM accounts WHERE username = $1`, username))
+	return scanAccountWithPassword(s.pool.QueryRow(ctx, `
+		SELECT `+accountWithPasswordColumnsAliased+`
+		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
+		WHERE a.username = $1`, username))
 }
 
 func (s *Store) FindAccountByID(ctx context.Context, id string) (identity.AccountWithPassword, error) {
-	return scanAccountWithPassword(s.pool.QueryRow(ctx, `SELECT `+accountWithPasswordColumns+` FROM accounts WHERE id = $1`, id))
+	return scanAccountWithPassword(s.pool.QueryRow(ctx, `
+		SELECT `+accountWithPasswordColumnsAliased+`
+		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
+		WHERE a.id = $1`, id))
 }
 
 func (s *Store) FindAccountBySession(ctx context.Context, tokenHash []byte, now time.Time) (identity.Account, error) {
 	return scanAccount(s.pool.QueryRow(ctx, `
-		SELECT `+accountColumnsAliased+`
-		FROM accounts a
-		JOIN sessions s ON s.account_id = a.id
+			SELECT `+accountColumnsAliased+`
+			FROM accounts a
+			JOIN sessions s ON s.account_id = a.id
+			JOIN ledger_accounts la ON la.identity_account_id = a.id
 		WHERE s.token_hash = $1
 			AND s.expires_at > $2
 			AND s.password_version = a.password_version
@@ -162,12 +192,13 @@ func (s *Store) CreateAccount(ctx context.Context, account identity.NewAccount) 
 	}
 	defer transaction.Rollback(ctx) //nolint:errcheck
 
-	created, err := scanAccount(transaction.QueryRow(ctx, `
+	var createdID string
+	err = transaction.QueryRow(ctx, `
 		INSERT INTO accounts (
 			username, display_name, password_hash, must_change_password,
 			is_admin, status, disabled_at, credit_limit_nano, created_by
 		) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $6 = 'disabled' THEN now() END, $7, $8)
-		RETURNING `+accountColumns,
+		RETURNING id::text`,
 		account.Username,
 		account.DisplayName,
 		account.PasswordHash,
@@ -176,7 +207,14 @@ func (s *Store) CreateAccount(ctx context.Context, account identity.NewAccount) 
 		account.Status,
 		account.CreditLimit.Nano(),
 		account.ActorID,
-	))
+	).Scan(&createdID)
+	if err != nil {
+		return identity.Account{}, mapIdentityError(err)
+	}
+	if _, err := transaction.Exec(ctx, `INSERT INTO ledger_accounts (identity_account_id, kind) VALUES ($1, 'user')`, createdID); err != nil {
+		return identity.Account{}, err
+	}
+	created, err := accountByID(ctx, transaction, createdID)
 	if err != nil {
 		return identity.Account{}, err
 	}
@@ -211,18 +249,26 @@ func (s *Store) CreateBootstrapAdmin(ctx context.Context, account identity.NewAc
 	if exists {
 		return identity.Account{}, identity.ErrConflict
 	}
-	created, err := scanAccount(transaction.QueryRow(ctx, `
+	var createdID string
+	err = transaction.QueryRow(ctx, `
 		INSERT INTO accounts (
 			username, display_name, password_hash, must_change_password,
 			is_admin, status, credit_limit_nano
 		) VALUES ($1, $2, $3, $4, true, $5, 0)
-		RETURNING `+accountColumns,
+		RETURNING id::text`,
 		account.Username,
 		account.DisplayName,
 		account.PasswordHash,
 		account.MustChangePassword,
 		account.Status,
-	))
+	).Scan(&createdID)
+	if err != nil {
+		return identity.Account{}, mapIdentityError(err)
+	}
+	if _, err := transaction.Exec(ctx, `INSERT INTO ledger_accounts (identity_account_id, kind) VALUES ($1, 'user')`, createdID); err != nil {
+		return identity.Account{}, err
+	}
+	created, err := accountByID(ctx, transaction, createdID)
 	if err != nil {
 		return identity.Account{}, err
 	}
@@ -239,10 +285,10 @@ func (s *Store) CreateBootstrapAdmin(ctx context.Context, account identity.NewAc
 
 func (s *Store) ListAccounts(ctx context.Context, query string) ([]identity.Account, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+accountColumns+`
-		FROM accounts
-		WHERE $1 = '' OR username ILIKE '%' || $1 || '%' OR display_name ILIKE '%' || $1 || '%'
-		ORDER BY created_at DESC`, query)
+		SELECT `+accountColumnsAliased+`
+		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
+		WHERE $1 = '' OR a.username ILIKE '%' || $1 || '%' OR a.display_name ILIKE '%' || $1 || '%'
+		ORDER BY a.created_at DESC`, query)
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +311,13 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 		return identity.Account{}, err
 	}
 	defer transaction.Rollback(ctx) //nolint:errcheck
+	// Ledger mutations lock this same row before consulting credit policy. Taking
+	// it first serializes a limit/freeze change with every new debit or hold.
+	var lockedLedgerAccount int
+	if err := transaction.QueryRow(ctx, `
+		SELECT 1 FROM ledger_accounts WHERE identity_account_id = $1 FOR UPDATE`, accountID).Scan(&lockedLedgerAccount); err != nil {
+		return identity.Account{}, mapIdentityError(err)
+	}
 	if update.Status != nil || update.IsAdmin != nil {
 		if _, err := transaction.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('oh-my-aihub-administrator-membership'))`); err != nil {
 			return identity.Account{}, err
@@ -314,11 +367,16 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 	if update.IsAdmin != nil {
 		isAdmin = *update.IsAdmin
 	}
-	account, err := scanAccount(transaction.QueryRow(ctx, `
+	var creditFrozen any
+	if update.CreditFrozen != nil {
+		creditFrozen = *update.CreditFrozen
+	}
+	result, err := transaction.Exec(ctx, `
 		UPDATE accounts
 		SET status = COALESCE($2, status),
 			credit_limit_nano = COALESCE($3, credit_limit_nano),
 			is_admin = COALESCE($4, is_admin),
+			credit_frozen = COALESCE($6, credit_frozen),
 			version = version + 1,
 			disabled_at = CASE
 				WHEN $2 = 'disabled' AND status <> 'disabled' THEN now()
@@ -326,12 +384,15 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 				ELSE disabled_at
 			END,
 			updated_at = now()
-		WHERE id = $1 AND version = $5
-		RETURNING `+accountColumns, accountID, status, creditLimit, isAdmin, update.ExpectedVersion))
+		WHERE id = $1 AND version = $5`, accountID, status, creditLimit, isAdmin, update.ExpectedVersion, creditFrozen)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return identity.Account{}, identity.ErrConflict
-		}
+		return identity.Account{}, err
+	}
+	if result.RowsAffected() != 1 {
+		return identity.Account{}, identity.ErrConflict
+	}
+	account, err := accountByID(ctx, transaction, accountID)
+	if err != nil {
 		return identity.Account{}, err
 	}
 	if update.Status != nil && *update.Status == identity.StatusDisabled {
@@ -345,6 +406,9 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 	}
 	if update.CreditLimit != nil {
 		details["credit_limit_nano"] = update.CreditLimit.Nano()
+	}
+	if update.CreditFrozen != nil {
+		details["credit_frozen"] = *update.CreditFrozen
 	}
 	if update.IsAdmin != nil {
 		details["is_admin"] = *update.IsAdmin

@@ -17,6 +17,12 @@ import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
 import { AdminModelsPage } from './models/AdminModelsPage'
 import { LoadingState } from './ui/FormControls'
 import { WelcomePage } from './welcome/WelcomePage'
+import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
+import { AdminLedgerPage } from './ledger/AdminLedgerPage'
+import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
+import { UpcomingC2CPage } from './wallet/UpcomingC2CPage'
+import { WalletPage } from './wallet/WalletPage'
+import { WalletProvider } from './wallet/WalletProvider'
 
 function RequireSession() {
   const { account, loading } = useAuth()
@@ -57,7 +63,9 @@ function AppProviders() {
   return (
     <EphemeralCredentialProvider>
       <AuthProvider>
-        <Outlet />
+        <WalletProvider>
+          <Outlet />
+        </WalletProvider>
       </AuthProvider>
     </EphemeralCredentialProvider>
   )
@@ -71,13 +79,23 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<FirstPasswordChangePage />} path="/account/password" />
       <Route element={<RequireReadyAccount />}>
         <Route element={<AccountSettingsPage />} path="/account" />
+        <Route element={<WalletPage />} path="/wallet" />
+        <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />
+        <Route element={<UpcomingC2CPage />} path="/c2c" />
+        <Route element={<UpcomingC2CPage />} path="/c2c/orders/new" />
+        <Route element={<UpcomingC2CPage />} path="/c2c/me" />
         <Route element={<RequireAdministrator />}>
+          <Route element={<AdminLedgerPage />} path="/admin/ops" />
           <Route element={<AdminAccountsPage />} path="/admin/accounts" />
           <Route
             element={<CreatedCredentialPage />}
             path="/admin/accounts/created"
           />
           <Route element={<AdminModelsPage />} path="/admin/models" />
+          <Route
+            element={<AdminAccountLedgerPage />}
+            path="/admin/ledger/accounts/:accountID"
+          />
         </Route>
       </Route>
     </Route>

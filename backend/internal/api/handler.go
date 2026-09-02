@@ -16,6 +16,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -24,6 +25,7 @@ const defaultSessionCookie = "oma_session"
 type Dependencies struct {
 	Identity          *identity.Service
 	Catalog           *catalog.Service
+	Ledger            *ledger.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -32,6 +34,7 @@ type Dependencies struct {
 type app struct {
 	identity             *identity.Service
 	catalog              *catalog.Service
+	ledger               *ledger.Service
 	databaseReady        func(context.Context) error
 	cookieSecure         bool
 	cookieName           string
@@ -50,6 +53,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	application := &app{
 		identity:             dependencies.Identity,
 		catalog:              dependencies.Catalog,
+		ledger:               dependencies.Ledger,
 		databaseReady:        dependencies.DatabaseReady,
 		cookieSecure:         dependencies.CookieSecure,
 		cookieName:           defaultSessionCookie,
@@ -73,6 +77,8 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/account", application.requireReadyAccount(http.HandlerFunc(application.currentAccount)))
 	mux.Handle("GET /api/models", application.requireReadyAccount(http.HandlerFunc(application.listPublicModels)))
 	mux.Handle("GET /api/models/{modelID...}", application.requireReadyAccount(http.HandlerFunc(application.getPublicModel)))
+	mux.Handle("GET /api/wallet", application.requireReadyAccount(http.HandlerFunc(application.wallet)))
+	mux.Handle("GET /api/wallet/entries", application.requireReadyAccount(http.HandlerFunc(application.walletEntries)))
 	mux.Handle("GET /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.listAccounts)))
 	mux.Handle("POST /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.createAccount)))
 	mux.Handle("PATCH /api/admin/accounts/{accountID}", application.requireAdmin(http.HandlerFunc(application.updateAccount)))
@@ -80,6 +86,13 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("POST /api/admin/models", application.requireAdmin(http.HandlerFunc(application.createModel)))
 	mux.Handle("GET /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.getAdminModel)))
 	mux.Handle("PUT /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.updateModel)))
+	mux.Handle("GET /api/admin/ledger/metrics", application.requireAdmin(http.HandlerFunc(application.ledgerMetrics)))
+	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountWallet)))
+	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountEntries)))
+	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemWallet)))
+	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemEntries)))
+	mux.Handle("POST /api/admin/ledger/adjustments", application.requireAdmin(http.HandlerFunc(application.adminLedgerAdjustment)))
+	mux.Handle("POST /api/admin/ledger/bad-debts", application.requireAdmin(http.HandlerFunc(application.adminBadDebtTransfer)))
 
 	return securityHeaders(application.requireSameOrigin(mux))
 }
@@ -399,11 +412,17 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
-	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound):
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
-	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, money.ErrInvalidAmount):
+	case errors.Is(err, ledger.ErrConflict), errors.Is(err, ledger.ErrHoldClosed), errors.Is(err, ledger.ErrHoldAmountExceeded):
+		writeError(w, http.StatusConflict, "ledger_conflict", "账本操作与当前状态冲突")
+	case errors.Is(err, ledger.ErrInsufficientFunds):
+		writeError(w, http.StatusUnprocessableEntity, "insufficient_spendable_capacity", "可消费额度不足")
+	case errors.Is(err, ledger.ErrCreditFrozen):
+		writeError(w, http.StatusForbidden, "credit_frozen", "账户信用已冻结")
+	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")
@@ -411,21 +430,35 @@ func writeDomainError(w http.ResponseWriter, err error) {
 }
 
 func accountResponse(account identity.Account) map[string]any {
+	effectiveCredit := account.CreditLimit
+	if account.CreditFrozen {
+		effectiveCredit = 0
+	}
+	capacity := ledger.SpendableCapacity(account.PostedBalance, effectiveCredit, account.AssetReserved, account.SpendAuthorized)
+	if account.CreditFrozen {
+		capacity = 0
+	}
+	overLimit := ledger.IsOverLimit(account.PostedBalance, effectiveCredit)
 	return map[string]any{
-		"id":                   account.ID,
-		"username":             account.Username,
-		"display_name":         account.DisplayName,
-		"is_admin":             account.IsAdmin,
-		"status":               account.Status,
-		"must_change_password": account.MustChangePassword,
-		"version":              account.Version,
-		"credit_limit":         account.CreditLimit.String(),
-		"balance":              "0",
-		"frozen_balance":       "0",
-		"available_credit":     account.CreditLimit.String(),
-		"created_at":           account.CreatedAt,
-		"updated_at":           account.UpdatedAt,
-		"password_changed_at":  account.PasswordChangedAt,
+		"id":                     account.ID,
+		"username":               account.Username,
+		"display_name":           account.DisplayName,
+		"is_admin":               account.IsAdmin,
+		"status":                 account.Status,
+		"must_change_password":   account.MustChangePassword,
+		"version":                account.Version,
+		"credit_limit":           account.CreditLimit.String(),
+		"credit_frozen":          account.CreditFrozen,
+		"posted_balance":         account.PostedBalance.String(),
+		"asset_reserved":         account.AssetReserved.String(),
+		"spend_authorized":       account.SpendAuthorized.String(),
+		"effective_credit_limit": effectiveCredit.String(),
+		"credit_used":            ledger.CreditUsed(account.PostedBalance).String(),
+		"spendable_capacity":     capacity.String(),
+		"over_limit":             overLimit,
+		"created_at":             account.CreatedAt,
+		"updated_at":             account.UpdatedAt,
+		"password_changed_at":    account.PasswordChangedAt,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
 func TestHealth(t *testing.T) {
@@ -267,5 +268,19 @@ func TestParseModelPriceUsesExactNanoPointPrecision(t *testing.T) {
 		if _, err := parseModelPrice(value); err == nil {
 			t.Fatalf("parseModelPrice(%q) unexpectedly succeeded", value)
 		}
+	}
+}
+
+func TestAccountResponseFreezesAllSpendableCapacity(t *testing.T) {
+	response := accountResponse(identity.Account{
+		CreditLimit:     money.Amount(10_000_000_000),
+		CreditFrozen:    true,
+		PostedBalance:   money.Amount(5_000_000_000),
+		AssetReserved:   money.Amount(1_000_000_000),
+		SpendAuthorized: money.Amount(1_000_000_000),
+	})
+
+	if response["effective_credit_limit"] != "0" || response["spendable_capacity"] != "0" {
+		t.Fatalf("frozen account response = %+v, want zero effective credit and spendable capacity", response)
 	}
 }

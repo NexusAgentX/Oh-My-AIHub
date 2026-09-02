@@ -157,6 +157,7 @@ func (a *app) updateAccount(w http.ResponseWriter, r *http.Request) {
 		ExpectedVersion int64            `json:"expected_version"`
 		Status          *identity.Status `json:"status"`
 		CreditLimit     *string          `json:"credit_limit"`
+		CreditFrozen    *bool            `json:"credit_frozen"`
 		IsAdmin         *bool            `json:"is_admin"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
@@ -166,6 +167,7 @@ func (a *app) updateAccount(w http.ResponseWriter, r *http.Request) {
 	update := identity.AccountUpdate{
 		ExpectedVersion: request.ExpectedVersion,
 		Status:          request.Status,
+		CreditFrozen:    request.CreditFrozen,
 		IsAdmin:         request.IsAdmin,
 	}
 	if request.CreditLimit != nil {

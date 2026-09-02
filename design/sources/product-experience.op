@@ -30107,7 +30107,7 @@
                           "id": "n1415",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "可用 102.40 积分",
+                          "content": "可消费 112.40 积分",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -30284,7 +30284,7 @@
                               "id": "n1425",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "总余额",
+                              "content": "已入账余额",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 500,
@@ -30330,7 +30330,7 @@
                                   "id": "n1428",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "可用 102.40",
+                                  "content": "可消费 112.40",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -30349,7 +30349,7 @@
                                   "id": "n1429",
                                   "width": "fit_content",
                                   "height": "fit_content",
-                                  "content": "冻结 26.00",
+                                  "content": "正积分持有 26.00",
                                   "fontFamily": "Inter Display, system-ui, sans-serif",
                                   "fontSize": 14.0,
                                   "fontWeight": 500,
@@ -30582,7 +30582,7 @@
                                       "id": "n1441",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "余额合计 0",
+                                      "content": "账本已核对",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -30731,7 +30731,7 @@
                                       "id": "n1450",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "余额",
+                                      "content": "分录后余额",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -30851,7 +30851,7 @@
                                       "id": "n1457",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "−0.01737",
+                                      "content": "−0.18102",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 400,
@@ -32323,7 +32323,7 @@
                           "id": "n1553",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "可用 102.40 积分",
+                          "content": "可消费 0.20 积分",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -32521,7 +32521,7 @@
                               "id": "n8528",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "总余额",
+                              "content": "已入账余额",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 500,
@@ -32605,7 +32605,7 @@
                               "id": "n8532",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "可用余额",
+                              "content": "可消费额度",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 13.0,
                               "fontWeight": 500,
@@ -33542,7 +33542,7 @@
                                       "id": "n8589",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "+20.00",
+                                      "content": "+0.70",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 12.0,
                                       "fontWeight": 500,
@@ -33737,7 +33737,7 @@
                                       "id": "n8602",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "−29.20",
+                                      "content": "−9.90",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 12.0,
                                       "fontWeight": 500,
@@ -33865,7 +33865,7 @@
                                       "id": "n8611",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "+6.84",
+                                      "content": "+0.84",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 12.0,
                                       "fontWeight": 500,
@@ -33893,7 +33893,7 @@
                                       "id": "n8613",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "−27.93",
+                                      "content": "−8.63",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 12.0,
                                       "fontWeight": 500,
@@ -33960,7 +33960,7 @@
                                       "id": "n8617",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "可用余额偏低",
+                                      "content": "可消费额度偏低",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 18.0,
                                       "fontWeight": 500,
@@ -50724,7 +50724,7 @@
                           "id": "n2355",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "可用 102.40 积分",
+                          "content": "可消费 112.40 积分",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -51474,7 +51474,7 @@
                                           "id": "n2405",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "坏账承担账户",
+                                          "content": "平台损失账户",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 500,
@@ -51532,7 +51532,7 @@
                                           "id": "n2409",
                                           "width": "fit_content",
                                           "height": "fit_content",
-                                          "content": "信用额度实际使用率",
+                                          "content": "已用信用占比",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 500,
@@ -52342,7 +52342,7 @@
                                       "id": "n2455",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "逾期负余额",
+                                      "content": "余额投影差额",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 400,
@@ -52361,7 +52361,7 @@
                                       "id": "n2456",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "2 个账户 · -18.40",
+                                      "content": "0.000000",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -52391,7 +52391,7 @@
                                       "id": "n2458",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "长期不活跃负余额",
+                                      "content": "持有投影差额",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 400,
@@ -52410,7 +52410,7 @@
                                       "id": "n2459",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "1 个账户 · -6.00",
+                                      "content": "0.000000",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -53519,7 +53519,7 @@
                           "id": "n2682",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "可用 102.40 积分",
+                          "content": "可消费 112.40 积分",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -53652,7 +53652,7 @@
                       "type": "frame",
                       "id": "n2697",
                       "width": "fill_container",
-                      "height": 112.0,
+                      "height": 128.0,
                       "layout": "horizontal",
                       "gap": 16.0,
                       "children": [
@@ -53800,8 +53800,8 @@
                           "width": "fill_container",
                           "height": "fill_container",
                           "layout": "vertical",
-                          "gap": 16.0,
-                          "padding": 20.0,
+                          "gap": 8.0,
+                          "padding": 16.0,
                           "clipContent": true,
                           "cornerRadius": 10.0,
                           "fill": [
@@ -53825,7 +53825,7 @@
                               "id": "n2707",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "实际占用",
+                              "content": "已用信用",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 500,
@@ -53887,8 +53887,8 @@
                           "width": "fill_container",
                           "height": "fill_container",
                           "layout": "vertical",
-                          "gap": 16.0,
-                          "padding": 20.0,
+                          "gap": 8.0,
+                          "padding": 16.0,
                           "clipContent": true,
                           "cornerRadius": 10.0,
                           "fill": [
@@ -53912,7 +53912,7 @@
                               "id": "n2711",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "逾期账户",
+                              "content": "信用超限账户",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 500,
@@ -53950,7 +53950,7 @@
                               "id": "n2713",
                               "width": "fill_container",
                               "height": "fit_content",
-                              "content": "已冻结透支",
+                              "content": "禁止新消费与持有",
                               "fontFamily": "Inter Display, system-ui, sans-serif",
                               "fontSize": 14.0,
                               "fontWeight": 400,
@@ -54162,7 +54162,7 @@
                                           "id": "n2725",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "余额",
+                                          "content": "已入账余额",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 500,
@@ -54191,7 +54191,7 @@
                                           "id": "n2727",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "额度",
+                                          "content": "额度 / 已用",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 500,
@@ -54220,7 +54220,7 @@
                                           "id": "n2729",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "最低余额",
+                                          "content": "可消费额度",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 500,
@@ -54311,7 +54311,7 @@
                                           "id": "n2734",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "林墨 · lin@example.test",
+                                          "content": "林墨 · @lin",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54369,7 +54369,7 @@
                                           "id": "n2738",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "20.00",
+                                          "content": "20.00 / 0.00",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54398,7 +54398,7 @@
                                           "id": "n2740",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "-20.00",
+                                          "content": "122.40",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54489,7 +54489,7 @@
                                           "id": "n2745",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "周辰 · zhou@example.test",
+                                          "content": "周辰 · @zhou",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54547,7 +54547,7 @@
                                           "id": "n2749",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "10.00",
+                                          "content": "10.00 / 8.20",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54576,7 +54576,7 @@
                                           "id": "n2751",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "-10.00",
+                                          "content": "1.80",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54667,7 +54667,7 @@
                                           "id": "n2756",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "何笙 · he@example.test",
+                                          "content": "何笙 · @he",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54725,7 +54725,7 @@
                                           "id": "n2760",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "12.00",
+                                          "content": "12.00 / 12.00",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54754,7 +54754,7 @@
                                           "id": "n2762",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "-12.00",
+                                          "content": "0.00",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54783,7 +54783,7 @@
                                           "id": "n2764",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "冻结透支",
+                                          "content": "信用冻结",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54845,7 +54845,7 @@
                                           "id": "n2767",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "许宁 · xu@example.test",
+                                          "content": "许宁 · @xu",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54903,7 +54903,7 @@
                                           "id": "n2771",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "30.00",
+                                          "content": "30.00 / 0.00",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -54932,7 +54932,7 @@
                                           "id": "n2773",
                                           "width": "fill_container",
                                           "height": "fit_content",
-                                          "content": "-30.00",
+                                          "content": "66.80",
                                           "fontFamily": "Inter Display, system-ui, sans-serif",
                                           "fontSize": 14.0,
                                           "fontWeight": 400,
@@ -56956,68 +56956,30 @@
                                       ]
                                     },
                                     {
-                                      "type": "text_input",
-                                      "id": "n10731",
-                                      "name": "Provider Text Field",
+                                      "type": "select",
+                                      "id": "n2925",
                                       "width": "fill_container",
                                       "height": 44.0,
-                                      "placeholder": "例如 OpenAI",
-                                      "value": "OpenAI",
-                                      "fill": [
+                                      "placeholder": "选择提供商",
+                                      "value": "openai",
+                                      "options": [
                                         {
-                                          "type": "solid",
-                                          "color": "$color.canvas"
+                                          "value": "openai",
+                                          "label": "OpenAI"
+                                        },
+                                        {
+                                          "value": "anthropic",
+                                          "label": "Anthropic"
+                                        },
+                                        {
+                                          "value": "google",
+                                          "label": "Google"
+                                        },
+                                        {
+                                          "value": "other",
+                                          "label": "其他"
                                         }
                                       ],
-                                      "stroke": {
-                                        "thickness": 1.0,
-                                        "fill": [
-                                          {
-                                            "type": "solid",
-                                            "color": "$color.hairline"
-                                          }
-                                        ]
-                                      },
-                                      "effects": [],
-                                      "cornerRadius": 6.0
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "n10727",
-                                  "name": "Model Name Field",
-                                  "width": "fill_container",
-                                  "height": "fit_content",
-                                  "layout": "vertical",
-                                  "gap": 8.0,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "n10728",
-                                      "width": "fill_container",
-                                      "height": "fit_content",
-                                      "content": "模型名称",
-                                      "fontFamily": "Inter Display, system-ui, sans-serif",
-                                      "fontSize": 14.0,
-                                      "fontWeight": 500,
-                                      "letterSpacing": 0.0,
-                                      "lineHeight": 1.5,
-                                      "textGrowth": "fixed-width",
-                                      "fill": [
-                                        {
-                                          "type": "solid",
-                                          "color": "$color.body"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "text_input",
-                                      "id": "n10729",
-                                      "width": "fill_container",
-                                      "height": 44.0,
-                                      "placeholder": "例如 GPT-4.1",
-                                      "value": "GPT-4.1",
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57061,7 +57023,7 @@
                                       "id": "n2928",
                                       "width": "fill_container",
                                       "height": "fit_content",
-                                      "content": "上下文大小（tokens）",
+                                      "content": "上下文大小",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -57080,8 +57042,8 @@
                                       "id": "n2929",
                                       "width": "fill_container",
                                       "height": 44.0,
-                                      "placeholder": "例如 1000000",
-                                      "value": "1000000",
+                                      "placeholder": "例如 1M",
+                                      "value": "1M tokens",
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57194,116 +57156,43 @@
                                       ]
                                     },
                                     {
-                                      "type": "frame",
-                                      "id": "n10732",
-                                      "name": "Input Modalities",
+                                      "type": "select",
+                                      "id": "n2936",
                                       "width": "fill_container",
                                       "height": 44.0,
-                                      "layout": "horizontal",
-                                      "gap": 8.0,
-                                      "alignItems": "center",
-                                      "children": [
+                                      "placeholder": "选择模态",
+                                      "value": "text-image",
+                                      "options": [
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10733",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": true,
-                                          "label": "文本",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "text",
+                                          "label": "文本"
                                         },
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10734",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": true,
-                                          "label": "图片",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "text-image",
+                                          "label": "文本 · 图片"
                                         },
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10735",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": false,
-                                          "label": "音频",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
-                                        },
-                                        {
-                                          "type": "checkbox",
-                                          "id": "n10736",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": false,
-                                          "label": "视频",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "multimodal",
+                                          "label": "文本 · 图片 · 音频"
                                         }
-                                      ]
+                                      ],
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.canvas"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 1.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "effects": [],
+                                      "cornerRadius": 6.0
                                     }
                                   ]
                                 },
@@ -57335,116 +57224,43 @@
                                       ]
                                     },
                                     {
-                                      "type": "frame",
-                                      "id": "n10737",
-                                      "name": "Output Modalities",
+                                      "type": "select",
+                                      "id": "n2939",
                                       "width": "fill_container",
                                       "height": 44.0,
-                                      "layout": "horizontal",
-                                      "gap": 8.0,
-                                      "alignItems": "center",
-                                      "children": [
+                                      "placeholder": "选择模态",
+                                      "value": "text",
+                                      "options": [
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10738",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": true,
-                                          "label": "文本",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "text",
+                                          "label": "文本"
                                         },
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10739",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": false,
-                                          "label": "图片",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "text-image",
+                                          "label": "文本 · 图片"
                                         },
                                         {
-                                          "type": "checkbox",
-                                          "id": "n10740",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": false,
-                                          "label": "音频",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
-                                        },
-                                        {
-                                          "type": "checkbox",
-                                          "id": "n10741",
-                                          "width": "fill_container",
-                                          "height": 36.0,
-                                          "checked": false,
-                                          "label": "视频",
-                                          "fill": [
-                                            {
-                                              "type": "solid",
-                                              "color": "$color.primary"
-                                            }
-                                          ],
-                                          "stroke": {
-                                            "thickness": 1.0,
-                                            "fill": [
-                                              {
-                                                "type": "solid",
-                                                "color": "$color.hairline"
-                                              }
-                                            ]
-                                          },
-                                          "effects": [],
-                                          "cornerRadius": 6.0
+                                          "value": "text-audio",
+                                          "label": "文本 · 音频"
                                         }
-                                      ]
+                                      ],
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.canvas"
+                                        }
+                                      ],
+                                      "stroke": {
+                                        "thickness": 1.0,
+                                        "fill": [
+                                          {
+                                            "type": "solid",
+                                            "color": "$color.hairline"
+                                          }
+                                        ]
+                                      },
+                                      "effects": [],
+                                      "cornerRadius": 6.0
                                     }
                                   ]
                                 }
@@ -57598,7 +57414,7 @@
                                       "value": 14.4,
                                       "min": 0.0,
                                       "max": 100000.0,
-                                      "step": 1e-9,
+                                      "step": 0.01,
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57655,7 +57471,7 @@
                                       "value": 57.6,
                                       "min": 0.0,
                                       "max": 100000.0,
-                                      "step": 1e-9,
+                                      "step": 0.01,
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57712,7 +57528,7 @@
                                       "value": 18.0,
                                       "min": 0.0,
                                       "max": 100000.0,
-                                      "step": 1e-9,
+                                      "step": 0.01,
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57769,7 +57585,7 @@
                                       "value": 3.6,
                                       "min": 0.0,
                                       "max": 100000.0,
-                                      "step": 1e-9,
+                                      "step": 0.01,
                                       "fill": [
                                         {
                                           "type": "solid",
@@ -57887,7 +57703,7 @@
                                       "id": "n2962",
                                       "width": "fit_content",
                                       "height": "fit_content",
-                                      "content": "保存更改",
+                                      "content": "保存并发布新版本",
                                       "fontFamily": "Inter Display, system-ui, sans-serif",
                                       "fontSize": 14.0,
                                       "fontWeight": 500,
@@ -79782,7 +79598,7 @@
                       "x": 330.0,
                       "y": 148.0,
                       "width": 532.0,
-                      "height": 646.0,
+                      "height": 600.0,
                       "layout": "vertical",
                       "gap": 16.0,
                       "padding": 24.0,
@@ -80230,32 +80046,6 @@
                               ]
                             }
                           ]
-                        },
-                        {
-                          "type": "checkbox",
-                          "id": "n10730",
-                          "name": "Administrator Permission",
-                          "width": "fill_container",
-                          "height": 36.0,
-                          "checked": false,
-                          "label": "授予管理员权限",
-                          "fill": [
-                            {
-                              "type": "solid",
-                              "color": "#181d26"
-                            }
-                          ],
-                          "stroke": {
-                            "thickness": 1.0,
-                            "fill": [
-                              {
-                                "type": "solid",
-                                "color": "#dddddd"
-                              }
-                            ]
-                          },
-                          "effects": [],
-                          "cornerRadius": 6.0
                         },
                         {
                           "type": "frame",
@@ -124476,7 +124266,7 @@
                           "id": "n3505",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "Key 轮换",
+                          "content": "自定义提供商",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -124517,7 +124307,7 @@
                           "id": "n3507",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "渠道校验失败",
+                          "content": "多模态多选",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
@@ -124558,7 +124348,7 @@
                           "id": "n3509",
                           "width": "fit_content",
                           "height": "fit_content",
-                          "content": "渠道全部失败",
+                          "content": "冲突保留草稿",
                           "fontFamily": "Inter Display, system-ui, sans-serif",
                           "fontSize": 14.0,
                           "fontWeight": 500,
