@@ -16,6 +16,7 @@ import { LoginPage } from './auth/LoginPage'
 import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
 import { AdminModelsPage } from './models/AdminModelsPage'
 import { LoadingState } from './ui/FormControls'
+import { WelcomePage } from './welcome/WelcomePage'
 
 function RequireSession() {
   const { account, loading } = useAuth()
@@ -62,30 +63,32 @@ function AppProviders() {
   )
 }
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route element={<AppProviders />}>
-      <Route element={<LoginPage />} path="/login" />
-      <Route element={<RequireSession />}>
-        <Route element={<FirstPasswordChangePage />} path="/account/password" />
-        <Route element={<RequireReadyAccount />}>
-          <Route element={<AccountSettingsPage />} path="/account" />
-          <Route element={<RequireAdministrator />}>
-            <Route element={<AdminAccountsPage />} path="/admin/accounts" />
-            <Route
-              element={<CreatedCredentialPage />}
-              path="/admin/accounts/created"
-            />
-            <Route element={<AdminModelsPage />} path="/admin/models" />
-          </Route>
+export const appRoutes = createRoutesFromElements(
+  <Route element={<AppProviders />}>
+    <Route element={<WelcomePage />} path="/welcome" />
+    <Route element={<LoginPage />} path="/login" />
+    <Route element={<RequireSession />}>
+      <Route element={<FirstPasswordChangePage />} path="/account/password" />
+      <Route element={<RequireReadyAccount />}>
+        <Route element={<AccountSettingsPage />} path="/account" />
+        <Route element={<RequireAdministrator />}>
+          <Route element={<AdminAccountsPage />} path="/admin/accounts" />
+          <Route
+            element={<CreatedCredentialPage />}
+            path="/admin/accounts/created"
+          />
+          <Route element={<AdminModelsPage />} path="/admin/models" />
         </Route>
       </Route>
-      <Route element={<RootRedirect />} path="/" />
-      <Route element={<RootRedirect />} path="*" />
-    </Route>,
-  ),
+    </Route>
+    <Route element={<RootRedirect />} path="/" />
+    <Route element={<RootRedirect />} path="*" />
+  </Route>,
 )
 
+let router: ReturnType<typeof createBrowserRouter> | undefined
+
 export function App() {
+  router ??= createBrowserRouter(appRoutes)
   return <RouterProvider router={router} />
 }
