@@ -60,29 +60,6 @@ export function AccountSettingsPage() {
         <StatusBadge status={account.status} />
       </header>
 
-      <section className="metric-grid" aria-label="账户余额摘要">
-        <article className="metric-card">
-          <span>账户余额</span>
-          <strong>{account.balance}</strong>
-          <small>积分</small>
-        </article>
-        <article className="metric-card">
-          <span>冻结余额</span>
-          <strong>{account.frozen_balance}</strong>
-          <small>积分</small>
-        </article>
-        <article className="metric-card">
-          <span>信用额度</span>
-          <strong>{account.credit_limit}</strong>
-          <small>积分</small>
-        </article>
-        <article className="metric-card metric-card-accent">
-          <span>可用信用</span>
-          <strong>{account.available_credit}</strong>
-          <small>积分</small>
-        </article>
-      </section>
-
       <div className="settings-grid">
         <section className="panel">
           <header className="panel-heading">

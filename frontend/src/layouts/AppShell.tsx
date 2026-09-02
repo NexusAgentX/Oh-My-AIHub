@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { Button } from '../ui/FormControls'
 import { Icon, type IconName } from '../ui/Icon'
 import { Brand } from './Brand'
+import { useWallet } from '../wallet/WalletProvider'
 
 type NavigationItem = {
   label: string
@@ -17,11 +18,11 @@ const productNavigation: NavigationItem[] = [
   { label: '账户设置', to: '/account', icon: 'account' },
   { label: 'API Key', icon: 'key' },
   { label: '渠道市场', icon: 'database' },
-  { label: '积分钱包', icon: 'wallet' },
+  { label: '积分钱包', to: '/wallet', icon: 'wallet' },
 ]
 
 const adminNavigation: NavigationItem[] = [
-  { label: '运营总览', icon: 'settings' },
+  { label: '运营总览', to: '/admin/ops', icon: 'settings' },
   { label: '账户与信用', to: '/admin/accounts', icon: 'users' },
   { label: '模型目录', to: '/admin/models', icon: 'database' },
 ]
@@ -34,6 +35,7 @@ export function AppShell({
   admin?: boolean
 }) {
   const { account, logout, sessionError } = useAuth()
+  const { wallet } = useWallet()
   const { clearCredential } = useEphemeralCredential()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -199,7 +201,7 @@ export function AppShell({
       <div aria-hidden={menuOpen || undefined} className="workspace" inert={menuOpen || undefined}>
         <header className="workspace-bar">
           <span>受邀实例 · Singapore</span>
-          <strong>可用 {account?.available_credit ?? '0'} 积分</strong>
+          <strong>可消费 {wallet?.spendable_capacity ?? '0'} 积分</strong>
         </header>
         {(sessionError || signOutError) && (
           <div

@@ -1,13 +1,12 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type FormEvent,
 } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
-import type { Account, AccountStatus } from '../api/contracts'
+import type { Account, AccountStatus, LedgerMetrics } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
 import { AppShell } from '../layouts/AppShell'
 import {
@@ -18,8 +17,7 @@ import {
   TextField,
 } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
-import { formatNanoPoints } from '../money/amount'
-import { summarizeAccounts } from './accountMetrics'
+import { accountRiskLabel } from './accountMetrics'
 import { useEphemeralCredential } from './EphemeralCredentialProvider'
 
 export function AdminAccountsPage() {
@@ -28,7 +26,7 @@ export function AdminAccountsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [metricAccounts, setMetricAccounts] = useState<Account[]>([])
+  const [metrics, setMetrics] = useState<LedgerMetrics | null>(null)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,11 +38,12 @@ export function AdminAccountsPage() {
     setError('')
     try {
       const normalizedSearch = search.trim()
-      const [items, completeDirectory] = normalizedSearch
-        ? await Promise.all([api.accounts(normalizedSearch), api.accounts('')])
-        : await api.accounts('').then((allItems) => [allItems, allItems] as const)
+      const [items, nextMetrics] = await Promise.all([
+        api.accounts(normalizedSearch),
+        api.ledgerMetrics(),
+      ])
       setAccounts(items)
-      setMetricAccounts(completeDirectory)
+      setMetrics(nextMetrics)
       setError(successMessage)
     } catch (caught) {
       setError(
@@ -64,8 +63,6 @@ export function AdminAccountsPage() {
     setCreateOpen(true)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
-
-  const totals = useMemo(() => summarizeAccounts(metricAccounts), [metricAccounts])
 
   const search = (event: FormEvent) => {
     event.preventDefault()
@@ -89,24 +86,24 @@ export function AdminAccountsPage() {
 
       <section className="metric-grid" aria-label="账户指标">
         <article className="metric-card">
-          <span>全部账户</span>
-          <strong>{totals.total}</strong>
+          <span>账本账户</span>
+          <strong>{metrics?.ledger_account_count ?? '—'}</strong>
           <small>个</small>
         </article>
         <article className="metric-card metric-card-accent">
-          <span>启用账户</span>
-          <strong>{totals.active}</strong>
-          <small>个</small>
-        </article>
-        <article className="metric-card">
-          <span>停用账户</span>
-          <strong>{totals.disabled}</strong>
-          <small>个</small>
-        </article>
-        <article className="metric-card">
-          <span>信用额度合计</span>
-          <strong>{formatNanoPoints(totals.credit)}</strong>
+          <span>总信用额度</span>
+          <strong>{metrics?.total_credit_limit ?? '—'}</strong>
           <small>积分</small>
+        </article>
+        <article className="metric-card">
+          <span>已用信用</span>
+          <strong>{metrics?.credit_capacity_used ?? '—'}</strong>
+          <small>积分</small>
+        </article>
+        <article className="metric-card">
+          <span>信用超限账户</span>
+          <strong>{metrics?.over_limit_accounts ?? '—'}</strong>
+          <small>{metrics?.credit_frozen_accounts ?? '—'} 个信用冻结</small>
         </article>
       </section>
 
@@ -133,17 +130,18 @@ export function AdminAccountsPage() {
           <LoadingState />
         ) : (
           <>
-            <div className="desktop-table-wrap">
+            <div className="desktop-table-wrap account-desktop-table-wrap">
               <table className="data-table">
                 <caption className="visually-hidden">受邀账户列表</caption>
                 <thead>
                   <tr>
                     <th scope="col">账户</th>
-                    <th scope="col">权限</th>
-                    <th scope="col">状态</th>
+                    <th scope="col">已入账余额</th>
                     <th scope="col">信用额度</th>
-                    <th scope="col">首次改密</th>
-                    <th scope="col"><span className="visually-hidden">操作</span></th>
+                    <th scope="col">已用信用</th>
+                    <th scope="col">可消费额度</th>
+                    <th scope="col">风险状态</th>
+                    <th aria-label="操作" scope="col" />
                   </tr>
                 </thead>
                 <tbody>
@@ -151,43 +149,57 @@ export function AdminAccountsPage() {
                     <tr key={item.id}>
                       <td>
                         <strong>{item.display_name}</strong>
-                        <small>@{item.username}</small>
+                        <small>
+                          @{item.username} · {item.is_admin ? '管理员' : '普通账户'} · {item.status === 'active' ? '启用' : '停用'}
+                        </small>
                       </td>
-                      <td>{item.is_admin ? '管理员' : '普通账户'}</td>
-                      <td><StatusBadge status={item.status} /></td>
+                      <td>{item.posted_balance}</td>
                       <td>{item.credit_limit} 积分</td>
-                      <td>{item.must_change_password ? '待完成' : '已完成'}</td>
+                      <td>{item.credit_used}</td>
+                      <td>{item.spendable_capacity}</td>
+                      <td>{accountRiskLabel(item)}</td>
                       <td className="table-action">
-                        <Button
-                          onClick={() => setEditing(item)}
-                          variant="secondary"
-                        >
-                          管理
-                        </Button>
+                        <span className="table-action-group">
+                          <Link
+                            className="button button-secondary"
+                            to={`/admin/ledger/accounts/${item.id}`}
+                          >
+                            账本
+                          </Link>
+                          <Button
+                            onClick={() => setEditing(item)}
+                            variant="secondary"
+                          >
+                            管理
+                          </Button>
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mobile-card-list">
+            <div className="mobile-card-list account-mobile-card-list">
               {accounts.map((item) => (
                 <article className="mobile-data-card" key={item.id}>
                   <header>
                     <div>
                       <strong>{item.display_name}</strong>
-                      <span>@{item.username}</span>
+                      <span>@{item.username} · {item.is_admin ? '管理员' : '普通账户'}</span>
                     </div>
                     <StatusBadge status={item.status} />
                   </header>
                   <dl>
-                    <div><dt>权限</dt><dd>{item.is_admin ? '管理员' : '普通账户'}</dd></div>
+                    <div><dt>已入账余额</dt><dd>{item.posted_balance}</dd></div>
                     <div><dt>信用额度</dt><dd>{item.credit_limit} 积分</dd></div>
-                    <div><dt>首次改密</dt><dd>{item.must_change_password ? '待完成' : '已完成'}</dd></div>
+                    <div><dt>已用信用</dt><dd>{item.credit_used}</dd></div>
+                    <div><dt>可消费额度</dt><dd>{item.spendable_capacity}</dd></div>
+                    <div><dt>风险状态</dt><dd>{accountRiskLabel(item)}</dd></div>
                   </dl>
-                  <Button onClick={() => setEditing(item)} variant="secondary">
-                    管理账户
-                  </Button>
+                  <div className="mobile-card-actions">
+                    <Link className="button button-secondary" to={`/admin/ledger/accounts/${item.id}`}>查看账本</Link>
+                    <Button onClick={() => setEditing(item)} variant="secondary">管理账户</Button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -216,11 +228,9 @@ export function AdminAccountsPage() {
           setAccounts((items) =>
             items.map((item) => (item.id === updated.id ? updated : item)),
           )
-          setMetricAccounts((items) =>
-            items.map((item) => (item.id === updated.id ? updated : item)),
-          )
           synchronizeAccount(updated)
           setEditing(null)
+          void api.ledgerMetrics().then(setMetrics)
         }}
         onConflict={() => {
           setEditing(null)
@@ -395,6 +405,7 @@ function EditAccountDialog({
 }) {
   const reference = useDialog(Boolean(account))
   const [creditLimit, setCreditLimit] = useState('0')
+  const [creditFrozen, setCreditFrozen] = useState(false)
   const [status, setStatus] = useState<AccountStatus>('active')
   const [isAdmin, setIsAdmin] = useState(false)
   const [error, setError] = useState('')
@@ -403,6 +414,7 @@ function EditAccountDialog({
   useEffect(() => {
     if (account) {
       setCreditLimit(account.credit_limit)
+      setCreditFrozen(account.credit_frozen)
       setStatus(account.status)
       setIsAdmin(account.is_admin)
       setError('')
@@ -419,6 +431,7 @@ function EditAccountDialog({
       onUpdated(
         await api.updateAccount(account.id, account.version, {
           credit_limit: creditLimit,
+          credit_frozen: creditFrozen,
           status,
           is_admin: isAdmin,
         }),
@@ -477,6 +490,14 @@ function EditAccountDialog({
             <option value="active">启用</option>
             <option value="disabled">停用</option>
           </select>
+        </label>
+        <label className="checkbox-control">
+          <input
+            checked={creditFrozen}
+            onChange={(event) => setCreditFrozen(event.target.checked)}
+            type="checkbox"
+          />
+          <span>冻结新消费与持有</span>
         </label>
         <label className="checkbox-control">
           <input

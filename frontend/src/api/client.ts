@@ -2,7 +2,11 @@ import type {
   Account,
   AccountStatus,
   CatalogModel,
+  LedgerEntry,
+  LedgerMetrics,
   ModelInput,
+  Wallet,
+  WalletRecoveryAction,
 } from './contracts'
 
 type ErrorPayload = {
@@ -38,6 +42,16 @@ export function changesAuthenticatedAccount(error: ApiError) {
     error.code === 'password_change_required' ||
     error.code === 'administrator_required'
   )
+}
+
+export function ledgerEntriesPath(
+  path: string,
+  before = '',
+  limit = 20,
+) {
+  const query = new URLSearchParams({ limit: String(limit) })
+  if (before) query.set('before', before)
+  return `${path}?${query.toString()}`
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -122,6 +136,7 @@ export const api = {
     input: {
       status?: AccountStatus
       credit_limit?: string
+      credit_frozen?: boolean
       is_admin?: boolean
     },
   ) {
@@ -134,6 +149,57 @@ export const api = {
         },
       )
     ).account
+  },
+  wallet() {
+    return request<{ wallet: Wallet; recovery_actions: WalletRecoveryAction[] }>(
+      '/api/wallet',
+    )
+  },
+  walletEntries(before = '', limit = 20) {
+    return request<{ entries: LedgerEntry[]; next_before: string }>(
+      ledgerEntriesPath('/api/wallet/entries', before, limit),
+    )
+  },
+  async ledgerMetrics() {
+    return (
+      await request<{ metrics: LedgerMetrics }>('/api/admin/ledger/metrics')
+    ).metrics
+  },
+  async adminAccountWallet(accountID: string) {
+    return (
+      await request<{ wallet: Wallet }>(
+        `/api/admin/ledger/accounts/${encodeURIComponent(accountID)}/wallet`,
+      )
+    ).wallet
+  },
+  adminAccountEntries(accountID: string, before = '', limit = 20) {
+    return request<{ entries: LedgerEntry[]; next_before: string }>(
+      ledgerEntriesPath(
+        `/api/admin/ledger/accounts/${encodeURIComponent(accountID)}/entries`,
+        before,
+        limit,
+      ),
+    )
+  },
+  async adminSystemWallet(systemKind: 'platform_incentive' | 'platform_loss') {
+    return (
+      await request<{ wallet: Wallet }>(
+        `/api/admin/ledger/system-accounts/${systemKind}/wallet`,
+      )
+    ).wallet
+  },
+  adminSystemEntries(
+    systemKind: 'platform_incentive' | 'platform_loss',
+    before = '',
+    limit = 20,
+  ) {
+    return request<{ entries: LedgerEntry[]; next_before: string }>(
+      ledgerEntriesPath(
+        `/api/admin/ledger/system-accounts/${systemKind}/entries`,
+        before,
+        limit,
+      ),
+    )
   },
   async models(query = '', admin = false) {
     const suffix = query ? `?q=${encodeURIComponent(query)}` : ''

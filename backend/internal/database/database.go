@@ -38,6 +38,17 @@ func Open(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 }
 
 func Migrate(ctx context.Context, databaseURL string) error {
+	return migrate(ctx, databaseURL, 0)
+}
+
+func MigrateTo(ctx context.Context, databaseURL string, version int64) error {
+	if version < 1 {
+		return fmt.Errorf("migration version must be positive")
+	}
+	return migrate(ctx, databaseURL, version)
+}
+
+func migrate(ctx context.Context, databaseURL string, version int64) error {
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		return fmt.Errorf("open migration database: %w", err)
@@ -49,6 +60,12 @@ func Migrate(ctx context.Context, databaseURL string) error {
 	goose.SetBaseFS(migrationFiles)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("configure migration dialect: %w", err)
+	}
+	if version > 0 {
+		if err := goose.UpToContext(ctx, db, "migrations", version); err != nil {
+			return fmt.Errorf("apply database migrations through version %d: %w", version, err)
+		}
+		return nil
 	}
 	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
 		return fmt.Errorf("apply database migrations: %w", err)

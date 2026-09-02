@@ -87,6 +87,10 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.getAdminModel)))
 	mux.Handle("PUT /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.updateModel)))
 	mux.Handle("GET /api/admin/ledger/metrics", application.requireAdmin(http.HandlerFunc(application.ledgerMetrics)))
+	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountWallet)))
+	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountEntries)))
+	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemWallet)))
+	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemEntries)))
 	mux.Handle("POST /api/admin/ledger/adjustments", application.requireAdmin(http.HandlerFunc(application.adminLedgerAdjustment)))
 	mux.Handle("POST /api/admin/ledger/bad-debts", application.requireAdmin(http.HandlerFunc(application.adminBadDebtTransfer)))
 
@@ -431,7 +435,10 @@ func accountResponse(account identity.Account) map[string]any {
 		effectiveCredit = 0
 	}
 	capacity := ledger.SpendableCapacity(account.PostedBalance, effectiveCredit, account.AssetReserved, account.SpendAuthorized)
-	overLimit := ledger.IsOverLimit(account.PostedBalance, effectiveCredit, account.AssetReserved, account.SpendAuthorized)
+	if account.CreditFrozen {
+		capacity = 0
+	}
+	overLimit := ledger.IsOverLimit(account.PostedBalance, effectiveCredit)
 	return map[string]any{
 		"id":                     account.ID,
 		"username":               account.Username,
@@ -446,6 +453,7 @@ func accountResponse(account identity.Account) map[string]any {
 		"asset_reserved":         account.AssetReserved.String(),
 		"spend_authorized":       account.SpendAuthorized.String(),
 		"effective_credit_limit": effectiveCredit.String(),
+		"credit_used":            ledger.CreditUsed(account.PostedBalance).String(),
 		"spendable_capacity":     capacity.String(),
 		"over_limit":             overLimit,
 		"created_at":             account.CreatedAt,

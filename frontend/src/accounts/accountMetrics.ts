@@ -1,14 +1,8 @@
 import type { Account } from '../api/contracts'
-import { parseNanoPoints } from '../money/amount'
 
-export function summarizeAccounts(accounts: Account[]) {
-  return {
-    total: accounts.length,
-    active: accounts.filter((item) => item.status === 'active').length,
-    disabled: accounts.filter((item) => item.status === 'disabled').length,
-    credit: accounts.reduce(
-      (sum, item) => sum + parseNanoPoints(item.credit_limit || '0'),
-      0n,
-    ),
-  }
+export function accountRiskLabel(account: Account) {
+  if (account.credit_frozen) return '信用冻结'
+  if (account.over_limit) return '信用超限'
+  if (account.spendable_capacity === '0') return '可消费为零'
+  return '正常'
 }

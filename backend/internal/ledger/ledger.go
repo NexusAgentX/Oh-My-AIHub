@@ -48,9 +48,24 @@ const (
 
 type HoldAmountMode string
 
+type EntryRole string
+
 const (
 	HoldAmountExact HoldAmountMode = "exact"
 	HoldAmountAll   HoldAmountMode = "all_remaining"
+)
+
+const (
+	EntryRoleConsumer         EntryRole = "consumer"
+	EntryRoleProvider         EntryRole = "provider"
+	EntryRoleSeller           EntryRole = "seller"
+	EntryRoleBuyer            EntryRole = "buyer"
+	EntryRoleAdjustmentSource EntryRole = "adjustment_source"
+	EntryRoleAdjustmentTarget EntryRole = "adjustment_target"
+	EntryRoleDebtor           EntryRole = "debtor"
+	EntryRolePlatformLoss     EntryRole = "platform_loss"
+	EntryRolePlatformFee      EntryRole = "platform_fee"
+	EntryRoleReversal         EntryRole = "reversal"
 )
 
 var (
@@ -95,16 +110,32 @@ type Wallet struct {
 }
 
 type Entry struct {
-	ID                  int64
-	TransactionID       string
-	LedgerAccountID     string
-	AccountKind         AccountKind
-	IdentityAccountID   string
-	Ordinal             int
-	Amount              money.Amount
-	PostedBalanceBefore money.Amount
-	PostedBalanceAfter  money.Amount
-	CreatedAt           time.Time
+	ID                      int64
+	TransactionID           string
+	LedgerAccountID         string
+	AccountKind             AccountKind
+	IdentityAccountID       string
+	Ordinal                 int
+	BusinessRole            EntryRole
+	Amount                  money.Amount
+	PostedBalanceBefore     money.Amount
+	PostedBalanceAfter      money.Amount
+	CreatedAt               time.Time
+	TransactionKind         TransactionKind
+	Reason                  string
+	ReferenceType           string
+	ReferenceID             string
+	ActorAccountID          string
+	ReversalOfTransactionID string
+	HoldID                  string
+	Counterparties          []Counterparty
+}
+
+type Counterparty struct {
+	AccountKind       AccountKind
+	IdentityAccountID string
+	BusinessRole      EntryRole
+	Amount            money.Amount
 }
 
 type Transaction struct {
@@ -116,13 +147,15 @@ type Transaction struct {
 	ReferenceID             string
 	ActorAccountID          string
 	ReversalOfTransactionID string
+	HoldID                  string
 	Entries                 []Entry
 	CreatedAt               time.Time
 }
 
 type Posting struct {
-	Account AccountRef
-	Amount  money.Amount
+	Account      AccountRef
+	BusinessRole EntryRole
+	Amount       money.Amount
 }
 
 type PostRequest struct {
@@ -172,13 +205,14 @@ type HoldAmount struct {
 type MutateHoldRequest struct {
 	IdempotencyKey string
 	HoldID         string
+	BusinessID     string
 	Amount         HoldAmount
 	Reason         string
 }
 
 type CaptureHoldRequest struct {
 	MutateHoldRequest
-	Destination   AccountRef
+	Credits       []Posting
 	ReferenceType string
 	ReferenceID   string
 }
@@ -189,23 +223,30 @@ type CaptureResult struct {
 }
 
 type Metrics struct {
-	TotalPostedBalance     string
-	PositivePostedBalance  string
-	NegativePostedBalance  string
-	TotalCreditLimit       string
-	UsedCredit             string
-	AssetReserved          string
-	SpendAuthorized        string
-	IncentivePostedBalance string
-	LossPostedBalance      string
-	OverLimitAccounts      int64
-	CreditFrozenAccounts   int64
-	AccountCount           int64
+	TotalPostedBalance               string
+	PositivePostedBalance            string
+	NegativePostedBalance            string
+	TotalCreditLimit                 string
+	UsedCredit                       string
+	AssetReserved                    string
+	SpendAuthorized                  string
+	IncentivePostedBalance           string
+	LossPostedBalance                string
+	OverLimitAccounts                int64
+	CreditFrozenAccounts             int64
+	AccountCount                     int64
+	PostedProjectionDifference       string
+	PostedProjectionMismatchAccounts int64
+	AssetReservationDifference       string
+	SpendAuthorizationDifference     string
+	HoldProjectionMismatchAccounts   int64
 }
 
 type Store interface {
 	Wallet(context.Context, string) (Wallet, error)
 	Entries(context.Context, string, int64, int) ([]Entry, error)
+	WalletByRef(context.Context, AccountRef) (Wallet, error)
+	EntriesByRef(context.Context, AccountRef, int64, int) ([]Entry, error)
 	Metrics(context.Context) (Metrics, error)
 	Post(context.Context, PostRequest, [32]byte) (Transaction, error)
 	CreateHold(context.Context, CreateHoldRequest, [32]byte) (Hold, error)
@@ -251,9 +292,29 @@ func (s *Service) Metrics(ctx context.Context, actor identity.Account) (Metrics,
 	return s.store.Metrics(ctx)
 }
 
+func (s *Service) AdminWallet(ctx context.Context, actor identity.Account, account AccountRef) (Wallet, error) {
+	if !actor.IsAdmin {
+		return Wallet{}, identity.ErrForbidden
+	}
+	if !validAccountRef(account) {
+		return Wallet{}, ErrInvalidInput
+	}
+	return s.store.WalletByRef(ctx, account)
+}
+
+func (s *Service) AdminEntries(ctx context.Context, actor identity.Account, account AccountRef, beforeID int64, limit int) ([]Entry, error) {
+	if !actor.IsAdmin {
+		return nil, identity.ErrForbidden
+	}
+	if !validAccountRef(account) || beforeID < 0 || limit < 1 || limit > 100 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.EntriesByRef(ctx, account, beforeID, limit)
+}
+
 func (s *Service) post(ctx context.Context, request PostRequest) (Transaction, error) {
 	request = normalizePost(request)
-	if err := validatePost(request); err != nil {
+	if err := ValidatePostRequest(request); err != nil {
 		return Transaction{}, err
 	}
 	return s.store.Post(ctx, request, payloadHash(request))
@@ -269,7 +330,10 @@ func (s *Service) Transfer(ctx context.Context, key, fromAccountID, toAccountID 
 		Reason:         reason,
 		ReferenceType:  referenceType,
 		ReferenceID:    referenceID,
-		Entries:        []Posting{{Account: UserAccount(fromAccountID), Amount: -amount}, {Account: UserAccount(toAccountID), Amount: amount}},
+		Entries: []Posting{
+			{Account: UserAccount(fromAccountID), BusinessRole: EntryRoleConsumer, Amount: -amount},
+			{Account: UserAccount(toAccountID), BusinessRole: EntryRoleProvider, Amount: amount},
+		},
 	})
 }
 
@@ -287,7 +351,10 @@ func (s *Service) AdminAdjustment(ctx context.Context, actor identity.Account, k
 		ReferenceType:  referenceType,
 		ReferenceID:    referenceID,
 		ActorAccountID: actor.ID,
-		Entries:        []Posting{{Account: from, Amount: -amount}, {Account: to, Amount: amount}},
+		Entries: []Posting{
+			{Account: from, BusinessRole: EntryRoleAdjustmentSource, Amount: -amount},
+			{Account: to, BusinessRole: EntryRoleAdjustmentTarget, Amount: amount},
+		},
 	})
 }
 
@@ -315,7 +382,10 @@ func (s *Service) RecordSelfChannelUsage(ctx context.Context, key, accountID str
 		Reason:         "account consumed its own shared channel",
 		ReferenceType:  referenceType,
 		ReferenceID:    referenceID,
-		Entries:        []Posting{{Account: UserAccount(accountID), Amount: -amount}, {Account: UserAccount(accountID), Amount: amount}},
+		Entries: []Posting{
+			{Account: UserAccount(accountID), BusinessRole: EntryRoleConsumer, Amount: -amount},
+			{Account: UserAccount(accountID), BusinessRole: EntryRoleProvider, Amount: amount},
+		},
 	})
 }
 
@@ -358,7 +428,28 @@ func (s *Service) CaptureHold(ctx context.Context, request CaptureHoldRequest) (
 	request.MutateHoldRequest = normalizeHoldMutation(request.MutateHoldRequest)
 	request.ReferenceType = strings.TrimSpace(request.ReferenceType)
 	request.ReferenceID = strings.TrimSpace(request.ReferenceID)
-	if err := validateHoldMutation(request.MutateHoldRequest); err != nil || request.ReferenceType == "" || len(request.ReferenceType) > 64 || request.ReferenceID == "" || len(request.ReferenceID) > 256 || !validAccountRef(request.Destination) {
+	for index := range request.Credits {
+		request.Credits[index].Account.IdentityAccountID = strings.TrimSpace(request.Credits[index].Account.IdentityAccountID)
+		request.Credits[index].BusinessRole = EntryRole(strings.TrimSpace(string(request.Credits[index].BusinessRole)))
+	}
+	if err := validateHoldMutation(request.MutateHoldRequest); err != nil || request.ReferenceType == "" || len(request.ReferenceType) > 64 || request.ReferenceID == "" || len(request.ReferenceID) > 256 || len(request.Credits) < 1 || len(request.Credits) > 31 {
+		return CaptureResult{}, ErrInvalidInput
+	}
+	providerCount, buyerCount, feeCount := 0, 0, 0
+	for _, credit := range request.Credits {
+		if credit.Amount <= 0 || !validAccountRef(credit.Account) || (credit.BusinessRole != EntryRoleProvider && credit.BusinessRole != EntryRoleBuyer && credit.BusinessRole != EntryRolePlatformFee) {
+			return CaptureResult{}, ErrInvalidInput
+		}
+		switch credit.BusinessRole {
+		case EntryRoleProvider:
+			providerCount++
+		case EntryRoleBuyer:
+			buyerCount++
+		case EntryRolePlatformFee:
+			feeCount++
+		}
+	}
+	if providerCount+buyerCount != 1 || feeCount > 1 {
 		return CaptureResult{}, ErrInvalidInput
 	}
 	return s.store.CaptureHold(ctx, request, payloadHash(request))
@@ -372,20 +463,21 @@ func normalizePost(request PostRequest) PostRequest {
 	request.ActorAccountID = strings.TrimSpace(request.ActorAccountID)
 	for index := range request.Entries {
 		request.Entries[index].Account.IdentityAccountID = strings.TrimSpace(request.Entries[index].Account.IdentityAccountID)
+		request.Entries[index].BusinessRole = EntryRole(strings.TrimSpace(string(request.Entries[index].BusinessRole)))
 	}
 	return request
 }
 
-func validatePost(request PostRequest) error {
+func ValidatePostRequest(request PostRequest) error {
 	if !validKey(request.IdempotencyKey) || request.Reason == "" || len(request.Reason) > 512 || request.ReferenceType == "" || request.ReferenceID == "" || len(request.ReferenceType) > 64 || len(request.ReferenceID) > 256 || len(request.Entries) < 2 || len(request.Entries) > 32 {
 		return ErrInvalidInput
 	}
-	if request.Kind != TransactionTransfer && request.Kind != TransactionAdjustment && request.Kind != TransactionCapture && request.Kind != TransactionSelfUsage {
+	if request.Kind != TransactionTransfer && request.Kind != TransactionAdjustment && request.Kind != TransactionSelfUsage {
 		return ErrInvalidInput
 	}
 	total := money.Amount(0)
 	for _, entry := range request.Entries {
-		if entry.Amount == 0 || entry.Amount.Nano() == -1<<63 || !validAccountRef(entry.Account) {
+		if entry.Amount == 0 || entry.Amount.Nano() == -1<<63 || !validAccountRef(entry.Account) || entry.BusinessRole == "" || len(entry.BusinessRole) > 64 {
 			return ErrInvalidInput
 		}
 		var err error
@@ -397,18 +489,46 @@ func validatePost(request PostRequest) error {
 	if total != 0 {
 		return ErrUnbalanced
 	}
+	if err := validatePostShape(request); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validatePostShape(request PostRequest) error {
+	if len(request.Entries) != 2 {
+		return ErrInvalidInput
+	}
+	first, second := request.Entries[0], request.Entries[1]
+	switch request.Kind {
+	case TransactionTransfer:
+		if first.Account == second.Account || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleConsumer || second.BusinessRole != EntryRoleProvider {
+			return ErrInvalidInput
+		}
+	case TransactionAdjustment:
+		if first.Account == second.Account || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleAdjustmentSource || second.BusinessRole != EntryRoleAdjustmentTarget || request.ActorAccountID == "" {
+			return ErrInvalidInput
+		}
+	case TransactionSelfUsage:
+		if first.Account != second.Account || first.Account.IdentityAccountID == "" || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleConsumer || second.BusinessRole != EntryRoleProvider {
+			return ErrInvalidInput
+		}
+	default:
+		return ErrInvalidInput
+	}
 	return nil
 }
 
 func normalizeHoldMutation(request MutateHoldRequest) MutateHoldRequest {
 	request.IdempotencyKey = strings.TrimSpace(request.IdempotencyKey)
 	request.HoldID = strings.TrimSpace(request.HoldID)
+	request.BusinessID = strings.TrimSpace(request.BusinessID)
 	request.Reason = strings.TrimSpace(request.Reason)
 	return request
 }
 
 func validateHoldMutation(request MutateHoldRequest) error {
-	if !validKey(request.IdempotencyKey) || request.HoldID == "" || request.Reason == "" || len(request.Reason) > 512 {
+	if !validKey(request.IdempotencyKey) || request.HoldID == "" || request.BusinessID == "" || len(request.BusinessID) > 256 || request.Reason == "" || len(request.Reason) > 512 {
 		return ErrInvalidInput
 	}
 	if request.Amount.Mode == HoldAmountExact {

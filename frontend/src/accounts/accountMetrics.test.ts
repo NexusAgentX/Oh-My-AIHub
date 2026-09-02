@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Account } from '../api/contracts'
-import { summarizeAccounts } from './accountMetrics'
+import { accountRiskLabel } from './accountMetrics'
 
 const baseAccount: Account = {
   id: 'account-1',
@@ -10,35 +10,28 @@ const baseAccount: Account = {
   status: 'active',
   must_change_password: false,
   version: 1,
-  balance: '0',
-  frozen_balance: '0',
   credit_limit: '12.500000001',
-  available_credit: '12.500000001',
+  credit_frozen: false,
+  posted_balance: '0',
+  asset_reserved: '0',
+  spend_authorized: '0',
+  effective_credit_limit: '12.500000001',
+  credit_used: '0',
+  spendable_capacity: '12.500000001',
+  over_limit: false,
   created_at: '2026-09-02T00:00:00Z',
   updated_at: '2026-09-02T00:00:00Z',
   password_changed_at: null,
 }
 
-describe('account metrics', () => {
-  it('summarizes the complete directory independently of a filtered result', () => {
-    const completeDirectory = [
-      baseAccount,
-      {
-        ...baseAccount,
-        id: 'account-2',
-        username: 'second',
-        status: 'disabled' as const,
-        credit_limit: '2.5',
-      },
-    ]
-    const filteredResult = [completeDirectory[0]]
+describe('account risk label', () => {
+  it('prioritizes frozen and over-limit states', () => {
+    expect(accountRiskLabel({ ...baseAccount, credit_frozen: true })).toBe('信用冻结')
+    expect(accountRiskLabel({ ...baseAccount, over_limit: true })).toBe('信用超限')
+  })
 
-    expect(summarizeAccounts(completeDirectory)).toEqual({
-      total: 2,
-      active: 1,
-      disabled: 1,
-      credit: 15_000_000_001n,
-    })
-    expect(summarizeAccounts(filteredResult).total).toBe(1)
+  it('distinguishes zero spendable capacity from a healthy account', () => {
+    expect(accountRiskLabel({ ...baseAccount, spendable_capacity: '0' })).toBe('可消费为零')
+    expect(accountRiskLabel(baseAccount)).toBe('正常')
   })
 })
