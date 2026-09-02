@@ -199,7 +199,7 @@ func (s *Service) UpdateAccount(ctx context.Context, actor Account, accountID st
 	if update.CreditLimit != nil && *update.CreditLimit < 0 {
 		return Account{}, ErrInvalidInput
 	}
-	if update.Status == nil && update.CreditLimit == nil && update.IsAdmin == nil {
+	if update.Status == nil && update.CreditLimit == nil && update.CreditFrozen == nil && update.IsAdmin == nil {
 		return Account{}, ErrInvalidInput
 	}
 	return s.store.UpdateAccount(ctx, actor.ID, accountID, update)

@@ -17,6 +17,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 )
 
@@ -60,6 +61,7 @@ func main() {
 		Handler: api.NewHandler(api.Dependencies{
 			Identity:          identityService,
 			Catalog:           catalog.NewService(store),
+			Ledger:            ledger.NewService(store),
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
