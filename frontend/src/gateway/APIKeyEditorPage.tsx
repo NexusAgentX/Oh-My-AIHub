@@ -402,6 +402,9 @@ export function APIKeyEditorPage() {
                   onChange={(event) => setModelToAdd(event.target.value)}
                   value={modelToAdd}
                 >
+                  {models.length === 0 && (
+                    <option value="">管理员尚未配置模型目录</option>
+                  )}
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.provider} · {model.name}

@@ -133,13 +133,13 @@ export function AdminLedgerPage() {
                 </button>
               ))}
             </div>
-            <button type="button" className="button-secondary" onClick={() => void runInspection()} disabled={refreshing}>
+            <button type="button" className="button button-secondary" onClick={() => void runInspection()} disabled={refreshing}>
               立即巡检
             </button>
           </section>
 
           {anomalies && (anomalies.hard_anomalies.length > 0 || anomalies.attention_items.length > 0) && (
-            <section className="panel" aria-label="异常与关注">
+            <section className="panel projection-panel" aria-label="异常与关注">
               <header className="panel-heading">
                 <h2>异常与关注</h2>
                 <small>硬异常 {anomalies.hard_count} · 关注项不设阈值</small>
@@ -322,7 +322,7 @@ export function AdminLedgerPage() {
           </section>
 
           {trial && (
-            <section className="panel" aria-label="试用证据摘要">
+            <section className="panel projection-panel" aria-label="试用证据摘要">
               <header className="panel-heading">
                 <h2>试用证据摘要</h2>
                 <small>仅聚合计数与状态；不宣称参与者为真人或人民币已到账</small>

@@ -238,6 +238,8 @@ export function AdminModelsPage() {
           {loading ? (
             <LoadingState />
           ) : (
+            <>
+            {models.length > 0 && (
             <div className="model-list" role="list">
               {models.map((model) => (
                 <div key={model.id} role="listitem">
@@ -258,8 +260,10 @@ export function AdminModelsPage() {
                   </button>
                 </div>
               ))}
-              {models.length === 0 && <div className="empty-state">没有匹配的模型</div>}
             </div>
+            )}
+            {models.length === 0 && <div className="empty-state">没有匹配的模型</div>}
+            </>
           )}
         </section>
 

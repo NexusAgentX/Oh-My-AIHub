@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"context"
+	"strings"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -134,6 +135,15 @@ func TestOpsIntegration(t *testing.T) {
 		}
 		if snapshot.Concentration.Top1Share == nil || snapshot.Concentration.Top5Share == nil || snapshot.Concentration.HHI == nil {
 			t.Fatalf("concentration missing on real balances: %+v", snapshot.Concentration)
+		}
+		for label, value := range map[string]*string{"top1": snapshot.Concentration.Top1Share, "top5": snapshot.Concentration.Top5Share, "hhi": snapshot.Concentration.HHI} {
+			fraction := strings.Split(*value, ".")
+			if len(fraction) > 2 || len(fraction[1]) > 6 {
+				t.Fatalf("concentration %s not rounded to 6 decimals: %s", label, *value)
+			}
+		}
+		if *snapshot.Concentration.Top1Share != "1.000000" {
+			t.Fatalf("single positive account top1 share = %s, want 1.000000", *snapshot.Concentration.Top1Share)
 		}
 		if snapshot.Concentration.TotalPositive != "40" {
 			t.Fatalf("total positive = %s", snapshot.Concentration.TotalPositive)
