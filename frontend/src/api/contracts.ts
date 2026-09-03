@@ -417,3 +417,128 @@ export type ChannelOfferInput = {
   upstream_model_id: string
   multiplier: string
 }
+
+export type C2CSide = 'sell' | 'buy'
+export type C2COrderStatus = 'open' | 'allocated' | 'filled' | 'cancelled'
+export type C2CTradeStatus =
+  | 'awaiting_payment'
+  | 'paid'
+  | 'disputed'
+  | 'released_to_buyer'
+  | 'returned_to_seller'
+  | 'cancelled'
+  | 'expired'
+export type C2CPaymentMethodType =
+  | 'wechat'
+  | 'alipay'
+  | 'bank_transfer'
+  | 'other'
+export type C2CResolutionAction =
+  | 'release_to_buyer'
+  | 'return_to_seller'
+  | 'extend_review'
+
+export type C2CPaymentMethod = {
+  id: string
+  type: C2CPaymentMethodType
+  position: number
+  contact: string
+  instructions: string
+  qr_available: boolean
+  qr_url: string
+}
+
+export type C2COrder = {
+  id: string
+  owner_account_id: string
+  owner_display_name: string
+  side: C2CSide
+  unit_price_fen: number
+  total: string
+  available: string
+  allocated: string
+  settled: string
+  closed: string
+  minimum: string
+  maximum: string
+  status: C2COrderStatus
+  payment_types: C2CPaymentMethodType[]
+  payment_methods: C2CPaymentMethod[]
+  created_at: string
+  updated_at: string
+  cancelled_at: string | null
+}
+
+export type C2CEvidence = {
+  id: string
+  uploader_account_id: string
+  uploader_name: string
+  kind: 'payment' | 'dispute'
+  mime_type: 'image/jpeg' | 'image/png'
+  size_bytes: number
+  width: number
+  height: number
+  created_at: string
+  deleted_at: string | null
+  download_url: string
+}
+
+export type C2CStatement = {
+  id: string
+  actor_account_id: string
+  actor_display_name: string
+  text: string
+  character_count: number
+  created_at: string
+  deleted_at: string | null
+}
+
+export type C2CEvent = {
+  id: number
+  actor_account_id: string
+  action: string
+  reason: string
+  ledger_transaction_id: string
+  created_at: string
+}
+
+export type C2CTrade = {
+  id: string
+  order_id: string
+  order_side: C2CSide
+  buyer_account_id: string
+  buyer_display_name: string
+  seller_account_id: string
+  seller_display_name: string
+  quantity: string
+  unit_price_fen: number
+  fiat_amount_fen: number
+  status: C2CTradeStatus
+  payment_method: C2CPaymentMethod | null
+  payment_reference: string
+  payment_reference_deleted_at: string | null
+  payment_deadline: string
+  review_due_at: string | null
+  ledger_transaction_id: string
+  evidence: C2CEvidence[]
+  statements: C2CStatement[]
+  events: C2CEvent[]
+  created_at: string
+  updated_at: string
+  paid_at: string | null
+  resolved_at: string | null
+}
+
+export type C2CMarketMetrics = {
+  guidance_price_fen: number
+  latest_price_fen: number | null
+  best_bid_fen: number | null
+  best_ask_fen: number | null
+  spread_fen: number | null
+}
+
+export type C2CMarket = {
+  metrics: C2CMarketMetrics
+  sell_orders: C2COrder[]
+  buy_orders: C2COrder[]
+}

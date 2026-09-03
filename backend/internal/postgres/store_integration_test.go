@@ -160,6 +160,21 @@ func TestStoreIntegration(t *testing.T) {
 	if listResponse.Code != http.StatusOK || strings.Contains(listResponse.Body.String(), "initial_password") || strings.Contains(listResponse.Body.String(), createdPayload.InitialPassword) {
 		t.Fatalf("account list leaked one-time credential: %d %s", listResponse.Code, listResponse.Body.String())
 	}
+	exactAccountRequest := httptest.NewRequest(http.MethodGet, "https://hub.example/api/admin/accounts?q="+url.QueryEscape(createdPayload.Account.ID), nil)
+	exactAccountRequest.AddCookie(adminCookie)
+	exactAccountResponse := httptest.NewRecorder()
+	handler.ServeHTTP(exactAccountResponse, exactAccountRequest)
+	var exactAccountPayload struct {
+		Accounts []struct {
+			ID string `json:"id"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal(exactAccountResponse.Body.Bytes(), &exactAccountPayload); err != nil {
+		t.Fatalf("decode exact account search: %v", err)
+	}
+	if exactAccountResponse.Code != http.StatusOK || len(exactAccountPayload.Accounts) != 1 || exactAccountPayload.Accounts[0].ID != createdPayload.Account.ID {
+		t.Fatalf("exact account search = %d %+v", exactAccountResponse.Code, exactAccountPayload.Accounts)
+	}
 
 	invalidAccountRequest := jsonRequest(t, http.MethodPatch, "https://hub.example/api/admin/accounts/not-a-uuid", map[string]string{"status": "disabled"})
 	invalidAccountRequest.Header.Set("Origin", "https://hub.example")

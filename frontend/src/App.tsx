@@ -27,7 +27,6 @@ import { MarketPage } from './channels/MarketPage'
 import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
 import { AdminLedgerPage } from './ledger/AdminLedgerPage'
 import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
-import { UpcomingC2CPage } from './wallet/UpcomingC2CPage'
 import { WalletPage } from './wallet/WalletPage'
 import { WalletProvider } from './wallet/WalletProvider'
 import { APIKeyEditorPage } from './gateway/APIKeyEditorPage'
@@ -36,6 +35,13 @@ import { APIKeysPage } from './gateway/APIKeysPage'
 import { CallDetailPage } from './gateway/CallDetailPage'
 import { CallsPage } from './gateway/CallsPage'
 import { DashboardPage } from './gateway/DashboardPage'
+import { C2CActivityPage } from './c2c/C2CActivityPage'
+import { C2CDisputePage } from './c2c/C2CDisputePage'
+import { C2CMarketPage } from './c2c/C2CMarketPage'
+import { C2COrderEditorPage } from './c2c/C2COrderEditorPage'
+import { C2CTakeOrderPage } from './c2c/C2CTakeOrderPage'
+import { C2CTradePage } from './c2c/C2CTradePage'
+import { AdminC2CDisputePage, AdminC2CDisputesPage } from './c2c/AdminC2CPages'
 
 function RequireSession() {
   const { account, loading } = useAuth()
@@ -101,9 +107,12 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<AccountSettingsPage />} path="/account" />
         <Route element={<WalletPage />} path="/wallet" />
         <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />
-        <Route element={<UpcomingC2CPage />} path="/c2c" />
-        <Route element={<UpcomingC2CPage />} path="/c2c/orders/new" />
-        <Route element={<UpcomingC2CPage />} path="/c2c/me" />
+        <Route element={<C2CMarketPage />} path="/c2c" />
+        <Route element={<C2COrderEditorPage />} path="/c2c/orders/new" />
+        <Route element={<C2CTakeOrderPage />} path="/c2c/orders/:orderID/take" />
+        <Route element={<C2CActivityPage />} path="/c2c/me" />
+        <Route element={<C2CTradePage />} path="/c2c/trades/:tradeID" />
+        <Route element={<C2CDisputePage />} path="/c2c/trades/:tradeID/dispute" />
         <Route element={<MarketPage />} path="/market" />
         <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
         <Route element={<ChannelsPage />} path="/channels" />
@@ -120,6 +129,8 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<AdminModelsPage />} path="/admin/models" />
           <Route element={<AdminChannelsPage />} path="/admin/channels" />
           <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
+          <Route element={<AdminC2CDisputesPage />} path="/admin/c2c/disputes" />
+          <Route element={<AdminC2CDisputePage />} path="/admin/c2c/disputes/:tradeID" />
           <Route
             element={<AdminAccountLedgerPage />}
             path="/admin/ledger/accounts/:accountID"
