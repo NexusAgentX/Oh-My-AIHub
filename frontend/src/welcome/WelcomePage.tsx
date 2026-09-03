@@ -267,21 +267,6 @@ export function WelcomePage() {
         跳到主要内容
       </a>
 
-      <header className="welcome-topbar">
-        <a aria-label="Oh My AIHub 首页" className="welcome-brand-link" href="/welcome">
-          <Brand />
-        </a>
-        <nav aria-label="页面导航" className="welcome-nav-links">
-          <a href="#capabilities">产品能力</a>
-          <a href="#workflow">工作方式</a>
-          <a href="#security">安全边界</a>
-        </nav>
-        <div className="welcome-nav-actions">
-          <span className="welcome-invite-label">邀请制</span>
-          <LoginLink>登录</LoginLink>
-        </div>
-      </header>
-
       <main id="welcome-main">
         <section aria-labelledby="welcome-hero-title" className="welcome-hero">
           <div className="welcome-hero-copy">

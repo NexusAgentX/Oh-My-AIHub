@@ -17,8 +17,8 @@ describe('welcome route', () => {
 describe('WelcomePage', () => {
   const markup = renderToStaticMarkup(<WelcomePage />)
 
-  it('renders semantic navigation and the confirmed product story', () => {
-    expect(markup).toContain('<header')
+  it('renders the confirmed product story without a global topbar', () => {
+    expect(markup).not.toContain('welcome-topbar')
     expect(markup).toContain('<main id="welcome-main"')
     expect(markup).toContain('<footer')
     expect(markup).toContain('把分散的 API 渠道，')
@@ -30,7 +30,7 @@ describe('WelcomePage', () => {
   })
 
   it('offers only the invited login path as the account action', () => {
-    expect(markup.match(/href="\/login"/g)?.length).toBeGreaterThanOrEqual(5)
+    expect(markup.match(/href="\/login"/g)?.length).toBeGreaterThanOrEqual(4)
     expect(markup).toContain('受邀用户登录')
     expect(markup).toContain('暂不开放自由注册')
     expect(markup).not.toContain('href="/register"')
