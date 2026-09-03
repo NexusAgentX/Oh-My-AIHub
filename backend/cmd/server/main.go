@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
@@ -80,6 +81,20 @@ func main() {
 	if _, err := channelService.RecoverAbandonedValidations(startupContext); err != nil {
 		log.Fatal(err)
 	}
+	c2cKeyring, err := c2c.ParseKeyring(
+		os.Getenv("C2C_PRIVATE_DATA_KEYRING"),
+		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c2cService, err := c2c.NewService(store, c2cKeyring)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := c2cService.ValidateEncryptedInventory(startupContext); err != nil {
+		log.Fatal(err)
+	}
 	maintenanceContext, cancelMaintenance := context.WithCancel(context.Background())
 	defer cancelMaintenance()
 	go func() {
@@ -100,6 +115,32 @@ func main() {
 			}
 		}
 	}()
+	go func() {
+		expiryTicker := time.NewTicker(30 * time.Second)
+		cleanupTicker := time.NewTicker(time.Hour)
+		defer expiryTicker.Stop()
+		defer cleanupTicker.Stop()
+		for {
+			select {
+			case <-maintenanceContext.Done():
+				return
+			case <-expiryTicker.C:
+				jobContext, cancelJob := context.WithTimeout(maintenanceContext, 20*time.Second)
+				if expired, expiryErr := c2cService.ExpireDue(jobContext, 200); expiryErr != nil {
+					log.Printf("expire C2C payment windows: %v", expiryErr)
+				} else if expired > 0 {
+					log.Printf("expired %d C2C trades", expired)
+				}
+				cancelJob()
+			case <-cleanupTicker.C:
+				jobContext, cancelJob := context.WithTimeout(maintenanceContext, 20*time.Second)
+				if _, cleanupErr := c2cService.CleanupEvidence(jobContext, 500); cleanupErr != nil {
+					log.Printf("clean C2C private evidence: %v", cleanupErr)
+				}
+				cancelJob()
+			}
+		}
+	}()
 
 	server := &http.Server{
 		Addr: ":" + port,
@@ -108,6 +149,7 @@ func main() {
 			Catalog:           catalog.NewService(store),
 			Channels:          channelService,
 			Ledger:            ledger.NewService(store),
+			C2C:               c2cService,
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,

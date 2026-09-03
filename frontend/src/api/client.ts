@@ -8,6 +8,12 @@ import type {
   ChannelOffer,
   ChannelOfferInput,
   ChannelProtocol,
+  C2CMarket,
+  C2COrder,
+  C2CPaymentMethodType,
+  C2CResolutionAction,
+  C2CSide,
+  C2CTrade,
   LedgerEntry,
   LedgerMetrics,
   MarketChannel,
@@ -81,7 +87,9 @@ export function marketOffersPath(input: {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
-  if (init?.body) headers.set('Content-Type', 'application/json')
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   const response = await fetch(path, {
     ...init,
     headers,
@@ -463,5 +471,186 @@ export const api = {
         body: JSON.stringify({ expected_version: expectedVersion, reason }),
       })
     ).channel
+  },
+  c2cMarket() {
+    return request<C2CMarket>('/api/c2c/market')
+  },
+  async c2cOrder(orderID: string) {
+    return (
+      await request<{ order: C2COrder }>(
+        `/api/c2c/orders/${encodeURIComponent(orderID)}`,
+      )
+    ).order
+  },
+  async createC2COrder(input: {
+    side: C2CSide
+    unit_price_fen: number
+    total: string
+    minimum: string
+    maximum: string
+    payment_methods: Array<{
+      type: C2CPaymentMethodType
+      contact: string
+      instructions: string
+      qr?: File | null
+    }>
+  }) {
+    const key = crypto.randomUUID()
+    const hasFiles = input.payment_methods.some((method) => method.qr)
+    const payload = {
+      ...input,
+      payment_methods: input.payment_methods.map((method, index) => ({
+        type: method.type,
+        contact: method.contact,
+        instructions: method.instructions,
+        qr_field: method.qr ? `payment_qr_${index}` : '',
+      })),
+    }
+    let body: BodyInit
+    if (hasFiles) {
+      const form = new FormData()
+      form.set('payload', JSON.stringify(payload))
+      input.payment_methods.forEach((method, index) => {
+        if (method.qr) form.set(`payment_qr_${index}`, method.qr)
+      })
+      body = form
+    } else {
+      body = JSON.stringify(payload)
+    }
+    return (
+      await request<{ order: C2COrder }>('/api/c2c/orders', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': key },
+        body,
+      })
+    ).order
+  },
+  async takeC2COrder(orderID: string, quantity: string, paymentMethodID: string) {
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/orders/${encodeURIComponent(orderID)}/take`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ quantity, payment_method_id: paymentMethodID }),
+        },
+      )
+    ).trade
+  },
+  async cancelC2COrder(orderID: string) {
+    return (
+      await request<{ order: C2COrder }>(
+        `/api/c2c/orders/${encodeURIComponent(orderID)}/cancel`,
+        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      )
+    ).order
+  },
+  async c2cActivity() {
+    return request<{ orders: C2COrder[]; trades: C2CTrade[] }>('/api/c2c/me')
+  },
+  async c2cTrade(tradeID: string) {
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}`,
+      )
+    ).trade
+  },
+  async markC2CPaid(tradeID: string, paymentReference: string, screenshot?: File | null) {
+    const payload = { payment_reference: paymentReference }
+    let body: BodyInit
+    if (screenshot) {
+      const form = new FormData()
+      form.set('payload', JSON.stringify(payload))
+      form.set('screenshot', screenshot)
+      body = form
+    } else {
+      body = JSON.stringify(payload)
+    }
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}/paid`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body,
+        },
+      )
+    ).trade
+  },
+  async cancelC2CTrade(tradeID: string) {
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}/cancel`,
+        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      )
+    ).trade
+  },
+  async releaseC2CTrade(tradeID: string) {
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}/release`,
+        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      )
+    ).trade
+  },
+  async submitC2CDispute(
+    tradeID: string,
+    statement: string,
+    evidence: File[],
+    append = false,
+  ) {
+    const payload = { statement }
+    let body: BodyInit
+    if (evidence.length > 0) {
+      const form = new FormData()
+      form.set('payload', JSON.stringify(payload))
+      evidence.forEach((file) => form.append('evidence', file))
+      body = form
+    } else {
+      body = JSON.stringify(payload)
+    }
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}/${append ? 'evidence' : 'dispute'}`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body,
+        },
+      )
+    ).trade
+  },
+  async adminC2CDisputes() {
+    return (
+      await request<{ trades: C2CTrade[] }>('/api/admin/c2c/disputes')
+    ).trades
+  },
+  async adminCancelC2COrder(orderID: string, reason: string) {
+    return (
+      await request<{ order: C2COrder }>(
+        `/api/admin/c2c/orders/${encodeURIComponent(orderID)}/cancel`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ reason }),
+        },
+      )
+    ).order
+  },
+  async resolveC2CDispute(
+    tradeID: string,
+    action: C2CResolutionAction,
+    reason: string,
+  ) {
+    return (
+      await request<{ trade: C2CTrade }>(
+        `/api/admin/c2c/trades/${encodeURIComponent(tradeID)}/resolve`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ action, reason }),
+        },
+      )
+    ).trade
   },
 }

@@ -27,7 +27,8 @@ export function AdminAccountsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [metrics, setMetrics] = useState<LedgerMetrics | null>(null)
-  const [query, setQuery] = useState('')
+  const initialQuery = searchParams.get('query') ?? ''
+  const [query, setQuery] = useState(initialQuery)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -55,7 +56,7 @@ export function AdminAccountsPage() {
   }
 
   useEffect(() => {
-    void load('')
+    void load(initialQuery)
   }, [])
 
   useEffect(() => {

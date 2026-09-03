@@ -19,6 +19,7 @@ const productNavigation: NavigationItem[] = [
   { label: 'API Key', icon: 'key' },
   { label: '渠道市场', to: '/market', icon: 'database' },
   { label: '我的渠道', to: '/channels', icon: 'settings' },
+  { label: 'C2C 市场', to: '/c2c', icon: 'wallet' },
   { label: '积分钱包', to: '/wallet', icon: 'wallet' },
 ]
 
@@ -27,6 +28,7 @@ const adminNavigation: NavigationItem[] = [
   { label: '账户与信用', to: '/admin/accounts', icon: 'users' },
   { label: '模型目录', to: '/admin/models', icon: 'database' },
   { label: '渠道治理', to: '/admin/channels', icon: 'settings' },
+  { label: 'C2C 争议', to: '/admin/c2c/disputes', icon: 'wallet' },
 ]
 
 export function AppShell({

@@ -287,7 +287,7 @@ func (s *Store) ListAccounts(ctx context.Context, query string) ([]identity.Acco
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+accountColumnsAliased+`
 		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
-		WHERE $1 = '' OR a.username ILIKE '%' || $1 || '%' OR a.display_name ILIKE '%' || $1 || '%'
+		WHERE $1 = '' OR a.id::text = $1 OR a.username ILIKE '%' || $1 || '%' OR a.display_name ILIKE '%' || $1 || '%'
 		ORDER BY a.created_at DESC`, query)
 	if err != nil {
 		return nil, err
@@ -311,6 +311,12 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 		return identity.Account{}, err
 	}
 	defer transaction.Rollback(ctx) //nolint:errcheck
+	// Account policy changes and C2C commands share this stable per-account
+	// serialization key before taking ledger, identity, order, or hold rows.
+	if _, err := transaction.Exec(ctx, `
+		SELECT pg_advisory_xact_lock(hashtextextended('oh-my-aihub-account:' || $1, 0))`, accountID); err != nil {
+		return identity.Account{}, err
+	}
 	// Ledger mutations lock this same row before consulting credit policy. Taking
 	// it first serializes a limit/freeze change with every new debit or hold.
 	var lockedLedgerAccount int

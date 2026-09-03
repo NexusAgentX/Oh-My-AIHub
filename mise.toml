@@ -78,6 +78,8 @@ run = '''
 : "${BACKEND_TRUSTED_PROXY_CIDRS:?BACKEND_TRUSTED_PROXY_CIDRS must match the Compose network used by the frontend proxy}"
 : "${UPSTREAM_CREDENTIAL_KEYRING:?UPSTREAM_CREDENTIAL_KEYRING must contain the versioned upstream credential encryption keys}"
 : "${UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID:?UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID is required}"
+: "${C2C_PRIVATE_DATA_KEYRING:?C2C_PRIVATE_DATA_KEYRING must contain the versioned C2C private data encryption keys}"
+: "${C2C_PRIVATE_DATA_ACTIVE_KEY_ID:?C2C_PRIVATE_DATA_ACTIVE_KEY_ID is required}"
 docker compose up --build
 '''
 
@@ -86,6 +88,8 @@ description = "Build and start the Docker stack for local HTTP development"
 run = '''
 : "${UPSTREAM_CREDENTIAL_KEYRING:?UPSTREAM_CREDENTIAL_KEYRING must contain the versioned upstream credential encryption keys}"
 : "${UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID:?UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID is required}"
+: "${C2C_PRIVATE_DATA_KEYRING:?C2C_PRIVATE_DATA_KEYRING must contain the versioned C2C private data encryption keys}"
+: "${C2C_PRIVATE_DATA_ACTIVE_KEY_ID:?C2C_PRIVATE_DATA_ACTIVE_KEY_ID is required}"
 docker compose up --build
 '''
 env = { COOKIE_SECURE = "false", TRUSTED_PROXY_CIDR = "127.0.0.1/32" }
