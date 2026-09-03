@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+      - name: Check design assets
+        run: mise run check-design
+      - name: Frontend tests
+        run: npm --prefix frontend test
+      - name: Frontend build
+        run: npm --prefix frontend run build
+      - name: Backend vet
+        run: mise exec -- go -C backend vet ./...
+      - name: Backend tests with race detector
+        run: mise exec -- go -C backend test -race ./...
+      - name: Compose configuration
+        run: docker compose config --quiet

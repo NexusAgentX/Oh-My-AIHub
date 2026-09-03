@@ -542,3 +542,126 @@ export type C2CMarket = {
   sell_orders: C2COrder[]
   buy_orders: C2COrder[]
 }
+
+export type OpsNegativeBalanceRisk = {
+  account_id: string
+  username: string
+  posted_balance: string
+  negative_since: string
+  last_financial_activity: string
+  inactive_days: number
+  over_limit: boolean
+  credit_limit: string
+}
+
+export type OpsAPIMetrics = {
+  precheck_rejected: number
+  reached_upstream: number
+  succeeded: number
+  all_failed: number
+  incomplete_after_commit: number
+  cancelled: number
+  terminal_reached: number
+  success_rate: string | null
+  attempt_count: number
+  attempt_succeeded: number
+  average_ttft_milliseconds: number | null
+  average_tokens_per_second: string | null
+}
+
+export type OpsConsumptionMetrics = {
+  consumer_spend: string
+  provider_income: string
+  own_usage_income: string
+  other_consumer_income: string
+  platform_fee: string
+}
+
+export type OpsC2COrderStatusCount = { side: string; status: string; count: number }
+export type OpsC2CTradeStatusCount = { status: string; count: number }
+
+export type OpsC2CMetrics = {
+  orders: OpsC2COrderStatusCount[]
+  trades: OpsC2CTradeStatusCount[]
+  quote: {
+    last_traded_price_fen: number | null
+    best_bid_price_fen: number | null
+    best_ask_price_fen: number | null
+    spread_fen: number | null
+  }
+}
+
+export type OpsConcentrationMetrics = {
+  positive_user_count: number
+  total_positive: string
+  top1_share: string | null
+  top5_share: string | null
+  hhi: string | null
+}
+
+export type OpsMetrics = {
+  from: string
+  to: string
+  ledger: LedgerMetrics
+  effective_credit: string
+  negative_balances: OpsNegativeBalanceRisk[]
+  api: OpsAPIMetrics
+  consumption: OpsConsumptionMetrics
+  c2c: OpsC2CMetrics
+  concentration: OpsConcentrationMetrics
+}
+
+export type OpsAnomaly = {
+  kind: string
+  attention: boolean
+  count: number
+  detail: string
+  drilldown: string
+}
+
+export type OpsAnomalies = {
+  hard_anomalies: OpsAnomaly[]
+  attention_items: OpsAnomaly[]
+  hard_count: number
+  checked_at: string
+}
+
+export type OpsInspection = {
+  id: string
+  inspection_version: string
+  triggered_by: string
+  zero_sum_ok: boolean
+  projection_ok: boolean
+  call_settlement_ok: boolean
+  c2c_consistency_ok: boolean
+  zero_sum_difference: string
+  posted_projection_difference: string
+  asset_projection_difference: string
+  authorization_projection_difference: string
+  successful_calls_without_settlement: number
+  settlements_without_ledger_transaction: number
+  c2c_quantity_violations: number
+  c2c_hold_violations: number
+  checked_at: string
+}
+
+export type OpsTrialSummary = {
+  generated_at: string
+  non_admin_accounts: number
+  published_channels: number
+  passed_offers: number
+  active_api_keys: number
+  calls_succeeded: number
+  calls_failed: number
+  calls_incomplete: number
+  first_call_at: string | null
+  last_terminal_call_at: string | null
+  c2c_open_orders: number
+  c2c_released_trades: number
+  c2c_disputed_open: number
+  ledger_zero_sum_ok: boolean
+  last_inspection_ok: boolean | null
+  last_inspection_at: string | null
+  inspection_pass_count: number
+  inspection_total_count: number
+}

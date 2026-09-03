@@ -1584,3 +1584,58 @@ h2 {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* #22 运营总览：时间窗口与异常列表 */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented-item {
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.segmented-item + .segmented-item {
+  border-left: 1px solid var(--border, #d0d5dd);
+}
+
+.segmented-item.active {
+  background: var(--ink, #101828);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.anomaly-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.anomaly-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.anomaly-list li span,
+.anomaly-list li strong {
+  flex: 0 0 auto;
+}
+
+.anomaly-hard li strong {
+  color: #b42318;
+}
+
+.muted {
+  color: var(--ink-muted, #667085);
+  margin: 0;
+}

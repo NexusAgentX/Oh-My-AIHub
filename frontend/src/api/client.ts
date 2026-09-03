@@ -20,6 +20,10 @@ import type {
   C2CTrade,
   LedgerEntry,
   LedgerMetrics,
+  OpsMetrics,
+  OpsAnomalies,
+  OpsInspection,
+  OpsTrialSummary,
   MarketChannel,
   MarketOffer,
   ModelInput,
@@ -209,6 +213,22 @@ export const api = {
     return (
       await request<{ metrics: LedgerMetrics }>('/api/admin/ledger/metrics')
     ).metrics
+  },
+  async opsMetrics(from: string, to: string) {
+    const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    return (await request<{ metrics: OpsMetrics }>(`/api/admin/ops/metrics${query}`)).metrics
+  },
+  async opsAnomalies() {
+    return (await request<{ anomalies: OpsAnomalies }>('/api/admin/ops/anomalies')).anomalies
+  },
+  async opsInspections(limit = 20) {
+    return (await request<{ inspections: OpsInspection[] }>(`/api/admin/ops/inspections?limit=${limit}`)).inspections
+  },
+  async runOpsInspection() {
+    return (await request<{ inspection: OpsInspection }>('/api/admin/ops/inspections', { method: 'POST' })).inspection
+  },
+  async opsTrialSummary() {
+    return (await request<{ trial_summary: OpsTrialSummary }>('/api/admin/ops/trial-summary')).trial_summary
   },
   async adminAccountWallet(accountID: string) {
     return (
