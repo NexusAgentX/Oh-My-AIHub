@@ -41,3 +41,4 @@
 - [ADR-0007：采用受邀身份与服务器端 Cookie 会话](0007-adopt-invited-identity-and-server-sessions.md) — 已通过
 - [ADR-0008：采用不可变账本、双持有投影与计价公式 v1](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) — 已通过
 - [ADR-0009：采用版本化凭据加密与固定出站网络边界](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) — 已通过
+- [ADR-0010：采用快照化 API 网关与幂等终结状态机](0010-adopt-snapshot-gateway-and-idempotent-settlement.md) — 已通过

@@ -32,6 +32,58 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+type writeDeadlineRecorder struct {
+	*httptest.ResponseRecorder
+	deadlines []time.Time
+}
+
+func (w *writeDeadlineRecorder) SetWriteDeadline(deadline time.Time) error {
+	w.deadlines = append(w.deadlines, deadline)
+	return nil
+}
+
+func TestHandlerSetsABoundedDefaultWriteDeadlineAndAllowsStreamingOverride(t *testing.T) {
+	recorder := &writeDeadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+	NewHandler(Dependencies{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if len(recorder.deadlines) != 1 {
+		t.Fatalf("ordinary API write deadlines = %v", recorder.deadlines)
+	}
+	remaining := time.Until(recorder.deadlines[0])
+	if remaining <= 0 || remaining > defaultWriteTimeout {
+		t.Fatalf("ordinary API write deadline remaining = %s", remaining)
+	}
+
+	recorder = &writeDeadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+	responseWriteDeadline(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(90 * time.Second))
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/v1/responses", nil))
+	if len(recorder.deadlines) != 2 || !recorder.deadlines[1].After(recorder.deadlines[0]) {
+		t.Fatalf("streaming deadline did not override default: %v", recorder.deadlines)
+	}
+}
+
+func TestExternalGatewayRoutesReturnProtocolNativeMethodErrors(t *testing.T) {
+	tests := []struct {
+		path       string
+		bodyMarker string
+	}{
+		{"/v1/chat/completions", `"code":"method_not_allowed"`},
+		{"/v1/responses", `"code":"method_not_allowed"`},
+		{"/v1/messages", `"type":"method_not_allowed"`},
+		{"/v1beta/models/canonical/model:generateContent", `"status":"METHOD_NOT_ALLOWED"`},
+	}
+	for _, test := range tests {
+		for _, method := range []string{http.MethodGet, http.MethodPut} {
+			recorder := httptest.NewRecorder()
+			NewHandler(Dependencies{}).ServeHTTP(recorder, httptest.NewRequest(method, test.path, nil))
+			if recorder.Code != http.StatusMethodNotAllowed || recorder.Header().Get("Content-Type") != "application/json" || !strings.Contains(recorder.Body.String(), test.bodyMarker) {
+				t.Fatalf("%s %s = %d %s (%s)", method, test.path, recorder.Code, recorder.Header().Get("Content-Type"), recorder.Body.String())
+			}
+		}
+	}
+}
+
 type failingLogoutStore struct {
 	identity.Store
 	err error

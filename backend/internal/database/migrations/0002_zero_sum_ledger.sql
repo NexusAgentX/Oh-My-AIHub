@@ -16,9 +16,8 @@ CREATE TABLE ledger_accounts (
     CHECK (
         (kind = 'user' AND identity_account_id IS NOT NULL AND system_code IS NULL)
         OR
-        (kind <> 'user' AND identity_account_id IS NULL AND system_code IS NOT NULL AND system_code = kind)
-    ),
-    CHECK (kind <> 'platform_incentive' OR posted_balance_nano >= 0)
+		(kind <> 'user' AND identity_account_id IS NULL AND system_code IS NOT NULL AND system_code = kind)
+	)
 );
 
 CREATE UNIQUE INDEX ledger_accounts_system_kind_unique

@@ -355,7 +355,7 @@ func (t *LedgerTransaction) Post(ctx context.Context, request ledger.PostRequest
 		}
 		return decodeCommandResult[ledger.Transaction](snapshot)
 	}
-	created, err := postLocked(ctx, t.Tx, operation, request, nil, "", "")
+	created, err := postLocked(ctx, t.Tx, operation, request, nil, "", "", false)
 	if err != nil {
 		return ledger.Transaction{}, err
 	}
@@ -376,23 +376,56 @@ func (s *Store) Reverse(ctx context.Context, key, originalID, reason, referenceI
 }
 
 func (t *LedgerTransaction) Reverse(ctx context.Context, key, originalID, reason, referenceID, actorID string, hash [32]byte) (ledger.Transaction, error) {
+	return t.reverse(ctx, key, originalID, reason, referenceID, actorID, hash, false)
+}
+
+// ReverseSystem is intentionally available only inside the PostgreSQL
+// implementation. It allows an automatic delivery compensation to strictly
+// negate one sealed settlement transaction without depending on a currently
+// available human administrator. It cannot create arbitrary postings.
+func (t *LedgerTransaction) ReverseSystem(ctx context.Context, key, originalID, reason, referenceID string, hash [32]byte) (ledger.Transaction, error) {
+	return t.reverse(ctx, key, originalID, reason, referenceID, "", hash, true)
+}
+
+func (t *LedgerTransaction) reverse(ctx context.Context, key, originalID, reason, referenceID, actorID string, hash [32]byte, systemAuthorized bool) (ledger.Transaction, error) {
+	if systemAuthorized && actorID != "" {
+		return ledger.Transaction{}, ledger.ErrInvalidInput
+	}
 	operation := "transaction:reversal"
 	_, snapshot, replay, err := reserveLedgerCommand(ctx, t.Tx, key, operation, hash)
 	if err != nil {
 		return ledger.Transaction{}, err
 	}
 	if replay {
-		if err := requireActiveAdminLocked(ctx, t.Tx, actorID); err != nil {
-			return ledger.Transaction{}, err
+		if !systemAuthorized {
+			if err := requireActiveAdminLocked(ctx, t.Tx, actorID); err != nil {
+				return ledger.Transaction{}, err
+			}
 		}
 		return decodeCommandResult[ledger.Transaction](snapshot)
 	}
-	var originalKind string
-	if err := t.QueryRow(ctx, `SELECT kind FROM ledger_transactions WHERE id = $1 AND sealed FOR UPDATE`, originalID).Scan(&originalKind); err != nil {
+	var originalKind, originalReferenceType string
+	if err := t.QueryRow(ctx, `SELECT kind, reference_type FROM ledger_transactions WHERE id = $1 AND sealed FOR UPDATE`, originalID).Scan(&originalKind, &originalReferenceType); err != nil {
 		return ledger.Transaction{}, mapLedgerError(err)
 	}
 	if ledger.TransactionKind(originalKind) == ledger.TransactionReversal {
 		return ledger.Transaction{}, ledger.ErrInvalidInput
+	}
+	if originalReferenceType == "api_call" && !systemAuthorized {
+		return ledger.Transaction{}, ledger.ErrInvalidInput
+	}
+	if !systemAuthorized {
+		var gatewaySettlement bool
+		if err := t.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM api_call_settlements
+				WHERE capture_transaction_id = $1 OR self_transaction_id = $1
+			)`, originalID).Scan(&gatewaySettlement); err != nil {
+			return ledger.Transaction{}, mapLedgerError(err)
+		}
+		if gatewaySettlement {
+			return ledger.Transaction{}, ledger.ErrInvalidInput
+		}
 	}
 	var alreadyReversed bool
 	if err := t.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM ledger_transactions WHERE reversal_of_transaction_id = $1)`, originalID).Scan(&alreadyReversed); err != nil {
@@ -422,7 +455,7 @@ func (t *LedgerTransaction) Reverse(ctx context.Context, key, originalID, reason
 		ReferenceType: "reversal", ReferenceID: referenceID, ActorAccountID: actorID,
 		ReversalOfTransactionID: originalID, Entries: postings,
 	}
-	created, err := postLocked(ctx, t.Tx, operation, request, nil, "", "")
+	created, err := postLocked(ctx, t.Tx, operation, request, nil, "", "", systemAuthorized)
 	if err != nil {
 		return ledger.Transaction{}, err
 	}
@@ -432,12 +465,12 @@ func (t *LedgerTransaction) Reverse(ctx context.Context, key, originalID, reason
 	return created, nil
 }
 
-func postLocked(ctx context.Context, tx pgx.Tx, operation string, request ledger.PostRequest, prelocked map[string]ledgerAccountState, reservedDebitAccountID, holdID string) (ledger.Transaction, error) {
+func postLocked(ctx context.Context, tx pgx.Tx, operation string, request ledger.PostRequest, prelocked map[string]ledgerAccountState, reservedDebitAccountID, holdID string, systemReversal bool) (ledger.Transaction, error) {
 	resolved, states, err := resolveAndLockPostings(ctx, tx, request.Entries, prelocked)
 	if err != nil {
 		return ledger.Transaction{}, err
 	}
-	if request.Kind == ledger.TransactionAdjustment || request.Kind == ledger.TransactionBadDebt || request.Kind == ledger.TransactionReversal {
+	if request.Kind == ledger.TransactionAdjustment || request.Kind == ledger.TransactionBadDebt || (request.Kind == ledger.TransactionReversal && !systemReversal) {
 		if err := requireActiveAdminLocked(ctx, tx, request.ActorAccountID); err != nil {
 			return ledger.Transaction{}, err
 		}
@@ -617,7 +650,7 @@ func validatePostingChanges(kind ledger.TransactionKind, postings []resolvedPost
 			return nil, ledger.ErrAmountOverflow
 		}
 		if balance < state.postedBalance && id != reservedDebitAccountID {
-			if state.kind == ledger.AccountIncentive && balance < 0 {
+			if state.kind == ledger.AccountIncentive && balance < 0 && kind != ledger.TransactionReversal {
 				return nil, ledger.ErrInsufficientFunds
 			}
 			if state.kind == ledger.AccountUser && kind != ledger.TransactionReversal {
@@ -991,7 +1024,7 @@ func (t *LedgerTransaction) CaptureHold(ctx context.Context, request ledger.Capt
 		Reason: request.Reason, ReferenceType: request.ReferenceType, ReferenceID: request.ReferenceID,
 		Entries: postings,
 	}
-	transaction, err := postLocked(ctx, t.Tx, operation, postRequest, states, source.id, hold.ID)
+	transaction, err := postLocked(ctx, t.Tx, operation, postRequest, states, source.id, hold.ID, false)
 	if err != nil {
 		return ledger.CaptureResult{}, err
 	}
@@ -1154,7 +1187,7 @@ func (t *LedgerTransaction) TransferBadDebt(ctx context.Context, accountID strin
 		ReferenceType: "bad_debt", ReferenceID: referenceID, ActorAccountID: actorID,
 		Entries: postings,
 	}
-	created, err := postLocked(ctx, t.Tx, operation, request, states, "", "")
+	created, err := postLocked(ctx, t.Tx, operation, request, states, "", "", false)
 	if err != nil {
 		return ledger.Transaction{}, err
 	}

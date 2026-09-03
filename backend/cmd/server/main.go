@@ -17,6 +17,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
@@ -80,6 +81,13 @@ func main() {
 	if _, err := channelService.RecoverAbandonedValidations(startupContext); err != nil {
 		log.Fatal(err)
 	}
+	gatewayService, err := gateway.NewService(store, channelService)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := gatewayService.RecoverOrphans(startupContext, time.Now().Add(-2*time.Minute), 100); err != nil {
+		log.Fatal(err)
+	}
 	maintenanceContext, cancelMaintenance := context.WithCancel(context.Background())
 	defer cancelMaintenance()
 	go func() {
@@ -90,13 +98,24 @@ func main() {
 			case <-maintenanceContext.Done():
 				return
 			case <-ticker.C:
-				recoveryContext, cancelRecovery := context.WithTimeout(maintenanceContext, 5*time.Second)
-				if recovered, recoveryErr := channelService.RecoverAbandonedValidations(recoveryContext); recoveryErr != nil {
-					log.Printf("recover abandoned channel validations: %v", recoveryErr)
-				} else if recovered > 0 {
-					log.Printf("recovered %d abandoned channel validation attempts", recovered)
+				result := runRecoveryCycle(
+					maintenanceContext, 5*time.Second,
+					channelService.RecoverAbandonedValidations,
+					func(ctx context.Context) (int64, error) {
+						recovered, err := gatewayService.RecoverOrphans(ctx, time.Now().Add(-2*time.Minute), 100)
+						return int64(recovered), err
+					},
+				)
+				if result.channelErr != nil {
+					log.Printf("recover abandoned channel validations: %v", result.channelErr)
+				} else if result.channels > 0 {
+					log.Printf("recovered %d abandoned channel validation attempts", result.channels)
 				}
-				cancelRecovery()
+				if result.gatewayErr != nil {
+					log.Printf("recover orphan gateway calls: %v", result.gatewayErr)
+				} else if result.gateways > 0 {
+					log.Printf("recovered %d orphan gateway calls", result.gateways)
+				}
 			}
 		}
 	}()
@@ -107,14 +126,15 @@ func main() {
 			Identity:          identityService,
 			Catalog:           catalog.NewService(store),
 			Channels:          channelService,
+			Gateway:           gatewayService,
 			Ledger:            ledger.NewService(store),
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      0,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
@@ -139,6 +159,24 @@ func main() {
 			log.Printf("graceful shutdown failed: %v", err)
 		}
 	}
+}
+
+type recoveryCycleResult struct {
+	channels   int64
+	channelErr error
+	gateways   int64
+	gatewayErr error
+}
+
+func runRecoveryCycle(parent context.Context, timeout time.Duration, recoverChannels, recoverGateways func(context.Context) (int64, error)) recoveryCycleResult {
+	channelContext, cancelChannels := context.WithTimeout(parent, timeout)
+	channels, channelErr := recoverChannels(channelContext)
+	cancelChannels()
+
+	gatewayContext, cancelGateways := context.WithTimeout(parent, timeout)
+	gateways, gatewayErr := recoverGateways(gatewayContext)
+	cancelGateways()
+	return recoveryCycleResult{channels: channels, channelErr: channelErr, gateways: gateways, gatewayErr: gatewayErr}
 }
 
 func parseCommaSeparated(value string) []string {

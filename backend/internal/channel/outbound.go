@@ -322,6 +322,22 @@ func (p *OutboundPolicy) Endpoint(baseURL string, protocol Protocol, upstreamMod
 }
 
 func (p *OutboundPolicy) ClientFor(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
+	responseHeaderTimeout := 10 * time.Second
+	if totalTimeout < responseHeaderTimeout {
+		responseHeaderTimeout = totalTimeout
+	}
+	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, responseHeaderTimeout)
+}
+
+func (p *OutboundPolicy) ClientForProxy(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
+	responseHeaderTimeout := 60 * time.Second
+	if totalTimeout < responseHeaderTimeout {
+		responseHeaderTimeout = totalTimeout
+	}
+	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, responseHeaderTimeout)
+}
+
+func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string, totalTimeout, responseHeaderTimeout time.Duration) (*http.Client, error) {
 	canonical, err := p.NormalizeBaseURL(normalizedBaseURL)
 	if err != nil || canonical != normalizedBaseURL {
 		return nil, ErrUnsafeUpstream
@@ -330,7 +346,9 @@ func (p *OutboundPolicy) ClientFor(ctx context.Context, normalizedBaseURL string
 	if err != nil {
 		return nil, ErrUnsafeUpstream
 	}
-	addresses, err := p.ValidateResolution(ctx, canonical)
+	resolutionContext, cancelResolution := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelResolution()
+	addresses, err := p.ValidateResolution(resolutionContext, canonical)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +364,7 @@ func (p *OutboundPolicy) ClientFor(ctx context.Context, normalizedBaseURL string
 		ForceAttemptHTTP2:      false,
 		MaxResponseHeaderBytes: 1 << 20,
 		TLSHandshakeTimeout:    5 * time.Second,
-		ResponseHeaderTimeout:  10 * time.Second,
+		ResponseHeaderTimeout:  responseHeaderTimeout,
 		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: p.testRootCAs},
 		DialContext: func(dialContext context.Context, network, address string) (net.Conn, error) {
 			requestedHost, requestedPort, splitErr := net.SplitHostPort(address)

@@ -179,6 +179,11 @@ export type ChannelOffer = {
   output_price?: string | null
   cache_write_price?: string | null
   cache_read_price?: string | null
+  call_success_rate?: string | null
+  ttft_milliseconds?: number | null
+  tokens_per_second?: string | null
+  call_count?: number | null
+  provider_income?: string | null
   latest_validation: ValidationSummary | null
   created_at?: string
   updated_at?: string
@@ -267,6 +272,143 @@ export type AdminChannel = {
   rating_count: number
   created_at: string
   updated_at: string
+}
+
+export type APIKeyStatus = 'active' | 'disabled' | 'deleted'
+
+export type APIKeyPoolMember = {
+  priority: number
+  offer_id: string
+  channel_id: string
+  channel_name: string
+  provider_name: string
+  added_validation_version: number
+  current_validation_version: number
+  eligible: boolean
+  ineligible_reason: string
+  input_price: string
+  output_price: string
+  cache_write_price: string
+  cache_read_price: string
+  success_rate: string | null
+  ttft_milliseconds: number | null
+  tokens_per_second: string | null
+}
+
+export type APIKeyPool = {
+  id: string
+  model_id: string
+  model_name: string
+  protocol: ChannelProtocol
+  version: number
+  members: APIKeyPoolMember[]
+  created_at: string
+  updated_at: string
+}
+
+export type APIKey = {
+  id: string
+  display_name: string
+  prefix: string
+  generation: number
+  status: APIKeyStatus
+  version: number
+  pools: APIKeyPool[]
+  last_used_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type APIKeyPoolInput = {
+  model_id: string
+  protocol: ChannelProtocol
+  offer_ids: string[]
+}
+
+export type GatewayUsage = {
+  input_tokens: number
+  output_tokens: number
+  cache_write_tokens: number
+  cache_read_tokens: number
+}
+
+export type GatewayAttemptStatus =
+  | 'in_progress'
+  | 'pending_delivery'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'incomplete'
+
+export type GatewayAttempt = {
+  id: string
+  sequence: number
+  offer_id: string
+  channel_name: string
+  provider_account_id: string
+  status: GatewayAttemptStatus
+  http_status: number
+  error_code: string
+  raw_error: string
+  raw_error_truncated: boolean
+  semantic_committed: boolean
+  ttft_milliseconds: number | null
+  duration_milliseconds: number | null
+  usage: GatewayUsage | null
+  tokens_per_second: string | null
+  started_at: string
+  completed_at: string | null
+}
+
+export type GatewayCallStatus =
+  | 'rejected'
+  | 'in_progress'
+  | 'pending_delivery'
+  | 'succeeded'
+  | 'failed'
+  | 'incomplete'
+  | 'cancelled'
+
+export type GatewayCall = {
+  id: string
+  consumer_account_id: string
+  api_key_id: string
+  key_prefix: string
+  key_generation: number
+  pool_id: string
+  pool_version: number
+  model_id: string
+  protocol: ChannelProtocol
+  status: GatewayCallStatus
+  decision_code: string
+  candidate_count: number
+  attempt_count: number
+  hold_id: string
+  preauthorized: string
+  zero_hold_reason: string
+  fee_rate_version: number
+  fee_rate_nano: number
+  final_offer_id: string
+  final_channel_name: string
+  completion_reason: string
+  usage: GatewayUsage | null
+  provider_charge: string
+  platform_fee: string
+  final_http_status: number
+  attempts: GatewayAttempt[]
+  created_at: string
+  completed_at: string | null
+}
+
+export type GatewayDashboard = {
+  consumer_spent: string
+  provider_income: string
+  active_key_count: number
+  pool_count: number
+  healthy_offer_count: number
+  unhealthy_offer_count: number
+  pending_items: number
+  recent_calls: GatewayCall[]
 }
 
 export type ChannelOfferInput = {
