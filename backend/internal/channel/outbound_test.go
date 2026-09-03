@@ -285,25 +285,25 @@ func TestProbeUsesExactProtocolRequestsOverControlledTLS(t *testing.T) {
 		{
 			name: "chat completions", protocol: ProtocolOpenAIChat, model: "relay-chat", path: "/prefix/v1/chat/completions",
 			expectedHeaders: map[string]string{"Authorization": "Bearer probe-secret"},
-			expectedBody:    `{"model":"relay-chat","messages":[{"role":"user","content":"ping"}],"max_tokens":1,"stream":false}`,
+			expectedBody:    `{"max_tokens":64,"messages":[{"content":"ping","role":"user"}],"model":"relay-chat","stream":false}`,
 			responseBody:    `{"choices":[{"finish_reason":"stop"}]}`,
 		},
 		{
 			name: "responses", protocol: ProtocolOpenAIResponse, model: "relay-response", path: "/prefix/v1/responses",
 			expectedHeaders: map[string]string{"Authorization": "Bearer probe-secret"},
-			expectedBody:    `{"model":"relay-response","input":"ping","max_output_tokens":1,"stream":false}`,
+			expectedBody:    `{"input":"ping","max_output_tokens":64,"model":"relay-response","stream":false}`,
 			responseBody:    `{"status":"completed","output":[]}`,
 		},
 		{
 			name: "anthropic messages", protocol: ProtocolAnthropic, model: "relay-claude", path: "/prefix/v1/messages",
 			expectedHeaders: map[string]string{"x-api-key": "probe-secret", "anthropic-version": "2023-06-01"},
-			expectedBody:    `{"model":"relay-claude","max_tokens":1,"messages":[{"role":"user","content":"ping"}],"stream":false}`,
+			expectedBody:    `{"max_tokens":64,"messages":[{"content":"ping","role":"user"}],"model":"relay-claude","stream":false}`,
 			responseBody:    `{"type":"message","content":[],"stop_reason":"end_turn"}`,
 		},
 		{
 			name: "gemini generate content", protocol: ProtocolGemini, model: "gemini 2.5:flash", path: "/prefix/v1beta/models/gemini%202.5:flash:generateContent",
 			expectedHeaders: map[string]string{"x-goog-api-key": "probe-secret"},
-			expectedBody:    `{"contents":[{"role":"user","parts":[{"text":"ping"}]}],"generationConfig":{"maxOutputTokens":1}}`,
+			expectedBody:    `{"contents":[{"parts":[{"text":"ping"}],"role":"user"}],"generationConfig":{"maxOutputTokens":64}}`,
 			responseBody:    `{"candidates":[{"finishReason":"STOP"}]}`,
 		},
 	}

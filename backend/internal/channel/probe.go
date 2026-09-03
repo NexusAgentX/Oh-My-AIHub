@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	probeResponseLimit = int64(1 << 20)
-	probeErrorLimit    = 4096
+	probeResponseLimit   = int64(1 << 20)
+	probeErrorLimit      = 4096
+	probeMaxOutputTokens = 64
 )
 
 func (s *Service) probe(ctx context.Context, target ValidationTarget, credential string) ValidationAttempt {
@@ -108,15 +109,15 @@ func probeRequestBody(protocol Protocol, model string) ([]byte, error) {
 	var payload any
 	switch protocol {
 	case ProtocolOpenAIChat:
-		payload = map[string]any{"model": model, "messages": []map[string]string{{"role": "user", "content": "ping"}}, "max_tokens": 1, "stream": false}
+		payload = map[string]any{"model": model, "messages": []map[string]string{{"role": "user", "content": "ping"}}, "max_tokens": probeMaxOutputTokens, "stream": false}
 	case ProtocolOpenAIResponse:
-		payload = map[string]any{"model": model, "input": "ping", "max_output_tokens": 1, "stream": false}
+		payload = map[string]any{"model": model, "input": "ping", "max_output_tokens": probeMaxOutputTokens, "stream": false}
 	case ProtocolAnthropic:
-		payload = map[string]any{"model": model, "max_tokens": 1, "messages": []map[string]string{{"role": "user", "content": "ping"}}, "stream": false}
+		payload = map[string]any{"model": model, "max_tokens": probeMaxOutputTokens, "messages": []map[string]string{{"role": "user", "content": "ping"}}, "stream": false}
 	case ProtocolGemini:
 		payload = map[string]any{
 			"contents":         []any{map[string]any{"role": "user", "parts": []map[string]string{{"text": "ping"}}}},
-			"generationConfig": map[string]int{"maxOutputTokens": 1},
+			"generationConfig": map[string]int{"maxOutputTokens": probeMaxOutputTokens},
 		}
 	default:
 		return nil, ErrInvalidInput
