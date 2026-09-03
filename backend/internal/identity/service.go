@@ -125,6 +125,10 @@ func (s *Service) CreateInvitedAccount(ctx context.Context, actor Account, usern
 	return s.createAccount(ctx, actor.ID, username, displayName, creditLimit, isAdmin, status)
 }
 
+func (s *Service) HasAdministrator(ctx context.Context) (bool, error) {
+	return s.store.HasAdministrator(ctx)
+}
+
 func (s *Service) CreateBootstrapAdmin(ctx context.Context, username, displayName string, password string) (Account, error) {
 	username = NormalizeUsername(username)
 	displayName = strings.TrimSpace(displayName)

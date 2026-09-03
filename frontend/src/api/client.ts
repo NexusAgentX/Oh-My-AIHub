@@ -136,6 +136,15 @@ export const api = {
   async session() {
     return (await request<{ account: Account }>('/api/auth/session')).account
   },
+  async instanceState() {
+    return request<{ initialized: boolean }>('/api/instance')
+  },
+  async initializeInstance(username: string, displayName: string, password: string) {
+    return request<{ initialized: boolean }>('/api/instance/initialize', {
+      method: 'POST',
+      body: JSON.stringify({ username, display_name: displayName, password }),
+    })
+  },
   async login(username: string, password: string) {
     return (
       await request<{ account: Account }>('/api/auth/login', {

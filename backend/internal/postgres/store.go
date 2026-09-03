@@ -247,6 +247,14 @@ func (s *Store) CreateAccount(ctx context.Context, account identity.NewAccount) 
 	return created, nil
 }
 
+func (s *Store) HasAdministrator(ctx context.Context) (bool, error) {
+	var exists bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM accounts WHERE is_admin)`).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 func (s *Store) CreateBootstrapAdmin(ctx context.Context, account identity.NewAccount) (identity.Account, error) {
 	transaction, err := s.pool.Begin(ctx)
 	if err != nil {
