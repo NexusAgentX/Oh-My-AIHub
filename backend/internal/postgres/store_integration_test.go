@@ -72,8 +72,8 @@ func TestStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("log in bootstrap administrator: %v", err)
 	}
-	if !login.Account.MustChangePassword || !login.Account.IsAdmin {
-		t.Fatalf("bootstrap account = %+v, want administrator requiring password change", login.Account)
+	if login.Account.MustChangePassword || !login.Account.IsAdmin {
+		t.Fatalf("bootstrap account = %+v, want self-service administrator without forced password change", login.Account)
 	}
 	if _, err := identityService.Authenticate(ctx, login.SessionToken); err != nil {
 		t.Fatalf("authenticate bootstrap session: %v", err)
@@ -671,7 +671,7 @@ func createExactlyOneBootstrapAdmin(t *testing.T, ctx context.Context, store *st
 				PasswordHash:       passwordHash,
 				IsAdmin:            true,
 				Status:             identity.StatusActive,
-				MustChangePassword: true,
+				MustChangePassword: false,
 			})
 			results <- result{account: account, err: err}
 		}(username)
