@@ -1,10 +1,16 @@
 # 变更日志
 
-本文档记录对使用者、开发者和部署环境有意义的变化。项目尚未发布，当前变化统一记录在“未发布”章节。
+本文档记录对使用者、开发者和部署环境有意义的变化。当前最新版本为 v0.1.0；未发布变化记录在“未发布”章节。
 
 ## 未发布
 
+（暂无）
+
+## v0.1.0 - 2026-09-03
+
 ### 新增
+
+- 建立 GitHub Actions 发版与生产部署流水线：`v*` tag 触发 `mise run check-release` 门禁、backend/frontend 双镜像多架构构建推送 GHCR（digest 固定）并创建 GitHub Release，`production-hub` Environment 人工审批后经 SSH forced-command 受限脚本部署到 hub.isok.dev，失败自动回滚；`workflow_dispatch` 支持按既有 tag 重跑或回滚。
 
 - 按 `product-experience.op` 收口产品与管理信息架构：导航和工作台对齐原型，公开渠道通过独立页加入模型协议池，管理员新增按共享者拆开的近 30 天收入表。
 - 实例初始化一步到位：创建首个管理员后自动建立会话直达控制台（不再要求重新登录），且自设密码不再触发首登强制改密（该规则仅适用于管理员代发生成密码的受邀账户）；CLI bootstrap-admin 创建的账户同样免强制改密。
