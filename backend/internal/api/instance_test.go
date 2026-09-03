@@ -28,9 +28,23 @@ func (s *instanceStubStore) CreateBootstrapAdmin(_ context.Context, account iden
 	s.created = append(s.created, account)
 	return identity.Account{
 		ID: "admin-id", Username: account.Username, DisplayName: account.DisplayName,
-		IsAdmin: true, MustChangePassword: true, Status: identity.StatusActive,
+		IsAdmin: true, Status: identity.StatusActive,
 	}, nil
 }
+
+func (s *instanceStubStore) FindAccountByUsername(_ context.Context, username string) (identity.AccountWithPassword, error) {
+	for _, account := range s.created {
+		if account.Username == username {
+			return identity.AccountWithPassword{Account: identity.Account{
+				ID: "admin-id", Username: account.Username, DisplayName: account.DisplayName,
+				IsAdmin: true, Status: identity.StatusActive,
+			}, PasswordHash: account.PasswordHash}, nil
+		}
+	}
+	return identity.AccountWithPassword{}, identity.ErrInvalidCredentials
+}
+
+func (s *instanceStubStore) CreateSession(context.Context, identity.Session) error { return nil }
 
 func newInstanceApp(t *testing.T, store identity.Store) *app {
 	t.Helper()
@@ -68,11 +82,14 @@ func TestInstanceInitializeCreatesFirstAdministrator(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("initialize = %d %s", recorder.Code, recorder.Body.String())
 	}
-	if len(store.created) != 1 || store.created[0].Username != "founder" || !store.created[0].MustChangePassword {
+	if len(store.created) != 1 || store.created[0].Username != "founder" || store.created[0].MustChangePassword {
 		t.Fatalf("created account = %+v", store.created)
 	}
-	if !strings.Contains(recorder.Body.String(), `"must_change_password":true`) {
+	if !strings.Contains(recorder.Body.String(), `"account"`) || !strings.Contains(recorder.Body.String(), `"username":"founder"`) {
 		t.Fatalf("response = %s", recorder.Body.String())
+	}
+	if cookies := recorder.Result().Cookies(); len(cookies) == 0 {
+		t.Fatalf("initialize did not establish a session: %#v", cookies)
 	}
 }
 

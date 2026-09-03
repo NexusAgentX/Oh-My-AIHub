@@ -34,7 +34,7 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "already_initialized", "实例已有管理员，请直接登录")
 		return
 	}
-	account, err := a.identity.CreateBootstrapAdmin(r.Context(), request.Username, request.DisplayName, request.Password)
+	_, err = a.identity.CreateBootstrapAdmin(r.Context(), request.Username, request.DisplayName, request.Password)
 	if errors.Is(err, identity.ErrConflict) {
 		writeError(w, http.StatusConflict, "already_initialized", "实例已有管理员，请直接登录")
 		return
@@ -43,13 +43,15 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	// 密码为创始人自设，创建成功即建立会话，免去登录一步。
+	result, err := a.identity.Login(r.Context(), request.Username, request.Password)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	a.setSessionCookie(w, result.SessionToken)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"initialized": true,
-		"admin": map[string]any{
-			"id":            account.ID,
-			"username":      account.Username,
-			"display_name":  account.DisplayName,
-			"must_change_password": account.MustChangePassword,
-		},
+		"account":     accountResponse(result.Account),
 	})
 }

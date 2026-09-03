@@ -140,7 +140,7 @@ export const api = {
     return request<{ initialized: boolean }>('/api/instance')
   },
   async initializeInstance(username: string, displayName: string, password: string) {
-    return request<{ initialized: boolean }>('/api/instance/initialize', {
+    return request<{ initialized: boolean; account: Account }>('/api/instance/initialize', {
       method: 'POST',
       body: JSON.stringify({ username, display_name: displayName, password }),
     })

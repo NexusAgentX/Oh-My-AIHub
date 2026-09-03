@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { AuthShell } from '../layouts/AuthShell'
 import {
@@ -10,16 +10,19 @@ import {
   TextField,
 } from '../ui/FormControls'
 import { useInstance } from './InstanceProvider'
+import { defaultDestination } from './routePolicy'
+import { useAuth } from './AuthProvider'
 import { passwordProblem, passwordRuleText, usernameProblem, usernameRuleText } from './credentialsRules'
 
 export function InstanceInitializePage() {
   const { ready, initialized, refresh } = useInstance()
+  const { refresh: refreshSession } = useAuth()
+  const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
-  const [created, setCreated] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   if (!ready) {
@@ -48,31 +51,15 @@ export function InstanceInitializePage() {
     }
     setSubmitting(true)
     try {
-      await api.initializeInstance(username, displayName, password)
+      const result = await api.initializeInstance(username, displayName, password)
       await refresh()
-      setCreated(true)
+      const account = await refreshSession()
+      navigate(defaultDestination(account ?? result.account), { replace: true })
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : '初始化失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (created) {
-    return (
-      <AuthShell>
-        <div className="auth-heading">
-          <h1>实例已就绪</h1>
-          <p>首个管理员已创建，首次登录会要求修改密码</p>
-        </div>
-        <form className="auth-form">
-          <InlineError>{error}</InlineError>
-          <Link className="button" to="/login">
-            前往登录
-          </Link>
-        </form>
-      </AuthShell>
-    )
   }
 
   return (
