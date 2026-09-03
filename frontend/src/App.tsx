@@ -11,6 +11,8 @@ import { CreatedCredentialPage } from './accounts/CreatedCredentialPage'
 import { EphemeralCredentialProvider } from './accounts/EphemeralCredentialProvider'
 import { AccountSettingsPage } from './auth/AccountSettingsPage'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
+import { InstanceInitializePage } from './auth/InstanceInitializePage'
+import { InstanceProvider, RequireInitialized } from './auth/InstanceProvider'
 import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
@@ -64,12 +66,6 @@ function RequireAdministrator() {
   return <Outlet />
 }
 
-function RootRedirect() {
-  const { account, loading } = useAuth()
-  if (loading) return <FullPageLoading />
-  return <Navigate replace to={defaultDestination(account)} />
-}
-
 function FullPageLoading() {
   return (
     <main className="route-loading">
@@ -80,19 +76,25 @@ function FullPageLoading() {
 
 function AppProviders() {
   return (
-    <EphemeralCredentialProvider>
-      <AuthProvider>
-        <WalletProvider>
-          <Outlet />
-        </WalletProvider>
-      </AuthProvider>
-    </EphemeralCredentialProvider>
+    <InstanceProvider>
+      <EphemeralCredentialProvider>
+        <AuthProvider>
+          <WalletProvider>
+            <Outlet />
+          </WalletProvider>
+        </AuthProvider>
+      </EphemeralCredentialProvider>
+    </InstanceProvider>
   )
 }
 
 export const appRoutes = createRoutesFromElements(
   <Route element={<AppProviders />}>
+    <Route element={<InstanceInitializePage />} path="/initialize" />
+    <Route element={<RequireInitialized />}>
     <Route element={<WelcomePage />} path="/welcome" />
+    <Route element={<WelcomePage />} path="/" />
+    <Route element={<WelcomePage />} path="*" />
     <Route element={<LoginPage />} path="/login" />
     <Route element={<RequireSession />}>
       <Route element={<FirstPasswordChangePage />} path="/account/password" />
@@ -138,8 +140,7 @@ export const appRoutes = createRoutesFromElements(
         </Route>
       </Route>
     </Route>
-    <Route element={<RootRedirect />} path="/" />
-    <Route element={<RootRedirect />} path="*" />
+    </Route>
   </Route>,
 )
 

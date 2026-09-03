@@ -82,6 +82,7 @@ type Store interface {
 	ReplacePasswordAndSessions(context.Context, string, int64, string, Session, time.Time) error
 	CreateAccount(context.Context, NewAccount) (Account, error)
 	CreateBootstrapAdmin(context.Context, NewAccount) (Account, error)
+	HasAdministrator(context.Context) (bool, error)
 	ListAccounts(context.Context, string) ([]Account, error)
 	UpdateAccount(context.Context, string, string, AccountUpdate) (Account, error)
 }

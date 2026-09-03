@@ -98,6 +98,8 @@ func NewHandler(dependencies Dependencies) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", application.health)
+	mux.HandleFunc("GET /api/instance", application.instanceState)
+	mux.HandleFunc("POST /api/instance/initialize", application.instanceInitialize)
 	mux.HandleFunc("POST /api/auth/login", application.login)
 	mux.HandleFunc("POST /api/auth/logout", application.logout)
 	mux.Handle("GET /api/auth/session", application.requireSession(http.HandlerFunc(application.session)))
