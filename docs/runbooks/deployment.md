@@ -35,7 +35,8 @@
 
 ## 生产部署（hub.isok.dev）
 
-生产实例部署在 HK VPS，由 GitHub Actions 自动部署（`.github/workflows/release.yml`）：
+生产实例部署在 HK VPS，由 GitHub Actions 自动部署（`.github/workflows/release.yml`）。
+常规发版、审批上线、重跑/回滚与紧急手动部署的逐步操作见 `release.md`：
 
 1. 推送 `v*` tag（如 `v0.1.0`）后自动执行：`mise run check-release` 门禁 → backend/frontend 多架构镜像构建推送 GHCR（tag + digest 固定）→ 创建 GitHub Release。
 2. `production-hub` Environment 需人工审批。批准后 workflow 通过 SSH forced-command 调用 VPS 上的受限发布脚本：先做部署前加密备份，再以目标 digest 切换 Compose 镜像、`up -d`、等待健康并烟测本机与公网端点；任一步失败自动回滚到备份 Compose。
