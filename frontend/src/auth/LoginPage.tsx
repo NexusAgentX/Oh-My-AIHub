@@ -63,6 +63,7 @@ export function LoginPage() {
         />
         <PasswordField
           autoComplete="current-password"
+          hint="受邀账户的初始凭据或你修改后的密码"
           label="密码"
           onChange={(event) => setPassword(event.target.value)}
           required

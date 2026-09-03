@@ -19,6 +19,7 @@ import {
 import { Icon } from '../ui/Icon'
 import { accountRiskLabel } from './accountMetrics'
 import { useEphemeralCredential } from './EphemeralCredentialProvider'
+import { usernameProblem } from '../auth/credentialsRules'
 
 export function AdminAccountsPage() {
   const { account: currentAccount, synchronizeAccount } = useAuth()
@@ -285,6 +286,10 @@ function CreateAccountDialog({
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
+    if (usernameProblem(username)) {
+      setError(`用户名不符合规则：3-32 位，小写字母、数字、.、_ 或 -，以小写字母或数字开头`)
+      return
+    }
     setSubmitting(true)
     try {
       onCreated(
@@ -341,6 +346,7 @@ function CreateAccountDialog({
         />
         <TextField
           autoComplete="off"
+          hint="3-32 位，小写字母、数字、.、_ 或 -"
           label="用户名"
           onChange={(event) => setUsername(event.target.value)}
           pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"

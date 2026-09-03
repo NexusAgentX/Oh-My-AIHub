@@ -10,6 +10,7 @@ import {
   TextField,
 } from '../ui/FormControls'
 import { useInstance } from './InstanceProvider'
+import { passwordProblem, passwordRuleText, usernameProblem, usernameRuleText } from './credentialsRules'
 
 export function InstanceInitializePage() {
   const { ready, initialized, refresh } = useInstance()
@@ -33,6 +34,14 @@ export function InstanceInitializePage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
+    if (usernameProblem(username)) {
+      setError(`管理员用户名不符合规则：${usernameRuleText}`)
+      return
+    }
+    if (passwordProblem(password)) {
+      setError(`密码不符合规则：${passwordRuleText}`)
+      return
+    }
     if (password !== confirm) {
       setError('两次输入的密码不一致')
       return
@@ -77,6 +86,7 @@ export function InstanceInitializePage() {
         <TextField
           autoComplete="username"
           autoFocus
+          hint={usernameRuleText}
           label="管理员用户名"
           onChange={(event) => setUsername(event.target.value)}
           required
@@ -90,6 +100,7 @@ export function InstanceInitializePage() {
         />
         <PasswordField
           autoComplete="new-password"
+          hint={passwordRuleText}
           label="密码"
           onChange={(event) => setPassword(event.target.value)}
           required
