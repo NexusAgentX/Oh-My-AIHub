@@ -161,6 +161,26 @@ func main() {
 		}
 	}()
 
+	if _, inspectErr := store.OpsRunInspection(startupContext, "startup"); inspectErr != nil {
+		log.Printf("startup ops inspection: %v", inspectErr)
+	}
+	go func() {
+		inspectionTicker := time.NewTicker(time.Hour)
+		defer inspectionTicker.Stop()
+		for {
+			select {
+			case <-maintenanceContext.Done():
+				return
+			case <-inspectionTicker.C:
+				inspectionContext, cancelInspection := context.WithTimeout(maintenanceContext, 30*time.Second)
+				if _, inspectErr := store.OpsRunInspection(inspectionContext, "periodic"); inspectErr != nil {
+					log.Printf("periodic ops inspection: %v", inspectErr)
+				}
+				cancelInspection()
+			}
+		}
+	}()
+
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
@@ -170,6 +190,7 @@ func main() {
 			Gateway:           gatewayService,
 			Ledger:            ledger.NewService(store),
 			C2C:               c2cService,
+			Ops:               store,
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,

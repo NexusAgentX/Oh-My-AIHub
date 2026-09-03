@@ -62,6 +62,18 @@ run = [
 description = "Validate versioned design sources and previews"
 run = "node scripts/check-design-assets.mjs"
 
+[tasks.check-release]
+description = "Run every gate required for a release candidate"
+run = [
+  "node scripts/check-design-assets.mjs",
+  "npm --prefix frontend ci",
+  "npm --prefix frontend test",
+  "npm --prefix frontend run build",
+  "go -C backend vet ./...",
+  "go -C backend test -race ./...",
+  "docker compose config --quiet",
+]
+
 [tasks.build]
 description = "Build frontend and backend"
 run = [

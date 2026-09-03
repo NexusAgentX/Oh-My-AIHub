@@ -6,3 +6,8 @@ frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
 backend/bin/
+
+# Feature #22：加密备份产物永不入库
+backups/
+*.dump.aes
+*.manifest.json

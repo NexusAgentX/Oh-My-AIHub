@@ -21,6 +21,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ops"
 )
 
 const (
@@ -35,9 +36,19 @@ type Dependencies struct {
 	Gateway           *gateway.Service
 	Ledger            *ledger.Service
 	C2C               *c2c.Service
+	Ops               OpsStore
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
+}
+
+// OpsStore is the operations data surface consumed by the admin API.
+type OpsStore interface {
+	OpsMetrics(ctx context.Context, window ops.Window) (ops.Metrics, error)
+	OpsAnomalies(ctx context.Context) (ops.Anomalies, error)
+	OpsRunInspection(ctx context.Context, triggeredBy string) (ops.InspectionRecord, error)
+	OpsListInspections(ctx context.Context, limit int64) ([]ops.InspectionRecord, error)
+	OpsTrialSummary(ctx context.Context) (ops.TrialSummary, error)
 }
 
 type app struct {
@@ -47,6 +58,7 @@ type app struct {
 	gateway              *gateway.Service
 	ledger               *ledger.Service
 	c2c                  *c2c.Service
+	ops                  OpsStore
 	databaseReady        func(context.Context) error
 	cookieSecure         bool
 	cookieName           string
@@ -69,6 +81,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 		gateway:              dependencies.Gateway,
 		ledger:               dependencies.Ledger,
 		c2c:                  dependencies.C2C,
+		ops:                  dependencies.Ops,
 		databaseReady:        dependencies.DatabaseReady,
 		cookieSecure:         dependencies.CookieSecure,
 		cookieName:           defaultSessionCookie,
@@ -146,6 +159,11 @@ mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFu
 	mux.Handle("GET /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.getAdminModel)))
 	mux.Handle("PUT /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.updateModel)))
 	mux.Handle("GET /api/admin/ledger/metrics", application.requireAdmin(http.HandlerFunc(application.ledgerMetrics)))
+	mux.Handle("GET /api/admin/ops/metrics", application.requireAdmin(http.HandlerFunc(application.opsMetrics)))
+	mux.Handle("GET /api/admin/ops/anomalies", application.requireAdmin(http.HandlerFunc(application.opsAnomalies)))
+	mux.Handle("GET /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsListInspections)))
+	mux.Handle("POST /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsRunInspection)))
+	mux.Handle("GET /api/admin/ops/trial-summary", application.requireAdmin(http.HandlerFunc(application.opsTrialSummary)))
 	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountWallet)))
 	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountEntries)))
 	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemWallet)))
