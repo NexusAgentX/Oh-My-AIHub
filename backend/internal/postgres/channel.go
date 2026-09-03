@@ -230,7 +230,25 @@ func offersForChannel(ctx context.Context, queryer channelQueryer, channelID str
 		}
 		result = append(result, offer)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attachOfferPriceTiers(ctx, queryer, result)
+}
+
+func attachOfferPriceTiers(ctx context.Context, queryer tierQueryer, offers []channel.Offer) ([]channel.Offer, error) {
+	modelIDs := make([]string, 0, len(offers))
+	for _, offer := range offers {
+		modelIDs = append(modelIDs, offer.ModelID)
+	}
+	tiers, err := loadModelPriceTiers(ctx, queryer, modelIDs)
+	if err != nil {
+		return nil, err
+	}
+	for index := range offers {
+		offers[index].PriceTiers = tiers[offers[index].ModelID]
+	}
+	return offers, nil
 }
 
 func catalogStatus(value string) catalog.Status { return catalog.Status(value) }
@@ -244,6 +262,7 @@ func offerRoutingLease(offer channel.Offer) channel.RoutingLease {
 		ContextWindow: offer.ContextWindow, Multiplier: offer.Multiplier,
 		InputPrice: offer.InputPrice, OutputPrice: offer.OutputPrice,
 		CacheWritePrice: offer.CacheWritePrice, CacheReadPrice: offer.CacheReadPrice,
+		PriceTiers: offer.PriceTiers,
 	}
 }
 
@@ -683,7 +702,7 @@ func (s *Store) AddOffer(ctx context.Context, command channel.AddOfferCommand) (
 }
 
 func offerByID(ctx context.Context, queryer channelQueryer, offerID string) (channel.Offer, error) {
-	return scanOffer(queryer.QueryRow(ctx, `
+	offer, err := scanOffer(queryer.QueryRow(ctx, `
 		SELECT `+offerColumns+`
 		FROM channel_offers o
 		JOIN channel_models cm ON cm.id = o.channel_model_id
@@ -693,6 +712,14 @@ func offerByID(ctx context.Context, queryer channelQueryer, offerID string) (cha
 			AND attempt.attempt_seq = o.validation_attempt_seq
 		`+offerGatewayMetricJoins+`
 		WHERE o.id = $1`, offerID))
+	if err != nil {
+		return channel.Offer{}, err
+	}
+	withTiers, err := attachOfferPriceTiers(ctx, queryer, []channel.Offer{offer})
+	if err != nil {
+		return channel.Offer{}, err
+	}
+	return withTiers[0], nil
 }
 
 func (s *Store) UpdateOffer(ctx context.Context, command channel.OfferUpdateCommand) (channel.Offer, error) {
@@ -1274,6 +1301,19 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 	if err := rows.Err(); err != nil {
 		return nil, "", err
 	}
+	if len(items) > 0 {
+		modelIDs := make([]string, 0, len(items))
+		for _, item := range items {
+			modelIDs = append(modelIDs, item.ModelID)
+		}
+		tiers, tierErr := loadModelPriceTiers(ctx, s.pool, modelIDs)
+		if tierErr != nil {
+			return nil, "", tierErr
+		}
+		for index := range items {
+			items[index].PriceTiers = tiers[items[index].ModelID]
+		}
+	}
 	next := ""
 	if len(items) > query.Limit {
 		last := items[query.Limit-1]
@@ -1604,6 +1644,25 @@ func resolveRoutingTargets(ctx context.Context, queryer channelQueryer, offerIDs
 			},
 			Credential: channel.EncryptedCredential{Version: credentialVersion.Int64, KeyID: keyID.String, Nonce: nonce, Ciphertext: ciphertext},
 		})
+	}
+	// All resolved offers of one pool share the model, but resolve generically:
+	// load every referenced model's conditional tiers once and attach them so
+	// the routing lease snapshot and the pool display carry the same facts.
+	if len(targets) > 0 {
+		modelIDs := make([]string, 0, len(targets))
+		for _, target := range targets {
+			modelIDs = append(modelIDs, target.Lease.ModelID)
+		}
+		tiers, tierErr := loadModelPriceTiers(ctx, queryer, modelIDs)
+		if tierErr != nil {
+			return nil, nil, tierErr
+		}
+		for index := range targets {
+			targets[index].Lease.PriceTiers = tiers[targets[index].Lease.ModelID]
+		}
+		for index := range statuses {
+			statuses[index].PriceTiers = tiers[statuses[index].ModelID]
+		}
 	}
 	return statuses, targets, nil
 }

@@ -7,8 +7,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -22,6 +24,10 @@ const (
 	// channel multiplier ceiling of 1000x, the displayed per-million price is
 	// always representable by money.Amount.
 	MaxPriceNanoPerMillion money.Amount = 100_000 * money.Amount(money.Scale)
+
+	// MaxPriceTiers bounds the conditional tiers of one model. The storage
+	// schema enforces the same bound on tier sequence numbers.
+	MaxPriceTiers = 16
 )
 
 var (
@@ -45,6 +51,7 @@ type Model struct {
 	OutputPrice              money.Amount
 	CacheWritePrice          money.Amount
 	CacheReadPrice           money.Amount
+	PriceTiers               []ledger.PriceTier
 	Status                   Status
 	Version                  int64
 	CreatedAt                time.Time
@@ -124,7 +131,41 @@ func normalize(model Model) Model {
 	model.ParameterInfo = strings.TrimSpace(model.ParameterInfo)
 	model.InputModalities = normalizeModalities(model.InputModalities)
 	model.OutputModalities = normalizeModalities(model.OutputModalities)
+	model.PriceTiers = normalizePriceTiers(model.PriceTiers)
 	return model
+}
+
+func normalizePriceTiers(tiers []ledger.PriceTier) []ledger.PriceTier {
+	if len(tiers) == 0 {
+		return nil
+	}
+	normalized := make([]ledger.PriceTier, 0, len(tiers))
+	for _, tier := range tiers {
+		tier.Name = strings.TrimSpace(tier.Name)
+		if tier.Timezone = strings.TrimSpace(tier.Timezone); tier.Timezone == "" {
+			tier.Timezone = "UTC"
+		}
+		if len(tier.Weekdays) > 0 {
+			weekdays := make([]int, 0, len(tier.Weekdays))
+			seen := make(map[int]struct{}, len(tier.Weekdays))
+			for _, weekday := range tier.Weekdays {
+				if weekday < 1 || weekday > 7 {
+					continue
+				}
+				if _, ok := seen[weekday]; ok {
+					continue
+				}
+				seen[weekday] = struct{}{}
+				weekdays = append(weekdays, weekday)
+			}
+			sort.Ints(weekdays)
+			tier.Weekdays = weekdays
+		} else {
+			tier.Weekdays = nil
+		}
+		normalized = append(normalized, tier)
+	}
+	return normalized
 }
 
 func normalizeModalities(values []string) []string {
@@ -160,6 +201,50 @@ func validate(model Model) error {
 		model.CacheWritePrice < 0 || model.CacheWritePrice > MaxPriceNanoPerMillion ||
 		model.CacheReadPrice < 0 || model.CacheReadPrice > MaxPriceNanoPerMillion {
 		return ErrInvalidInput
+	}
+	return validatePriceTiers(model.PriceTiers)
+}
+
+func validatePriceTiers(tiers []ledger.PriceTier) error {
+	if len(tiers) > MaxPriceTiers {
+		return ErrInvalidInput
+	}
+	for _, tier := range tiers {
+		if !tier.HasPredicate() {
+			return ErrInvalidInput
+		}
+		if utf8.RuneCountInString(tier.Name) > 64 {
+			return ErrInvalidInput
+		}
+		if tier.MinPromptTokens != nil && *tier.MinPromptTokens < 0 {
+			return ErrInvalidInput
+		}
+		if tier.MaxPromptTokens != nil && *tier.MaxPromptTokens < 0 {
+			return ErrInvalidInput
+		}
+		if tier.MinPromptTokens != nil && tier.MaxPromptTokens != nil && *tier.MinPromptTokens >= *tier.MaxPromptTokens {
+			return ErrInvalidInput
+		}
+		if (tier.StartMinute == nil) != (tier.EndMinute == nil) {
+			return ErrInvalidInput
+		}
+		if tier.StartMinute != nil && (*tier.StartMinute < 0 || *tier.StartMinute > 1439 || *tier.EndMinute < 1 || *tier.EndMinute > 1440 || *tier.StartMinute == *tier.EndMinute) {
+			return ErrInvalidInput
+		}
+		for _, weekday := range tier.Weekdays {
+			if weekday < 1 || weekday > 7 {
+				return ErrInvalidInput
+			}
+		}
+		if _, err := time.LoadLocation(tier.Timezone); err != nil {
+			return ErrInvalidInput
+		}
+		if tier.InputPrice < 0 || tier.InputPrice > MaxPriceNanoPerMillion ||
+			tier.OutputPrice < 0 || tier.OutputPrice > MaxPriceNanoPerMillion ||
+			tier.CacheWritePrice < 0 || tier.CacheWritePrice > MaxPriceNanoPerMillion ||
+			tier.CacheReadPrice < 0 || tier.CacheReadPrice > MaxPriceNanoPerMillion {
+			return ErrInvalidInput
+		}
 	}
 	return nil
 }

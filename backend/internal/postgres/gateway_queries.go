@@ -59,6 +59,7 @@ func loadCall(ctx context.Context, queryer gatewayQueryer, callID, viewerID stri
 	var finalHTTPStatus sql.NullInt64
 	var completedAt sql.NullTime
 	var preauthorized, providerCharge, platformFee int64
+	var settledTierSeq int
 	err := queryer.QueryRow(ctx, `
 		SELECT call.id::text, call.consumer_account_id::text, call.api_key_id::text, call.key_prefix,
 			call.key_generation, call.pool_id::text, call.pool_version, call.canonical_model_id, call.protocol,
@@ -68,6 +69,7 @@ func loadCall(ctx context.Context, queryer gatewayQueryer, callID, viewerID stri
 			final_channel.display_name, call.completion_reason,
 			call.input_tokens, call.output_tokens, call.cache_write_tokens, call.cache_read_tokens,
 			call.provider_charge_nano, call.platform_fee_nano, call.final_http_status,
+			call.settled_price_tier_seq,
 			call.created_at, call.completed_at
 		FROM api_calls call
 		LEFT JOIN channel_offers final_offer ON final_offer.id = call.final_offer_id
@@ -85,6 +87,7 @@ func loadCall(ctx context.Context, queryer gatewayQueryer, callID, viewerID stri
 		&finalChannelName, &result.CompletionReason,
 		&inputTokens, &outputTokens, &cacheWriteTokens, &cacheReadTokens,
 		&providerCharge, &platformFee, &finalHTTPStatus,
+		&settledTierSeq,
 		&result.CreatedAt, &completedAt,
 	)
 	if err != nil {
@@ -98,6 +101,7 @@ func loadCall(ctx context.Context, queryer gatewayQueryer, callID, viewerID stri
 	result.Preauthorized = money.FromNano(preauthorized)
 	result.ProviderCharge = money.FromNano(providerCharge)
 	result.PlatformFee = money.FromNano(platformFee)
+	result.SettledPriceTierSeq = settledTierSeq
 	if inputTokens.Valid && outputTokens.Valid && cacheWriteTokens.Valid && cacheReadTokens.Valid {
 		usage := ledger.UsageV1{
 			InputTokens: inputTokens.Int64, OutputTokens: outputTokens.Int64,

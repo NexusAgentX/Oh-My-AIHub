@@ -43,3 +43,4 @@
 - [ADR-0009：采用版本化凭据加密与固定出站网络边界](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) — 已通过
 - [ADR-0010：采用快照化 API 网关与幂等终结状态机](0010-adopt-snapshot-gateway-and-idempotent-settlement.md) — 已通过
 - [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过
+- [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过

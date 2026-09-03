@@ -606,6 +606,7 @@ func modelResponse(model catalog.Model) map[string]any {
 		"output_price":               model.OutputPrice.String(),
 		"cache_write_price":          model.CacheWritePrice.String(),
 		"cache_read_price":           model.CacheReadPrice.String(),
+		"price_tiers":                benchmarkPriceTierResponses(model.PriceTiers),
 		"price_unit":                 "points_per_million_tokens",
 		"status":                     model.Status,
 		"version":                    model.Version,
@@ -647,6 +648,10 @@ func parseModelRequest(request modelRequest) (catalog.Model, error) {
 	if err != nil {
 		return catalog.Model{}, err
 	}
+	priceTiers, err := parsePriceTierRequests(request.PriceTiers)
+	if err != nil {
+		return catalog.Model{}, err
+	}
 	return catalog.Model{
 		ID:                       strings.TrimSpace(request.ID),
 		Name:                     request.Name,
@@ -662,6 +667,40 @@ func parseModelRequest(request modelRequest) (catalog.Model, error) {
 		OutputPrice:              outputPrice,
 		CacheWritePrice:          cacheWritePrice,
 		CacheReadPrice:           cacheReadPrice,
+		PriceTiers:               priceTiers,
 		Status:                   catalog.Status(request.Status),
 	}, nil
+}
+
+func parsePriceTierRequests(requests []priceTierRequest) ([]ledger.PriceTier, error) {
+	if requests == nil {
+		return nil, nil
+	}
+	tiers := make([]ledger.PriceTier, 0, len(requests))
+	for _, request := range requests {
+		inputPrice, err := parseModelPrice(request.InputPrice)
+		if err != nil {
+			return nil, err
+		}
+		outputPrice, err := parseModelPrice(request.OutputPrice)
+		if err != nil {
+			return nil, err
+		}
+		cacheWritePrice, err := parseModelPrice(request.CacheWritePrice)
+		if err != nil {
+			return nil, err
+		}
+		cacheReadPrice, err := parseModelPrice(request.CacheReadPrice)
+		if err != nil {
+			return nil, err
+		}
+		tiers = append(tiers, ledger.PriceTier{
+			Name: request.Name, MinPromptTokens: request.MinPromptTokens, MaxPromptTokens: request.MaxPromptTokens,
+			Timezone: request.Timezone, Weekdays: request.Weekdays,
+			StartMinute: request.StartMinute, EndMinute: request.EndMinute,
+			InputPrice: inputPrice, OutputPrice: outputPrice,
+			CacheWritePrice: cacheWritePrice, CacheReadPrice: cacheReadPrice,
+		})
+	}
+	return tiers, nil
 }

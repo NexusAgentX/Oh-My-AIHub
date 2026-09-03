@@ -184,9 +184,9 @@ func (s *Store) BeginCall(ctx context.Context, request gateway.BeginCallRequest,
 			id, consumer_account_id, consumer_ledger_account_id, api_key_id, key_prefix, key_generation,
 			pool_id, pool_version, canonical_model_id, protocol, status, decision_code,
 			candidate_count, hold_id, preauthorized_nano, zero_hold_reason,
-			fee_rate_version, fee_rate_nano, lease_expires_at, heartbeat_at
+			fee_rate_version, fee_rate_nano, formula_version, lease_expires_at, heartbeat_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'in_progress', 'authorized',
-			$11, NULLIF($12, '')::uuid, $13, $14, $15, $16, now() + $17, now())`,
+			$11, NULLIF($12, '')::uuid, $13, $14, $15, $16, 'formula-v2', now() + $17, now())`,
 		callID, ownerID, ledgerAccountID, request.Authenticated.ID, keyPrefix, generation,
 		poolID, poolVersion, request.CanonicalModelID, request.Protocol, len(candidates), holdID,
 		preauthorized.Nano(), zeroHoldReason, feeRateVersion, feeRateNano, leaseDuration,
@@ -208,6 +208,14 @@ func (s *Store) BeginCall(ctx context.Context, request gateway.BeginCallRequest,
 			lease.Multiplier.Nano(), candidate.SelfChannel, candidate.NetDebitUpper.Nano(),
 		); err != nil {
 			return gateway.CallPlan{}, mapGatewayError(err)
+		}
+	}
+	// Every candidate of one call resolves the same canonical model, so its
+	// conditional tier table is a call-level fact. Snapshot it now: tier
+	// selection happens at settlement, when the final usage is known.
+	if len(candidates) > 0 {
+		if err := insertCallPriceTiers(ctx, tx, callID, candidates[0].Lease.PriceTiers); err != nil {
+			return gateway.CallPlan{}, err
 		}
 	}
 	created, err := loadCall(ctx, tx, callID, ownerID, false)
@@ -328,7 +336,73 @@ func (s *Store) recoverBegunCall(parent context.Context, callID, ownerID string,
 		}
 		expected[index].LeaseGeneration = recovered.LeaseGeneration
 	}
+	expectedTiers := []ledger.PriceTier{}
+	if len(expected) > 0 {
+		expectedTiers = expected[0].Lease.PriceTiers
+	}
+	storedTiers, err := loadCallPriceTiers(ctx, s.pool, callID)
+	if err != nil {
+		return gateway.CallPlan{}, err
+	}
+	if !priceTiersEqual(storedTiers, expectedTiers) {
+		return gateway.CallPlan{}, gateway.ErrConflict
+	}
 	return gateway.CallPlan{Call: recovered, Candidates: expected}, nil
+}
+
+func insertCallPriceTiers(ctx context.Context, tx pgx.Tx, callID string, tiers []ledger.PriceTier) error {
+	for index, tier := range tiers {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO api_call_price_tiers (
+				call_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+				start_minute_of_day, end_minute_of_day,
+				input_price_nano, output_price_nano, cache_write_price_nano, cache_read_price_nano
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			callID, index+1, tier.Name, tier.MinPromptTokens, tier.MaxPromptTokens, tier.Timezone, tier.Weekdays,
+			tier.StartMinute, tier.EndMinute,
+			tier.InputPrice.Nano(), tier.OutputPrice.Nano(), tier.CacheWritePrice.Nano(), tier.CacheReadPrice.Nano(),
+		); err != nil {
+			return mapGatewayError(err)
+		}
+	}
+	return nil
+}
+
+func loadCallPriceTiers(ctx context.Context, queryer gatewayQueryer, callID string) ([]ledger.PriceTier, error) {
+	rows, err := queryer.Query(ctx, `
+		SELECT name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+			start_minute_of_day, end_minute_of_day,
+			input_price_nano, output_price_nano, cache_write_price_nano, cache_read_price_nano
+		FROM api_call_price_tiers WHERE call_id = $1 ORDER BY seq`, callID)
+	if err != nil {
+		return nil, mapGatewayError(err)
+	}
+	defer rows.Close()
+	tiers := make([]ledger.PriceTier, 0)
+	for rows.Next() {
+		var tier ledger.PriceTier
+		var weekdays []int16
+		var inputPrice, outputPrice, cacheWritePrice, cacheReadPrice int64
+		if err := rows.Scan(
+			&tier.Name, &tier.MinPromptTokens, &tier.MaxPromptTokens, &tier.Timezone, &weekdays,
+			&tier.StartMinute, &tier.EndMinute,
+			&inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice,
+		); err != nil {
+			return nil, err
+		}
+		if len(weekdays) > 0 {
+			tier.Weekdays = make([]int, len(weekdays))
+			for index, weekday := range weekdays {
+				tier.Weekdays[index] = int(weekday)
+			}
+		}
+		tier.InputPrice = money.FromNano(inputPrice)
+		tier.OutputPrice = money.FromNano(outputPrice)
+		tier.CacheWritePrice = money.FromNano(cacheWritePrice)
+		tier.CacheReadPrice = money.FromNano(cacheReadPrice)
+		tiers = append(tiers, tier)
+	}
+	return tiers, rows.Err()
 }
 
 type poolOfferReference struct {
@@ -636,14 +710,16 @@ func (s *Store) FinalizeCall(ctx context.Context, callID string, outcome gateway
 	ledgerTx := &LedgerTransaction{Tx: tx}
 	ledgerService := ledger.NewService(ledgerTx)
 
-	var consumerID, holdID, currentStatus string
+	var consumerID, holdID, currentStatus, formulaVersion string
 	var preauthorized, currentGeneration int64
+	var createdAt time.Time
 	var storedFinalizerHash []byte
 	if err := tx.QueryRow(ctx, `
 		SELECT consumer_account_id::text, COALESCE(hold_id::text, ''), preauthorized_nano,
-			status, lease_generation, finalizer_payload_hash
+			status, lease_generation, finalizer_payload_hash, formula_version, created_at
 		FROM api_calls WHERE id = $1 FOR UPDATE`, callID).Scan(
 		&consumerID, &holdID, &preauthorized, &currentStatus, &currentGeneration, &storedFinalizerHash,
+		&formulaVersion, &createdAt,
 	); err != nil {
 		return gateway.Call{}, mapGatewayError(err)
 	}
@@ -738,6 +814,7 @@ func (s *Store) FinalizeCall(ctx context.Context, callID string, outcome gateway
 	providerCharge, platformFee := money.Amount(0), money.Amount(0)
 	providerID, captureTransactionID, selfTransactionID := "", "", ""
 	settlementKind := "released"
+	settledTierSeq := 0
 	if fact.Status == gateway.CallSucceeded {
 		if fact.Usage == nil || fact.OfferID == "" {
 			return gateway.Call{}, gateway.ErrNoUsage
@@ -769,11 +846,26 @@ func (s *Store) FinalizeCall(ctx context.Context, callID string, outcome gateway
 		if err := tx.QueryRow(ctx, `SELECT fee_rate_nano FROM api_calls WHERE id = $1`, callID).Scan(&feeRateNano); err != nil {
 			return gateway.Call{}, err
 		}
-		price, err := ledger.CalculatePriceV1(*fact.Usage, gateway.OfficialPrices(lease), lease.Multiplier.Nano(), feeRateNano, selfChannel)
-		if err != nil {
-			return gateway.Call{}, err
+		if formulaVersion == gateway.FormulaVersionV2 {
+			// formula-v2 re-reads the call-level tier snapshot taken at BeginCall
+			// and selects by prompt-side token volume and the call start time.
+			tiers, tierErr := loadCallPriceTiers(ctx, tx, callID)
+			if tierErr != nil {
+				return gateway.Call{}, tierErr
+			}
+			priceV2, v2Err := ledger.CalculatePriceV2(*fact.Usage, gateway.OfficialPrices(lease), tiers, createdAt, lease.Multiplier.Nano(), feeRateNano, selfChannel)
+			if v2Err != nil {
+				return gateway.Call{}, v2Err
+			}
+			providerCharge, platformFee = priceV2.ProviderCharge, priceV2.PlatformFee
+			settledTierSeq = priceV2.TierSeq
+		} else {
+			price, err := ledger.CalculatePriceV1(*fact.Usage, gateway.OfficialPrices(lease), lease.Multiplier.Nano(), feeRateNano, selfChannel)
+			if err != nil {
+				return gateway.Call{}, err
+			}
+			providerCharge, platformFee = price.ProviderCharge, price.PlatformFee
 		}
-		providerCharge, platformFee = price.ProviderCharge, price.PlatformFee
 		if selfChannel {
 			if holdID != "" {
 				if _, err := ledgerService.ReleaseHold(ctx, ledger.MutateHoldRequest{
@@ -877,13 +969,14 @@ func (s *Store) FinalizeCall(ctx context.Context, callID string, outcome gateway
 			cache_write_tokens = $7, cache_read_tokens = $8,
 			provider_charge_nano = $9, platform_fee_nano = $10,
 			final_http_status = NULLIF($11, 0),
+			settled_price_tier_seq = $16,
 			heartbeat_at = CASE WHEN $2 = 'pending_delivery' THEN now() ELSE NULL END,
 			lease_expires_at = CASE WHEN $2 = 'pending_delivery' THEN now() + $13 ELSE NULL END,
 			finalizer_payload_hash = $12, completed_at = $14
 		WHERE id = $1 AND status = 'in_progress' AND lease_generation = $15`, callID, storedStatus, fact.Reason,
 		fact.OfferID, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens,
 		providerCharge.Nano(), platformFee.Nano(), fact.HTTPStatus, finalizerHash[:],
-		gateway.DefaultLeaseDuration, completedAt, outcome.LeaseGeneration,
+		gateway.DefaultLeaseDuration, completedAt, outcome.LeaseGeneration, settledTierSeq,
 	); err != nil {
 		return gateway.Call{}, mapGatewayError(err)
 	}

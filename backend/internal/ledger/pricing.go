@@ -3,6 +3,7 @@ package ledger
 import (
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
@@ -28,7 +29,36 @@ type PriceV1Result struct {
 	PlatformFee    money.Amount
 }
 
+// PriceV2Result extends the v1 settlement with the tier sequence that won
+// selection, 0 meaning the model's unconditional prices.
+type PriceV2Result struct {
+	PriceV1Result
+	TierSeq int
+}
+
 func CalculatePriceV1(usage UsageV1, prices OfficialPricesV1, multiplierNano, feeRateNano int64, selfChannel bool) (PriceV1Result, error) {
+	return calculateWeightedUsage(usage, prices, multiplierNano, feeRateNano, selfChannel)
+}
+
+// CalculatePriceV2 prices one call under formula-v2: it selects the first
+// conditional tier whose predicates match the prompt-side token volume and the
+// call start time, then charges the whole request (all four usage buckets)
+// with that tier's prices. Models without conditional tiers settle to exactly
+// the CalculatePriceV1 amounts.
+func CalculatePriceV2(usage UsageV1, defaultPrices OfficialPricesV1, tiers []PriceTier, at time.Time, multiplierNano, feeRateNano int64, selfChannel bool) (PriceV2Result, error) {
+	promptTokens, err := PromptSideTokens(usage)
+	if err != nil {
+		return PriceV2Result{}, err
+	}
+	prices, tierSeq := SelectPriceTier(defaultPrices, tiers, promptTokens, at)
+	priced, err := calculateWeightedUsage(usage, prices, multiplierNano, feeRateNano, selfChannel)
+	if err != nil {
+		return PriceV2Result{}, err
+	}
+	return PriceV2Result{PriceV1Result: priced, TierSeq: tierSeq}, nil
+}
+
+func calculateWeightedUsage(usage UsageV1, prices OfficialPricesV1, multiplierNano, feeRateNano int64, selfChannel bool) (PriceV1Result, error) {
 	usageValues := []int64{usage.InputTokens, usage.OutputTokens, usage.CacheWriteTokens, usage.CacheReadTokens}
 	priceValues := []money.Amount{prices.InputPerMillion, prices.OutputPerMillion, prices.CacheWritePerMillion, prices.CacheReadPerMillion}
 	if multiplierNano < 0 || feeRateNano < 0 || feeRateNano > FixedPointScale {

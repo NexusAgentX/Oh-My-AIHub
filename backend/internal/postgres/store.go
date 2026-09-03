@@ -9,6 +9,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -492,6 +493,179 @@ func scanModel(row scanner) (catalog.Model, error) {
 	return model, mapCatalogError(err)
 }
 
+const modelPriceTierColumns = `
+	model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+	start_minute_of_day, end_minute_of_day,
+	input_price_nano_per_million, output_price_nano_per_million,
+	cache_write_price_nano_per_million, cache_read_price_nano_per_million`
+
+type tierQueryer interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func scanPriceTiers(rows pgx.Rows) (map[string][]ledger.PriceTier, error) {
+	result := make(map[string][]ledger.PriceTier)
+	defer rows.Close()
+	for rows.Next() {
+		var modelID string
+		var seq int
+		var tier ledger.PriceTier
+		var minPrompt, maxPrompt *int64
+		var weekdays []int16
+		var startMinute, endMinute *int16
+		var inputPrice, outputPrice, cacheWritePrice, cacheReadPrice int64
+		if err := rows.Scan(
+			&modelID, &seq, &tier.Name, &minPrompt, &maxPrompt, &tier.Timezone, &weekdays,
+			&startMinute, &endMinute,
+			&inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice,
+		); err != nil {
+			return nil, err
+		}
+		tier.MinPromptTokens, tier.MaxPromptTokens = minPrompt, maxPrompt
+		if len(weekdays) > 0 {
+			tier.Weekdays = make([]int, len(weekdays))
+			for index, weekday := range weekdays {
+				tier.Weekdays[index] = int(weekday)
+			}
+		}
+		tier.StartMinute, tier.EndMinute = startMinute, endMinute
+		tier.InputPrice = money.FromNano(inputPrice)
+		tier.OutputPrice = money.FromNano(outputPrice)
+		tier.CacheWritePrice = money.FromNano(cacheWritePrice)
+		tier.CacheReadPrice = money.FromNano(cacheReadPrice)
+		// seq starts at 1 and rows arrive ordered, so append keeps slice order
+		// aligned with the stored tier sequence.
+		result[modelID] = append(result[modelID], tier)
+	}
+	return result, rows.Err()
+}
+
+func loadModelPriceTiers(ctx context.Context, queryer tierQueryer, modelIDs []string) (map[string][]ledger.PriceTier, error) {
+	if len(modelIDs) == 0 {
+		return map[string][]ledger.PriceTier{}, nil
+	}
+	rows, err := queryer.Query(ctx, `
+		SELECT `+modelPriceTierColumns+`
+		FROM model_price_tiers
+		WHERE model_id = ANY($1)
+		ORDER BY model_id, seq`, modelIDs)
+	if err != nil {
+		return nil, err
+	}
+	tiers, err := scanPriceTiers(rows)
+	if err != nil {
+		return nil, err
+	}
+	return tiers, nil
+}
+
+func attachModelPriceTiers(ctx context.Context, queryer tierQueryer, models []catalog.Model) ([]catalog.Model, error) {
+	ids := make([]string, 0, len(models))
+	for _, model := range models {
+		ids = append(ids, model.ID)
+	}
+	tiers, err := loadModelPriceTiers(ctx, queryer, ids)
+	if err != nil {
+		return nil, err
+	}
+	for index := range models {
+		models[index].PriceTiers = tiers[models[index].ID]
+	}
+	return models, nil
+}
+
+func insertModelPriceTiers(ctx context.Context, executor queryExecutor, modelID string, tiers []ledger.PriceTier) error {
+	for index, tier := range tiers {
+		if _, err := executor.Exec(ctx, `
+			INSERT INTO model_price_tiers (
+				model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+				start_minute_of_day, end_minute_of_day,
+				input_price_nano_per_million, output_price_nano_per_million,
+				cache_write_price_nano_per_million, cache_read_price_nano_per_million
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			modelID, index+1, tier.Name, tier.MinPromptTokens, tier.MaxPromptTokens, tier.Timezone, tier.Weekdays,
+			tier.StartMinute, tier.EndMinute,
+			tier.InputPrice.Nano(), tier.OutputPrice.Nano(), tier.CacheWritePrice.Nano(), tier.CacheReadPrice.Nano(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func priceTiersEqual(left, right []ledger.PriceTier) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		a, b := left[index], right[index]
+		if a.Name != b.Name || a.Timezone != b.Timezone ||
+			!int64PointerEqual(a.MinPromptTokens, b.MinPromptTokens) ||
+			!int64PointerEqual(a.MaxPromptTokens, b.MaxPromptTokens) ||
+			!int16PointerEqual(a.StartMinute, b.StartMinute) ||
+			!int16PointerEqual(a.EndMinute, b.EndMinute) ||
+			len(a.Weekdays) != len(b.Weekdays) {
+			return false
+		}
+		for weekday := range a.Weekdays {
+			if a.Weekdays[weekday] != b.Weekdays[weekday] {
+				return false
+			}
+		}
+		if a.InputPrice != b.InputPrice || a.OutputPrice != b.OutputPrice ||
+			a.CacheWritePrice != b.CacheWritePrice || a.CacheReadPrice != b.CacheReadPrice {
+			return false
+		}
+	}
+	return true
+}
+
+func int64PointerEqual(left, right *int64) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
+}
+
+func int16PointerEqual(left, right *int16) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
+}
+
+func priceTierAuditDetails(tiers []ledger.PriceTier) []map[string]any {
+	details := make([]map[string]any, 0, len(tiers))
+	for index, tier := range tiers {
+		detail := map[string]any{
+			"seq":      index + 1,
+			"name":     tier.Name,
+			"timezone": tier.Timezone,
+			"input_price_nano_per_million":       tier.InputPrice.Nano(),
+			"output_price_nano_per_million":      tier.OutputPrice.Nano(),
+			"cache_write_price_nano_per_million": tier.CacheWritePrice.Nano(),
+			"cache_read_price_nano_per_million":  tier.CacheReadPrice.Nano(),
+		}
+		if tier.MinPromptTokens != nil {
+			detail["min_prompt_tokens"] = *tier.MinPromptTokens
+		}
+		if tier.MaxPromptTokens != nil {
+			detail["max_prompt_tokens"] = *tier.MaxPromptTokens
+		}
+		if tier.StartMinute != nil {
+			detail["start_minute_of_day"] = *tier.StartMinute
+		}
+		if tier.EndMinute != nil {
+			detail["end_minute_of_day"] = *tier.EndMinute
+		}
+		if len(tier.Weekdays) > 0 {
+			detail["weekdays"] = tier.Weekdays
+		}
+		details = append(details, detail)
+	}
+	return details
+}
+
 func (s *Store) ListModels(ctx context.Context, includeDisabled bool, query string) ([]catalog.Model, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+modelColumns+`
@@ -511,14 +685,25 @@ func (s *Store) ListModels(ctx context.Context, includeDisabled bool, query stri
 		}
 		models = append(models, model)
 	}
-	return models, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attachModelPriceTiers(ctx, s.pool, models)
 }
 
 func (s *Store) GetModel(ctx context.Context, id string, includeDisabled bool) (catalog.Model, error) {
-	return scanModel(s.pool.QueryRow(ctx, `
+	model, err := scanModel(s.pool.QueryRow(ctx, `
 		SELECT `+modelColumns+`
 		FROM models
 		WHERE id = $1 AND ($2 OR status = 'active')`, id, includeDisabled))
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	withTiers, err := attachModelPriceTiers(ctx, s.pool, []catalog.Model{model})
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	return withTiers[0], nil
 }
 
 func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.Model) (catalog.Model, error) {
@@ -547,12 +732,16 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 	if err != nil {
 		return catalog.Model{}, err
 	}
-	if err := insertAudit(ctx, transaction, actorID, "model.created", "model", created.ID, "administrator created catalog model", modelAuditDetails(created)); err != nil {
+	if err := insertModelPriceTiers(ctx, transaction, created.ID, model.PriceTiers); err != nil {
+		return catalog.Model{}, mapCatalogError(err)
+	}
+	if err := insertAudit(ctx, transaction, actorID, "model.created", "model", created.ID, "administrator created catalog model", modelAuditDetails(created, model.PriceTiers)); err != nil {
 		return catalog.Model{}, err
 	}
 	if err := transaction.Commit(ctx); err != nil {
 		return catalog.Model{}, err
 	}
+	created.PriceTiers = model.PriceTiers
 	return created, nil
 }
 
@@ -562,6 +751,12 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, expectedVer
 		return catalog.Model{}, err
 	}
 	defer transaction.Rollback(ctx) //nolint:errcheck
+
+	existingTiers, err := loadModelPriceTiers(ctx, transaction, []string{id})
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	priceTiersChanged := !priceTiersEqual(existingTiers[id], model.PriceTiers)
 
 	updated, err := scanModel(transaction.QueryRow(ctx, `
 		UPDATE models SET
@@ -586,6 +781,7 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, expectedVer
 					OR output_price_nano_per_million <> $12
 					OR cache_write_price_nano_per_million <> $13
 					OR cache_read_price_nano_per_million <> $14
+					OR $17
 				THEN now()
 				ELSE price_updated_at
 			END
@@ -595,7 +791,7 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, expectedVer
 		model.InputModalities, model.OutputModalities, model.SupportsTools,
 		model.SupportsStructuredOutput, model.SupportsVision,
 		model.InputPrice.Nano(), model.OutputPrice.Nano(), model.CacheWritePrice.Nano(), model.CacheReadPrice.Nano(),
-		model.Status, expectedVersion,
+		model.Status, expectedVersion, priceTiersChanged,
 	))
 	if err != nil {
 		if errors.Is(err, catalog.ErrNotFound) {
@@ -609,16 +805,23 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, expectedVer
 		}
 		return catalog.Model{}, err
 	}
-	if err := insertAudit(ctx, transaction, actorID, "model.updated", "model", id, "administrator updated catalog model", modelAuditDetails(updated)); err != nil {
+	if _, err := transaction.Exec(ctx, `DELETE FROM model_price_tiers WHERE model_id = $1`, id); err != nil {
+		return catalog.Model{}, mapCatalogError(err)
+	}
+	if err := insertModelPriceTiers(ctx, transaction, id, model.PriceTiers); err != nil {
+		return catalog.Model{}, mapCatalogError(err)
+	}
+	if err := insertAudit(ctx, transaction, actorID, "model.updated", "model", id, "administrator updated catalog model", modelAuditDetails(updated, model.PriceTiers)); err != nil {
 		return catalog.Model{}, err
 	}
 	if err := transaction.Commit(ctx); err != nil {
 		return catalog.Model{}, err
 	}
+	updated.PriceTiers = model.PriceTiers
 	return updated, nil
 }
 
-func modelAuditDetails(model catalog.Model) map[string]any {
+func modelAuditDetails(model catalog.Model, tiers []ledger.PriceTier) map[string]any {
 	return map[string]any{
 		"status":                             model.Status,
 		"input_price_nano_per_million":       model.InputPrice.Nano(),
@@ -626,6 +829,8 @@ func modelAuditDetails(model catalog.Model) map[string]any {
 		"cache_write_price_nano_per_million": model.CacheWritePrice.Nano(),
 		"cache_read_price_nano_per_million":  model.CacheReadPrice.Nano(),
 		"context_window":                     model.ContextWindow,
+		"price_tier_count":                   len(tiers),
+		"price_tiers":                        priceTierAuditDetails(tiers),
 		"version":                            model.Version,
 	}
 }
