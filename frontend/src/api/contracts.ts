@@ -403,12 +403,34 @@ export type GatewayCall = {
 export type GatewayDashboard = {
   consumer_spent: string
   provider_income: string
+  today_spent: string
+  today_succeeded_calls: number
+  today_external_provider_income: string
   active_key_count: number
   pool_count: number
   healthy_offer_count: number
   unhealthy_offer_count: number
   pending_items: number
   recent_calls: GatewayCall[]
+}
+
+export type ProviderIncomeRow = {
+  account_id: string
+  display_name: string
+  total_income: string
+  other_consumer_income: string
+  own_usage_income: string
+  success_rate: string | null
+}
+
+export type ProviderIncomeSnapshot = {
+  from: string
+  to: string
+  total_income: string
+  other_consumer_income: string
+  own_usage_income: string
+  active_providers: number
+  providers: ProviderIncomeRow[]
 }
 
 export type ChannelOfferInput = {

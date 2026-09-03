@@ -1,8 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
+import { useEphemeralCredential } from '../accounts/EphemeralCredentialProvider'
 import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, PasswordField, StatusBadge } from '../ui/FormControls'
 import { useAuth } from './AuthProvider'
+import { useWallet } from '../wallet/WalletProvider'
+import { formatPointAmount } from '../wallet/presentation'
 
 function formatDate(value: string | null) {
   if (!value) return '尚未修改'
@@ -13,7 +17,10 @@ function formatDate(value: string | null) {
 }
 
 export function AccountSettingsPage() {
-  const { account, changePassword } = useAuth()
+  const { account, changePassword, logout } = useAuth()
+  const { wallet } = useWallet()
+  const { clearCredential } = useEphemeralCredential()
+  const navigate = useNavigate()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -22,6 +29,17 @@ export function AccountSettingsPage() {
   const [submitting, setSubmitting] = useState(false)
 
   if (!account) return null
+
+  const signOut = async () => {
+    setError('')
+    try {
+      await logout()
+      clearCredential()
+      navigate('/login', { replace: true })
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : '退出失败，请重试')
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -57,7 +75,9 @@ export function AccountSettingsPage() {
         <div>
           <h1>账户设置</h1>
         </div>
-        <StatusBadge status={account.status} />
+        <Button onClick={() => void signOut()} type="button" variant="secondary">
+          退出登录
+        </Button>
       </header>
 
       <div className="settings-grid">
@@ -75,12 +95,28 @@ export function AccountSettingsPage() {
               <dd>@{account.username}</dd>
             </div>
             <div>
-              <dt>账户类型</dt>
-              <dd>{account.is_admin ? '管理员' : '普通账户'}</dd>
+              <dt>角色</dt>
+              <dd>{account.is_admin ? '管理员' : '消费者 · 共享者'}</dd>
             </div>
             <div>
-              <dt>上次改密</dt>
+              <dt>账户状态</dt>
+              <dd><StatusBadge status={account.status} /></dd>
+            </div>
+            <div>
+              <dt>信用额度</dt>
+              <dd>{formatPointAmount(account.credit_limit)} 积分</dd>
+            </div>
+            <div>
+              <dt>创建方式</dt>
+              <dd>管理员创建</dd>
+            </div>
+            <div>
+              <dt>密码更新</dt>
               <dd>{formatDate(account.password_changed_at)}</dd>
+            </div>
+            <div>
+              <dt>可消费</dt>
+              <dd>{formatPointAmount(wallet?.spendable_capacity ?? account.spendable_capacity)} 积分</dd>
             </div>
           </dl>
         </section>

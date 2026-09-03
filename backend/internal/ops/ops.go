@@ -171,6 +171,27 @@ type Metrics struct {
 	Concentration       ConcentrationMetrics `json:"concentration"`
 }
 
+// ProviderIncomeRow is one sharer's windowed income projection. SuccessRate
+// stays null when the window has no terminal upstream attempts.
+type ProviderIncomeRow struct {
+	AccountID           string  `json:"account_id"`
+	DisplayName         string  `json:"display_name"`
+	TotalIncome         string  `json:"total_income"`
+	OtherConsumerIncome string  `json:"other_consumer_income"`
+	OwnUsageIncome      string  `json:"own_usage_income"`
+	SuccessRate         *string `json:"success_rate"`
+}
+
+// ProviderIncomeSnapshot is the admin sharer-income table for one window.
+type ProviderIncomeSnapshot struct {
+	Window
+	TotalIncome         string              `json:"total_income"`
+	OtherConsumerIncome string              `json:"other_consumer_income"`
+	OwnUsageIncome      string              `json:"own_usage_income"`
+	ActiveProviders     int64               `json:"active_providers"`
+	Providers           []ProviderIncomeRow `json:"providers"`
+}
+
 // Anomaly is one hard invariant violation with a fixed drilldown target.
 // Attention items carry Attention=true and never use invented thresholds.
 type Anomaly struct {

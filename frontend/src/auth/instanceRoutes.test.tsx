@@ -10,6 +10,7 @@ describe('instance routes', () => {
     ['/welcome', '/welcome'],
     ['/dashboard', '/dashboard'],
     ['/admin/ops', '/admin/ops'],
+    ['/admin/providers', '/admin/providers'],
   ])('matches %s to route %s', (pathname, expectedRoute) => {
     expect(matchRoutes(appRoutes, pathname)?.at(-1)?.route.path).toBe(expectedRoute)
   })

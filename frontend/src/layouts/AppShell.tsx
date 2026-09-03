@@ -17,13 +17,12 @@ type NavigationItem = {
 
 const productNavigation: NavigationItem[] = [
   { label: '总览', to: '/dashboard', icon: 'database', mobile: true },
-  { label: 'API Key', to: '/keys', icon: 'key', mobile: true },
-  { label: '渠道市场', to: '/market', icon: 'database', mobile: true },
+  { label: 'API Keys', to: '/keys', icon: 'key', mobile: true },
   { label: '调用记录', to: '/calls', icon: 'database' },
+  { label: 'API 市场', to: '/market', icon: 'database', mobile: true },
   { label: '我的渠道', to: '/channels', icon: 'settings' },
-  { label: 'C2C 市场', to: '/c2c', icon: 'wallet', mobile: true },
   { label: '积分钱包', to: '/wallet', icon: 'wallet', mobile: true },
-  { label: '账户设置', to: '/account', icon: 'account' },
+  { label: 'C2C 市场', to: '/c2c', icon: 'wallet', mobile: true },
 ]
 
 const adminNavigation: NavigationItem[] = [
@@ -31,7 +30,8 @@ const adminNavigation: NavigationItem[] = [
   { label: '账户与信用', to: '/admin/accounts', icon: 'users', mobile: true },
   { label: '模型目录', to: '/admin/models', icon: 'database', mobile: true },
   { label: '渠道治理', to: '/admin/channels', icon: 'settings' },
-  { label: 'C2C 争议', to: '/admin/c2c/disputes', icon: 'wallet' },
+  { label: '争议处理', to: '/admin/c2c/disputes', icon: 'wallet' },
+  { label: '共享者收入', to: '/admin/providers', icon: 'wallet' },
 ]
 
 export function AppShell({
@@ -153,7 +153,7 @@ export function AppShell({
         >
           <Icon name="arrow-left" size={20} />
         </button>
-        <Brand subtitle={admin ? '管理后台' : '受邀实例'} />
+        <Brand subtitle={admin ? '管理后台' : '共享网络'} />
         <nav aria-label={admin ? '管理导航' : '产品导航'} className="sidebar-nav">
           {navigation.map((item) =>
             item.to ? (
@@ -189,13 +189,20 @@ export function AppShell({
           )}
         </nav>
         <div className="sidebar-account">
-          <span aria-hidden="true" className="avatar">
-            {account?.display_name.slice(0, 1) || '用'}
-          </span>
-          <span className="sidebar-account-copy">
-            <strong>{account?.display_name}</strong>
-            <span>@{account?.username}</span>
-          </span>
+          <NavLink
+            aria-label="账户设置"
+            className="sidebar-account-link"
+            onClick={() => closeMenu()}
+            to="/account"
+          >
+            <span aria-hidden="true" className="avatar">
+              {account?.display_name.slice(0, 1) || '用'}
+            </span>
+            <span className="sidebar-account-copy">
+              <strong>{account?.display_name}</strong>
+              <span>@{account?.username}</span>
+            </span>
+          </NavLink>
           <Button
             aria-label="退出登录"
             icon={<Icon name="logout" />}
@@ -209,7 +216,9 @@ export function AppShell({
       <div aria-hidden={menuOpen || undefined} className="workspace" inert={menuOpen || undefined}>
         <header className="workspace-bar">
           <span>受邀实例 · Singapore</span>
-          <strong>可消费 {wallet?.spendable_capacity ?? '0'} 积分</strong>
+          <strong>
+            账本平衡 0 · 可用 {wallet?.spendable_capacity ?? '0'} 积分
+          </strong>
         </header>
         {(sessionError || signOutError) && (
           <div

@@ -55,6 +55,85 @@ func (s *Store) OpsMetrics(ctx context.Context, window ops.Window) (ops.Metrics,
 	return result, nil
 }
 
+// OpsProviderIncome lists windowed sharer income without credentials or raw errors.
+func (s *Store) OpsProviderIncome(ctx context.Context, window ops.Window) (ops.ProviderIncomeSnapshot, error) {
+	result := ops.ProviderIncomeSnapshot{
+		Window:    window,
+		Providers: []ops.ProviderIncomeRow{},
+	}
+	rows, err := s.pool.Query(ctx, `
+			WITH income AS (
+				SELECT
+					s.provider_account_id AS account_id,
+					COALESCE(sum(s.provider_charge_nano) FILTER (WHERE s.kind IN ('captured', 'self_usage')), 0) AS total_income_nano,
+					COALESCE(sum(s.provider_charge_nano) FILTER (WHERE s.kind = 'captured'), 0) AS other_consumer_income_nano,
+					COALESCE(sum(s.provider_charge_nano) FILTER (WHERE s.kind = 'self_usage'), 0) AS own_usage_income_nano
+				FROM api_call_settlements s
+				JOIN api_calls c ON c.id = s.call_id
+				WHERE c.created_at >= $1 AND c.created_at < $2
+					AND s.provider_account_id IS NOT NULL
+					AND s.kind IN ('captured', 'self_usage')
+				GROUP BY s.provider_account_id
+			), attempts AS (
+				SELECT
+					a.provider_account_id AS account_id,
+					count(*) FILTER (WHERE a.status IN ('succeeded', 'failed', 'cancelled', 'incomplete')) AS terminal_attempts,
+					count(*) FILTER (WHERE a.status = 'succeeded') AS succeeded_attempts
+				FROM api_call_attempts a
+				WHERE a.started_at >= $1 AND a.started_at < $2
+				GROUP BY a.provider_account_id
+			)
+			SELECT
+				a.id::text,
+				a.display_name,
+				COALESCE(income.total_income_nano, 0),
+				COALESCE(income.other_consumer_income_nano, 0),
+				COALESCE(income.own_usage_income_nano, 0),
+				attempts.succeeded_attempts,
+				attempts.terminal_attempts
+			FROM accounts a
+			LEFT JOIN income ON income.account_id = a.id
+			LEFT JOIN attempts ON attempts.account_id = a.id
+			WHERE COALESCE(income.total_income_nano, 0) > 0
+				OR COALESCE(attempts.terminal_attempts, 0) > 0
+			ORDER BY COALESCE(income.total_income_nano, 0) DESC, a.display_name, a.id`, window.From, window.To)
+	if err != nil {
+		return ops.ProviderIncomeSnapshot{}, err
+	}
+	defer rows.Close()
+	var totalIncome, otherIncome, ownIncome int64
+	for rows.Next() {
+		var row ops.ProviderIncomeRow
+		var totalNano, otherNano, ownNano int64
+		var succeeded, terminal *int64
+		if err := rows.Scan(
+			&row.AccountID, &row.DisplayName, &totalNano, &otherNano, &ownNano, &succeeded, &terminal,
+		); err != nil {
+			return ops.ProviderIncomeSnapshot{}, err
+		}
+		row.TotalIncome = pointsString(totalNano)
+		row.OtherConsumerIncome = pointsString(otherNano)
+		row.OwnUsageIncome = pointsString(ownNano)
+		if terminal != nil && *terminal > 0 && succeeded != nil {
+			row.SuccessRate = ratioString(*succeeded, *terminal)
+		}
+		result.Providers = append(result.Providers, row)
+		totalIncome += totalNano
+		otherIncome += otherNano
+		ownIncome += ownNano
+		if totalNano > 0 {
+			result.ActiveProviders++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return ops.ProviderIncomeSnapshot{}, err
+	}
+	result.TotalIncome = pointsString(totalIncome)
+	result.OtherConsumerIncome = pointsString(otherIncome)
+	result.OwnUsageIncome = pointsString(ownIncome)
+	return result, nil
+}
+
 func subtractPoints(total, used string) (string, error) {
 	totalNano, err := money.Parse(total)
 	if err != nil {
@@ -292,21 +371,21 @@ func (s *Store) OpsAnomalies(ctx context.Context) (ops.Anomalies, error) {
 	if zeroSum != 0 {
 		result.Hard = append(result.Hard, ops.Anomaly{
 			Kind: "zero_sum_difference", Count: 1,
-			Detail: "全账户余额和为 " + ledgerSnapshot.TotalPostedBalance + " 积分，期望恒为 0",
+			Detail:    "全账户余额和为 " + ledgerSnapshot.TotalPostedBalance + " 积分，期望恒为 0",
 			Drilldown: "/admin/ops?drilldown=ledger-accounts",
 		})
 	}
 	if ledgerSnapshot.PostedProjectionMismatchAccounts > 0 {
 		result.Hard = append(result.Hard, ops.Anomaly{
 			Kind: "posted_projection_difference", Count: ledgerSnapshot.PostedProjectionMismatchAccounts,
-			Detail: "入账投影与分录合计差异 " + ledgerSnapshot.PostedProjectionDifference + " 积分",
+			Detail:    "入账投影与分录合计差异 " + ledgerSnapshot.PostedProjectionDifference + " 积分",
 			Drilldown: "/admin/ops?drilldown=ledger-accounts",
 		})
 	}
 	if ledgerSnapshot.HoldProjectionMismatchAccounts > 0 {
 		result.Hard = append(result.Hard, ops.Anomaly{
 			Kind: "hold_projection_difference", Count: ledgerSnapshot.HoldProjectionMismatchAccounts,
-			Detail: "资产/授权投影与持有合计差异（资产 " + ledgerSnapshot.AssetReservationDifference + "，授权 " + ledgerSnapshot.SpendAuthorizationDifference + "）",
+			Detail:    "资产/授权投影与持有合计差异（资产 " + ledgerSnapshot.AssetReservationDifference + "，授权 " + ledgerSnapshot.SpendAuthorizationDifference + "）",
 			Drilldown: "/admin/ops?drilldown=ledger-accounts",
 		})
 	}

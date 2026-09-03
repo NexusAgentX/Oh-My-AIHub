@@ -12,6 +12,7 @@ import type {
   ChannelProtocol,
   GatewayCall,
   GatewayDashboard,
+  ProviderIncomeSnapshot,
   C2CMarket,
   C2COrder,
   C2CPaymentMethodType,
@@ -226,6 +227,14 @@ export const api = {
   async opsMetrics(from: string, to: string) {
     const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     return (await request<{ metrics: OpsMetrics }>(`/api/admin/ops/metrics${query}`)).metrics
+  },
+  async opsProviderIncome(from: string, to: string) {
+    const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    return (
+      await request<{ provider_income: ProviderIncomeSnapshot }>(
+        `/api/admin/ops/providers${query}`,
+      )
+    ).provider_income
   },
   async opsAnomalies() {
     return (await request<{ anomalies: OpsAnomalies }>('/api/admin/ops/anomalies')).anomalies

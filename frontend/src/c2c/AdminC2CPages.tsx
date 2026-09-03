@@ -22,7 +22,7 @@ export function AdminC2CDisputesPage() {
 
   return (
     <AppShell admin>
-      <header className="page-heading"><div><h1>C2C 争议</h1></div><span className="count-badge">{trades.length}</span></header>
+      <header className="page-heading"><div><h1>争议处理</h1></div><span className="count-badge">{trades.length}</span></header>
       <InlineError>{error}</InlineError>
       {loading ? <LoadingState /> : (
         <section className="panel table-panel">
@@ -66,7 +66,7 @@ export function AdminC2CDisputePage() {
 
   return (
     <AppShell admin>
-      <header className="page-heading c2c-page-heading"><div><Link className="back-link" to="/admin/c2c/disputes">← C2C 争议</Link><h1>争议详情</h1></div>{trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}</header>
+      <header className="page-heading c2c-page-heading"><div><Link className="back-link" to="/admin/c2c/disputes">← 争议处理</Link><h1>争议详情</h1></div>{trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}</header>
       <InlineError>{error}</InlineError>
       {loading && !trade ? <LoadingState /> : trade ? (
         <>
