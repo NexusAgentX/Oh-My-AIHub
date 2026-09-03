@@ -3,6 +3,7 @@ import type {
   ChannelOfferStatus,
   ChannelProtocol,
   ChannelStatus,
+  PriceTier,
   ValidationStatus,
 } from '../api/contracts'
 import { Button } from '../ui/FormControls'
@@ -16,6 +17,62 @@ export const protocolLabels: Record<ChannelProtocol, string> = {
 
 export function PricePair({ first, second }: { first?: string | null; second?: string | null }) {
   return <span className="channel-price-pair"><span>{first ?? '—'} / {second ?? '—'}</span><small>积分 / 百万 tokens</small></span>
+}
+
+function formatTokenBound(value: number): string {
+  if (value >= 1_000_000 && value % 1_000_000 === 0) return `${value / 1_000_000}M`
+  if (value >= 1_000 && value % 1_000 === 0) return `${value / 1_000}K`
+  return value.toLocaleString('zh-CN')
+}
+
+function formatWeekdays(weekdays: number[]): string {
+  if (weekdays.length === 5 && [1, 2, 3, 4, 5].every((day) => weekdays.includes(day))) return '工作日'
+  if (weekdays.length === 2 && weekdays.includes(6) && weekdays.includes(7)) return '周末'
+  const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  return weekdays.map((day) => labels[day - 1] ?? String(day)).join('/')
+}
+
+function formatMinute(value: number): string {
+  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`
+}
+
+export function tierConditionLabel(tier: PriceTier): string {
+  const parts: string[] = []
+  if (tier.min_prompt_tokens !== null && tier.max_prompt_tokens !== null) {
+    parts.push(`${formatTokenBound(tier.min_prompt_tokens)}–${formatTokenBound(tier.max_prompt_tokens)} tokens`)
+  } else if (tier.min_prompt_tokens !== null) {
+    parts.push(`≥ ${formatTokenBound(tier.min_prompt_tokens)} tokens`)
+  } else if (tier.max_prompt_tokens !== null) {
+    parts.push(`< ${formatTokenBound(tier.max_prompt_tokens)} tokens`)
+  }
+  if (tier.start_minute_of_day !== null && tier.end_minute_of_day !== null) {
+    const window = `${formatMinute(tier.start_minute_of_day)}–${formatMinute(tier.end_minute_of_day)}`
+    const days = tier.weekdays && tier.weekdays.length > 0 ? formatWeekdays(tier.weekdays) : '每天'
+    parts.push(`${days} ${window}`)
+  } else if (tier.weekdays && tier.weekdays.length > 0) {
+    parts.push(formatWeekdays(tier.weekdays))
+  }
+  if (parts.length === 0) parts.push('默认')
+  return parts.join(' · ')
+}
+
+export function TierCountBadge({ tiers }: { tiers?: PriceTier[] | null }) {
+  if (!tiers || tiers.length === 0) return null
+  return <span className="tier-count-badge">+{tiers.length} 条件档</span>
+}
+
+export function TierPriceList({ tiers }: { tiers?: PriceTier[] | null }) {
+  if (!tiers || tiers.length === 0) return null
+  return (
+    <ul className="tier-price-list">
+      {tiers.map((tier, index) => (
+        <li key={index}>
+          <span className="tier-condition">{tier.name ? `${tier.name} · ` : ''}{tierConditionLabel(tier)}</span>
+          <PricePair first={tier.input_price} second={tier.output_price} />
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 const stateLabels: Record<ChannelStatus | ChannelOfferStatus | ValidationStatus, string> = {

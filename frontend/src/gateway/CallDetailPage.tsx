@@ -59,6 +59,7 @@ export function CallDetailPage() {
           <header className="panel-heading"><h2>结算结果</h2></header>
           <dl className="detail-list">
             <div><dt>预授权上限</dt><dd>{formatPoints(call.preauthorized)} 积分</dd></div>
+            <div><dt>计费档位</dt><dd>{call.settled_price_tier_seq > 0 ? `条件档 #${call.settled_price_tier_seq}` : '默认档'}</dd></div>
             <div><dt>最终渠道</dt><dd>{call.final_channel_name || '—'}</dd></div>
             <div><dt>HTTP 状态</dt><dd>{call.final_http_status || '—'}</dd></div>
             <div><dt>完成原因</dt><dd>{call.completion_reason || call.decision_code || '—'}</dd></div>

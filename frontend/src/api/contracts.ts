@@ -102,6 +102,21 @@ export type LedgerMetrics = {
 
 export type CatalogModelStatus = 'active' | 'disabled'
 
+export type PriceTier = {
+  name: string
+  timezone: string
+  min_prompt_tokens: number | null
+  max_prompt_tokens: number | null
+  weekdays: number[] | null
+  start_minute_of_day: number | null
+  end_minute_of_day: number | null
+  input_price: string
+  output_price: string
+  cache_write_price: string
+  cache_read_price: string
+  price_unit: 'points_per_million_tokens'
+}
+
 export type CatalogModel = {
   id: string
   name: string
@@ -117,6 +132,7 @@ export type CatalogModel = {
   output_price: string
   cache_write_price: string
   cache_read_price: string
+  price_tiers: PriceTier[]
   price_unit: 'points_per_million_tokens'
   status: CatalogModelStatus
   version: number
@@ -132,8 +148,10 @@ export type CreatedCredential = {
 
 export type ModelInput = Omit<
   CatalogModel,
-  'price_unit' | 'version' | 'created_at' | 'updated_at' | 'price_updated_at'
->
+  'price_unit' | 'price_tiers' | 'version' | 'created_at' | 'updated_at' | 'price_updated_at'
+> & {
+  price_tiers: Array<Omit<PriceTier, 'price_unit'>>
+}
 
 export type ChannelStatus = 'draft' | 'published' | 'paused' | 'deleted'
 export type ChannelOfferStatus = 'active' | 'disabled' | 'deleted'
@@ -179,6 +197,7 @@ export type ChannelOffer = {
   output_price?: string | null
   cache_write_price?: string | null
   cache_read_price?: string | null
+  price_tiers?: PriceTier[]
   call_success_rate?: string | null
   ttft_milliseconds?: number | null
   tokens_per_second?: string | null
@@ -223,6 +242,7 @@ export type MarketOffer = {
   output_price: string
   cache_write_price: string
   cache_read_price: string
+  price_tiers: PriceTier[]
   validation_status: ValidationStatus
   last_tested_at: string | null
   average_rating: string | null
@@ -290,6 +310,7 @@ export type APIKeyPoolMember = {
   output_price: string
   cache_write_price: string
   cache_read_price: string
+  price_tiers: PriceTier[]
   success_rate: string | null
   ttft_milliseconds: number | null
   tokens_per_second: string | null
@@ -394,6 +415,7 @@ export type GatewayCall = {
   usage: GatewayUsage | null
   provider_charge: string
   platform_fee: string
+  settled_price_tier_seq: number
   final_http_status: number
   attempts: GatewayAttempt[]
   created_at: string

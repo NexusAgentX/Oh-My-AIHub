@@ -13,13 +13,16 @@ import {
 import { Icon } from '../ui/Icon'
 import {
   emptyModelForm,
+  emptyTierForm,
   formToModelInput,
   mergeModelDraft,
   modelFormHasChanges,
   modelStatusUpdate,
   modelToForm,
   validateModelForm,
+  weekdayLabel,
   type ModelForm,
+  type TierForm,
 } from './modelForm'
 
 const modalityOptions = [
@@ -382,7 +385,7 @@ export function AdminModelsPage() {
               />
             </fieldset>
             <fieldset className="price-fieldset">
-              <legend>平台基准价 · 积分 / 1M tokens</legend>
+              <legend>默认档基准价（无命中时适用）· 积分 / 1M tokens</legend>
               <div className="price-grid">
                 <PriceField label="输入" error={fieldErrors.inputPrice} value={form.inputPrice} onChange={(value) => setForm({ ...form, inputPrice: value })} />
                 <PriceField label="输出" error={fieldErrors.outputPrice} value={form.outputPrice} onChange={(value) => setForm({ ...form, outputPrice: value })} />
@@ -390,6 +393,11 @@ export function AdminModelsPage() {
                 <PriceField label="缓存读取" error={fieldErrors.cacheReadPrice} value={form.cacheReadPrice} onChange={(value) => setForm({ ...form, cacheReadPrice: value })} />
               </div>
             </fieldset>
+            <TierEditor
+              errors={fieldErrors}
+              form={form}
+              onChange={(tiers) => setForm({ ...form, tiers })}
+            />
             <footer className="form-actions">
               {selectedID && (
                 <Button disabled={saving || conflictPending} onClick={() => void toggleStatus()} type="button" variant="secondary">
@@ -465,5 +473,135 @@ function PriceField({ label, value, error, onChange }: { label: string; value: s
       required
       value={value}
     />
+  )
+}
+
+function TierEditor({
+  form,
+  errors,
+  onChange,
+}: {
+  form: ModelForm
+  errors: Record<string, string>
+  onChange: (tiers: TierForm[]) => void
+}) {
+  const tiers = form.tiers
+  const update = (index: number, patch: Partial<TierForm>) => {
+    onChange(tiers.map((tier, position) => (position === index ? { ...tier, ...patch } : tier)))
+  }
+  const toggleWeekday = (index: number, weekday: number, checked: boolean) => {
+    const current = tiers[index].weekdays
+    const next = checked
+      ? [...current, weekday].sort((left, right) => left - right)
+      : current.filter((item) => item !== weekday)
+    update(index, { weekdays: next })
+  }
+  return (
+    <fieldset className="price-fieldset tier-fieldset">
+      <legend>条件档位 · 按序首个命中，整单按该档计价</legend>
+      {errors.tiers && <span className="field-message field-error">{errors.tiers}</span>}
+      {tiers.map((tier, index) => (
+        <div className="tier-card" key={index}>
+          <div className="tier-card-head">
+            <TextField
+              label={`档位 ${index + 1} 名称`}
+              onChange={(event) => update(index, { name: event.target.value })}
+              placeholder="例如 工作日高峰"
+              value={tier.name}
+            />
+            <Button
+              onClick={() => onChange(tiers.filter((_, position) => position !== index))}
+              type="button"
+              variant="secondary"
+            >
+              删除
+            </Button>
+          </div>
+          <div className="tier-predicate-row">
+            <TextField
+              error={errors[`tiers.${index}.minPromptTokens`]}
+              inputMode="numeric"
+              label="输入 Token ≥"
+              onChange={(event) => update(index, { minPromptTokens: event.target.value })}
+              placeholder="留空不限"
+              value={tier.minPromptTokens}
+            />
+            <TextField
+              error={errors[`tiers.${index}.maxPromptTokens`]}
+              inputMode="numeric"
+              label="输入 Token <"
+              onChange={(event) => update(index, { maxPromptTokens: event.target.value })}
+              placeholder="留空不限"
+              value={tier.maxPromptTokens}
+            />
+            <TextField
+              error={errors[`tiers.${index}.timezone`]}
+              label="时区"
+              onChange={(event) => update(index, { timezone: event.target.value })}
+              placeholder="Asia/Shanghai"
+              value={tier.timezone}
+            />
+          </div>
+          <div className="tier-window-row">
+            <label className="checkbox-control">
+              <input
+                checked={tier.useWindow}
+                onChange={(event) => update(index, { useWindow: event.target.checked })}
+                type="checkbox"
+              />
+              <span>时间窗</span>
+            </label>
+            <TextField
+              disabled={!tier.useWindow}
+              error={errors[`tiers.${index}.startTime`]}
+              label="开始 (HH:MM)"
+              onChange={(event) => update(index, { startTime: event.target.value })}
+              placeholder="09:00"
+              value={tier.startTime}
+            />
+            <TextField
+              disabled={!tier.useWindow}
+              error={errors[`tiers.${index}.endTime`]}
+              label="结束 (HH:MM)"
+              onChange={(event) => update(index, { endTime: event.target.value })}
+              placeholder="12:00"
+              value={tier.endTime}
+            />
+            <fieldset className="choice-field">
+              <legend>星期</legend>
+              <div className="choice-pills">
+                {[1, 2, 3, 4, 5, 6, 7].map((weekday) => (
+                  <label key={weekday}>
+                    <input
+                      checked={tier.weekdays.includes(weekday)}
+                      onChange={(event) => toggleWeekday(index, weekday, event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>{weekdayLabel(weekday)}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div className="price-grid">
+            <PriceField label="输入价" error={errors[`tiers.${index}.inputPrice`]} value={tier.inputPrice} onChange={(value) => update(index, { inputPrice: value })} />
+            <PriceField label="输出价" error={errors[`tiers.${index}.outputPrice`]} value={tier.outputPrice} onChange={(value) => update(index, { outputPrice: value })} />
+            <PriceField label="缓存创建价" error={errors[`tiers.${index}.cacheWritePrice`]} value={tier.cacheWritePrice} onChange={(value) => update(index, { cacheWritePrice: value })} />
+            <PriceField label="缓存读取价" error={errors[`tiers.${index}.cacheReadPrice`]} value={tier.cacheReadPrice} onChange={(value) => update(index, { cacheReadPrice: value })} />
+          </div>
+        </div>
+      ))}
+      <div className="form-actions">
+        <Button
+          disabled={tiers.length >= 16}
+          icon={<Icon name="plus" />}
+          onClick={() => onChange([...tiers, { ...emptyTierForm }])}
+          type="button"
+          variant="secondary"
+        >
+          添加档位
+        </Button>
+      </div>
+    </fieldset>
   )
 }
