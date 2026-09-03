@@ -25,6 +25,7 @@ const (
 	MaxChatToolCallIndex      = 127
 	MaxStoredRawErrorBytes    = 4096
 	FormulaVersion            = "formula-v1"
+	FormulaVersionV2          = "formula-v2"
 	DefaultLeaseDuration      = 2 * time.Minute
 	NonStreamingTotalTimeout  = 10 * time.Minute
 	StreamingTotalTimeout     = 30 * time.Minute
@@ -99,9 +100,15 @@ type PoolMember struct {
 	OutputPrice              money.Amount
 	CacheWritePrice          money.Amount
 	CacheReadPrice           money.Amount
-	CallSuccessRate          *string
-	TTFTMilliseconds         *int64
-	TokensPerSecond          *string
+	// ModelID, Multiplier and PriceTiers carry the benchmark facts behind the
+	// precomputed display prices above; the API layer derives per-tier display
+	// prices from them.
+	ModelID         string
+	Multiplier      money.Amount
+	PriceTiers      []ledger.PriceTier
+	CallSuccessRate *string
+	TTFTMilliseconds *int64
+	TokensPerSecond *string
 }
 
 type PoolInput struct {
@@ -160,6 +167,7 @@ type Call struct {
 	Usage                *ledger.UsageV1
 	ProviderCharge       money.Amount
 	PlatformFee          money.Amount
+	SettledPriceTierSeq  int
 	FinalHTTPStatus      int
 	Attempts             []Attempt
 	CreatedAt            time.Time

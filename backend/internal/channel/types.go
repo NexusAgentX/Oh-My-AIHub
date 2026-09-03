@@ -7,6 +7,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -105,6 +106,7 @@ type Offer struct {
 	OutputPrice       money.Amount
 	CacheWritePrice   money.Amount
 	CacheReadPrice    money.Amount
+	PriceTiers        []ledger.PriceTier
 	LatestValidation  *ValidationAttempt
 	Eligible          bool
 	IneligibleReason  string
@@ -225,6 +227,7 @@ type MarketOffer struct {
 	OutputPrice        money.Amount
 	CacheWritePrice    money.Amount
 	CacheReadPrice     money.Amount
+	PriceTiers         []ledger.PriceTier
 	ValidationStatus   ValidationStatus
 	LastTestedAt       *time.Time
 	AverageRating      *string
@@ -259,6 +262,7 @@ type RoutingLease struct {
 	OutputPrice       money.Amount
 	CacheWritePrice   money.Amount
 	CacheReadPrice    money.Amount
+	PriceTiers        []ledger.PriceTier
 	NormalizedBaseURL string `json:"-"`
 	UpstreamModelID   string `json:"-"`
 	// Credential is intentionally excluded from every JSON representation.

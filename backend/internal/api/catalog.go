@@ -6,23 +6,38 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 )
 
+type priceTierRequest struct {
+	Name            string `json:"name"`
+	MinPromptTokens *int64 `json:"min_prompt_tokens"`
+	MaxPromptTokens *int64 `json:"max_prompt_tokens"`
+	Timezone        string `json:"timezone"`
+	Weekdays        []int  `json:"weekdays"`
+	StartMinute     *int16 `json:"start_minute_of_day"`
+	EndMinute       *int16 `json:"end_minute_of_day"`
+	InputPrice      string `json:"input_price"`
+	OutputPrice     string `json:"output_price"`
+	CacheWritePrice string `json:"cache_write_price"`
+	CacheReadPrice  string `json:"cache_read_price"`
+}
+
 type modelRequest struct {
-	ID                       string   `json:"id"`
-	Name                     string   `json:"name"`
-	Provider                 string   `json:"provider"`
-	ContextWindow            int64    `json:"context_window"`
-	ParameterInfo            string   `json:"parameter_info"`
-	InputModalities          []string `json:"input_modalities"`
-	OutputModalities         []string `json:"output_modalities"`
-	SupportsTools            bool     `json:"supports_tools"`
-	SupportsStructuredOutput bool     `json:"supports_structured_output"`
-	SupportsVision           bool     `json:"supports_vision"`
-	InputPrice               string   `json:"input_price"`
-	OutputPrice              string   `json:"output_price"`
-	CacheWritePrice          string   `json:"cache_write_price"`
-	CacheReadPrice           string   `json:"cache_read_price"`
-	Status                   string   `json:"status"`
-	ExpectedVersion          int64    `json:"expected_version"`
+	ID                       string             `json:"id"`
+	Name                     string             `json:"name"`
+	Provider                 string             `json:"provider"`
+	ContextWindow            int64              `json:"context_window"`
+	ParameterInfo            string             `json:"parameter_info"`
+	InputModalities          []string           `json:"input_modalities"`
+	OutputModalities         []string           `json:"output_modalities"`
+	SupportsTools            bool               `json:"supports_tools"`
+	SupportsStructuredOutput bool               `json:"supports_structured_output"`
+	SupportsVision           bool               `json:"supports_vision"`
+	InputPrice               string             `json:"input_price"`
+	OutputPrice              string             `json:"output_price"`
+	CacheWritePrice          string             `json:"cache_write_price"`
+	CacheReadPrice           string             `json:"cache_read_price"`
+	PriceTiers               []priceTierRequest `json:"price_tiers"`
+	Status                   string             `json:"status"`
+	ExpectedVersion          int64              `json:"expected_version"`
 }
 
 func (a *app) listPublicModels(w http.ResponseWriter, r *http.Request) {

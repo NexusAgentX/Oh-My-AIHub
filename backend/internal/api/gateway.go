@@ -271,6 +271,7 @@ func apiKeyResponse(item gateway.APIKey) map[string]any {
 				"eligible": member.Eligible, "ineligible_reason": member.IneligibleReason,
 				"input_price": member.InputPrice.String(), "output_price": member.OutputPrice.String(),
 				"cache_write_price": member.CacheWritePrice.String(), "cache_read_price": member.CacheReadPrice.String(),
+				"price_tiers": effectivePriceTierResponses(member.Multiplier, member.PriceTiers),
 				"success_rate": member.CallSuccessRate, "ttft_milliseconds": member.TTFTMilliseconds, "tokens_per_second": member.TokensPerSecond,
 			})
 		}
@@ -310,6 +311,7 @@ func gatewayCallResponse(item gateway.Call) map[string]any {
 		"final_offer_id": item.FinalOfferID, "final_channel_name": item.FinalChannelName,
 		"completion_reason": item.CompletionReason, "usage": gatewayUsageResponse(item.Usage),
 		"provider_charge": item.ProviderCharge.String(), "platform_fee": item.PlatformFee.String(),
+		"settled_price_tier_seq": item.SettledPriceTierSeq,
 		"final_http_status": item.FinalHTTPStatus, "attempts": attempts, "created_at": item.CreatedAt, "completed_at": item.CompletedAt,
 	}
 }

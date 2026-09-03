@@ -420,6 +420,7 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 	rows, err := queryer.Query(ctx, `
 		SELECT member.priority, member.offer_id::text, cm.channel_id::text, c.display_name, owner.display_name,
 			member.added_validation_version, offer.validation_version, model.context_window,
+			cm.model_id, cm.multiplier_nano,
 			owner.status, owner.must_change_password, c.status, model.status, offer.status,
 			latest.status, credential.channel_id IS NOT NULL,
 			CASE WHEN model.input_price_nano_per_million BETWEEN 0 AND 100000000000000
@@ -454,9 +455,11 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 	}
 	defer rows.Close()
 	items := make([]gateway.PoolMember, 0)
+	contextWindows := make([]int64, 0)
 	for rows.Next() {
 		var item gateway.PoolMember
 		var contextWindow int64
+		var multiplierNano int64
 		var ownerStatus, channelStatus, modelStatus, offerStatus string
 		var mustChange bool
 		var validationStatus sql.NullString
@@ -467,6 +470,7 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 		if err := rows.Scan(
 			&item.Priority, &item.OfferID, &item.ChannelID, &item.ChannelDisplayName, &item.OwnerDisplayName,
 			&item.AddedValidationVersion, &item.CurrentValidationVersion, &contextWindow,
+			&item.ModelID, &multiplierNano,
 			&ownerStatus, &mustChange, &channelStatus, &modelStatus, &offerStatus,
 			&validationStatus, &credentialConfigured,
 			&inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice,
@@ -474,6 +478,7 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 		); err != nil {
 			return nil, err
 		}
+		item.Multiplier = money.FromNano(multiplierNano)
 		item.Eligible, item.IneligibleReason = routingEligibility(
 			identity.Status(ownerStatus), mustChange, channel.Status(channelStatus), channel.OfferStatus(offerStatus),
 			catalog.Status(modelStatus), validationStatus.String, credentialConfigured,
@@ -489,16 +494,6 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 			item.Eligible = false
 			item.IneligibleReason = "price_unrepresentable"
 		}
-		if item.Eligible {
-			if _, upperErr := gateway.ConservativeNetDebitUpperBound(channel.RoutingLease{
-				ContextWindow: contextWindow, Multiplier: money.FromNano(ledger.FixedPointScale),
-				InputPrice: item.InputPrice, OutputPrice: item.OutputPrice,
-				CacheWritePrice: item.CacheWritePrice, CacheReadPrice: item.CacheReadPrice,
-			}, ledger.FixedPointScale, false); upperErr != nil {
-				item.Eligible = false
-				item.IneligibleReason = "price_unrepresentable"
-			}
-		}
 		if successRate.Valid {
 			value := successRate.String
 			item.CallSuccessRate = &value
@@ -512,8 +507,47 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 			item.TokensPerSecond = &value
 		}
 		items = append(items, item)
+		contextWindows = append(contextWindows, contextWindow)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		modelIDs := make([]string, 0, len(items))
+		for _, item := range items {
+			modelIDs = append(modelIDs, item.ModelID)
+		}
+		tiers, tierErr := loadModelPriceTiers(ctx, queryer, modelIDs)
+		if tierErr != nil {
+			return nil, tierErr
+		}
+		for index := range items {
+			items[index].PriceTiers = tiers[items[index].ModelID]
+		}
+		// The tier-aware bound check runs after tiers are attached so it sees
+		// the same facts the routing-time check will see.
+		for index := range items {
+			if !items[index].Eligible {
+				continue
+			}
+			effectiveTiers, effectiveErr := channel.EffectivePriceTiers(items[index].Multiplier, items[index].PriceTiers)
+			if effectiveErr != nil {
+				items[index].Eligible = false
+				items[index].IneligibleReason = "price_unrepresentable"
+				continue
+			}
+			if _, upperErr := gateway.ConservativeNetDebitUpperBound(channel.RoutingLease{
+				ContextWindow: contextWindows[index], Multiplier: money.FromNano(ledger.FixedPointScale),
+				InputPrice: items[index].InputPrice, OutputPrice: items[index].OutputPrice,
+				CacheWritePrice: items[index].CacheWritePrice, CacheReadPrice: items[index].CacheReadPrice,
+				PriceTiers: effectiveTiers,
+			}, ledger.FixedPointScale, false); upperErr != nil {
+				items[index].Eligible = false
+				items[index].IneligibleReason = "price_unrepresentable"
+			}
+		}
+	}
+	return items, nil
 }
 
 func mapGatewayError(err error) error {

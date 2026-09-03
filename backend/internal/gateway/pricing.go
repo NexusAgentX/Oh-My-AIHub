@@ -13,10 +13,29 @@ func ConservativeNetDebitUpperBound(lease channel.RoutingLease, feeRateNano int6
 	if lease.ContextWindow <= 0 || lease.ContextWindow > math.MaxInt64/2 || feeRateNano < 0 || feeRateNano > ledger.FixedPointScale {
 		return 0, ErrInvalidInput
 	}
-	prices := []money.Amount{lease.InputPrice, lease.OutputPrice, lease.CacheWritePrice, lease.CacheReadPrice}
+	bound, err := conservativeBoundForPrices(lease.ContextWindow, OfficialPrices(lease), lease.Multiplier.Nano(), feeRateNano, selfChannel)
+	if err != nil {
+		return 0, err
+	}
+	// Tiered models may settle on any conditional tier, so the authorization
+	// must dominate the worst tier as well as the default prices.
+	for _, tier := range lease.PriceTiers {
+		tierBound, tierErr := conservativeBoundForPrices(lease.ContextWindow, tier.Prices(), lease.Multiplier.Nano(), feeRateNano, selfChannel)
+		if tierErr != nil {
+			return 0, tierErr
+		}
+		if tierBound > bound {
+			bound = tierBound
+		}
+	}
+	return bound, nil
+}
+
+func conservativeBoundForPrices(contextWindow int64, prices ledger.OfficialPricesV1, multiplierNano, feeRateNano int64, selfChannel bool) (money.Amount, error) {
+	priceValues := []money.Amount{prices.InputPerMillion, prices.OutputPerMillion, prices.CacheWritePerMillion, prices.CacheReadPerMillion}
 	maxIndex := 0
-	for index := 1; index < len(prices); index++ {
-		if prices[index] > prices[maxIndex] {
+	for index := 1; index < len(priceValues); index++ {
+		if priceValues[index] > priceValues[maxIndex] {
 			maxIndex = index
 		}
 	}
@@ -25,7 +44,7 @@ func ConservativeNetDebitUpperBound(lease channel.RoutingLease, feeRateNano int6
 	// still produce up to one context window of output tokens. Keeping this
 	// limit identical to ValidateUsage makes the authorization a real upper
 	// bound instead of a post-paid validation trap.
-	maximumBillableTokens := lease.ContextWindow * 2
+	maximumBillableTokens := contextWindow * 2
 	switch maxIndex {
 	case 0:
 		usage.InputTokens = maximumBillableTokens
@@ -36,7 +55,7 @@ func ConservativeNetDebitUpperBound(lease channel.RoutingLease, feeRateNano int6
 	case 3:
 		usage.CacheReadTokens = maximumBillableTokens
 	}
-	priced, err := ledger.CalculatePriceV1(usage, OfficialPrices(lease), lease.Multiplier.Nano(), feeRateNano, selfChannel)
+	priced, err := ledger.CalculatePriceV1(usage, prices, multiplierNano, feeRateNano, selfChannel)
 	if err != nil {
 		return 0, err
 	}
