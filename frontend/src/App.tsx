@@ -26,8 +26,10 @@ import { ChannelEditorPage } from './channels/ChannelEditorPage'
 import { ChannelsPage } from './channels/ChannelsPage'
 import { MarketChannelPage } from './channels/MarketChannelPage'
 import { MarketPage } from './channels/MarketPage'
+import { AddOfferToPoolPage } from './gateway/AddOfferToPoolPage'
 import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
 import { AdminLedgerPage } from './ledger/AdminLedgerPage'
+import { AdminProvidersPage } from './ledger/AdminProvidersPage'
 import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
 import { WalletPage } from './wallet/WalletPage'
 import { WalletProvider } from './wallet/WalletProvider'
@@ -117,6 +119,7 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<C2CDisputePage />} path="/c2c/trades/:tradeID/dispute" />
         <Route element={<MarketPage />} path="/market" />
         <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
+        <Route element={<AddOfferToPoolPage />} path="/market/channels/:channelID/add" />
         <Route element={<ChannelsPage />} path="/channels" />
         <Route element={<ChannelEditorPage />} path="/channels/new" />
         <Route element={<ChannelDetailPage />} path="/channels/:channelID" />
@@ -133,6 +136,7 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
           <Route element={<AdminC2CDisputesPage />} path="/admin/c2c/disputes" />
           <Route element={<AdminC2CDisputePage />} path="/admin/c2c/disputes/:tradeID" />
+          <Route element={<AdminProvidersPage />} path="/admin/providers" />
           <Route
             element={<AdminAccountLedgerPage />}
             path="/admin/ledger/accounts/:accountID"

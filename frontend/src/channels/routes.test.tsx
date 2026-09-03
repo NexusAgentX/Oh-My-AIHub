@@ -6,6 +6,7 @@ describe('channel and market routes', () => {
   it.each([
     ['/market', '/market'],
     ['/market/channels/channel-id', '/market/channels/:channelID'],
+    ['/market/channels/channel-id/add', '/market/channels/:channelID/add'],
     ['/channels', '/channels'],
     ['/channels/new', '/channels/new'],
     ['/channels/channel-id', '/channels/:channelID'],

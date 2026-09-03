@@ -33,7 +33,7 @@ export function APIKeysPage() {
     <AppShell>
       <header className="page-heading">
         <div>
-          <h1>API Key</h1>
+          <h1>API Keys</h1>
         </div>
         <Link className="button button-primary" to="/keys/new">
           <Icon name="plus" /> 新建 Key

@@ -42,7 +42,7 @@ export function MarketPage() {
       setNext(result.next_after)
     } catch (caught) {
       if (generation !== requestGeneration.current) return
-      setError(caught instanceof ApiError ? caught.message : '渠道市场加载失败')
+      setError(caught instanceof ApiError ? caught.message : 'API 市场加载失败')
     } finally {
       if (generation === requestGeneration.current) setLoading(false)
     }
@@ -64,7 +64,7 @@ export function MarketPage() {
 
   return (
     <AppShell>
-      <header className="page-heading"><div><h1>渠道市场</h1></div><Link className="button button-secondary" to="/channels">我的渠道</Link></header>
+      <header className="page-heading"><div><h1>API 市场</h1></div><Link className="button button-secondary" to="/channels">我的渠道</Link></header>
       <InlineError>{error}</InlineError>
       <section className="panel market-filter-panel">
         <form className="market-filter-grid" onSubmit={applyFilters}>

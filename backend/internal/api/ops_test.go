@@ -14,6 +14,7 @@ import (
 
 type fakeOpsStore struct {
 	metrics   ops.Metrics
+	providers ops.ProviderIncomeSnapshot
 	records   []ops.InspectionRecord
 	summary   ops.TrialSummary
 	anomalies ops.Anomalies
@@ -21,6 +22,14 @@ type fakeOpsStore struct {
 
 func (fake *fakeOpsStore) OpsMetrics(context.Context, ops.Window) (ops.Metrics, error) {
 	return fake.metrics, nil
+}
+func (fake *fakeOpsStore) OpsProviderIncome(_ context.Context, window ops.Window) (ops.ProviderIncomeSnapshot, error) {
+	snapshot := fake.providers
+	snapshot.Window = window
+	if snapshot.Providers == nil {
+		snapshot.Providers = []ops.ProviderIncomeRow{}
+	}
+	return snapshot, nil
 }
 func (fake *fakeOpsStore) OpsAnomalies(context.Context) (ops.Anomalies, error) {
 	return fake.anomalies, nil
@@ -65,6 +74,41 @@ func TestOpsMetricsWindowValidation(t *testing.T) {
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func callOpsProviders(query string) *httptest.ResponseRecorder {
+	application := &app{ops: &fakeOpsStore{providers: ops.ProviderIncomeSnapshot{
+		TotalIncome: "12",
+		Providers: []ops.ProviderIncomeRow{{
+			AccountID: "provider-id", DisplayName: "顾言", TotalIncome: "12",
+			OtherConsumerIncome: "10", OwnUsageIncome: "2",
+		}},
+	}}}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/ops/providers"+query, nil)
+	application.opsProviderIncome(recorder, request)
+	return recorder
+}
+
+func TestOpsProviderIncomeWindowValidation(t *testing.T) {
+	if recorder := callOpsProviders(""); recorder.Code != http.StatusBadRequest {
+		t.Fatalf("missing from/to = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	from := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+	to := time.Now().UTC().Format(time.RFC3339)
+	recorder := callOpsProviders("?from=" + from + "&to=" + to)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("valid window = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"display_name":"顾言"`) || !strings.Contains(body, `"success_rate":null`) {
+		t.Fatalf("provider income missing explicit empty success rate: %s", body)
+	}
+	for _, forbidden := range []string{"base_url", "credential", "raw_error", "upstream_model_id"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("provider income leaked %q: %s", forbidden, body)
+		}
 	}
 }
 

@@ -257,14 +257,17 @@ type FinalizeOutcome struct {
 }
 
 type Dashboard struct {
-	ConsumerSpent       money.Amount
-	ProviderIncome      money.Amount
-	ActiveKeyCount      int64
-	PoolCount           int64
-	HealthyOfferCount   int64
-	UnhealthyOfferCount int64
-	PendingItems        int64
-	RecentCalls         []Call
+	ConsumerSpent               money.Amount
+	ProviderIncome              money.Amount
+	TodaySpent                  money.Amount
+	TodaySucceededCalls         int64
+	TodayExternalProviderIncome money.Amount
+	ActiveKeyCount              int64
+	PoolCount                   int64
+	HealthyOfferCount           int64
+	UnhealthyOfferCount         int64
+	PendingItems                int64
+	RecentCalls                 []Call
 }
 
 type Store interface {

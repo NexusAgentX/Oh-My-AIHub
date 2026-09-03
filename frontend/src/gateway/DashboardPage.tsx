@@ -4,11 +4,19 @@ import { api, ApiError } from '../api/client'
 import type { GatewayDashboard } from '../api/contracts'
 import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
-import { Icon } from '../ui/Icon'
+import { useWallet } from '../wallet/WalletProvider'
+import { formatPointAmount } from '../wallet/presentation'
+import { formatNanoPoints, parseNanoPoints } from '../money/amount'
 import { CallTable } from './CallTable'
 import { formatPoints } from './presentation'
 
+function remainingCredit(limit: string, used: string) {
+  const leftover = parseNanoPoints(limit) - parseNanoPoints(used)
+  return formatNanoPoints(leftover > 0n ? leftover : 0n)
+}
+
 export function DashboardPage() {
+  const { wallet } = useWallet()
   const [dashboard, setDashboard] = useState<GatewayDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,18 +39,40 @@ export function DashboardPage() {
 
   return (
     <AppShell>
-      <header className="page-heading">
-        <div><h1>总览</h1></div>
-        <Link className="button button-primary" to="/keys/new"><Icon name="plus" /> 新建 API Key</Link>
+      <header className="page-heading workspace-heading">
+        <div>
+          <h1>工作台</h1>
+          <p>消费、共享和交易的今日状态</p>
+        </div>
+        <div className="workspace-heading-actions">
+          <Link className="button button-secondary" to="/market">浏览 API 市场</Link>
+          <Link className="button button-primary" to="/keys/new">创建 API Key</Link>
+        </div>
       </header>
       <InlineError>{error}</InlineError>
       {loading ? <LoadingState /> : dashboard && (
         <>
           <section className="metric-grid">
-            <article className="metric-card metric-card-accent"><span>累计 API 消费</span><strong>{formatPoints(dashboard.consumer_spent)}</strong><small>积分</small></article>
-            <article className="metric-card"><span>累计渠道收入</span><strong>{formatPoints(dashboard.provider_income)}</strong><small>积分</small></article>
-            <article className="metric-card"><span>活跃 API Key</span><strong>{dashboard.active_key_count}</strong><small><Link to="/keys">管理 Key</Link></small></article>
-            <article className="metric-card"><span>模型协议池</span><strong>{dashboard.pool_count}</strong><small>固定优先级路由</small></article>
+            <article className="metric-card metric-card-accent">
+              <span>可用余额</span>
+              <strong>{formatPointAmount(wallet?.spendable_capacity ?? '0')}</strong>
+              <small>冻结 {formatPointAmount(wallet?.asset_reserved ?? '0')}</small>
+            </article>
+            <article className="metric-card metric-card-warm">
+              <span>剩余信用</span>
+              <strong>{formatPointAmount(wallet ? remainingCredit(wallet.effective_credit_limit, wallet.credit_used) : '0')}</strong>
+              <small>额度 {formatPointAmount(wallet?.credit_limit ?? '0')}</small>
+            </article>
+            <article className="metric-card">
+              <span>今日消费</span>
+              <strong>{formatPoints(dashboard.today_spent)}</strong>
+              <small>{dashboard.today_succeeded_calls} 次成功调用</small>
+            </article>
+            <article className="metric-card">
+              <span>今日渠道收入</span>
+              <strong>{formatPoints(dashboard.today_external_provider_income)}</strong>
+              <small>不含自有调用</small>
+            </article>
           </section>
           <section className="dashboard-grid">
             <article className="panel dashboard-health-panel">
@@ -54,17 +84,15 @@ export function DashboardPage() {
               </div>
             </article>
             <article className="panel dashboard-actions-panel">
-              <header className="panel-heading"><h2>快捷入口</h2></header>
-              <nav aria-label="快捷入口" className="dashboard-actions">
-                <Link to="/keys">API Key</Link>
-                <Link to="/market">渠道市场</Link>
-                <Link to="/channels">我的渠道</Link>
-                <Link to="/wallet">积分钱包</Link>
-              </nav>
+              <header className="panel-heading"><h2>API Key 与模型协议池</h2></header>
+              <div className="health-stat-grid health-stat-grid-compact">
+                <div><span>活跃 API Keys</span><strong>{dashboard.active_key_count}</strong></div>
+                <div><span>模型协议池</span><strong>{dashboard.pool_count}</strong></div>
+              </div>
             </article>
           </section>
           <section className="panel table-panel dashboard-recent-panel">
-            <header className="table-toolbar"><h2>最近调用</h2><Link to="/calls">全部调用</Link></header>
+            <header className="table-toolbar"><h2>最近调用</h2><Link to="/calls">全部记录</Link></header>
             <CallTable calls={dashboard.recent_calls} />
           </section>
         </>

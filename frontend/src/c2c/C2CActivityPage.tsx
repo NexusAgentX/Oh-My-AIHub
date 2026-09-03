@@ -57,8 +57,8 @@ export function C2CActivityPage() {
   return (
     <AppShell>
       <header className="page-heading c2c-page-heading">
-        <div><Link className="back-link" to="/c2c">← C2C 市场</Link><h1>我的 C2C</h1></div>
-        <div className="c2c-heading-actions"><Link className="button button-secondary" to="/c2c/orders/new?side=buy">发布买单</Link><Link className="button button-primary" to="/c2c/orders/new?side=sell">发布卖单</Link></div>
+        <div><Link className="back-link" to="/c2c">← C2C 市场</Link><h1>我的挂单与交易</h1></div>
+        <div className="c2c-heading-actions"><Link className="button button-primary" to="/c2c/orders/new">发布挂单</Link></div>
       </header>
       <InlineError>{error}</InlineError>
       {loading && orders.length === 0 && trades.length === 0 ? <LoadingState /> : (

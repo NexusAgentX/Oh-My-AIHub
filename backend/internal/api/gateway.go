@@ -190,7 +190,9 @@ func (a *app) gatewayDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"consumer_spent": dashboard.ConsumerSpent.String(), "provider_income": dashboard.ProviderIncome.String(),
-		"active_key_count": dashboard.ActiveKeyCount, "pool_count": dashboard.PoolCount,
+		"today_spent": dashboard.TodaySpent.String(), "today_succeeded_calls": dashboard.TodaySucceededCalls,
+		"today_external_provider_income": dashboard.TodayExternalProviderIncome.String(),
+		"active_key_count":               dashboard.ActiveKeyCount, "pool_count": dashboard.PoolCount,
 		"healthy_offer_count": dashboard.HealthyOfferCount, "unhealthy_offer_count": dashboard.UnhealthyOfferCount,
 		"pending_items": dashboard.PendingItems, "recent_calls": recent,
 	})

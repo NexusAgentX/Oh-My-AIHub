@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
-import type { MarketChannel, MarketOffer } from '../api/contracts'
+import type { MarketChannel } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
 import { AppShell } from '../layouts/AppShell'
-import { Button, InlineError, LoadingState } from '../ui/FormControls'
+import { InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText, StarRating } from './presentation'
 import { createLatestRequestGate } from './requestGate'
-import { AddOfferToKeyDialog } from '../gateway/AddOfferToKeyDialog'
 import { formatRate } from '../gateway/presentation'
 
 export function MarketChannelPage() {
@@ -18,7 +17,6 @@ export function MarketChannelPage() {
   const [ratingBusy, setRatingBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [offerToAdd, setOfferToAdd] = useState<MarketOffer | null>(null)
   const loadGate = useRef(createLatestRequestGate())
   const ratingGate = useRef(createLatestRequestGate())
 
@@ -76,7 +74,7 @@ export function MarketChannelPage() {
 
   return (
     <AppShell>
-      <Link className="back-link" to="/market">← 渠道市场</Link>
+      <Link className="back-link" to="/market">← API 市场</Link>
       <header className="page-heading channel-detail-heading"><div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div></header>
       <InlineError>{error}</InlineError>
       {message && <div aria-live="polite" className="success-message">{message}</div>}
@@ -88,12 +86,11 @@ export function MarketChannelPage() {
         <header className="table-toolbar"><h2>可用报价</h2><span className="count-badge">{channel.offers.length}</span></header>
         {channel.offers.length === 0 ? <div className="empty-state">渠道当前不可用</div> : <>
           <div className="desktop-table-wrap"><table className="data-table"><thead><tr><th scope="col">模型</th><th scope="col">API 格式</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">质量</th><th scope="col"><span className="visually-hidden">操作</span></th></tr></thead><tbody>{channel.offers.map((offer) => <tr key={offer.offer_id}>
-            <td><strong>{offer.model_name}</strong><small>{offer.model_provider}</small></td><td>{protocolLabels[offer.protocol]}</td><td>{offer.multiplier}×</td><td><PricePair first={offer.input_price} second={offer.output_price} /></td><td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td><td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : `${formatRate(offer.call_success_rate)} · ${offer.call_count ?? 0} 次 · ${offer.ttft_milliseconds ?? '—'} ms`}</td><td className="table-action"><Button onClick={() => setOfferToAdd(offer)} type="button" variant="secondary">加入模型池</Button></td>
+            <td><strong>{offer.model_name}</strong><small>{offer.model_provider}</small></td><td>{protocolLabels[offer.protocol]}</td><td>{offer.multiplier}×</td><td><PricePair first={offer.input_price} second={offer.output_price} /></td><td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td><td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : `${formatRate(offer.call_success_rate)} · ${offer.call_count ?? 0} 次 · ${offer.ttft_milliseconds ?? '—'} ms`}</td><td className="table-action"><Link className="button button-secondary" to={`/market/channels/${channel.id}/add?offer=${offer.offer_id}`}>加入模型池</Link></td>
           </tr>)}</tbody></table></div>
-          <div className="mobile-card-list">{channel.offers.map((offer) => <article className="mobile-data-card" key={offer.offer_id}><header><div><strong>{offer.model_name}</strong><span>{offer.model_provider}</span></div><ChannelStateBadge status={offer.validation_status} /></header><dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div></dl><Button onClick={() => setOfferToAdd(offer)} type="button" variant="secondary">加入模型池</Button></article>)}</div>
+          <div className="mobile-card-list">{channel.offers.map((offer) => <article className="mobile-data-card" key={offer.offer_id}><header><div><strong>{offer.model_name}</strong><span>{offer.model_provider}</span></div><ChannelStateBadge status={offer.validation_status} /></header><dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div></dl><Link className="button button-secondary" to={`/market/channels/${channel.id}/add?offer=${offer.offer_id}`}>加入模型池</Link></article>)}</div>
         </>}
       </section>
-      <AddOfferToKeyDialog offer={offerToAdd} onAdded={(key) => { setMessage(`已加入 ${key.display_name}`); setOfferToAdd(null) }} onCancel={() => setOfferToAdd(null)} />
     </AppShell>
   )
 }

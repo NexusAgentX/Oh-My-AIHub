@@ -42,7 +42,7 @@ export function C2CMarketPage() {
       <header className="page-heading c2c-page-heading">
         <div><h1>C2C 市场</h1></div>
         <div className="c2c-heading-actions">
-          <Link className="button button-secondary" to="/c2c/me">我的订单</Link>
+          <Link className="button button-secondary" to="/c2c/me">我的挂单与交易</Link>
           <Link className="button button-secondary" to="/c2c/orders/new?side=buy">发布买单</Link>
           <Link className="button button-primary" to="/c2c/orders/new?side=sell"><Icon name="plus" />发布卖单</Link>
         </div>

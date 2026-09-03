@@ -32,6 +32,30 @@ func (a *app) opsMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"metrics": snapshot})
 }
 
+func (a *app) opsProviderIncome(w http.ResponseWriter, r *http.Request) {
+	from, err := time.Parse(time.RFC3339, r.URL.Query().Get("from"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "from 必须是 UTC RFC3339 时间")
+		return
+	}
+	to, err := time.Parse(time.RFC3339, r.URL.Query().Get("to"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "to 必须是 UTC RFC3339 时间")
+		return
+	}
+	window := ops.Window{From: from.UTC(), To: to.UTC()}
+	if !window.Validate() {
+		writeError(w, http.StatusBadRequest, "invalid_input", "时间窗口无效：需要 from < to")
+		return
+	}
+	snapshot, err := a.ops.OpsProviderIncome(r.Context(), window)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"provider_income": snapshot})
+}
+
 func (a *app) opsAnomalies(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := a.ops.OpsAnomalies(r.Context())
 	if err != nil {

@@ -242,18 +242,33 @@ func loadCallAttempts(ctx context.Context, queryer gatewayQueryer, callID, viewe
 
 func (s *Store) Dashboard(ctx context.Context, accountID string) (gateway.Dashboard, error) {
 	var result gateway.Dashboard
-	var consumerSpent, providerIncome int64
+	var consumerSpent, providerIncome, todaySpent, todayExternalIncome int64
 	err := s.pool.QueryRow(ctx, `
-		SELECT
-			COALESCE((SELECT sum(call.provider_charge_nano + call.platform_fee_nano)
-				FROM api_calls call
-				JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
-				WHERE call.consumer_account_id = $1 AND call.status = 'succeeded'), 0),
-			COALESCE((SELECT sum(call.provider_charge_nano)
-				FROM api_calls call
-				JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
-				WHERE candidate.provider_account_id = $1 AND call.status = 'succeeded'), 0),
-			(SELECT count(*) FROM api_keys WHERE owner_account_id = $1 AND status = 'active'),
+			SELECT
+				COALESCE((SELECT sum(call.provider_charge_nano + call.platform_fee_nano)
+					FROM api_calls call
+					JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
+					WHERE call.consumer_account_id = $1 AND call.status = 'succeeded'), 0),
+				COALESCE((SELECT sum(call.provider_charge_nano)
+					FROM api_calls call
+					JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
+					WHERE candidate.provider_account_id = $1 AND call.status = 'succeeded'), 0),
+				COALESCE((SELECT sum(call.provider_charge_nano + call.platform_fee_nano)
+					FROM api_calls call
+					JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
+					WHERE call.consumer_account_id = $1 AND call.status = 'succeeded'
+						AND call.created_at >= date_trunc('day', timezone('UTC', now()))), 0),
+				COALESCE((SELECT count(*)
+					FROM api_calls call
+					WHERE call.consumer_account_id = $1 AND call.status = 'succeeded'
+						AND call.created_at >= date_trunc('day', timezone('UTC', now()))), 0),
+				COALESCE((SELECT sum(call.provider_charge_nano)
+					FROM api_calls call
+					JOIN api_call_candidates candidate ON candidate.call_id = call.id AND candidate.offer_id = call.final_offer_id
+					WHERE candidate.provider_account_id = $1 AND call.status = 'succeeded'
+						AND call.consumer_account_id <> $1
+						AND call.created_at >= date_trunc('day', timezone('UTC', now()))), 0),
+				(SELECT count(*) FROM api_keys WHERE owner_account_id = $1 AND status = 'active'),
 			(SELECT count(*) FROM api_model_pools pool JOIN api_keys key ON key.id = pool.api_key_id
 				WHERE key.owner_account_id = $1 AND key.status <> 'deleted' AND pool.status = 'active'),
 			(SELECT count(*) FROM channel_offers offer
@@ -286,8 +301,9 @@ func (s *Store) Dashboard(ctx context.Context, accountID string) (gateway.Dashbo
 						OR channel_owner.status <> 'active' OR channel_owner.must_change_password
 						OR channel.status <> 'published' OR catalog_model.status <> 'active'
 						OR offer.status <> 'active' OR credential.channel_id IS NULL
-						OR attempt.status IS DISTINCT FROM 'passed'))`, accountID).Scan(
-		&consumerSpent, &providerIncome, &result.ActiveKeyCount, &result.PoolCount,
+					OR attempt.status IS DISTINCT FROM 'passed'))`, accountID).Scan(
+		&consumerSpent, &providerIncome, &todaySpent, &result.TodaySucceededCalls, &todayExternalIncome,
+		&result.ActiveKeyCount, &result.PoolCount,
 		&result.HealthyOfferCount, &result.UnhealthyOfferCount, &result.PendingItems,
 	)
 	if err != nil {
@@ -295,6 +311,8 @@ func (s *Store) Dashboard(ctx context.Context, accountID string) (gateway.Dashbo
 	}
 	result.ConsumerSpent = money.FromNano(consumerSpent)
 	result.ProviderIncome = money.FromNano(providerIncome)
+	result.TodaySpent = money.FromNano(todaySpent)
+	result.TodayExternalProviderIncome = money.FromNano(todayExternalIncome)
 	actor := identity.Account{ID: accountID, Status: identity.StatusActive}
 	recent, err := s.ListCalls(ctx, actor, 5)
 	if err != nil {

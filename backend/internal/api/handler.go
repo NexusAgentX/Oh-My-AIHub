@@ -45,6 +45,7 @@ type Dependencies struct {
 // OpsStore is the operations data surface consumed by the admin API.
 type OpsStore interface {
 	OpsMetrics(ctx context.Context, window ops.Window) (ops.Metrics, error)
+	OpsProviderIncome(ctx context.Context, window ops.Window) (ops.ProviderIncomeSnapshot, error)
 	OpsAnomalies(ctx context.Context) (ops.Anomalies, error)
 	OpsRunInspection(ctx context.Context, triggeredBy string) (ops.InspectionRecord, error)
 	OpsListInspections(ctx context.Context, limit int64) ([]ops.InspectionRecord, error)
@@ -127,7 +128,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/market/offers", application.requireReadyAccount(http.HandlerFunc(application.listMarketOffers)))
 	mux.Handle("GET /api/market/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.getMarketChannel)))
 	mux.Handle("PUT /api/market/channels/{channelID}/rating", application.requireReadyAccount(http.HandlerFunc(application.rateMarketChannel)))
-mux.Handle("GET /api/keys", application.requireReadyAccount(http.HandlerFunc(application.listAPIKeys)))
+	mux.Handle("GET /api/keys", application.requireReadyAccount(http.HandlerFunc(application.listAPIKeys)))
 	mux.Handle("POST /api/keys", application.requireReadyAccount(http.HandlerFunc(application.createAPIKey)))
 	mux.Handle("GET /api/keys/{keyID}", application.requireReadyAccount(http.HandlerFunc(application.getAPIKey)))
 	mux.Handle("PATCH /api/keys/{keyID}", application.requireReadyAccount(http.HandlerFunc(application.updateAPIKey)))
@@ -139,7 +140,7 @@ mux.Handle("GET /api/keys", application.requireReadyAccount(http.HandlerFunc(app
 	mux.Handle("GET /api/calls", application.requireReadyAccount(http.HandlerFunc(application.listGatewayCalls)))
 	mux.Handle("GET /api/calls/{callID}", application.requireReadyAccount(http.HandlerFunc(application.getGatewayCall)))
 	mux.Handle("GET /api/dashboard", application.requireReadyAccount(http.HandlerFunc(application.gatewayDashboard)))
-mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFunc(application.c2cMarket)))
+	mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFunc(application.c2cMarket)))
 	mux.Handle("POST /api/c2c/orders", application.requireReadyAccount(http.HandlerFunc(application.c2cCreateOrder)))
 	mux.Handle("GET /api/c2c/orders/{orderID}", application.requireReadyAccount(http.HandlerFunc(application.c2cOrder)))
 	mux.Handle("GET /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr", application.requireReadyAccount(http.HandlerFunc(application.c2cPaymentQR)))
@@ -162,6 +163,7 @@ mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFu
 	mux.Handle("PUT /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.updateModel)))
 	mux.Handle("GET /api/admin/ledger/metrics", application.requireAdmin(http.HandlerFunc(application.ledgerMetrics)))
 	mux.Handle("GET /api/admin/ops/metrics", application.requireAdmin(http.HandlerFunc(application.opsMetrics)))
+	mux.Handle("GET /api/admin/ops/providers", application.requireAdmin(http.HandlerFunc(application.opsProviderIncome)))
 	mux.Handle("GET /api/admin/ops/anomalies", application.requireAdmin(http.HandlerFunc(application.opsAnomalies)))
 	mux.Handle("GET /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsListInspections)))
 	mux.Handle("POST /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsRunInspection)))
@@ -179,11 +181,11 @@ mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFu
 	mux.Handle("POST /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.validateChannelOffer)))
 	mux.Handle("GET /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.listOfferValidationAttempts)))
 	mux.Handle("POST /api/admin/channel-credentials/reencrypt", application.requireAdmin(http.HandlerFunc(application.reencryptChannelCredentials)))
-mux.HandleFunc("/v1/chat/completions", application.proxyChatCompletions)
+	mux.HandleFunc("/v1/chat/completions", application.proxyChatCompletions)
 	mux.HandleFunc("/v1/responses", application.proxyResponses)
 	mux.HandleFunc("/v1/messages", application.proxyAnthropicMessages)
 	mux.HandleFunc("/v1beta/models/{model...}", application.proxyGemini)
-mux.Handle("GET /api/admin/c2c/disputes", application.requireAdmin(http.HandlerFunc(application.adminC2CDisputes)))
+	mux.Handle("GET /api/admin/c2c/disputes", application.requireAdmin(http.HandlerFunc(application.adminC2CDisputes)))
 	mux.Handle("POST /api/admin/c2c/orders/{orderID}/cancel", application.requireAdmin(http.HandlerFunc(application.adminC2CCancelOrder)))
 	mux.Handle("POST /api/admin/c2c/trades/{tradeID}/resolve", application.requireAdmin(http.HandlerFunc(application.adminC2CResolve)))
 
@@ -524,7 +526,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden), errors.Is(err, c2c.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
-case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, channel.ErrNotFound), errors.Is(err, gateway.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, channel.ErrNotFound), errors.Is(err, gateway.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict), errors.Is(err, channel.ErrConflict), errors.Is(err, gateway.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
@@ -548,7 +550,7 @@ case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), 
 		writeError(w, http.StatusUnprocessableEntity, "channel_unavailable", "至少需要一个通过当前验证的可用报价")
 	case errors.Is(err, channel.ErrUnsafeUpstream):
 		writeError(w, http.StatusUnprocessableEntity, "unsafe_upstream", "Base URL 无法通过安全解析")
-case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, channel.ErrInvalidInput), errors.Is(err, gateway.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount), errors.Is(err, c2c.ErrInvalidInput):
+	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, channel.ErrInvalidInput), errors.Is(err, gateway.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount), errors.Is(err, c2c.ErrInvalidInput):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")
