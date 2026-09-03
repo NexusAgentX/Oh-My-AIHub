@@ -6,12 +6,13 @@ import { useAuth } from '../auth/AuthProvider'
 import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText } from './presentation'
+import { formatRate } from '../gateway/presentation'
 
 type Filters = {
   modelID: string
   protocol: ChannelProtocol | ''
   owner: string
-  sort: 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'rating'
+  sort: 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'rating' | 'success_rate' | 'ttft' | 'tps'
 }
 
 const initialFilters: Filters = { modelID: '', protocol: '', owner: '', sort: 'input_price' }
@@ -70,7 +71,7 @@ export function MarketPage() {
           <label className="field"><span className="field-label">模型</span><select className="input" onChange={(event) => setDraft({ ...draft, modelID: event.target.value })} value={draft.modelID}><option value="">全部模型</option>{models.map((model) => <option key={model.id} value={model.id}>{model.provider} · {model.name}</option>)}</select></label>
           <label className="field"><span className="field-label">API 格式</span><select className="input" onChange={(event) => setDraft({ ...draft, protocol: event.target.value as ChannelProtocol | '' })} value={draft.protocol}><option value="">全部格式</option>{Object.entries(protocolLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="field"><span className="field-label">共享者</span><input className="input" onChange={(event) => setDraft({ ...draft, owner: event.target.value })} value={draft.owner} /></label>
-          <label className="field"><span className="field-label">排序</span><select className="input" onChange={(event) => setDraft({ ...draft, sort: event.target.value as Filters['sort'] })} value={draft.sort}><option value="input_price">输入价格</option><option value="output_price">输出价格</option><option value="cache_write_price">缓存写价格</option><option value="cache_read_price">缓存读价格</option><option value="rating">用户评分</option></select></label>
+          <label className="field"><span className="field-label">排序</span><select className="input" onChange={(event) => setDraft({ ...draft, sort: event.target.value as Filters['sort'] })} value={draft.sort}><option value="input_price">输入价格</option><option value="output_price">输出价格</option><option value="cache_write_price">缓存写价格</option><option value="cache_read_price">缓存读价格</option><option value="rating">用户评分</option><option value="success_rate">成功率</option><option value="ttft">首字响应</option><option value="tps">输出速度</option></select></label>
           <Button type="submit">筛选</Button>
         </form>
       </section>
@@ -87,7 +88,7 @@ export function MarketPage() {
                 <td>{offer.multiplier}×</td>
                 <td><PricePair first={offer.input_price} second={offer.output_price} /></td>
                 <td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td>
-                <td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : <><strong>{offer.call_success_rate}</strong><small>{offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
+                <td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : <><strong>{formatRate(offer.call_success_rate)}</strong><small>{offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
                 <td>{ratingText(offer.average_rating, offer.rating_count)}</td>
                 <td className="table-action"><Link className="button button-secondary" to={`/market/channels/${offer.channel_id}`}>查看</Link></td>
               </tr>)}</tbody>
@@ -95,7 +96,7 @@ export function MarketPage() {
           </div>
           <div className="mobile-card-list">{offers.map((offer) => <article className="mobile-data-card" key={offer.offer_id}>
             <header><div><strong>{offer.model_name}</strong><span>{offer.channel_display_name} · {offer.owner_display_name}</span>{offer.owner_account_id === account?.id && <span className="own-channel-badge">我的 · 0 手续费</span>}</div><ChannelStateBadge status={offer.validation_status} /></header>
-            <dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : offer.call_success_rate}</dd></div><div><dt>评分</dt><dd>{ratingText(offer.average_rating, offer.rating_count)}</dd></div></dl>
+            <dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div><div><dt>评分</dt><dd>{ratingText(offer.average_rating, offer.rating_count)}</dd></div></dl>
             <Link className="button button-secondary" to={`/market/channels/${offer.channel_id}`}>渠道详情</Link>
           </article>)}</div>
           {next && <div className="table-pagination"><Button disabled={loading} onClick={() => void load(filters, next)} variant="secondary">{loading ? '正在加载' : '加载更多'}</Button></div>}

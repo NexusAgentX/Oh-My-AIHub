@@ -33,7 +33,7 @@ describe('route policy', () => {
   })
 
   it('sends ready users to their product boundary', () => {
-    expect(defaultDestination(account)).toBe('/account')
+    expect(defaultDestination(account)).toBe('/dashboard')
     expect(defaultDestination({ ...account, is_admin: true })).toBe(
       '/admin/accounts',
     )

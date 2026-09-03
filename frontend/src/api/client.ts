@@ -2,12 +2,16 @@ import type {
   Account,
   AccountStatus,
   AdminChannel,
+  APIKey,
+  APIKeyPoolInput,
   AuthorizedValidationAttempt,
   CatalogModel,
   Channel,
   ChannelOffer,
   ChannelOfferInput,
   ChannelProtocol,
+  GatewayCall,
+  GatewayDashboard,
   LedgerEntry,
   LedgerMetrics,
   MarketChannel,
@@ -66,7 +70,15 @@ export function marketOffersPath(input: {
   modelID?: string
   protocol?: ChannelProtocol | ''
   owner?: string
-  sort?: 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'rating'
+  sort?:
+    | 'input_price'
+    | 'output_price'
+    | 'cache_write_price'
+    | 'cache_read_price'
+    | 'rating'
+    | 'success_rate'
+    | 'ttft'
+    | 'tps'
   after?: string
   limit?: number
 } = {}) {
@@ -439,6 +451,112 @@ export const api = {
         { method: 'PUT', body: JSON.stringify({ score }) },
       )
     ).channel
+  },
+  async apiKeys() {
+    return (await request<{ keys: APIKey[] }>('/api/keys')).keys
+  },
+  async apiKey(keyID: string) {
+    return (
+      await request<{ key: APIKey }>(
+        `/api/keys/${encodeURIComponent(keyID)}`,
+      )
+    ).key
+  },
+  createAPIKey(displayName: string, pools: APIKeyPoolInput[]) {
+    return request<{ key: APIKey; secret: string }>('/api/keys', {
+      method: 'POST',
+      body: JSON.stringify({ display_name: displayName, pools }),
+    })
+  },
+  async updateAPIKey(
+    keyID: string,
+    expectedVersion: number,
+    displayName: string,
+    pools: APIKeyPoolInput[],
+  ) {
+    return (
+      await request<{ key: APIKey }>(
+        `/api/keys/${encodeURIComponent(keyID)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            display_name: displayName,
+            pools,
+            expected_version: expectedVersion,
+          }),
+        },
+      )
+    ).key
+  },
+  rotateAPIKey(keyID: string, expectedVersion: number) {
+    return request<{ key: APIKey; secret: string }>(
+      `/api/keys/${encodeURIComponent(keyID)}/rotate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ expected_version: expectedVersion }),
+      },
+    )
+  },
+  async setAPIKeyStatus(
+    keyID: string,
+    action: 'disable' | 'enable',
+    expectedVersion: number,
+  ) {
+    return (
+      await request<{ key: APIKey }>(
+        `/api/keys/${encodeURIComponent(keyID)}/${action}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expected_version: expectedVersion }),
+        },
+      )
+    ).key
+  },
+  async deleteAPIKey(keyID: string, expectedVersion: number) {
+    return (
+      await request<{ key: APIKey }>(
+        `/api/keys/${encodeURIComponent(keyID)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ expected_version: expectedVersion }),
+        },
+      )
+    ).key
+  },
+  async addAPIKeyPoolMember(
+    keyID: string,
+    expectedVersion: number,
+    input: {
+      model_id: string
+      protocol: ChannelProtocol
+      offer_id: string
+      priority: number
+    },
+  ) {
+    return (
+      await request<{ key: APIKey }>(
+        `/api/keys/${encodeURIComponent(keyID)}/pool-members`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ ...input, expected_version: expectedVersion }),
+        },
+      )
+    ).key
+  },
+  async gatewayCalls(limit = 50) {
+    return (
+      await request<{ calls: GatewayCall[] }>(`/api/calls?limit=${limit}`)
+    ).calls
+  },
+  async gatewayCall(callID: string) {
+    return (
+      await request<{ call: GatewayCall }>(
+        `/api/calls/${encodeURIComponent(callID)}`,
+      )
+    ).call
+  },
+  gatewayDashboard() {
+    return request<GatewayDashboard>('/api/dashboard')
   },
   async adminChannels() {
     return (await request<{ channels: AdminChannel[] }>('/api/admin/channels')).channels

@@ -64,6 +64,98 @@ describe('channel client contracts', () => {
     const [, init] = fetchMock.mock.calls[0]
     expect(JSON.parse(String(init?.body))).toEqual({ confirmed_upstream_cost: true })
   })
+
+  it('encodes real quality sorts', () => {
+    expect(marketOffersPath({ sort: 'success_rate', limit: 100 })).toBe(
+      '/api/market/offers?limit=100&sort=success_rate',
+    )
+    expect(marketOffersPath({ sort: 'ttft' })).toContain('sort=ttft')
+    expect(marketOffersPath({ sort: 'tps' })).toContain('sort=tps')
+  })
+})
+
+describe('gateway client contracts', () => {
+  it('creates and updates API Key pools in priority order', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ key: {}, secret: 'one-time' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ key: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    const pools = [
+      {
+        model_id: 'openai/gpt-5',
+        protocol: 'openai_responses' as const,
+        offer_ids: ['offer-2', 'offer-1'],
+      },
+    ]
+
+    await api.createAPIKey('主力 Key', pools)
+    await api.updateAPIKey('key/one', 7, '主力 Key', pools)
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/keys')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      display_name: '主力 Key',
+      pools,
+    })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/keys/key%2Fone')
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+      display_name: '主力 Key',
+      pools,
+      expected_version: 7,
+    })
+  })
+
+  it('appends a market offer with API Key CAS', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ key: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.addAPIKeyPoolMember('key/one', 4, {
+      model_id: 'anthropic/claude',
+      protocol: 'anthropic_messages',
+      offer_id: 'offer/one',
+      priority: 0,
+    })
+
+    const [path, init] = fetchMock.mock.calls[0]
+    expect(path).toBe('/api/keys/key%2Fone/pool-members')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      expected_version: 4,
+      model_id: 'anthropic/claude',
+      protocol: 'anthropic_messages',
+      offer_id: 'offer/one',
+      priority: 0,
+    })
+  })
+
+  it('deletes a key with its current version', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ key: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await api.deleteAPIKey('key/one', 9)
+    const [path, init] = fetchMock.mock.calls[0]
+    expect(path).toBe('/api/keys/key%2Fone')
+    expect(init?.method).toBe('DELETE')
+    expect(JSON.parse(String(init?.body))).toEqual({ expected_version: 9 })
+  })
 })
 
 describe('ledger client contracts', () => {

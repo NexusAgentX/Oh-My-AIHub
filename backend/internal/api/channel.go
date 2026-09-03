@@ -402,7 +402,7 @@ func ownerChannelResponse(item channel.Channel) map[string]any {
 
 func ownerOfferResponse(item channel.Offer) map[string]any {
 	prices, priceErr := channel.CalculateBenchmarkPrices(item)
-	var input, output, cacheWrite, cacheRead any
+	var input, output, cacheWrite, cacheRead, providerIncome any
 	eligible, ineligibleReason := item.Eligible, item.IneligibleReason
 	if priceErr == nil {
 		input, output = prices.Input.String(), prices.Output.String()
@@ -410,12 +410,17 @@ func ownerOfferResponse(item channel.Offer) map[string]any {
 	} else {
 		eligible, ineligibleReason = false, "price_unrepresentable"
 	}
+	if item.ProviderIncome != nil {
+		providerIncome = item.ProviderIncome.String()
+	}
 	return map[string]any{
 		"id": item.ID, "model_id": item.ModelID, "model_name": item.ModelName, "model_provider": item.ModelProvider,
 		"protocol": item.Protocol, "upstream_model_id": item.UpstreamModelID, "multiplier": item.Multiplier.String(),
 		"status": item.Status, "validation_version": item.ValidationVersion, "version": item.Version,
 		"eligible": eligible, "ineligible_reason": ineligibleReason,
 		"input_price": input, "output_price": output, "cache_write_price": cacheWrite, "cache_read_price": cacheRead,
+		"call_success_rate": item.CallSuccessRate, "ttft_milliseconds": item.TTFTMilliseconds,
+		"tokens_per_second": item.TokensPerSecond, "call_count": item.CallCount, "provider_income": providerIncome,
 		"latest_validation": validationResponsePointer(item.LatestValidation, false), "created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
 	}
 }
@@ -449,6 +454,8 @@ func marketChannelResponse(item channel.Channel) map[string]any {
 			CacheWritePrice: prices.CacheWrite, CacheReadPrice: prices.CacheRead, ValidationStatus: channel.ValidationPassed,
 			LastTestedAt:  offer.LatestValidation.CompletedAt,
 			AverageRating: item.AverageRating, RatingCount: item.RatingCount,
+			CallSuccessRate: offer.CallSuccessRate, TTFTMilliseconds: offer.TTFTMilliseconds,
+			TokensPerSecond: offer.TokensPerSecond, CallCount: offer.CallCount,
 		}))
 	}
 	return map[string]any{

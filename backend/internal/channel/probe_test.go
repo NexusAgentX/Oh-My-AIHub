@@ -1,8 +1,10 @@
 package channel
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -22,10 +24,71 @@ func TestAuthenticationStatusWinsOverBodyReadAndSizeFailures(t *testing.T) {
 		{http.StatusInternalServerError, true, nil, ErrorTooLarge},
 		{http.StatusOK, false, errors.New("unexpected EOF"), ErrorTransport},
 	} {
-		attempt, terminal := probeHTTPFailure(ValidationAttempt{HTTPStatus: test.status}, test.status, http.StatusText(test.status), []byte("upstream error"), test.tooLarge, test.readErr, time.Millisecond)
+		attempt, terminal := probeHTTPFailure(ValidationAttempt{HTTPStatus: test.status}, test.status, http.StatusText(test.status), []byte("upstream error"), test.tooLarge, test.readErr, "probe-secret", time.Millisecond)
 		if !terminal || attempt.ErrorCategory != test.want || attempt.HTTPStatus != test.status {
 			t.Fatalf("status %d = %#v, terminal %v; want %s", test.status, attempt, terminal, test.want)
 		}
+	}
+}
+
+func TestProbeHTTPFailureBlocksExactCredentialEcho(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusInternalServerError} {
+		attempt, terminal := probeHTTPFailure(
+			ValidationAttempt{HTTPStatus: status}, status, http.StatusText(status),
+			[]byte(`{"error":"Bearer probe-secret"}`), false, nil, "probe-secret", time.Millisecond,
+		)
+		if !terminal || strings.Contains(attempt.RawError, "probe-secret") || attempt.RawError != "upstream error contained a credential and was blocked" {
+			t.Fatalf("status %d credential echo persisted: %+v terminal=%v", status, attempt, terminal)
+		}
+	}
+	credential := `probe"secret\tail`
+	escaped, err := json.Marshal(map[string]string{"error": credential})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt, terminal := probeHTTPFailure(
+		ValidationAttempt{HTTPStatus: http.StatusUnauthorized}, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized),
+		escaped, false, nil, credential, time.Millisecond,
+	)
+	if !terminal || attempt.RawError != "upstream error contained a credential and was blocked" {
+		t.Fatalf("JSON-escaped credential echo persisted: %+v terminal=%v", attempt, terminal)
+	}
+	normal := `{"error":"ordinary upstream URL https://relay.example/models/vendor"}`
+	attempt, terminal = probeHTTPFailure(
+		ValidationAttempt{HTTPStatus: http.StatusInternalServerError}, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError),
+		[]byte(normal), false, nil, credential, time.Millisecond,
+	)
+	if !terminal || attempt.RawError != normal {
+		t.Fatalf("ordinary upstream error was changed: %+v terminal=%v", attempt, terminal)
+	}
+	unicodeEscaped := `{"debug":"probe-\u0073ecret"}`
+	attempt, terminal = probeHTTPFailure(
+		ValidationAttempt{HTTPStatus: http.StatusInternalServerError}, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError),
+		[]byte(unicodeEscaped), false, nil, "probe-secret", time.Millisecond,
+	)
+	if !terminal || attempt.RawError != "upstream error contained a credential and was blocked" {
+		t.Fatalf("Unicode-escaped probe credential persisted: %+v terminal=%v", attempt, terminal)
+	}
+}
+
+func TestProbeTransportFailureCannotPersistCredentialFromEndpointPath(t *testing.T) {
+	credential := "exact-upstream-credential"
+	policy, err := NewOutboundPolicyWithResolver(nil, nil, &fakeResolver{addresses: []net.IP{net.ParseIP("93.184.216.34")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.dialContext = func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("injected connection failure")
+	}
+	service := &Service{outbound: policy}
+	attempt := service.probe(context.Background(), ValidationTarget{
+		Attempt:           ValidationAttempt{ID: "attempt-credential", StartedAt: time.Now()},
+		NormalizedBaseURL: "https://relay.example/" + credential,
+		Protocol:          ProtocolOpenAIChat,
+		UpstreamModelID:   "vendor-model",
+	}, credential)
+	if attempt.Status != ValidationFailed || attempt.ErrorCategory != ErrorTransport || attempt.RawError != "upstream error contained a credential and was blocked" || strings.Contains(attempt.RawError, credential) {
+		t.Fatalf("probe transport credential persisted: %+v", attempt)
 	}
 }
 

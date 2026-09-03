@@ -17,10 +17,25 @@ import (
 
 type Store struct {
 	pool *pgxpool.Pool
+	// gatewayCommitHook is a deterministic test seam for the PostgreSQL
+	// "commit succeeded but the acknowledgement was lost" outcome. Production
+	// stores leave it nil. Callers must still disambiguate every returned commit
+	// error by rereading the immutable business fact.
+	gatewayCommitHook func(operation, resourceID string) error
 }
 
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
+}
+
+func (s *Store) commitGatewayTransaction(ctx context.Context, tx pgx.Tx, operation, resourceID string) error {
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	if s.gatewayCommitHook != nil {
+		return s.gatewayCommitHook(operation, resourceID)
+	}
+	return nil
 }
 
 type scanner interface {
