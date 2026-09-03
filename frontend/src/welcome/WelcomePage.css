@@ -93,21 +93,6 @@
   transform: translateY(0);
 }
 
-.welcome-topbar {
-  width: 100%;
-  height: 72px;
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 300px;
-  gap: 24px;
-  align-items: center;
-  padding: 0 48px;
-  background: var(--welcome-canvas);
-}
-
-.welcome-brand-link {
-  width: fit-content;
-}
-
 .welcome-brand {
   display: inline-flex;
   gap: 12px;
@@ -127,39 +112,10 @@
   border-radius: 8px;
   color: var(--welcome-canvas);
   background: var(--welcome-ink);
-}
-
-.welcome-nav-links {
-  display: flex;
-  gap: 32px;
-  justify-content: center;
-  align-items: center;
-  color: var(--welcome-body);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.welcome-nav-links a,
-.welcome-footer a {
+}.welcome-footer a{
   border-bottom: 1px solid transparent;
-}
-
-.welcome-nav-links a:active,
-.welcome-footer a:active {
+}.welcome-footer a:active{
   border-bottom-color: currentColor;
-}
-
-.welcome-nav-actions {
-  display: flex;
-  gap: 18px;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.welcome-invite-label {
-  color: var(--welcome-muted);
-  font-size: 13px;
-  font-weight: 500;
 }
 
 .welcome-button {
@@ -175,15 +131,6 @@
   font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
-}
-
-.welcome-topbar .welcome-button {
-  min-height: 40px;
-  height: 40px;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  font-size: 14px;
-  font-weight: 600;
 }
 
 .welcome-button-primary {
@@ -1236,14 +1183,6 @@
     padding: 0 32px;
   }
 
-  .welcome-nav-links {
-    gap: 20px;
-  }
-
-  .welcome-invite-label {
-    display: none;
-  }
-
   .welcome-hero {
     min-height: auto;
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
@@ -1353,26 +1292,6 @@
     width: 30px;
     height: 30px;
     border-radius: 7px;
-  }
-
-  .welcome-nav-links,
-  .welcome-invite-label {
-    display: none;
-  }
-
-  .welcome-nav-actions {
-    gap: 0;
-  }
-
-  .welcome-topbar .welcome-button {
-    min-width: 78px;
-    height: 36px;
-    min-height: 36px;
-    padding: 7px 14px;
-  }
-
-  .welcome-topbar .welcome-button .welcome-icon {
-    display: none;
   }
 
   .welcome-hero {
