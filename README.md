@@ -2,6 +2,7 @@
 
 Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在双边 C2C 市场出售所得积分。
 
+产品方向和首版边界已经确认。当前代码已经交付公开产品落地页、受邀账户、模型目录、中心化零和账本、渠道共享与市场，以及平台 API Key、四协议优先级代理和调用结算；C2C 仍按 Epic #16 继续实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
 产品方向和首版边界已经确认。当前代码已经交付公开产品落地页、受邀账户、模型目录、中心化零和账本、渠道共享、校验、公开 API 市场与 C2C 双边市场；平台 API Key 和代理调用结算仍按 Epic #16 继续实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
 
 ## 文档导航
@@ -50,11 +51,13 @@ op --version
 ## 当前工程组成
 
 - 前端：React 19、TypeScript、Vite 与 React Router。
+- 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、市场、平台 API 网关、调用结算与管理员治理 API。
 - 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、API 市场、C2C 状态机与管理员治理 API。
 - 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
 - 本地工具链：mise。
-- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 请求，迁移完成后再启动后端。
+- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与四类外部协议请求，迁移完成后再启动后端。
 
+当前可运行能力包括未认证的 `/welcome`、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、评分、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 业务流程尚未交付。
 当前可运行能力包括未认证的 `/welcome`、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户还可以创建自己的渠道，安全替换或撤销上游凭据，为模型配置原生协议和统一倍率，执行可能产生上游费用的显式校验，发布、暂停或逻辑删除渠道；公开 API 市场提供报价筛选、确定性游标分页、独立价格和评分，管理员可以查看非敏感配置、重验并带原因暂停或删除异常渠道。C2C 市场支持固定价格买卖单、部分成交、多种支付方式、可选付款截图、争议和管理员裁决；卖单积分由账本父持有担保，买单按成交冻结卖家的积分。平台 Key、真实请求代理与结算和运行质量聚合尚未交付。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
@@ -107,7 +110,9 @@ mise run dev-backend
 mise run dev-frontend
 ```
 
-前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/welcome>，并将 `/api` 请求代理到 <http://localhost:8080>。
+前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/welcome>，并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。
+
+平台代理入口只接受各协议规定的认证头：OpenAI 风格使用 `Authorization: Bearer <平台 Key>`，Anthropic 使用 `x-api-key`，Gemini 使用 `x-goog-api-key`。客户端必须提交模型目录中的 canonical model ID；平台不做跨协议转换。请求上限为 32 MiB，非流式调用最长 10 分钟，流式调用最长 30 分钟。
 
 本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
 

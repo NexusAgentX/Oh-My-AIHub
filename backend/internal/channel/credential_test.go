@@ -64,7 +64,7 @@ func TestKeyringFailsClosedAndEncryptsWithBoundAAD(t *testing.T) {
 }
 
 func TestCredentialValidationRejectsHeaderControlCharacters(t *testing.T) {
-	for _, value := range []string{"", "line\nbreak", "carriage\rreturn", "nul\x00byte", strings.Repeat("x", 8193)} {
+	for _, value := range []string{"", "short-key", "line\nbreak-long-enough", "carriage\rreturn-long-enough", "nul\x00byte-long-enough", strings.Repeat("x", 8193)} {
 		if validCredential(value) {
 			t.Fatalf("credential %q unexpectedly valid", value)
 		}

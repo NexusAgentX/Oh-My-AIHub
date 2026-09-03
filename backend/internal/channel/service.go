@@ -3,6 +3,7 @@ package channel
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 	"unicode"
@@ -238,7 +239,8 @@ func (s *Service) ListMarket(ctx context.Context, actor identity.Account, query 
 	if query.Sort == "" {
 		query.Sort = "input_price"
 	}
-	if query.Sort != "input_price" && query.Sort != "output_price" && query.Sort != "cache_write_price" && query.Sort != "cache_read_price" && query.Sort != "rating" {
+	if query.Sort != "input_price" && query.Sort != "output_price" && query.Sort != "cache_write_price" && query.Sort != "cache_read_price" &&
+		query.Sort != "rating" && query.Sort != "success_rate" && query.Sort != "ttft" && query.Sort != "tps" {
 		return nil, "", ErrInvalidInput
 	}
 	if query.Limit <= 0 {
@@ -356,6 +358,26 @@ func (s *Service) ResolveRoutingLeasesWithStore(ctx context.Context, store Routi
 	return statuses, leases, nil
 }
 
+// ProxyTarget performs the same DNS/IP pinning and endpoint construction used
+// by validation while keeping the decrypted credential inside the server-only
+// routing lease. The caller is responsible for injecting the credential into
+// the protocol-specific request and must never serialize the lease.
+func (s *Service) ProxyTarget(ctx context.Context, lease RoutingLease, stream bool, totalTimeout time.Duration) (*http.Client, string, error) {
+	if lease.OfferID == "" || lease.ChannelID == "" || lease.NormalizedBaseURL == "" || lease.UpstreamModelID == "" || lease.Credential == "" ||
+		!validProtocol(lease.Protocol) || totalTimeout <= 0 {
+		return nil, "", ErrInvalidInput
+	}
+	endpoint, err := s.outbound.Endpoint(lease.NormalizedBaseURL, lease.Protocol, lease.UpstreamModelID, stream)
+	if err != nil {
+		return nil, "", err
+	}
+	client, err := s.outbound.ClientForProxy(ctx, lease.NormalizedBaseURL, totalTimeout)
+	if err != nil {
+		return nil, "", err
+	}
+	return client, endpoint.String(), nil
+}
+
 func readyActor(actor identity.Account) bool {
 	return actor.ID != "" && actor.Status == identity.StatusActive && !actor.MustChangePassword
 }
@@ -392,7 +414,7 @@ func validUpstreamModelID(value string, protocol Protocol) bool {
 }
 
 func validCredential(value string) bool {
-	if len([]byte(value)) < 1 || len([]byte(value)) > 8192 {
+	if len([]byte(value)) < 16 || len([]byte(value)) > 8192 {
 		return false
 	}
 	for _, character := range value {

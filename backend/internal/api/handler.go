@@ -17,17 +17,22 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-const defaultSessionCookie = "oma_session"
+const (
+	defaultSessionCookie = "oma_session"
+	defaultWriteTimeout  = 30 * time.Second
+)
 
 type Dependencies struct {
 	Identity          *identity.Service
 	Catalog           *catalog.Service
 	Channels          *channel.Service
+	Gateway           *gateway.Service
 	Ledger            *ledger.Service
 	C2C               *c2c.Service
 	DatabaseReady     func(context.Context) error
@@ -39,6 +44,7 @@ type app struct {
 	identity             *identity.Service
 	catalog              *catalog.Service
 	channels             *channel.Service
+	gateway              *gateway.Service
 	ledger               *ledger.Service
 	c2c                  *c2c.Service
 	databaseReady        func(context.Context) error
@@ -60,6 +66,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 		identity:             dependencies.Identity,
 		catalog:              dependencies.Catalog,
 		channels:             dependencies.Channels,
+		gateway:              dependencies.Gateway,
 		ledger:               dependencies.Ledger,
 		c2c:                  dependencies.C2C,
 		databaseReady:        dependencies.DatabaseReady,
@@ -105,7 +112,19 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/market/offers", application.requireReadyAccount(http.HandlerFunc(application.listMarketOffers)))
 	mux.Handle("GET /api/market/channels/{channelID}", application.requireReadyAccount(http.HandlerFunc(application.getMarketChannel)))
 	mux.Handle("PUT /api/market/channels/{channelID}/rating", application.requireReadyAccount(http.HandlerFunc(application.rateMarketChannel)))
-	mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFunc(application.c2cMarket)))
+mux.Handle("GET /api/keys", application.requireReadyAccount(http.HandlerFunc(application.listAPIKeys)))
+	mux.Handle("POST /api/keys", application.requireReadyAccount(http.HandlerFunc(application.createAPIKey)))
+	mux.Handle("GET /api/keys/{keyID}", application.requireReadyAccount(http.HandlerFunc(application.getAPIKey)))
+	mux.Handle("PATCH /api/keys/{keyID}", application.requireReadyAccount(http.HandlerFunc(application.updateAPIKey)))
+	mux.Handle("DELETE /api/keys/{keyID}", application.requireReadyAccount(http.HandlerFunc(application.deleteAPIKey)))
+	mux.Handle("POST /api/keys/{keyID}/rotate", application.requireReadyAccount(http.HandlerFunc(application.rotateAPIKey)))
+	mux.Handle("POST /api/keys/{keyID}/disable", application.requireReadyAccount(http.HandlerFunc(application.disableAPIKey)))
+	mux.Handle("POST /api/keys/{keyID}/enable", application.requireReadyAccount(http.HandlerFunc(application.enableAPIKey)))
+	mux.Handle("POST /api/keys/{keyID}/pool-members", application.requireReadyAccount(http.HandlerFunc(application.addAPIKeyPoolMember)))
+	mux.Handle("GET /api/calls", application.requireReadyAccount(http.HandlerFunc(application.listGatewayCalls)))
+	mux.Handle("GET /api/calls/{callID}", application.requireReadyAccount(http.HandlerFunc(application.getGatewayCall)))
+	mux.Handle("GET /api/dashboard", application.requireReadyAccount(http.HandlerFunc(application.gatewayDashboard)))
+mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFunc(application.c2cMarket)))
 	mux.Handle("POST /api/c2c/orders", application.requireReadyAccount(http.HandlerFunc(application.c2cCreateOrder)))
 	mux.Handle("GET /api/c2c/orders/{orderID}", application.requireReadyAccount(http.HandlerFunc(application.c2cOrder)))
 	mux.Handle("GET /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr", application.requireReadyAccount(http.HandlerFunc(application.c2cPaymentQR)))
@@ -140,11 +159,26 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("POST /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.validateChannelOffer)))
 	mux.Handle("GET /api/admin/channel-offers/{offerID}/validation-attempts", application.requireAdmin(http.HandlerFunc(application.listOfferValidationAttempts)))
 	mux.Handle("POST /api/admin/channel-credentials/reencrypt", application.requireAdmin(http.HandlerFunc(application.reencryptChannelCredentials)))
-	mux.Handle("GET /api/admin/c2c/disputes", application.requireAdmin(http.HandlerFunc(application.adminC2CDisputes)))
+mux.HandleFunc("/v1/chat/completions", application.proxyChatCompletions)
+	mux.HandleFunc("/v1/responses", application.proxyResponses)
+	mux.HandleFunc("/v1/messages", application.proxyAnthropicMessages)
+	mux.HandleFunc("/v1beta/models/{model...}", application.proxyGemini)
+mux.Handle("GET /api/admin/c2c/disputes", application.requireAdmin(http.HandlerFunc(application.adminC2CDisputes)))
 	mux.Handle("POST /api/admin/c2c/orders/{orderID}/cancel", application.requireAdmin(http.HandlerFunc(application.adminC2CCancelOrder)))
 	mux.Handle("POST /api/admin/c2c/trades/{tradeID}/resolve", application.requireAdmin(http.HandlerFunc(application.adminC2CResolve)))
 
-	return securityHeaders(application.requireSameOrigin(mux))
+	return responseWriteDeadline(securityHeaders(application.requireSameOrigin(mux)))
+}
+
+func responseWriteDeadline(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		controller := http.NewResponseController(w)
+		if err := controller.SetWriteDeadline(time.Now().Add(defaultWriteTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+			writeError(w, http.StatusServiceUnavailable, "write_deadline_unavailable", "响应暂不可用")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -159,6 +193,10 @@ func securityHeaders(next http.Handler) http.Handler {
 
 func (a *app) requireSameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isExternalGatewayPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			origin := r.Header.Get("Origin")
 			parsed, err := url.Parse(origin)
@@ -169,6 +207,10 @@ func (a *app) requireSameOrigin(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isExternalGatewayPath(path string) bool {
+	return path == "/v1/chat/completions" || path == "/v1/responses" || path == "/v1/messages" || strings.HasPrefix(path, "/v1beta/models/")
 }
 
 func (a *app) requestScheme(r *http.Request) string {
@@ -462,9 +504,9 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden), errors.Is(err, c2c.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
-	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, channel.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
+case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, channel.ErrNotFound), errors.Is(err, gateway.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
-	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict), errors.Is(err, channel.ErrConflict):
+	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict), errors.Is(err, channel.ErrConflict), errors.Is(err, gateway.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
 	case errors.Is(err, ledger.ErrConflict), errors.Is(err, ledger.ErrHoldClosed), errors.Is(err, ledger.ErrHoldAmountExceeded):
 		writeError(w, http.StatusConflict, "ledger_conflict", "账本操作与当前状态冲突")
@@ -478,11 +520,15 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "credit_frozen", "账户信用已冻结")
 	case errors.Is(err, channel.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, gateway.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, gateway.ErrSnapshotRetry):
+		writeError(w, http.StatusConflict, "snapshot_conflict", "资源正在更新，请重试")
 	case errors.Is(err, channel.ErrUnavailable):
 		writeError(w, http.StatusUnprocessableEntity, "channel_unavailable", "至少需要一个通过当前验证的可用报价")
 	case errors.Is(err, channel.ErrUnsafeUpstream):
 		writeError(w, http.StatusUnprocessableEntity, "unsafe_upstream", "Base URL 无法通过安全解析")
-	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, channel.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount), errors.Is(err, c2c.ErrInvalidInput):
+case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, channel.ErrInvalidInput), errors.Is(err, gateway.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput), errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount), errors.Is(err, c2c.ErrInvalidInput):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")

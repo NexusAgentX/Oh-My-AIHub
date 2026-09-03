@@ -29,6 +29,12 @@ import { AdminLedgerPage } from './ledger/AdminLedgerPage'
 import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
 import { WalletPage } from './wallet/WalletPage'
 import { WalletProvider } from './wallet/WalletProvider'
+import { APIKeyEditorPage } from './gateway/APIKeyEditorPage'
+import { APIKeyPage } from './gateway/APIKeyPage'
+import { APIKeysPage } from './gateway/APIKeysPage'
+import { CallDetailPage } from './gateway/CallDetailPage'
+import { CallsPage } from './gateway/CallsPage'
+import { DashboardPage } from './gateway/DashboardPage'
 import { C2CActivityPage } from './c2c/C2CActivityPage'
 import { C2CDisputePage } from './c2c/C2CDisputePage'
 import { C2CMarketPage } from './c2c/C2CMarketPage'
@@ -91,6 +97,13 @@ export const appRoutes = createRoutesFromElements(
     <Route element={<RequireSession />}>
       <Route element={<FirstPasswordChangePage />} path="/account/password" />
       <Route element={<RequireReadyAccount />}>
+        <Route element={<DashboardPage />} path="/dashboard" />
+        <Route element={<APIKeysPage />} path="/keys" />
+        <Route element={<APIKeyEditorPage />} path="/keys/new" />
+        <Route element={<APIKeyPage />} path="/keys/:keyID" />
+        <Route element={<APIKeyEditorPage />} path="/keys/:keyID/settings" />
+        <Route element={<CallsPage />} path="/calls" />
+        <Route element={<CallDetailPage />} path="/calls/:callID" />
         <Route element={<AccountSettingsPage />} path="/account" />
         <Route element={<WalletPage />} path="/wallet" />
         <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />

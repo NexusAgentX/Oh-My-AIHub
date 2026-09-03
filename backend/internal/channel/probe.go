@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 )
 
 const (
@@ -24,19 +26,19 @@ func (s *Service) probe(ctx context.Context, target ValidationTarget, credential
 	defer cancel()
 	body, err := probeRequestBody(target.Protocol, target.UpstreamModelID)
 	if err != nil {
-		return failedAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started), credential)
 	}
 	endpoint, err := s.outbound.Endpoint(target.NormalizedBaseURL, target.Protocol, target.UpstreamModelID, false)
 	if err != nil {
-		return failedAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started), credential)
 	}
 	client, err := s.outbound.ClientFor(probeContext, target.NormalizedBaseURL, 0)
 	if err != nil {
-		return failedAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started), credential)
 	}
 	request, err := http.NewRequestWithContext(probeContext, http.MethodPost, endpoint.String(), bytes.NewReader(body))
 	if err != nil {
-		return failedAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, ErrorConfiguration, err.Error(), time.Since(started), credential)
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
@@ -47,16 +49,16 @@ func (s *Service) probe(ctx context.Context, target ValidationTarget, credential
 		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(strings.ToLower(err.Error()), "timeout") {
 			category = ErrorTimeout
 		}
-		return failedAttemptWithDuration(target.Attempt, category, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, category, err.Error(), time.Since(started), credential)
 	}
 	defer response.Body.Close()
 	target.Attempt.HTTPStatus = response.StatusCode
 	responseBytes, tooLarge, err := readLimited(response.Body, probeResponseLimit)
-	if failed, terminal := probeHTTPFailure(target.Attempt, response.StatusCode, response.Status, responseBytes, tooLarge, err, time.Since(started)); terminal {
+	if failed, terminal := probeHTTPFailure(target.Attempt, response.StatusCode, response.Status, responseBytes, tooLarge, err, credential, time.Since(started)); terminal {
 		return failed
 	}
 	if err := validateProbeResponse(target.Protocol, responseBytes); err != nil {
-		return failedAttemptWithDuration(target.Attempt, ErrorInvalid, err.Error(), time.Since(started))
+		return failedProbeAttemptWithDuration(target.Attempt, ErrorInvalid, err.Error(), time.Since(started), credential)
 	}
 	completed := time.Now().UTC()
 	target.Attempt.Status = ValidationPassed
@@ -65,16 +67,17 @@ func (s *Service) probe(ctx context.Context, target ValidationTarget, credential
 	return target.Attempt
 }
 
-func probeHTTPFailure(attempt ValidationAttempt, statusCode int, status string, body []byte, tooLarge bool, readErr error, duration time.Duration) (ValidationAttempt, bool) {
+func probeHTTPFailure(attempt ValidationAttempt, statusCode int, status string, body []byte, tooLarge bool, readErr error, credential string, duration time.Duration) (ValidationAttempt, bool) {
 	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
 		raw := string(body)
 		if raw == "" {
 			raw = status
 		}
+		raw = protectProbeError(raw, credential)
 		return failedAttemptWithDuration(attempt, ErrorAuth, raw, duration), true
 	}
 	if readErr != nil {
-		return failedAttemptWithDuration(attempt, ErrorTransport, readErr.Error(), duration), true
+		return failedProbeAttemptWithDuration(attempt, ErrorTransport, readErr.Error(), duration, credential), true
 	}
 	if tooLarge {
 		return failedAttemptWithDuration(attempt, ErrorTooLarge, "upstream response exceeded 1048576 bytes", duration), true
@@ -84,9 +87,21 @@ func probeHTTPFailure(attempt ValidationAttempt, statusCode int, status string, 
 		if raw == "" {
 			raw = status
 		}
+		raw = protectProbeError(raw, credential)
 		return failedAttemptWithDuration(attempt, ErrorUpstream, raw, duration), true
 	}
 	return ValidationAttempt{}, false
+}
+
+func protectProbeError(raw, credential string) string {
+	if secretguard.ContainsExactOrJSONEscaped(raw, credential) || secretguard.ContainsExactInJSON([]byte(raw), credential) {
+		return secretguard.CredentialErrorMessage
+	}
+	return raw
+}
+
+func failedProbeAttemptWithDuration(attempt ValidationAttempt, category ErrorCategory, raw string, duration time.Duration, credential string) ValidationAttempt {
+	return failedAttemptWithDuration(attempt, category, protectProbeError(raw, credential), duration)
 }
 
 func probeRequestBody(protocol Protocol, model string) ([]byte, error) {

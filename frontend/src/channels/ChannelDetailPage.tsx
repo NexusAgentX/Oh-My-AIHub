@@ -5,6 +5,7 @@ import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/
 import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, ConfirmDialog, formatDate, PricePair, protocolLabels, ratingText } from './presentation'
+import { formatPoints, formatRate } from '../gateway/presentation'
 import { createLatestRequestGate } from './requestGate'
 
 type PendingAction =
@@ -189,12 +190,14 @@ export function ChannelDetailPage() {
         {activeOffers.length === 0 ? <div className="empty-state">没有协议报价</div> : <>
           <div className="desktop-table-wrap">
             <table className="data-table channel-offer-table">
-              <thead><tr><th scope="col">模型 / 协议</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">验证</th><th scope="col"><span className="visually-hidden">操作</span></th></tr></thead>
+              <thead><tr><th scope="col">模型 / 协议</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">调用质量</th><th scope="col">收入</th><th scope="col">验证</th><th scope="col"><span className="visually-hidden">操作</span></th></tr></thead>
               <tbody>{activeOffers.map((offer) => <tr key={offer.id}>
                 <td><strong>{offer.model_name}</strong><small>{protocolLabels[offer.protocol]} · {offer.upstream_model_id}</small></td>
                 <td>{offer.multiplier}×</td>
                 <td><PricePair first={offer.input_price} second={offer.output_price} /></td>
                 <td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td>
+                <td>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : <><strong>{formatRate(offer.call_success_rate)}</strong><small>{offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
+                <td>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</td>
                 <td>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : '待验证'}<small>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</small><small>{formatDate(offer.latest_validation?.completed_at)}</small></td>
                 <td className="table-action"><div className="table-action-group">
                   <Button disabled={busy} onClick={() => { setCostConfirmed(false); setPending({ kind: 'validate', offer }) }} variant="secondary">验证</Button>
@@ -207,7 +210,7 @@ export function ChannelDetailPage() {
           </div>
           <div className="mobile-card-list">{activeOffers.map((offer) => <article className="mobile-data-card" key={offer.id}>
             <header><div><strong>{offer.model_name}</strong><span>{protocolLabels[offer.protocol]}</span></div>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : <span>待验证</span>}</header>
-            <dl><div><dt>资格</dt><dd>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div></dl>
+            <dl><div><dt>资格</dt><dd>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>成功率 / 调用</dt><dd>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : `${formatRate(offer.call_success_rate)} / ${offer.call_count ?? 0}`}</dd></div><div><dt>收入</dt><dd>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</dd></div></dl>
             <div className="mobile-card-actions"><Button disabled={busy} onClick={() => { setCostConfirmed(false); setPending({ kind: 'validate', offer }) }} variant="secondary">验证</Button><Button onClick={() => void showHistory(offer)} variant="secondary">记录</Button><Button disabled={busy} onClick={() => void toggleOffer(offer)} variant="secondary">{offer.status === 'active' ? '停用' : '启用'}</Button><Button onClick={() => setPending({ kind: 'delete-offer', offer })} variant="danger">删除</Button></div>
           </article>)}</div>
         </>}

@@ -56,6 +56,19 @@ func (blockingResolver) LookupNetIP(ctx context.Context, _, _ string) ([]net.IP,
 	return nil, ctx.Err()
 }
 
+type deadlineObservingResolver struct {
+	remaining time.Duration
+}
+
+func (r *deadlineObservingResolver) LookupNetIP(ctx context.Context, _, _ string) ([]net.IP, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return nil, errors.New("resolver context has no deadline")
+	}
+	r.remaining = time.Until(deadline)
+	return []net.IP{net.ParseIP("93.184.216.34")}, nil
+}
+
 func (r *fakeResolver) LookupNetIP(context.Context, string, string) ([]net.IP, error) {
 	r.calls++
 	return r.addresses, r.err
@@ -405,6 +418,22 @@ func TestClientResolutionHonorsCallerDeadline(t *testing.T) {
 	}
 	if elapsed := time.Since(started); elapsed > time.Second {
 		t.Fatalf("DNS deadline took %s", elapsed)
+	}
+}
+
+func TestProxyClientAddsFiveSecondResolutionDeadline(t *testing.T) {
+	resolver := &deadlineObservingResolver{}
+	policy, err := NewOutboundPolicyWithResolver(nil, nil, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	if _, err := policy.ClientForProxy(ctx, "https://gateway.example", 30*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if resolver.remaining <= 0 || resolver.remaining > 5*time.Second || resolver.remaining < 4*time.Second {
+		t.Fatalf("proxy DNS deadline = %s, want an internal five-second bound", resolver.remaining)
 	}
 }
 

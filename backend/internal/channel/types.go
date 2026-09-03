@@ -100,6 +100,7 @@ type Offer struct {
 	ValidationVersion int64
 	Version           int64
 	ModelStatus       catalog.Status
+	ContextWindow     int64
 	InputPrice        money.Amount
 	OutputPrice       money.Amount
 	CacheWritePrice   money.Amount

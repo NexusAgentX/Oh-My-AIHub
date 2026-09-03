@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -97,6 +100,9 @@ func getChannel(ctx context.Context, queryer channelQueryer, channelID, viewerID
 		if _, priceErr := channel.CalculateBenchmarkPrices(result.Offers[index]); priceErr != nil {
 			result.Offers[index].Eligible = false
 			result.Offers[index].IneligibleReason = "price_unrepresentable"
+		} else if _, priceErr := gateway.ConservativeNetDebitUpperBound(offerRoutingLease(result.Offers[index]), ledger.FixedPointScale, false); priceErr != nil {
+			result.Offers[index].Eligible = false
+			result.Offers[index].IneligibleReason = "price_unrepresentable"
 		}
 	}
 	return result, nil
@@ -105,12 +111,15 @@ func getChannel(ctx context.Context, queryer channelQueryer, channelID, viewerID
 const offerColumns = `
 		o.id::text, cm.channel_id::text, cm.model_id, m.name, m.provider, o.protocol,
 		o.upstream_model_id, COALESCE(o.deleted_multiplier_nano, cm.multiplier_nano), o.status, o.validation_version, o.version,
-		m.status, m.input_price_nano_per_million, m.output_price_nano_per_million,
+		m.status, m.context_window, m.input_price_nano_per_million, m.output_price_nano_per_million,
 		m.cache_write_price_nano_per_million, m.cache_read_price_nano_per_million,
 		attempt.id::text, attempt.attempt_seq, attempt.actor_account_id::text,
 		attempt.status, attempt.error_category, attempt.http_status, attempt.raw_error,
 		attempt.raw_error_truncated, attempt.duration_milliseconds,
-		attempt.started_at, attempt.completed_at, o.created_at, o.updated_at`
+		attempt.started_at, attempt.completed_at, o.created_at, o.updated_at,
+		gateway_metrics.success_rate, gateway_metrics.ttft_milliseconds,
+		gateway_metrics.tokens_per_second, gateway_metrics.call_count,
+		gateway_income.provider_income_nano`
 
 func scanOffer(row scanner) (channel.Offer, error) {
 	var result channel.Offer
@@ -118,14 +127,17 @@ func scanOffer(row scanner) (channel.Offer, error) {
 	var multiplier, inputPrice, outputPrice, cacheWritePrice, cacheReadPrice int64
 	var attemptID, attemptActor, attemptStatus, errorCategory, rawError sql.NullString
 	var attemptSeq, httpStatus, duration sql.NullInt64
+	var successRate, tokensPerSecond sql.NullString
+	var gatewayTTFT, callCount, providerIncome sql.NullInt64
 	var rawTruncated sql.NullBool
 	var startedAt, completedAt sql.NullTime
 	if err := row.Scan(
 		&result.ID, &result.ChannelID, &result.ModelID, &result.ModelName, &result.ModelProvider, &protocol,
 		&result.UpstreamModelID, &multiplier, &status, &result.ValidationVersion, &result.Version,
-		&modelStatus, &inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice,
+		&modelStatus, &result.ContextWindow, &inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice,
 		&attemptID, &attemptSeq, &attemptActor, &attemptStatus, &errorCategory, &httpStatus, &rawError,
 		&rawTruncated, &duration, &startedAt, &completedAt, &result.CreatedAt, &result.UpdatedAt,
+		&successRate, &gatewayTTFT, &tokensPerSecond, &callCount, &providerIncome,
 	); err != nil {
 		return channel.Offer{}, mapChannelError(err)
 	}
@@ -152,8 +164,46 @@ func scanOffer(row scanner) (channel.Offer, error) {
 		}
 		result.LatestValidation = &attempt
 	}
+	if successRate.Valid {
+		value := successRate.String
+		result.CallSuccessRate = &value
+	}
+	if gatewayTTFT.Valid {
+		value := gatewayTTFT.Int64
+		result.TTFTMilliseconds = &value
+	}
+	if tokensPerSecond.Valid {
+		value := tokensPerSecond.String
+		result.TokensPerSecond = &value
+	}
+	if callCount.Valid {
+		value := callCount.Int64
+		result.CallCount = &value
+	}
+	if providerIncome.Valid {
+		value := money.FromNano(providerIncome.Int64)
+		result.ProviderIncome = &value
+	}
 	return result, nil
 }
+
+const offerGatewayMetricJoins = `
+		LEFT JOIN LATERAL (
+			SELECT
+				round((count(*) FILTER (WHERE gateway_attempt.status = 'succeeded'))::numeric /
+					NULLIF(count(*) FILTER (WHERE gateway_attempt.status IN ('succeeded', 'failed', 'cancelled', 'incomplete')), 0), 4)::text AS success_rate,
+				round(avg(gateway_attempt.ttft_milliseconds) FILTER (WHERE gateway_attempt.status = 'succeeded'))::bigint AS ttft_milliseconds,
+				round((avg(gateway_attempt.tokens_per_second_nano) FILTER (WHERE gateway_attempt.status = 'succeeded'))::numeric /
+					1000000000, 3)::text AS tokens_per_second,
+				NULLIF(count(*) FILTER (WHERE gateway_attempt.status IN ('succeeded', 'failed', 'cancelled', 'incomplete')), 0) AS call_count
+			FROM api_call_attempts gateway_attempt WHERE gateway_attempt.offer_id = o.id
+		) gateway_metrics ON true
+		LEFT JOIN LATERAL (
+			SELECT NULLIF(sum(gateway_settlement.provider_charge_nano), 0) AS provider_income_nano
+			FROM api_call_settlements gateway_settlement
+			JOIN api_calls gateway_call ON gateway_call.id = gateway_settlement.call_id
+			WHERE gateway_call.final_offer_id = o.id AND gateway_call.status = 'succeeded'
+		) gateway_income ON true`
 
 func offersForChannel(ctx context.Context, queryer channelQueryer, channelID string, includeDeleted bool) ([]channel.Offer, error) {
 	rows, err := queryer.Query(ctx, `
@@ -165,6 +215,7 @@ func offersForChannel(ctx context.Context, queryer channelQueryer, channelID str
 			ON attempt.offer_id = o.id
 			AND attempt.validation_version = o.validation_version
 			AND attempt.attempt_seq = o.validation_attempt_seq
+		`+offerGatewayMetricJoins+`
 		WHERE cm.channel_id = $1 AND ($2 OR o.status <> 'deleted')
 		ORDER BY m.provider, m.name, o.protocol, o.created_at, o.id`, channelID, includeDeleted)
 	if err != nil {
@@ -186,6 +237,14 @@ func catalogStatus(value string) catalog.Status { return catalog.Status(value) }
 
 func timeDurationMilliseconds(value int64) time.Duration {
 	return time.Duration(value) * time.Millisecond
+}
+
+func offerRoutingLease(offer channel.Offer) channel.RoutingLease {
+	return channel.RoutingLease{
+		ContextWindow: offer.ContextWindow, Multiplier: offer.Multiplier,
+		InputPrice: offer.InputPrice, OutputPrice: offer.OutputPrice,
+		CacheWritePrice: offer.CacheWritePrice, CacheReadPrice: offer.CacheReadPrice,
+	}
 }
 
 func (s *Store) CreateChannel(ctx context.Context, command channel.CreateCommand) (channel.Channel, error) {
@@ -632,6 +691,7 @@ func offerByID(ctx context.Context, queryer channelQueryer, offerID string) (cha
 		LEFT JOIN channel_validation_attempts attempt
 			ON attempt.offer_id = o.id AND attempt.validation_version = o.validation_version
 			AND attempt.attempt_seq = o.validation_attempt_seq
+		`+offerGatewayMetricJoins+`
 		WHERE o.id = $1`, offerID))
 }
 
@@ -1003,6 +1063,7 @@ type marketCursor struct {
 	PriceNano   int64            `json:"price_nano,omitempty"`
 	Rating      *string          `json:"rating,omitempty"`
 	RatingCount int64            `json:"rating_count,omitempty"`
+	Metric      *string          `json:"metric,omitempty"`
 }
 
 func encodeMarketCursor(value marketCursor) (string, error) {
@@ -1048,6 +1109,12 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 		priceColumn = "cache_read_price_nano"
 	case "rating":
 		sortExpression = "average_rating DESC NULLS LAST, rating_count DESC, offer_id ASC"
+	case "success_rate":
+		sortExpression = "success_rate DESC NULLS LAST, offer_id ASC"
+	case "ttft":
+		sortExpression = "ttft_milliseconds ASC NULLS LAST, offer_id ASC"
+	case "tps":
+		sortExpression = "tokens_per_second DESC NULLS LAST, offer_id ASC"
 	}
 	afterExpression := "($4 = '' OR " + priceColumn + " > $5 OR (" + priceColumn + " = $5 AND offer_id > $4::uuid))"
 	limitPlaceholder := "$6"
@@ -1059,11 +1126,32 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 			($5::numeric IS NULL AND average_rating IS NULL AND
 				(rating_count < $6 OR (rating_count = $6 AND offer_id > $4::uuid))))`
 	}
+	if query.Sort == "success_rate" || query.Sort == "ttft" || query.Sort == "tps" {
+		metricColumn := query.Sort
+		if query.Sort == "ttft" {
+			metricColumn = "ttft_milliseconds"
+		} else if query.Sort == "tps" {
+			metricColumn = "tokens_per_second"
+		}
+		comparison := "<"
+		if query.Sort == "ttft" {
+			comparison = ">"
+		}
+		afterExpression = `($4 = '' OR
+			($5::numeric IS NOT NULL AND (` + metricColumn + ` IS NULL OR ` + metricColumn + ` ` + comparison + ` $5::numeric OR
+				(` + metricColumn + ` = $5::numeric AND offer_id > $4::uuid))) OR
+			($5::numeric IS NULL AND ` + metricColumn + ` IS NULL AND offer_id > $4::uuid))`
+	}
 	cursorValue := any(cursor.PriceNano)
 	if query.Sort == "rating" {
 		cursorValue = nil
 		if cursor.Rating != nil {
 			cursorValue = *cursor.Rating
+		}
+	} else if query.Sort == "success_rate" || query.Sort == "ttft" || query.Sort == "tps" {
+		cursorValue = nil
+		if cursor.Metric != nil {
+			cursorValue = *cursor.Metric
 		}
 	}
 	statement := `
@@ -1084,6 +1172,10 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 						AND COALESCE(o.deleted_multiplier_nano, cm.multiplier_nano) BETWEEN 0 AND 1000000000000
 					THEN ceil(m.cache_read_price_nano_per_million::numeric * COALESCE(o.deleted_multiplier_nano, cm.multiplier_nano)::numeric / 1000000000)::bigint END AS cache_read_price_nano,
 				rating.average_rating, COALESCE(rating.rating_count, 0) AS rating_count, attempt.completed_at AS last_tested_at,
+				gateway_metrics.success_rate::numeric AS success_rate,
+				gateway_metrics.ttft_milliseconds,
+				gateway_metrics.tokens_per_second::numeric AS tokens_per_second,
+				gateway_metrics.call_count,
 				(owner.status = 'active' AND NOT owner.must_change_password
 					AND c.status = 'published' AND m.status = 'active' AND o.status = 'active'
 					AND m.input_price_nano_per_million BETWEEN 0 AND 100000000000000
@@ -1106,11 +1198,13 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 				SELECT round(avg(score)::numeric, 2) AS average_rating, count(*) AS rating_count
 				FROM channel_ratings WHERE channel_id = c.id
 			) rating ON true
+			` + offerGatewayMetricJoins + `
 		)
 		SELECT offer_id::text, channel_id::text, channel_name, owner_account_id::text, owner_name,
 			model_id, model_name, model_provider, protocol, multiplier_nano,
 			input_price_nano, output_price_nano, cache_write_price_nano, cache_read_price_nano,
-			COALESCE(average_rating::text, ''), rating_count, last_tested_at
+			COALESCE(average_rating::text, ''), rating_count, last_tested_at,
+			success_rate::text, ttft_milliseconds, tokens_per_second::text, call_count
 		FROM candidates
 		WHERE eligible
 			AND ($1 = '' OR model_id = $1)
@@ -1135,10 +1229,13 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 		var multiplier, inputPrice, outputPrice, cacheWritePrice, cacheReadPrice int64
 		var rating string
 		var lastTestedAt sql.NullTime
+		var successRate, tokensPerSecond sql.NullString
+		var ttft, callCount sql.NullInt64
 		if err := rows.Scan(
 			&item.OfferID, &item.ChannelID, &item.ChannelDisplayName, &item.OwnerAccountID, &item.OwnerDisplayName,
 			&item.ModelID, &item.ModelName, &item.ModelProvider, &protocol, &multiplier,
 			&inputPrice, &outputPrice, &cacheWritePrice, &cacheReadPrice, &rating, &item.RatingCount, &lastTestedAt,
+			&successRate, &ttft, &tokensPerSecond, &callCount,
 		); err != nil {
 			return nil, "", err
 		}
@@ -1155,6 +1252,22 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 		if lastTestedAt.Valid {
 			value := lastTestedAt.Time
 			item.LastTestedAt = &value
+		}
+		if successRate.Valid {
+			value := successRate.String
+			item.CallSuccessRate = &value
+		}
+		if ttft.Valid {
+			value := ttft.Int64
+			item.TTFTMilliseconds = &value
+		}
+		if tokensPerSecond.Valid {
+			value := tokensPerSecond.String
+			item.TokensPerSecond = &value
+		}
+		if callCount.Valid {
+			value := callCount.Int64
+			item.CallCount = &value
 		}
 		items = append(items, item)
 	}
@@ -1175,6 +1288,15 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 			nextCursor.PriceNano = last.CacheWritePrice.Nano()
 		case "cache_read_price":
 			nextCursor.PriceNano = last.CacheReadPrice.Nano()
+		case "success_rate":
+			nextCursor.Metric = last.CallSuccessRate
+		case "ttft":
+			if last.TTFTMilliseconds != nil {
+				value := strconv.FormatInt(*last.TTFTMilliseconds, 10)
+				nextCursor.Metric = &value
+			}
+		case "tps":
+			nextCursor.Metric = last.TokensPerSecond
 		default:
 			nextCursor.PriceNano = last.InputPrice.Nano()
 		}
@@ -1457,6 +1579,13 @@ func resolveRoutingTargets(ctx context.Context, queryer channelQueryer, offerIDs
 			catalog.Status(modelStatus), validationStatus.String, credentialVersion.Valid,
 		)
 		if priceErr != nil {
+			status.Eligible = false
+			status.IneligibleReason = "price_unrepresentable"
+		} else if _, upperErr := gateway.ConservativeNetDebitUpperBound(channel.RoutingLease{
+			ContextWindow: contextWindow, Multiplier: money.FromNano(multiplier),
+			InputPrice: money.FromNano(inputPrice), OutputPrice: money.FromNano(outputPrice),
+			CacheWritePrice: money.FromNano(cacheWritePrice), CacheReadPrice: money.FromNano(cacheReadPrice),
+		}, ledger.FixedPointScale, false); upperErr != nil {
 			status.Eligible = false
 			status.IneligibleReason = "price_unrepresentable"
 		}

@@ -12,21 +12,24 @@ type NavigationItem = {
   label: string
   to?: string
   icon: IconName
+  mobile?: boolean
 }
 
 const productNavigation: NavigationItem[] = [
-  { label: '账户设置', to: '/account', icon: 'account' },
-  { label: 'API Key', icon: 'key' },
-  { label: '渠道市场', to: '/market', icon: 'database' },
+  { label: '总览', to: '/dashboard', icon: 'database', mobile: true },
+  { label: 'API Key', to: '/keys', icon: 'key', mobile: true },
+  { label: '渠道市场', to: '/market', icon: 'database', mobile: true },
+  { label: '调用记录', to: '/calls', icon: 'database' },
   { label: '我的渠道', to: '/channels', icon: 'settings' },
-  { label: 'C2C 市场', to: '/c2c', icon: 'wallet' },
-  { label: '积分钱包', to: '/wallet', icon: 'wallet' },
+  { label: 'C2C 市场', to: '/c2c', icon: 'wallet', mobile: true },
+  { label: '积分钱包', to: '/wallet', icon: 'wallet', mobile: true },
+  { label: '账户设置', to: '/account', icon: 'account' },
 ]
 
 const adminNavigation: NavigationItem[] = [
-  { label: '运营总览', to: '/admin/ops', icon: 'settings' },
-  { label: '账户与信用', to: '/admin/accounts', icon: 'users' },
-  { label: '模型目录', to: '/admin/models', icon: 'database' },
+  { label: '运营总览', to: '/admin/ops', icon: 'settings', mobile: true },
+  { label: '账户与信用', to: '/admin/accounts', icon: 'users', mobile: true },
+  { label: '模型目录', to: '/admin/models', icon: 'database', mobile: true },
   { label: '渠道治理', to: '/admin/channels', icon: 'settings' },
   { label: 'C2C 争议', to: '/admin/c2c/disputes', icon: 'wallet' },
 ]
@@ -49,7 +52,8 @@ export function AppShell({
   const sidebarReference = useRef<HTMLElement>(null)
   const navigation = admin ? adminNavigation : productNavigation
   const bottomNavigation = navigation.filter(
-    (item): item is NavigationItem & { to: string } => Boolean(item.to),
+    (item): item is NavigationItem & { to: string } =>
+      Boolean(item.to && item.mobile),
   )
 
   const closeMenu = useCallback((restoreFocus = true) => {
