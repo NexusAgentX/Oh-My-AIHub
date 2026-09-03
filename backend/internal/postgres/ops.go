@@ -264,12 +264,12 @@ func (s *Store) opsConcentration(ctx context.Context, result *ops.Metrics) error
 			(SELECT count(*) FROM pos),
 			(SELECT COALESCE(sum(posted_balance_nano), 0)::text FROM pos),
 			(WITH agg AS (SELECT max(posted_balance_nano) AS top, COALESCE(sum(posted_balance_nano), 0)::numeric AS total FROM pos)
-				SELECT (top::numeric / total)::text FROM agg WHERE total > 0),
+				SELECT round(top::numeric / total, 6)::text FROM agg WHERE total > 0),
 			(WITH top5 AS (SELECT posted_balance_nano FROM pos ORDER BY posted_balance_nano DESC LIMIT 5),
 				agg AS (SELECT COALESCE(sum(posted_balance_nano), 0)::numeric AS top_sum, COALESCE((SELECT sum(posted_balance_nano) FROM pos), 0)::numeric AS total FROM top5)
-				SELECT (top_sum / total)::text FROM agg WHERE total > 0),
+				SELECT round(top_sum / total, 6)::text FROM agg WHERE total > 0),
 			(WITH agg AS (SELECT posted_balance_nano::numeric AS balance, COALESCE((SELECT sum(posted_balance_nano) FROM pos), 0)::numeric AS total FROM pos)
-				SELECT sum((balance / total) * (balance / total))::text FROM agg WHERE total > 0)`).
+				SELECT round(sum((balance / total) * (balance / total)), 6)::text FROM agg WHERE total > 0)`).
 		Scan(&count, &total, &top1, &top5, &hhi); err != nil {
 		return err
 	}
