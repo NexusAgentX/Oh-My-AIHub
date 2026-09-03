@@ -4,7 +4,7 @@ import { api, ApiError } from '../api/client'
 import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/contracts'
 import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
-import { ChannelStateBadge, ConfirmDialog, formatDate, PricePair, protocolLabels, ratingText } from './presentation'
+import { ChannelStateBadge, ConfirmDialog, formatDate, PricePair, protocolLabels, ratingText, TierCountBadge, TierPriceList } from './presentation'
 import { formatPoints, formatRate } from '../gateway/presentation'
 import { createLatestRequestGate } from './requestGate'
 
@@ -194,8 +194,8 @@ export function ChannelDetailPage() {
               <tbody>{activeOffers.map((offer) => <tr key={offer.id}>
                 <td><strong>{offer.model_name}</strong><small>{protocolLabels[offer.protocol]} · {offer.upstream_model_id}</small></td>
                 <td>{offer.multiplier}×</td>
-                <td><PricePair first={offer.input_price} second={offer.output_price} /></td>
-                <td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td>
+                <td><span className="price-with-tiers"><PricePair first={offer.input_price} second={offer.output_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
+                <td><span className="price-with-tiers"><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
                 <td>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : <><strong>{formatRate(offer.call_success_rate)}</strong><small>{offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
                 <td>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</td>
                 <td>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : '待验证'}<small>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</small><small>{formatDate(offer.latest_validation?.completed_at)}</small></td>
@@ -211,6 +211,7 @@ export function ChannelDetailPage() {
           <div className="mobile-card-list">{activeOffers.map((offer) => <article className="mobile-data-card" key={offer.id}>
             <header><div><strong>{offer.model_name}</strong><span>{protocolLabels[offer.protocol]}</span></div>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : <span>待验证</span>}</header>
             <dl><div><dt>资格</dt><dd>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>成功率 / 调用</dt><dd>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : `${formatRate(offer.call_success_rate)} / ${offer.call_count ?? 0}`}</dd></div><div><dt>收入</dt><dd>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</dd></div></dl>
+            <TierPriceList tiers={offer.price_tiers} />
             <div className="mobile-card-actions"><Button disabled={busy} onClick={() => { setCostConfirmed(false); setPending({ kind: 'validate', offer }) }} variant="secondary">验证</Button><Button onClick={() => void showHistory(offer)} variant="secondary">记录</Button><Button disabled={busy} onClick={() => void toggleOffer(offer)} variant="secondary">{offer.status === 'active' ? '停用' : '启用'}</Button><Button onClick={() => setPending({ kind: 'delete-offer', offer })} variant="danger">删除</Button></div>
           </article>)}</div>
         </>}

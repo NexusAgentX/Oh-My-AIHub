@@ -1182,6 +1182,44 @@ h2 {
 }
 .channel-price-pair { display: inline-flex; flex-direction: column; gap: 2px; white-space: nowrap; }
 .channel-price-pair small { color: var(--muted); font-size: 11px; font-weight: 400; }
+.price-with-tiers { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tier-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: var(--ink);
+  background: var(--positive-soft);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tier-price-list { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.tier-price-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--soft);
+}
+.tier-price-list .tier-condition { color: var(--muted); font-size: 12px; }
+.tier-fieldset { gap: 10px; }
+.tier-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--soft);
+}
+.tier-card-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.tier-predicate-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tier-window-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.tier-window-row .choice-field { flex: 1; min-width: 260px; margin: 0; }
 .market-channel-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 20px; }
 .market-channel-summary > div { display: flex; align-items: center; gap: 12px; }
 .market-channel-summary > div > div { display: grid; gap: 3px; }

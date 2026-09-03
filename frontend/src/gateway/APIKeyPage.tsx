@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { APIKey } from '../api/contracts'
-import { formatDate, PricePair, protocolLabels } from '../channels/presentation'
+import { formatDate, PricePair, protocolLabels, TierCountBadge, TierPriceList } from '../channels/presentation'
 import { AppShell } from '../layouts/AppShell'
 import {
   Button,
@@ -219,8 +219,8 @@ export function APIKeyPage() {
                               {member.eligible ? '可用' : '需更新'}
                             </span>
                           </td>
-                          <td><PricePair first={member.input_price} second={member.output_price} /></td>
-                          <td><PricePair first={member.cache_write_price} second={member.cache_read_price} /></td>
+                          <td><span className="price-with-tiers"><PricePair first={member.input_price} second={member.output_price} /><TierCountBadge tiers={member.price_tiers} /></span></td>
+                          <td><span className="price-with-tiers"><PricePair first={member.cache_write_price} second={member.cache_read_price} /><TierCountBadge tiers={member.price_tiers} /></span></td>
                           <td>{member.success_rate === null ? '—' : formatRate(member.success_rate)}</td>
                           <td>{member.ttft_milliseconds ?? '—'} ms / {member.tokens_per_second ?? '—'}</td>
                         </tr>
@@ -238,7 +238,7 @@ export function APIKeyPage() {
                         </span>
                       </header>
                       <dl>
-                        <div><dt>输入 / 输出</dt><dd><PricePair first={member.input_price} second={member.output_price} /></dd></div>
+                        <div><dt>输入 / 输出</dt><dd><PricePair first={member.input_price} second={member.output_price} /><TierCountBadge tiers={member.price_tiers} /></dd></div>
                         <div><dt>成功率</dt><dd>{member.success_rate === null ? '—' : formatRate(member.success_rate)}</dd></div>
                         <div><dt>TTFT / TPS</dt><dd>{member.ttft_milliseconds ?? '—'} ms / {member.tokens_per_second ?? '—'}</dd></div>
                       </dl>
