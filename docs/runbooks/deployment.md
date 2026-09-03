@@ -32,3 +32,13 @@
 2. 执行一次数据库备份（见备份恢复 Runbook）。
 3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。
 4. 升级后烟测同上；若巡检出现硬异常，按故障处理 Runbook 处置并保留现场。
+
+## 生产部署（hub.isok.dev）
+
+生产实例部署在 HK VPS，由 GitHub Actions 自动部署（`.github/workflows/release.yml`）：
+
+1. 推送 `v*` tag（如 `v0.1.0`）后自动执行：`mise run check-release` 门禁 → backend/frontend 多架构镜像构建推送 GHCR（tag + digest 固定）→ 创建 GitHub Release。
+2. `production-hub` Environment 需人工审批。批准后 workflow 通过 SSH forced-command 调用 VPS 上的受限发布脚本：先做部署前加密备份，再以目标 digest 切换 Compose 镜像、`up -d`、等待健康并烟测本机与公网端点；任一步失败自动回滚到备份 Compose。
+3. 重跑或回滚：对 `release` workflow 使用 `workflow_dispatch` 并填入既有 tag，直接复用已发布镜像 digest 部署，不重新构建。
+4. 运行时事实（生产 Compose、Nginx、备份与发布脚本副本）以个人运维仓库 `remote-hosts/hk-vps/sites/oh-my-aihub/` 为准；首次部署与新环境自举使用该仓库的 `bin/deploy-oh-my-aihub`。
+

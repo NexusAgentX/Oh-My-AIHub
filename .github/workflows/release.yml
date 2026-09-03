@@ -1,0 +1,298 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要部署的既有版本 tag（重跑/回滚，不重新构建）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: ghcr.io/nexusagentx/oh-my-aihub-backend
+  FRONTEND_IMAGE: ghcr.io/nexusagentx/oh-my-aihub-frontend
+
+jobs:
+  resolve:
+    name: Resolve release target
+    if: github.repository == 'NexusAgentX/Oh-My-AIHub'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      backend_digest: ${{ steps.inspect.outputs.backend_digest }}
+      frontend_digest: ${{ steps.inspect.outputs.frontend_digest }}
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve tag and commit
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+
+          tag_re='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [[ ! "$TAG" =~ $tag_re ]]; then
+            echo "::error::Tag '$TAG' must look like v0.1.0"
+            exit 1
+          fi
+
+          REMOTE_SHA="$(
+            git ls-remote https://github.com/NexusAgentX/Oh-My-AIHub.git \
+              "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | \
+              awk -v direct="refs/tags/${TAG}" -v peeled="refs/tags/${TAG}^{}" '
+                $2 == peeled { print $1; found_peeled = 1; exit }
+                $2 == direct { direct_sha = $1 }
+                END { if (!found_peeled) print direct_sha }
+              '
+          )"
+          if [[ ! "$REMOTE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not resolve tag commit for $TAG"
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha=${REMOTE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect published images
+        id: inspect
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          for name in backend frontend; do
+            case "$name" in
+              backend) repo="${BACKEND_IMAGE}" ;;
+              frontend) repo="${FRONTEND_IMAGE}" ;;
+            esac
+            INSPECT_OUTPUT="$(
+              docker buildx imagetools inspect "${repo}:${TAG}" 2>&1
+            )" || {
+              printf '%s\n' "$INSPECT_OUTPUT" >&2
+              echo "::error::${repo}:${TAG} 不存在；重跑/回滚只能使用已通过 tag 构建发布的版本。"
+              exit 1
+            }
+            DIGEST="$(
+              awk '/^Digest:/ { print $2; exit }' <<<"$INSPECT_OUTPUT"
+            )"
+            if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::Could not resolve a sha256 digest for ${repo}:${TAG}"
+              exit 1
+            fi
+            echo "${name}_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "### Resolved release target"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Tag | \`${{ steps.resolve.outputs.tag }}\` |"
+            echo "| Source | \`${{ steps.resolve.outputs.sha }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  gates:
+    name: Release gates
+    if: github.event_name == 'push' && github.repository == 'NexusAgentX/Oh-My-AIHub'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+      - name: Run release gates
+        run: mise run check-release
+
+  images:
+    name: Build and push images
+    if: github.event_name == 'push' && github.repository == 'NexusAgentX/Oh-My-AIHub'
+    needs: [resolve, gates]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      backend_digest: ${{ steps.backend.outputs.digest }}
+      frontend_digest: ${{ steps.frontend.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push backend image
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.BACKEND_IMAGE }}:${{ needs.resolve.outputs.tag }}
+          labels: |
+            org.opencontainers.image.title=oh-my-aihub-backend
+            org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
+            org.opencontainers.image.revision=${{ needs.resolve.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.resolve.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        id: frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.FRONTEND_IMAGE }}:${{ needs.resolve.outputs.tag }}
+          labels: |
+            org.opencontainers.image.title=oh-my-aihub-frontend
+            org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
+            org.opencontainers.image.revision=${{ needs.resolve.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.resolve.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "### Published images"
+            echo
+            echo "| Image | Digest |"
+            echo "|---|---|"
+            echo "| \`${{ env.BACKEND_IMAGE }}:${{ needs.resolve.outputs.tag }}\` | \`${{ steps.backend.outputs.digest }}\` |"
+            echo "| \`${{ env.FRONTEND_IMAGE }}:${{ needs.resolve.outputs.tag }}\` | \`${{ steps.frontend.outputs.digest }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  github-release:
+    name: GitHub Release
+    if: github.event_name == 'push' && github.repository == 'NexusAgentX/Oh-My-AIHub'
+    needs: [resolve, images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release from CHANGELOG
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          awk -v tag="$TAG" '
+            $0 ~ "^## " tag "([[:space:]]|$)" { capture = 1; next }
+            /^## / { capture = 0 }
+            capture { print }
+          ' CHANGELOG.md > /tmp/notes.md
+          if [[ ! -s /tmp/notes.md ]]; then
+            echo "（CHANGELOG.md 未找到 $TAG 章节）" > /tmp/notes.md
+          fi
+          gh release create "$TAG" --title "$TAG" --notes-file /tmp/notes.md \
+            || gh release edit "$TAG" --notes-file /tmp/notes.md
+
+  deploy:
+    name: Deploy production
+    needs: [resolve, images]
+    if: >-
+      always() && !cancelled() &&
+      github.repository == 'NexusAgentX/Oh-My-AIHub' &&
+      needs.resolve.result == 'success' &&
+      (needs.images.result == 'success' || needs.images.result == 'skipped')
+    environment:
+      name: production-hub
+      url: https://hub.isok.dev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+      PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+      PRODUCTION_SSH_HOST_KEY: ${{ secrets.PRODUCTION_SSH_HOST_KEY }}
+      PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+      TAG: ${{ needs.resolve.outputs.tag }}
+      BACKEND_DIGEST: ${{ github.event_name == 'push' && needs.images.outputs.backend_digest || needs.resolve.outputs.backend_digest }}
+      FRONTEND_DIGEST: ${{ github.event_name == 'push' && needs.images.outputs.frontend_digest || needs.resolve.outputs.frontend_digest }}
+
+    steps:
+      - name: Configure restricted deploy key
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$PRODUCTION_SSH_PRIVATE_KEY" > "$HOME/.ssh/oh-my-aihub-production-deploy"
+          chmod 0600 "$HOME/.ssh/oh-my-aihub-production-deploy"
+          printf '%s\n' "$PRODUCTION_SSH_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/known_hosts"
+
+      - name: Run production preflight check
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh \
+            -i "$HOME/.ssh/oh-my-aihub-production-deploy" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_HOST}" \
+            check "$TAG" "$BACKEND_DIGEST" "$FRONTEND_DIGEST"
+
+      - name: Run production deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh \
+            -i "$HOME/.ssh/oh-my-aihub-production-deploy" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_HOST}" \
+            deploy "$TAG" "$BACKEND_DIGEST" "$FRONTEND_DIGEST"
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Oh-My-AIHub production deploy"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Tag | \`${TAG}\` |"
+            echo "| Backend image | \`ghcr.io/nexusagentx/oh-my-aihub-backend:${TAG}@${BACKEND_DIGEST}\` |"
+            echo "| Frontend image | \`ghcr.io/nexusagentx/oh-my-aihub-frontend:${TAG}@${FRONTEND_DIGEST}\` |"
+            echo "| Endpoint | https://hub.isok.dev |"
+          } >> "$GITHUB_STEP_SUMMARY"
