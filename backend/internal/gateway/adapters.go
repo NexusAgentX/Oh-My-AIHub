@@ -1161,7 +1161,8 @@ func validateSuccessfulResponse(protocol channel.Protocol, value map[string]any,
 		indexes := make(map[int64]struct{}, expectedChoices)
 		for _, raw := range choices {
 			choice, _ := raw.(map[string]any)
-			if !onlyKnownFields(choice, "index", "message", "logprobs", "finish_reason") {
+			if !onlyKnownFields(choice, "index", "message", "logprobs", "finish_reason", "native_finish_reason") ||
+				!optionalStringField(choice, "native_finish_reason") {
 				return invalid()
 			}
 			index, indexOK := intField(choice, "index")
@@ -1209,7 +1210,8 @@ func validateSuccessfulResponse(protocol channel.Protocol, value map[string]any,
 }
 
 func billableChatMessage(message map[string]any) bool {
-	if !onlyKnownFields(message, "role", "content", "refusal", "tool_calls", "function_call") {
+	if !onlyKnownFields(message, "role", "content", "refusal", "tool_calls", "function_call", "reasoning_content") ||
+		!optionalStringField(message, "reasoning_content") {
 		return false
 	}
 	if role, exists := message["role"]; exists && role != nil && role != "assistant" {
@@ -1239,8 +1241,9 @@ func billableChatMessage(message map[string]any) bool {
 }
 
 func billableChatDelta(message map[string]any) bool {
-	if !onlyKnownFields(message, "role", "content", "refusal", "tool_calls", "function_call") ||
-		!optionalStringField(message, "role") || !optionalStringField(message, "content") || !optionalStringField(message, "refusal") {
+	if !onlyKnownFields(message, "role", "content", "refusal", "tool_calls", "function_call", "reasoning_content") ||
+		!optionalStringField(message, "role") || !optionalStringField(message, "content") || !optionalStringField(message, "refusal") ||
+		!optionalStringField(message, "reasoning_content") {
 		return false
 	}
 	if role := stringField(message, "role"); role != "" && role != "assistant" {
@@ -1383,7 +1386,8 @@ func billableResponsesEnvelope(response map[string]any, complete bool) bool {
 		"max_output_tokens", "max_tool_calls", "model", "output", "parallel_tool_calls", "previous_response_id",
 		"reasoning", "service_tier", "store", "temperature", "text", "tool_choice", "tools", "top_p",
 		"truncation", "usage", "user", "metadata", "background", "conversation", "moderation", "prompt",
-		"prompt_cache_key", "prompt_cache_retention", "prompt_cache_options", "safety_identifier", "top_logprobs") ||
+		"prompt_cache_key", "prompt_cache_retention", "prompt_cache_options", "safety_identifier", "top_logprobs",
+		"presence_penalty", "frequency_penalty") ||
 		stringField(response, "object") != "response" || requestFieldEnabled(response, "background") ||
 		requestFieldPresent(response, "conversation") || requestFieldPresent(response, "moderation") || requestFieldPresent(response, "prompt") ||
 		requestFieldPresent(response, "previous_response_id") || requestFieldEnabled(response, "store") ||
@@ -1572,7 +1576,8 @@ func billableStreamingResponse(protocol channel.Protocol, value map[string]any) 
 		}
 		for position, rawChoice := range choices {
 			choice, ok := rawChoice.(map[string]any)
-			if !ok || !onlyKnownFields(choice, "index", "delta", "logprobs", "finish_reason") || !optionalStringField(choice, "finish_reason") {
+			if !ok || !onlyKnownFields(choice, "index", "delta", "logprobs", "finish_reason", "native_finish_reason") ||
+				!optionalStringField(choice, "finish_reason") || !optionalStringField(choice, "native_finish_reason") {
 				return false
 			}
 			index, valid := intField(choice, "index")
@@ -1958,7 +1963,8 @@ func openAIUsage(usage map[string]any, inputKey, outputKey, detailKey string) (U
 	if outputKey == "completion_tokens" {
 		outputDetailKey = "completion_tokens_details"
 	}
-	if !onlyKnownFields(usage, inputKey, outputKey, "total_tokens", detailKey, outputDetailKey) {
+	if !onlyKnownFields(usage, inputKey, outputKey, "total_tokens", detailKey, outputDetailKey,
+		"num_sources_used", "num_server_side_tools_used", "cost_in_usd_ticks", "context_details") {
 		return UsageObservation{}, false
 	}
 	inputTotal, inputOK := intField(usage, inputKey)
@@ -1966,20 +1972,12 @@ func openAIUsage(usage map[string]any, inputKey, outputKey, detailKey string) (U
 	if !inputOK || !outputOK {
 		return UsageObservation{}, false
 	}
-	combined, combinedOK := addNonnegativeTokens(inputTotal, output)
-	if !combinedOK {
-		return UsageObservation{}, false
-	}
-	if _, exists := usage["total_tokens"]; exists {
-		total, valid := intField(usage, "total_tokens")
-		if !valid || total != combined {
-			return UsageObservation{}, false
-		}
-	}
 	cached := int64(0)
 	cacheWrite := int64(0)
 	if details, ok := usage[detailKey].(map[string]any); ok {
-		if !onlyKnownFields(details, "cached_tokens", "cache_write_tokens", "audio_tokens") || !zeroOptionalTokenField(details, "audio_tokens") {
+		if !onlyKnownFields(details, "cached_tokens", "cache_write_tokens", "audio_tokens", "text_tokens", "image_tokens") ||
+			!zeroOptionalTokenField(details, "audio_tokens") || !zeroOptionalTokenField(details, "image_tokens") ||
+			!nonnegativeOptionalTokenField(details, "text_tokens") {
 			return UsageObservation{}, false
 		}
 		var cachedOK, cacheWriteOK bool
@@ -1991,15 +1989,52 @@ func openAIUsage(usage map[string]any, inputKey, outputKey, detailKey string) (U
 	} else if _, exists := usage[detailKey]; exists {
 		return UsageObservation{}, false
 	}
+	reasoning := int64(0)
 	if details, ok := usage[outputDetailKey].(map[string]any); ok {
 		if !onlyKnownFields(details, "reasoning_tokens", "audio_tokens", "accepted_prediction_tokens", "rejected_prediction_tokens") ||
 			!nonnegativeOptionalTokenField(details, "reasoning_tokens") || !zeroOptionalTokenField(details, "audio_tokens") ||
 			!nonnegativeOptionalTokenField(details, "accepted_prediction_tokens") || !nonnegativeOptionalTokenField(details, "rejected_prediction_tokens") {
 			return UsageObservation{}, false
 		}
+		var reasoningOK bool
+		reasoning, reasoningOK = intFieldDefault(details, "reasoning_tokens", 0)
+		if !reasoningOK {
+			return UsageObservation{}, false
+		}
 	} else if _, exists := usage[outputDetailKey]; exists {
 		return UsageObservation{}, false
 	}
+	visibleOutput := output
+	billedOutput := output
+	combinedVisible, combinedVisibleOK := addNonnegativeTokens(inputTotal, visibleOutput)
+	if !combinedVisibleOK {
+		return UsageObservation{}, false
+	}
+	if outputKey == "completion_tokens" && reasoning > 0 {
+		combinedBilled, combinedBilledOK := addNonnegativeTokens(combinedVisible, reasoning)
+		if !combinedBilledOK {
+			return UsageObservation{}, false
+		}
+		if _, exists := usage["total_tokens"]; exists {
+			total, valid := intField(usage, "total_tokens")
+			if !valid {
+				return UsageObservation{}, false
+			}
+			switch total {
+			case combinedVisible:
+			case combinedBilled:
+				billedOutput, _ = addNonnegativeTokens(visibleOutput, reasoning)
+			default:
+				return UsageObservation{}, false
+			}
+		}
+	} else if _, exists := usage["total_tokens"]; exists {
+		total, valid := intField(usage, "total_tokens")
+		if !valid || total != combinedVisible {
+			return UsageObservation{}, false
+		}
+	}
+	output = billedOutput
 	partitioned, partitionedOK := addNonnegativeTokens(cached, cacheWrite)
 	if !partitionedOK || inputTotal < partitioned {
 		return UsageObservation{}, false

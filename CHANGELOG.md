@@ -70,6 +70,7 @@
 
 ### 修复
 
+- 网关接受 xAI/中转站成功响应中的推理元数据与用量附加字段：Responses 允许 `presence_penalty`/`frequency_penalty`，Chat 允许 `reasoning_content`/`native_finish_reason`；忽略美元成本等无关 usage 字段，并在 Chat `total_tokens` 把 reasoning 单独加总时将其计入输出用量，避免上游 200 被误判为不可结算。
 - 设计资产检查器兼容 OpenPencil MCP 保存的多页面 `.op` 结构，不再把有效多页设计误报为缺少可编辑节点。
 - 会话查询或撤销遇到数据库故障时不再错误清除本地会话；Compose 安全入口不再关闭 Secure Cookie，只向宿主机回环地址发布明文前端端口，并要求显式配置内外两层可信代理网段后通过全链路自检。
 
