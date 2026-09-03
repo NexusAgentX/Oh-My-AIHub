@@ -106,6 +106,7 @@ export function AccountSettingsPage() {
             <div className="field-row">
               <PasswordField
                 autoComplete="new-password"
+                hint="至少 12 个字符"
                 label="新密码"
                 minLength={12}
                 onChange={(event) => setNewPassword(event.target.value)}
