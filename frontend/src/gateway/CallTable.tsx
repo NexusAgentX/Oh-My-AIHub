@@ -19,13 +19,18 @@ export function CallTable({ calls }: { calls: GatewayCall[] }) {
               <th scope="col">尝试</th>
               <th scope="col">Tokens</th>
               <th scope="col">时间</th>
-              <th scope="col"><span className="visually-hidden">操作</span></th>
             </tr>
           </thead>
           <tbody>
             {calls.map((call) => (
               <tr key={call.id}>
-                <td><strong>{call.model_id || '受限调用视图'}</strong><small className="mono-value">{shortID(call.id)}</small></td>
+                <td>
+                  <Link className="table-row-link" to={`/calls/${call.id}`}>
+                    <strong>{call.model_id || '受限调用视图'}</strong>
+                    <small className="mono-value">{shortID(call.id)}</small>
+                    <span className="visually-hidden">调用详情</span>
+                  </Link>
+                </td>
                 <td><GatewayStatusBadge status={call.status} /></td>
                 <td>{call.protocol ? protocolLabels[call.protocol] : '—'}</td>
                 <td className="mono-value">{call.key_prefix ? `${call.key_prefix}…` : '—'}</td>
@@ -33,7 +38,6 @@ export function CallTable({ calls }: { calls: GatewayCall[] }) {
                 <td>{call.attempt_count}</td>
                 <td>{totalTokens(call)}</td>
                 <td>{formatDate(call.created_at)}</td>
-                <td className="table-action"><Link className="button button-secondary" to={`/calls/${call.id}`}>详情</Link></td>
               </tr>
             ))}
           </tbody>
@@ -41,7 +45,7 @@ export function CallTable({ calls }: { calls: GatewayCall[] }) {
       </div>
       <div className="mobile-card-list">
         {calls.map((call) => (
-          <article className="mobile-data-card" key={call.id}>
+          <Link className="mobile-data-card mobile-data-card-link" key={call.id} to={`/calls/${call.id}`}>
             <header>
               <div><strong>{call.model_id || '受限调用视图'}</strong><span className="mono-value">{shortID(call.id)}</span></div>
               <GatewayStatusBadge status={call.status} />
@@ -52,8 +56,8 @@ export function CallTable({ calls }: { calls: GatewayCall[] }) {
               <div><dt>尝试 / Tokens</dt><dd>{call.attempt_count} / {totalTokens(call)}</dd></div>
               <div><dt>时间</dt><dd>{formatDate(call.created_at)}</dd></div>
             </dl>
-            <Link className="button button-secondary" to={`/calls/${call.id}`}>调用详情</Link>
-          </article>
+            <span className="visually-hidden">调用详情</span>
+          </Link>
         ))}
       </div>
     </>

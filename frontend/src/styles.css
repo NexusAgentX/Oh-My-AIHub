@@ -750,6 +750,29 @@ h2 {
 .data-table td > strong,
 .data-table td > small { display: block; }
 .data-table td > small { margin-top: 3px; color: var(--muted); }
+.data-table tbody tr:has(.table-row-link) {
+  position: relative;
+  cursor: pointer;
+}
+.data-table tbody tr:has(.table-row-link):hover { background: var(--soft); }
+.table-row-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.table-row-link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+.table-row-link:hover { text-decoration: none; }
+.table-row-link strong { display: block; }
+.table-row-link small { display: block; margin-top: 3px; color: var(--muted); }
+.mobile-data-card-link {
+  color: inherit;
+  text-decoration: none;
+}
+.mobile-data-card-link:hover { text-decoration: none; }
 .table-action { text-align: right !important; }
 .table-action .button { min-height: 38px; }
 .table-action-group,
