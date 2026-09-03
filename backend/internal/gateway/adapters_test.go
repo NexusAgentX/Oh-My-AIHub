@@ -230,6 +230,46 @@ func TestUsageRejectsInvalidOptionalFieldsAndCountsGeminiThoughts(t *testing.T) 
 	}
 }
 
+func TestXAIRelaySuccessMetadataIsBillable(t *testing.T) {
+	chatBody := `{
+			"id":"chat-xai","object":"chat.completion","created":1,"model":"grok-4.6-build","service_tier":"default",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Pong","reasoning_content":"ping check","refusal":null},"finish_reason":"stop","native_finish_reason":"stop"}],
+			"usage":{"prompt_tokens":207,"completion_tokens":12,"total_tokens":406,"prompt_tokens_details":{"text_tokens":207,"audio_tokens":0,"image_tokens":0,"cached_tokens":0},"completion_tokens_details":{"reasoning_tokens":187,"audio_tokens":0,"accepted_prediction_tokens":0,"rejected_prediction_tokens":0},"num_sources_used":0,"cost_in_usd_ticks":2733600}
+		}`
+	_, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "xai/grok-4.6", 1)
+	if err != nil || chatUsage == nil || chatUsage.InputTokens != 207 || chatUsage.OutputTokens != 199 {
+		t.Fatalf("xAI chat rewrite = %+v, %v", chatUsage, err)
+	}
+
+	responsesBody := `{
+			"id":"resp-xai","object":"response","created_at":1,"completed_at":2,"status":"completed","model":"grok-4.6-build",
+			"max_output_tokens":64,"output":[{"id":"rs_1","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"ping"}]},{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Pong","annotations":[],"logprobs":[]}]}],
+			"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":"high","summary":"detailed"},"temperature":0.7,
+			"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":0.95,"user":null,"incomplete_details":null,
+			"store":false,"metadata":{"system_fingerprint":"fp"},"background":false,"service_tier":"default","truncation":"disabled",
+			"top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":"cache","max_tool_calls":null,
+			"safety_identifier":null,"error":null,"instructions":null,
+			"usage":{"input_tokens":207,"output_tokens":142,"total_tokens":349,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":134},"num_sources_used":0,"num_server_side_tools_used":0,"cost_in_usd_ticks":2152200,"context_details":{"input_tokens":207,"output_tokens":142}}
+		}`
+	_, responsesUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "xai/grok-4.6", 1)
+	if err != nil || responsesUsage == nil || responsesUsage.InputTokens != 207 || responsesUsage.OutputTokens != 142 {
+		t.Fatalf("xAI responses rewrite = %+v, %v", responsesUsage, err)
+	}
+
+	includedReasoning := `{"id":"chat-2","object":"chat.completion","model":"x","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30,"completion_tokens_details":{"reasoning_tokens":8}}}`
+	_, includedUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(includedReasoning), "canonical/model", 1)
+	if err != nil || includedUsage == nil || includedUsage.OutputTokens != 20 {
+		t.Fatalf("chat usage with reasoning already in completion = %+v, %v", includedUsage, err)
+	}
+
+	chatFrame := "data: {\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"think\"},\"native_finish_reason\":null}],\"usage\":{\"prompt_tokens\":207,\"completion_tokens\":12,\"total_tokens\":406,\"completion_tokens_details\":{\"reasoning_tokens\":187}}}\n\n"
+	analysis, err := AnalyzeSSEFrame(channel.ProtocolOpenAIChat, []byte(chatFrame), "xai/grok-4.6")
+	streamUsage, complete := analysis.Observation.Complete()
+	if err != nil || !complete || streamUsage == nil || streamUsage.OutputTokens != 199 {
+		t.Fatalf("xAI chat stream usage = %+v complete=%t err=%v", streamUsage, complete, err)
+	}
+}
+
 func TestSSESemanticAndTerminalClassification(t *testing.T) {
 	tests := []struct {
 		name     string
