@@ -106,6 +106,25 @@ func TestProbePayloadsAndTerminalResponseValidation(t *testing.T) {
 		if protocol != ProtocolGemini && decoded["model"] != "model-id" {
 			t.Fatalf("%s payload omitted model: %s", protocol, body)
 		}
+		switch protocol {
+		case ProtocolOpenAIChat:
+			if decoded["max_tokens"] != float64(probeMaxOutputTokens) || decoded["stream"] != false {
+				t.Fatalf("chat probe payload = %s", body)
+			}
+		case ProtocolOpenAIResponse:
+			if decoded["max_output_tokens"] != float64(probeMaxOutputTokens) || decoded["stream"] != false {
+				t.Fatalf("responses probe payload = %s", body)
+			}
+		case ProtocolAnthropic:
+			if decoded["max_tokens"] != float64(probeMaxOutputTokens) || decoded["stream"] != false {
+				t.Fatalf("anthropic probe payload = %s", body)
+			}
+		case ProtocolGemini:
+			config, _ := decoded["generationConfig"].(map[string]any)
+			if config["maxOutputTokens"] != float64(probeMaxOutputTokens) {
+				t.Fatalf("gemini probe payload = %s", body)
+			}
+		}
 	}
 	valid := map[Protocol]string{
 		ProtocolOpenAIChat:     `{"choices":[{"finish_reason":"stop"}]}`,
