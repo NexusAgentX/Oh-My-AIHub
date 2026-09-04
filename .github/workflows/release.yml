@@ -172,8 +172,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
             org.opencontainers.image.revision=${{ needs.resolve.outputs.sha }}
             org.opencontainers.image.version=${{ needs.resolve.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
 
       - name: Build and push frontend image
         id: frontend
@@ -188,8 +188,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
             org.opencontainers.image.revision=${{ needs.resolve.outputs.sha }}
             org.opencontainers.image.version=${{ needs.resolve.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache,mode=max
 
       - name: Summary
         shell: bash
