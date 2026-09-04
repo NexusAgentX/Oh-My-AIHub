@@ -209,6 +209,12 @@ export const api = {
       )
     ).account
   },
+  async resetAccountPassword(accountID: string) {
+    return request<{ account: Account; initial_password: string }>(
+      `/api/admin/accounts/${encodeURIComponent(accountID)}/password-reset`,
+      { method: 'POST', body: JSON.stringify({}) },
+    )
+  },
   wallet() {
     return request<{ wallet: Wallet; recovery_actions: WalletRecoveryAction[] }>(
       '/api/wallet',

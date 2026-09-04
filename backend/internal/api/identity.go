@@ -185,3 +185,38 @@ func (a *app) updateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"account": accountResponse(account)})
 }
+
+func (a *app) resetAccountPassword(w http.ResponseWriter, r *http.Request) {
+	if !uuidPattern.MatchString(r.PathValue("accountID")) {
+		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
+		return
+	}
+	var request struct{}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
+		return
+	}
+	account := accountFromContext(r.Context())
+	if r.PathValue("accountID") == account.ID {
+		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "不能重置自己的密码，请在账户设置中修改")
+		return
+	}
+	if !a.allowPasswordChangeAttempt(a.loginClientIP(r), account.ID) {
+		writeError(w, http.StatusTooManyRequests, "password_rate_limited", "密码修改尝试过多，请稍后再试")
+		return
+	}
+	if !acquirePasswordSlot(a.accountPasswordSlots) {
+		writeError(w, http.StatusTooManyRequests, "password_service_busy", "密码服务繁忙，请稍后再试")
+		return
+	}
+	defer func() { <-a.accountPasswordSlots }()
+	reset, err := a.identity.AdminResetPassword(r.Context(), account, r.PathValue("accountID"))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"account":          accountResponse(reset.Account),
+		"initial_password": reset.InitialPassword,
+	})
+}

@@ -417,6 +417,10 @@ function EditAccountDialog({
   const [isAdmin, setIsAdmin] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [newInitialPassword, setNewInitialPassword] = useState('')
+  const [copyState, setCopyState] = useState('')
 
   useEffect(() => {
     if (account) {
@@ -425,10 +429,42 @@ function EditAccountDialog({
       setStatus(account.status)
       setIsAdmin(account.is_admin)
       setError('')
+      setConfirmingReset(false)
+      setResetting(false)
+      setNewInitialPassword('')
+      setCopyState('')
     }
   }, [account])
 
   if (!account) return <dialog className="modal" ref={reference} />
+
+  const resetPassword = async () => {
+    if (!confirmingReset || resetting) return
+    setResetting(true)
+    setError('')
+    try {
+      const result = await api.resetAccountPassword(account.id)
+      setNewInitialPassword(result.initial_password)
+      setConfirmingReset(false)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'conflict') {
+        setError('该账户密码刚被其他操作修改，请重试')
+      } else {
+        setError(caught instanceof ApiError ? caught.message : '密码重置失败')
+      }
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const copyNewPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(newInitialPassword)
+      setCopyState('已复制')
+    } catch {
+      setCopyState('复制失败，请手动复制')
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -515,6 +551,65 @@ function EditAccountDialog({
           />
           <span>管理员权限</span>
         </label>
+        <div className="modal-divider">
+          <span className="field-label">密码</span>
+          {account.id === currentAccountID ? (
+            <p className="modal-hint">自己的密码请在账户设置中修改。</p>
+          ) : newInitialPassword ? (
+            <>
+              <p className="modal-hint">
+                新初始密码仅显示这一次，请立即复制并通过可信渠道交付；关闭后无法再次查看。
+              </p>
+              <div className="reset-credential">
+                <strong>{newInitialPassword}</strong>
+                <Button
+                  icon={<Icon name="copy" />}
+                  onClick={() => void copyNewPassword()}
+                  type="button"
+                  variant="secondary"
+                >
+                  复制
+                </Button>
+              </div>
+              <p aria-live="polite" className="modal-hint">{copyState}</p>
+            </>
+          ) : (
+            <>
+              <p className="modal-hint">
+                重置会生成仅显示一次的新初始密码；该账户全部登录会话立即失效，用户下次登录必须修改密码。
+              </p>
+              {confirmingReset ? (
+                <div className="reset-confirm-row">
+                  <Button
+                    disabled={resetting}
+                    onClick={() => void resetPassword()}
+                    type="button"
+                    variant="danger"
+                  >
+                    {resetting ? '正在重置' : '确认重置'}
+                  </Button>
+                  <Button
+                    disabled={resetting}
+                    onClick={() => setConfirmingReset(false)}
+                    type="button"
+                    variant="quiet"
+                  >
+                    取消
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  disabled={submitting || resetting}
+                  onClick={() => setConfirmingReset(true)}
+                  type="button"
+                  variant="secondary"
+                >
+                  重置密码
+                </Button>
+              )}
+            </>
+          )}
+        </div>
         <footer className="modal-actions">
           <Button onClick={onClose} type="button" variant="secondary">取消</Button>
           <Button disabled={submitting} type="submit">{submitting ? '正在保存' : '保存更改'}</Button>

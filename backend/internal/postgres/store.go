@@ -201,6 +201,40 @@ func (s *Store) ReplacePasswordAndSessions(ctx context.Context, accountID string
 	return transaction.Commit(ctx)
 }
 
+// ResetPassword 由管理员发起：允许重置停用账户（与建号交付同链路），但绝不
+// 创建新会话；密码版本 CAS 保证与并发改密只有一方成功。
+func (s *Store) ResetPassword(ctx context.Context, actorID, accountID string, expectedPasswordVersion int64, passwordHash string, changedAt time.Time) error {
+	transaction, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer transaction.Rollback(ctx) //nolint:errcheck
+
+	result, err := transaction.Exec(ctx, `
+		UPDATE accounts
+		SET password_hash = $2,
+			must_change_password = true,
+			password_version = password_version + 1,
+			password_changed_at = $3,
+			updated_at = $3
+		WHERE id = $1 AND password_version = $4`, accountID, passwordHash, changedAt, expectedPasswordVersion)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return identity.ErrConflict
+	}
+	if _, err := transaction.Exec(ctx, `DELETE FROM sessions WHERE account_id = $1`, accountID); err != nil {
+		return err
+	}
+	if err := insertAudit(ctx, transaction, actorID, "account.password_reset", "account", accountID, "administrator reset account password", map[string]any{
+		"password_version": expectedPasswordVersion + 1,
+	}); err != nil {
+		return err
+	}
+	return transaction.Commit(ctx)
+}
+
 func (s *Store) CreateAccount(ctx context.Context, account identity.NewAccount) (identity.Account, error) {
 	transaction, err := s.pool.Begin(ctx)
 	if err != nil {
