@@ -100,7 +100,7 @@ PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可
 - 模型目录四类基准价与每条条件档四价单项上限均为 100,000 积分/百万 token；配合九位定点 `0～1000` 倍报价倍率，公开价格和后续结算费用保持在金额类型的可表示范围内，Go 领域校验与数据库约束共同拒绝越界写入。
 - 平台 API Key 由服务端生成，只保存摘要、前缀、代次、状态和版本；创建及轮换响应只展示一次完整 Key，旧代次在轮换提交时立即失效。Key 配置、状态、轮换和删除使用 CAS，删除保留历史墓碑。具体见 [ADR-0010](docs/adr/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)。
 - 每个 Key 以 `(canonical model, native protocol)` 唯一标识池，池成员引用稳定报价 ID并使用连续固定优先级。市场详情可以把当前合格报价直接加入兼容池；调用前会再次校验当前资格和加入时的验证版本。
-- 四个外部 POST 入口分别支持 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 的非流式与流式原生格式。平台代理只重写同协议模型别名并还原成功元数据，不做跨协议转换；认证头、Cookie、转发头和上游凭据相互隔离。成功体白名单接受 xAI/中转站附加的推理元数据（如 `reasoning_content`、`native_finish_reason`、`presence_penalty`、`frequency_penalty`）和用量附加字段（如 `cost_in_usd_ticks`），账本仍只按明确 token 用量结算；Chat 在 `total_tokens` 把 reasoning 单独加总时才把 `reasoning_tokens` 计入输出。
+- 四个外部 POST 入口分别支持 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 的非流式与流式原生格式。网关按原生协议透传请求与响应：只重写同协议模型别名、还原成功元数据、擦除凭据并透传 `anthropic-beta`，不做跨协议转换，也不按字段白名单拦截原生形状（`previous_response_id`、`store`、`n`、服务端工具等由上游决定）；Chat 流式额外注入 `include_usage=true` 以取得用量帧。计费约束只在结算层执行：成功调用必须有可映射到四类 token 的完整用量，未知用量字段被忽略，出现公式无法计价的额外计费维（非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态）时该次调用不成功扣款并按失败回退；Chat 在 `total_tokens` 把 reasoning 单独加总时才把 `reasoning_tokens` 计入输出。
 - 调用快照、预授权和业务拒绝在同一个 `REPEATABLE READ` 账本事务内建立；条件档位作为调用级不可变快照（`api_call_price_tiers`）一并固化，预授权上界覆盖默认档与全部条件档的最坏组合，成功调用记录命中的档位序号。非自有成功调用精确捕获最终渠道费用与手续费并释放余量；自有渠道免手续费，名义费用非零时写同账户消费/收入双分录，余额净变化为零。
 - 流式提交点按协议语义事件判断，角色、心跳、空增量和 usage 元数据不锁定候选；成功终止事件在结算后才发送。调用、尝试、finalizer 和 orphan 恢复使用行锁、唯一约束、载荷摘要和调用 ID 幂等，禁止重复扣款、收入或释放。
 - 请求和响应正文只在受限进程内内存中处理，不进入数据库、缓存、审计或日志。调用长期保存统计、价格/用量快照、HTTP 状态、错误码和最多 4096 字节的原始错误消息；消费者、相关共享者和管理员使用不同投影读取。

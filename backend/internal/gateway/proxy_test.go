@@ -297,7 +297,7 @@ func TestProxyRejectsPlatformCredentialInRequestBodyBeforeUpstreamAccess(t *test
 	}
 }
 
-func TestProxyRejectsUnbillableProtocolShapesBeforeBeginCall(t *testing.T) {
+func TestProxyForwardsNativeRequestShapesToUpstream(t *testing.T) {
 	tests := []struct {
 		name      string
 		protocol  channel.Protocol
@@ -305,56 +305,43 @@ func TestProxyRejectsUnbillableProtocolShapesBeforeBeginCall(t *testing.T) {
 		canonical string
 		body      string
 		headers   map[string]string
+		response  string
 	}{
 		{
-			name: "chat non-text modality", protocol: channel.ProtocolOpenAIChat, path: "/v1/chat/completions",
-			body:    `{"model":"canonical/model","messages":[],"modalities":["audio"]}`,
-			headers: map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("c", 43)},
+			name: "responses session continuation", protocol: channel.ProtocolOpenAIResponse, path: "/v1/responses",
+			body:     `{"model":"canonical/model","input":"hi","previous_response_id":"resp_prev","store":true}`,
+			headers:  map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("r", 43)},
+			response: `{"id":"resp_1","object":"response","status":"completed","model":"vendor-one","previous_response_id":"resp_prev","store":true,"output":[{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
+		},
+		{
+			name: "chat audio modality", protocol: channel.ProtocolOpenAIChat, path: "/v1/chat/completions",
+			body:     `{"model":"canonical/model","messages":[],"modalities":["audio"]}`,
+			headers:  map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("c", 43)},
+			response: validChatResponse("vendor-one"),
 		},
 		{
 			name: "responses provider file", protocol: channel.ProtocolOpenAIResponse, path: "/v1/responses",
-			body:    `{"model":"canonical/model","input":[{"type":"message","content":[{"type":"input_file","file_id":"file_1"}]}]}`,
-			headers: map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("r", 43)},
-		},
-		{
-			name: "responses function media output", protocol: channel.ProtocolOpenAIResponse, path: "/v1/responses",
-			body:    `{"model":"canonical/model","input":[{"type":"function_call_output","call_id":"call_1","output":[{"type":"input_image","image_url":"https://example/image"}]}]}`,
-			headers: map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("o", 43)},
+			body:     `{"model":"canonical/model","input":[{"type":"message","content":[{"type":"input_file","file_id":"file_1"}]}]}`,
+			headers:  map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("o", 43)},
+			response: `{"id":"resp_1","object":"response","status":"completed","model":"vendor-one","output":[],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
 		},
 		{
 			name: "responses pro reasoning", protocol: channel.ProtocolOpenAIResponse, path: "/v1/responses",
-			body:    `{"model":"canonical/model","input":"hi","reasoning":{"mode":"pro"}}`,
-			headers: map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("p", 43)},
+			body:     `{"model":"canonical/model","input":"hi","reasoning":{"mode":"pro"}}`,
+			headers:  map[string]string{"Authorization": "Bearer oma_live_" + strings.Repeat("p", 43)},
+			response: `{"id":"resp_1","object":"response","status":"completed","model":"vendor-one","output":[],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
 		},
 		{
-			name: "anthropic media", protocol: channel.ProtocolAnthropic, path: "/v1/messages",
-			body:    `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"image","source":{"type":"base64","data":"x"}}]}]}`,
-			headers: map[string]string{"x-api-key": "oma_live_" + strings.Repeat("a", 43), "anthropic-version": "2023-06-01"},
-		},
-		{
-			name: "anthropic beta", protocol: channel.ProtocolAnthropic, path: "/v1/messages",
-			body:    `{"model":"canonical/model","messages":[]}`,
-			headers: map[string]string{"x-api-key": "oma_live_" + strings.Repeat("b", 43), "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05"},
-		},
-		{
-			name: "anthropic one hour cache", protocol: channel.ProtocolAnthropic, path: "/v1/messages",
-			body:    `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"text","text":"hi","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}`,
-			headers: map[string]string{"x-api-key": "oma_live_" + strings.Repeat("t", 43), "anthropic-version": "2023-06-01"},
-		},
-		{
-			name: "anthropic top level one hour cache", protocol: channel.ProtocolAnthropic, path: "/v1/messages",
-			body:    `{"model":"canonical/model","cache_control":{"type":"ephemeral","ttl":"1h"},"messages":[]}`,
-			headers: map[string]string{"x-api-key": "oma_live_" + strings.Repeat("u", 43), "anthropic-version": "2023-06-01"},
+			name: "anthropic media and beta", protocol: channel.ProtocolAnthropic, path: "/v1/messages",
+			body:     `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"image","source":{"type":"base64","data":"x"}}]}]}`,
+			headers:  map[string]string{"x-api-key": "oma_live_" + strings.Repeat("a", 43), "anthropic-version": "2023-06-01", "anthropic-beta": "pdfs-2024-09-25"},
+			response: `{"id":"msg_1","type":"message","role":"assistant","model":"vendor-one","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":2,"output_tokens":1}}`,
 		},
 		{
 			name: "gemini inline data", protocol: channel.ProtocolGemini, path: "/v1beta/models/canonical/model:generateContent", canonical: "canonical/model",
-			body:    `{"contents":[{"parts":[{"inlineData":{"mimeType":"image/png","data":"x"}}]}]}`,
-			headers: map[string]string{"x-goog-api-key": "oma_live_" + strings.Repeat("g", 43)},
-		},
-		{
-			name: "gemini nested function media", protocol: channel.ProtocolGemini, path: "/v1beta/models/canonical/model:generateContent", canonical: "canonical/model",
-			body:    `{"contents":[{"parts":[{"functionResponse":{"name":"tool","response":{"parts":[{"inlineData":{"data":"x"}}]}}}]}]}`,
-			headers: map[string]string{"x-goog-api-key": "oma_live_" + strings.Repeat("h", 43)},
+			body:     `{"contents":[{"parts":[{"inlineData":{"mimeType":"image/png","data":"x"}}]}]}`,
+			headers:  map[string]string{"x-goog-api-key": "oma_live_" + strings.Repeat("g", 43)},
+			response: `{"modelVersion":"vendor-one","candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`,
 		},
 	}
 	for _, test := range tests {
@@ -362,8 +349,7 @@ func TestProxyRejectsUnbillableProtocolShapesBeforeBeginCall(t *testing.T) {
 			store := newProxyStore([]Candidate{proxyCandidate(1, "offer-one", "vendor-one", "upstream-key")})
 			outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
 				"offer-one": func(*http.Request) (*http.Response, error) {
-					t.Fatal("unbillable request reached upstream")
-					return nil, errors.New("unreachable")
+					return proxyResponse(http.StatusOK, jsonHeader(), test.response), nil
 				},
 			}}
 			service, _ := NewService(store, outbound)
@@ -373,13 +359,26 @@ func TestProxyRejectsUnbillableProtocolShapesBeforeBeginCall(t *testing.T) {
 			}
 			recorder := httptest.NewRecorder()
 			service.ServeProtocol(recorder, request, test.protocol, test.canonical, false)
-			if recorder.Code != http.StatusBadRequest || len(outbound.snapshotRequests()) != 0 {
-				t.Fatalf("unbillable request response = %d %s", recorder.Code, recorder.Body.String())
+			requests := outbound.snapshotRequests()
+			if recorder.Code != http.StatusOK || len(requests) != 1 {
+				t.Fatalf("native shape response = %d %s, requests=%d", recorder.Code, recorder.Body.String(), len(requests))
+			}
+			if test.protocol != channel.ProtocolGemini && !strings.Contains(requests[0].body, "\"model\":\"vendor-one\"") {
+				t.Fatalf("upstream model rewrite missing: %s", requests[0].body)
+			}
+			if strings.Contains(test.body, "previous_response_id") && !strings.Contains(requests[0].body, "previous_response_id") {
+				t.Fatalf("previous_response_id was stripped: %s", requests[0].body)
+			}
+			if strings.Contains(test.body, "modalities") && !strings.Contains(requests[0].body, "modalities") {
+				t.Fatalf("modalities was stripped: %s", requests[0].body)
+			}
+			if beta := request.Header.Get("anthropic-beta"); beta != "" && requests[0].header.Get("anthropic-beta") != beta {
+				t.Fatalf("anthropic-beta was stripped: %v", requests[0].header)
 			}
 			store.mu.Lock()
 			defer store.mu.Unlock()
-			if store.begun != 0 || len(store.started) != 0 || len(store.completed) != 0 || len(store.finalized) != 0 {
-				t.Fatalf("unbillable request created facts: begun=%d attempts:%+v completed:%+v final:%+v", store.begun, store.started, store.completed, store.finalized)
+			if store.begun != 1 || len(store.started) != 1 || len(store.completed) != 1 || store.completed[0].Status != AttemptSucceeded {
+				t.Fatalf("native shape facts: begun=%d attempts:%+v completed:%+v", store.begun, store.started, store.completed)
 			}
 		})
 	}
@@ -780,12 +779,15 @@ func TestProxyRejectsFalse200PayloadsBeforeCharging(t *testing.T) {
 	}
 }
 
-func TestProxyRejectsMultipleChatChoicesBeforePreauthorizationOrUpstream(t *testing.T) {
+func TestProxyForwardsMultipleChatChoicesAndSettles(t *testing.T) {
 	store := newProxyStore([]Candidate{proxyCandidate(1, "offer-one", "vendor-one", "key-one")})
+	twoChoices := `{"id":"chat-2","object":"chat.completion","model":"vendor-one","choices":[` +
+		`{"index":0,"message":{"role":"assistant","content":"first"},"finish_reason":"stop"},` +
+		`{"index":1,"message":{"role":"assistant","content":"second"},"finish_reason":"stop"}` +
+		`],"usage":{"prompt_tokens":4,"completion_tokens":2}}`
 	outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
 		"offer-one": func(*http.Request) (*http.Response, error) {
-			t.Fatal("n > 1 request reached upstream")
-			return nil, errors.New("unreachable")
+			return proxyResponse(http.StatusOK, jsonHeader(), twoChoices), nil
 		},
 	}}
 	service, _ := NewService(store, outbound)
@@ -793,22 +795,29 @@ func TestProxyRejectsMultipleChatChoicesBeforePreauthorizationOrUpstream(t *test
 	request.Header.Set("Authorization", "Bearer oma_live_"+strings.Repeat("q", 43))
 	recorder := httptest.NewRecorder()
 	service.ServeProtocol(recorder, request, channel.ProtocolOpenAIChat, "", false)
-	if recorder.Code != http.StatusBadRequest || !strings.Contains(strings.ToLower(recorder.Body.String()), "unsupported_billing_shape") || len(outbound.snapshotRequests()) != 0 {
-		t.Fatalf("n=2 preauthorization rejection = %d %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "second") {
+		t.Fatalf("n=2 response = %d %s", recorder.Code, recorder.Body.String())
+	}
+	requests := outbound.snapshotRequests()
+	if len(requests) != 1 || !strings.Contains(requests[0].body, `"n":2`) {
+		t.Fatalf("n=2 upstream forward = %d %+v", len(requests), requests)
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if len(store.started) != 0 || len(store.completed) != 0 || len(store.finalized) != 0 {
-		t.Fatalf("n=2 request created billable facts: attempts:%+v completed:%+v final:%+v", store.started, store.completed, store.finalized)
+	if len(store.completed) != 1 || store.completed[0].Status != AttemptSucceeded || len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded {
+		t.Fatalf("n=2 settlement facts: attempts:%+v final:%+v", store.completed, store.finalized)
 	}
 }
 
-func TestProxyRejectsMultipleGeminiCandidatesBeforePreauthorizationOrUpstream(t *testing.T) {
+func TestProxyForwardsMultipleGeminiCandidatesAndSettles(t *testing.T) {
 	store := newProxyStore([]Candidate{proxyCandidate(1, "offer-one", "vendor-one", "key-one")})
+	twoCandidates := `{"modelVersion":"vendor-one","candidates":[` +
+		`{"index":0,"content":{"parts":[{"text":"first"}]},"finishReason":"STOP"},` +
+		`{"index":1,"content":{"parts":[{"text":"second"}]},"finishReason":"STOP"}` +
+		`],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":2,"totalTokenCount":6}}`
 	outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
 		"offer-one": func(*http.Request) (*http.Response, error) {
-			t.Fatal("candidateCount > 1 request reached upstream")
-			return nil, errors.New("unreachable")
+			return proxyResponse(http.StatusOK, jsonHeader(), twoCandidates), nil
 		},
 	}}
 	service, _ := NewService(store, outbound)
@@ -816,13 +825,17 @@ func TestProxyRejectsMultipleGeminiCandidatesBeforePreauthorizationOrUpstream(t 
 	request.Header.Set("X-Goog-Api-Key", "oma_live_"+strings.Repeat("g", 43))
 	recorder := httptest.NewRecorder()
 	service.ServeProtocol(recorder, request, channel.ProtocolGemini, "canonical/model", false)
-	if recorder.Code != http.StatusBadRequest || !strings.Contains(strings.ToLower(recorder.Body.String()), "unsupported_billing_shape") || len(outbound.snapshotRequests()) != 0 {
-		t.Fatalf("Gemini multiplicity rejection = %d %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "second") {
+		t.Fatalf("Gemini multi-candidate response = %d %s", recorder.Code, recorder.Body.String())
+	}
+	requests := outbound.snapshotRequests()
+	if len(requests) != 1 || !strings.Contains(requests[0].body, "candidateCount") {
+		t.Fatalf("Gemini multi-candidate forward = %d %+v", len(requests), requests)
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if len(store.started) != 0 || len(store.completed) != 0 || len(store.finalized) != 0 {
-		t.Fatalf("Gemini multiplicity created billable facts: attempts:%+v completed:%+v final:%+v", store.started, store.completed, store.finalized)
+	if len(store.completed) != 1 || store.completed[0].Status != AttemptSucceeded || len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded {
+		t.Fatalf("Gemini multi-candidate facts: attempts:%+v final:%+v", store.completed, store.finalized)
 	}
 }
 

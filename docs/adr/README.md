@@ -45,3 +45,4 @@
 - [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md) — 已通过
+- [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过

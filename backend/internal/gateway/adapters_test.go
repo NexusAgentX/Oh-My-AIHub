@@ -455,63 +455,53 @@ func TestParseChatRequestTracksChoiceCountBeforeBillingValidation(t *testing.T) 
 	}
 }
 
-func TestV1BillableRequestAllowsClientToolsAndRejectsUnboundedServerWork(t *testing.T) {
-	valid := []struct {
-		protocol channel.Protocol
-		body     string
-	}{
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","n":1,"tools":[{"type":"function","function":{"name":"weather","parameters":{"type":"object","properties":{"image":{"type":"string"},"audio":{"type":"string"}}}}}]}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","tools":[{"type":"custom","name":"grammar","format":{"type":"text","schema":{"properties":{"file_id":{"type":"string"}}}}}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","tools":[{"name":"weather","input_schema":{"type":"object","properties":{"source":{"type":"string"},"file":{"type":"string"},"cache_control":{"type":"string"}}},"cache_control":{"type":"ephemeral","ttl":"5m"}}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","messages":[{"role":"assistant","content":[{"type":"tool_use","id":"tool_1","name":"weather","input":{"cache_control":"ordinary tool argument"}}]}]}`},
-		{channel.ProtocolGemini, `{"generationConfig":{"candidateCount":1},"tools":[{"functionDeclarations":[{"name":"weather","parameters":{"type":"object","properties":{"image":{"type":"string"}}}}]}]}`},
+func TestNativeRequestAndResponseShapesPassThroughBilling(t *testing.T) {
+	// Upstream success envelopes may echo native session fields and unknown
+	// metadata; the gateway forwards them and settles on the four buckets.
+	responsesBody := `{
+		"id":"resp-session","object":"response","status":"completed","model":"vendor",
+		"previous_response_id":"resp_prev","store":true,"background":false,"service_tier":"priority",
+		"output":[{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],
+		"vendor_extra":{"nested":true},"usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12,"input_tokens_details":{"cached_tokens":4},"vendor_cost_ticks":99}
+	}`
+	rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "canonical/model", 1)
+	if err != nil || usage == nil || usage.InputTokens != 6 || usage.OutputTokens != 2 || usage.CacheReadTokens != 4 {
+		t.Fatalf("responses passthrough = %+v, %v", usage, err)
 	}
-	for _, test := range valid {
-		if err := validateV1BillableRequest(test.protocol, []byte(test.body)); err != nil {
-			t.Fatalf("client tool rejected for %s: %v", test.protocol, err)
-		}
+	if !strings.Contains(string(rewritten), `"previous_response_id":"resp_prev"`) || !strings.Contains(string(rewritten), `"store":true`) {
+		t.Fatalf("native session fields were stripped: %s", rewritten)
 	}
 
-	invalid := []struct {
+	chatBody := `{"id":"chat-1","object":"chat.completion","model":"x","vendor_extra":true,
+		"choices":[{"index":0,"message":{"role":"assistant","content":"ok","audio":null},"finish_reason":"stop"}],
+		"usage":{"prompt_tokens":8,"completion_tokens":3,"vendor_field":"ignored"}}`
+	if _, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "canonical/model", 1); err != nil || chatUsage == nil || chatUsage.InputTokens != 8 || chatUsage.OutputTokens != 3 {
+		t.Fatalf("chat passthrough = %+v, %v", chatUsage, err)
+	}
+
+	// Unknown streaming events pass through without failing the stream.
+	unknownFrame := "data: {\"type\":\"response.web_search_call.completed\",\"sequence_number\":7,\"vendor\":true}\n\n"
+	analysis, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte(unknownFrame), "canonical/model")
+	if err != nil || analysis.Semantic || analysis.Terminal {
+		t.Fatalf("unknown event analysis = %+v, %v", analysis, err)
+	}
+	if !strings.Contains(string(analysis.Frame), "response.web_search_call.completed") {
+		t.Fatalf("unknown event not forwarded: %s", analysis.Frame)
+	}
+
+	// Billing boundaries stay at settlement: unpriceable extra dimensions
+	// make the usage unbillable instead of rejecting the request shape.
+	unbillable := []struct {
 		protocol channel.Protocol
 		body     string
 	}{
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","n":2}`},
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","web_search_options":{}}`},
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","tools":[{"type":"web_search"}]}`},
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","modalities":["text","audio"]}`},
-		{channel.ProtocolOpenAIChat, `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example/image"}}]}]}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","background":true}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","previous_response_id":"resp_1"}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","tools":[{"type":"file_search"}]}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","service_tier":"priority"}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","input":[{"role":"user","content":[{"type":"input_file","file_id":"file_1"}]}]}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","prompt":{"id":"pmpt_1"}}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","store":true}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","reasoning":{"mode":"pro"}}`},
-		{channel.ProtocolOpenAIResponse, `{"model":"canonical/model","input":[{"type":"function_call_output","call_id":"call_1","output":[{"type":"input_image","image_url":"https://example/image"}]}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","tools":[{"type":"web_search_20250305","name":"search"}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","speed":"fast"}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","mcp_servers":[{"url":"https://mcp.example"}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","service_tier":"auto"}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","inference_geo":"us"}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"image","source":{"type":"base64","data":"x"}}]}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","system":[{"type":"document","source":{"type":"text","data":"x"}}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","messages":[{"role":"user","content":[{"type":"text","text":"hi","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}`},
-		{channel.ProtocolAnthropic, `{"model":"canonical/model","cache_control":{"type":"ephemeral","ttl":"1h"},"messages":[]}`},
-		{channel.ProtocolGemini, `{"generationConfig":{"candidateCount":2}}`},
-		{channel.ProtocolGemini, `{"tools":[{"googleSearch":{}}]}`},
-		{channel.ProtocolGemini, `{"tools":[{"codeExecution":{}}]}`},
-		{channel.ProtocolGemini, `{"mcpServers":[{"url":"https://mcp.example"}]}`},
-		{channel.ProtocolGemini, `{"cachedContent":"cachedContents/1"}`},
-		{channel.ProtocolGemini, `{"generationConfig":{"responseModalities":["AUDIO"]}}`},
-		{channel.ProtocolGemini, `{"contents":[{"parts":[{"inlineData":{"mimeType":"image/png","data":"x"}}]}]}`},
-		{channel.ProtocolGemini, `{"contents":[{"parts":[{"functionResponse":{"name":"tool","response":{"parts":[{"inlineData":{"data":"x"}}]}}}]}]}`},
-		{channel.ProtocolGemini, `{"contents":[{"parts":[{"functionResponse":{"name":"tool","response":{"$ref":"files/1"}}}]}]}`},
+		{channel.ProtocolOpenAIChat, `{"id":"c","object":"chat.completion","model":"x","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"prompt_tokens_details":{"audio_tokens":2}}}`},
+		{channel.ProtocolAnthropic, `{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":1,"cache_creation":{"ephemeral_1h_input_tokens":2,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":0}}`},
+		{channel.ProtocolGemini, `{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":1,"candidatesTokensDetails":[{"modality":"AUDIO","tokenCount":2}]}}`},
 	}
-	for _, test := range invalid {
-		if err := validateV1BillableRequest(test.protocol, []byte(test.body)); !errors.Is(err, ErrInvalidInput) {
-			t.Fatalf("unbounded request accepted for %s: %s (%v)", test.protocol, test.body, err)
+	for _, test := range unbillable {
+		if _, _, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model", 1); !errors.Is(err, ErrNoUsage) {
+			t.Fatalf("unbillable usage accepted for %s: %v", test.protocol, err)
 		}
 	}
 }
