@@ -4,7 +4,9 @@
 
 ## 未发布
 
-（暂无）
+### 变更
+
+- API 网关改为原生协议透传，计费约束移到结算层（Feature #87，ADR-0014）：删除 Feature #20 引入的请求/响应封闭字段白名单，`previous_response_id`、`store`、`n`、`candidateCount`、多模态、服务端工具、`anthropic-beta` 等原生字段原样转发并由上游决定；不再强制改写 `service_tier` 或 `include_obfuscation`；未知响应字段与未知 SSE 事件透传，不再把上游 200 判成 502“所有候选渠道均失败”。成功结算仍要求完整四类 token 用量，出现计价公式无法表示的额外计费维（非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态）时该次调用不成功扣款并按失败回退。修复真实客户端的 Responses 流式与会话续接被网关误拦的问题。
 
 ## v0.3.4 - 2026-09-04
 

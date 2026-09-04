@@ -79,10 +79,6 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 		writeProtocolError(w, protocol, http.StatusBadRequest, "invalid_model_path", "模型路径无效", "")
 		return
 	}
-	if err := validateV1BillableRequest(protocol, body); err != nil {
-		writeProtocolError(w, protocol, http.StatusBadRequest, "unsupported_billing_shape", "首版仅支持单候选与客户端执行的函数工具", "")
-		return
-	}
 	if protocol == channel.ProtocolAnthropic {
 		if err := validateAnthropicHeaders(r.Header); err != nil {
 			writeProtocolError(w, protocol, http.StatusBadRequest, "invalid_anthropic_headers", "anthropic-version 无效", "")
@@ -944,10 +940,6 @@ func validateAnthropicHeaders(header http.Header) error {
 	if len(versions) != 1 || versions[0] != "2023-06-01" {
 		return ErrInvalidInput
 	}
-	betas := header.Values("anthropic-beta")
-	if len(betas) != 0 {
-		return ErrInvalidInput
-	}
 	return nil
 }
 
@@ -973,6 +965,9 @@ func copyOutboundHeaders(target, source http.Header, protocol channel.Protocol, 
 	}
 	if protocol == channel.ProtocolAnthropic {
 		target.Set("anthropic-version", "2023-06-01")
+		for _, beta := range source.Values("anthropic-beta") {
+			target.Add("anthropic-beta", beta)
+		}
 	}
 }
 
