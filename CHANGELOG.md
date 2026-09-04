@@ -4,7 +4,9 @@
 
 ## 未发布
 
-（暂无）
+### 变更
+
+- 镜像构建层缓存改用 GHCR registry cache（Feature #80 后续）：buildx 缓存从 `type=gha`（索引按触发 ref 作用域隔离，tag 发版之间互相不可见，v0.3.3 实测零层命中）改为每镜像独立的 `ghcr.io/…:buildcache`，跨 tag/分支持久共享；首个发版仍冷构建并写入缓存，其后发版 `npm ci`/`go mod download` 等层可命中。
 
 ## v0.3.3 - 2026-09-04
 
