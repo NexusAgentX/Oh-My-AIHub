@@ -17,6 +17,16 @@ jobs:
       - uses: jdx/mise-action@v2
         with:
           install: true
+      - name: Restore npm and Go caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-deps-${{ hashFiles('frontend/package-lock.json', 'backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
       - name: Check design assets

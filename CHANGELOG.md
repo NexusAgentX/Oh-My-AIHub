@@ -4,7 +4,9 @@
 
 ## 未发布
 
-（暂无）
+### 变更
+
+- CI/CD 提速（Feature #80）：backend 镜像改在原生架构上以 `GOARCH=$TARGETARCH` 交叉编译、frontend 构建阶段固定 `--platform=$BUILDPLATFORM` 只构建一次静态产物，多架构镜像不再经 QEMU 模拟编译；CI 与 release 门禁新增 npm/Go 依赖与构建缓存。产物语义不变，digest 固定部署链路不受影响。
 
 ## v0.3.1 - 2026-09-04
 

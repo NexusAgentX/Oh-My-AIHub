@@ -124,6 +124,16 @@ jobs:
       - uses: jdx/mise-action@v2
         with:
           install: true
+      - name: Restore npm and Go caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-deps-${{ hashFiles('frontend/package-lock.json', 'backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
       - name: Run release gates
         run: mise run check-release
 
@@ -138,9 +148,6 @@ jobs:
       frontend_digest: ${{ steps.frontend.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
