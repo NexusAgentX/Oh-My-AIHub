@@ -395,6 +395,48 @@ func TestStoreIntegration(t *testing.T) {
 		t.Fatalf("self-disable administrator error = %v, want forbidden", err)
 	}
 
+	resetInvite, err := identityService.CreateInvitedAccount(ctx, admin, "password.reset", "重置成员", 0, false, identity.StatusActive)
+	if err != nil {
+		t.Fatalf("create password reset account: %v", err)
+	}
+	resetLogin, err := identityService.Login(ctx, resetInvite.Account.Username, resetInvite.InitialPassword)
+	if err != nil {
+		t.Fatalf("login password reset account: %v", err)
+	}
+	if _, err := identityService.AdminResetPassword(ctx, resetLogin.Account, resetInvite.Account.ID); !errors.Is(err, identity.ErrForbidden) {
+		t.Fatalf("non-admin reset error = %v, want forbidden", err)
+	}
+	if _, err := identityService.AdminResetPassword(ctx, admin, admin.ID); !errors.Is(err, identity.ErrInvalidInput) {
+		t.Fatalf("self reset error = %v, want invalid input", err)
+	}
+	reset, err := identityService.AdminResetPassword(ctx, admin, resetInvite.Account.ID)
+	if err != nil {
+		t.Fatalf("administrator reset account password: %v", err)
+	}
+	if reset.InitialPassword == "" || reset.InitialPassword == resetInvite.InitialPassword || !reset.Account.MustChangePassword || reset.Account.PasswordVersion != resetInvite.Account.PasswordVersion+1 {
+		t.Fatalf("reset result = %+v, want fresh one-time password with forced change at version %d", reset.Account, resetInvite.Account.PasswordVersion+1)
+	}
+	if _, err := identityService.Authenticate(ctx, resetLogin.SessionToken); !errors.Is(err, identity.ErrInvalidCredentials) {
+		t.Fatalf("reset account session error = %v, want invalid credentials", err)
+	}
+	if _, err := identityService.Login(ctx, resetInvite.Account.Username, resetInvite.InitialPassword); !errors.Is(err, identity.ErrInvalidCredentials) {
+		t.Fatalf("old password login error = %v, want invalid credentials", err)
+	}
+	afterReset, err := identityService.Login(ctx, resetInvite.Account.Username, reset.InitialPassword)
+	if err != nil || !afterReset.Account.MustChangePassword {
+		t.Fatalf("new password login = %+v, err = %v, want forced password change", afterReset.Account, err)
+	}
+	if err := store.ResetPassword(ctx, admin.ID, resetInvite.Account.ID, resetInvite.Account.PasswordVersion, "phc-stale-version", time.Now().UTC()); !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("stale version reset error = %v, want conflict", err)
+	}
+	var resetActor string
+	if err := pool.QueryRow(ctx, `SELECT actor_account_id FROM audit_events WHERE action = 'account.password_reset' AND target_id = $1`, resetInvite.Account.ID).Scan(&resetActor); err != nil {
+		t.Fatalf("read password reset audit: %v", err)
+	}
+	if resetActor != admin.ID {
+		t.Fatalf("password reset audit actor = %s, want %s", resetActor, admin.ID)
+	}
+
 	raceAccount, err := identityService.CreateInvitedAccount(ctx, admin, "password.race", "并发改密", 0, false, identity.StatusActive)
 	if err != nil {
 		t.Fatalf("create password race account: %v", err)

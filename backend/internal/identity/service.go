@@ -118,6 +118,39 @@ func (s *Service) ChangePassword(ctx context.Context, accountID, currentPassword
 	return LoginResult{Account: account.Account, SessionToken: token}, nil
 }
 
+// AdminResetPassword 生成管理员代发的新初始密码：目标账户被标记必须改密，
+// 既有会话全部撤销；不为目标创建新会话，因为发起者是管理员而非账户本人。
+func (s *Service) AdminResetPassword(ctx context.Context, actor Account, accountID string) (CreatedAccount, error) {
+	if !actor.IsAdmin {
+		return CreatedAccount{}, ErrForbidden
+	}
+	if accountID == "" || accountID == actor.ID {
+		return CreatedAccount{}, ErrInvalidInput
+	}
+	account, err := s.store.FindAccountByID(ctx, accountID)
+	if err != nil {
+		return CreatedAccount{}, err
+	}
+	password, err := GenerateInitialPassword()
+	if err != nil {
+		return CreatedAccount{}, err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return CreatedAccount{}, err
+	}
+	changedAt := s.now().UTC()
+	if err := s.store.ResetPassword(ctx, actor.ID, accountID, account.PasswordVersion, hash, changedAt); err != nil {
+		return CreatedAccount{}, err
+	}
+	account.PasswordHash = ""
+	account.MustChangePassword = true
+	account.PasswordVersion++
+	account.PasswordChangedAt = &changedAt
+	account.UpdatedAt = changedAt
+	return CreatedAccount{Account: account.Account, InitialPassword: password}, nil
+}
+
 func (s *Service) CreateInvitedAccount(ctx context.Context, actor Account, username, displayName string, creditLimit money.Amount, isAdmin bool, status Status) (CreatedAccount, error) {
 	if !actor.IsAdmin {
 		return CreatedAccount{}, ErrForbidden

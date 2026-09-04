@@ -157,6 +157,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.listAccounts)))
 	mux.Handle("POST /api/admin/accounts", application.requireAdmin(http.HandlerFunc(application.createAccount)))
 	mux.Handle("PATCH /api/admin/accounts/{accountID}", application.requireAdmin(http.HandlerFunc(application.updateAccount)))
+	mux.Handle("POST /api/admin/accounts/{accountID}/password-reset", application.requireAdmin(http.HandlerFunc(application.resetAccountPassword)))
 	mux.Handle("GET /api/admin/models", application.requireAdmin(http.HandlerFunc(application.listAdminModels)))
 	mux.Handle("POST /api/admin/models", application.requireAdmin(http.HandlerFunc(application.createModel)))
 	mux.Handle("GET /api/admin/models/{modelID...}", application.requireAdmin(http.HandlerFunc(application.getAdminModel)))

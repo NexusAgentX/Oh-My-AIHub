@@ -184,4 +184,23 @@ describe('ledger client contracts', () => {
       expected_version: 7,
     })
   })
+
+  it('posts an empty payload to the password reset action', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+        JSON.stringify({ account: {}, initial_password: 'one-time-password' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await api.resetAccountPassword('account/with space')
+
+    expect(result.initial_password).toBe('one-time-password')
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [path, init] = fetchMock.mock.calls[0]
+    expect(path).toBe('/api/admin/accounts/account%2Fwith%20space/password-reset')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({})
+  })
 })

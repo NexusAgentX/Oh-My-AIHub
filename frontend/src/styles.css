@@ -927,6 +927,34 @@ h2 {
 .modal-heading .icon-button { margin: -10px -10px 0 0; font-size: 24px; }
 .modal-actions { margin-top: 4px; }
 
+.modal-divider {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+}
+
+.modal-hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+.reset-credential {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.reset-credential strong {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+}
+
+.reset-confirm-row { display: flex; gap: 10px; }
+
 .credential-page {
   display: grid;
   width: min(680px, 100%);
