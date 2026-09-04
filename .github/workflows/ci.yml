@@ -28,7 +28,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-
       - name: Install frontend dependencies
-        run: npm --prefix frontend ci --prefer-offline
+        run: npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000
       - name: Check design assets
         run: mise run check-design
       - name: Frontend tests

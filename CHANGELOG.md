@@ -6,7 +6,7 @@
 
 ### 变更
 
-- CI 门禁 npm 安装提速（Feature #80 后续）：CI 与 `mise run check-release` 的 `npm ci` 改用 `--prefer-offline`，命中 `~/.npm` 缓存时跳过 registry 元数据往返（v0.3.2 实测缓存已命中但 npm ci 仍耗时 5 分钟，瓶颈在元数据校验而非下载）；版本正确性仍由 package-lock 保证，本地 `mise run install` 不受影响。
+- CI 门禁 npm 安装提速（Feature #80 后续）：CI 与 `mise run check-release` 的 `npm ci` 改用 `--prefer-offline --no-audit --no-fund --fetch-timeout=60000`。v0.3.2 实测 `~/.npm` 缓存已 2 秒命中，但安装仍静默卡满 npm 默认 fetch-timeout 的 300 秒（单次 registry 请求挂起，audit 上报失败不报错）后瞬间完成；关闭审计上报并收紧超时后命中缓存即装完。版本正确性仍由 package-lock 保证，本地 `mise run install` 不受影响。
 
 ## v0.3.2 - 2026-09-04
 
