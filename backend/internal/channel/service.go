@@ -414,7 +414,7 @@ func validUpstreamModelID(value string, protocol Protocol) bool {
 }
 
 func validCredential(value string) bool {
-	if len([]byte(value)) < 16 || len([]byte(value)) > 8192 {
+	if value == "" || len([]byte(value)) > 8192 {
 		return false
 	}
 	for _, character := range value {
