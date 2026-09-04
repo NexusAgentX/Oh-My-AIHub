@@ -129902,6 +129902,3781 @@
             }
           ],
           "screen": "/admin/models"
+        },
+        {
+          "type": "frame",
+          "id": "n11762",
+          "name": "57 · 账户与信用 · 管理账户",
+          "x": 4620.0,
+          "y": 10800.0,
+          "width": 1440.0,
+          "height": 960.0,
+          "layout": "horizontal",
+          "clipContent": true,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.canvas"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n11763",
+              "name": "Global Sidebar",
+              "width": 248.0,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 24.0,
+              "padding": [
+                24.0,
+                16.0
+              ],
+              "justifyContent": "space_between",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.surface.soft"
+                }
+              ],
+              "stroke": {
+                "thickness": {
+                  "right": 1.0
+                },
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "$color.hairline"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n11764",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "layout": "vertical",
+                  "gap": 24.0,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11765",
+                      "width": "fill_container",
+                      "height": 48.0,
+                      "layout": "horizontal",
+                      "gap": 12.0,
+                      "padding": [
+                        0.0,
+                        8.0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11766",
+                          "width": 32.0,
+                          "height": 32.0,
+                          "layout": "horizontal",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.primary"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11767",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "O",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 18.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.on.primary"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11768",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 0.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11769",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "Oh My AIHub",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 15.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11770",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "管理后台",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11771",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 4.0,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11772",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11773",
+                              "iconFontName": "activity",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11774",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "运营总览",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/ops\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11775",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "#e0e2e6"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11776",
+                              "iconFontName": "users",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11777",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户与信用",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/accounts\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11778",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11779",
+                              "iconFontName": "database",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11780",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "模型目录",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/models\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11781",
+                          "name": "API Market Navigation",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11782",
+                              "iconFontName": "shield",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11783",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "争议处理",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/disputes/C2C-2048\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11784",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11785",
+                              "iconFontName": "chart-no-axes-column",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11786",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "共享者收入",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/providers\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11787",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11788",
+                              "iconFontName": "arrow-left",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11789",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "返回产品",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/\""
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n11790",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "gap": 12.0,
+                  "padding": [
+                    8.0,
+                    12.0
+                  ],
+                  "alignItems": "center",
+                  "cornerRadius": 10.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": 1.0,
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11791",
+                      "width": 36.0,
+                      "height": 36.0,
+                      "layout": "horizontal",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "cornerRadius": 9999.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.signature.cream"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n11792",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "林",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11793",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 0.0,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n11794",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "管理员",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n11795",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "运营与仲裁",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n11796",
+              "name": "Workspace",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.canvas"
+                }
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n11797",
+                  "role": "navbar",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "padding": [
+                    0.0,
+                    40.0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1.0
+                    },
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n11798",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "受邀实例 · Singapore",
+                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.5,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.muted"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11799",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "layout": "horizontal",
+                      "gap": 16.0,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11800",
+                          "role": "badge",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "padding": [
+                            4.0,
+                            8.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.signature.mint"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11801",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "账本平衡 0",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n11802",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "可用 102.40 积分",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n11803",
+                  "name": "Page Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "none",
+                  "gap": 0.0,
+                  "padding": 0.0,
+                  "clipContent": true,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11804",
+                      "name": "Accounts Page Background",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "opacity": 0.38,
+                      "width": 1192.0,
+                      "height": 896.0,
+                      "layout": "vertical",
+                      "gap": 18.0,
+                      "padding": [
+                        28.0,
+                        32.0
+                      ],
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.canvas"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11805",
+                          "width": "fill_container",
+                          "height": 60.0,
+                          "layout": "horizontal",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11806",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户与信用",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 30.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11807",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.primary"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n11808",
+                                  "iconFontName": "user-plus",
+                                  "width": 16.0,
+                                  "height": 16.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11809",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "创建账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts?modal=create\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11810",
+                          "width": "fill_container",
+                          "height": 112.0,
+                          "layout": "horizontal",
+                          "gap": 14.0,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11811",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11812",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "账户总数",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11813",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "42",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11814",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11815",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "总信用额度",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11816",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "320",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11817",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11818",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "实际占用",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11819",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "86.4",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11820",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11821",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "逾期账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11822",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "2",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11823",
+                          "role": "card",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.surface.soft"
+                            }
+                          ],
+                          "stroke": {
+                            "thickness": 1.0,
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11824",
+                      "name": "Modal Scrim",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "opacity": 0.18,
+                      "width": 1192.0,
+                      "height": 896.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.surface.dark"
+                        }
+                      ],
+                      "children": []
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11825",
+                      "name": "Edit Account Modal",
+                      "role": "dialog",
+                      "x": 330.0,
+                      "y": 148.0,
+                      "width": 532.0,
+                      "height": 600.0,
+                      "layout": "vertical",
+                      "gap": 16.0,
+                      "padding": 24.0,
+                      "clipContent": true,
+                      "cornerRadius": 12.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.canvas"
+                        }
+                      ],
+                      "stroke": {
+                        "thickness": 1.0,
+                        "fill": [
+                          {
+                            "type": "solid",
+                            "color": "$color.hairline"
+                          }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11826",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11827",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "vertical",
+                              "gap": 2.0,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11828",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "管理账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 23.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11829",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "夜兰 · @yelan",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11830",
+                              "role": "button",
+                              "width": 36.0,
+                              "height": 36.0,
+                              "layout": "horizontal",
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 999.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n11831",
+                                  "iconFontName": "x",
+                                  "width": 17.0,
+                                  "height": 17.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11832",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 6.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11833",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "信用额度",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11834",
+                              "role": "textbox",
+                              "width": "fill_container",
+                              "height": 44.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                12.0
+                              ],
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11835",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "10.000000000",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11836",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 6.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11837",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户状态",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11838",
+                              "role": "textbox",
+                              "width": "fill_container",
+                              "height": 44.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                12.0
+                              ],
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11839",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "启用",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11860",
+                          "name": "Freeze Credit Checkbox",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 8.0,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "n11861",
+                              "width": 16.0,
+                              "height": 16.0,
+                              "cornerRadius": 4.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": []
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11862",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "冻结新消费与持有",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11863",
+                          "name": "Administrator Checkbox",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 8.0,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "n11864",
+                              "width": 16.0,
+                              "height": 16.0,
+                              "cornerRadius": 4.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": []
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11865",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "管理员权限",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11866",
+                          "name": "Password Reset Section",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 10.0,
+                          "padding": [
+                            14.0,
+                            0.0,
+                            0.0,
+                            0.0
+                          ],
+                          "stroke": {
+                            "thickness": {
+                              "top": 1.0
+                            },
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11867",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "密码",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11868",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "重置会生成仅显示一次的新初始密码；该账户全部登录会话立即失效，用户下次登录必须修改密码。",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.55,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11869",
+                              "name": "Reset Password Button",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 38.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                15.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n11870",
+                                  "iconFontName": "key-round",
+                                  "width": 16.0,
+                                  "height": 16.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11871",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "重置密码",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts?modal=edit&reveal=1\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11854",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "justifyContent": "end",
+                          "alignItems": "end",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11855",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11856",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "取消",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11857",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.primary"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11859",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "保存更改",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "screen": "/admin/accounts?modal=edit"
+        },
+        {
+          "type": "frame",
+          "id": "n11872",
+          "name": "58 · 账户与信用 · 重置密码",
+          "x": 6160.0,
+          "y": 10800.0,
+          "width": 1440.0,
+          "height": 960.0,
+          "layout": "horizontal",
+          "clipContent": true,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "$color.canvas"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n11873",
+              "name": "Global Sidebar",
+              "width": 248.0,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 24.0,
+              "padding": [
+                24.0,
+                16.0
+              ],
+              "justifyContent": "space_between",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.surface.soft"
+                }
+              ],
+              "stroke": {
+                "thickness": {
+                  "right": 1.0
+                },
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "$color.hairline"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n11874",
+                  "width": "fill_container",
+                  "height": "fit_content",
+                  "layout": "vertical",
+                  "gap": 24.0,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11875",
+                      "width": "fill_container",
+                      "height": 48.0,
+                      "layout": "horizontal",
+                      "gap": 12.0,
+                      "padding": [
+                        0.0,
+                        8.0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11876",
+                          "width": 32.0,
+                          "height": 32.0,
+                          "layout": "horizontal",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.primary"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11877",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "O",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 18.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.on.primary"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11878",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 0.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11879",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "Oh My AIHub",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 15.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11880",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "管理后台",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11881",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 4.0,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11882",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11883",
+                              "iconFontName": "activity",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11884",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "运营总览",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/ops\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11885",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "#e0e2e6"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11886",
+                              "iconFontName": "users",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11887",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户与信用",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/accounts\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11888",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11889",
+                              "iconFontName": "database",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11890",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "模型目录",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/models\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11891",
+                          "name": "API Market Navigation",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11892",
+                              "iconFontName": "shield",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11893",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "争议处理",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/disputes/C2C-2048\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11894",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11895",
+                              "iconFontName": "chart-no-axes-column",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11896",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "共享者收入",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/admin/providers\""
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11897",
+                          "role": "nav-link",
+                          "width": "fill_container",
+                          "height": 40.0,
+                          "layout": "horizontal",
+                          "gap": 12.0,
+                          "padding": [
+                            0.0,
+                            12.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [],
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "n11898",
+                              "iconFontName": "arrow-left",
+                              "width": 18.0,
+                              "height": 18.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11899",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "返回产品",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 400,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ],
+                          "events": {
+                            "onTap": [
+                              {
+                                "replace": "\"/\""
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n11900",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "gap": 12.0,
+                  "padding": [
+                    8.0,
+                    12.0
+                  ],
+                  "alignItems": "center",
+                  "cornerRadius": 10.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": 1.0,
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11901",
+                      "width": 36.0,
+                      "height": 36.0,
+                      "layout": "horizontal",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "cornerRadius": 9999.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.signature.cream"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n11902",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "林",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11903",
+                      "width": "fill_container",
+                      "height": "fit_content",
+                      "layout": "vertical",
+                      "gap": 0.0,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "n11904",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "管理员",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n11905",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "content": "运营与仲裁",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 400,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "fixed-width",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n11906",
+              "name": "Workspace",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "$color.canvas"
+                }
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n11907",
+                  "role": "navbar",
+                  "width": "fill_container",
+                  "height": 64.0,
+                  "layout": "horizontal",
+                  "padding": [
+                    0.0,
+                    40.0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1.0
+                    },
+                    "fill": [
+                      {
+                        "type": "solid",
+                        "color": "$color.hairline"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n11908",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "content": "受邀实例 · Singapore",
+                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                      "fontSize": 14.0,
+                      "fontWeight": 400,
+                      "letterSpacing": 0.0,
+                      "lineHeight": 1.5,
+                      "textGrowth": "auto",
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.muted"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11909",
+                      "width": "fit_content",
+                      "height": "fit_content",
+                      "layout": "horizontal",
+                      "gap": 16.0,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11910",
+                          "role": "badge",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "padding": [
+                            4.0,
+                            8.0
+                          ],
+                          "alignItems": "center",
+                          "cornerRadius": 6.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.signature.mint"
+                            }
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11911",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "账本平衡 0",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 14.0,
+                              "fontWeight": 500,
+                              "letterSpacing": 0.0,
+                              "lineHeight": 1.5,
+                              "textGrowth": "auto",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "n11912",
+                          "width": "fit_content",
+                          "height": "fit_content",
+                          "content": "可用 102.40 积分",
+                          "fontFamily": "Inter Display, system-ui, sans-serif",
+                          "fontSize": 14.0,
+                          "fontWeight": 500,
+                          "letterSpacing": 0.0,
+                          "lineHeight": 1.5,
+                          "textGrowth": "auto",
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.ink"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n11913",
+                  "name": "Page Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "none",
+                  "gap": 0.0,
+                  "padding": 0.0,
+                  "clipContent": true,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "$color.canvas"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "n11914",
+                      "name": "Accounts Page Background",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "opacity": 0.38,
+                      "width": 1192.0,
+                      "height": 896.0,
+                      "layout": "vertical",
+                      "gap": 18.0,
+                      "padding": [
+                        28.0,
+                        32.0
+                      ],
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.canvas"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11915",
+                          "width": "fill_container",
+                          "height": 60.0,
+                          "layout": "horizontal",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11916",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户与信用",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 30.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.ink"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11917",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.primary"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n11918",
+                                  "iconFontName": "user-plus",
+                                  "width": 16.0,
+                                  "height": 16.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11919",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "创建账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts?modal=create\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11920",
+                          "width": "fill_container",
+                          "height": 112.0,
+                          "layout": "horizontal",
+                          "gap": 14.0,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11921",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11922",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "账户总数",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11923",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "42",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11924",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11925",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "总信用额度",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11926",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "320",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11927",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11928",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "实际占用",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11929",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "86.4",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11930",
+                              "role": "card",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8.0,
+                              "padding": 16.0,
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11931",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "逾期账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11932",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "2",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 24.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11933",
+                          "role": "card",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 10.0,
+                          "fill": [
+                            {
+                              "type": "solid",
+                              "color": "$color.surface.soft"
+                            }
+                          ],
+                          "stroke": {
+                            "thickness": 1.0,
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11934",
+                      "name": "Modal Scrim",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "opacity": 0.18,
+                      "width": 1192.0,
+                      "height": 896.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.surface.dark"
+                        }
+                      ],
+                      "children": []
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n11935",
+                      "name": "Edit Account Modal",
+                      "role": "dialog",
+                      "x": 330.0,
+                      "y": 148.0,
+                      "width": 532.0,
+                      "height": 600.0,
+                      "layout": "vertical",
+                      "gap": 16.0,
+                      "padding": 24.0,
+                      "clipContent": true,
+                      "cornerRadius": 12.0,
+                      "fill": [
+                        {
+                          "type": "solid",
+                          "color": "$color.canvas"
+                        }
+                      ],
+                      "stroke": {
+                        "thickness": 1.0,
+                        "fill": [
+                          {
+                            "type": "solid",
+                            "color": "$color.hairline"
+                          }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n11936",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11937",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "vertical",
+                              "gap": 2.0,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11938",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "管理账户",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 23.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n11939",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "夜兰 · @yelan",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 12.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11940",
+                              "role": "button",
+                              "width": 36.0,
+                              "height": 36.0,
+                              "layout": "horizontal",
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 999.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "n11941",
+                                  "iconFontName": "x",
+                                  "width": 17.0,
+                                  "height": 17.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11942",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 6.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11943",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "信用额度",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11944",
+                              "role": "textbox",
+                              "width": "fill_container",
+                              "height": 44.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                12.0
+                              ],
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11945",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "10.000000000",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.muted"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11946",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 6.0,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11947",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "账户状态",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "textGrowth": "fixed-width",
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11948",
+                              "role": "textbox",
+                              "width": "fill_container",
+                              "height": 44.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                12.0
+                              ],
+                              "alignItems": "center",
+                              "cornerRadius": 6.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11949",
+                                  "width": "fill_container",
+                                  "height": "fit_content",
+                                  "content": "启用",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 13.0,
+                                  "fontWeight": 400,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "fixed-width",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11950",
+                          "name": "Freeze Credit Checkbox",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 8.0,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "n11951",
+                              "width": 16.0,
+                              "height": 16.0,
+                              "cornerRadius": 4.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": []
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11952",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "冻结新消费与持有",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11953",
+                          "name": "Administrator Checkbox",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "horizontal",
+                          "gap": 8.0,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "n11954",
+                              "width": 16.0,
+                              "height": 16.0,
+                              "cornerRadius": 4.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": []
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11955",
+                              "width": "fit_content",
+                              "height": "fit_content",
+                              "content": "管理员权限",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 13.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11956",
+                          "name": "Password Reset Section",
+                          "width": "fill_container",
+                          "height": "fit_content",
+                          "layout": "vertical",
+                          "gap": 10.0,
+                          "padding": [
+                            14.0,
+                            0.0,
+                            0.0,
+                            0.0
+                          ],
+                          "stroke": {
+                            "thickness": {
+                              "top": 1.0
+                            },
+                            "fill": [
+                              {
+                                "type": "solid",
+                                "color": "$color.hairline"
+                              }
+                            ]
+                          },
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n11957",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "密码",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 500,
+                              "lineHeight": 1.5,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "n11958",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "content": "新初始密码仅显示这一次，请立即复制并通过可信渠道交付；关闭后无法再次查看。",
+                              "fontFamily": "Inter Display, system-ui, sans-serif",
+                              "fontSize": 12.0,
+                              "fontWeight": 400,
+                              "lineHeight": 1.55,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.muted"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11967",
+                              "name": "Reset Credential Card",
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "layout": "horizontal",
+                              "gap": 12.0,
+                              "padding": [
+                                10.0,
+                                12.0
+                              ],
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "cornerRadius": 8.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.surface.soft"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11968",
+                                  "name": "New Initial Password",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "7Qk-mR2v-T4x-9Zn-A1w",
+                                  "fontFamily": "ui-monospace, SFMono-Regular, Menlo, monospace",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "n11969",
+                                  "role": "button",
+                                  "width": "fit_content",
+                                  "height": 34.0,
+                                  "layout": "horizontal",
+                                  "gap": 6.0,
+                                  "padding": [
+                                    0.0,
+                                    13.0
+                                  ],
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "cornerRadius": 8.0,
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.canvas"
+                                    }
+                                  ],
+                                  "stroke": {
+                                    "thickness": 1.0,
+                                    "fill": [
+                                      {
+                                        "type": "solid",
+                                        "color": "$color.hairline"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "icon_font",
+                                      "id": "n11970",
+                                      "iconFontName": "copy",
+                                      "width": 14.0,
+                                      "height": 14.0,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.ink"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "n11971",
+                                      "width": "fit_content",
+                                      "height": "fit_content",
+                                      "content": "复制",
+                                      "fontFamily": "Inter Display, system-ui, sans-serif",
+                                      "fontSize": 13.0,
+                                      "fontWeight": 500,
+                                      "lineHeight": 1.5,
+                                      "fill": [
+                                        {
+                                          "type": "solid",
+                                          "color": "$color.ink"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n11962",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "horizontal",
+                          "gap": 10.0,
+                          "justifyContent": "end",
+                          "alignItems": "end",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "n11963",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.canvas"
+                                }
+                              ],
+                              "stroke": {
+                                "thickness": 1.0,
+                                "fill": [
+                                  {
+                                    "type": "solid",
+                                    "color": "$color.hairline"
+                                  }
+                                ]
+                              },
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11964",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "取消",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.ink"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "n11965",
+                              "role": "button",
+                              "width": "fit_content",
+                              "height": 42.0,
+                              "layout": "horizontal",
+                              "gap": 8.0,
+                              "padding": [
+                                0.0,
+                                17.0
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "cornerRadius": 10.0,
+                              "fill": [
+                                {
+                                  "type": "solid",
+                                  "color": "$color.primary"
+                                }
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n11966",
+                                  "width": "fit_content",
+                                  "height": "fit_content",
+                                  "content": "保存更改",
+                                  "fontFamily": "Inter Display, system-ui, sans-serif",
+                                  "fontSize": 14.0,
+                                  "fontWeight": 500,
+                                  "lineHeight": 1.5,
+                                  "textGrowth": "auto",
+                                  "fill": [
+                                    {
+                                      "type": "solid",
+                                      "color": "$color.on.primary"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "events": {
+                                "onTap": [
+                                  {
+                                    "push": "\"/admin/accounts\""
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "screen": "/admin/accounts?modal=edit&reveal=1"
         }
       ]
     },
