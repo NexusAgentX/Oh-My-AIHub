@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 )
 
@@ -79,11 +79,10 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 		writeProtocolError(w, protocol, http.StatusBadRequest, "invalid_model_path", "模型路径无效", "")
 		return
 	}
-	if protocol == channel.ProtocolAnthropic {
-		if err := validateAnthropicHeaders(r.Header); err != nil {
-			writeProtocolError(w, protocol, http.StatusBadRequest, "invalid_anthropic_headers", "anthropic-version 无效", "")
-			return
-		}
+	if protocol == channel.ProtocolAnthropic && r.Header.Get("anthropic-version") == "" {
+		// The header is still forwarded verbatim when the client sends one; only
+		// a missing value is defaulted, because the upstream requires it.
+		r.Header.Set("anthropic-version", defaultAnthropicVersion)
 	}
 	plan, err := s.BeginCall(r.Context(), authenticated, protocol, canonicalModelID)
 	if err != nil {
@@ -138,16 +137,14 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 			continue
 		}
 		requestBody := body
+		if endpoint, err = mergeUpstreamQuery(endpoint, r.URL.RawQuery, protocol, stream); err != nil {
+			code, message, _ := secretguard.ProtectUpstreamError("invalid_query", err.Error(), publicCredentials...)
+			_ = s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, code, message, 0, false, attemptStarted, publicCredentials...)
+			lastFailure = lastUpstreamFailure{code: code, message: message}
+			continue
+		}
 		if protocol != channel.ProtocolGemini {
 			requestBody, err = RewriteRequest(protocol, body, candidate.Lease.UpstreamModelID, stream)
-			if err != nil {
-				code, message, _ := secretguard.ProtectUpstreamError("request_rewrite_failed", err.Error(), publicCredentials...)
-				_ = s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, code, message, 0, false, attemptStarted, publicCredentials...)
-				lastFailure = lastUpstreamFailure{code: code, message: message}
-				continue
-			}
-		} else if stream {
-			endpoint, err = withGeminiSSEQuery(endpoint)
 			if err != nil {
 				code, message, _ := secretguard.ProtectUpstreamError("request_rewrite_failed", err.Error(), publicCredentials...)
 				_ = s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, code, message, 0, false, attemptStarted, publicCredentials...)
@@ -181,6 +178,18 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 		upstreamRequest.GetBody = nil
 		upstreamRequest.Close = true
 		copyOutboundHeaders(upstreamRequest.Header, r.Header, protocol, stream)
+		// Foreign credentials are detected before the platform injects its own
+		// authentication: candidates may legitimately share one upstream key, so
+		// scanning afterwards would reject its own credential.
+		if outboundRequestCarriesForeignCredential(upstreamRequest, foreignCredentials...) {
+			_ = s.completeFailedAttempt(
+				r.Context(), attempt.ID, attempt.LeaseGeneration,
+				"credential_in_request_headers", "request carried a credential belonging to the platform or another candidate",
+				0, false, attemptStarted, publicCredentials...,
+			)
+			lastFailure = lastUpstreamFailure{code: "credential_in_request_headers", message: "request carried a protected credential"}
+			continue
+		}
 		injectUpstreamAuthentication(upstreamRequest.Header, protocol, candidate.Lease.Credential)
 		response, err := client.Do(upstreamRequest)
 		if err != nil {
@@ -213,21 +222,14 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 			continue
 		}
 		if !supportedContentEncoding(response.Header) {
+			// Go decodes gzip itself, so a residual encoding is one the gateway
+			// cannot decode; forwarding those bytes would corrupt the response.
 			response.Body.Close()
-			if completeErr := s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, "unsupported_content_encoding", "upstream content encoding must be identity", response.StatusCode, false, attemptStarted, publicCredentials...); completeErr != nil {
+			if completeErr := s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, "unsupported_content_encoding", "upstream content encoding cannot be decoded", response.StatusCode, false, attemptStarted, publicCredentials...); completeErr != nil {
 				s.finalizePlatformFailure(r.Context(), plan.Call.ID, publicCallID, plan.Call.LeaseGeneration, protocol, w, "attempt_persistence_failed", "无法保存上游错误")
 				return
 			}
-			lastFailure = lastUpstreamFailure{code: "unsupported_content_encoding", message: "upstream content encoding must be identity"}
-			continue
-		}
-		if response.StatusCode >= 200 && response.StatusCode < 300 && !validSuccessContentType(response.Header, stream) {
-			response.Body.Close()
-			if completeErr := s.completeFailedAttempt(r.Context(), attempt.ID, attempt.LeaseGeneration, "invalid_content_type", "upstream success response has an invalid content type", response.StatusCode, false, attemptStarted, publicCredentials...); completeErr != nil {
-				s.finalizePlatformFailure(r.Context(), plan.Call.ID, publicCallID, plan.Call.LeaseGeneration, protocol, w, "attempt_persistence_failed", "无法保存上游错误")
-				return
-			}
-			lastFailure = lastUpstreamFailure{code: "invalid_content_type", message: "upstream success response has an invalid content type"}
+			lastFailure = lastUpstreamFailure{code: "unsupported_content_encoding", message: "upstream content encoding cannot be decoded"}
 			continue
 		}
 		if responseHeaderContainsCredential(response.Header, publicCredentials...) {
@@ -299,7 +301,7 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 			lastFailure = lastUpstreamFailure{code: secretguard.CredentialErrorCode, message: secretguard.CredentialErrorMessage}
 			continue
 		}
-		rewritten, usage, rewriteErr := RewriteNonStreamingResponse(protocol, rawResponse, canonicalModelID, expectedChoices)
+		rewritten, usage, rewriteErr := RewriteNonStreamingResponse(protocol, rawResponse, canonicalModelID)
 		if rewriteErr != nil {
 			code, message := "invalid_upstream_response", rewriteErr.Error()
 			var responseErr *UpstreamResponseError
@@ -321,6 +323,21 @@ func (s *Service) ServeProtocol(w http.ResponseWriter, r *http.Request, protocol
 			)
 			lastFailure = lastUpstreamFailure{code: secretguard.CredentialErrorCode, message: secretguard.CredentialErrorMessage}
 			continue
+		}
+		if usage == nil {
+			// The upstream answered successfully but the platform cannot price it.
+			// Deliver the body and settle the call as incomplete with no charge
+			// (ADR-0014) instead of failing over and hiding a valid response.
+			unsettled := AttemptResult{
+				LeaseGeneration: attempt.LeaseGeneration, Status: AttemptIncomplete, HTTPStatus: response.StatusCode,
+				Duration: time.Since(attemptStarted), ErrorCode: "missing_settlement_usage", RawError: ErrNoUsage.Error(),
+			}
+			if err := s.abortUnsettledSuccess(r.Context(), plan.Call.ID, attempt.ID, candidate.Lease.OfferID, response.StatusCode, unsettled, false, "missing_settlement_usage", ErrNoUsage.Error()); err != nil {
+				writeProtocolError(w, protocol, http.StatusServiceUnavailable, "settlement_failed", "结算未完成", publicCallID)
+				return
+			}
+			_ = writeSanitizedResponse(callContext, w, response.StatusCode, response.Header, rewritten)
+			return
 		}
 		duration := time.Since(attemptStarted)
 		successResult := AttemptResult{
@@ -477,9 +494,10 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 	precommit := make([]bufferedStreamFrame, 0)
 	terminal := make([]bufferedStreamFrame, 0)
 	precommitBytes, terminalBytes, streamBytes := 0, 0, 0
-	terminalStarted, finishSeen := false, false
-	observedChoices := make(map[int]struct{})
-	finishedChoices := make(map[int]struct{})
+	terminalStarted := false
+	usageInvalid := false
+	terminalUsage := UsageObservation{}
+	terminalUsageState := UsageAbsent
 	downstreamStarted, semanticDelivered := false, false
 	ttft := time.Duration(0)
 	observation := UsageObservation{}
@@ -556,6 +574,77 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 		}
 		return streamResult{committed: downstreamStarted, code: code, message: message, err: cause}
 	}
+	// bufferedHasSemantic reports whether anything client-visible is still in the
+	// buffers, so a truncated stream that produced nothing can still fail over.
+	bufferedHasSemantic := func() bool {
+		for _, frame := range precommit {
+			if frame.semantic {
+				return true
+			}
+		}
+		for _, frame := range terminal {
+			if frame.semantic {
+				return true
+			}
+		}
+		return false
+	}
+	// Settle delivers the buffered frames and settles the call. The native
+	// terminal branch and a normal EOF both use it, because a relay may legally
+	// end a stream without a terminal frame (or without the [DONE] marker).
+	settle := func() streamResult {
+		usage, settleable := settlementUsage(observation, usageInvalid, terminalUsage, terminalUsageState)
+		code := "missing_settlement_usage"
+		if usageInvalid {
+			code = "unpriceable_usage"
+		}
+		successResult := AttemptResult{
+			LeaseGeneration: attempt.LeaseGeneration, Status: AttemptSucceeded,
+			HTTPStatus: response.StatusCode, SemanticCommitted: semanticDelivered,
+			MeasureTPS: semanticDelivered, TTFTObserved: semanticDelivered, TTFT: ttft,
+			Duration: time.Since(attemptStarted), Usage: usage,
+		}
+		if !settleable {
+			// The upstream completed but the platform cannot price the call. The
+			// body is still the client's answer, so deliver it and settle as
+			// incomplete with no charge (ADR-0014) instead of hiding a valid
+			// response; nothing was delivered yet still fails over.
+			deliveryErr := writeFrames(precommit)
+			if deliveryErr == nil {
+				deliveryErr = writeFrames(terminal)
+			}
+			if deliveryErr != nil {
+				return fail("downstream_write_failed", deliveryErr.Error(), deliveryErr)
+			}
+			return fail(code, ErrNoUsage.Error(), ErrNoUsage)
+		}
+		if _, err := s.persistFinalize(r.Context(), callID, FinalizeOutcome{
+			LeaseGeneration: attempt.LeaseGeneration, Status: CallSucceeded,
+			CompletionReason: "completed", FinalOfferID: candidate.Lease.OfferID,
+			HTTPStatus: response.StatusCode, Usage: usage,
+			SuccessAttemptID: attempt.ID, SuccessAttempt: &successResult,
+		}); err != nil {
+			_ = s.abortUnsettledSuccess(r.Context(), callID, attempt.ID, candidate.Lease.OfferID, response.StatusCode, successResult, downstreamStarted, "settlement_failed", "结算未完成")
+			if !downstreamStarted {
+				writeProtocolError(w, protocol, http.StatusServiceUnavailable, "settlement_failed", "结算未完成", publicCallID)
+			}
+			return streamResult{committed: true, code: "settlement_failed", message: err.Error(), err: err}
+		}
+		pendingDelivery = true
+		deliveryErr := writeFrames(precommit)
+		if deliveryErr == nil {
+			deliveryErr = writeFrames(terminal)
+		}
+		if deliveryErr != nil {
+			_, _ = s.persistCompensate(r.Context(), callID, attempt.LeaseGeneration, "downstream_write_failed")
+			return streamResult{committed: downstreamStarted, code: "downstream_write_failed", message: deliveryErr.Error(), err: deliveryErr}
+		}
+		if _, err := s.persistConfirm(r.Context(), callID, attempt.LeaseGeneration); err != nil {
+			_, _ = s.persistCompensate(r.Context(), callID, attempt.LeaseGeneration, "delivery_confirmation_failed")
+			return streamResult{committed: downstreamStarted, code: "delivery_confirmation_failed", message: err.Error(), err: err}
+		}
+		return streamResult{committed: downstreamStarted, succeeded: true}
+	}
 	for {
 		deadline := StreamingIdleTimeout
 		if !downstreamStarted {
@@ -567,6 +656,17 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 		}
 		frame, readErr := readSSEFrameWithTimeout(reader, response.Body, deadline)
 		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				if !semanticDelivered && !bufferedHasSemantic() && !terminalStarted {
+					// The upstream closed with nothing usable: a truncated stream is a
+					// failure the caller may retry on the next candidate.
+					return fail("stream_incomplete", readErr.Error(), readErr)
+				}
+				// Normal EOF after real output: deliver it and settle instead of
+				// discarding the response and failing over.
+				_ = response.Body.Close()
+				return settle()
+			}
 			return fail("stream_incomplete", readErr.Error(), readErr)
 		}
 		streamBytes += len(frame)
@@ -602,11 +702,6 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 			}
 			return result
 		}
-		if protocol == channel.ProtocolOpenAIChat {
-			if progressErr := validateChatChoiceProgress(expectedChoices, analysis.ChoiceIndexes); progressErr != nil {
-				return fail("invalid_choice_index", progressErr.Error(), progressErr)
-			}
-		}
 		credentialEcho, credentialErr := credentialGuard.containsFragments(analysis.CredentialFragments)
 		if credentialErr != nil {
 			return fail("stream_resource_limit", credentialErr.Error(), credentialErr)
@@ -632,27 +727,27 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 			}
 			return result
 		}
-		if terminalStarted && !analysis.Terminal {
-			if !analysis.AfterTerminalAllowed {
-				return fail("unexpected_event_after_terminal", "upstream sent data after a terminal event", ErrInvalidInput)
+		// Usage validity is recorded before any branch that skips settlement, so
+		// an unpriceable snapshot in the terminal zone cannot be masked by an
+		// earlier valid one.
+		if analysis.UsageState == UsageInvalid {
+			usageInvalid = true
+		}
+		if !terminalStarted {
+			if analysis.UsageState != UsageAbsent {
+				// The latest record wins until the first terminal event: relays send
+				// partial usage early and the authoritative snapshot last.
+				terminalUsage, terminalUsageState = analysis.Observation, analysis.UsageState
 			}
-			terminalBytes += len(analysis.Frame)
-			if len(terminal) >= maxTerminalFrames || terminalBytes > MaxTerminalBytes {
-				return fail("terminal_flood", ErrResponseTooBig.Error(), ErrResponseTooBig)
-			}
-			terminal = append(terminal, bufferedStreamFrame{data: analysis.Frame, semantic: analysis.Semantic})
-			continue
+			observation.Merge(analysis.Observation)
 		}
-		finishSeen = finishSeen || analysis.FinishObserved
-		for _, index := range analysis.ChoiceIndexes {
-			observedChoices[index] = struct{}{}
-		}
-		for _, index := range analysis.FinishedChoiceIndexes {
-			finishedChoices[index] = struct{}{}
-		}
-		observation.Merge(analysis.Observation)
 		if analysis.Terminal {
 			terminalStarted = true
+		}
+		if terminalStarted {
+			// Terminal wind-down: the first terminal event freezes settlement and
+			// every later frame — including repeated terminal frames — is only
+			// delivered. Frames stay bounded by count and byte budget.
 			terminalBytes += len(analysis.Frame)
 			if len(terminal) >= maxTerminalFrames || terminalBytes > MaxTerminalBytes {
 				return fail("terminal_flood", ErrResponseTooBig.Error(), ErrResponseTooBig)
@@ -662,53 +757,7 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 				continue
 			}
 			_ = response.Body.Close()
-			if protocol == channel.ProtocolOpenAIChat {
-				if !completeChatChoices(expectedChoices, observedChoices, finishedChoices) {
-					return fail("missing_success_terminal", "upstream stream ended before every choice completed", ErrInvalidInput)
-				}
-			} else if !finishSeen {
-				return fail("missing_success_terminal", "upstream stream ended without a protocol success terminal", ErrInvalidInput)
-			}
-			usageObservation := observation
-			if protocol == channel.ProtocolOpenAIResponse || protocol == channel.ProtocolGemini {
-				usageObservation = analysis.Observation
-			}
-			usage, complete := usageObservation.Complete()
-			if !complete {
-				return fail("missing_terminal_usage", ErrNoUsage.Error(), ErrNoUsage)
-			}
-			successResult := AttemptResult{
-				LeaseGeneration: attempt.LeaseGeneration, Status: AttemptSucceeded,
-				HTTPStatus: response.StatusCode, SemanticCommitted: semanticDelivered,
-				MeasureTPS: semanticDelivered, TTFTObserved: semanticDelivered, TTFT: ttft,
-				Duration: time.Since(attemptStarted), Usage: usage,
-			}
-			if _, err := s.persistFinalize(r.Context(), callID, FinalizeOutcome{
-				LeaseGeneration: attempt.LeaseGeneration, Status: CallSucceeded,
-				CompletionReason: "completed", FinalOfferID: candidate.Lease.OfferID,
-				HTTPStatus: response.StatusCode, Usage: usage,
-				SuccessAttemptID: attempt.ID, SuccessAttempt: &successResult,
-			}); err != nil {
-				_ = s.abortUnsettledSuccess(r.Context(), callID, attempt.ID, candidate.Lease.OfferID, response.StatusCode, successResult, downstreamStarted, "settlement_failed", "结算未完成")
-				if !downstreamStarted {
-					writeProtocolError(w, protocol, http.StatusServiceUnavailable, "settlement_failed", "结算未完成", publicCallID)
-				}
-				return streamResult{committed: true, code: "settlement_failed", message: err.Error(), err: err}
-			}
-			pendingDelivery = true
-			deliveryErr := writeFrames(precommit)
-			if deliveryErr == nil {
-				deliveryErr = writeFrames(terminal)
-			}
-			if deliveryErr != nil {
-				_, _ = s.persistCompensate(r.Context(), callID, attempt.LeaseGeneration, "downstream_write_failed")
-				return streamResult{committed: downstreamStarted, code: "downstream_write_failed", message: deliveryErr.Error(), err: deliveryErr}
-			}
-			if _, err := s.persistConfirm(r.Context(), callID, attempt.LeaseGeneration); err != nil {
-				_, _ = s.persistCompensate(r.Context(), callID, attempt.LeaseGeneration, "delivery_confirmation_failed")
-				return streamResult{committed: downstreamStarted, code: "delivery_confirmation_failed", message: err.Error(), err: err}
-			}
-			return streamResult{committed: downstreamStarted, succeeded: true}
+			return settle()
 		}
 		buffered := bufferedStreamFrame{data: analysis.Frame, semantic: analysis.Semantic}
 		if !downstreamStarted {
@@ -732,21 +781,25 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func validateChatChoiceProgress(expected int, indexes []int) error {
-	if expected <= 0 {
-		return ErrInvalidInput
+// settlementUsage returns the billable usage for a completed stream.
+//
+// The terminal frame is preferred because relays commonly report partial usage
+// in earlier frames; the accumulated observation is the fallback. Any frame that
+// reported unpriceable or contradictory usage — including one in the terminal
+// zone — makes the whole attempt unsettleable.
+func settlementUsage(accumulated UsageObservation, accumulatedInvalid bool, terminal UsageObservation, terminalState UsageState) (*ledger.UsageV1, bool) {
+	if accumulatedInvalid || terminalState == UsageInvalid {
+		return nil, false
 	}
-	seen := make(map[int]struct{}, len(indexes))
-	for _, index := range indexes {
-		if index < 0 || index >= expected {
-			return ErrInvalidInput
+	if terminalState == UsageValid {
+		if usage, complete := terminal.Complete(); complete {
+			return usage, true
 		}
-		if _, duplicate := seen[index]; duplicate {
-			return ErrInvalidInput
-		}
-		seen[index] = struct{}{}
 	}
-	return nil
+	if usage, complete := accumulated.Complete(); complete {
+		return usage, true
+	}
+	return nil, false
 }
 
 func sseFrameContainsDecodedCredential(frame []byte, credentials ...string) bool {
@@ -935,13 +988,7 @@ func extractPlatformCredential(r *http.Request, protocol channel.Protocol) (stri
 	return value, nil
 }
 
-func validateAnthropicHeaders(header http.Header) error {
-	versions := header.Values("anthropic-version")
-	if len(versions) != 1 || versions[0] != "2023-06-01" {
-		return ErrInvalidInput
-	}
-	return nil
-}
+const defaultAnthropicVersion = "2023-06-01"
 
 func safeHeaderValue(value string, maxLength int) bool {
 	if strings.TrimSpace(value) == "" || len(value) > maxLength {
@@ -955,19 +1002,74 @@ func safeHeaderValue(value string, maxLength int) bool {
 	return true
 }
 
+// outboundHeaderDenylist lists headers the gateway never forwards.
+//
+// Request framing and hop-by-hop headers belong to Go's transport; credential
+// and account-scoping headers belong to the platform. Accept-Encoding is
+// stripped so Go negotiates and transparently decodes gzip itself.
+//
+// ponytail: static denylist. When a channel genuinely needs an
+// account-scoping header such as OpenAI-Organization, add a per-channel
+// allowlist rather than removing the entry.
+var outboundHeaderDenylist = map[string]struct{}{
+	"Host":                {},
+	"Content-Length":      {},
+	"Connection":          {},
+	"Keep-Alive":          {},
+	"Te":                  {},
+	"Trailer":             {},
+	"Transfer-Encoding":   {},
+	"Upgrade":             {},
+	"Proxy-Authorization": {},
+	"Proxy-Connection":    {},
+	"Authorization":       {},
+	"X-Api-Key":           {},
+	"X-Goog-Api-Key":      {},
+	"Cookie":              {},
+	"Accept-Encoding":     {},
+	"Openai-Organization": {},
+	"Openai-Project":      {},
+	// Client identity, tracing and retry-key headers stay platform-owned: they
+	// change what the upstream attributes to this call and are not vendor
+	// protocol features.
+	"Forwarded":         {},
+	"X-Forwarded-For":   {},
+	"X-Forwarded-Host":  {},
+	"X-Forwarded-Proto": {},
+	"X-Real-Ip":         {},
+	"Idempotency-Key":   {},
+	"Traceparent":       {},
+	"Baggage":           {},
+}
+
+// copyOutboundHeaders forwards every client header the platform does not own, so
+// beta features and vendor headers reach the upstream unchanged.
 func copyOutboundHeaders(target, source http.Header, protocol channel.Protocol, stream bool) {
+	for name, values := range source {
+		canonical := http.CanonicalHeaderKey(name)
+		if _, blocked := outboundHeaderDenylist[canonical]; blocked {
+			continue
+		}
+		for _, value := range values {
+			target.Add(canonical, value)
+		}
+	}
+	// Connection may name additional hop-by-hop headers, in any of its values.
+	for _, connection := range source.Values("Connection") {
+		for _, name := range strings.Split(connection, ",") {
+			if trimmed := strings.TrimSpace(name); trimmed != "" {
+				target.Del(trimmed)
+			}
+		}
+	}
 	target.Set("Content-Type", "application/json")
-	target.Set("Accept-Encoding", "identity")
 	if stream {
 		target.Set("Accept", "text/event-stream")
 	} else {
 		target.Set("Accept", "application/json")
 	}
-	if protocol == channel.ProtocolAnthropic {
-		target.Set("anthropic-version", "2023-06-01")
-		for _, beta := range source.Values("anthropic-beta") {
-			target.Add("anthropic-beta", beta)
-		}
+	if protocol == channel.ProtocolAnthropic && target.Get("anthropic-version") == "" {
+		target.Set("anthropic-version", defaultAnthropicVersion)
 	}
 }
 
@@ -1000,6 +1102,54 @@ func sanitizedResponseHeaders(source http.Header) http.Header {
 	return result
 }
 
+// outboundRequestCarriesForeignCredential reports whether the request the gateway
+// is about to send would leak a platform or sibling-candidate credential through
+// a forwarded header or query parameter. It runs after authentication injection,
+// so the candidate's own credential is excluded by the caller.
+func outboundRequestCarriesForeignCredential(request *http.Request, foreignCredentials ...string) bool {
+	for name, values := range request.Header {
+		if headerNameCarriesCredential(name, foreignCredentials) {
+			return true
+		}
+		for _, value := range values {
+			if secretguard.ContainsExactOrJSONEscaped(value, foreignCredentials...) {
+				return true
+			}
+		}
+	}
+	// Query values are decoded first so a percent-encoded credential is caught too.
+	for key, values := range request.URL.Query() {
+		if secretguard.ContainsExactOrJSONEscaped(key, foreignCredentials...) {
+			return true
+		}
+		for _, value := range values {
+			if secretguard.ContainsExactOrJSONEscaped(value, foreignCredentials...) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// headerNameCarriesCredential reports a credential smuggled in a header name.
+// Names are canonicalised and may be percent-encoded, so the lowered original and
+// the lowered PathUnescape form are both checked (PathUnescape keeps a literal
+// '+', which QueryUnescape would turn into a space).
+func headerNameCarriesCredential(name string, credentials []string) bool {
+	candidates := []string{strings.ToLower(name)}
+	if decoded, err := url.PathUnescape(name); err == nil && decoded != name {
+		candidates = append(candidates, strings.ToLower(decoded))
+	}
+	for _, candidate := range candidates {
+		for _, credential := range credentials {
+			if credential != "" && strings.Contains(candidate, strings.ToLower(credential)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func responseHeaderContainsCredential(source http.Header, credentials ...string) bool {
 	for _, values := range sanitizedResponseHeaders(source) {
 		for _, value := range values {
@@ -1009,22 +1159,6 @@ func responseHeaderContainsCredential(source http.Header, credentials ...string)
 		}
 	}
 	return false
-}
-
-func validSuccessContentType(header http.Header, stream bool) bool {
-	values := header.Values("Content-Type")
-	if len(values) != 1 {
-		return false
-	}
-	mediaType, _, err := mime.ParseMediaType(values[0])
-	if err != nil {
-		return false
-	}
-	if stream {
-		return strings.EqualFold(mediaType, "text/event-stream")
-	}
-	mediaType = strings.ToLower(mediaType)
-	return mediaType == "application/json" || strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json")
 }
 
 func supportedContentEncoding(header http.Header) bool {
@@ -1043,41 +1177,14 @@ func supportedContentEncoding(header http.Header) bool {
 }
 
 func validateProtocolQuery(protocol channel.Protocol, stream bool, rawQuery string) error {
+	// Only two things are rejected: a malformed query string, and the API-key
+	// query parameter, which would leak the platform credential upstream. Every
+	// other parameter is forwarded verbatim; the upstream decides what it takes.
 	query, err := url.ParseQuery(rawQuery)
 	if err != nil || query.Has("key") {
 		return ErrInvalidInput
 	}
-	if protocol != channel.ProtocolGemini {
-		if rawQuery != "" {
-			return ErrInvalidInput
-		}
-		return nil
-	}
-	if !stream {
-		if rawQuery == "" {
-			return nil
-		}
-		return ErrInvalidInput
-	}
-	if rawQuery != "alt=sse" || len(query) != 1 || len(query["alt"]) != 1 || query.Get("alt") != "sse" {
-		return ErrInvalidInput
-	}
 	return nil
-}
-
-func completeChatChoices(expected int, observed, finished map[int]struct{}) bool {
-	if expected <= 0 || len(observed) != expected || len(finished) != expected {
-		return false
-	}
-	for index := 0; index < expected; index++ {
-		if _, ok := observed[index]; !ok {
-			return false
-		}
-		if _, ok := finished[index]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func protocolErrorPayload(protocol channel.Protocol, status int, code, message, callID string) any {
@@ -1160,13 +1267,32 @@ func readBounded(body io.Reader, maximum int64) ([]byte, error) {
 	return encoded, nil
 }
 
-func withGeminiSSEQuery(endpoint string) (string, error) {
+// mergeUpstreamQuery carries the client query string to the upstream endpoint.
+// The provider endpoint keeps its own parameters; the client's are appended.
+// Gemini streaming keeps its mandated alt=sse.
+func mergeUpstreamQuery(endpoint, rawQuery string, protocol channel.Protocol, stream bool) (string, error) {
 	parsed, err := url.Parse(endpoint)
 	if err != nil {
-		return "", err
+		return "", ErrInvalidInput
 	}
-	query := parsed.Query()
-	query.Set("alt", "sse")
+	query, err := url.ParseQuery(parsed.RawQuery)
+	if err != nil {
+		return "", ErrInvalidInput
+	}
+	if rawQuery != "" {
+		clientQuery, err := url.ParseQuery(rawQuery)
+		if err != nil {
+			return "", ErrInvalidInput
+		}
+		for key, values := range clientQuery {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+	}
+	if protocol == channel.ProtocolGemini && stream {
+		query.Set("alt", "sse")
+	}
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
 }

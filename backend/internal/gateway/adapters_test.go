@@ -43,7 +43,7 @@ func TestProtocolAdaptersNormalizeUsageAndRestoreModels(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			rewritten, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model", 1)
+			rewritten, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -72,8 +72,12 @@ func TestProtocolAdaptersNormalizeUsageAndRestoreModels(t *testing.T) {
 		{channel.ProtocolGemini, `{"modelVersion":"x","candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"cachedContentTokenCount":3}}`},
 	}
 	for _, test := range invalid {
-		if _, _, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model", 1); !errors.Is(err, ErrNoUsage) {
-			t.Fatalf("invalid usage for %s = %v, want ErrNoUsage", test.protocol, err)
+		rewritten, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model")
+		if err != nil || usage != nil {
+			t.Fatalf("unbillable usage for %s = %+v, %v, want passthrough without usage", test.protocol, usage, err)
+		}
+		if len(rewritten) == 0 {
+			t.Fatalf("unbillable %s body was not forwarded", test.protocol)
 		}
 	}
 }
@@ -150,7 +154,7 @@ func TestRequestRewriteStartsFromOriginalAndForcesChatUsage(t *testing.T) {
 	}
 }
 
-func TestNonStreamingRejectsErrorEnvelopesAndUsageOnlyPayloads(t *testing.T) {
+func TestNonStreamingRejectsErrorEnvelopesAndForwardsUsageOnlyPayloads(t *testing.T) {
 	tests := []struct {
 		name      string
 		protocol  channel.Protocol
@@ -180,10 +184,14 @@ func TestNonStreamingRejectsErrorEnvelopesAndUsageOnlyPayloads(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			for _, body := range []string{test.error, test.usageOnly} {
-				if _, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(body), "canonical/model", 1); err == nil || usage != nil {
-					t.Fatalf("invalid 200 payload accepted: usage=%+v err=%v body=%s", usage, err, body)
-				}
+			// An explicit error envelope still fails the attempt.
+			if _, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.error), "canonical/model"); err == nil || usage != nil {
+				t.Fatalf("error envelope accepted: usage=%+v err=%v body=%s", usage, err, test.error)
+			}
+			// A 200 carrying only usage is the client's business: forward it and
+			// settle on whatever usage it reports.
+			if _, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.usageOnly), "canonical/model"); err != nil || usage == nil {
+				t.Fatalf("usage-only payload rejected: usage=%+v err=%v body=%s", usage, err, test.usageOnly)
 			}
 		})
 	}
@@ -203,11 +211,12 @@ func TestUsageRejectsInvalidOptionalFieldsAndCountsGeminiThoughts(t *testing.T) 
 		{channel.ProtocolGemini, `{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":9223372036854775807,"toolUsePromptTokenCount":1,"candidatesTokenCount":0}}`},
 	}
 	for _, test := range invalid {
-		if _, _, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model", 1); !errors.Is(err, ErrNoUsage) {
-			t.Fatalf("invalid optional usage accepted for %s: %v", test.protocol, err)
+		rewritten, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model")
+		if err != nil || usage != nil || len(rewritten) == 0 {
+			t.Fatalf("invalid optional usage accepted for %s: %+v %v", test.protocol, usage, err)
 		}
 	}
-	_, usage, err := RewriteNonStreamingResponse(channel.ProtocolGemini, []byte(`{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":2,"thoughtsTokenCount":3,"toolUsePromptTokenCount":3,"cachedContentTokenCount":1,"totalTokenCount":12}}`), "canonical/model", 1)
+	_, usage, err := RewriteNonStreamingResponse(channel.ProtocolGemini, []byte(`{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":2,"thoughtsTokenCount":3,"toolUsePromptTokenCount":3,"cachedContentTokenCount":1,"totalTokenCount":12}}`), "canonical/model")
 	if err != nil || usage == nil || usage.InputTokens != 6 || usage.OutputTokens != 5 || usage.CacheReadTokens != 1 {
 		t.Fatalf("Gemini tool/thought/cache usage = %+v, %v", usage, err)
 	}
@@ -236,7 +245,7 @@ func TestXAIRelaySuccessMetadataIsBillable(t *testing.T) {
 			"choices":[{"index":0,"message":{"role":"assistant","content":"Pong","reasoning_content":"ping check","refusal":null},"finish_reason":"stop","native_finish_reason":"stop"}],
 			"usage":{"prompt_tokens":207,"completion_tokens":12,"total_tokens":406,"prompt_tokens_details":{"text_tokens":207,"audio_tokens":0,"image_tokens":0,"cached_tokens":0},"completion_tokens_details":{"reasoning_tokens":187,"audio_tokens":0,"accepted_prediction_tokens":0,"rejected_prediction_tokens":0},"num_sources_used":0,"cost_in_usd_ticks":2733600}
 		}`
-	_, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "xai/grok-4.6", 1)
+	_, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "xai/grok-4.6")
 	if err != nil || chatUsage == nil || chatUsage.InputTokens != 207 || chatUsage.OutputTokens != 199 {
 		t.Fatalf("xAI chat rewrite = %+v, %v", chatUsage, err)
 	}
@@ -251,13 +260,13 @@ func TestXAIRelaySuccessMetadataIsBillable(t *testing.T) {
 			"safety_identifier":null,"error":null,"instructions":null,
 			"usage":{"input_tokens":207,"output_tokens":142,"total_tokens":349,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":134},"num_sources_used":0,"num_server_side_tools_used":0,"cost_in_usd_ticks":2152200,"context_details":{"input_tokens":207,"output_tokens":142}}
 		}`
-	_, responsesUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "xai/grok-4.6", 1)
+	_, responsesUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "xai/grok-4.6")
 	if err != nil || responsesUsage == nil || responsesUsage.InputTokens != 207 || responsesUsage.OutputTokens != 142 {
 		t.Fatalf("xAI responses rewrite = %+v, %v", responsesUsage, err)
 	}
 
 	includedReasoning := `{"id":"chat-2","object":"chat.completion","model":"x","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30,"completion_tokens_details":{"reasoning_tokens":8}}}`
-	_, includedUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(includedReasoning), "canonical/model", 1)
+	_, includedUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(includedReasoning), "canonical/model")
 	if err != nil || includedUsage == nil || includedUsage.OutputTokens != 20 {
 		t.Fatalf("chat usage with reasoning already in completion = %+v, %v", includedUsage, err)
 	}
@@ -352,8 +361,17 @@ func TestSSESemanticAndTerminalClassification(t *testing.T) {
 
 func TestSSEProtocolEndsAndNativeErrors(t *testing.T) {
 	for _, protocol := range []channel.Protocol{channel.ProtocolOpenAIResponse, channel.ProtocolAnthropic, channel.ProtocolGemini} {
-		if _, err := AnalyzeSSEFrame(protocol, []byte("data: [DONE]\n\n"), "canonical/model"); !errors.Is(err, ErrInvalidInput) {
-			t.Fatalf("%s accepted Chat-only DONE marker: %v", protocol, err)
+		// [DONE] only terminates Chat streams. Other protocols forward the relay's
+		// frame untouched instead of failing the stream.
+		analysis, err := AnalyzeSSEFrame(protocol, []byte("data: [DONE]\n\n"), "canonical/model")
+		if err != nil {
+			t.Fatalf("%s rejected a foreign [DONE] frame: %v", protocol, err)
+		}
+		if analysis.Terminal || analysis.StreamEnd || analysis.Semantic {
+			t.Fatalf("%s classified [DONE] as terminal/semantic: %+v", protocol, analysis)
+		}
+		if string(analysis.Frame) != "data: [DONE]\n\n" {
+			t.Fatalf("%s did not forward [DONE] verbatim: %q", protocol, analysis.Frame)
 		}
 	}
 	errorsByProtocol := []struct {
@@ -399,10 +417,6 @@ func TestGeminiPathValidation(t *testing.T) {
 		"/v1beta/models/../gemini:generateContent",
 		"/v1beta/models/gemini:other:generateContent",
 		"/v1beta/models/gemini:generateContent?key=secret",
-		"/v1beta/models/gemini:generateContent?alt=sse",
-		"/v1beta/models/gemini:streamGenerateContent",
-		"/v1beta/models/gemini:streamGenerateContent?alt=json",
-		"/v1beta/models/gemini:streamGenerateContent?alt=sse&extra=1",
 	}
 	for _, path := range invalid {
 		r := httptest.NewRequest("POST", path, nil)
@@ -416,13 +430,9 @@ func TestGeminiPathValidation(t *testing.T) {
 		raw      string
 	}{
 		{channel.ProtocolOpenAIChat, false, "key=secret"},
-		{channel.ProtocolOpenAIResponse, false, "trace=1"},
 		{channel.ProtocolAnthropic, true, "%zz"},
-		{channel.ProtocolGemini, true, "alt=sse&alt=sse"},
-		{channel.ProtocolGemini, true, ""},
-		{channel.ProtocolGemini, true, "alt=%73se"},
 		{channel.ProtocolGemini, true, "alt=sse;key=secret"},
-		{channel.ProtocolGemini, false, "alt=sse"},
+		{channel.ProtocolGemini, true, "trace=1&key=secret"},
 	}
 	for _, test := range invalidQueries {
 		if err := validateProtocolQuery(test.protocol, test.stream, test.raw); !errors.Is(err, ErrInvalidInput) {
@@ -432,10 +442,13 @@ func TestGeminiPathValidation(t *testing.T) {
 	for _, test := range []struct {
 		stream bool
 		raw    string
-	}{{false, ""}, {true, "alt=sse"}} {
+	}{{false, ""}, {true, "alt=sse"}, {false, "trace=1"}, {true, "alt=sse&extra=1"}, {false, "alt=sse"}} {
 		if err := validateProtocolQuery(channel.ProtocolGemini, test.stream, test.raw); err != nil {
 			t.Fatalf("valid Gemini query rejected: stream=%t raw=%q (%v)", test.stream, test.raw, err)
 		}
+	}
+	if err := validateProtocolQuery(channel.ProtocolOpenAIResponse, false, "trace=1"); err != nil {
+		t.Fatalf("vendor query rejected: %v", err)
 	}
 }
 
@@ -464,7 +477,7 @@ func TestNativeRequestAndResponseShapesPassThroughBilling(t *testing.T) {
 		"output":[{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],
 		"vendor_extra":{"nested":true},"usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12,"input_tokens_details":{"cached_tokens":4},"vendor_cost_ticks":99}
 	}`
-	rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "canonical/model", 1)
+	rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(responsesBody), "canonical/model")
 	if err != nil || usage == nil || usage.InputTokens != 6 || usage.OutputTokens != 2 || usage.CacheReadTokens != 4 {
 		t.Fatalf("responses passthrough = %+v, %v", usage, err)
 	}
@@ -475,7 +488,7 @@ func TestNativeRequestAndResponseShapesPassThroughBilling(t *testing.T) {
 	chatBody := `{"id":"chat-1","object":"chat.completion","model":"x","vendor_extra":true,
 		"choices":[{"index":0,"message":{"role":"assistant","content":"ok","audio":null},"finish_reason":"stop"}],
 		"usage":{"prompt_tokens":8,"completion_tokens":3,"vendor_field":"ignored"}}`
-	if _, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "canonical/model", 1); err != nil || chatUsage == nil || chatUsage.InputTokens != 8 || chatUsage.OutputTokens != 3 {
+	if _, chatUsage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(chatBody), "canonical/model"); err != nil || chatUsage == nil || chatUsage.InputTokens != 8 || chatUsage.OutputTokens != 3 {
 		t.Fatalf("chat passthrough = %+v, %v", chatUsage, err)
 	}
 
@@ -500,28 +513,62 @@ func TestNativeRequestAndResponseShapesPassThroughBilling(t *testing.T) {
 		{channel.ProtocolGemini, `{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":1,"candidatesTokensDetails":[{"modality":"AUDIO","tokenCount":2}]}}`},
 	}
 	for _, test := range unbillable {
-		if _, _, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model", 1); !errors.Is(err, ErrNoUsage) {
-			t.Fatalf("unbillable usage accepted for %s: %v", test.protocol, err)
+		rewritten, usage, err := RewriteNonStreamingResponse(test.protocol, []byte(test.body), "canonical/model")
+		if err != nil || usage != nil || len(rewritten) == 0 {
+			t.Fatalf("unbillable usage accepted for %s: %+v %v", test.protocol, usage, err)
 		}
 	}
 }
 
-func TestNonStreamingChatRequiresEveryRequestedChoiceExactlyOnce(t *testing.T) {
+// `incomplete` and `cancelled` are valid Responses terminal states that still
+// carry usage; only an explicit failure is an error.
+func TestResponsesTerminalStatesAreNotErrors(t *testing.T) {
+	for _, status := range []string{"incomplete", "cancelled"} {
+		body := `{"id":"resp-1","object":"response","model":"x","status":"` + status + `","output":[],"usage":{"input_tokens":5,"output_tokens":1},"incomplete_details":{"reason":"max_output_tokens"}}`
+		rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(body), "canonical/model")
+		if err != nil || usage == nil || len(rewritten) == 0 {
+			t.Fatalf("%s response = %+v %v", status, usage, err)
+		}
+	}
+	failed := `{"id":"resp-1","object":"response","status":"failed","error":{"code":"server_error","message":"boom"},"usage":{"input_tokens":5,"output_tokens":1}}`
+	if _, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIResponse, []byte(failed), "canonical/model"); err == nil || usage != nil {
+		t.Fatalf("failed response accepted: %+v %v", usage, err)
+	}
+
+	// Streams: response.incomplete is a terminal event that ends the stream.
+	analysis, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte(`data: {"type":"response.incomplete","response":{"id":"resp-1","status":"incomplete"},"usage":{"input_tokens":5,"output_tokens":1}}`+"\n\n"), "canonical/model")
+	if err != nil || analysis.ErrorCode != "" || !analysis.Terminal || !analysis.StreamEnd || analysis.UsageState != UsageValid {
+		t.Fatalf("response.incomplete = %+v %v", analysis, err)
+	}
+	// A normal event that still carries an explicit failure envelope is an error.
+	nested, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte(`data: {"type":"response.completed","response":{"id":"resp-1","status":"failed","error":{"code":"server_error","message":"boom"}},"usage":{"input_tokens":5,"output_tokens":1}}`+"\n\n"), "canonical/model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nested.ErrorCode == "" {
+		t.Fatalf("nested failure envelope was ignored: %+v", nested)
+	}
+}
+
+func TestNonStreamingAcceptsVendorChoiceShapes(t *testing.T) {
 	valid := `{"id":"chat-1","object":"chat.completion","model":"x","choices":[` +
 		`{"index":0,"message":{"role":"assistant","content":"first"},"finish_reason":"stop"},` +
 		`{"index":1,"message":{"role":"assistant","content":"second"},"finish_reason":"stop"}` +
 		`],"usage":{"prompt_tokens":4,"completion_tokens":2}}`
-	if _, _, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(valid), "canonical/model", 2); err != nil {
+	if _, _, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(valid), "canonical/model"); err != nil {
 		t.Fatalf("valid n=2 response rejected: %v", err)
 	}
-	invalid := []string{
+	// Relays return fewer choices than n, repeat indexes, or skip indexes. The
+	// platform forwards the body and settles on the usage it reports.
+	vendorShapes := []string{
 		`{"object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":1}}`,
 		`{"object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant"},"finish_reason":"stop"},{"index":0,"message":{"role":"assistant"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2}}`,
 		`{"object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant"},"finish_reason":"stop"},{"index":2,"message":{"role":"assistant"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2}}`,
 	}
-	for _, body := range invalid {
-		if _, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(body), "canonical/model", 2); err == nil || usage != nil {
-			t.Fatalf("invalid n=2 response accepted: %s", body)
+	for _, body := range vendorShapes {
+		rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(body), "canonical/model")
+		if err != nil || usage == nil || len(rewritten) == 0 {
+			t.Fatalf("vendor n=2 shape rejected: %s", body)
 		}
 	}
 }

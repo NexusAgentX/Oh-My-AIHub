@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -18,6 +19,140 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 )
+
+func TestUsageStateSeparatesAbsentFromInvalid(t *testing.T) {
+	absent := []struct {
+		protocol channel.Protocol
+		frame    string
+	}{
+		{channel.ProtocolOpenAIChat, `data: {"choices":[{"index":0,"delta":{"content":"hi"}}]}` + "\n\n"},
+		{channel.ProtocolOpenAIResponse, `data: {"type":"response.output_text.delta","delta":"hi"}` + "\n\n"},
+		{channel.ProtocolAnthropic, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}` + "\n\n"},
+	}
+	for _, test := range absent {
+		analysis, err := AnalyzeSSEFrame(test.protocol, []byte(test.frame), "canonical/model")
+		if err != nil || analysis.UsageState != UsageAbsent {
+			t.Fatalf("absent usage for %s = %v %v", test.protocol, analysis.UsageState, err)
+		}
+	}
+	invalid := []struct {
+		name     string
+		protocol channel.Protocol
+		frame    string
+	}{
+		{"chat-usage-not-object", channel.ProtocolOpenAIChat, `data: {"choices":[],"usage":"bad"}` + "\n\n"},
+		{"chat-contradictory-cache", channel.ProtocolOpenAIChat, `data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":6}}}` + "\n\n"},
+		{"chat-audio-dimension", channel.ProtocolOpenAIChat, `data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":1,"prompt_tokens_details":{"audio_tokens":2}}}` + "\n\n"},
+		{"anthropic-token-not-a-number", channel.ProtocolAnthropic, `data: {"type":"message_delta","usage":{"output_tokens":"bad"}}` + "\n\n"},
+		{"anthropic-cache-without-input", channel.ProtocolAnthropic, `data: {"type":"message_delta","usage":{"cache_read_input_tokens":3}}` + "\n\n"},
+		{"gemini-metadata-not-object", channel.ProtocolGemini, `data: {"candidates":[{"finishReason":"STOP"}],"usageMetadata":"bad"}` + "\n\n"},
+	}
+	for _, test := range invalid {
+		t.Run(test.name, func(t *testing.T) {
+			analysis, err := AnalyzeSSEFrame(test.protocol, []byte(test.frame), "canonical/model")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if analysis.UsageState != UsageInvalid {
+				t.Fatalf("usage state = %v, want UsageInvalid", analysis.UsageState)
+			}
+		})
+	}
+}
+
+// Event names are observation only: relays rename events, add fields, and send
+// their own keepalive payloads. Only an explicit error payload fails the attempt.
+func TestSSEFrameEventNamesAreObservationOnly(t *testing.T) {
+	frames := []struct {
+		name         string
+		protocol     channel.Protocol
+		frame        string
+		wantMismatch bool
+	}{
+		{"renamed-responses-event", channel.ProtocolOpenAIResponse, "event: vendor.renamed\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n", true},
+		{"renamed-anthropic-event", channel.ProtocolAnthropic, "event: vendor.renamed\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n", true},
+		{"non-json-data", channel.ProtocolOpenAIResponse, "event: vendor.ping\ndata: keepalive\n\n", false},
+		{"unknown-sse-field", channel.ProtocolAnthropic, "vendor-field: 1\ndata: {\"type\":\"ping\"}\n\n", false},
+	}
+	for _, test := range frames {
+		t.Run(test.name, func(t *testing.T) {
+			analysis, err := AnalyzeSSEFrame(test.protocol, []byte(test.frame), "canonical/model")
+			if err != nil {
+				t.Fatalf("frame was rejected: %v", err)
+			}
+			if len(analysis.Frame) == 0 {
+				t.Fatal("frame was dropped instead of forwarded")
+			}
+			if analysis.EventNameMismatch != test.wantMismatch {
+				t.Fatalf("event name mismatch = %t, want %t", analysis.EventNameMismatch, test.wantMismatch)
+			}
+		})
+	}
+	keepalive, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte("event: vendor.ping\ndata: keepalive\n\n"), "canonical/model")
+	if err != nil || keepalive.Semantic || keepalive.Terminal || keepalive.UsageState != UsageAbsent {
+		t.Fatalf("keepalive payload classified: %+v %v", keepalive, err)
+	}
+	// The SSE specification keeps the last event field, so this is a real
+	// Anthropic terminal frame.
+	terminal, err := AnalyzeSSEFrame(channel.ProtocolAnthropic, []byte("event: first\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"), "canonical/model")
+	if err != nil || !terminal.Terminal {
+		t.Fatalf("duplicate event field = %+v %v", terminal, err)
+	}
+	if terminal.EventNameMismatch {
+		t.Fatalf("last event field did not win: %+v", terminal)
+	}
+	// An empty event field resets the event type instead of keeping the old one.
+	reset, err := AnalyzeSSEFrame(channel.ProtocolAnthropic, []byte("event: vendor.old\nevent:\ndata: {\"type\":\"message_stop\"}\n\n"), "canonical/model")
+	if err != nil || !reset.Terminal {
+		t.Fatalf("empty event field = %+v %v", reset, err)
+	}
+	if reset.EventNameMismatch {
+		t.Fatalf("empty event field did not reset the event name: %+v", reset)
+	}
+}
+
+// A payload that explicitly reports failure still fails, even when the relay
+// renamed the event around it.
+func TestSSEErrorPayloadWinsOverEventNameMismatch(t *testing.T) {
+	analysis, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte("event: vendor.renamed\ndata: {\"type\":\"response.failed\",\"error\":{\"code\":\"relay_busy\",\"message\":\"nope\"}}\n\n"), "canonical/model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if analysis.ErrorCode != "relay_busy" {
+		t.Fatalf("renamed error payload was not classified as an error: %+v", analysis)
+	}
+}
+
+// Frame fidelity is branch dependent, and documented as such: frames that never
+// reach the JSON path travel byte for byte, while JSON frames are re-serialised
+// into a compact event/data frame.
+func TestSSEFrameFidelityIsBranchDependent(t *testing.T) {
+	raw := "id: 42\nretry: 1000\n: comment\nevent: vendor.ping\ndata: keepalive\n\n"
+	analysis, err := AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte(raw), "canonical/model")
+	if err != nil || string(analysis.Frame) != raw {
+		t.Fatalf("non-JSON frame = %q %v", analysis.Frame, err)
+	}
+	jsonFrame := "id: 42\nretry: 1000\n: comment\nvendor-field: 1\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\",\"vendor_extra\":true}\n\n"
+	analysis, err = AnalyzeSSEFrame(channel.ProtocolOpenAIResponse, []byte(jsonFrame), "canonical/model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(analysis.Frame)
+	if strings.Contains(encoded, "id:") || strings.Contains(encoded, "retry:") || strings.Contains(encoded, "vendor-field") {
+		t.Fatalf("transport metadata reached the client: %q", encoded)
+	}
+	if !strings.Contains(encoded, `"vendor_extra":true`) {
+		t.Fatalf("unknown JSON field was dropped: %q", encoded)
+	}
+}
+
+func TestNonStreamingForwardsNonJSONBodyWithoutUsage(t *testing.T) {
+	body := "<html>relay outage page</html>"
+	rewritten, usage, err := RewriteNonStreamingResponse(channel.ProtocolOpenAIChat, []byte(body), "canonical/model")
+	if err != nil || usage != nil || string(rewritten) != body {
+		t.Fatalf("non-JSON body = %q %+v %v", rewritten, usage, err)
+	}
+}
 
 func TestSSEFrameWithoutNewlineStopsAtTheEventLimit(t *testing.T) {
 	reader, writer := io.Pipe()
@@ -744,7 +879,10 @@ func TestProxyRejectsUnsupportedStreamingContentBeforeCommitAndFallsBack(t *test
 	}
 }
 
-func TestProxyRejectsFalse200PayloadsBeforeCharging(t *testing.T) {
+// A 200 whose body is an error envelope still fails the attempt and fails over.
+// A 200 that only carries usage is forwarded and settled: the platform reads
+// usage and leaves response shape to the client.
+func TestProxyRejectsFalse200ErrorEnvelopesAndSettlesUsageOnlyPayloads(t *testing.T) {
 	candidates := []Candidate{
 		proxyCandidate(1, "offer-error", "vendor-error", "key-error"),
 		proxyCandidate(2, "offer-usage", "vendor-usage", "key-usage"),
@@ -766,15 +904,19 @@ func TestProxyRejectsFalse200PayloadsBeforeCharging(t *testing.T) {
 	request := chatProxyRequest(context.Background(), false)
 	recorder := httptest.NewRecorder()
 	service.ServeProtocol(recorder, request, channel.ProtocolOpenAIChat, "", false)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "canonical/model") {
-		t.Fatalf("fallback response = %d %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"prompt_tokens":1`) {
+		t.Fatalf("usage-only response = %d %s", recorder.Code, recorder.Body.String())
+	}
+	if len(outbound.snapshotRequests()) != 2 {
+		t.Fatalf("usage-only payload triggered extra attempts: %#v", outbound.snapshotRequests())
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if len(store.completed) != 3 || store.completed[0].Status != AttemptFailed || store.completed[0].ErrorCode != "false_success" || store.completed[0].Usage != nil || store.completed[1].Status != AttemptFailed || store.completed[1].Usage != nil || store.completed[2].Status != AttemptSucceeded {
+	if len(store.completed) != 2 || store.completed[0].Status != AttemptFailed || store.completed[0].ErrorCode != "false_success" || store.completed[0].Usage != nil ||
+		store.completed[1].Status != AttemptSucceeded || store.completed[1].Usage == nil {
 		t.Fatalf("false 200 attempt results = %+v", store.completed)
 	}
-	if len(store.finalized) != 1 || store.finalized[0].FinalOfferID != "offer-success" || store.finalized[0].Usage == nil {
+	if len(store.finalized) != 1 || store.finalized[0].FinalOfferID != "offer-usage" || store.finalized[0].Usage == nil {
 		t.Fatalf("false 200 settlement = %+v", store.finalized)
 	}
 }
@@ -897,36 +1039,43 @@ func TestProxyBoundsTerminalFramesAndFallsBack(t *testing.T) {
 	}
 }
 
-func TestProxyRejectsOutOfRangeDuplicateAndHighToolIndexesBeforeDelivery(t *testing.T) {
-	invalidStreams := []string{
-		`data: {"choices":[{"index":1,"delta":{"content":"bad"}}]}` + "\n\n",
-		`data: {"choices":[{"index":0,"delta":{"content":"one"}},{"index":0,"delta":{"content":"duplicate"}}]}` + "\n\n",
-		fmt.Sprintf(`data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":%d,"function":{"arguments":"bad"}}]}}]}`, MaxChatToolCallIndex+1) + "\n\n",
+// Vendor-shaped streams used to be rejected before delivery: choice indexes
+// outside the requested n, duplicated indexes and large tool-call indexes are all
+// things real relays emit. The gateway now forwards them verbatim and settles the
+// call as incomplete when nothing priceable came with it.
+func TestProxyForwardsVendorShapedStreamsWithoutFailover(t *testing.T) {
+	vendorStreams := []string{
+		`data: {"choices":[{"index":1,"delta":{"content":"vendor-index"}}]}` + "\n\n",
+		`data: {"choices":[{"index":0,"delta":{"content":"vendor-one"}},{"index":0,"delta":{"content":"vendor-duplicate"}}]}` + "\n\n",
+		`data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":200,"function":{"arguments":"vendor-args"}}]}}]}` + "\n\n",
 	}
-	for index, stream := range invalidStreams {
+	for index, stream := range vendorStreams {
 		t.Run(strconv.Itoa(index), func(t *testing.T) {
 			store := newProxyStore([]Candidate{
-				proxyCandidate(1, "offer-invalid", "vendor-invalid", "key-invalid"),
-				proxyCandidate(2, "offer-valid", "vendor-valid", "key-valid"),
+				proxyCandidate(1, "offer-vendor", "vendor-one", "key-one"),
+				proxyCandidate(2, "offer-next", "vendor-two", "key-two"),
 			})
 			outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
-				"offer-invalid": func(*http.Request) (*http.Response, error) {
+				"offer-vendor": func(*http.Request) (*http.Response, error) {
 					return proxyResponse(http.StatusOK, sseHeader(), stream), nil
 				},
-				"offer-valid": func(*http.Request) (*http.Response, error) {
-					return proxyResponse(http.StatusOK, sseHeader(), validChatStream("vendor-valid", "safe")), nil
+				"offer-next": func(*http.Request) (*http.Response, error) {
+					return proxyResponse(http.StatusOK, sseHeader(), validChatStream("vendor-two", "other-candidate")), nil
 				},
 			}}
 			service, _ := NewService(store, outbound)
 			recorder := httptest.NewRecorder()
 			service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
-			if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "safe") || strings.Contains(recorder.Body.String(), "bad") || strings.Contains(recorder.Body.String(), "duplicate") {
-				t.Fatalf("invalid stream escaped or blocked fallback: %d %s", recorder.Code, recorder.Body.String())
+			if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "vendor-") || strings.Contains(recorder.Body.String(), "other-candidate") {
+				t.Fatalf("vendor stream was not forwarded verbatim: %d %s", recorder.Code, recorder.Body.String())
+			}
+			if len(outbound.snapshotRequests()) != 1 {
+				t.Fatalf("vendor stream triggered failover: %#v", outbound.snapshotRequests())
 			}
 			store.mu.Lock()
 			defer store.mu.Unlock()
-			if len(store.completed) != 2 || store.completed[0].SemanticCommitted || store.completed[1].Status != AttemptSucceeded {
-				t.Fatalf("invalid index facts = %+v", store.completed)
+			if len(store.completed) != 1 || store.completed[0].Status != AttemptIncomplete {
+				t.Fatalf("vendor stream facts = %+v", store.completed)
 			}
 		})
 	}
@@ -1131,8 +1280,283 @@ func TestAuthenticationAndHeaderIsolation(t *testing.T) {
 			t.Fatalf("blocked outbound header %s escaped: %v", blocked, target)
 		}
 	}
-	if target.Get("X-Safe") != "" || target.Get("Content-Type") != "application/json" || target.Get("Accept") != "application/json" {
-		t.Fatalf("outbound allowlist mismatch: %v", target)
+	if target.Get("X-Safe") != "kept" || target.Get("Content-Type") != "application/json" || target.Get("Accept") != "application/json" {
+		t.Fatalf("outbound header passthrough mismatch: %v", target)
+	}
+}
+
+// Streams that carry no priceable usage are delivered and settled as incomplete
+// with no charge instead of being dropped or failed over.
+func TestProxySettlesUnpriceableStreamsAsIncomplete(t *testing.T) {
+	semantic := `data: {"choices":[{"index":0,"delta":{"content":"hello-from-vendor"}}]}` + "\n\n"
+	streams := map[string]string{
+		"no-usage": semantic + "data: [DONE]\n\n",
+		"unpriceable-usage": semantic +
+			`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2,"prompt_tokens_details":{"audio_tokens":1}}}` + "\n\ndata: [DONE]\n\n",
+		// A valid terminal snapshot followed by an unpriceable frame in the
+		// terminal zone must not restore the call's settleability.
+		"termin" + "al-zone-invalid-usage": semantic +
+			`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n" +
+			`data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":9,"prompt_tokens_details":{"image_tokens":1}}}` + "\n\ndata: [DONE]\n\n",
+	}
+	for name, stream := range streams {
+		t.Run(name, func(t *testing.T) {
+			store := newProxyStore([]Candidate{
+				proxyCandidate(1, "offer-vendor", "vendor-one", "key-one"),
+				proxyCandidate(2, "offer-next", "vendor-two", "key-two"),
+			})
+			outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
+				"offer-vendor": func(*http.Request) (*http.Response, error) {
+					return proxyResponse(http.StatusOK, sseHeader(), stream), nil
+				},
+				"offer-next": func(*http.Request) (*http.Response, error) {
+					return proxyResponse(http.StatusOK, sseHeader(), validChatStream("vendor-two", "other-candidate")), nil
+				},
+			}}
+			service, _ := NewService(store, outbound)
+			recorder := httptest.NewRecorder()
+			service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+			if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "hello-from-vendor") {
+				t.Fatalf("unpriceable stream = %d %s", recorder.Code, recorder.Body.String())
+			}
+			if requests := outbound.snapshotRequests(); len(requests) != 1 {
+				t.Fatalf("unpriceable stream failed over: %#v", requests)
+			}
+			store.mu.Lock()
+			defer store.mu.Unlock()
+			if len(store.completed) != 1 || store.completed[0].Status != AttemptIncomplete || store.completed[0].Usage != nil {
+				t.Fatalf("unpriceable attempt facts = %+v", store.completed)
+			}
+			if len(store.finalized) != 1 || store.finalized[0].Status != CallIncomplete || store.finalized[0].Usage != nil {
+				t.Fatalf("unpriceable settlement = %+v", store.finalized)
+			}
+		})
+	}
+}
+
+// Vendor protocol features reach the upstream, while the platform credential
+// cannot leak through a forwarded header name, header value, or query value.
+func TestProxyForwardsVendorFeaturesButNotPlatformCredentials(t *testing.T) {
+	secret := "oma_live_" + strings.Repeat("c", 43)
+	newService := func() (*Service, *proxyOutbound) {
+		store := newProxyStore([]Candidate{proxyCandidate(1, "offer-one", "vendor-one", "upstream-key-one")})
+		outbound := &proxyOutbound{
+			endpoints: map[string]string{"offer-one": "https://upstream.example/v1/chat/completions"},
+			handlers: map[string]func(*http.Request) (*http.Response, error){
+				"offer-one": func(*http.Request) (*http.Response, error) {
+					return proxyResponse(http.StatusOK, jsonHeader(), validChatResponse("vendor-one")), nil
+				},
+			},
+		}
+		service, _ := NewService(store, outbound)
+		return service, outbound
+	}
+	withSecret := func(mutate func(*http.Request)) *http.Request {
+		request := chatProxyRequest(context.Background(), false)
+		request.Header.Set("Authorization", "Bearer "+secret)
+		mutate(request)
+		return request
+	}
+
+	service, outbound := newService()
+	recorded := withSecret(func(request *http.Request) {
+		request.URL.RawQuery = "trace=1&vendor=2"
+		request.Header.Set("OpenAI-Beta", "assistants=v2")
+		request.Header.Set("X-Stainless-Lang", "go")
+	})
+	recorder := httptest.NewRecorder()
+	service.ServeProtocol(recorder, recorded, channel.ProtocolOpenAIChat, "", false)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("vendor feature request = %d %s", recorder.Code, recorder.Body.String())
+	}
+	requests := outbound.snapshotRequests()
+	if len(requests) != 1 || !strings.Contains(requests[0].url, "trace=1") || !strings.Contains(requests[0].url, "vendor=2") {
+		t.Fatalf("client query did not reach the upstream: %#v", requests)
+	}
+	if requests[0].header.Get("OpenAI-Beta") != "assistants=v2" || requests[0].header.Get("X-Stainless-Lang") != "go" {
+		t.Fatalf("vendor headers did not reach the upstream: %v", requests[0].header)
+	}
+
+	leaks := map[string]func(*http.Request){
+		"header-value": func(request *http.Request) { request.Header.Set("X-Debug", secret) },
+		"header-name":  func(request *http.Request) { request.Header.Set("X-"+secret, "1") },
+		"query-value": func(request *http.Request) {
+			request.URL.RawQuery = "vendor=" + strings.Replace(secret, "oma", "%6Fma", 1)
+		},
+	}
+	for name, mutate := range leaks {
+		t.Run(name, func(t *testing.T) {
+			service, outbound := newService()
+			recorder := httptest.NewRecorder()
+			service.ServeProtocol(recorder, withSecret(mutate), channel.ProtocolOpenAIChat, "", false)
+			if recorder.Code == http.StatusOK {
+				t.Fatalf("credential leak was forwarded: %d %s", recorder.Code, recorder.Body.String())
+			}
+			if len(outbound.snapshotRequests()) != 0 {
+				t.Fatalf("credential leak reached the upstream: %#v", outbound.snapshotRequests())
+			}
+		})
+	}
+}
+
+// The gateway must not force an encoding the upstream cannot negotiate: it lets
+// the transport agree on gzip and decodes the body before settling.
+func TestProxyLetsTheTransportDecodeCompressedResponses(t *testing.T) {
+	observed := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observed <- r.Header.Get("Accept-Encoding")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
+		writer := gzip.NewWriter(w)
+		_, _ = writer.Write([]byte(validChatResponse("vendor-gzip")))
+		_ = writer.Close()
+	}))
+	defer server.Close()
+	store := newProxyStore([]Candidate{proxyCandidate(1, "offer-gzip", "vendor-gzip", "key-gzip")})
+	outbound := &proxyOutbound{
+		client:    server.Client(),
+		endpoints: map[string]string{"offer-gzip": server.URL + "/v1/chat/completions"},
+	}
+	service, _ := NewService(store, outbound)
+	recorder := httptest.NewRecorder()
+	service.ServeProtocol(recorder, chatProxyRequest(context.Background(), false), channel.ProtocolOpenAIChat, "", false)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "canonical/model") {
+		t.Fatalf("compressed upstream response = %d %s", recorder.Code, recorder.Body.String())
+	}
+	if acceptEncoding := <-observed; acceptEncoding != "gzip" {
+		t.Fatalf("upstream accept-encoding = %q, want the transport's gzip negotiation", acceptEncoding)
+	}
+}
+
+// Usage reported by frames after the first terminal event — including repeated
+// terminal frames — must not rewrite the settled snapshot.
+func TestProxyKeepsTheTerminalUsageSnapshot(t *testing.T) {
+	trailingFrame := `data: {"choices":[{"index":0,"delta":{"content":"late"}}],"usage":{"prompt_tokens":100,"completion_tokens":100}}` + "\n\n"
+	repeatedTerminal := `data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":100}}` + "\n\n"
+	streams := map[string]string{
+		"trailing-frame": `data: {"choices":[{"index":0,"delta":{"content":"hello-from-vendor"}}]}` + "\n\n" +
+			`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n" +
+			trailingFrame + "data: [DONE]\n\n",
+		"repeated-terminal-frame": `data: {"choices":[{"index":0,"delta":{"content":"hello-from-vendor"}}]}` + "\n\n" +
+			`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n" +
+			repeatedTerminal + "data: [DONE]\n\n",
+	}
+	for name, stream := range streams {
+		t.Run(name, func(t *testing.T) {
+			store, outbound := newVendorStreamStore(stream)
+			service, _ := NewService(store, outbound)
+			recorder := httptest.NewRecorder()
+			service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+			assertDeliveredWithoutFailover(t, recorder, outbound, "hello-from-vendor")
+			store.mu.Lock()
+			defer store.mu.Unlock()
+			if len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded || store.finalized[0].Usage == nil {
+				t.Fatalf("terminal snapshot settlement = %+v", store.finalized)
+			}
+			if usage := store.finalized[0].Usage; usage.InputTokens != 4 || usage.OutputTokens != 2 {
+				t.Fatalf("post-terminal usage leaked into settlement: %+v", usage)
+			}
+		})
+	}
+}
+
+// A relay may close the stream without a terminal frame. Output that already
+// arrived must still reach the client instead of being discarded and failed over.
+func TestProxyDeliversStreamsThatEndWithoutATerminalFrame(t *testing.T) {
+	chatWithoutDone := `data: {"choices":[{"index":0,"delta":{"content":"hello-from-vendor"}}]}` + "\n\n" +
+		`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n"
+	responsesWithoutStatus := `data: {"type":"response.output_text.delta","delta":"hello-from-vendor"}` + "\n\n" +
+		`data: {"type":"response.completed","response":{"id":"resp-1"}}` + "\n\n"
+
+	t.Run("chat-usage-without-done-is-charged", func(t *testing.T) {
+		store, outbound := newVendorStreamStore(chatWithoutDone)
+		service, _ := NewService(store, outbound)
+		recorder := httptest.NewRecorder()
+		service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+		assertDeliveredWithoutFailover(t, recorder, outbound, "hello-from-vendor")
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		if len(store.completed) != 1 || store.completed[0].Status != AttemptSucceeded || store.completed[0].Usage == nil {
+			t.Fatalf("terminal-less chat attempt facts = %+v", store.completed)
+		}
+		if len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded || store.finalized[0].Usage == nil {
+			t.Fatalf("terminal-less chat settlement = %+v", store.finalized)
+		}
+	})
+
+	t.Run("responses-terminal-without-finish-is-delivered", func(t *testing.T) {
+		store, outbound := newVendorStreamStore(responsesWithoutStatus)
+		service, _ := NewService(store, outbound)
+		recorder := httptest.NewRecorder()
+		service.ServeProtocol(recorder, responsesProxyRequest(context.Background(), true), channel.ProtocolOpenAIResponse, "", false)
+		assertDeliveredWithoutFailover(t, recorder, outbound, "hello-from-vendor")
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		if len(store.completed) != 1 || store.completed[0].Status != AttemptIncomplete || store.completed[0].Usage != nil {
+			t.Fatalf("unfinished responses attempt facts = %+v", store.completed)
+		}
+		if len(store.finalized) != 1 || store.finalized[0].Status != CallIncomplete {
+			t.Fatalf("unfinished responses settlement = %+v", store.finalized)
+		}
+	})
+
+	t.Run("usage-only-stream-is-billed-per-usage", func(t *testing.T) {
+		// Accepted tradeoff (ADR-0014 / ADR-0015): a 200 whose only payload is
+		// usage is forwarded and settled on that usage, including as a stream.
+		store, outbound := newVendorStreamStore(`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n")
+		service, _ := NewService(store, outbound)
+		recorder := httptest.NewRecorder()
+		service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+		assertDeliveredWithoutFailover(t, recorder, outbound, "prompt_tokens")
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		if len(store.completed) != 1 || store.completed[0].Status != AttemptSucceeded || store.completed[0].Usage == nil {
+			t.Fatalf("usage-only attempt facts = %+v", store.completed)
+		}
+		if len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded || store.finalized[0].Usage == nil {
+			t.Fatalf("usage-only settlement = %+v", store.finalized)
+		}
+	})
+}
+
+// A stream that closes with nothing usable is still a failure the caller may
+// retry on the next candidate.
+func TestProxyFailsOverWhenAStreamProducesNothing(t *testing.T) {
+	store, outbound := newVendorStreamStore(`data: {"choices":[{"index":0,"delta":{"role":"assistant"}}]}` + "\n\n" + "data: keepalive\n\n")
+	service, _ := NewService(store, outbound)
+	recorder := httptest.NewRecorder()
+	service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "other-candidate") {
+		t.Fatalf("empty stream fallback = %d %s", recorder.Code, recorder.Body.String())
+	}
+	if requests := outbound.snapshotRequests(); len(requests) != 2 {
+		t.Fatalf("empty stream attempts = %d, want 2", len(requests))
+	}
+}
+
+func newVendorStreamStore(vendorStream string) (*proxyStore, *proxyOutbound) {
+	store := newProxyStore([]Candidate{
+		proxyCandidate(1, "offer-vendor", "vendor-one", "key-one"),
+		proxyCandidate(2, "offer-next", "vendor-two", "key-two"),
+	})
+	outbound := &proxyOutbound{handlers: map[string]func(*http.Request) (*http.Response, error){
+		"offer-vendor": func(*http.Request) (*http.Response, error) {
+			return proxyResponse(http.StatusOK, sseHeader(), vendorStream), nil
+		},
+		"offer-next": func(*http.Request) (*http.Response, error) {
+			return proxyResponse(http.StatusOK, sseHeader(), validChatStream("vendor-two", "other-candidate")), nil
+		},
+	}}
+	return store, outbound
+}
+
+func assertDeliveredWithoutFailover(t *testing.T, recorder *httptest.ResponseRecorder, outbound *proxyOutbound, content string) {
+	t.Helper()
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), content) {
+		t.Fatalf("delivery = %d %s", recorder.Code, recorder.Body.String())
+	}
+	if requests := outbound.snapshotRequests(); len(requests) != 1 {
+		t.Fatalf("delivered stream failed over: %#v", requests)
 	}
 }
 
@@ -1162,6 +1586,13 @@ func chatProxyRequest(ctx context.Context, stream bool) *http.Request {
 	return request
 }
 
+func responsesProxyRequest(ctx context.Context, stream bool) *http.Request {
+	body := fmt.Sprintf(`{"model":"canonical/model","stream":%t,"input":"hi"}`, stream)
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body)).WithContext(ctx)
+	request.Header.Set("Authorization", "Bearer oma_live_"+strings.Repeat("z", 43))
+	return request
+}
+
 func proxyCandidate(priority int, offerID, upstreamModel, credential string) Candidate {
 	return Candidate{Priority: priority, Lease: channel.RoutingLease{
 		OfferID: offerID, ChannelID: "channel-" + offerID, ProviderAccountID: "provider-" + offerID,
@@ -1172,7 +1603,7 @@ func proxyCandidate(priority int, offerID, upstreamModel, credential string) Can
 
 func assertIsolatedUpstreamRequest(t *testing.T, request *http.Request, wantAuthorization string) {
 	t.Helper()
-	if request.Header.Get("Authorization") != wantAuthorization || request.Header.Get("Accept-Encoding") != "identity" {
+	if request.Header.Get("Authorization") != wantAuthorization || request.Header.Get("Accept-Encoding") != "" {
 		t.Fatalf("upstream authentication/encoding = %v", request.Header)
 	}
 	for _, blocked := range []string{"x-api-key", "x-goog-api-key", "Cookie", "Forwarded", "X-Forwarded-For", "X-Client-Leak", "Idempotency-Key", "Traceparent", "Baggage"} {
@@ -1209,6 +1640,9 @@ type proxyOutbound struct {
 	targetErrors map[string]error
 	endpoints    map[string]string
 	requests     []capturedProxyRequest
+	// client replaces the capturing transport; used by tests that need the real
+	// net/http transport behaviour (for example gzip negotiation).
+	client *http.Client
 }
 
 func (o *proxyOutbound) ResolveRoutingLeasesWithStore(context.Context, channel.RoutingStore, []string) ([]channel.PoolOfferStatus, []channel.RoutingLease, error) {
@@ -1220,6 +1654,10 @@ func (o *proxyOutbound) ProxyTarget(_ context.Context, lease channel.RoutingLeas
 		return nil, "", err
 	}
 	handler := o.handlers[lease.OfferID]
+	if o.client != nil {
+		endpoint := o.endpoints[lease.OfferID]
+		return o.client, endpoint, nil
+	}
 	if handler == nil {
 		return nil, "", errors.New("missing proxy test handler")
 	}

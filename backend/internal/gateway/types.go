@@ -19,10 +19,9 @@ const (
 	MaxSSEEventBytes          = 2 << 20
 	MaxPrecommitBytes         = 2 << 20
 	MaxStreamingBytes         = 128 << 20
-	MaxTerminalFrames         = 3
+	MaxTerminalFrames         = 64
 	MaxTerminalBytes          = 6 << 20
 	MaxSSECredentialStreams   = 2048
-	MaxChatToolCallIndex      = 127
 	MaxStoredRawErrorBytes    = 4096
 	FormulaVersion            = "formula-v1"
 	FormulaVersionV2          = "formula-v2"
@@ -103,12 +102,12 @@ type PoolMember struct {
 	// ModelID, Multiplier and PriceTiers carry the benchmark facts behind the
 	// precomputed display prices above; the API layer derives per-tier display
 	// prices from them.
-	ModelID         string
-	Multiplier      money.Amount
-	PriceTiers      []ledger.PriceTier
-	CallSuccessRate *string
+	ModelID          string
+	Multiplier       money.Amount
+	PriceTiers       []ledger.PriceTier
+	CallSuccessRate  *string
 	TTFTMilliseconds *int64
-	TokensPerSecond *string
+	TokensPerSecond  *string
 }
 
 type PoolInput struct {
