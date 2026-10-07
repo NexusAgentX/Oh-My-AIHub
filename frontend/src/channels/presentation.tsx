@@ -7,6 +7,9 @@ import type {
   ValidationStatus,
 } from '../api/contracts'
 import { Button } from '../ui/FormControls'
+import { Badge, type BadgeTone } from '../ui/Badge'
+import { Dialog } from '../ui/Dialog'
+import { InlineError } from '../ui/Feedback'
 
 export const protocolLabels: Record<ChannelProtocol, string> = {
   openai_chat_completions: 'OpenAI Chat Completions',
@@ -87,19 +90,39 @@ const stateLabels: Record<ChannelStatus | ChannelOfferStatus | ValidationStatus,
   failed: '失败',
 }
 
+const stateTones: Record<ChannelStatus | ChannelOfferStatus | ValidationStatus, BadgeTone> = {
+  draft: 'neutral',
+  published: 'success',
+  paused: 'warning',
+  deleted: 'danger',
+  active: 'success',
+  disabled: 'warning',
+  in_progress: 'info',
+  passed: 'success',
+  failed: 'danger',
+}
+
 export function ChannelStateBadge({
   status,
 }: {
   status: ChannelStatus | ChannelOfferStatus | ValidationStatus
 }) {
-  const tone = ['published', 'active', 'passed'].includes(status)
-    ? 'positive'
-    : ['deleted', 'failed'].includes(status)
-      ? 'danger'
-      : ['paused', 'disabled'].includes(status)
-        ? 'warning'
-        : 'neutral'
-  return <span className={`channel-state channel-state-${tone}`}>{stateLabels[status]}</span>
+  return <Badge tone={stateTones[status]}>{stateLabels[status]}</Badge>
+}
+
+/** 报价当前不可用的原因（后端 ineligible_reason 的中文呈现）。 */
+export function eligibilityLabel(reason: string) {
+  switch (reason) {
+    case 'credential_unavailable': return '凭据不可用'
+    case 'model_inactive': return '模型已停用'
+    case 'offer_inactive': return '报价已停用'
+    case 'validation_required': return '需要重新验证'
+    case 'channel_unpublished': return '渠道未发布'
+    case 'owner_inactive': return '账户已停用'
+    case 'owner_password_change_required': return '账户需先改密'
+    case 'price_unrepresentable': return '价格不可用'
+    default: return '当前不可用'
+  }
 }
 
 export function formatDate(value?: string | null) {
@@ -190,6 +213,56 @@ export function ConfirmDialog({
         </div>
       </div>
     </dialog>
+  )
+}
+
+/** 风险确认对话框：基于 ui/Dialog，错误显示在对话框内，处理中禁止关闭。 */
+export function ConfirmActionDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel = '取消',
+  danger = false,
+  busy = false,
+  confirmDisabled = false,
+  error,
+  children,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  title: string
+  description?: string
+  confirmLabel: string
+  cancelLabel?: string
+  danger?: boolean
+  busy?: boolean
+  confirmDisabled?: boolean
+  error?: string
+  children?: ReactNode
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog
+      busy={busy}
+      description={description}
+      footer={(
+        <>
+          <Button disabled={busy} onClick={onCancel} type="button" variant="secondary">{cancelLabel}</Button>
+          <Button disabled={confirmDisabled} loading={busy} onClick={onConfirm} type="button" variant={danger ? 'danger' : 'primary'}>
+            {confirmLabel}
+          </Button>
+        </>
+      )}
+      onClose={onCancel}
+      open={open}
+      title={title}
+    >
+      {children}
+      <InlineError>{error}</InlineError>
+    </Dialog>
   )
 }
 

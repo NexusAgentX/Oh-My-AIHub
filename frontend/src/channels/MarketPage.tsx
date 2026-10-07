@@ -1,106 +1,269 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
-import type { CatalogModel, ChannelProtocol, MarketOffer } from '../api/contracts'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import type { MarketOffer } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { Button, InlineError, LoadingState } from '../ui/FormControls'
-import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText, TierCountBadge, TierPriceList } from './presentation'
-import { formatRate } from '../gateway/presentation'
+import {
+  formatDate,
+  formatRate,
+  isProtocol,
+  PricePair,
+  protocolLabels,
+  ratingText,
+} from '../gateway/presentation'
+import {
+  Badge,
+  Button,
+  Card,
+  CountBadge,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  Icon,
+  LoadingState,
+  PageHeader,
+  SearchInput,
+  SelectField,
+  Toolbar,
+  type Column,
+} from '../ui'
+import {
+  useCatalogModelsQuery,
+  useMarketOffersQuery,
+  type MarketFilters,
+  type MarketSort,
+} from './marketQueries'
+import { errorMessage } from '../api/query'
 
-type Filters = {
-  modelID: string
-  protocol: ChannelProtocol | ''
-  owner: string
-  sort: 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'rating' | 'success_rate' | 'ttft' | 'tps'
+const sortOptions: Array<{ key: MarketSort; label: string }> = [
+  { key: 'input_price', label: '输入价格' },
+  { key: 'output_price', label: '输出价格' },
+  { key: 'cache_write_price', label: '缓存写价格' },
+  { key: 'cache_read_price', label: '缓存读价格' },
+  { key: 'rating', label: '用户评分' },
+  { key: 'success_rate', label: '成功率' },
+  { key: 'ttft', label: '首字响应' },
+  { key: 'tps', label: '输出速度' },
+]
+
+function isSort(value: string | null): value is MarketSort {
+  return sortOptions.some((option) => option.key === value)
 }
 
-const initialFilters: Filters = { modelID: '', protocol: '', owner: '', sort: 'input_price' }
+/** 筛选条件以 URL 查询参数为唯一来源，便于分享与从待处理事项直接定位。 */
+export function filtersFromParams(params: URLSearchParams): MarketFilters {
+  const protocol = params.get('protocol')
+  const sort = params.get('sort')
+  return {
+    modelID: params.get('model') ?? '',
+    protocol: isProtocol(protocol) ? protocol : '',
+    owner: params.get('owner') ?? '',
+    sort: isSort(sort) ? sort : 'input_price',
+  }
+}
+
+export function paramsFromFilters(filters: MarketFilters) {
+  const params = new URLSearchParams()
+  if (filters.modelID) params.set('model', filters.modelID)
+  if (filters.protocol) params.set('protocol', filters.protocol)
+  if (filters.owner) params.set('owner', filters.owner)
+  if (filters.sort !== 'input_price') params.set('sort', filters.sort)
+  return params
+}
+
+export function hasActiveFilters(filters: MarketFilters) {
+  return Boolean(filters.modelID || filters.protocol || filters.owner)
+}
 
 export function MarketPage() {
   const { account } = useAuth()
-  const [models, setModels] = useState<CatalogModel[]>([])
-  const [draft, setDraft] = useState<Filters>(initialFilters)
-  const [filters, setFilters] = useState<Filters>(initialFilters)
-  const [offers, setOffers] = useState<MarketOffer[]>([])
-  const [next, setNext] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const requestGeneration = useRef(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filters = filtersFromParams(searchParams)
+  const models = useCatalogModelsQuery()
+  const query = useMarketOffersQuery(filters)
+  const [owner, setOwner] = useState(filters.owner)
 
-  const load = async (activeFilters: Filters, after = '') => {
-    const generation = after ? requestGeneration.current : ++requestGeneration.current
-    setLoading(true)
-    setError('')
-    try {
-      const result = await api.marketOffers({ ...activeFilters, after, limit: 20 })
-      if (generation !== requestGeneration.current) return
-      setOffers((current) => {
-        const combined = after ? [...current, ...result.offers] : result.offers
-        return [...new Map(combined.map((offer) => [offer.offer_id, offer])).values()]
-      })
-      setNext(result.next_after)
-    } catch (caught) {
-      if (generation !== requestGeneration.current) return
-      setError(caught instanceof ApiError ? caught.message : 'API 市场加载失败')
-    } finally {
-      if (generation === requestGeneration.current) setLoading(false)
-    }
-  }
+  useEffect(() => setOwner(filters.owner), [filters.owner])
 
-  useEffect(() => {
-    void api.models().then(setModels).catch(() => undefined)
-    void load(initialFilters)
-    return () => { requestGeneration.current += 1 }
-  }, [])
+  const apply = (patch: Partial<MarketFilters>) =>
+    setSearchParams(paramsFromFilters({ ...filters, ...patch }), { replace: true })
+  const clear = () => setSearchParams(paramsFromFilters({ ...filters, modelID: '', protocol: '', owner: '' }), { replace: true })
 
-  const applyFilters = (event: FormEvent) => {
+  const offers = [
+    ...new Map(
+      (query.data?.pages ?? []).flatMap((page) => page.offers).map((offer) => [offer.offer_id, offer]),
+    ).values(),
+  ]
+
+  const columns: Column<MarketOffer>[] = [
+    {
+      key: 'channel',
+      header: '模型 / 渠道',
+      primary: true,
+      cell: (offer) => (
+        <>
+          <strong>{offer.model_name}</strong>
+          <small>
+            {offer.channel_display_name} · {offer.owner_display_name}
+          </small>
+          {offer.owner_account_id === account?.id && <Badge tone="info">我的 · 0 手续费</Badge>}
+        </>
+      ),
+    },
+    { key: 'protocol', header: 'API 格式', cell: (offer) => protocolLabels[offer.protocol] },
+    { key: 'multiplier', header: '倍率', numeric: true, hideOnMobile: true, cell: (offer) => `${offer.multiplier}×` },
+    {
+      key: 'price',
+      header: '输入 / 输出',
+      cell: (offer) => (
+        <PricePair first={offer.input_price} second={offer.output_price} tiers={offer.price_tiers} />
+      ),
+    },
+    {
+      key: 'cache',
+      header: '缓存写 / 读',
+      hideOnMobile: true,
+      cell: (offer) => <PricePair first={offer.cache_write_price} second={offer.cache_read_price} />,
+    },
+    {
+      key: 'quality',
+      header: '质量',
+      cell: (offer) =>
+        offer.call_success_rate === null ? (
+          <>
+            <span className="muted">暂无调用数据</span>
+            <small>验证 {formatDate(offer.last_tested_at)}</small>
+          </>
+        ) : (
+          <>
+            <strong>{formatRate(offer.call_success_rate)}</strong>
+            <small>
+              {offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms ·{' '}
+              {offer.tokens_per_second ?? '—'} tok/s
+            </small>
+          </>
+        ),
+    },
+    {
+      key: 'rating',
+      header: '评分',
+      cell: (offer) => ratingText(offer.average_rating, offer.rating_count),
+    },
+  ]
+
+  const submitOwner = (event: FormEvent) => {
     event.preventDefault()
-    setFilters(draft)
-    setOffers([])
-    setNext('')
-    void load(draft)
+    apply({ owner: owner.trim() })
   }
 
   return (
     <>
-      <header className="page-heading"><div><h1>API 市场</h1></div><Link className="button button-secondary" to="/channels">我的渠道</Link></header>
-      <InlineError>{error}</InlineError>
-      <section className="panel market-filter-panel">
-        <form className="market-filter-grid" onSubmit={applyFilters}>
-          <label className="field"><span className="field-label">模型</span><select className="input" onChange={(event) => setDraft({ ...draft, modelID: event.target.value })} value={draft.modelID}><option value="">全部模型</option>{models.map((model) => <option key={model.id} value={model.id}>{model.provider} · {model.name}</option>)}</select></label>
-          <label className="field"><span className="field-label">API 格式</span><select className="input" onChange={(event) => setDraft({ ...draft, protocol: event.target.value as ChannelProtocol | '' })} value={draft.protocol}><option value="">全部格式</option>{Object.entries(protocolLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="field"><span className="field-label">共享者</span><input className="input" onChange={(event) => setDraft({ ...draft, owner: event.target.value })} value={draft.owner} /></label>
-          <label className="field"><span className="field-label">排序</span><select className="input" onChange={(event) => setDraft({ ...draft, sort: event.target.value as Filters['sort'] })} value={draft.sort}><option value="input_price">输入价格</option><option value="output_price">输出价格</option><option value="cache_write_price">缓存写价格</option><option value="cache_read_price">缓存读价格</option><option value="rating">用户评分</option><option value="success_rate">成功率</option><option value="ttft">首字响应</option><option value="tps">输出速度</option></select></label>
-          <Button type="submit">筛选</Button>
-        </form>
-      </section>
-
-      <section className="panel table-panel market-offers-panel">
-        <header className="table-toolbar"><h2>可用报价</h2><span className="count-badge">{offers.length}</span></header>
-        {loading && offers.length === 0 ? <LoadingState /> : offers.length === 0 ? <div className="empty-state">没有匹配的报价</div> : <>
-          <div className="desktop-table-wrap">
-            <table className="data-table market-table">
-              <thead><tr><th scope="col">模型 / 渠道</th><th scope="col">API 格式</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">质量</th><th scope="col">评分</th></tr></thead>
-              <tbody>{offers.map((offer) => <tr key={offer.offer_id}>
-                <td><Link className="table-row-link" to={`/market/channels/${offer.channel_id}`}><strong>{offer.model_name}</strong><small>{offer.channel_display_name} · {offer.owner_display_name}</small>{offer.owner_account_id === account?.id && <span className="own-channel-badge">我的 · 0 手续费</span>}<span className="visually-hidden">渠道详情</span></Link></td>
-                <td>{protocolLabels[offer.protocol]}</td>
-                <td>{offer.multiplier}×</td>
-                <td><span className="price-with-tiers"><PricePair first={offer.input_price} second={offer.output_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
-                <td><span className="price-with-tiers"><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
-                <td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : <><strong>{formatRate(offer.call_success_rate)}</strong><small>{offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
-                <td>{ratingText(offer.average_rating, offer.rating_count)}</td>
-              </tr>)}</tbody>
-            </table>
+      <PageHeader title="API 市场" />
+      <Card className="market-filters">
+        <Toolbar
+          end={
+            hasActiveFilters(filters) ? (
+              <Button icon={<Icon name="x" />} onClick={clear} size="sm" variant="quiet">
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+        >
+          <div className="market-filter-grid">
+            <SelectField
+              label="模型"
+              onChange={(event) => apply({ modelID: event.target.value })}
+              value={filters.modelID}
+            >
+              <option value="">全部模型</option>
+              {(models.data ?? []).map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.provider} · {model.name}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              label="API 格式"
+              onChange={(event) =>
+                apply({ protocol: isProtocol(event.target.value) ? event.target.value : '' })
+              }
+              value={filters.protocol}
+            >
+              <option value="">全部格式</option>
+              {Object.entries(protocolLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              label="排序"
+              onChange={(event) => apply({ sort: event.target.value as MarketSort })}
+              value={filters.sort}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
+            <form className="market-owner" onSubmit={submitOwner}>
+              <SearchInput
+                label="共享者"
+                onChange={(event) => setOwner(event.target.value)}
+                placeholder="共享者"
+                value={owner}
+              />
+            </form>
           </div>
-          <div className="mobile-card-list">{offers.map((offer) => <Link className="mobile-data-card mobile-data-card-link" key={offer.offer_id} to={`/market/channels/${offer.channel_id}`}>
-            <header><div><strong>{offer.model_name}</strong><span>{offer.channel_display_name} · {offer.owner_display_name}</span>{offer.owner_account_id === account?.id && <span className="own-channel-badge">我的 · 0 手续费</span>}</div><ChannelStateBadge status={offer.validation_status} /></header>
-            <dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /><TierCountBadge tiers={offer.price_tiers} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div><div><dt>评分</dt><dd>{ratingText(offer.average_rating, offer.rating_count)}</dd></div></dl>
-            <TierPriceList tiers={offer.price_tiers} />
-            <span className="visually-hidden">渠道详情</span>
-          </Link>)}</div>
-          {next && <div className="table-pagination"><Button disabled={loading} onClick={() => void load(filters, next)} variant="secondary">{loading ? '正在加载' : '加载更多'}</Button></div>}
-        </>}
-      </section>
+        </Toolbar>
+      </Card>
+
+      <Card
+        actions={<CountBadge>{offers.length}</CountBadge>}
+        className="market-offers"
+        flush
+        title="可用报价"
+      >
+        {query.isPending ? (
+          <LoadingState />
+        ) : query.isError && offers.length === 0 ? (
+          <ErrorState message={errorMessage(query.error, 'API 市场加载失败')} onRetry={() => void query.refetch()} />
+        ) : (
+          <>
+            <DataTable
+              caption="可用报价"
+              columns={columns}
+              empty={
+                <EmptyState
+                  action={
+                    hasActiveFilters(filters) ? (
+                      <Button onClick={clear} variant="secondary">
+                        清除筛选
+                      </Button>
+                    ) : undefined
+                  }
+                  title="没有匹配的报价"
+                />
+              }
+              rowHref={(offer) => `/market/channels/${offer.channel_id}`}
+              rowKey={(offer) => offer.offer_id}
+              rows={offers}
+            />
+            {query.hasNextPage && (
+              <div className="table-pagination">
+                <Button
+                  loading={query.isFetchingNextPage}
+                  onClick={() => void query.fetchNextPage()}
+                  variant="secondary"
+                >
+                  加载更多
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
     </>
   )
 }
+

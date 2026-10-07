@@ -1,95 +1,205 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
-import type { MarketChannel } from '../api/contracts'
+import { useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import type { MarketOffer } from '../api/contracts'
+import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
-import { InlineError, LoadingState } from '../ui/FormControls'
-import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText, StarRating } from './presentation'
-import { createLatestRequestGate } from './requestGate'
-import { formatRate } from '../gateway/presentation'
+import { JoinRouteDrawer } from '../gateway/JoinRouteDrawer'
+import {
+  PricePair,
+  formatDate,
+  formatRate,
+  protocolLabels,
+  qualitySummary,
+  ratingText,
+} from '../gateway/presentation'
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CountBadge,
+  DataTable,
+  EmptyState,
+  InlineError,
+  PageHeader,
+  QueryBoundary,
+  SuccessMessage,
+  type Column,
+} from '../ui'
+import { MarketRating } from './MarketRating'
+import { useMarketChannelQuery, useRateChannelMutation } from './marketQueries'
 
 export function MarketChannelPage() {
-  const { account } = useAuth()
   const { channelID = '' } = useParams()
-  const [channel, setChannel] = useState<MarketChannel | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [ratingBusy, setRatingBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const loadGate = useRef(createLatestRequestGate())
-  const ratingGate = useRef(createLatestRequestGate())
+  const query = useMarketChannelQuery(channelID)
+  return (
+    <QueryBoundary errorFallback="渠道详情加载失败" query={query}>
+      {(channel) => <ChannelDetail channel={channel} key={channel.id} />}
+    </QueryBoundary>
+  )
+}
 
-  const load = useCallback(async (clear = false) => {
-    const ticket = loadGate.current.begin()
-    if (clear) {
-      setLoading(true)
-      setChannel(null)
-    }
-    setError('')
-    try {
-      const loaded = await api.marketChannel(channelID)
-      if (loadGate.current.isCurrent(ticket)) setChannel(loaded)
-    } catch (caught) {
-      if (loadGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '渠道详情加载失败')
-      }
-    } finally {
-      if (loadGate.current.isCurrent(ticket)) setLoading(false)
-    }
-  }, [channelID])
+function ChannelDetail({
+  channel,
+}: {
+  channel: NonNullable<ReturnType<typeof useMarketChannelQuery>['data']>
+}) {
+  const { account } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rate = useRateChannelMutation(channel.id)
+  const [message, setMessage] = useState<{ text: string; keyID?: string } | null>(null)
 
-  useEffect(() => {
-    ratingGate.current.invalidate()
-    setRatingBusy(false)
-    setMessage('')
-    void load(true)
-    return () => {
-      loadGate.current.invalidate()
-      ratingGate.current.invalidate()
-    }
-  }, [load])
+  // ?add=<offerID> 打开加入路由抽屉；旧的整页入口重定向到这里
+  const addParam = searchParams.get('add')
+  const joining = addParam
+    ? (channel.offers.find((offer) => offer.offer_id === addParam) ?? channel.offers[0] ?? null)
+    : null
+  const joinOpen = Boolean(addParam)
 
-  const rate = async (score: number) => {
-    const ticket = ratingGate.current.begin()
-    setRatingBusy(true)
-    setError('')
-    setMessage('')
-    try {
-      const rated = await api.rateChannel(channelID, score)
-      if (!ratingGate.current.isCurrent(ticket)) return
-      setChannel(rated)
-      setMessage('评分已保存')
-    } catch (caught) {
-      if (ratingGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '评分保存失败')
-      }
-    } finally {
-      if (ratingGate.current.isCurrent(ticket)) setRatingBusy(false)
-    }
+  const setJoining = (offerID: string | null) => {
+    const next = new URLSearchParams(searchParams)
+    if (offerID) next.set('add', offerID)
+    else next.delete('add')
+    setSearchParams(next, { replace: true })
   }
 
-  if (loading) return <><LoadingState /></>
-  if (!channel || channel.id !== channelID) return <><InlineError>{error || '渠道不存在'}</InlineError></>
+  const own = channel.owner_account_id === account?.id
+  const published = channel.status === 'published'
+
+  const columns: Column<MarketOffer>[] = [
+    {
+      key: 'model',
+      header: '模型',
+      primary: true,
+      cell: (offer) => (
+        <>
+          <strong>{offer.model_name}</strong>
+          <small>{offer.model_provider}</small>
+        </>
+      ),
+    },
+    { key: 'protocol', header: 'API 格式', cell: (offer) => protocolLabels[offer.protocol] },
+    { key: 'multiplier', header: '倍率', numeric: true, hideOnMobile: true, cell: (offer) => `${offer.multiplier}×` },
+    {
+      key: 'price',
+      header: '输入 / 输出',
+      cell: (offer) => (
+        <PricePair first={offer.input_price} second={offer.output_price} tiers={offer.price_tiers} />
+      ),
+    },
+    {
+      key: 'cache',
+      header: '缓存写 / 读',
+      hideOnMobile: true,
+      cell: (offer) => <PricePair first={offer.cache_write_price} second={offer.cache_read_price} />,
+    },
+    {
+      key: 'quality',
+      header: '质量',
+      cell: (offer) =>
+        offer.call_success_rate === null ? (
+          <>
+            <span className="muted">暂无调用数据</span>
+            <small>验证 {formatDate(offer.last_tested_at)}</small>
+          </>
+        ) : (
+          <>
+            <strong>{formatRate(offer.call_success_rate)}</strong>
+            <small>{qualitySummary(offer)}</small>
+          </>
+        ),
+    },
+    {
+      key: 'action',
+      header: '操作',
+      cell: (offer) => (
+        <Button onClick={() => setJoining(offer.offer_id)} size="sm" variant="secondary">
+          加入路由
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <>
-      <Link className="back-link" to="/market">← API 市场</Link>
-      <header className="page-heading channel-detail-heading"><div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div></header>
-      <InlineError>{error}</InlineError>
-      {message && <div aria-live="polite" className="success-message">{message}</div>}
-      <section className="panel market-channel-summary">
-        <div><span className="avatar" aria-hidden="true">{channel.owner_display_name.slice(0, 1)}</span><div><strong>{channel.owner_display_name}</strong><span>共享者</span>{channel.owner_account_id === account?.id && <span className="own-channel-badge">我的 · 0 手续费</span>}</div></div>
-        <div><strong>{ratingText(channel.average_rating, channel.rating_count)}</strong><StarRating disabled={ratingBusy} onChange={(score) => void rate(score)} value={channel.current_user_rating} /></div>
-      </section>
-      <section className="panel table-panel market-channel-offers">
-        <header className="table-toolbar"><h2>可用报价</h2><span className="count-badge">{channel.offers.length}</span></header>
-        {channel.offers.length === 0 ? <div className="empty-state">渠道当前不可用</div> : <>
-          <div className="desktop-table-wrap"><table className="data-table"><thead><tr><th scope="col">模型</th><th scope="col">API 格式</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">质量</th><th scope="col"><span className="visually-hidden">操作</span></th></tr></thead><tbody>{channel.offers.map((offer) => <tr key={offer.offer_id}>
-            <td><strong>{offer.model_name}</strong><small>{offer.model_provider}</small></td><td>{protocolLabels[offer.protocol]}</td><td>{offer.multiplier}×</td><td><PricePair first={offer.input_price} second={offer.output_price} /></td><td><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></td><td>{offer.call_success_rate === null ? <><span className="quality-empty">暂无调用数据</span><small>验证 {formatDate(offer.last_tested_at)}</small></> : `${formatRate(offer.call_success_rate)} · ${offer.call_count ?? 0} 次 · ${offer.ttft_milliseconds ?? '—'} ms`}</td><td className="table-action"><Link className="button button-secondary" to={`/market/channels/${channel.id}/add?offer=${offer.offer_id}`}>加入模型池</Link></td>
-          </tr>)}</tbody></table></div>
-          <div className="mobile-card-list">{channel.offers.map((offer) => <article className="mobile-data-card" key={offer.offer_id}><header><div><strong>{offer.model_name}</strong><span>{offer.model_provider}</span></div><ChannelStateBadge status={offer.validation_status} /></header><dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div></dl><Link className="button button-secondary" to={`/market/channels/${channel.id}/add?offer=${offer.offer_id}`}>加入模型池</Link></article>)}</div>
-        </>}
-      </section>
+      <PageHeader
+        actions={
+          <Badge tone={published ? 'success' : 'warning'}>{published ? '已发布' : '已暂停'}</Badge>
+        }
+        back={
+          <Link className="back-link" to="/market">
+            ← API 市场
+          </Link>
+        }
+        title={channel.display_name}
+      />
+      {message && (
+        <SuccessMessage>
+          {message.text}
+          {message.keyID && (
+            <>
+              {' '}
+              <Link to={`/keys/${message.keyID}`}>查看 Key</Link>
+            </>
+          )}
+        </SuccessMessage>
+      )}
+      <InlineError>{rate.isError ? errorMessage(rate.error, '评分保存失败') : ''}</InlineError>
+
+      <Card className="market-channel-summary">
+        <div className="market-owner-info">
+          <span aria-hidden="true" className="market-avatar">
+            {channel.owner_display_name.slice(0, 1)}
+          </span>
+          <div>
+            <strong>{channel.owner_display_name}</strong>
+            <small>共享者</small>
+            {own && <Badge tone="info">我的 · 0 手续费</Badge>}
+          </div>
+        </div>
+        <div className="market-rating-info">
+          <strong className="num">{ratingText(channel.average_rating, channel.rating_count)}</strong>
+          <MarketRating
+            disabled={rate.isPending}
+            onChange={(score) => {
+              setMessage(null)
+              rate.mutate(score, { onSuccess: () => setMessage({ text: '评分已保存' }) })
+            }}
+            value={channel.current_user_rating}
+          />
+        </div>
+      </Card>
+
+      <Card
+        actions={<CountBadge>{channel.offers.length}</CountBadge>}
+        className="market-channel-offers"
+        flush
+        title="可用报价"
+      >
+        <DataTable
+          caption="可用报价"
+          columns={columns}
+          empty={
+            <EmptyState
+              action={<ButtonLink to="/market">返回市场</ButtonLink>}
+              title="渠道当前不可用"
+            />
+          }
+          rowKey={(offer) => offer.offer_id}
+          rows={channel.offers}
+        />
+      </Card>
+
+      <JoinRouteDrawer
+        channel={channel}
+        offer={joining}
+        onClose={() => setJoining(null)}
+        onJoined={(key) => {
+          setJoining(null)
+          setMessage({ text: `已加入 ${key.display_name} 的路由`, keyID: key.id })
+        }}
+        open={joinOpen}
+      />
     </>
   )
 }
