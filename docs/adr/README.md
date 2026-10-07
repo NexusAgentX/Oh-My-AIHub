@@ -51,3 +51,4 @@
 - [ADR-0017：采用 sqlc 与按领域分包的持久化分层](0017-adopt-sqlc-domain-persistence-layering.md) — 已通过
 - [ADR-0018：移除 C2C 付款截图与争议证据图片](0018-remove-c2c-evidence-images.md) — 已通过
 - [ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定](0019-frontend-query-and-design-conventions.md) — 已通过
+- [ADR-0020：跨领域原子提交由调用方持有事务](0020-adopt-caller-owned-transactions-across-persistence-domains.md) — 已通过
