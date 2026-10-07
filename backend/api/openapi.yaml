@@ -1,0 +1,3891 @@
+openapi: "3.1.0"
+info: {title: Oh-My-AIHub API, version: "0.1.0", description: "Oh-My-AIHub 前后端契约的唯一来源（见 ADR）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型协议入口只登记路径与认证。\n\n约定：金额一律为十进制字符串；时间为 RFC 3339；错误统一为 {\"error\":{\"code\",\"message\"}}；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin。\n\n扩展字段 x-access 声明路由门禁，由契约测试与路由表逐项对照：public 无需会话；session 需会话（允许首次改密前访问）；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭网关 API Key。"}
+servers:
+  - url: /
+    description: "同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。"
+tags:
+  - name: instance
+    description: "实例与健康检查"
+  - name: auth
+    description: "认证与账户"
+  - name: admin-accounts
+    description: "管理员：账户"
+  - name: models
+    description: "模型目录"
+  - name: wallet
+    description: "钱包与账本"
+  - name: admin-ledger
+    description: "管理员：账本"
+  - name: channels
+    description: "渠道与报价"
+  - name: market
+    description: "共享市场"
+  - name: admin-channels
+    description: "管理员：渠道"
+  - name: keys
+    description: API Key
+  - name: calls
+    description: "调用记录与看板"
+  - name: c2c
+    description: "C2C 订单与交易"
+  - name: admin-c2c
+    description: "管理员：C2C"
+  - name: admin-fee-rate
+    description: "管理员：手续费率"
+  - name: admin-ops
+    description: "管理员：运营"
+  - name: gateway
+    description: "外部模型协议入口"
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [instance]
+      summary: "健康检查"
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: "服务与数据库可用。"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Health"}
+        '503': {$ref: "#/components/responses/Unavailable"}
+  /api/instance:
+    get:
+      operationId: getInstance
+      tags: [instance]
+      summary: "实例是否已初始化"
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InstanceState"}
+  /api/instance/initialize:
+    post:
+      operationId: initializeInstance
+      tags: [instance]
+      summary: "初始化实例并创建首个管理员"
+      description: "仅在实例尚无管理员时可用；成功后建立会话并设置会话 Cookie。 注意：请求体无法解析时当前实现不写入响应（返回空的 200），属于既有行为，待单独修复。"
+      x-access: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/InstanceInitializeRequest"}
+      responses:
+        '201':
+          description: "已创建管理员并登录。"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InstanceInitializeResponse"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: "登录"
+      description: "成功时设置会话 Cookie。"
+      x-access: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LoginRequest"}
+      responses:
+        '200':
+          description: "登录成功。"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '429': {$ref: "#/components/responses/TooManyRequests"}
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: "退出登录"
+      x-access: public
+      security: []
+      responses:
+        '204': {description: "已退出，会话 Cookie 被清除。"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/auth/session:
+    get:
+      operationId: getSession
+      tags: [auth]
+      summary: "当前会话账户"
+      description: "允许仍须首次改密的账户访问。"
+      x-access: session
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+  /api/account/password:
+    put:
+      operationId: changePassword
+      tags: [auth]
+      summary: "修改自己的密码"
+      description: "成功后轮换会话 Cookie。"
+      x-access: session
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ChangePasswordRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+        '429': {$ref: "#/components/responses/TooManyRequests"}
+  /api/account:
+    get:
+      operationId: getAccount
+      tags: [auth]
+      summary: "当前账户与额度"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/accounts:
+    get:
+      operationId: listAccounts
+      tags: [admin-accounts]
+      summary: "账户列表"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: "按用户名或显示名搜索。"
+          schema: {type: string}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    post:
+      operationId: createAccount
+      tags: [admin-accounts]
+      summary: "邀请创建账户"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CreateAccountRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountWithInitialPassword"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+        '429': {$ref: "#/components/responses/TooManyRequests"}
+  /api/admin/accounts/{accountID}:
+    patch:
+      operationId: updateAccount
+      tags: [admin-accounts]
+      summary: "更新账户"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/accountID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/UpdateAccountRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/accounts/{accountID}/password-reset:
+    post:
+      operationId: resetAccountPassword
+      tags: [admin-accounts]
+      summary: "重置账户密码"
+      description: "不能重置自己的密码。"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/accountID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmptyRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountWithInitialPassword"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+        '429': {$ref: "#/components/responses/TooManyRequests"}
+  /api/models:
+    get:
+      operationId: listModels
+      tags: [models]
+      summary: "模型列表"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: "按名称或 ID 搜索。"
+          schema: {type: string}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/models/{modelID}:
+    get:
+      operationId: getModel
+      tags: [models]
+      summary: "模型详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/modelID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/admin/models:
+    get:
+      operationId: listAdminModels
+      tags: [models]
+      summary: "管理员：模型列表"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: "按名称或 ID 搜索。"
+          schema: {type: string}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    post:
+      operationId: createModel
+      tags: [models]
+      summary: "管理员：创建模型"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/models/{modelID}:
+    get:
+      operationId: getAdminModel
+      tags: [models]
+      summary: "管理员：模型详情"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/modelID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+    put:
+      operationId: updateModel
+      tags: [models]
+      summary: "管理员：更新模型"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/modelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: "我的钱包"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WalletResponse"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/wallet/entries:
+    get:
+      operationId: listWalletEntries
+      tags: [wallet]
+      summary: "我的账本分录"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 20}
+        - name: before
+          in: query
+          required: false
+          description: "分录 ID 游标，返回早于该分录的记录。"
+          schema: {type: string, pattern: "^[0-9]+$"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerEntryPage"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/ledger/metrics:
+    get:
+      operationId: getLedgerMetrics
+      tags: [admin-ledger]
+      summary: "账本一致性指标"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerMetricsEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/ledger/accounts/{accountID}/wallet:
+    get:
+      operationId: getAdminLedgerAccountWallet
+      tags: [admin-ledger]
+      summary: "用户账户钱包"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/accountID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WalletEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/admin/ledger/accounts/{accountID}/entries:
+    get:
+      operationId: listAdminLedgerAccountEntries
+      tags: [admin-ledger]
+      summary: "用户账户账本分录"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/accountID"
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 20}
+        - name: before
+          in: query
+          required: false
+          description: "分录 ID 游标。"
+          schema: {type: string, pattern: "^[0-9]+$"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerEntryPage"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/ledger/system-accounts/{systemKind}/wallet:
+    get:
+      operationId: getAdminLedgerSystemWallet
+      tags: [admin-ledger]
+      summary: "系统账户钱包"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/systemKind"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WalletEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/admin/ledger/system-accounts/{systemKind}/entries:
+    get:
+      operationId: listAdminLedgerSystemEntries
+      tags: [admin-ledger]
+      summary: "系统账户账本分录"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/systemKind"
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 20}
+        - name: before
+          in: query
+          required: false
+          description: "分录 ID 游标。"
+          schema: {type: string, pattern: "^[0-9]+$"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerEntryPage"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/ledger/adjustments:
+    post:
+      operationId: createLedgerAdjustment
+      tags: [admin-ledger]
+      summary: "管理员账本调整"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LedgerAdjustmentRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerTransactionEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/ledger/bad-debts:
+    post:
+      operationId: createBadDebtTransfer
+      tags: [admin-ledger]
+      summary: "坏账划转"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BadDebtRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LedgerTransactionEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels:
+    get:
+      operationId: listChannels
+      tags: [channels]
+      summary: "我的渠道"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    post:
+      operationId: createChannel
+      tags: [channels]
+      summary: "创建渠道"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CreateChannelRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels/{channelID}:
+    get:
+      operationId: getChannel
+      tags: [channels]
+      summary: "我的渠道详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+    patch:
+      operationId: updateChannel
+      tags: [channels]
+      summary: "更新渠道"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/UpdateChannelRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+    delete:
+      operationId: deleteChannel
+      tags: [channels]
+      summary: "删除渠道"
+      description: "DELETE 请求携带 JSON 请求体（expected_version）。"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels/{channelID}/publish:
+    post:
+      operationId: publishChannel
+      tags: [channels]
+      summary: "发布渠道"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels/{channelID}/pause:
+    post:
+      operationId: pauseChannel
+      tags: [channels]
+      summary: "暂停渠道"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels/{channelID}/credential-revoke:
+    post:
+      operationId: revokeChannelCredential
+      tags: [channels]
+      summary: "撤销渠道凭据"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channels/{channelID}/offers:
+    post:
+      operationId: addChannelOffer
+      tags: [channels]
+      summary: "新增报价"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AddOfferRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerOfferEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channel-offers/{offerID}:
+    patch:
+      operationId: updateChannelOffer
+      tags: [channels]
+      summary: "更新报价"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/UpdateOfferRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerOfferEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+    delete:
+      operationId: deleteChannelOffer
+      tags: [channels]
+      summary: "删除报价"
+      description: "DELETE 请求携带 JSON 请求体（expected_version）。"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerOfferEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channel-offers/{offerID}/disable:
+    post:
+      operationId: disableChannelOffer
+      tags: [channels]
+      summary: "停用报价"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerOfferEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channel-offers/{offerID}/resume:
+    post:
+      operationId: resumeChannelOffer
+      tags: [channels]
+      summary: "恢复报价"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OwnerOfferEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/channel-offers/{offerID}/validation-attempts:
+    post:
+      operationId: validateChannelOffer
+      tags: [channels]
+      summary: "发起报价验证"
+      description: "会向上游发起真实调用，需通过 confirmed_upstream_cost 确认费用。"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ValidateOfferRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ValidationAttemptEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+    get:
+      operationId: listOfferValidationAttempts
+      tags: [channels]
+      summary: "报价验证记录"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 50}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ValidationAttemptList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/market/offers:
+    get:
+      operationId: listMarketOffers
+      tags: [market]
+      summary: "市场报价列表"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: model_id
+          in: query
+          required: false
+          description: "模型 ID。"
+          schema: {type: string}
+        - name: protocol
+          in: query
+          required: false
+          description: "协议。"
+          schema: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        - name: owner
+          in: query
+          required: false
+          description: "按所有者名称搜索。"
+          schema: {type: string}
+        - name: sort
+          in: query
+          required: false
+          description: "排序方式。"
+          schema: {type: string}
+        - name: after
+          in: query
+          required: false
+          description: "分页游标。"
+          schema: {type: string}
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 20}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MarketOfferPage"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/market/channels/{channelID}:
+    get:
+      operationId: getMarketChannel
+      tags: [market]
+      summary: "市场渠道详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MarketChannelEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/market/channels/{channelID}/rating:
+    put:
+      operationId: rateMarketChannel
+      tags: [market]
+      summary: "为渠道评分"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RatingRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MarketChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/channels:
+    get:
+      operationId: listAdminChannels
+      tags: [admin-channels]
+      summary: "管理员：渠道列表"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminChannelList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/channels/{channelID}:
+    get:
+      operationId: getAdminChannel
+      tags: [admin-channels]
+      summary: "管理员：渠道详情"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminChannelEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+    delete:
+      operationId: adminDeleteChannel
+      tags: [admin-channels]
+      summary: "管理员：删除渠道"
+      description: "DELETE 请求携带 JSON 请求体（expected_version、reason）。"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/channels/{channelID}/pause:
+    post:
+      operationId: adminPauseChannel
+      tags: [admin-channels]
+      summary: "管理员：暂停渠道"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/channelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VersionedRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminChannelEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/channel-offers/{offerID}/validation-attempts:
+    post:
+      operationId: adminValidateChannelOffer
+      tags: [admin-channels]
+      summary: "管理员：发起报价验证"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ValidateOfferRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ValidationAttemptEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+    get:
+      operationId: adminListOfferValidationAttempts
+      tags: [admin-channels]
+      summary: "管理员：报价验证记录"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/offerID"
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数。"
+          schema: {type: integer, default: 50}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ValidationAttemptList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/channel-credentials/reencrypt:
+    post:
+      operationId: reencryptChannelCredentials
+      tags: [admin-channels]
+      summary: "管理员：重加密渠道凭据"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ReencryptRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReencryptResponse"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys:
+    get:
+      operationId: listAPIKeys
+      tags: [keys]
+      summary: "我的 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    post:
+      operationId: createAPIKey
+      tags: [keys]
+      summary: "创建 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyConfigRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyWithSecret"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys/{keyID}:
+    get:
+      operationId: getAPIKey
+      tags: [keys]
+      summary: "API Key 详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+    patch:
+      operationId: updateAPIKey
+      tags: [keys]
+      summary: "更新 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyConfigRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+    delete:
+      operationId: deleteAPIKey
+      tags: [keys]
+      summary: "删除 API Key"
+      description: "DELETE 请求携带 JSON 请求体（expected_version）。"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyVersionRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys/{keyID}/rotate:
+    post:
+      operationId: rotateAPIKey
+      tags: [keys]
+      summary: "轮换 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyVersionRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyWithSecret"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys/{keyID}/disable:
+    post:
+      operationId: disableAPIKey
+      tags: [keys]
+      summary: "停用 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyVersionRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys/{keyID}/enable:
+    post:
+      operationId: enableAPIKey
+      tags: [keys]
+      summary: "启用 API Key"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyVersionRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/keys/{keyID}/pool-members:
+    post:
+      operationId: addAPIKeyPoolMember
+      tags: [keys]
+      summary: "向模型池追加报价"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/keyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApiKeyPoolMemberRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/calls:
+    get:
+      operationId: listGatewayCalls
+      tags: [calls]
+      summary: "调用记录"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数上限。"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GatewayCallList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/calls/{callID}:
+    get:
+      operationId: getGatewayCall
+      tags: [calls]
+      summary: "调用详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/callID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GatewayCallEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [calls]
+      summary: "使用看板"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Dashboard"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/c2c/market:
+    get:
+      operationId: getC2CMarket
+      tags: [c2c]
+      summary: "C2C 市场"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CMarket"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/c2c/orders:
+    post:
+      operationId: createC2COrder
+      tags: [c2c]
+      summary: "创建 C2C 订单"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CCreateOrderRequest"}
+          multipart/form-data:
+            schema:
+              type: object
+              description: "payload 为 C2CCreateOrderRequest 的 JSON 字符串；其余部分为各收款方式 qr_field 指向的图片文件。"
+              properties:
+                payload: {type: string}
+              required: [payload]
+              additionalProperties: {type: string, format: binary}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2COrderEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/c2c/orders/{orderID}:
+    get:
+      operationId: getC2COrder
+      tags: [c2c]
+      summary: "订单详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/orderID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2COrderEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr:
+    get:
+      operationId: getC2CPaymentQR
+      tags: [c2c]
+      summary: "收款码图片"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/orderID"
+        - $ref: "#/components/parameters/methodID"
+      responses:
+        '200':
+          description: "已清洗的收款码图片，Content-Type 随图片格式。"
+          content:
+            image/png:
+              schema: {type: string, format: binary}
+            image/jpeg:
+              schema: {type: string, format: binary}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/c2c/orders/{orderID}/take:
+    post:
+      operationId: takeC2COrder
+      tags: [c2c]
+      summary: "吃单"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/orderID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CTakeOrderRequest"}
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/c2c/orders/{orderID}/cancel:
+    post:
+      operationId: cancelC2COrder
+      tags: [c2c]
+      summary: "撤销订单"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/orderID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2COrderEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+  /api/c2c/me:
+    get:
+      operationId: getC2CMyActivity
+      tags: [c2c]
+      summary: "我的订单与交易"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CMyActivity"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/c2c/trades/{tradeID}:
+    get:
+      operationId: getC2CTrade
+      tags: [c2c]
+      summary: "交易详情"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeViewEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+  /api/c2c/trades/{tradeID}/paid:
+    post:
+      operationId: markC2CTradePaid
+      tags: [c2c]
+      summary: "标记已付款"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CMarkPaidRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/c2c/trades/{tradeID}/cancel:
+    post:
+      operationId: cancelC2CTrade
+      tags: [c2c]
+      summary: "取消交易"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+  /api/c2c/trades/{tradeID}/release:
+    post:
+      operationId: confirmC2CReceipt
+      tags: [c2c]
+      summary: "确认收款并放行"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+  /api/c2c/trades/{tradeID}/dispute:
+    post:
+      operationId: openC2CDispute
+      tags: [c2c]
+      summary: "发起争议"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CStatementRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/c2c/trades/{tradeID}/statements:
+    post:
+      operationId: addC2CStatement
+      tags: [c2c]
+      summary: "补充争议陈述"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CStatementRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CTradeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/c2c/disputes:
+    get:
+      operationId: listC2CDisputes
+      tags: [admin-c2c]
+      summary: "管理员：争议列表"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CAdminTradeList"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/c2c/orders/{orderID}/cancel:
+    post:
+      operationId: adminCancelC2COrder
+      tags: [admin-c2c]
+      summary: "管理员：撤销订单"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/orderID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CAdminCancelOrderRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2COrderEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/c2c/trades/{tradeID}/resolve:
+    post:
+      operationId: resolveC2CDispute
+      tags: [admin-c2c]
+      summary: "管理员：裁决争议"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/tradeID"
+        - $ref: "#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/C2CResolveRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/C2CAdminTradeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '404': {$ref: "#/components/responses/NotFound"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/fee-rate:
+    get:
+      operationId: getFeeRates
+      tags: [admin-fee-rate]
+      summary: "手续费率与历史"
+      description: "limit 缺省时返回服务端默认条数。"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数上限。"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 0
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FeeRateHistory"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    put:
+      operationId: setFeeRate
+      tags: [admin-fee-rate]
+      summary: "调整手续费率"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SetFeeRateRequest"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FeeRateEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+        '409': {$ref: "#/components/responses/Conflict"}
+        '422': {$ref: "#/components/responses/Unprocessable"}
+  /api/admin/ops/metrics:
+    get:
+      operationId: getOpsMetrics
+      tags: [admin-ops]
+      summary: "运营指标"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: "窗口起点，RFC 3339（UTC）。"
+          schema: {$ref: "#/components/schemas/Timestamp"}
+        - name: to
+          in: query
+          required: true
+          description: "窗口终点，RFC 3339（UTC），须晚于 from。"
+          schema: {$ref: "#/components/schemas/Timestamp"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsMetricsEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/ops/providers:
+    get:
+      operationId: getOpsProviderIncome
+      tags: [admin-ops]
+      summary: "分享方收入"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: "窗口起点，RFC 3339（UTC）。"
+          schema: {$ref: "#/components/schemas/Timestamp"}
+        - name: to
+          in: query
+          required: true
+          description: "窗口终点，RFC 3339（UTC），须晚于 from。"
+          schema: {$ref: "#/components/schemas/Timestamp"}
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsProviderIncomeEnvelope"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/ops/anomalies:
+    get:
+      operationId: getOpsAnomalies
+      tags: [admin-ops]
+      summary: "异常与关注项"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsAnomaliesEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/ops/inspections:
+    get:
+      operationId: listOpsInspections
+      tags: [admin-ops]
+      summary: "巡检记录"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "返回条数上限。"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsInspectionList"}
+        '400': {$ref: "#/components/responses/BadRequest"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+    post:
+      operationId: runOpsInspection
+      tags: [admin-ops]
+      summary: "手动执行巡检"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '201':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsInspectionEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/admin/ops/trial-summary:
+    get:
+      operationId: getOpsTrialSummary
+      tags: [admin-ops]
+      summary: "试运行摘要"
+      x-access: admin
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpsTrialSummaryEnvelope"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /v1/chat/completions:
+    post:
+      operationId: proxyOpenAIChat
+      tags: [gateway]
+      summary: OpenAI Chat Completions
+      description: "外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。"
+      x-access: gateway_key
+      security:
+        - bearerKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: "协议原生请求正文。"}
+      responses:
+        default: {description: "协议原生响应（含流式）与协议原生错误。"}
+  /v1/responses:
+    post:
+      operationId: proxyOpenAIResponses
+      tags: [gateway]
+      summary: OpenAI Responses
+      description: "外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。"
+      x-access: gateway_key
+      security:
+        - bearerKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: "协议原生请求正文。"}
+      responses:
+        default: {description: "协议原生响应（含流式）与协议原生错误。"}
+  /v1/messages:
+    post:
+      operationId: proxyAnthropicMessages
+      tags: [gateway]
+      summary: Anthropic Messages
+      description: "外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。"
+      x-access: gateway_key
+      security:
+        - anthropicKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: "协议原生请求正文。"}
+      responses:
+        default: {description: "协议原生响应（含流式）与协议原生错误。"}
+  /v1beta/models/{model}:
+    post:
+      operationId: proxyGemini
+      tags: [gateway]
+      summary: Google Gemini generateContent / streamGenerateContent
+      description: "外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。"
+      x-access: gateway_key
+      security:
+        - geminiKey: []
+      parameters:
+        - $ref: "#/components/parameters/model"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: "协议原生请求正文。"}
+      responses:
+        default: {description: "协议原生响应（含流式）与协议原生错误。"}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: oma_session
+      description: "登录后由服务端设置的 HttpOnly 会话 Cookie。"
+    bearerKey: {type: http, scheme: bearer, description: "平台 API Key：Authorization: Bearer <key>（OpenAI 协议）。"}
+    anthropicKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: "平台 API Key（Anthropic 协议）。"
+    geminiKey:
+      type: apiKey
+      in: header
+      name: x-goog-api-key
+      description: "平台 API Key（Gemini 协议）。"
+  parameters:
+    accountID:
+      name: accountID
+      in: path
+      required: true
+      description: "账户 ID（UUID）。"
+      schema: {type: string, format: uuid}
+    modelID:
+      name: modelID
+      in: path
+      required: true
+      description: "规范模型 ID；ID 可含 `/`，原样放入路径。"
+      schema: {type: string}
+    channelID:
+      name: channelID
+      in: path
+      required: true
+      description: "渠道 ID。"
+      schema: {type: string}
+    offerID:
+      name: offerID
+      in: path
+      required: true
+      description: "报价 ID。"
+      schema: {type: string}
+    keyID:
+      name: keyID
+      in: path
+      required: true
+      description: "API Key ID。"
+      schema: {type: string}
+    callID:
+      name: callID
+      in: path
+      required: true
+      description: "调用 ID。"
+      schema: {type: string}
+    orderID:
+      name: orderID
+      in: path
+      required: true
+      description: "C2C 订单 ID。"
+      schema: {type: string}
+    tradeID:
+      name: tradeID
+      in: path
+      required: true
+      description: "C2C 交易 ID。"
+      schema: {type: string}
+    methodID:
+      name: methodID
+      in: path
+      required: true
+      description: "收款方式 ID。"
+      schema: {type: string}
+    systemKind:
+      name: systemKind
+      in: path
+      required: true
+      description: "系统账户类型。"
+      schema: {type: string, enum: [platform_incentive, platform_loss]}
+    Idempotency-Key:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: "幂等键；相同键重复提交返回同一结果。"
+      schema: {type: string}
+    model:
+      name: model
+      in: path
+      required: true
+      description: "规范模型 ID 与动作，例如 `canonical/model:generateContent`。"
+      schema: {type: string}
+  responses:
+    BadRequest:
+      description: "请求格式无效或查询参数非法（invalid_json、invalid_request、invalid_input）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    Unauthorized:
+      description: "未登录或会话失效（authentication_required）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    Forbidden:
+      description: "被拒绝：跨站请求（cross_origin_request）、首次登录须改密（password_change_required）、需要管理员（administrator_required）或无权操作（forbidden）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    NotFound:
+      description: "资源不存在（not_found）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    Conflict:
+      description: "版本或状态冲突（conflict、ledger_conflict、c2c_conflict、fee_rate_conflict 等）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    Unprocessable:
+      description: "业务校验失败（invalid_input、insufficient_spendable_capacity、unsafe_upstream 等）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    TooManyRequests:
+      description: "触发限流或服务繁忙（login_rate_limited、password_rate_limited、*_busy）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    Unavailable:
+      description: "服务暂不可用（database_unavailable、gateway_unavailable）。"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+  schemas:
+    Amount: {type: string, pattern: "^-?[0-9]+(\\.[0-9]{1,9})?$", description: "积分金额的十进制字符串，最多 9 位小数，不使用浮点数。"}
+    Timestamp: {type: string, format: date-time, description: "RFC 3339 时间。"}
+    PriceString: {type: string, pattern: "^(0|[1-9][0-9]{0,5})(\\.[0-9]{1,9})?$", description: "模型单价（积分/百万 Token）的十进制字符串。"}
+    Error:
+      type: object
+      properties:
+        code: {type: string}
+        message: {type: string}
+      required: [code, message]
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      description: "所有 /api 错误的统一信封；code 为稳定的机器可读标识，message 为中文提示。"
+      properties:
+        error: {$ref: "#/components/schemas/Error"}
+      required: [error]
+      additionalProperties: false
+    Health:
+      type: object
+      properties:
+        service: {type: string, const: oh-my-aihub-backend}
+        status: {type: string, const: ok}
+      required: [service, status]
+      additionalProperties: false
+    InstanceState:
+      type: object
+      properties:
+        initialized: {type: boolean}
+      required: [initialized]
+      additionalProperties: false
+    InstanceInitializeRequest:
+      type: object
+      properties:
+        username: {type: string}
+        display_name: {type: string}
+        password: {type: string}
+      required: [username, display_name, password]
+      additionalProperties: false
+    InstanceInitializeResponse:
+      type: object
+      properties:
+        initialized: {type: boolean, const: true}
+        account: {$ref: "#/components/schemas/Account"}
+      required: [initialized, account]
+      additionalProperties: false
+    Account:
+      type: object
+      properties:
+        id: {type: string}
+        username: {type: string}
+        display_name: {type: string}
+        is_admin: {type: boolean}
+        status: {type: string, enum: [active, disabled]}
+        must_change_password: {type: boolean}
+        version: {type: integer}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+        credit_frozen: {type: boolean}
+        posted_balance: {$ref: "#/components/schemas/Amount"}
+        asset_reserved: {$ref: "#/components/schemas/Amount"}
+        spend_authorized: {$ref: "#/components/schemas/Amount"}
+        effective_credit_limit: {$ref: "#/components/schemas/Amount"}
+        credit_used: {$ref: "#/components/schemas/Amount"}
+        spendable_capacity: {$ref: "#/components/schemas/Amount"}
+        over_limit: {type: boolean}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+        password_changed_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, username, display_name, is_admin, status, must_change_password, version, credit_limit, credit_frozen, posted_balance, asset_reserved, spend_authorized, effective_credit_limit, credit_used, spendable_capacity, over_limit, created_at, updated_at, password_changed_at]
+      additionalProperties: false
+    AccountEnvelope:
+      type: object
+      properties:
+        account: {$ref: "#/components/schemas/Account"}
+      required: [account]
+      additionalProperties: false
+    AccountList:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items: {$ref: "#/components/schemas/Account"}
+      required: [accounts]
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      properties:
+        username: {type: string, maxLength: 128}
+        password: {type: string, maxLength: 128}
+      required: [username, password]
+      additionalProperties: false
+    ChangePasswordRequest:
+      type: object
+      properties:
+        current_password: {type: string, maxLength: 128}
+        new_password: {type: string, maxLength: 128}
+      required: [current_password, new_password]
+      additionalProperties: false
+    CreateAccountRequest:
+      type: object
+      properties:
+        username: {type: string}
+        display_name: {type: string}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+        is_admin: {type: boolean}
+        status: {type: string, enum: [active, disabled]}
+      required: [username, display_name, credit_limit]
+      additionalProperties: false
+    AccountWithInitialPassword:
+      type: object
+      description: "initial_password 仅在创建或重置时返回一次。"
+      properties:
+        account: {$ref: "#/components/schemas/Account"}
+        initial_password: {type: string}
+      required: [account, initial_password]
+      additionalProperties: false
+    UpdateAccountRequest:
+      type: object
+      properties:
+        expected_version: {type: integer}
+        status: {type: string, enum: [active, disabled]}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+        credit_frozen: {type: boolean}
+        is_admin: {type: boolean}
+      required: [expected_version]
+      additionalProperties: false
+    EmptyRequest:
+      type: object
+      properties: {}
+      required: []
+      additionalProperties: false
+    PriceTier:
+      type: object
+      properties:
+        name: {type: string}
+        timezone: {type: string}
+        min_prompt_tokens: {type: [integer, "null"]}
+        max_prompt_tokens: {type: [integer, "null"]}
+        weekdays:
+          type: [array, "null"]
+          items: {type: integer}
+        start_minute_of_day: {type: [integer, "null"]}
+        end_minute_of_day: {type: [integer, "null"]}
+        input_price: {$ref: "#/components/schemas/Amount"}
+        output_price: {$ref: "#/components/schemas/Amount"}
+        cache_write_price: {$ref: "#/components/schemas/Amount"}
+        cache_read_price: {$ref: "#/components/schemas/Amount"}
+        price_unit: {type: string, const: points_per_million_tokens}
+      required: [name, timezone, min_prompt_tokens, max_prompt_tokens, weekdays, start_minute_of_day, end_minute_of_day, input_price, output_price, cache_write_price, cache_read_price, price_unit]
+      additionalProperties: false
+    PriceTierRequest:
+      type: object
+      properties:
+        name: {type: string}
+        min_prompt_tokens: {type: [integer, "null"]}
+        max_prompt_tokens: {type: [integer, "null"]}
+        timezone: {type: string}
+        weekdays:
+          type: array
+          items: {type: integer}
+        start_minute_of_day: {type: [integer, "null"]}
+        end_minute_of_day: {type: [integer, "null"]}
+        input_price: {$ref: "#/components/schemas/PriceString"}
+        output_price: {$ref: "#/components/schemas/PriceString"}
+        cache_write_price: {$ref: "#/components/schemas/PriceString"}
+        cache_read_price: {$ref: "#/components/schemas/PriceString"}
+      required: [name, input_price, output_price, cache_write_price, cache_read_price]
+      additionalProperties: false
+    Model:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        provider: {type: string}
+        context_window: {type: integer}
+        parameter_info: {type: string}
+        input_modalities:
+          type: array
+          items: {type: string}
+        output_modalities:
+          type: array
+          items: {type: string}
+        supports_tools: {type: boolean}
+        supports_structured_output: {type: boolean}
+        supports_vision: {type: boolean}
+        input_price: {$ref: "#/components/schemas/Amount"}
+        output_price: {$ref: "#/components/schemas/Amount"}
+        cache_write_price: {$ref: "#/components/schemas/Amount"}
+        cache_read_price: {$ref: "#/components/schemas/Amount"}
+        price_tiers:
+          type: array
+          items: {$ref: "#/components/schemas/PriceTier"}
+        price_unit: {type: string, const: points_per_million_tokens}
+        status: {type: string, enum: [active, disabled]}
+        version: {type: integer}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+        price_updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, name, provider, context_window, parameter_info, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, input_price, output_price, cache_write_price, cache_read_price, price_tiers, price_unit, status, version, created_at, updated_at, price_updated_at]
+      additionalProperties: false
+    ModelEnvelope:
+      type: object
+      properties:
+        model: {$ref: "#/components/schemas/Model"}
+      required: [model]
+      additionalProperties: false
+    ModelList:
+      type: object
+      properties:
+        models:
+          type: array
+          items: {$ref: "#/components/schemas/Model"}
+      required: [models]
+      additionalProperties: false
+    ModelRequest:
+      type: object
+      properties:
+        id: {type: string, description: "创建时必填；更新时以路径为准。"}
+        name: {type: string}
+        provider: {type: string}
+        context_window: {type: integer}
+        parameter_info: {type: string}
+        input_modalities:
+          type: array
+          items: {type: string}
+        output_modalities:
+          type: array
+          items: {type: string}
+        supports_tools: {type: boolean}
+        supports_structured_output: {type: boolean}
+        supports_vision: {type: boolean}
+        input_price: {$ref: "#/components/schemas/PriceString"}
+        output_price: {$ref: "#/components/schemas/PriceString"}
+        cache_write_price: {$ref: "#/components/schemas/PriceString"}
+        cache_read_price: {$ref: "#/components/schemas/PriceString"}
+        price_tiers:
+          type: array
+          items: {$ref: "#/components/schemas/PriceTierRequest"}
+        status: {type: string, enum: [active, disabled]}
+        expected_version: {type: integer, description: "仅更新时使用。"}
+      required: [name, provider, input_price, output_price, cache_write_price, cache_read_price, status]
+      additionalProperties: false
+    Wallet:
+      type: object
+      properties:
+        posted_balance: {$ref: "#/components/schemas/Amount"}
+        asset_reserved: {$ref: "#/components/schemas/Amount"}
+        spend_authorized: {$ref: "#/components/schemas/Amount"}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+        effective_credit_limit: {$ref: "#/components/schemas/Amount"}
+        credit_used: {$ref: "#/components/schemas/Amount"}
+        credit_frozen: {type: boolean}
+        spendable_capacity: {$ref: "#/components/schemas/Amount"}
+        over_limit: {type: boolean}
+        risk_status: {type: string, enum: [credit_frozen, over_limit, insufficient, normal]}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [posted_balance, asset_reserved, spend_authorized, credit_limit, effective_credit_limit, credit_used, credit_frozen, spendable_capacity, over_limit, risk_status, updated_at]
+      additionalProperties: false
+    WalletEnvelope:
+      type: object
+      properties:
+        wallet: {$ref: "#/components/schemas/Wallet"}
+      required: [wallet]
+      additionalProperties: false
+    WalletResponse:
+      type: object
+      properties:
+        wallet: {$ref: "#/components/schemas/Wallet"}
+        recovery_actions:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: {type: string}
+              href: {type: string}
+            required: [kind, href]
+            additionalProperties: false
+      required: [wallet, recovery_actions]
+      additionalProperties: false
+    LedgerCounterparty:
+      type: object
+      properties:
+        account_kind: {type: string, enum: [user, platform_incentive, platform_loss]}
+        account_id: {type: string}
+        business_role: {type: string}
+        amount: {$ref: "#/components/schemas/Amount"}
+      required: [account_kind, account_id, business_role, amount]
+      additionalProperties: false
+    LedgerEntry:
+      type: object
+      properties:
+        id: {type: string, description: "账本分录 ID 的十进制字符串，可作为 before 游标。"}
+        transaction_id: {type: string}
+        entry_ordinal: {type: integer}
+        business_role: {type: string}
+        amount: {$ref: "#/components/schemas/Amount"}
+        posted_balance_before: {$ref: "#/components/schemas/Amount"}
+        posted_balance_after: {$ref: "#/components/schemas/Amount"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        transaction_kind: {type: string, enum: [transfer, admin_adjustment, bad_debt_transfer, hold_capture, self_channel_usage, reversal]}
+        reason: {type: string}
+        reference_type: {type: string}
+        reference_id: {type: string}
+        actor_account_id: {type: string}
+        reversal_of_transaction_id: {type: string}
+        hold_id: {type: string}
+        counterparties:
+          type: array
+          items: {$ref: "#/components/schemas/LedgerCounterparty"}
+      required: [id, transaction_id, entry_ordinal, business_role, amount, posted_balance_before, posted_balance_after, created_at, transaction_kind, reason, reference_type, reference_id, actor_account_id, reversal_of_transaction_id, hold_id, counterparties]
+      additionalProperties: false
+    LedgerTransactionEntry:
+      type: object
+      properties:
+        id: {type: string, description: "账本分录 ID 的十进制字符串，可作为 before 游标。"}
+        transaction_id: {type: string}
+        entry_ordinal: {type: integer}
+        business_role: {type: string}
+        amount: {$ref: "#/components/schemas/Amount"}
+        posted_balance_before: {$ref: "#/components/schemas/Amount"}
+        posted_balance_after: {$ref: "#/components/schemas/Amount"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        transaction_kind: {type: string, enum: [transfer, admin_adjustment, bad_debt_transfer, hold_capture, self_channel_usage, reversal]}
+        reason: {type: string}
+        reference_type: {type: string}
+        reference_id: {type: string}
+        actor_account_id: {type: string}
+        reversal_of_transaction_id: {type: string}
+        hold_id: {type: string}
+        counterparties:
+          type: array
+          items: {$ref: "#/components/schemas/LedgerCounterparty"}
+        account_id: {type: string}
+        account_kind: {type: string, enum: [user, platform_incentive, platform_loss]}
+      required: [id, transaction_id, entry_ordinal, business_role, amount, posted_balance_before, posted_balance_after, created_at, transaction_kind, reason, reference_type, reference_id, actor_account_id, reversal_of_transaction_id, hold_id, counterparties, account_id, account_kind]
+      additionalProperties: false
+    LedgerEntryPage:
+      type: object
+      properties:
+        entries:
+          type: array
+          items: {$ref: "#/components/schemas/LedgerEntry"}
+        next_before: {type: string, description: "下一页游标；已无更多时为空字符串。"}
+      required: [entries, next_before]
+      additionalProperties: false
+    LedgerTransaction:
+      type: object
+      properties:
+        id: {type: string}
+        idempotency_key: {type: string}
+        kind: {type: string}
+        reason: {type: string}
+        reference_type: {type: string}
+        reference_id: {type: string}
+        actor_account_id: {type: string}
+        reversal_of_transaction_id: {type: string}
+        hold_id: {type: string}
+        entries:
+          type: array
+          items: {$ref: "#/components/schemas/LedgerTransactionEntry"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, idempotency_key, kind, reason, reference_type, reference_id, actor_account_id, reversal_of_transaction_id, hold_id, entries, created_at]
+      additionalProperties: false
+    LedgerTransactionEnvelope:
+      type: object
+      properties:
+        transaction: {$ref: "#/components/schemas/LedgerTransaction"}
+      required: [transaction]
+      additionalProperties: false
+    LedgerAccountRef:
+      type: object
+      description: "account_id 与 system_kind 二选一。"
+      properties:
+        account_id: {type: string, format: uuid}
+        system_kind: {type: string, enum: [platform_incentive, platform_loss]}
+      required: []
+      additionalProperties: false
+    LedgerAdjustmentRequest:
+      type: object
+      properties:
+        from: {$ref: "#/components/schemas/LedgerAccountRef"}
+        to: {$ref: "#/components/schemas/LedgerAccountRef"}
+        amount: {$ref: "#/components/schemas/Amount"}
+        reason: {type: string}
+        reference_type: {type: string}
+        reference_id: {type: string}
+      required: [from, to, amount, reason]
+      additionalProperties: false
+    BadDebtRequest:
+      type: object
+      properties:
+        account_id: {type: string, format: uuid}
+        amount: {$ref: "#/components/schemas/Amount"}
+        reason: {type: string}
+        reference_id: {type: string}
+      required: [account_id, amount, reason]
+      additionalProperties: false
+    LedgerMetrics:
+      type: object
+      properties:
+        total_posted_balance: {$ref: "#/components/schemas/Amount"}
+        positive_posted_balance: {$ref: "#/components/schemas/Amount"}
+        negative_posted_balance: {$ref: "#/components/schemas/Amount"}
+        posted_projection_difference: {$ref: "#/components/schemas/Amount"}
+        posted_projection_mismatch_accounts: {type: integer}
+        asset_reservation_difference: {$ref: "#/components/schemas/Amount"}
+        spend_authorization_difference: {$ref: "#/components/schemas/Amount"}
+        hold_projection_mismatch_accounts: {type: integer}
+        zero_sum: {type: boolean}
+        ledger_consistent: {type: boolean}
+        total_credit_limit: {$ref: "#/components/schemas/Amount"}
+        credit_capacity_used: {$ref: "#/components/schemas/Amount"}
+        asset_reserved: {$ref: "#/components/schemas/Amount"}
+        spend_authorized: {$ref: "#/components/schemas/Amount"}
+        incentive_posted_balance: {$ref: "#/components/schemas/Amount"}
+        loss_posted_balance: {$ref: "#/components/schemas/Amount"}
+        over_limit_accounts: {type: integer}
+        credit_frozen_accounts: {type: integer}
+        ledger_account_count: {type: integer}
+      required: [total_posted_balance, positive_posted_balance, negative_posted_balance, posted_projection_difference, posted_projection_mismatch_accounts, asset_reservation_difference, spend_authorization_difference, hold_projection_mismatch_accounts, zero_sum, ledger_consistent, total_credit_limit, credit_capacity_used, asset_reserved, spend_authorized, incentive_posted_balance, loss_posted_balance, over_limit_accounts, credit_frozen_accounts, ledger_account_count]
+      additionalProperties: false
+    LedgerMetricsEnvelope:
+      type: object
+      properties:
+        metrics: {$ref: "#/components/schemas/LedgerMetrics"}
+      required: [metrics]
+      additionalProperties: false
+    ValidationSummary:
+      type: object
+      properties:
+        id: {type: string}
+        validation_version: {type: integer}
+        attempt_seq: {type: integer}
+        status: {type: string, enum: [in_progress, passed, failed]}
+        error_category: {type: string, description: "auth_failure、upstream_error、transport_error、timeout、response_too_large、invalid_response、configuration_error 或空串。"}
+        http_status: {type: [integer, "null"]}
+        duration_milliseconds: {type: integer}
+        started_at: {$ref: "#/components/schemas/Timestamp"}
+        completed_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, validation_version, attempt_seq, status, error_category, http_status, duration_milliseconds, started_at, completed_at]
+      additionalProperties: false
+    ValidationAttempt:
+      type: object
+      description: "含上游原始错误，仅渠道所有者与管理员可见。"
+      properties:
+        id: {type: string}
+        validation_version: {type: integer}
+        attempt_seq: {type: integer}
+        status: {type: string, enum: [in_progress, passed, failed]}
+        error_category: {type: string, description: "auth_failure、upstream_error、transport_error、timeout、response_too_large、invalid_response、configuration_error 或空串。"}
+        http_status: {type: [integer, "null"]}
+        duration_milliseconds: {type: integer}
+        started_at: {$ref: "#/components/schemas/Timestamp"}
+        completed_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        actor_account_id: {type: string}
+        raw_error: {type: string}
+        raw_error_truncated: {type: boolean}
+      required: [id, validation_version, attempt_seq, status, error_category, http_status, duration_milliseconds, started_at, completed_at, actor_account_id, raw_error, raw_error_truncated]
+      additionalProperties: false
+    ValidationAttemptEnvelope:
+      type: object
+      properties:
+        validation: {$ref: "#/components/schemas/ValidationAttempt"}
+      required: [validation]
+      additionalProperties: false
+    ValidationAttemptList:
+      type: object
+      properties:
+        validation_attempts:
+          type: array
+          items: {$ref: "#/components/schemas/ValidationAttempt"}
+      required: [validation_attempts]
+      additionalProperties: false
+    OwnerOffer:
+      type: object
+      properties:
+        id: {type: string}
+        model_id: {type: string}
+        model_name: {type: string}
+        model_provider: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        upstream_model_id: {type: string}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+        status: {type: string, enum: [active, disabled, deleted]}
+        validation_version: {type: integer}
+        version: {type: integer}
+        eligible: {type: boolean}
+        ineligible_reason: {type: string}
+        input_price:
+          anyOf:
+            - $ref: "#/components/schemas/Amount"
+            - type: "null"
+        output_price:
+          anyOf:
+            - $ref: "#/components/schemas/Amount"
+            - type: "null"
+        cache_write_price:
+          anyOf:
+            - $ref: "#/components/schemas/Amount"
+            - type: "null"
+        cache_read_price:
+          anyOf:
+            - $ref: "#/components/schemas/Amount"
+            - type: "null"
+        price_tiers:
+          type: array
+          items: {$ref: "#/components/schemas/PriceTier"}
+        call_success_rate: {type: [string, "null"]}
+        ttft_milliseconds: {type: [integer, "null"]}
+        tokens_per_second: {type: [string, "null"]}
+        call_count: {type: [integer, "null"]}
+        provider_income:
+          anyOf:
+            - $ref: "#/components/schemas/Amount"
+            - type: "null"
+        latest_validation:
+          anyOf:
+            - $ref: "#/components/schemas/ValidationSummary"
+            - type: "null"
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, model_id, model_name, model_provider, protocol, upstream_model_id, multiplier, status, validation_version, version, eligible, ineligible_reason, input_price, output_price, cache_write_price, cache_read_price, price_tiers, call_success_rate, ttft_milliseconds, tokens_per_second, call_count, provider_income, latest_validation, created_at, updated_at]
+      additionalProperties: false
+    OwnerOfferEnvelope:
+      type: object
+      properties:
+        offer: {$ref: "#/components/schemas/OwnerOffer"}
+      required: [offer]
+      additionalProperties: false
+    OwnerChannel:
+      type: object
+      properties:
+        id: {type: string}
+        owner_account_id: {type: string}
+        owner_display_name: {type: string}
+        display_name: {type: string}
+        base_url: {type: string}
+        credential_configured: {type: boolean}
+        credential_version: {type: integer}
+        credential_updated_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        status: {type: string, enum: [draft, published, paused, deleted]}
+        version: {type: integer}
+        offers:
+          type: array
+          items: {$ref: "#/components/schemas/OwnerOffer"}
+        average_rating: {type: [string, "null"]}
+        rating_count: {type: integer}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, owner_account_id, owner_display_name, display_name, base_url, credential_configured, credential_version, credential_updated_at, status, version, offers, average_rating, rating_count, created_at, updated_at]
+      additionalProperties: false
+    OwnerChannelEnvelope:
+      type: object
+      properties:
+        channel: {$ref: "#/components/schemas/OwnerChannel"}
+      required: [channel]
+      additionalProperties: false
+    OwnerChannelList:
+      type: object
+      properties:
+        channels:
+          type: array
+          items: {$ref: "#/components/schemas/OwnerChannel"}
+      required: [channels]
+      additionalProperties: false
+    AdminChannelOffer:
+      type: object
+      properties:
+        id: {type: string}
+        model_id: {type: string}
+        model_name: {type: string}
+        model_provider: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+        status: {type: string, enum: [active, disabled, deleted]}
+        validation_version: {type: integer}
+        latest_validation:
+          anyOf:
+            - $ref: "#/components/schemas/ValidationSummary"
+            - type: "null"
+      required: [id, model_id, model_name, model_provider, protocol, multiplier, status, validation_version, latest_validation]
+      additionalProperties: false
+    AdminChannel:
+      type: object
+      properties:
+        id: {type: string}
+        owner_account_id: {type: string}
+        owner_display_name: {type: string}
+        display_name: {type: string}
+        credential_configured: {type: boolean}
+        credential_version: {type: integer}
+        credential_updated_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        status: {type: string, enum: [draft, published, paused, deleted]}
+        version: {type: integer}
+        offers:
+          type: array
+          items: {$ref: "#/components/schemas/AdminChannelOffer"}
+        average_rating: {type: [string, "null"]}
+        rating_count: {type: integer}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, owner_account_id, owner_display_name, display_name, credential_configured, credential_version, credential_updated_at, status, version, offers, average_rating, rating_count, created_at, updated_at]
+      additionalProperties: false
+    AdminChannelEnvelope:
+      type: object
+      properties:
+        channel: {$ref: "#/components/schemas/AdminChannel"}
+      required: [channel]
+      additionalProperties: false
+    AdminChannelList:
+      type: object
+      properties:
+        channels:
+          type: array
+          items: {$ref: "#/components/schemas/AdminChannel"}
+      required: [channels]
+      additionalProperties: false
+    MarketOffer:
+      type: object
+      properties:
+        offer_id: {type: string}
+        channel_id: {type: string}
+        channel_display_name: {type: string}
+        owner_account_id: {type: string}
+        owner_display_name: {type: string}
+        model_id: {type: string}
+        model_name: {type: string}
+        model_provider: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+        input_price: {$ref: "#/components/schemas/Amount"}
+        output_price: {$ref: "#/components/schemas/Amount"}
+        cache_write_price: {$ref: "#/components/schemas/Amount"}
+        cache_read_price: {$ref: "#/components/schemas/Amount"}
+        price_tiers:
+          type: array
+          items: {$ref: "#/components/schemas/PriceTier"}
+        validation_status: {type: string, enum: [in_progress, passed, failed]}
+        average_rating: {type: [string, "null"]}
+        rating_count: {type: integer}
+        last_tested_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        call_success_rate: {type: [string, "null"]}
+        ttft_milliseconds: {type: [integer, "null"]}
+        tokens_per_second: {type: [string, "null"]}
+        call_count: {type: [integer, "null"]}
+      required: [offer_id, channel_id, channel_display_name, owner_account_id, owner_display_name, model_id, model_name, model_provider, protocol, multiplier, input_price, output_price, cache_write_price, cache_read_price, price_tiers, validation_status, average_rating, rating_count, last_tested_at, call_success_rate, ttft_milliseconds, tokens_per_second, call_count]
+      additionalProperties: false
+    MarketOfferPage:
+      type: object
+      properties:
+        offers:
+          type: array
+          items: {$ref: "#/components/schemas/MarketOffer"}
+        next_after: {type: string, description: "下一页游标；已无更多时为空字符串。"}
+      required: [offers, next_after]
+      additionalProperties: false
+    MarketChannel:
+      type: object
+      properties:
+        id: {type: string}
+        display_name: {type: string}
+        owner_account_id: {type: string}
+        owner_display_name: {type: string}
+        status: {type: string, enum: [draft, published, paused, deleted]}
+        offers:
+          type: array
+          items: {$ref: "#/components/schemas/MarketOffer"}
+        average_rating: {type: [string, "null"]}
+        rating_count: {type: integer}
+        current_user_rating: {type: [integer, "null"]}
+      required: [id, display_name, owner_account_id, owner_display_name, status, offers, average_rating, rating_count, current_user_rating]
+      additionalProperties: false
+    MarketChannelEnvelope:
+      type: object
+      properties:
+        channel: {$ref: "#/components/schemas/MarketChannel"}
+      required: [channel]
+      additionalProperties: false
+    OfferInput:
+      type: object
+      properties:
+        model_id: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        upstream_model_id: {type: string}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+      required: [model_id, protocol, upstream_model_id, multiplier]
+      additionalProperties: false
+    CreateChannelRequest:
+      type: object
+      properties:
+        display_name: {type: string}
+        base_url: {type: string}
+        credential: {type: string}
+        offers:
+          type: array
+          items: {$ref: "#/components/schemas/OfferInput"}
+      required: [display_name, base_url, credential]
+      additionalProperties: false
+    UpdateChannelRequest:
+      type: object
+      properties:
+        display_name: {type: string}
+        base_url: {type: string}
+        credential: {type: [string, "null"]}
+        expected_version: {type: integer}
+      required: [display_name, base_url, expected_version]
+      additionalProperties: false
+    AddOfferRequest:
+      type: object
+      properties:
+        model_id: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        upstream_model_id: {type: string}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+        expected_version: {type: integer, description: "所属渠道当前版本。"}
+      required: [model_id, protocol, upstream_model_id, multiplier, expected_version]
+      additionalProperties: false
+    UpdateOfferRequest:
+      type: object
+      properties:
+        upstream_model_id: {type: string}
+        multiplier: {$ref: "#/components/schemas/Amount"}
+        expected_version: {type: integer}
+      required: [upstream_model_id, multiplier, expected_version]
+      additionalProperties: false
+    VersionedRequest:
+      type: object
+      properties:
+        expected_version: {type: integer}
+        reason: {type: string}
+      required: [expected_version]
+      additionalProperties: false
+    ValidateOfferRequest:
+      type: object
+      properties:
+        confirmed_upstream_cost: {type: boolean}
+      required: []
+      additionalProperties: false
+    RatingRequest:
+      type: object
+      properties:
+        score: {type: integer, minimum: 1, maximum: 5}
+      required: [score]
+      additionalProperties: false
+    ReencryptRequest:
+      type: object
+      properties:
+        limit: {type: integer}
+      required: []
+      additionalProperties: false
+    ReencryptResponse:
+      type: object
+      properties:
+        reencrypted: {type: integer}
+      required: [reencrypted]
+      additionalProperties: false
+    Usage:
+      type: object
+      properties:
+        input_tokens: {type: integer}
+        output_tokens: {type: integer}
+        cache_write_tokens: {type: integer}
+        cache_read_tokens: {type: integer}
+      required: [input_tokens, output_tokens, cache_write_tokens, cache_read_tokens]
+      additionalProperties: false
+    ApiKeyPoolMember:
+      type: object
+      properties:
+        priority: {type: integer}
+        offer_id: {type: string}
+        channel_id: {type: string}
+        channel_name: {type: string}
+        provider_name: {type: string}
+        added_validation_version: {type: integer}
+        current_validation_version: {type: integer}
+        eligible: {type: boolean}
+        ineligible_reason: {type: string}
+        input_price: {$ref: "#/components/schemas/Amount"}
+        output_price: {$ref: "#/components/schemas/Amount"}
+        cache_write_price: {$ref: "#/components/schemas/Amount"}
+        cache_read_price: {$ref: "#/components/schemas/Amount"}
+        price_tiers:
+          type: array
+          items: {$ref: "#/components/schemas/PriceTier"}
+        success_rate: {type: [string, "null"]}
+        ttft_milliseconds: {type: [integer, "null"]}
+        tokens_per_second: {type: [string, "null"]}
+      required: [priority, offer_id, channel_id, channel_name, provider_name, added_validation_version, current_validation_version, eligible, ineligible_reason, input_price, output_price, cache_write_price, cache_read_price, price_tiers, success_rate, ttft_milliseconds, tokens_per_second]
+      additionalProperties: false
+    ApiKeyPool:
+      type: object
+      properties:
+        id: {type: string}
+        model_id: {type: string}
+        model_name: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        version: {type: integer}
+        members:
+          type: array
+          items: {$ref: "#/components/schemas/ApiKeyPoolMember"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, model_id, model_name, protocol, version, members, created_at, updated_at]
+      additionalProperties: false
+    ApiKey:
+      type: object
+      properties:
+        id: {type: string}
+        display_name: {type: string}
+        prefix: {type: string}
+        generation: {type: integer}
+        status: {type: string, enum: [active, disabled, deleted]}
+        version: {type: integer}
+        pools:
+          type: array
+          items: {$ref: "#/components/schemas/ApiKeyPool"}
+        last_used_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, display_name, prefix, generation, status, version, pools, last_used_at, created_at, updated_at]
+      additionalProperties: false
+    ApiKeyEnvelope:
+      type: object
+      properties:
+        key: {$ref: "#/components/schemas/ApiKey"}
+      required: [key]
+      additionalProperties: false
+    ApiKeyList:
+      type: object
+      properties:
+        keys:
+          type: array
+          items: {$ref: "#/components/schemas/ApiKey"}
+      required: [keys]
+      additionalProperties: false
+    ApiKeyWithSecret:
+      type: object
+      properties:
+        key: {$ref: "#/components/schemas/ApiKey"}
+        secret: {type: string, description: "平台 API Key 明文，仅在创建或轮换时返回一次。"}
+      required: [key, secret]
+      additionalProperties: false
+    ApiPoolRequest:
+      type: object
+      properties:
+        model_id: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        offer_ids:
+          type: array
+          items: {type: string}
+      required: [model_id, protocol, offer_ids]
+      additionalProperties: false
+    ApiKeyConfigRequest:
+      type: object
+      properties:
+        display_name: {type: string}
+        expected_version: {type: integer, description: "仅更新时使用。"}
+        pools:
+          type: array
+          items: {$ref: "#/components/schemas/ApiPoolRequest"}
+      required: [display_name, pools]
+      additionalProperties: false
+    ApiKeyVersionRequest:
+      type: object
+      properties:
+        expected_version: {type: integer}
+      required: [expected_version]
+      additionalProperties: false
+    ApiKeyPoolMemberRequest:
+      type: object
+      properties:
+        expected_version: {type: integer}
+        model_id: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        offer_id: {type: string}
+        priority: {type: integer}
+      required: [expected_version, model_id, protocol, offer_id]
+      additionalProperties: false
+    GatewayAttempt:
+      type: object
+      properties:
+        id: {type: string}
+        sequence: {type: integer}
+        offer_id: {type: string}
+        channel_name: {type: string}
+        provider_account_id: {type: string}
+        status: {type: string, enum: [in_progress, pending_delivery, succeeded, failed, cancelled, incomplete]}
+        http_status: {type: integer}
+        error_code: {type: string}
+        raw_error: {type: string}
+        raw_error_truncated: {type: boolean}
+        semantic_committed: {type: boolean}
+        ttft_milliseconds: {type: [integer, "null"]}
+        duration_milliseconds: {type: [integer, "null"]}
+        usage:
+          anyOf:
+            - $ref: "#/components/schemas/Usage"
+            - type: "null"
+        tokens_per_second: {type: [string, "null"]}
+        started_at: {$ref: "#/components/schemas/Timestamp"}
+        completed_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, sequence, offer_id, channel_name, provider_account_id, status, http_status, error_code, raw_error, raw_error_truncated, semantic_committed, ttft_milliseconds, duration_milliseconds, usage, tokens_per_second, started_at, completed_at]
+      additionalProperties: false
+    GatewayCall:
+      type: object
+      properties:
+        id: {type: string}
+        consumer_account_id: {type: string}
+        api_key_id: {type: string}
+        key_prefix: {type: string}
+        key_generation: {type: integer}
+        pool_id: {type: string}
+        pool_version: {type: integer}
+        model_id: {type: string}
+        protocol: {type: string, enum: [openai_chat_completions, openai_responses, anthropic_messages, google_gemini_generate_content]}
+        status: {type: string, enum: [rejected, in_progress, pending_delivery, succeeded, failed, incomplete, cancelled]}
+        decision_code: {type: string}
+        candidate_count: {type: integer}
+        attempt_count: {type: integer}
+        hold_id: {type: string}
+        preauthorized: {$ref: "#/components/schemas/Amount"}
+        zero_hold_reason: {type: string}
+        fee_rate_version: {type: integer}
+        fee_rate_nano: {type: integer}
+        final_offer_id: {type: string}
+        final_channel_name: {type: string}
+        completion_reason: {type: string}
+        usage:
+          anyOf:
+            - $ref: "#/components/schemas/Usage"
+            - type: "null"
+        provider_charge: {$ref: "#/components/schemas/Amount"}
+        platform_fee: {$ref: "#/components/schemas/Amount"}
+        settled_price_tier_seq: {type: integer}
+        final_http_status: {type: integer}
+        attempts:
+          type: array
+          items: {$ref: "#/components/schemas/GatewayAttempt"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        completed_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, consumer_account_id, api_key_id, key_prefix, key_generation, pool_id, pool_version, model_id, protocol, status, decision_code, candidate_count, attempt_count, hold_id, preauthorized, zero_hold_reason, fee_rate_version, fee_rate_nano, final_offer_id, final_channel_name, completion_reason, usage, provider_charge, platform_fee, settled_price_tier_seq, final_http_status, attempts, created_at, completed_at]
+      additionalProperties: false
+    GatewayCallEnvelope:
+      type: object
+      properties:
+        call: {$ref: "#/components/schemas/GatewayCall"}
+      required: [call]
+      additionalProperties: false
+    GatewayCallList:
+      type: object
+      properties:
+        calls:
+          type: array
+          items: {$ref: "#/components/schemas/GatewayCall"}
+      required: [calls]
+      additionalProperties: false
+    Dashboard:
+      type: object
+      properties:
+        consumer_spent: {$ref: "#/components/schemas/Amount"}
+        provider_income: {$ref: "#/components/schemas/Amount"}
+        today_spent: {$ref: "#/components/schemas/Amount"}
+        today_succeeded_calls: {type: integer}
+        today_external_provider_income: {$ref: "#/components/schemas/Amount"}
+        active_key_count: {type: integer}
+        pool_count: {type: integer}
+        healthy_offer_count: {type: integer}
+        unhealthy_offer_count: {type: integer}
+        pending_items: {type: integer}
+        recent_calls:
+          type: array
+          items: {$ref: "#/components/schemas/GatewayCall"}
+      required: [consumer_spent, provider_income, today_spent, today_succeeded_calls, today_external_provider_income, active_key_count, pool_count, healthy_offer_count, unhealthy_offer_count, pending_items, recent_calls]
+      additionalProperties: false
+    C2CPaymentMethod:
+      type: object
+      properties:
+        id: {type: string}
+        type: {type: string, enum: [wechat, alipay, bank_transfer, other]}
+        contact: {type: string}
+        instructions: {type: string}
+        qr_available: {type: boolean}
+        qr_url: {type: string}
+      required: [id, type, contact, instructions, qr_available, qr_url]
+      additionalProperties: false
+    C2COrderPaymentMethod:
+      type: object
+      properties:
+        id: {type: string}
+        type: {type: string, enum: [wechat, alipay, bank_transfer, other]}
+        position: {type: integer}
+        contact: {type: string}
+        instructions: {type: string}
+        qr_available: {type: boolean}
+        qr_url: {type: string}
+      required: [id, type, position, contact, instructions, qr_available, qr_url]
+      additionalProperties: false
+    C2COrder:
+      type: object
+      properties:
+        id: {type: string}
+        owner_account_id: {type: string}
+        owner_display_name: {type: string}
+        side: {type: string, enum: [sell, buy]}
+        unit_price_fen: {type: integer}
+        total: {$ref: "#/components/schemas/Amount"}
+        available: {$ref: "#/components/schemas/Amount"}
+        allocated: {$ref: "#/components/schemas/Amount"}
+        settled: {$ref: "#/components/schemas/Amount"}
+        closed: {$ref: "#/components/schemas/Amount"}
+        minimum: {$ref: "#/components/schemas/Amount"}
+        maximum: {$ref: "#/components/schemas/Amount"}
+        status: {type: string, enum: [open, allocated, filled, cancelled]}
+        takeable: {type: boolean}
+        payment_types:
+          type: array
+          items: {type: string, enum: [wechat, alipay, bank_transfer, other]}
+        payment_methods:
+          type: array
+          items: {$ref: "#/components/schemas/C2COrderPaymentMethod"}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+        cancelled_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, owner_account_id, owner_display_name, side, unit_price_fen, total, available, allocated, settled, closed, minimum, maximum, status, takeable, payment_types, payment_methods, created_at, updated_at, cancelled_at]
+      additionalProperties: false
+    C2COrderEnvelope:
+      type: object
+      properties:
+        order: {$ref: "#/components/schemas/C2COrder"}
+      required: [order]
+      additionalProperties: false
+    C2CTrade:
+      type: object
+      description: "参与方视图；不含管理员专属的处罚事件。"
+      properties:
+        id: {type: string}
+        order_id: {type: string}
+        order_side: {type: string, enum: [sell, buy]}
+        buyer_account_id: {type: string}
+        buyer_display_name: {type: string}
+        seller_account_id: {type: string}
+        seller_display_name: {type: string}
+        quantity: {$ref: "#/components/schemas/Amount"}
+        unit_price_fen: {type: integer}
+        fiat_amount_fen: {type: integer}
+        status: {type: string, enum: [awaiting_payment, paid, disputed, released_to_buyer, returned_to_seller, cancelled, expired]}
+        payment_method:
+          anyOf:
+            - $ref: "#/components/schemas/C2CPaymentMethod"
+            - type: "null"
+        payment_reference: {type: string}
+        payment_reference_deleted_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        payment_deadline: {$ref: "#/components/schemas/Timestamp"}
+        review_due_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        ledger_transaction_id: {type: string}
+        statements:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              actor_account_id: {type: string}
+              actor_display_name: {type: string}
+              text: {type: string}
+              character_count: {type: integer}
+              created_at: {$ref: "#/components/schemas/Timestamp"}
+              deleted_at:
+                anyOf:
+                  - $ref: "#/components/schemas/Timestamp"
+                  - type: "null"
+            required: [id, actor_account_id, actor_display_name, text, character_count, created_at, deleted_at]
+            additionalProperties: false
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              actor_account_id: {type: string}
+              action: {type: string}
+              reason: {type: string}
+              ledger_transaction_id: {type: string}
+              created_at: {$ref: "#/components/schemas/Timestamp"}
+            required: [id, actor_account_id, action, reason, ledger_transaction_id, created_at]
+            additionalProperties: false
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+        paid_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        resolved_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at]
+      additionalProperties: false
+    C2CAdminTrade:
+      type: object
+      description: "管理员视图，附带双方信用冻结状态与处罚事件。"
+      properties:
+        id: {type: string}
+        order_id: {type: string}
+        order_side: {type: string, enum: [sell, buy]}
+        buyer_account_id: {type: string}
+        buyer_display_name: {type: string}
+        seller_account_id: {type: string}
+        seller_display_name: {type: string}
+        quantity: {$ref: "#/components/schemas/Amount"}
+        unit_price_fen: {type: integer}
+        fiat_amount_fen: {type: integer}
+        status: {type: string, enum: [awaiting_payment, paid, disputed, released_to_buyer, returned_to_seller, cancelled, expired]}
+        payment_method:
+          anyOf:
+            - $ref: "#/components/schemas/C2CPaymentMethod"
+            - type: "null"
+        payment_reference: {type: string}
+        payment_reference_deleted_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        payment_deadline: {$ref: "#/components/schemas/Timestamp"}
+        review_due_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        ledger_transaction_id: {type: string}
+        statements:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              actor_account_id: {type: string}
+              actor_display_name: {type: string}
+              text: {type: string}
+              character_count: {type: integer}
+              created_at: {$ref: "#/components/schemas/Timestamp"}
+              deleted_at:
+                anyOf:
+                  - $ref: "#/components/schemas/Timestamp"
+                  - type: "null"
+            required: [id, actor_account_id, actor_display_name, text, character_count, created_at, deleted_at]
+            additionalProperties: false
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              actor_account_id: {type: string}
+              action: {type: string}
+              reason: {type: string}
+              ledger_transaction_id: {type: string}
+              created_at: {$ref: "#/components/schemas/Timestamp"}
+            required: [id, actor_account_id, action, reason, ledger_transaction_id, created_at]
+            additionalProperties: false
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+        paid_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        resolved_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        buyer_credit_frozen: {type: boolean}
+        seller_credit_frozen: {type: boolean}
+      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at, buyer_credit_frozen, seller_credit_frozen]
+      additionalProperties: false
+    C2CTradeEnvelope:
+      type: object
+      properties:
+        trade: {$ref: "#/components/schemas/C2CTrade"}
+      required: [trade]
+      additionalProperties: false
+    C2CAdminTradeEnvelope:
+      type: object
+      properties:
+        trade: {$ref: "#/components/schemas/C2CAdminTrade"}
+      required: [trade]
+      additionalProperties: false
+    C2CTradeViewEnvelope:
+      type: object
+      description: "管理员得到 C2CAdminTrade，其他账户得到 C2CTrade。"
+      properties:
+        trade:
+          oneOf:
+            - $ref: "#/components/schemas/C2CTrade"
+            - $ref: "#/components/schemas/C2CAdminTrade"
+      required: [trade]
+      additionalProperties: false
+    C2CAdminTradeList:
+      type: object
+      properties:
+        trades:
+          type: array
+          items: {$ref: "#/components/schemas/C2CAdminTrade"}
+      required: [trades]
+      additionalProperties: false
+    C2CMarket:
+      type: object
+      properties:
+        metrics:
+          type: object
+          properties:
+            guidance_price_fen: {type: integer}
+            latest_price_fen: {type: [integer, "null"]}
+            best_bid_fen: {type: [integer, "null"]}
+            best_ask_fen: {type: [integer, "null"]}
+            spread_fen: {type: [integer, "null"]}
+          required: [guidance_price_fen, latest_price_fen, best_bid_fen, best_ask_fen, spread_fen]
+          additionalProperties: false
+        sell_orders:
+          type: array
+          items: {$ref: "#/components/schemas/C2COrder"}
+        buy_orders:
+          type: array
+          items: {$ref: "#/components/schemas/C2COrder"}
+      required: [metrics, sell_orders, buy_orders]
+      additionalProperties: false
+    C2CMyActivity:
+      type: object
+      properties:
+        orders:
+          type: array
+          items: {$ref: "#/components/schemas/C2COrder"}
+        trades:
+          type: array
+          items: {$ref: "#/components/schemas/C2CTrade"}
+      required: [orders, trades]
+      additionalProperties: false
+    C2CPaymentMethodRequest:
+      type: object
+      properties:
+        type: {type: string, enum: [wechat, alipay, bank_transfer, other]}
+        contact: {type: string}
+        instructions: {type: string}
+        qr_field: {type: string, description: "多部分请求中承载收款码图片的文件字段名；无图片时留空。"}
+      required: [type]
+      additionalProperties: false
+    C2CCreateOrderRequest:
+      type: object
+      properties:
+        side: {type: string, enum: [sell, buy]}
+        unit_price_fen: {type: integer}
+        total: {$ref: "#/components/schemas/Amount"}
+        minimum: {$ref: "#/components/schemas/Amount"}
+        maximum: {$ref: "#/components/schemas/Amount"}
+        payment_methods:
+          type: array
+          items: {$ref: "#/components/schemas/C2CPaymentMethodRequest"}
+      required: [side, unit_price_fen, total, minimum, maximum, payment_methods]
+      additionalProperties: false
+    C2CTakeOrderRequest:
+      type: object
+      properties:
+        quantity: {$ref: "#/components/schemas/Amount"}
+        payment_method_id: {type: string}
+      required: [quantity, payment_method_id]
+      additionalProperties: false
+    C2CMarkPaidRequest:
+      type: object
+      properties:
+        payment_reference: {type: string}
+      required: [payment_reference]
+      additionalProperties: false
+    C2CStatementRequest:
+      type: object
+      properties:
+        statement: {type: string}
+      required: [statement]
+      additionalProperties: false
+    C2CAdminCancelOrderRequest:
+      type: object
+      properties:
+        reason: {type: string}
+      required: [reason]
+      additionalProperties: false
+    C2CResolveRequest:
+      type: object
+      properties:
+        action: {type: string, enum: [release_to_buyer, return_to_seller, extend_review, restrict_buyer, restrict_seller]}
+        reason: {type: string}
+      required: [action, reason]
+      additionalProperties: false
+    FeeRateVersion:
+      type: object
+      properties:
+        version: {type: integer}
+        fee_rate: {$ref: "#/components/schemas/Amount"}
+        reason: {type: string}
+        created_by:
+          type: [object, "null"]
+          properties:
+            id: {type: string}
+            username: {type: string}
+          required: [id, username]
+          additionalProperties: false
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [version, fee_rate, reason, created_by, created_at]
+      additionalProperties: false
+    FeeRateEnvelope:
+      type: object
+      properties:
+        fee_rate: {$ref: "#/components/schemas/FeeRateVersion"}
+      required: [fee_rate]
+      additionalProperties: false
+    FeeRateHistory:
+      type: object
+      properties:
+        current: {$ref: "#/components/schemas/FeeRateVersion"}
+        history:
+          type: array
+          items: {$ref: "#/components/schemas/FeeRateVersion"}
+      required: [current, history]
+      additionalProperties: false
+    SetFeeRateRequest:
+      type: object
+      properties:
+        expected_version: {type: integer}
+        fee_rate: {type: string, pattern: "^(0|1)(\\.[0-9]{1,9})?$"}
+        reason: {type: string}
+      required: [expected_version, fee_rate, reason]
+      additionalProperties: false
+    OpsNegativeBalanceRisk:
+      type: object
+      properties:
+        account_id: {type: string}
+        username: {type: string}
+        posted_balance: {$ref: "#/components/schemas/Amount"}
+        negative_since: {type: string}
+        last_financial_activity: {type: string}
+        inactive_days: {type: integer}
+        over_limit: {type: boolean}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+      required: [account_id, username, posted_balance, negative_since, last_financial_activity, inactive_days, over_limit, credit_limit]
+      additionalProperties: false
+    OpsMetrics:
+      type: object
+      properties:
+        from: {$ref: "#/components/schemas/Timestamp"}
+        to: {$ref: "#/components/schemas/Timestamp"}
+        ledger: {$ref: "#/components/schemas/LedgerMetrics"}
+        effective_credit: {$ref: "#/components/schemas/Amount"}
+        negative_balances:
+          type: array
+          items: {$ref: "#/components/schemas/OpsNegativeBalanceRisk"}
+        api:
+          type: object
+          properties:
+            precheck_rejected: {type: integer}
+            reached_upstream: {type: integer}
+            succeeded: {type: integer}
+            all_failed: {type: integer}
+            incomplete_after_commit: {type: integer}
+            cancelled: {type: integer}
+            terminal_reached: {type: integer}
+            success_rate: {type: [string, "null"]}
+            attempt_count: {type: integer}
+            attempt_succeeded: {type: integer}
+            average_ttft_milliseconds: {type: [integer, "null"]}
+            average_tokens_per_second: {type: [string, "null"]}
+          required: [precheck_rejected, reached_upstream, succeeded, all_failed, incomplete_after_commit, cancelled, terminal_reached, success_rate, attempt_count, attempt_succeeded, average_ttft_milliseconds, average_tokens_per_second]
+          additionalProperties: false
+        consumption:
+          type: object
+          properties:
+            consumer_spend: {$ref: "#/components/schemas/Amount"}
+            provider_income: {$ref: "#/components/schemas/Amount"}
+            own_usage_income: {$ref: "#/components/schemas/Amount"}
+            other_consumer_income: {$ref: "#/components/schemas/Amount"}
+            platform_fee: {$ref: "#/components/schemas/Amount"}
+          required: [consumer_spend, provider_income, own_usage_income, other_consumer_income, platform_fee]
+          additionalProperties: false
+        c2c:
+          type: object
+          properties:
+            orders:
+              type: array
+              items:
+                type: object
+                properties:
+                  side: {type: string}
+                  status: {type: string}
+                  count: {type: integer}
+                required: [side, status, count]
+                additionalProperties: false
+            trades:
+              type: array
+              items:
+                type: object
+                properties:
+                  status: {type: string}
+                  count: {type: integer}
+                required: [status, count]
+                additionalProperties: false
+            quote:
+              type: object
+              properties:
+                last_traded_price_fen: {type: [integer, "null"]}
+                best_bid_price_fen: {type: [integer, "null"]}
+                best_ask_price_fen: {type: [integer, "null"]}
+                spread_fen: {type: [integer, "null"]}
+              required: [last_traded_price_fen, best_bid_price_fen, best_ask_price_fen, spread_fen]
+              additionalProperties: false
+          required: [orders, trades, quote]
+          additionalProperties: false
+        concentration:
+          type: object
+          properties:
+            positive_user_count: {type: integer}
+            total_positive: {$ref: "#/components/schemas/Amount"}
+            top1_share: {type: [string, "null"]}
+            top5_share: {type: [string, "null"]}
+            hhi: {type: [string, "null"]}
+          required: [positive_user_count, total_positive, top1_share, top5_share, hhi]
+          additionalProperties: false
+      required: [from, to, ledger, effective_credit, negative_balances, api, consumption, c2c, concentration]
+      additionalProperties: false
+    OpsMetricsEnvelope:
+      type: object
+      properties:
+        metrics: {$ref: "#/components/schemas/OpsMetrics"}
+      required: [metrics]
+      additionalProperties: false
+    OpsProviderIncome:
+      type: object
+      properties:
+        from: {$ref: "#/components/schemas/Timestamp"}
+        to: {$ref: "#/components/schemas/Timestamp"}
+        total_income: {$ref: "#/components/schemas/Amount"}
+        other_consumer_income: {$ref: "#/components/schemas/Amount"}
+        own_usage_income: {$ref: "#/components/schemas/Amount"}
+        active_providers: {type: integer}
+        providers:
+          type: array
+          items:
+            type: object
+            properties:
+              account_id: {type: string}
+              display_name: {type: string}
+              total_income: {$ref: "#/components/schemas/Amount"}
+              other_consumer_income: {$ref: "#/components/schemas/Amount"}
+              own_usage_income: {$ref: "#/components/schemas/Amount"}
+              success_rate: {type: [string, "null"]}
+            required: [account_id, display_name, total_income, other_consumer_income, own_usage_income, success_rate]
+            additionalProperties: false
+      required: [from, to, total_income, other_consumer_income, own_usage_income, active_providers, providers]
+      additionalProperties: false
+    OpsProviderIncomeEnvelope:
+      type: object
+      properties:
+        provider_income: {$ref: "#/components/schemas/OpsProviderIncome"}
+      required: [provider_income]
+      additionalProperties: false
+    OpsAnomalies:
+      type: object
+      properties:
+        hard_anomalies:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: {type: string}
+              attention: {type: boolean}
+              count: {type: integer}
+              detail: {type: string}
+              drilldown: {type: string}
+            required: [kind, attention, count, detail, drilldown]
+            additionalProperties: false
+        attention_items:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: {type: string}
+              attention: {type: boolean}
+              count: {type: integer}
+              detail: {type: string}
+              drilldown: {type: string}
+            required: [kind, attention, count, detail, drilldown]
+            additionalProperties: false
+        hard_count: {type: integer}
+        checked_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [hard_anomalies, attention_items, hard_count, checked_at]
+      additionalProperties: false
+    OpsAnomaliesEnvelope:
+      type: object
+      properties:
+        anomalies: {$ref: "#/components/schemas/OpsAnomalies"}
+      required: [anomalies]
+      additionalProperties: false
+    OpsInspection:
+      type: object
+      properties:
+        id: {type: string}
+        inspection_version: {type: string}
+        triggered_by: {type: string}
+        zero_sum_ok: {type: boolean}
+        projection_ok: {type: boolean}
+        call_settlement_ok: {type: boolean}
+        c2c_consistency_ok: {type: boolean}
+        zero_sum_difference: {$ref: "#/components/schemas/Amount"}
+        posted_projection_difference: {$ref: "#/components/schemas/Amount"}
+        asset_projection_difference: {$ref: "#/components/schemas/Amount"}
+        authorization_projection_difference: {$ref: "#/components/schemas/Amount"}
+        successful_calls_without_settlement: {type: integer}
+        settlements_without_ledger_transaction: {type: integer}
+        c2c_quantity_violations: {type: integer}
+        c2c_hold_violations: {type: integer}
+        checked_at: {$ref: "#/components/schemas/Timestamp"}
+      required: [id, inspection_version, triggered_by, zero_sum_ok, projection_ok, call_settlement_ok, c2c_consistency_ok, zero_sum_difference, posted_projection_difference, asset_projection_difference, authorization_projection_difference, successful_calls_without_settlement, settlements_without_ledger_transaction, c2c_quantity_violations, c2c_hold_violations, checked_at]
+      additionalProperties: false
+    OpsInspectionEnvelope:
+      type: object
+      properties:
+        inspection: {$ref: "#/components/schemas/OpsInspection"}
+      required: [inspection]
+      additionalProperties: false
+    OpsInspectionList:
+      type: object
+      properties:
+        inspections:
+          type: array
+          items: {$ref: "#/components/schemas/OpsInspection"}
+      required: [inspections]
+      additionalProperties: false
+    OpsTrialSummary:
+      type: object
+      properties:
+        generated_at: {$ref: "#/components/schemas/Timestamp"}
+        non_admin_accounts: {type: integer}
+        published_channels: {type: integer}
+        passed_offers: {type: integer}
+        active_api_keys: {type: integer}
+        calls_succeeded: {type: integer}
+        calls_failed: {type: integer}
+        calls_incomplete: {type: integer}
+        first_call_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        last_terminal_call_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        c2c_open_orders: {type: integer}
+        c2c_released_trades: {type: integer}
+        c2c_disputed_open: {type: integer}
+        ledger_zero_sum_ok: {type: boolean}
+        last_inspection_ok: {type: [boolean, "null"]}
+        last_inspection_at:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        inspection_pass_count: {type: integer}
+        inspection_total_count: {type: integer}
+      required: [generated_at, non_admin_accounts, published_channels, passed_offers, active_api_keys, calls_succeeded, calls_failed, calls_incomplete, first_call_at, last_terminal_call_at, c2c_open_orders, c2c_released_trades, c2c_disputed_open, ledger_zero_sum_ok, last_inspection_ok, last_inspection_at, inspection_pass_count, inspection_total_count]
+      additionalProperties: false
+    OpsTrialSummaryEnvelope:
+      type: object
+      properties:
+        trial_summary: {$ref: "#/components/schemas/OpsTrialSummary"}
+      required: [trial_summary]
+      additionalProperties: false

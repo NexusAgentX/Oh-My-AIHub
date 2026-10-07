@@ -32,6 +32,7 @@
 | --- | --- | --- |
 | 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包、模型目录、渠道配置、API 市场、公开渠道加入模型协议池、平台 Key/池配置、工作台、调用记录、C2C 市场与管理员运营/共享者收入界面 |
 | 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、评分、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
+| API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是 `/api/**` JSON 契约的唯一来源（`/v1`、`/v1beta` 只登记路径与认证），`x-access` 声明各路由门禁；`internal/api` 按领域文件注册路由，`router` 依 access 包裹会话、首次改密与管理员门禁，全局中间件链为“写超时 → 安全头 → 同源校验 → mux”，限流状态集中在 `rateLimits`；契约测试对照路由表并用规范 schema 校验响应（见 [ADR-0021](docs/adr/0021-openapi-as-single-api-contract.md)） |
 | 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、评分、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
 | 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 组合根 `postgres.Store` 嵌入各领域持久化包；已迁移领域（身份、模型目录、API 手续费率、账本、渠道、C2C，加共享的审计与事务辅助）在 `<domain>pg/` 中以 `queries.sql` 加 sqlc 生成代码实现领域服务定义的 Store 接口；其余领域暂为同包手写 SQL，逐个迁移（见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)）；账本与业务行需原子提交时，业务领域自己开启 `pgx.Tx` 并用 `ledgerpg.NewTx(tx)` 得到绑定该事务的账本 Store，事务与提交始终由调用方持有（见 [ADR-0020](docs/adr/0020-adopt-caller-owned-transactions-across-persistence-domains.md)） |
 | 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 以嵌入式 SQL-only Goose 迁移建立并演进数据库结构 |

@@ -184,18 +184,22 @@ func (a *app) gatewayDashboard(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, dashboardResponse(dashboard))
+}
+
+func dashboardResponse(dashboard gateway.Dashboard) map[string]any {
 	recent := make([]map[string]any, 0, len(dashboard.RecentCalls))
 	for _, item := range dashboard.RecentCalls {
 		recent = append(recent, gatewayCallResponse(item))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"consumer_spent": dashboard.ConsumerSpent.String(), "provider_income": dashboard.ProviderIncome.String(),
 		"today_spent": dashboard.TodaySpent.String(), "today_succeeded_calls": dashboard.TodaySucceededCalls,
 		"today_external_provider_income": dashboard.TodayExternalProviderIncome.String(),
 		"active_key_count":               dashboard.ActiveKeyCount, "pool_count": dashboard.PoolCount,
 		"healthy_offer_count": dashboard.HealthyOfferCount, "unhealthy_offer_count": dashboard.UnhealthyOfferCount,
 		"pending_items": dashboard.PendingItems, "recent_calls": recent,
-	})
+	}
 }
 
 func (a *app) proxyChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -271,7 +275,7 @@ func apiKeyResponse(item gateway.APIKey) map[string]any {
 				"eligible": member.Eligible, "ineligible_reason": member.IneligibleReason,
 				"input_price": member.InputPrice.String(), "output_price": member.OutputPrice.String(),
 				"cache_write_price": member.CacheWritePrice.String(), "cache_read_price": member.CacheReadPrice.String(),
-				"price_tiers": effectivePriceTierResponses(member.Multiplier, member.PriceTiers),
+				"price_tiers":  effectivePriceTierResponses(member.Multiplier, member.PriceTiers),
 				"success_rate": member.CallSuccessRate, "ttft_milliseconds": member.TTFTMilliseconds, "tokens_per_second": member.TokensPerSecond,
 			})
 		}
@@ -312,7 +316,7 @@ func gatewayCallResponse(item gateway.Call) map[string]any {
 		"completion_reason": item.CompletionReason, "usage": gatewayUsageResponse(item.Usage),
 		"provider_charge": item.ProviderCharge.String(), "platform_fee": item.PlatformFee.String(),
 		"settled_price_tier_seq": item.SettledPriceTierSeq,
-		"final_http_status": item.FinalHTTPStatus, "attempts": attempts, "created_at": item.CreatedAt, "completed_at": item.CompletedAt,
+		"final_http_status":      item.FinalHTTPStatus, "attempts": attempts, "created_at": item.CreatedAt, "completed_at": item.CompletedAt,
 	}
 }
 
@@ -347,4 +351,24 @@ func durationMilliseconds(value *time.Duration) any {
 		return nil
 	}
 	return value.Milliseconds()
+}
+
+// registerGatewayRoutes 注册API Key、调用记录与外部协议入口路由。
+func (a *app) registerGatewayRoutes(r *router) {
+	r.ready("GET /api/keys", a.listAPIKeys)
+	r.ready("POST /api/keys", a.createAPIKey)
+	r.ready("GET /api/keys/{keyID}", a.getAPIKey)
+	r.ready("PATCH /api/keys/{keyID}", a.updateAPIKey)
+	r.ready("DELETE /api/keys/{keyID}", a.deleteAPIKey)
+	r.ready("POST /api/keys/{keyID}/rotate", a.rotateAPIKey)
+	r.ready("POST /api/keys/{keyID}/disable", a.disableAPIKey)
+	r.ready("POST /api/keys/{keyID}/enable", a.enableAPIKey)
+	r.ready("POST /api/keys/{keyID}/pool-members", a.addAPIKeyPoolMember)
+	r.ready("GET /api/calls", a.listGatewayCalls)
+	r.ready("GET /api/calls/{callID}", a.getGatewayCall)
+	r.ready("GET /api/dashboard", a.gatewayDashboard)
+	r.gateway("/v1/chat/completions", a.proxyChatCompletions)
+	r.gateway("/v1/responses", a.proxyResponses)
+	r.gateway("/v1/messages", a.proxyAnthropicMessages)
+	r.gateway("/v1beta/models/{model...}", a.proxyGemini)
 }
