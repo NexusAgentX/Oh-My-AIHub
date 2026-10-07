@@ -17,7 +17,7 @@
 2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id（具体要求见 `compose.yaml` 顶部注释与 `ARCHITECTURE.md`）。
 3. `mise install && mise run install`。
 4. `mise run up` 启动安全栈；首次启动会自动执行迁移、凭据可解密自检和一次跨模块巡检（结果进入运营总览的巡检历史）。
-5. `printf '<密码>\n<密码>\n' | script -q /dev/null mise exec -- go -C backend run ./cmd/bootstrap-admin -username <用户名> -display-name <名称>` 创建唯一管理员（需 pty 交互输入两次密码）。
+5. 浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员。
 6. 管理员登录后完成首次改密，再按需创建受邀账户。
 
 ## 发布检查
