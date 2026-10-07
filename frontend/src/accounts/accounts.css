@@ -1,6 +1,5 @@
-.modal-hint { margin: 0; color: var(--muted); font-size: var(--text-sm); line-height: 1.55; }
 .reset-credential { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 12px 14px; border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--soft); }
-.reset-credential strong { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-base); }
+.reset-credential strong { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-base); }
 .reset-confirm-row { display: flex; gap: 10px; }
 .credential-page { display: grid; width: min(680px, 100%); margin: clamp(20px, 8vh, 88px) auto 0; justify-items: center; text-align: center; }
 .credential-success-mark { display: grid; width: 56px; height: 56px; margin-bottom: 20px; place-items: center; border-radius: 50%; color: var(--positive); background: var(--positive-soft); }
@@ -11,7 +10,7 @@
 .credential-card > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--space-5); padding: 18px 20px; border-bottom: 1px solid var(--hairline); }
 .credential-card > div:last-child { border-bottom: 0; }
 .credential-card span { color: var(--muted); font-size: var(--text-base); }
-.credential-card strong { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-base); }
+.credential-card strong { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-base); }
 .credential-copy-status { min-height: 42px; padding-top: 12px; color: var(--muted); font-size: var(--text-sm); }
 .credential-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); }
 

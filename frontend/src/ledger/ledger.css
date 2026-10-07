@@ -1,22 +1,27 @@
-.ledger-health { display: inline-flex; min-height: 32px; align-items: center; padding: 4px 10px; border-radius: var(--radius-xs); font-size: var(--text-sm); font-weight: 600; }
-.ledger-health-ok { color: var(--positive); background: var(--positive-soft); }
-.ledger-health-error { color: var(--danger-ink); background: var(--danger-soft); }
-.ops-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-bottom: 20px; }
-.projection-panel { overflow: hidden; }
-.ops-list { margin: 0; padding: 8px 20px 16px; }
+/* 运营台与账户账本的领域私有布局；通用外观使用 src/ui 组件。 */
+.ops-stack { display: grid; gap: var(--space-4); }
+.ops-stack > .metric-grid { margin-bottom: 0; }
+.ops-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+
+.ops-list { margin: 0; }
 .ops-list > div { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-4); border-bottom: 1px solid var(--hairline); }
 .ops-list > div:last-child { border-bottom: 0; }
 .ops-list dt { color: var(--muted); font-size: var(--text-sm); }
-.ops-list dd { margin: 0; color: var(--ink); font-weight: 600; }
-.system-ledger-panel { margin-top: 20px; }
-.fee-rate-panel { margin-bottom: 20px; }
-.fee-rate-panel .stack-form { padding: 20px; border-bottom: 1px solid var(--hairline); }
-.anomaly-list { list-style: none; margin: 0; padding: 8px 20px 16px; display: grid; gap: 0.4rem; }
-.anomaly-list li { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
-.anomaly-list li span, .anomaly-list li strong { flex: 0 0 auto; }
-.anomaly-hard li strong { color: var(--danger); }
+.ops-list dd { margin: 0; color: var(--ink); font-weight: 600; text-align: right; }
 
-@media (max-width: 760px) {
+.ops-anomalies { margin-bottom: var(--space-4); border-color: var(--danger-border); }
+.ops-anomaly-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.ops-anomaly { display: grid; min-height: 44px; grid-template-columns: auto minmax(0, 1fr) auto 3.5em; align-items: center; gap: var(--space-3); border-bottom: 1px solid var(--hairline); font-size: var(--text-base); }
+.ops-anomaly:last-child { border-bottom: 0; }
+.ops-anomaly-hard strong { color: var(--danger); }
+
+.ops-fee-form { padding: var(--space-5); border-bottom: 1px solid var(--hairline); }
+
+@media (max-width: 960px) {
   .ops-grid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 760px) {
+  .ops-anomaly { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .ops-anomaly > :last-child { grid-column: 2 / -1; }
+}

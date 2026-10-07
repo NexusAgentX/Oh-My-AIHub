@@ -1,28 +1,41 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useBlocker } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
+import { ApiError } from '../api/client'
 import type { CatalogModel } from '../api/contracts'
+import { errorMessage } from '../api/query'
 import {
   Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  FormSection,
+  Icon,
   InlineError,
-  LoadingState,
+  Notice,
+  PageHeader,
+  QueryBoundary,
+  SearchInput,
   StatusBadge,
+  SuccessMessage,
   TextField,
-} from '../ui/FormControls'
-import { Icon } from '../ui/Icon'
+} from '../ui'
 import {
   emptyModelForm,
-  emptyTierForm,
   formToModelInput,
   mergeModelDraft,
   modelFormHasChanges,
   modelStatusUpdate,
   modelToForm,
   validateModelForm,
-  weekdayLabel,
   type ModelForm,
-  type TierForm,
 } from './modelForm'
+import {
+  useAdminModelsQuery,
+  useCreateModel,
+  useFetchLatestModel,
+  useUpdateModel,
+} from './queries'
+import { PriceField, TierEditor } from './TierEditor'
 
 const modalityOptions = [
   { value: 'text', label: '文本' },
@@ -31,45 +44,34 @@ const modalityOptions = [
   { value: 'video', label: '视频' },
 ]
 
+function formatContext(value: number) {
+  if (value >= 1_000_000 && value % 1_000_000 === 0) return `${value / 1_000_000}M`
+  if (value >= 1_000 && value % 1_000 === 0) return `${value / 1_000}K`
+  return value.toLocaleString('zh-CN')
+}
+
 export function AdminModelsPage() {
-  const [models, setModels] = useState<CatalogModel[]>([])
-  const [query, setQuery] = useState('')
-  const [selectedID, setSelectedID] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [draftSearch, setDraftSearch] = useState('')
   const [selectedModel, setSelectedModel] = useState<CatalogModel | null>(null)
   const [form, setForm] = useState<ModelForm>({ ...emptyModelForm })
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
   const [conflictPending, setConflictPending] = useState(false)
+  const list = useAdminModelsQuery(search)
+  const createModel = useCreateModel()
+  const updateModel = useUpdateModel()
+  const fetchLatest = useFetchLatestModel()
+  const saving = createModel.isPending || updateModel.isPending
+  const selectedID = selectedModel?.id ?? null
   const hasUnsavedChanges = modelFormHasChanges(form, selectedModel)
   const navigationBlocker = useBlocker(hasUnsavedChanges)
 
-  const load = async (search = query) => {
-    setLoading(true)
-    setError('')
-    try {
-      const items = await api.models(search, true)
-      setModels(items)
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : '模型目录加载失败')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void load('')
-  }, [])
-
   useEffect(() => {
     if (navigationBlocker.state !== 'blocked') return
-    if (window.confirm('放弃未保存的模型更改？')) {
-      navigationBlocker.proceed()
-    } else {
-      navigationBlocker.reset()
-    }
+    if (window.confirm('放弃未保存的模型更改？')) navigationBlocker.proceed()
+    else navigationBlocker.reset()
   }, [navigationBlocker])
 
   useEffect(() => {
@@ -83,43 +85,30 @@ export function AdminModelsPage() {
   }, [hasUnsavedChanges])
 
   const confirmDiscardDraft = () =>
-    !modelFormHasChanges(form, selectedModel) ||
-    window.confirm('放弃未保存的模型更改？')
+    !hasUnsavedChanges || window.confirm('放弃未保存的模型更改？')
 
-  const selectModel = (model: CatalogModel) => {
-    if (model.id === selectedID || !confirmDiscardDraft()) return
-    setSelectedID(model.id)
+  const reset = (model: CatalogModel | null) => {
     setSelectedModel(model)
-    setForm(modelToForm(model))
+    setForm(model ? modelToForm(model) : { ...emptyModelForm })
     setConflictPending(false)
     setFieldErrors({})
     setError('')
     setMessage('')
+  }
+
+  const selectModel = (model: CatalogModel) => {
+    if (model.id === selectedID || !confirmDiscardDraft()) return
+    reset(model)
   }
 
   const startNew = () => {
     if (!confirmDiscardDraft()) return
-    setSelectedID(null)
-    setSelectedModel(null)
-    setForm({ ...emptyModelForm, inputModalities: ['text'], outputModalities: ['text'] })
-    setConflictPending(false)
-    setFieldErrors({})
-    setError('')
-    setMessage('')
+    reset(null)
   }
 
-  const reloadLatestAfterConflict = async (
-    modelID: string,
-    baseline: CatalogModel,
-    draft: ModelForm,
-  ) => {
-    setLoading(true)
+  const reloadLatestAfterConflict = async (baseline: CatalogModel, draft: ModelForm) => {
     try {
-      const latest = await api.model(modelID, true)
-      setModels((items) =>
-        items.map((item) => (item.id === latest.id ? latest : item)),
-      )
-      setSelectedID(latest.id)
+      const latest = await fetchLatest(baseline.id)
       setSelectedModel(latest)
       setForm(mergeModelDraft(baseline, draft, latest))
       setFieldErrors({})
@@ -128,8 +117,6 @@ export function AdminModelsPage() {
       setConflictPending(true)
     } catch {
       setError('模型版本冲突，且最新版本加载失败，请刷新页面')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -139,171 +126,159 @@ export function AdminModelsPage() {
     const validation = validateModelForm(form)
     setFieldErrors(validation)
     if (Object.keys(validation).length > 0) return
-    setSaving(true)
     setError('')
     setMessage('')
     try {
       const input = formToModelInput(form)
-      const saved = selectedID
-        ? await api.updateModel(selectedID, selectedModel?.version ?? 0, (() => {
-            const { id: _id, ...update } = input
-            return update
-          })())
-        : await api.createModel(input)
-      setModels((items) => {
-        const exists = items.some((item) => item.id === saved.id)
-        return exists
-          ? items.map((item) => (item.id === saved.id ? saved : item))
-          : [...items, saved].sort((left, right) =>
-              left.provider.localeCompare(right.provider, 'zh-CN'),
-            )
-      })
-      setSelectedID(saved.id)
+      let saved: CatalogModel
+      if (selectedModel) {
+        const { id: _id, ...update } = input
+        saved = await updateModel.mutateAsync({
+          modelID: selectedModel.id,
+          expectedVersion: selectedModel.version,
+          update,
+        })
+      } else {
+        saved = await createModel.mutateAsync(input)
+      }
       setSelectedModel(saved)
       setForm(modelToForm(saved))
       setConflictPending(false)
       setMessage('模型已保存')
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'conflict' && selectedID) {
-        if (selectedModel) {
-          await reloadLatestAfterConflict(selectedID, selectedModel, form)
-        }
+      if (caught instanceof ApiError && caught.code === 'conflict' && selectedModel) {
+        await reloadLatestAfterConflict(selectedModel, form)
       } else {
-        setError(caught instanceof ApiError ? caught.message : '模型保存失败')
+        setError(errorMessage(caught, '模型保存失败'))
       }
-    } finally {
-      setSaving(false)
     }
   }
 
   const toggleStatus = async () => {
-    if (!selectedID || !selectedModel) return
+    if (!selectedModel) return
     const nextStatus: ModelForm['status'] =
       selectedModel.status === 'active' ? 'disabled' : 'active'
-    setSaving(true)
     setError('')
     try {
-      const saved = await api.updateModel(
-        selectedID,
-        selectedModel.version,
-        modelStatusUpdate(selectedModel, nextStatus),
-      )
-      setModels((items) =>
-        items.map((item) => (item.id === saved.id ? saved : item)),
-      )
+      const saved = await updateModel.mutateAsync({
+        modelID: selectedModel.id,
+        expectedVersion: selectedModel.version,
+        update: modelStatusUpdate(selectedModel, nextStatus),
+      })
       setSelectedModel(saved)
       setForm((current) => ({ ...current, status: saved.status }))
-      setMessage(saved.status === 'active'
-        ? '模型已启用；未保存的表单修改仍保留'
-        : '模型已停用；未保存的表单修改仍保留')
+      setMessage(
+        saved.status === 'active'
+          ? '模型已启用；未保存的表单修改仍保留'
+          : '模型已停用；未保存的表单修改仍保留',
+      )
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'conflict') {
-        await reloadLatestAfterConflict(selectedID, selectedModel, form)
+        await reloadLatestAfterConflict(selectedModel, form)
       } else {
-        setError(caught instanceof ApiError ? caught.message : '状态更新失败')
+        setError(errorMessage(caught, '状态更新失败'))
       }
-    } finally {
-      setSaving(false)
     }
   }
 
-  const search = (event: FormEvent) => {
-    event.preventDefault()
-    void load(query)
-  }
+  const patch = (value: Partial<ModelForm>) => setForm((current) => ({ ...current, ...value }))
 
   return (
     <>
-      <header className="page-heading">
-        <div><h1>模型目录</h1></div>
-        <Button aria-label="新增模型" icon={<Icon name="plus" />} onClick={startNew}>新增模型</Button>
-      </header>
-      <InlineError>{error}</InlineError>
+      <PageHeader
+        actions={
+          <Button icon={<Icon name="plus" />} onClick={startNew}>
+            新增模型
+          </Button>
+        }
+        title="模型目录"
+      />
       <div className="model-workspace">
-        <section className="panel model-list-panel">
-          <header className="model-list-heading">
-            <div>
-              <h2>公开模型</h2>
-              <span className="count-badge">{models.length} 个</span>
-            </div>
-            <form className="search-form" onSubmit={search}>
-              <Icon name="search" />
-              <input
-                aria-label="搜索模型"
-                onChange={(event) => setQuery(event.target.value)}
+        <Card className="model-list-card" flush>
+          <div className="model-list-search">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                setSearch(draftSearch.trim())
+              }}
+            >
+              <SearchInput
+                label="搜索模型"
+                onChange={(event) => setDraftSearch(event.target.value)}
                 placeholder="搜索模型"
-                value={query}
+                value={draftSearch}
               />
-              <button className="visually-hidden" type="submit">搜索</button>
             </form>
-          </header>
-          {loading ? (
-            <LoadingState />
-          ) : (
-            <>
-            {models.length > 0 && (
-            <div className="model-list" role="list">
-              {models.map((model) => (
-                <div key={model.id} role="listitem">
-                  <button
-                    aria-current={selectedID === model.id ? 'true' : undefined}
-                    className={`model-list-item ${selectedID === model.id ? 'model-list-item-active' : ''}`}
-                    onClick={() => selectModel(model)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{model.name}</strong>
-                      <small>{model.id}</small>
-                    </span>
-                    <span>
-                      <small>{formatContext(model.context_window)}</small>
-                      <StatusBadge status={model.status} />
-                    </span>
-                  </button>
-                </div>
-              ))}
-            </div>
+          </div>
+          <QueryBoundary
+            empty={<EmptyState title="没有匹配的模型" />}
+            errorFallback="模型目录加载失败"
+            isEmpty={(models) => models.length === 0}
+            query={list}
+          >
+            {(models) => (
+              <ul className="model-list">
+                {models.map((model) => (
+                  <li key={model.id}>
+                    <button
+                      aria-current={selectedID === model.id ? 'true' : undefined}
+                      className={`model-list-item ${selectedID === model.id ? 'model-list-item-active' : ''}`}
+                      onClick={() => selectModel(model)}
+                      type="button"
+                    >
+                      <span>
+                        <strong>{model.name}</strong>
+                        <small>{model.id}</small>
+                      </span>
+                      <span>
+                        <small>{formatContext(model.context_window)}</small>
+                        <StatusBadge status={model.status} />
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-            {models.length === 0 && <div className="empty-state">没有匹配的模型</div>}
-            </>
-          )}
-        </section>
+          </QueryBoundary>
+        </Card>
 
-        <section className="panel model-editor-panel">
-          <header className="model-editor-heading">
-            <div>
-              <h2>{selectedModel ? `编辑模型 · ${selectedModel.id}` : '新增模型'}</h2>
-            </div>
-            <StatusBadge status={form.status} />
-          </header>
-          {message && <div aria-live="polite" className="success-message">{message}</div>}
+        <Card
+          actions={<StatusBadge status={form.status} />}
+          className="model-editor-card"
+          title={selectedModel ? `编辑模型 · ${selectedModel.id}` : '新增模型'}
+        >
+          <InlineError>{error}</InlineError>
+          <SuccessMessage>{message}</SuccessMessage>
           {conflictPending && selectedModel && (
-            <div className="conflict-message" role="alert">
-              <span>模型已被其他管理员修改，本地字段已合并到最新版。</span>
-              <div>
-                <Button
-                  onClick={() => {
-                    setConflictPending(false)
-                    setMessage('已基于最新版本保留草稿，请确认后保存')
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  接受合并结果
-                </Button>
-                <Button
-                  onClick={() => {
-                    setForm(modelToForm(selectedModel))
-                    setConflictPending(false)
-                    setMessage('已载入其他管理员保存的最新版本')
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  载入最新版
-                </Button>
-              </div>
-            </div>
+            <Notice
+              action={
+                <span className="model-conflict-actions">
+                  <Button
+                    onClick={() => {
+                      setConflictPending(false)
+                      setMessage('已基于最新版本保留草稿，请确认后保存')
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    接受合并结果
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setForm(modelToForm(selectedModel))
+                      setConflictPending(false)
+                      setMessage('已载入其他管理员保存的最新版本')
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    载入最新版
+                  </Button>
+                </span>
+              }
+            >
+              模型已被其他管理员修改，本地字段已合并到最新版。
+            </Notice>
           )}
           <form className="model-form" onSubmit={submit}>
             <div className="field-row field-row-three">
@@ -311,7 +286,7 @@ export function AdminModelsPage() {
                 disabled={Boolean(selectedID)}
                 error={fieldErrors.id}
                 label="模型 ID"
-                onChange={(event) => setForm({ ...form, id: event.target.value })}
+                onChange={(event) => patch({ id: event.target.value })}
                 placeholder="provider/model-id"
                 required
                 value={form.id}
@@ -319,7 +294,7 @@ export function AdminModelsPage() {
               <TextField
                 error={fieldErrors.name}
                 label="模型名称"
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                onChange={(event) => patch({ name: event.target.value })}
                 placeholder="例如 GPT-5"
                 required
                 value={form.name}
@@ -327,7 +302,7 @@ export function AdminModelsPage() {
               <TextField
                 error={fieldErrors.provider}
                 label="官方提供商"
-                onChange={(event) => setForm({ ...form, provider: event.target.value })}
+                onChange={(event) => patch({ provider: event.target.value })}
                 placeholder="例如 OpenAI"
                 required
                 value={form.provider}
@@ -339,14 +314,14 @@ export function AdminModelsPage() {
                 inputMode="numeric"
                 label="上下文大小（tokens）"
                 min="1"
-                onChange={(event) => setForm({ ...form, contextWindow: event.target.value })}
+                onChange={(event) => patch({ contextWindow: event.target.value })}
                 required
                 type="number"
                 value={form.contextWindow}
               />
               <TextField
                 label="参数信息"
-                onChange={(event) => setForm({ ...form, parameterInfo: event.target.value })}
+                onChange={(event) => patch({ parameterInfo: event.target.value })}
                 placeholder="未知可留空"
                 value={form.parameterInfo}
               />
@@ -355,67 +330,67 @@ export function AdminModelsPage() {
               <ModalityField
                 error={fieldErrors.inputModalities}
                 label="输入模态"
-                onChange={(values) => setForm({ ...form, inputModalities: values })}
+                onChange={(values) => patch({ inputModalities: values })}
                 values={form.inputModalities}
               />
               <ModalityField
                 error={fieldErrors.outputModalities}
                 label="输出模态"
-                onChange={(values) => setForm({ ...form, outputModalities: values })}
+                onChange={(values) => patch({ outputModalities: values })}
                 values={form.outputModalities}
               />
             </div>
-            <fieldset className="checkbox-row">
+            <fieldset className="model-capabilities">
               <legend className="visually-hidden">模型能力</legend>
               <Checkbox
                 checked={form.supportsTools}
                 label="工具调用"
-                onChange={(checked) => setForm({ ...form, supportsTools: checked })}
+                onChange={(event) => patch({ supportsTools: event.target.checked })}
               />
               <Checkbox
                 checked={form.supportsStructuredOutput}
                 label="结构化输出"
-                onChange={(checked) => setForm({ ...form, supportsStructuredOutput: checked })}
+                onChange={(event) => patch({ supportsStructuredOutput: event.target.checked })}
               />
               <Checkbox
                 checked={form.supportsVision}
                 label="视觉理解"
-                onChange={(checked) => setForm({ ...form, supportsVision: checked })}
+                onChange={(event) => patch({ supportsVision: event.target.checked })}
               />
             </fieldset>
-            <fieldset className="price-fieldset">
-              <legend>默认档基准价（无命中时适用）· 积分 / 1M tokens</legend>
-              <div className="price-grid">
-                <PriceField label="输入" error={fieldErrors.inputPrice} value={form.inputPrice} onChange={(value) => setForm({ ...form, inputPrice: value })} />
-                <PriceField label="输出" error={fieldErrors.outputPrice} value={form.outputPrice} onChange={(value) => setForm({ ...form, outputPrice: value })} />
-                <PriceField label="缓存创建" error={fieldErrors.cacheWritePrice} value={form.cacheWritePrice} onChange={(value) => setForm({ ...form, cacheWritePrice: value })} />
-                <PriceField label="缓存读取" error={fieldErrors.cacheReadPrice} value={form.cacheReadPrice} onChange={(value) => setForm({ ...form, cacheReadPrice: value })} />
+            <FormSection title="默认价 · 积分 / 百万 tokens">
+              <div className="field-row model-price-row">
+                <PriceField error={fieldErrors.inputPrice} label="输入" onChange={(value) => patch({ inputPrice: value })} value={form.inputPrice} />
+                <PriceField error={fieldErrors.outputPrice} label="输出" onChange={(value) => patch({ outputPrice: value })} value={form.outputPrice} />
+                <PriceField error={fieldErrors.cacheWritePrice} label="缓存写" onChange={(value) => patch({ cacheWritePrice: value })} value={form.cacheWritePrice} />
+                <PriceField error={fieldErrors.cacheReadPrice} label="缓存读" onChange={(value) => patch({ cacheReadPrice: value })} value={form.cacheReadPrice} />
               </div>
-            </fieldset>
+            </FormSection>
             <TierEditor
-              errors={fieldErrors}
+              error={fieldErrors.tiers}
               form={form}
-              onChange={(tiers) => setForm({ ...form, tiers })}
+              onChange={(tiers) => patch({ tiers })}
             />
             <footer className="form-actions">
               {selectedID && (
-                <Button disabled={saving || conflictPending} onClick={() => void toggleStatus()} type="button" variant="secondary">
+                <Button
+                  disabled={saving || conflictPending}
+                  onClick={() => void toggleStatus()}
+                  type="button"
+                  variant="secondary"
+                >
                   {form.status === 'active' ? '停用模型' : '启用模型'}
                 </Button>
               )}
-              <Button disabled={saving || conflictPending} type="submit">{saving ? '正在保存' : '保存更改'}</Button>
+              <Button disabled={conflictPending} loading={saving} type="submit">
+                保存更改
+              </Button>
             </footer>
           </form>
-        </section>
+        </Card>
       </div>
     </>
   )
-}
-
-function formatContext(value: number) {
-  if (value >= 1_000_000 && value % 1_000_000 === 0) return `${value / 1_000_000}M`
-  if (value >= 1_000 && value % 1_000 === 0) return `${value / 1_000}K`
-  return value.toLocaleString('zh-CN')
 }
 
 function ModalityField({
@@ -448,159 +423,6 @@ function ModalityField({
         ))}
       </div>
       {error && <span className="field-message field-error">{error}</span>}
-    </fieldset>
-  )
-}
-
-function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label className="checkbox-control">
-      <input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
-      <span>{label}</span>
-    </label>
-  )
-}
-
-function PriceField({ label, value, error, onChange }: { label: string; value: string; error?: string; onChange: (value: string) => void }) {
-  return (
-    <TextField
-      error={error}
-      inputMode="decimal"
-      label={label}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder="0"
-      required
-      value={value}
-    />
-  )
-}
-
-function TierEditor({
-  form,
-  errors,
-  onChange,
-}: {
-  form: ModelForm
-  errors: Record<string, string>
-  onChange: (tiers: TierForm[]) => void
-}) {
-  const tiers = form.tiers
-  const update = (index: number, patch: Partial<TierForm>) => {
-    onChange(tiers.map((tier, position) => (position === index ? { ...tier, ...patch } : tier)))
-  }
-  const toggleWeekday = (index: number, weekday: number, checked: boolean) => {
-    const current = tiers[index].weekdays
-    const next = checked
-      ? [...current, weekday].sort((left, right) => left - right)
-      : current.filter((item) => item !== weekday)
-    update(index, { weekdays: next })
-  }
-  return (
-    <fieldset className="price-fieldset tier-fieldset">
-      <legend>条件档位 · 按序首个命中，整单按该档计价</legend>
-      {errors.tiers && <span className="field-message field-error">{errors.tiers}</span>}
-      {tiers.map((tier, index) => (
-        <div className="tier-card" key={index}>
-          <div className="tier-card-head">
-            <TextField
-              label={`档位 ${index + 1} 名称`}
-              onChange={(event) => update(index, { name: event.target.value })}
-              placeholder="例如 工作日高峰"
-              value={tier.name}
-            />
-            <Button
-              onClick={() => onChange(tiers.filter((_, position) => position !== index))}
-              type="button"
-              variant="secondary"
-            >
-              删除
-            </Button>
-          </div>
-          <div className="tier-predicate-row">
-            <TextField
-              error={errors[`tiers.${index}.minPromptTokens`]}
-              inputMode="numeric"
-              label="输入 Token ≥"
-              onChange={(event) => update(index, { minPromptTokens: event.target.value })}
-              placeholder="留空不限"
-              value={tier.minPromptTokens}
-            />
-            <TextField
-              error={errors[`tiers.${index}.maxPromptTokens`]}
-              inputMode="numeric"
-              label="输入 Token <"
-              onChange={(event) => update(index, { maxPromptTokens: event.target.value })}
-              placeholder="留空不限"
-              value={tier.maxPromptTokens}
-            />
-            <TextField
-              error={errors[`tiers.${index}.timezone`]}
-              label="时区"
-              onChange={(event) => update(index, { timezone: event.target.value })}
-              placeholder="Asia/Shanghai"
-              value={tier.timezone}
-            />
-          </div>
-          <div className="tier-window-row">
-            <label className="checkbox-control">
-              <input
-                checked={tier.useWindow}
-                onChange={(event) => update(index, { useWindow: event.target.checked })}
-                type="checkbox"
-              />
-              <span>时间窗</span>
-            </label>
-            <TextField
-              disabled={!tier.useWindow}
-              error={errors[`tiers.${index}.startTime`]}
-              label="开始 (HH:MM)"
-              onChange={(event) => update(index, { startTime: event.target.value })}
-              placeholder="09:00"
-              value={tier.startTime}
-            />
-            <TextField
-              disabled={!tier.useWindow}
-              error={errors[`tiers.${index}.endTime`]}
-              label="结束 (HH:MM)"
-              onChange={(event) => update(index, { endTime: event.target.value })}
-              placeholder="12:00"
-              value={tier.endTime}
-            />
-            <fieldset className="choice-field">
-              <legend>星期</legend>
-              <div className="choice-pills">
-                {[1, 2, 3, 4, 5, 6, 7].map((weekday) => (
-                  <label key={weekday}>
-                    <input
-                      checked={tier.weekdays.includes(weekday)}
-                      onChange={(event) => toggleWeekday(index, weekday, event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>{weekdayLabel(weekday)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </div>
-          <div className="price-grid">
-            <PriceField label="输入价" error={errors[`tiers.${index}.inputPrice`]} value={tier.inputPrice} onChange={(value) => update(index, { inputPrice: value })} />
-            <PriceField label="输出价" error={errors[`tiers.${index}.outputPrice`]} value={tier.outputPrice} onChange={(value) => update(index, { outputPrice: value })} />
-            <PriceField label="缓存创建价" error={errors[`tiers.${index}.cacheWritePrice`]} value={tier.cacheWritePrice} onChange={(value) => update(index, { cacheWritePrice: value })} />
-            <PriceField label="缓存读取价" error={errors[`tiers.${index}.cacheReadPrice`]} value={tier.cacheReadPrice} onChange={(value) => update(index, { cacheReadPrice: value })} />
-          </div>
-        </div>
-      ))}
-      <div className="form-actions">
-        <Button
-          disabled={tiers.length >= 16}
-          icon={<Icon name="plus" />}
-          onClick={() => onChange([...tiers, { ...emptyTierForm }])}
-          type="button"
-          variant="secondary"
-        >
-          添加档位
-        </Button>
-      </div>
     </fieldset>
   )
 }

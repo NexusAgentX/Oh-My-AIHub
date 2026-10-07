@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Button } from '../ui/FormControls'
-import { Icon } from '../ui/Icon'
+import { Button, Icon } from '../ui'
 import { useEphemeralCredential } from './EphemeralCredentialProvider'
 
 export function CreatedCredentialPage() {

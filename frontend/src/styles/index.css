@@ -23,7 +23,9 @@
 @import '../channels/channels.css';
 @import '../channels/sharing.css';
 @import '../channels/market.css';
+@import '../channels/admin-channels.css';
 @import '../gateway/gateway.css';
 @import '../c2c/c2c.css';
+@import '../c2c/admin-c2c.css';
 @import '../welcome/welcome.css';
 @import '../auth/auth.css';

@@ -33,7 +33,6 @@ import { MarketChannelPage } from './channels/MarketChannelPage'
 import { MarketPage } from './channels/MarketPage'
 import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
 import { AdminLedgerPage } from './ledger/AdminLedgerPage'
-import { AdminProvidersPage } from './ledger/AdminProvidersPage'
 import { WalletPage } from './wallet/WalletPage'
 import { APIKeyPage } from './gateway/APIKeyPage'
 import { APIKeysPage } from './gateway/APIKeysPage'
@@ -158,7 +157,10 @@ export const appRoutes = createRoutesFromElements(
             <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
             <Route element={<AdminC2CDisputesPage />} path="/admin/c2c/disputes" />
             <Route element={<AdminC2CDisputePage />} path="/admin/c2c/disputes/:tradeID" />
-            <Route element={<AdminProvidersPage />} path="/admin/providers" />
+            <Route
+              element={<Navigate replace to="/admin/ops?tab=providers" />}
+              path="/admin/providers"
+            />
             <Route
               element={<AdminAccountLedgerPage />}
               path="/admin/ledger/accounts/:accountID"

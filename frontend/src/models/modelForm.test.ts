@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogModel } from '../api/contracts'
 import {
+  moveTier,
+  setTierCondition,
+  tierConditionSummary,
+  timeToMinutes,
+  toggleWeekday,
+  validateTierForm,
   emptyModelForm,
   emptyTierForm,
   formToModelInput,
+  formToTierInput,
+  tierToForm,
   modelFormHasChanges,
   mergeModelDraft,
   modelStatusUpdate,
@@ -246,8 +254,8 @@ describe('model form mapping', () => {
       tiers: [
         { ...emptyTierForm, inputPrice: '3' },
         { ...emptyTierForm, minPromptTokens: '500', maxPromptTokens: '200' },
-        { ...emptyTierForm, useWindow: true, startTime: '9am', endTime: '12:00' },
-        { ...emptyTierForm, weekdays: [1], timezone: 'Not/AZone' },
+        { ...emptyTierForm, useTokens: false, useTime: true, useWindow: true, startTime: '9am', endTime: '12:00' },
+        { ...emptyTierForm, useTokens: false, useTime: true, weekdays: [1], timezone: 'Not/AZone' },
       ],
     })
     expect(errors['tiers.0.minPromptTokens']).toBeTruthy()
@@ -264,10 +272,110 @@ describe('model form mapping', () => {
       provider: 'DeepSeek',
       contextWindow: '131072',
       tiers: [
-        { ...emptyTierForm, useWindow: true, startTime: '22:00', endTime: '06:00', weekdays: [5] },
-        { ...emptyTierForm, weekdays: [6, 7] },
+        { ...emptyTierForm, useTokens: false, useTime: true, useWindow: true, startTime: '22:00', endTime: '06:00', weekdays: [5] },
+        { ...emptyTierForm, useTokens: false, useTime: true, weekdays: [6, 7] },
       ],
     })
     expect(errors).toEqual({})
+  })
+})
+
+describe('conditional tier editing', () => {
+  const peak = {
+    ...emptyTierForm,
+    name: '工作日高峰',
+    useTokens: false,
+    useTime: true,
+    timezone: 'Asia/Shanghai',
+    weekdays: [1, 2, 3, 4, 5],
+    useWindow: true,
+    startTime: '09:00',
+    endTime: '18:00',
+    inputPrice: '2',
+  }
+
+  it('only submits conditions that are switched on', () => {
+    const withLeftovers = { ...peak, minPromptTokens: '1000', maxPromptTokens: '2000' }
+    expect(formToTierInput(withLeftovers)).toMatchObject({
+      min_prompt_tokens: null,
+      max_prompt_tokens: null,
+      weekdays: [1, 2, 3, 4, 5],
+      start_minute_of_day: 540,
+      end_minute_of_day: 1080,
+    })
+    const tokensOnly = { ...peak, useTokens: true, useTime: false, minPromptTokens: '200000' }
+    expect(formToTierInput(tokensOnly)).toMatchObject({
+      min_prompt_tokens: 200000,
+      max_prompt_tokens: null,
+      weekdays: null,
+      start_minute_of_day: null,
+      end_minute_of_day: null,
+    })
+  })
+
+  it('clears fields when a condition is switched off', () => {
+    const cleared = setTierCondition({ ...peak, useTokens: true, minPromptTokens: '10' }, 'tokens', false)
+    expect(cleared).toMatchObject({ useTokens: false, minPromptTokens: '', maxPromptTokens: '' })
+    const noTime = setTierCondition(peak, 'time', false)
+    expect(noTime).toMatchObject({ useTime: false, weekdays: [], useWindow: false, startTime: '', endTime: '' })
+    expect(setTierCondition(noTime, 'time', true).useTime).toBe(true)
+  })
+
+  it('derives the switches from persisted tiers', () => {
+    const form = tierToForm({
+      name: '',
+      timezone: 'UTC',
+      min_prompt_tokens: 131072,
+      max_prompt_tokens: null,
+      weekdays: null,
+      start_minute_of_day: null,
+      end_minute_of_day: null,
+      input_price: '2',
+      output_price: '6',
+      cache_write_price: '2',
+      cache_read_price: '0.1',
+      price_unit: 'points_per_million_tokens',
+    })
+    expect(form).toMatchObject({ useTokens: true, useTime: false })
+    expect(tierConditionSummary(form)).toBe('输入 ≥ 131,072')
+  })
+
+  it('summarizes the active conditions with the timezone', () => {
+    expect(tierConditionSummary(peak)).toBe('工作日 09:00–18:00（Asia/Shanghai）')
+    expect(tierConditionSummary({ ...peak, useTime: false })).toBe('未设置条件')
+    expect(
+      tierConditionSummary({ ...emptyTierForm, minPromptTokens: '32000', maxPromptTokens: '200000' }),
+    ).toBe('输入 32K–200K')
+  })
+
+  it('validates a single tier and requires at least one active condition', () => {
+    expect(validateTierForm(peak)).toEqual({})
+    expect(validateTierForm({ ...peak, useTime: false })['tier.conditions']).toBeTruthy()
+    expect(validateTierForm({ ...peak, useWindow: false, weekdays: [] })['tier.weekdays']).toBeTruthy()
+    expect(validateTierForm({ ...emptyTierForm })['tier.minPromptTokens']).toBeTruthy()
+    expect(validateTierForm({ ...peak, inputPrice: '-1' })['tier.inputPrice']).toBeTruthy()
+  })
+
+  it('accepts a window ending at midnight and keeps it round-tripping', () => {
+    expect(timeToMinutes('24:00')).toBe(1440)
+    const evening = { ...peak, startTime: '18:00', endTime: '24:00' }
+    expect(validateTierForm(evening)).toEqual({})
+    expect(formToTierInput(evening).end_minute_of_day).toBe(1440)
+    expect(validateTierForm({ ...peak, startTime: '24:00' })['tier.startTime']).toBeTruthy()
+  })
+
+  it('reorders tiers without mutating the input and ignores out-of-range moves', () => {
+    const tiers = ['a', 'b', 'c']
+    expect(moveTier(tiers, 1, -1)).toEqual(['b', 'a', 'c'])
+    expect(moveTier(tiers, 1, 1)).toEqual(['a', 'c', 'b'])
+    expect(moveTier(tiers, 0, -1)).toBe(tiers)
+    expect(moveTier(tiers, 2, 1)).toBe(tiers)
+    expect(tiers).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps weekdays unique and sorted', () => {
+    const added = toggleWeekday(toggleWeekday({ ...emptyTierForm, weekdays: [5] }, 2, true), 5, true)
+    expect(added.weekdays).toEqual([2, 5])
+    expect(toggleWeekday(added, 2, false).weekdays).toEqual([5])
   })
 })
