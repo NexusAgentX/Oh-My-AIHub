@@ -419,7 +419,7 @@ func ownerOfferResponse(item channel.Offer) map[string]any {
 		"status": item.Status, "validation_version": item.ValidationVersion, "version": item.Version,
 		"eligible": eligible, "ineligible_reason": ineligibleReason,
 		"input_price": input, "output_price": output, "cache_write_price": cacheWrite, "cache_read_price": cacheRead,
-		"price_tiers": effectivePriceTierResponses(item.Multiplier, item.PriceTiers),
+		"price_tiers":       effectivePriceTierResponses(item.Multiplier, item.PriceTiers),
 		"call_success_rate": item.CallSuccessRate, "ttft_milliseconds": item.TTFTMilliseconds,
 		"tokens_per_second": item.TokensPerSecond, "call_count": item.CallCount, "provider_income": providerIncome,
 		"latest_validation": validationResponsePointer(item.LatestValidation, false), "created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
@@ -433,7 +433,7 @@ func marketOfferResponse(item channel.MarketOffer) map[string]any {
 		"model_id": item.ModelID, "model_name": item.ModelName, "model_provider": item.ModelProvider,
 		"protocol": item.Protocol, "multiplier": item.Multiplier.String(), "input_price": item.InputPrice.String(),
 		"output_price": item.OutputPrice.String(), "cache_write_price": item.CacheWritePrice.String(), "cache_read_price": item.CacheReadPrice.String(),
-		"price_tiers": effectivePriceTierResponses(item.Multiplier, item.PriceTiers),
+		"price_tiers":       effectivePriceTierResponses(item.Multiplier, item.PriceTiers),
 		"validation_status": item.ValidationStatus, "average_rating": item.AverageRating, "rating_count": item.RatingCount,
 		"last_tested_at":    item.LastTestedAt,
 		"call_success_rate": item.CallSuccessRate, "ttft_milliseconds": item.TTFTMilliseconds,
@@ -455,7 +455,7 @@ func marketChannelResponse(item channel.Channel) map[string]any {
 			Protocol: offer.Protocol, Multiplier: offer.Multiplier, InputPrice: prices.Input, OutputPrice: prices.Output,
 			CacheWritePrice: prices.CacheWrite, CacheReadPrice: prices.CacheRead, ValidationStatus: channel.ValidationPassed,
 			PriceTiers:    offer.PriceTiers,
-			LastTestedAt: offer.LatestValidation.CompletedAt,
+			LastTestedAt:  offer.LatestValidation.CompletedAt,
 			AverageRating: item.AverageRating, RatingCount: item.RatingCount,
 			CallSuccessRate: offer.CallSuccessRate, TTFTMilliseconds: offer.TTFTMilliseconds,
 			TokensPerSecond: offer.TokensPerSecond, CallCount: offer.CallCount,
@@ -513,4 +513,33 @@ func nullableHTTPStatus(value int) any {
 		return nil
 	}
 	return value
+}
+
+// registerChannelRoutes 注册渠道、报价与市场路由。
+func (a *app) registerChannelRoutes(r *router) {
+	r.ready("GET /api/channels", a.listChannels)
+	r.ready("POST /api/channels", a.createChannel)
+	r.ready("GET /api/channels/{channelID}", a.getChannel)
+	r.ready("PATCH /api/channels/{channelID}", a.updateChannel)
+	r.ready("POST /api/channels/{channelID}/publish", a.publishChannel)
+	r.ready("POST /api/channels/{channelID}/pause", a.pauseChannel)
+	r.ready("DELETE /api/channels/{channelID}", a.deleteChannel)
+	r.ready("POST /api/channels/{channelID}/credential-revoke", a.revokeChannelCredential)
+	r.ready("POST /api/channels/{channelID}/offers", a.addChannelOffer)
+	r.ready("PATCH /api/channel-offers/{offerID}", a.updateChannelOffer)
+	r.ready("POST /api/channel-offers/{offerID}/disable", a.disableChannelOffer)
+	r.ready("POST /api/channel-offers/{offerID}/resume", a.resumeChannelOffer)
+	r.ready("DELETE /api/channel-offers/{offerID}", a.deleteChannelOffer)
+	r.ready("POST /api/channel-offers/{offerID}/validation-attempts", a.validateChannelOffer)
+	r.ready("GET /api/channel-offers/{offerID}/validation-attempts", a.listOfferValidationAttempts)
+	r.ready("GET /api/market/offers", a.listMarketOffers)
+	r.ready("GET /api/market/channels/{channelID}", a.getMarketChannel)
+	r.ready("PUT /api/market/channels/{channelID}/rating", a.rateMarketChannel)
+	r.admin("GET /api/admin/channels", a.listAdminChannels)
+	r.admin("GET /api/admin/channels/{channelID}", a.getAdminChannel)
+	r.admin("POST /api/admin/channels/{channelID}/pause", a.adminPauseChannel)
+	r.admin("DELETE /api/admin/channels/{channelID}", a.adminDeleteChannel)
+	r.admin("POST /api/admin/channel-offers/{offerID}/validation-attempts", a.validateChannelOffer)
+	r.admin("GET /api/admin/channel-offers/{offerID}/validation-attempts", a.listOfferValidationAttempts)
+	r.admin("POST /api/admin/channel-credentials/reencrypt", a.reencryptChannelCredentials)
 }

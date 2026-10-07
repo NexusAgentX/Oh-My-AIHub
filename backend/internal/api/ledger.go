@@ -318,3 +318,16 @@ func transactionResponse(transaction ledger.Transaction) map[string]any {
 		"created_at":                 transaction.CreatedAt,
 	}
 }
+
+// registerLedgerRoutes 注册钱包与账本路由。
+func (a *app) registerLedgerRoutes(r *router) {
+	r.ready("GET /api/wallet", a.wallet)
+	r.ready("GET /api/wallet/entries", a.walletEntries)
+	r.admin("GET /api/admin/ledger/metrics", a.ledgerMetrics)
+	r.admin("GET /api/admin/ledger/accounts/{accountID}/wallet", a.adminLedgerAccountWallet)
+	r.admin("GET /api/admin/ledger/accounts/{accountID}/entries", a.adminLedgerAccountEntries)
+	r.admin("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", a.adminLedgerSystemWallet)
+	r.admin("GET /api/admin/ledger/system-accounts/{systemKind}/entries", a.adminLedgerSystemEntries)
+	r.admin("POST /api/admin/ledger/adjustments", a.adminLedgerAdjustment)
+	r.admin("POST /api/admin/ledger/bad-debts", a.adminBadDebtTransfer)
+}
