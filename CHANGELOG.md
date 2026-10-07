@@ -14,6 +14,7 @@
 
 ### 变更
 
+- 前端改版“使用 API”（Feature #126，Epic #109）：工作台新增快速开始（选择模型与原生协议、从市场勾选一个或多个渠道，创建 Key 与路由后展示带真实 Base URL 与 Key 的 curl / Python / Node.js 调用示例，完整 Key 仍只显示一次）和待处理事项（由现有接口在前端组合：待放行/待付款 C2C 交易、校验失败或暂停的渠道、单渠道路由、需更新的路由渠道、已使用未评分渠道）；API Key 创建与设置、加入路由改为抽屉，界面用语“模型协议池”改称“路由”、优先级改称“备用顺序”并保留版本冲突提示；`/keys/new`、`/keys/:keyID/settings`、`/market/channels/:channelID/add` 改为重定向到对应抽屉；API 市场筛选以 URL 参数保存并支持清除筛选，公开渠道详情保留 1～5 分评分；调用记录与详情迁移到 TanStack Query 与基础组件。无后端与接口变化。
 - 删除交互式命令 `cmd/bootstrap-admin`（Feature #125，Epic #109）：实例初始化只保留网页 `/initialize`（`POST /api/instance/initialize`，行为不变）；同时移除 `mise run bootstrap-admin` 任务、后端镜像中的 `bootstrap-admin` 二进制与 `golang.org/x/term` 依赖。部署手册首次部署步骤改为访问 `/initialize`。
 - 前端基础改版（Feature #114，ADR-0019）：新增设计 token（`styles/tokens.css`）与按组件拆分的样式，基础组件库 `src/ui/`（Button、Card、Metric、Badge、DataTable、Toolbar、EmptyState、Dialog、Drawer、Tabs/Segmented、表单控件与独立图标集）；外壳改为用户与管理员两个 react-router layout route，页面不再各自包裹 `AppShell`；用户导航分为“使用 API / 共享渠道 / 积分”三组，顶栏常驻可用积分与钱包入口，760px 以下改为底部 Tab 栏与“更多”抽屉；引入 TanStack Query，工作台与钱包迁移为样板并以 `useWallet()` 取代 `WalletProvider`。路由、权限跳转与后端接口不变；删除未使用的 `UpcomingC2CPage`。
 - 账本持久化迁移到 sqlc（Feature #122，Epic #109，ADR-0020）：`internal/postgres/ledger.go` 由 `internal/postgres/ledgerpg` 取代，查询集中在 `queries.sql`，金额列登记为 `money.Amount`；`ledgerpg.Store` 供服务层使用，`ledgerpg.NewTx(db)` 返回绑定到调用方 `pgx.Tx` 的账本 Store，C2C 与网关仍在同一事务内原子提交账本与业务记录。API、行为与数据库结构不变。
