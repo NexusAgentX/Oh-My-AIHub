@@ -10,6 +10,8 @@ import {
 import { creditUsagePercent, formatPointAmount, remainingCredit } from '../wallet/presentation'
 import { useWallet } from '../wallet/queries'
 import { CallTable } from './CallTable'
+import { PendingItems } from './PendingItems'
+import { QuickStart } from './QuickStart'
 import { formatPoints } from './presentation'
 import { useGatewayDashboardQuery } from './queries'
 
@@ -20,15 +22,13 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader
-        actions={
-          <>
-            <ButtonLink to="/market">浏览 API 市场</ButtonLink>
-            <ButtonLink to="/keys/new" variant="primary">创建 API Key</ButtonLink>
-          </>
-        }
-        description="消费、共享和交易的今日状态"
+        actions={<ButtonLink to="/market">浏览 API 市场</ButtonLink>}
         title="工作台"
       />
+      <div className="dashboard-main">
+        <QuickStart />
+        <PendingItems />
+      </div>
       <QueryBoundary errorFallback="工作台加载失败" query={query}>
         {(dashboard) => (
           <>
@@ -56,29 +56,9 @@ export function DashboardPage() {
                 value={formatPoints(dashboard.today_external_provider_income)}
               />
             </MetricGrid>
-            <section className="dashboard-grid">
-              <Card
-                actions={<Link to="/market">打开市场</Link>}
-                className="dashboard-health-panel"
-                flush
-                title="渠道健康"
-              >
-                <div className="health-stat-grid">
-                  <div><span>可用</span><strong>{dashboard.healthy_offer_count}</strong></div>
-                  <div><span>需处理</span><strong>{dashboard.unhealthy_offer_count}</strong></div>
-                  <div><span>待处理事项</span><strong>{dashboard.pending_items}</strong></div>
-                </div>
-              </Card>
-              <Card className="dashboard-actions-panel" flush title="API Key 与模型协议池">
-                <div className="health-stat-grid health-stat-grid-compact">
-                  <div><span>活跃 API Keys</span><strong>{dashboard.active_key_count}</strong></div>
-                  <div><span>模型协议池</span><strong>{dashboard.pool_count}</strong></div>
-                </div>
-              </Card>
-            </section>
             <Card
               actions={<Link to="/calls">全部记录</Link>}
-              className="dashboard-recent-panel"
+              className="dashboard-recent"
               flush
               title="最近调用"
             >

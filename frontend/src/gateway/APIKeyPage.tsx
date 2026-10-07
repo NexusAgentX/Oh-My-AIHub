@@ -1,286 +1,321 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
-import type { APIKey } from '../api/contracts'
-import { formatDate, PricePair, protocolLabels, TierCountBadge, TierPriceList } from '../channels/presentation'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import type { APIKey, APIKeyPool, APIKeyPoolMember } from '../api/contracts'
+import { ApiError } from '../api/client'
+import { errorMessage } from '../api/query'
 import {
+  Badge,
   Button,
+  Card,
+  CountBadge,
+  DataTable,
+  Dialog,
+  Drawer,
+  EmptyState,
+  Icon,
   InlineError,
-  LoadingState,
-} from '../ui/FormControls'
-import { Icon } from '../ui/Icon'
-import { ConfirmDialog } from '../channels/presentation'
-import { formatRate, GatewayStatusBadge } from './presentation'
+  Notice,
+  PageHeader,
+  QueryBoundary,
+  type Column,
+} from '../ui'
+import { CallExamples, SecretValue } from './CallExamples'
+import { KeyEditorDrawer } from './KeyEditorDrawer'
+import {
+  GatewayStatusBadge,
+  PricePair,
+  formatDate,
+  formatRate,
+  protocolLabels,
+} from './presentation'
+import { gatewayKeys, useAPIKeyQuery, useKeyActionMutation, type KeyAction } from './queries'
 
-type SecretLocationState = { secret?: string } | null
-type PendingAction = 'rotate' | 'disable' | 'enable' | 'delete' | ''
+type SecretState = { secret?: string } | null
+
+const actionCopy: Record<
+  KeyAction,
+  { title: string; confirm: string; description?: string; danger?: boolean }
+> = {
+  rotate: {
+    title: '轮换 API Key',
+    confirm: '轮换并停用旧 Key',
+    description: '旧 Key 会立即失效，新 Key 只显示一次。',
+  },
+  disable: { title: '停用 API Key', confirm: '确认停用' },
+  enable: { title: '启用 API Key', confirm: '确认启用' },
+  delete: {
+    title: '删除 API Key',
+    confirm: '确认删除',
+    description: '删除后不可恢复，历史调用与账单仍会保留。',
+    danger: true,
+  },
+}
+
+const memberColumns: Column<APIKeyPoolMember>[] = [
+  {
+    key: 'channel',
+    header: '备用顺序 / 渠道',
+    primary: true,
+    cell: (member) => (
+      <>
+        <strong>
+          #{member.priority} {member.channel_name}
+        </strong>
+        <small>{member.provider_name}</small>
+      </>
+    ),
+  },
+  {
+    key: 'eligible',
+    header: '资格',
+    cell: (member) => (
+      <Badge tone={member.eligible ? 'success' : 'warning'}>
+        {member.eligible ? '可用' : '需更新'}
+      </Badge>
+    ),
+  },
+  {
+    key: 'price',
+    header: '输入 / 输出',
+    cell: (member) => (
+      <PricePair first={member.input_price} second={member.output_price} tiers={member.price_tiers} />
+    ),
+  },
+  {
+    key: 'cache',
+    header: '缓存写 / 读',
+    hideOnMobile: true,
+    cell: (member) => <PricePair first={member.cache_write_price} second={member.cache_read_price} />,
+  },
+  { key: 'rate', header: '成功率', numeric: true, cell: (member) => formatRate(member.success_rate) },
+  {
+    key: 'speed',
+    header: 'TTFT / TPS',
+    numeric: true,
+    hideOnMobile: true,
+    cell: (member) => `${member.ttft_milliseconds ?? '—'} ms / ${member.tokens_per_second ?? '—'}`,
+  },
+]
 
 export function APIKeyPage() {
   const { keyID = '' } = useParams()
+  const query = useAPIKeyQuery(keyID)
+  return (
+    <QueryBoundary errorFallback="API Key 加载失败" query={query}>
+      {(key) => <KeyDetail key={key.id} keyData={key} refetch={() => void query.refetch()} />}
+    </QueryBoundary>
+  )
+}
+
+function KeyDetail({ keyData: key, refetch }: { keyData: APIKey; refetch: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [key, setKey] = useState<APIKey | null>(null)
-  const [secret, setSecret] = useState(
-    (location.state as SecretLocationState)?.secret ?? '',
-  )
-  const [copied, setCopied] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [pending, setPending] = useState<PendingAction>('')
+  const client = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const action = useKeyActionMutation()
+  const [secret, setSecret] = useState((location.state as SecretState)?.secret ?? '')
+  const [pending, setPending] = useState<KeyAction | null>(null)
+  const [exampleRoute, setExampleRoute] = useState<APIKeyPool | null>(null)
   const [error, setError] = useState('')
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      setKey(await api.apiKey(keyID))
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'API Key 加载失败')
-    } finally {
-      setLoading(false)
-    }
-  }, [keyID])
+  const editing = searchParams.get('settings') === '1'
+  const editable = key.status !== 'deleted'
 
   useEffect(() => {
-    void load()
-  }, [load])
-
-  useEffect(() => {
-    if ((location.state as SecretLocationState)?.secret) {
-      navigate(location.pathname, { replace: true, state: null })
+    // 完整 Key 只保留在组件内存中，立即从历史状态里清除
+    if ((location.state as SecretState)?.secret) {
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
     }
-  }, [location.pathname, location.state, navigate])
+  }, [location.pathname, location.search, location.state, navigate])
 
-  const dismissSecret = () => {
-    setSecret('')
-    setCopied(false)
-    navigate(location.pathname, { replace: true, state: null })
+  const setEditing = (open: boolean) => {
+    const next = new URLSearchParams(searchParams)
+    if (open) next.set('settings', '1')
+    else next.delete('settings')
+    setSearchParams(next, { replace: true })
   }
 
-  const runAction = async () => {
-    if (!key || !pending) return
-    setBusy(true)
+  const confirm = async () => {
+    if (!pending) return
     setError('')
     try {
-      if (pending === 'rotate') {
-        const rotated = await api.rotateAPIKey(key.id, key.version)
-        setKey(rotated.key)
-        setSecret(rotated.secret)
-        setCopied(false)
-      } else if (pending === 'delete') {
-        await api.deleteAPIKey(key.id, key.version)
+      const result = await action.mutateAsync({ keyID: key.id, version: key.version, action: pending })
+      if (pending === 'delete') {
         setSecret('')
-        setPending('')
+        client.removeQueries({ queryKey: gatewayKeys.key(key.id) })
         navigate('/keys', { replace: true })
         return
-      } else {
-        setKey(await api.setAPIKeyStatus(key.id, pending, key.version))
       }
-      setPending('')
+      if (pending === 'rotate') setSecret(result.secret)
+      setPending(null)
     } catch (caught) {
       setError(
         caught instanceof ApiError && caught.code === 'conflict'
-          ? 'Key 状态已变化，请重新加载后重试'
-          : caught instanceof ApiError
-            ? caught.message
-            : '操作失败',
+          ? 'Key 状态已变化，已重新加载，请重试'
+          : errorMessage(caught, '操作失败'),
       )
-    } finally {
-      setBusy(false)
+      if (caught instanceof ApiError && caught.code === 'conflict') refetch()
+      setPending(null)
     }
   }
 
-  if (loading) return <><LoadingState /></>
-  if (!key) {
-    return <><InlineError>{error || 'API Key 不存在'}</InlineError></>
-  }
+  const copy = pending ? actionCopy[pending] : null
 
   return (
     <>
-      <Link className="back-link" to="/keys">← API Key</Link>
-      <header className="page-heading channel-detail-heading">
-        <div>
-          <h1>{key.display_name}</h1>
-          <GatewayStatusBadge status={key.status} />
-        </div>
-        {key.status !== 'deleted' && (
-          <Link className="button button-primary" to={`/keys/${key.id}/settings`}>
-            <Icon name="settings" /> 编辑配置
+      <PageHeader
+        actions={
+          editable && (
+            <>
+              <Button icon={<Icon name="settings" />} onClick={() => setEditing(true)} variant="secondary">
+                设置
+              </Button>
+              <Button onClick={() => setPending('rotate')} variant="secondary">
+                轮换
+              </Button>
+              {key.status === 'active' && (
+                <Button onClick={() => setPending('disable')} variant="secondary">
+                  停用
+                </Button>
+              )}
+              {key.status === 'disabled' && (
+                <Button onClick={() => setPending('enable')} variant="secondary">
+                  启用
+                </Button>
+              )}
+              <Button onClick={() => setPending('delete')} variant="danger">
+                删除
+              </Button>
+            </>
+          )
+        }
+        back={
+          <Link className="back-link" to="/keys">
+            ← API Keys
           </Link>
-        )}
-      </header>
+        }
+        description={
+          <span className="key-meta">
+            <span className="mono">{key.prefix}…</span>
+            <GatewayStatusBadge status={key.status} />
+            <span>第 {key.generation} 代</span>
+            <span>最后调用 {formatDate(key.last_used_at)}</span>
+          </span>
+        }
+        title={key.display_name}
+      />
       <InlineError>{error}</InlineError>
+
       {secret && (
-        <section className="panel one-time-key-panel">
-          <header className="panel-heading">
-            <h2>保存新 Key</h2>
-            <span className="channel-state channel-state-warning">仅显示一次</span>
-          </header>
-          <div className="credential-card">
+        <Card className="one-time-key" title="保存新 Key">
+          <div className="one-time-key-body">
+            <Notice tone="warning">完整 Key 只显示这一次。</Notice>
+            <SecretValue secret={secret} />
+            {key.pools.length > 0 && (
+              <CallExamples
+                apiKey={secret}
+                modelID={key.pools[0].model_id}
+                protocol={key.pools[0].protocol}
+              />
+            )}
             <div>
-              <span>API Key</span>
-              <strong>{secret}</strong>
+              <Button onClick={() => setSecret('')} variant="quiet">
+                我已保存
+              </Button>
             </div>
           </div>
-          <div className="credential-actions">
-            <Button
-              icon={<Icon name={copied ? 'check' : 'copy'} />}
-              onClick={() => {
-                void navigator.clipboard.writeText(secret).then(() => setCopied(true))
-              }}
-              type="button"
-              variant="secondary"
-            >
-              {copied ? '已复制' : '复制 Key'}
-            </Button>
-            <Button onClick={dismissSecret} type="button" variant="quiet">
-              我已保存
-            </Button>
-          </div>
-        </section>
+        </Card>
       )}
-      <section className="gateway-detail-grid">
-        <article className="panel">
-          <header className="panel-heading"><h2>Key 概况</h2></header>
-          <dl className="detail-list">
-            <div><dt>公开前缀</dt><dd className="mono-value">{key.prefix}…</dd></div>
-            <div><dt>代次</dt><dd>{key.generation}</dd></div>
-            <div><dt>模型协议池</dt><dd>{key.pools.length}</dd></div>
-            <div><dt>最后调用</dt><dd>{formatDate(key.last_used_at)}</dd></div>
-            <div><dt>更新时间</dt><dd>{formatDate(key.updated_at)}</dd></div>
-          </dl>
-        </article>
-        <article className="panel key-action-panel">
-          <header className="panel-heading"><h2>Key 操作</h2></header>
-          <div className="key-action-list">
-            {key.status !== 'deleted' && (
-              <Button onClick={() => setPending('rotate')} type="button" variant="secondary">
-                轮换 Key
-              </Button>
-            )}
-            {key.status === 'active' && (
-              <Button onClick={() => setPending('disable')} type="button" variant="secondary">
-                停用
-              </Button>
-            )}
-            {key.status === 'disabled' && (
-              <Button onClick={() => setPending('enable')} type="button" variant="secondary">
-                启用
-              </Button>
-            )}
-            {key.status !== 'deleted' && (
-              <Button onClick={() => setPending('delete')} type="button" variant="danger">
-                删除 Key
-              </Button>
-            )}
-          </div>
-        </article>
-      </section>
-      <section className="panel table-panel key-pool-detail-panel">
-        <header className="table-toolbar">
-          <h2>模型协议池</h2>
-          <span className="count-badge">{key.pools.length}</span>
-        </header>
-        {key.pools.length === 0 ? (
-          <div className="empty-state">没有已配置的模型协议池</div>
-        ) : (
-          <div className="key-pool-detail-list">
-            {key.pools.map((pool) => (
-              <article className="key-pool-detail" key={pool.id}>
-                <header>
-                  <div>
-                    <strong>{pool.model_name}</strong>
-                    <span>{protocolLabels[pool.protocol]}</span>
-                  </div>
-                  <span className="count-badge">{pool.members.length}</span>
-                </header>
-                <div className="desktop-table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">优先级 / 渠道</th>
-                        <th scope="col">资格</th>
-                        <th scope="col">输入 / 输出</th>
-                        <th scope="col">缓存写 / 读</th>
-                        <th scope="col">成功率</th>
-                        <th scope="col">TTFT / TPS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pool.members.map((member) => (
-                        <tr key={member.offer_id}>
-                          <td>
-                            <strong>#{member.priority} {member.channel_name}</strong>
-                            <small>{member.provider_name}</small>
-                          </td>
-                          <td>
-                            <span className={`channel-state channel-state-${member.eligible ? 'positive' : 'warning'}`}>
-                              {member.eligible ? '可用' : '需更新'}
-                            </span>
-                          </td>
-                          <td><span className="price-with-tiers"><PricePair first={member.input_price} second={member.output_price} /><TierCountBadge tiers={member.price_tiers} /></span></td>
-                          <td><span className="price-with-tiers"><PricePair first={member.cache_write_price} second={member.cache_read_price} /><TierCountBadge tiers={member.price_tiers} /></span></td>
-                          <td>{member.success_rate === null ? '—' : formatRate(member.success_rate)}</td>
-                          <td>{member.ttft_milliseconds ?? '—'} ms / {member.tokens_per_second ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mobile-card-list">
-                  {pool.members.map((member) => (
-                    <article className="mobile-data-card" key={member.offer_id}>
-                      <header>
-                        <div><strong>#{member.priority} {member.channel_name}</strong><span>{member.provider_name}</span></div>
-                        <span className={`channel-state channel-state-${member.eligible ? 'positive' : 'warning'}`}>
-                          {member.eligible ? '可用' : '需更新'}
-                        </span>
-                      </header>
-                      <dl>
-                        <div><dt>输入 / 输出</dt><dd><PricePair first={member.input_price} second={member.output_price} /><TierCountBadge tiers={member.price_tiers} /></dd></div>
-                        <div><dt>成功率</dt><dd>{member.success_rate === null ? '—' : formatRate(member.success_rate)}</dd></div>
-                        <div><dt>TTFT / TPS</dt><dd>{member.ttft_milliseconds ?? '—'} ms / {member.tokens_per_second ?? '—'}</dd></div>
-                      </dl>
-                    </article>
-                  ))}
-                </div>
-              </article>
-            ))}
+
+      <h2 className="section-heading">
+        路由 <CountBadge>{key.pools.length}</CountBadge>
+      </h2>
+      {key.pools.length === 0 ? (
+        <Card flush>
+          <EmptyState
+            action={
+              editable && (
+                <Button onClick={() => setEditing(true)} variant="secondary">
+                  设置路由
+                </Button>
+              )
+            }
+            title="没有已配置的路由"
+          />
+        </Card>
+      ) : (
+        <div className="route-sections">
+          {key.pools.map((pool) => (
+            <Card
+              actions={
+                <Button onClick={() => setExampleRoute(pool)} size="sm" variant="secondary">
+                  调用示例
+                </Button>
+              }
+              flush
+              key={pool.id}
+              title={
+                <span className="route-title">
+                  {pool.model_name}
+                  <small>{protocolLabels[pool.protocol]}</small>
+                </span>
+              }
+            >
+              <DataTable
+                caption={`${pool.model_name} 的备用顺序`}
+                columns={memberColumns}
+                rowKey={(member) => member.offer_id}
+                rows={pool.members}
+              />
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <KeyEditorDrawer
+        keyData={key}
+        onClose={() => setEditing(false)}
+        onSaved={() => setEditing(false)}
+        open={editing}
+      />
+
+      <Drawer
+        description={exampleRoute ? protocolLabels[exampleRoute.protocol] : undefined}
+        onClose={() => setExampleRoute(null)}
+        open={Boolean(exampleRoute)}
+        title="调用示例"
+      >
+        {exampleRoute && (
+          <div className="examples-drawer">
+            <Notice tone="info">示例中的 YOUR_API_KEY 请替换为完整 Key；需要新 Key 时轮换。</Notice>
+            <CallExamples apiKey="" modelID={exampleRoute.model_id} protocol={exampleRoute.protocol} />
           </div>
         )}
-      </section>
-      <ConfirmDialog
-        busy={busy}
-        confirmLabel={
-          pending === 'rotate'
-            ? '轮换并停用旧 Key'
-            : pending === 'delete'
-              ? '确认删除'
-              : pending === 'disable'
-                ? '确认停用'
-                : '确认启用'
+      </Drawer>
+
+      <Dialog
+        busy={action.isPending}
+        description={copy?.description}
+        footer={
+          <>
+            <Button disabled={action.isPending} onClick={() => setPending(null)} variant="secondary">
+              取消
+            </Button>
+            <Button
+              loading={action.isPending}
+              onClick={() => void confirm()}
+              variant={copy?.danger ? 'danger' : 'primary'}
+            >
+              {copy?.confirm ?? ''}
+            </Button>
+          </>
         }
-        danger={pending === 'delete'}
-        description={
-          pending === 'rotate'
-            ? '旧 Key 会立即失效，新 Key 只显示一次。'
-            : pending === 'delete'
-              ? '删除后不可恢复，历史调用与账单仍会保留。'
-              : undefined
-        }
-        onCancel={() => setPending('')}
-        onConfirm={() => void runAction()}
+        onClose={() => setPending(null)}
         open={Boolean(pending)}
-        title={
-          pending === 'rotate'
-            ? '轮换 API Key'
-            : pending === 'delete'
-              ? '删除 API Key'
-              : pending === 'disable'
-                ? '停用 API Key'
-                : '启用 API Key'
-        }
-      />
+        title={copy?.title ?? ''}
+      >
+        {null}
+      </Dialog>
     </>
   )
 }
