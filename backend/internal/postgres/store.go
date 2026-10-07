@@ -9,6 +9,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/feeratepg"
@@ -24,6 +25,7 @@ type (
 	feeRateStore  = feeratepg.Store
 	channelStore  = channelpg.Store
 	ledgerStore   = ledgerpg.Store
+	c2cStore      = c2cpg.Store
 )
 
 // Store is the composition root of persistence. Domains migrated to sqlc live
@@ -37,6 +39,7 @@ type Store struct {
 	*feeRateStore
 	*channelStore
 	*ledgerStore
+	*c2cStore
 
 	pool *pgxpool.Pool
 	// gatewayCommitHook is a deterministic test seam for the PostgreSQL
@@ -53,6 +56,7 @@ func New(pool *pgxpool.Pool) *Store {
 		feeRateStore:  feeratepg.NewStore(pool),
 		channelStore:  channelpg.NewStore(pool),
 		ledgerStore:   ledgerpg.NewStore(pool),
+		c2cStore:      c2cpg.NewStore(pool),
 		pool:          pool,
 	}
 }
