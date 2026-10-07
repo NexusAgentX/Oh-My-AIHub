@@ -70,6 +70,22 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "api_fee_rates.fee_rate_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_entries.amount_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_entries.posted_balance_before_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_entries.posted_balance_after_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_holds.amount_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_holds.remaining_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_holds.captured_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_holds.released_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_hold_events.amount_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
   - <<: *domain
     queries: internal/postgres/catalogpg/queries.sql
     gen:
@@ -91,6 +107,13 @@ sql:
         <<: *gen
         package: auditpg
         out: internal/postgres/auditpg
+  - <<: *domain
+    queries: internal/postgres/ledgerpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: ledgerpg
+        out: internal/postgres/ledgerpg
   - <<: *domain
     queries: internal/postgres/channelpg/queries.sql
     gen:

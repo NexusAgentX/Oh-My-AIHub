@@ -36,15 +36,6 @@ run = [
   "docker compose run --rm --build migration",
 ]
 
-[tasks.bootstrap-admin]
-description = "Interactively create the first administrator"
-run = '''
-AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
-DATABASE_URL="${DATABASE_URL:-postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable}" \
-PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
-go -C backend run ./cmd/bootstrap-admin
-'''
-
 [tasks.test-backend-integration]
 description = "Run PostgreSQL-backed backend integration tests"
 run = [
