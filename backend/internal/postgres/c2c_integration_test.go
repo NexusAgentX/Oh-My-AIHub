@@ -720,6 +720,159 @@ func TestC2CIntegration(t *testing.T) {
 			}
 			assertHold(t, pool, order.ParentHoldID, "1", "0", "0", "1")
 		})
+
+		t.Run("dispute restriction freezes one party without touching the trade", func(t *testing.T) {
+			seller := createFundedSeller("c2c.restrict.seller")
+			buyer := createReady("c2c.restrict.buyer", "0")
+			otherSeller := createFundedSeller("c2c.restrict.other.seller")
+			order, err := service.CreateOrder(ctx, seller, "restrict-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			if err != nil {
+				t.Fatal(err)
+			}
+			otherOrder, err := service.CreateOrder(ctx, otherSeller, "restrict-other-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			if err != nil {
+				t.Fatal(err)
+			}
+			trade, err := service.TakeOrder(ctx, buyer, "restrict-take", order.ID, mustAmount(t, "1"), order.PaymentMethods[0].ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.MarkPaid(ctx, buyer, "restrict-paid", trade.ID, "", nil); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.OpenDispute(ctx, buyer, "restrict-dispute", trade.ID, "seller denies receiving the payment", nil); err != nil {
+				t.Fatal(err)
+			}
+			before, err := service.Trade(ctx, admin, trade.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			countRows := func(query string, args ...any) int {
+				t.Helper()
+				var count int
+				if err := pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+					t.Fatalf("count rows: %v", err)
+				}
+				return count
+			}
+			accountState := func(accountID string) (bool, int64) {
+				t.Helper()
+				var frozen bool
+				var version int64
+				if err := pool.QueryRow(ctx, `SELECT credit_frozen, version FROM accounts WHERE id = $1`, accountID).Scan(&frozen, &version); err != nil {
+					t.Fatalf("read account: %v", err)
+				}
+				return frozen, version
+			}
+			holdEventsBefore := countRows(`SELECT count(*) FROM ledger_hold_events WHERE business_id = $1`, trade.ID)
+			_, sellerVersionBefore := accountState(seller.ID)
+
+			restricted, err := service.ResolveDispute(ctx, admin, "restrict-seller", trade.ID, c2c.ResolutionRestrictSeller, "seller account under dispute review")
+			if err != nil {
+				t.Fatalf("restrict seller: %v", err)
+			}
+			if restricted.Status != c2c.TradeDisputed || !restricted.SellerCreditFrozen || restricted.BuyerCreditFrozen || restricted.ResolvedAt != nil {
+				t.Fatalf("restricted trade = status %s seller %v buyer %v resolved %v", restricted.Status, restricted.SellerCreditFrozen, restricted.BuyerCreditFrozen, restricted.ResolvedAt)
+			}
+			replay, err := service.ResolveDispute(ctx, admin, "restrict-seller", trade.ID, c2c.ResolutionRestrictSeller, "seller account under dispute review")
+			if err != nil || replay.ID != trade.ID || !replay.SellerCreditFrozen {
+				t.Fatalf("restrict replay = %+v, %v", replay, err)
+			}
+			if _, err := service.ResolveDispute(ctx, admin, "restrict-seller", trade.ID, c2c.ResolutionRestrictBuyer, "seller account under dispute review"); !errors.Is(err, c2c.ErrConflict) {
+				t.Fatalf("changed restrict replay error = %v", err)
+			}
+			frozen, sellerVersion := accountState(seller.ID)
+			if !frozen || sellerVersion != sellerVersionBefore+1 {
+				t.Fatalf("seller frozen/version = %v/%d, want true/%d", frozen, sellerVersion, sellerVersionBefore+1)
+			}
+			if events := countRows(`SELECT count(*) FROM c2c_events WHERE trade_id = $1 AND action = 'dispute.seller_restricted' AND reason = 'seller account under dispute review'`, trade.ID); events != 1 {
+				t.Fatalf("seller restriction events = %d", events)
+			}
+			if audits := countRows(`SELECT count(*) FROM audit_events WHERE action = 'c2c.dispute.party_restricted' AND target_id = $1 AND details->>'trade_id' = $2 AND (details->>'changed')::boolean`, seller.ID, trade.ID); audits != 1 {
+				t.Fatalf("seller restriction audits = %d", audits)
+			}
+
+			// A second decision on an already frozen party records the decision
+			// but leaves the account row (and its CAS version) untouched.
+			if _, err := service.ResolveDispute(ctx, admin, "restrict-seller-again", trade.ID, c2c.ResolutionRestrictSeller, "seller restriction confirmed"); err != nil {
+				t.Fatalf("restrict already frozen seller: %v", err)
+			}
+			if _, version := accountState(seller.ID); version != sellerVersion {
+				t.Fatalf("already frozen seller version = %d, want %d", version, sellerVersion)
+			}
+			if audits := countRows(`SELECT count(*) FROM audit_events WHERE action = 'c2c.dispute.party_restricted' AND target_id = $1 AND NOT (details->>'changed')::boolean`, seller.ID); audits != 1 {
+				t.Fatalf("unchanged seller restriction audits = %d", audits)
+			}
+
+			// Restricting the buyer races account management on the same account;
+			// both paths share the advisory key and row order, so neither deadlocks.
+			_, buyerVersion := accountState(buyer.ID)
+			limit := mustAmount(t, "5")
+			restrictErr, updateErr := runRace(t,
+				func(raceContext context.Context) error {
+					_, err := service.ResolveDispute(raceContext, admin, "restrict-buyer", trade.ID, c2c.ResolutionRestrictBuyer, "buyer account under dispute review")
+					return err
+				},
+				func(raceContext context.Context) error {
+					_, err := identityService.UpdateAccount(raceContext, admin, buyer.ID, identity.AccountUpdate{ExpectedVersion: buyerVersion, CreditLimit: &limit})
+					return err
+				},
+			)
+			if restrictErr != nil {
+				t.Fatalf("restrict buyer: %v", restrictErr)
+			}
+			if updateErr != nil && !errors.Is(updateErr, identity.ErrConflict) {
+				t.Fatalf("account update against restriction: %v", updateErr)
+			}
+			if frozen, _ := accountState(buyer.ID); !frozen {
+				t.Fatal("buyer credit was not frozen")
+			}
+
+			after, err := service.Trade(ctx, admin, trade.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.Status != c2c.TradeDisputed || after.HoldID != before.HoldID || after.LedgerTransactionID != "" || !after.UpdatedAt.Equal(before.UpdatedAt) {
+				t.Fatalf("trade changed by restriction: before %+v after %+v", before, after)
+			}
+			if events := countRows(`SELECT count(*) FROM ledger_hold_events WHERE business_id = $1`, trade.ID); events != holdEventsBefore {
+				t.Fatalf("restriction changed hold events: %d -> %d", holdEventsBefore, events)
+			}
+			assertHold(t, pool, order.ParentHoldID, "2", "2", "0", "0")
+
+			if _, err := service.CreateOrder(ctx, buyer, "restricted-buyer-buy", c2c.SideBuy, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "restricted"}}); !errors.Is(err, ledger.ErrCreditFrozen) {
+				t.Fatalf("frozen buyer create buy order error = %v", err)
+			}
+			if _, err := service.TakeOrder(ctx, buyer, "restricted-buyer-take", otherOrder.ID, mustAmount(t, "1"), otherOrder.PaymentMethods[0].ID); !errors.Is(err, ledger.ErrCreditFrozen) {
+				t.Fatalf("frozen buyer take sell order error = %v", err)
+			}
+			if _, err := service.CreateOrder(ctx, seller, "restricted-seller-sell", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method); !errors.Is(err, ledger.ErrCreditFrozen) {
+				t.Fatalf("frozen seller create sell order error = %v", err)
+			}
+
+			// Restricted parties keep handling the existing dispute, and the
+			// restriction combines with extending review before a final decision.
+			if _, err := service.AddDisputeEvidence(ctx, buyer, "restricted-evidence", trade.ID, "bank record attached separately", nil); err != nil {
+				t.Fatalf("restricted buyer add evidence: %v", err)
+			}
+			extended, err := service.ResolveDispute(ctx, admin, "restrict-extend", trade.ID, c2c.ResolutionExtend, "awaiting bank confirmation")
+			if err != nil || extended.Status != c2c.TradeDisputed || extended.ReviewDueAt == nil {
+				t.Fatalf("extend restricted dispute = %+v, %v", extended, err)
+			}
+			released, err := service.ResolveDispute(ctx, admin, "restrict-release", trade.ID, c2c.ResolutionRelease, "bank confirmed the payment")
+			if err != nil || released.Status != c2c.TradeReleasedToBuyer {
+				t.Fatalf("release restricted dispute = %+v, %v", released, err)
+			}
+			if _, err := service.ResolveDispute(ctx, admin, "restrict-after-release", trade.ID, c2c.ResolutionRestrictBuyer, "late restriction"); !errors.Is(err, c2c.ErrConflict) {
+				t.Fatalf("restrict terminal trade error = %v", err)
+			}
+			if _, err := service.CancelOrder(ctx, otherSeller, "restrict-other-cancel", otherOrder.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.AdminCancelOrder(ctx, admin, "restrict-order-cancel", order.ID, "close restricted seller listing"); err != nil {
+				t.Fatal(err)
+			}
+		})
 	})
 
 	metrics, err := ledgerService.Metrics(ctx, admin)

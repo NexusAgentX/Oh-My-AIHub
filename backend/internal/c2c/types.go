@@ -59,7 +59,19 @@ const (
 	ResolutionRelease ResolutionAction = "release_to_buyer"
 	ResolutionReturn  ResolutionAction = "return_to_seller"
 	ResolutionExtend  ResolutionAction = "extend_review"
+	// Restrict actions freeze one party's credit through the account policy
+	// path. They never finalize the trade or change its ledger holds.
+	ResolutionRestrictBuyer  ResolutionAction = "restrict_buyer"
+	ResolutionRestrictSeller ResolutionAction = "restrict_seller"
 )
+
+func (action ResolutionAction) Valid() bool {
+	switch action {
+	case ResolutionRelease, ResolutionReturn, ResolutionExtend, ResolutionRestrictBuyer, ResolutionRestrictSeller:
+		return true
+	}
+	return false
+}
 
 var (
 	ErrInvalidInput = errors.New("invalid C2C input")
@@ -190,6 +202,8 @@ type Trade struct {
 	BuyerDisplayName      string
 	SellerAccountID       string
 	SellerDisplayName     string
+	BuyerCreditFrozen     bool
+	SellerCreditFrozen    bool
 	Quantity              money.Amount
 	UnitPriceFen          int64
 	FiatAmountFen         int64

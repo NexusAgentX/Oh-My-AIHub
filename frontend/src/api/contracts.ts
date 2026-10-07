@@ -481,6 +481,8 @@ export type C2CResolutionAction =
   | 'release_to_buyer'
   | 'return_to_seller'
   | 'extend_review'
+  | 'restrict_buyer'
+  | 'restrict_seller'
 
 export type C2CPaymentMethod = {
   id: string
@@ -554,6 +556,10 @@ export type C2CTrade = {
   buyer_display_name: string
   seller_account_id: string
   seller_display_name: string
+  /** Present only in administrator responses. */
+  buyer_credit_frozen?: boolean
+  /** Present only in administrator responses. */
+  seller_credit_frozen?: boolean
   quantity: string
   unit_price_fen: number
   fiat_amount_fen: number
