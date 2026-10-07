@@ -118,29 +118,31 @@ func (a *app) ledgerMetrics(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"metrics": map[string]any{
-			"total_posted_balance":                metrics.TotalPostedBalance,
-			"positive_posted_balance":             metrics.PositivePostedBalance,
-			"negative_posted_balance":             metrics.NegativePostedBalance,
-			"posted_projection_difference":        metrics.PostedProjectionDifference,
-			"posted_projection_mismatch_accounts": metrics.PostedProjectionMismatchAccounts,
-			"asset_reservation_difference":        metrics.AssetReservationDifference,
-			"spend_authorization_difference":      metrics.SpendAuthorizationDifference,
-			"hold_projection_mismatch_accounts":   metrics.HoldProjectionMismatchAccounts,
-			"zero_sum":                            metrics.TotalPostedBalance == "0",
-			"ledger_consistent":                   metrics.TotalPostedBalance == "0" && metrics.PostedProjectionDifference == "0" && metrics.AssetReservationDifference == "0" && metrics.SpendAuthorizationDifference == "0",
-			"total_credit_limit":                  metrics.TotalCreditLimit,
-			"credit_capacity_used":                metrics.UsedCredit,
-			"asset_reserved":                      metrics.AssetReserved,
-			"spend_authorized":                    metrics.SpendAuthorized,
-			"incentive_posted_balance":            metrics.IncentivePostedBalance,
-			"loss_posted_balance":                 metrics.LossPostedBalance,
-			"over_limit_accounts":                 metrics.OverLimitAccounts,
-			"credit_frozen_accounts":              metrics.CreditFrozenAccounts,
-			"ledger_account_count":                metrics.AccountCount,
-		},
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"metrics": ledgerMetricsResponse(metrics)})
+}
+
+func ledgerMetricsResponse(metrics ledger.Metrics) map[string]any {
+	return map[string]any{
+		"total_posted_balance":                metrics.TotalPostedBalance,
+		"positive_posted_balance":             metrics.PositivePostedBalance,
+		"negative_posted_balance":             metrics.NegativePostedBalance,
+		"posted_projection_difference":        metrics.PostedProjectionDifference,
+		"posted_projection_mismatch_accounts": metrics.PostedProjectionMismatchAccounts,
+		"asset_reservation_difference":        metrics.AssetReservationDifference,
+		"spend_authorization_difference":      metrics.SpendAuthorizationDifference,
+		"hold_projection_mismatch_accounts":   metrics.HoldProjectionMismatchAccounts,
+		"zero_sum":                            metrics.TotalPostedBalance == "0",
+		"ledger_consistent":                   metrics.TotalPostedBalance == "0" && metrics.PostedProjectionDifference == "0" && metrics.AssetReservationDifference == "0" && metrics.SpendAuthorizationDifference == "0",
+		"total_credit_limit":                  metrics.TotalCreditLimit,
+		"credit_capacity_used":                metrics.UsedCredit,
+		"asset_reserved":                      metrics.AssetReserved,
+		"spend_authorized":                    metrics.SpendAuthorized,
+		"incentive_posted_balance":            metrics.IncentivePostedBalance,
+		"loss_posted_balance":                 metrics.LossPostedBalance,
+		"over_limit_accounts":                 metrics.OverLimitAccounts,
+		"credit_frozen_accounts":              metrics.CreditFrozenAccounts,
+		"ledger_account_count":                metrics.AccountCount,
+	}
 }
 
 type ledgerAccountReferenceRequest struct {
@@ -317,4 +319,17 @@ func transactionResponse(transaction ledger.Transaction) map[string]any {
 		"entries":                    entries,
 		"created_at":                 transaction.CreatedAt,
 	}
+}
+
+// registerLedgerRoutes 注册钱包与账本路由。
+func (a *app) registerLedgerRoutes(r *router) {
+	r.ready("GET /api/wallet", a.wallet)
+	r.ready("GET /api/wallet/entries", a.walletEntries)
+	r.admin("GET /api/admin/ledger/metrics", a.ledgerMetrics)
+	r.admin("GET /api/admin/ledger/accounts/{accountID}/wallet", a.adminLedgerAccountWallet)
+	r.admin("GET /api/admin/ledger/accounts/{accountID}/entries", a.adminLedgerAccountEntries)
+	r.admin("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", a.adminLedgerSystemWallet)
+	r.admin("GET /api/admin/ledger/system-accounts/{systemKind}/entries", a.adminLedgerSystemEntries)
+	r.admin("POST /api/admin/ledger/adjustments", a.adminLedgerAdjustment)
+	r.admin("POST /api/admin/ledger/bad-debts", a.adminBadDebtTransfer)
 }

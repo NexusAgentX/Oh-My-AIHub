@@ -37,6 +37,10 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, c2cMarketResponse(market))
+}
+
+func c2cMarketResponse(market c2c.Market) map[string]any {
 	sell := make([]map[string]any, 0, len(market.SellOrders))
 	for _, order := range market.SellOrders {
 		sell = append(sell, c2cOrderResponse(order))
@@ -45,7 +49,7 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 	for _, order := range market.BuyOrders {
 		buy = append(buy, c2cOrderResponse(order))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"metrics": map[string]any{
 			"guidance_price_fen": market.GuidancePriceFen,
 			"latest_price_fen":   market.LatestPriceFen,
@@ -55,7 +59,7 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 		},
 		"sell_orders": sell,
 		"buy_orders":  buy,
-	})
+	}
 }
 
 func (a *app) c2cCreateOrder(w http.ResponseWriter, r *http.Request) {
@@ -440,4 +444,24 @@ func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 		"created_at": trade.CreatedAt, "updated_at": trade.UpdatedAt,
 		"paid_at": trade.PaidAt, "resolved_at": trade.ResolvedAt,
 	}
+}
+
+// registerC2CRoutes 注册C2C 订单与交易路由。
+func (a *app) registerC2CRoutes(r *router) {
+	r.ready("GET /api/c2c/market", a.c2cMarket)
+	r.ready("POST /api/c2c/orders", a.c2cCreateOrder)
+	r.ready("GET /api/c2c/orders/{orderID}", a.c2cOrder)
+	r.ready("GET /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr", a.c2cPaymentQR)
+	r.ready("POST /api/c2c/orders/{orderID}/take", a.c2cTakeOrder)
+	r.ready("POST /api/c2c/orders/{orderID}/cancel", a.c2cCancelOrder)
+	r.ready("GET /api/c2c/me", a.c2cMyActivity)
+	r.ready("GET /api/c2c/trades/{tradeID}", a.c2cTrade)
+	r.ready("POST /api/c2c/trades/{tradeID}/paid", a.c2cMarkPaid)
+	r.ready("POST /api/c2c/trades/{tradeID}/cancel", a.c2cCancelTrade)
+	r.ready("POST /api/c2c/trades/{tradeID}/release", a.c2cConfirmReceipt)
+	r.ready("POST /api/c2c/trades/{tradeID}/dispute", a.c2cOpenDispute)
+	r.ready("POST /api/c2c/trades/{tradeID}/statements", a.c2cAddStatement)
+	r.admin("GET /api/admin/c2c/disputes", a.adminC2CDisputes)
+	r.admin("POST /api/admin/c2c/orders/{orderID}/cancel", a.adminC2CCancelOrder)
+	r.admin("POST /api/admin/c2c/trades/{tradeID}/resolve", a.adminC2CResolve)
 }
