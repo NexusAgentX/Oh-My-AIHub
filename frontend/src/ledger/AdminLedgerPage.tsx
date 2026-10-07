@@ -244,8 +244,6 @@ export function AdminLedgerPage() {
             </article>
           </section>
 
-          <FeeRatePanel />
-
           <section className="ops-grid">
             <article className="panel projection-panel">
               <header className="panel-heading"><h2>C2C 市场</h2></header>
@@ -367,6 +365,7 @@ export function AdminLedgerPage() {
           <SystemAccountPanel label="平台损失账户" view={loss} />
         </>
       ) : null}
+      <FeeRatePanel />
     </AppShell>
   )
 }
