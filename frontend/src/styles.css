@@ -886,6 +886,8 @@ h2 {
 .ops-list dt { color: var(--muted); font-size: 13px; }
 .ops-list dd { margin: 0; color: var(--ink); font-weight: 600; }
 .system-ledger-panel { margin-top: 20px; }
+.fee-rate-panel { margin-bottom: 20px; }
+.fee-rate-panel .stack-form { padding: 20px; border-bottom: 1px solid var(--hairline); }
 .muted-copy,
 .back-link { color: var(--muted); font-size: 13px; }
 .back-link { display: inline-block; margin-bottom: 8px; text-decoration: none; }

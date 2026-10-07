@@ -709,3 +709,17 @@ export type OpsTrialSummary = {
   inspection_pass_count: number
   inspection_total_count: number
 }
+
+export type FeeRateVersion = {
+  version: number
+  /** Ratio between 0 and 1 with at most nine decimals, e.g. "0.001" = 0.1%. */
+  fee_rate: string
+  reason: string
+  created_by: { id: string; username: string } | null
+  created_at: string
+}
+
+export type FeeRateSnapshot = {
+  current: FeeRateVersion
+  history: FeeRateVersion[]
+}

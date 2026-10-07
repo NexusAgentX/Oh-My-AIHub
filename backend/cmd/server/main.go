@@ -18,6 +18,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -191,6 +192,7 @@ func main() {
 			Ledger:            ledger.NewService(store),
 			C2C:               c2cService,
 			Ops:               store,
+			FeeRates:          feerate.NewService(store),
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
