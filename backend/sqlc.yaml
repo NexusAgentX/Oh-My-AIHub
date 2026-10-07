@@ -144,6 +144,14 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "api_call_compensations.platform_fee_reversed_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ops_inspections.zero_sum_difference_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ops_inspections.posted_projection_difference_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ops_inspections.asset_projection_difference_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ops_inspections.authorization_projection_difference_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
   - <<: *domain
     queries: internal/postgres/catalogpg/queries.sql
     gen:
@@ -193,3 +201,10 @@ sql:
         <<: *gen
         package: gatewaypg
         out: internal/postgres/gatewaypg
+  - <<: *domain
+    queries: internal/postgres/opspg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: opspg
+        out: internal/postgres/opspg
