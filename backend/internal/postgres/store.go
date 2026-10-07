@@ -1,11 +1,8 @@
 package postgres
 
 import (
-	"context"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
@@ -60,17 +57,4 @@ func New(pool *pgxpool.Pool) *Store {
 		opsStore:      opspg.NewStore(pool, ledgerStore),
 		pool:          pool,
 	}
-}
-
-type scanner interface {
-	Scan(...any) error
-}
-
-// insertAudit stays for the domains that have not moved to sqlc yet; migrated
-// domains call auditpg.Record directly.
-func insertAudit(ctx context.Context, db auditpg.DBTX, actorID, action, targetType, targetID, reason string, details map[string]any) error {
-	return auditpg.Record(ctx, db, auditpg.Event{
-		ActorID: actorID, Action: action, TargetType: targetType, TargetID: targetID,
-		Reason: reason, Details: details,
-	})
 }

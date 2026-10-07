@@ -35,6 +35,8 @@ jobs:
         run: npm --prefix frontend run build
       - name: sqlc generated code is up to date
         run: mise exec -- sqlc -f backend/sqlc.yaml diff
+      - name: Backend gofmt
+        run: test -z "$(mise exec -- gofmt -l backend)"
       - name: Backend vet
         run: mise exec -- go -C backend vet ./...
       - name: Backend tests with race detector

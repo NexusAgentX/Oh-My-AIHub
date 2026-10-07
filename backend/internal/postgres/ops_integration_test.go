@@ -2,10 +2,10 @@ package postgres_test
 
 import (
 	"context"
-	"strings"
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 

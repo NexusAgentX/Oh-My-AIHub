@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
@@ -20,6 +23,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
 )
 
 type ledgerHTTPErrorResponse struct {
@@ -574,7 +578,7 @@ func TestLedgerIntegration(t *testing.T) {
 	testConcurrentSameKeyReplay(t, ctx, service, create)
 	testConcurrentCaptureRelease(t, ctx, service, create)
 	testCaptureFailureRollback(t, ctx, service, create)
-	testTransactionBoundLedgerPrimitive(t, ctx, store, service, create)
+	testTransactionBoundLedgerPrimitive(t, ctx, pool, service, create)
 	testMinimumBalanceGuard(t, ctx, service, admin, create)
 
 	metrics, err := service.Metrics(ctx, admin)
@@ -1453,11 +1457,32 @@ func testCaptureFailureRollback(t *testing.T, ctx context.Context, service *ledg
 	}
 }
 
-func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, store *storepg.Store, service *ledger.Service, create func(string, string) identity.Account) {
+type ledgerBoundTx = ledgerpg.Tx
+
+// ledgerTransaction 在测试中组合调用方的 pgx.Tx 与绑定同一事务的 ledgerpg.Tx，
+// 用于验证账本过账与业务行在同一事务内原子提交或回滚。
+type ledgerTransaction struct {
+	pgx.Tx
+	*ledgerBoundTx
+}
+
+func withLedgerTransaction(ctx context.Context, pool *pgxpool.Pool, work func(*ledgerTransaction) error) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	if err := work(&ledgerTransaction{Tx: tx, ledgerBoundTx: ledgerpg.NewTx(tx)}); err != nil {
+		return err
+	}
+	return ledgerpg.MapError(tx.Commit(ctx))
+}
+
+func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, pool *pgxpool.Pool, service *ledger.Service, create func(string, string) identity.Account) {
 	t.Helper()
 	account := create("ledger.transaction.bound", "2")
 	rollbackMarker := errors.New("rollback business transaction")
-	err := store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err := withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		transactionService := ledger.NewService(tx)
 		if _, err := transactionService.CreateHold(ctx, ledger.CreateHoldRequest{
 			IdempotencyKey: "transaction-bound-rollback", AccountID: account.ID, Amount: mustAmount(t, "1"),
@@ -1481,7 +1506,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 		t.Fatalf("wallet after shared rollback = %+v, err %v", wallet, err)
 	}
 	var rolledBackEvents int
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		return tx.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'test.transaction_bound.rollback' AND actor_account_id = $1`, account.ID).Scan(&rolledBackEvents)
 	})
 	if err != nil || rolledBackEvents != 0 {
@@ -1489,7 +1514,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 	}
 
 	var committedHold ledger.Hold
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		transactionService := ledger.NewService(tx)
 		var err error
 		committedHold, err = transactionService.CreateHold(ctx, ledger.CreateHoldRequest{
@@ -1509,7 +1534,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 		t.Fatalf("transaction-bound commit: %v", err)
 	}
 	var committedEvents int
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		return tx.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'test.transaction_bound.commit' AND actor_account_id = $1`, account.ID).Scan(&committedEvents)
 	})
 	if err != nil || committedEvents != 1 {
@@ -1525,7 +1550,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 	multiPayer := create("ledger.transaction.multi.payer", "3")
 	multiFirst := create("ledger.transaction.multi.first", "0")
 	multiSecond := create("ledger.transaction.multi.second", "0")
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		transactionService := ledger.NewService(tx)
 		if _, err := transactionService.Transfer(ctx, "transaction-multi-first", multiPayer.ID, multiFirst.ID, mustAmount(t, "1"), "first transfer in one outer transaction", "test", "transaction-multi-first"); err != nil {
 			return err
@@ -1543,7 +1568,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 
 	poisoned := create("ledger.transaction.incomplete", "1")
 	poisonTarget := create("ledger.tx.incomplete.target", "0")
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		transactionService := ledger.NewService(tx)
 		if _, err := transactionService.Transfer(ctx, "transaction-incomplete", poisoned.ID, poisonTarget.ID, mustAmount(t, "2"), "intentionally exceed credit", "test", "transaction-incomplete"); !errors.Is(err, ledger.ErrInsufficientFunds) {
 			return fmt.Errorf("unexpected incomplete command error: %w", err)
@@ -1557,7 +1582,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 		t.Fatal("outer transaction with swallowed ledger failure unexpectedly committed")
 	}
 	var incompleteAuditEvents int
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		return tx.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'test.transaction_bound.incomplete' AND actor_account_id = $1`, poisoned.ID).Scan(&incompleteAuditEvents)
 	})
 	if err != nil || incompleteAuditEvents != 0 {
@@ -1567,7 +1592,7 @@ func testTransactionBoundLedgerPrimitive(t *testing.T, ctx context.Context, stor
 		t.Fatalf("retry after incomplete command rollback: %v", err)
 	}
 
-	err = store.WithLedgerTransaction(ctx, func(tx *storepg.LedgerTransaction) error {
+	err = withLedgerTransaction(ctx, pool, func(tx *ledgerTransaction) error {
 		invalidHash := [32]byte{1}
 		if _, err := tx.Post(ctx, ledger.PostRequest{
 			IdempotencyKey: "forged-reversal", Kind: ledger.TransactionReversal, Reason: "forged reversal",
