@@ -2,15 +2,12 @@
 
 Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在双边 C2C 市场出售所得积分。
 
-产品方向和首版边界已经确认。当前代码已经交付公开产品落地页、受邀账户、模型目录、中心化零和账本、渠道共享与市场，以及平台 API Key、四协议优先级代理和调用结算；C2C 仍按 Epic #16 继续实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
-产品方向和首版边界已经确认。当前代码已经交付公开产品落地页、受邀账户、模型目录、中心化零和账本、渠道共享、校验、公开 API 市场与 C2C 双边市场；平台 API Key 和代理调用结算仍按 Epic #16 继续实现。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前真实实现见 `ARCHITECTURE.md`。
+MVP 已完成，涵盖公开产品入口、受邀账户、模型目录、API 渠道共享、平台 Key 与四协议代理、积分结算和 C2C 双边市场。后续直接基于需求和现有代码迭代。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前系统结构见 `ARCHITECTURE.md`。
 
 ## 文档导航
 
 - [产品说明](PRODUCT.md)：产品目标、用户、范围与需求。
 - [产品路线图](ROADMAP.md)：面向用户结果的优先级、证据视野与推进顺序。
-- [设计系统](DESIGN.md)：视觉 Token、组件、交互、响应式与无障碍规则。
-- [设计资产](design/README.md)：OpenPencil 源文件、预览与 Git 工作流。
 - [架构说明](ARCHITECTURE.md)：当前系统结构、边界与技术决策。
 - [变更日志](CHANGELOG.md)：面向版本与使用者的重要变化。
 - [Agent 协作说明](AGENTS.md)：所有 Agent 在本仓库中的工作规则。
@@ -28,37 +25,28 @@ Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平
 项目采用“人类定向、AI 执行”的持续产品研发模型：
 
 - 人类从用户视角负责目标用户、核心问题、产品方向、关键取舍和发布判断。
-- AI 负责研究、假设整理、驱动专业工具设计、工程实现、测试、文档、发布准备与反馈归纳。
-- 工作按方向与结果、发现、设计、交付、发布与学习形成闭环；设计不是开发前的一次性附件。
+- AI 负责研究、假设整理、工程实现、测试、文档、发布准备与反馈归纳。
+- 工作按方向与结果、发现、直接开发、验证、发布与学习形成闭环。
 - 任务区分 Ready、Done 和 Validated，代码合并或功能上线不自动等于用户结果已经成立。
 - 高不确定产品能力先用发现或原型 Feature 降低风险，再进入小批量交付；纯技术或已知小改动保持单个 Feature 的轻量流程。
 
-完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，结果优先级与推进顺序维护在 `ROADMAP.md`，视觉规则维护在 `DESIGN.md`。
+完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，结果优先级与推进顺序维护在 `ROADMAP.md`，界面以现有组件和样式为基础持续迭代。
 
-## 设计工作流
+## 直接开发
 
-项目使用 [OpenPencil](https://github.com/ZSeven-W/openpencil) 作为主要 UI/UX 设计工具。AI Agent 只通过 OpenPencil MCP 执行设计；MCP 不可用时暂停并由维护者修复或重载，不降级到 CLI。人类负责目标用户、产品方向和关键方案选择。可编辑 `.op` 源文件与同名 PNG 预览都提交到 `design/`，并与对应代码处于同一个 Issue、分支和 Pull Request。
+MVP 已完成，后续需求明确后直接基于现有代码实施，无需独立设计阶段、OpenPencil、设计源文件或预览。保留 Issue、独立 worktree、聚焦验证与 PR 验收流程；界面变化通过实际运行结果验收。
 
-安装桌面端和 `op` CLI 后执行：
-
-```bash
-op install --target codex
-op --version
-```
-
-重载 Codex 会话后验证 OpenPencil MCP 已进入工具清单。目录、命名、安全、导出和评审规则见 `design/README.md`；任何视觉任务还必须遵守 `DESIGN.md`。
+现有界面沿用了第三方设计分析中的部分规则，其 MIT 许可保存在 [第三方许可](licenses/airtable-design-analysis-MIT.txt)。该许可仅用于来源归属，不构成开发前置设计规范。
 
 ## 当前工程组成
 
 - 前端：React 19、TypeScript、Vite 与 React Router。
-- 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、市场、平台 API 网关、调用结算与管理员治理 API。
-- 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、API 市场、C2C 状态机与管理员治理 API。
+- 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、API 市场、平台 API 网关、调用结算、C2C 状态机与管理员治理 API。
 - 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与四类外部协议请求，迁移完成后再启动后端。
 
-管理员运营总览提供 UTC 时间窗口的统一指标、硬异常下钻、跨模块巡检历史与试用证据摘要；发布准备包含 `mise run check-release` 门禁、CI、加密备份与隔离恢复演练，操作手册见 `docs/runbooks/`。当前可运行能力包括作为首页的公开 SaaS 落地页（`/`）、未初始化实例的 `/initialize` 网页引导（也可继续用 `cmd/bootstrap-admin` CLI）、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、评分、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 业务流程尚未交付。
-当前可运行能力包括未认证的 `/welcome`、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户还可以创建自己的渠道，安全替换或撤销上游凭据，为模型配置原生协议和统一倍率，执行可能产生上游费用的显式校验，发布、暂停或逻辑删除渠道；公开 API 市场提供报价筛选、确定性游标分页、独立价格和评分，管理员可以查看非敏感配置、重验并带原因暂停或删除异常渠道。C2C 市场支持固定价格买卖单、部分成交、多种支付方式、可选付款截图、争议和管理员裁决；卖单积分由账本父持有担保，买单按成交冻结卖家的积分。平台 Key、真实请求代理与结算和运行质量聚合尚未交付。
+管理员运营总览提供 UTC 时间窗口的统一指标、硬异常下钻、跨模块巡检历史与试用证据摘要；发布准备包含 `mise run check-release` 门禁、CI、加密备份与隔离恢复演练，操作手册见 `docs/runbooks/`。当前可运行能力包括作为首页的公开 SaaS 落地页（`/`）、未初始化实例的 `/initialize` 网页引导（也可继续用 `cmd/bootstrap-admin` CLI）、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、评分、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 市场支持固定价格买卖单、部分成交、多种支付方式、可选付款截图、争议和管理员裁决；卖单积分由账本父持有担保，买单按成交冻结卖家的积分。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 
@@ -143,7 +131,6 @@ mise run down
 ## 验证
 
 ```bash
-mise run check-design
 mise run test
 mise run test-backend-integration
 docker compose config --quiet
@@ -155,7 +142,6 @@ mise run check-proxy-trust # 需要已按上文启动安全栈
 ```text
 .
 ├── backend/       Go 后端
-├── design/        OpenPencil 设计源文件与预览
 ├── frontend/      React 前端
 ├── scripts/       仓库聚焦检查脚本
 ├── docs/adr/      架构决策记录

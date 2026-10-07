@@ -50,22 +50,16 @@ go -C backend test -count=1 ./internal/postgres
 ]
 
 [tasks.test]
-description = "Run all tests and asset checks"
+description = "Run frontend and backend tests and build checks"
 run = [
-  "node scripts/check-design-assets.mjs",
   "npm --prefix frontend test",
   "npm --prefix frontend run build",
   "go -C backend test ./...",
 ]
 
-[tasks.check-design]
-description = "Validate versioned design sources and previews"
-run = "node scripts/check-design-assets.mjs"
-
 [tasks.check-release]
 description = "Run every gate required for a release candidate"
 run = [
-  "node scripts/check-design-assets.mjs",
   "npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000",
   "npm --prefix frontend test",
   "npm --prefix frontend run build",
