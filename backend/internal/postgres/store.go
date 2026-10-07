@@ -3,16 +3,14 @@ package postgres
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/feeratepg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/gatewaypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/identitypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
 )
@@ -25,6 +23,7 @@ type (
 	feeRateStore  = feeratepg.Store
 	channelStore  = channelpg.Store
 	ledgerStore   = ledgerpg.Store
+	gatewayStore  = gatewaypg.Store
 	c2cStore      = c2cpg.Store
 )
 
@@ -39,14 +38,10 @@ type Store struct {
 	*feeRateStore
 	*channelStore
 	*ledgerStore
+	*gatewayStore
 	*c2cStore
 
 	pool *pgxpool.Pool
-	// gatewayCommitHook is a deterministic test seam for the PostgreSQL
-	// "commit succeeded but the acknowledgement was lost" outcome. Production
-	// stores leave it nil. Callers must still disambiguate every returned commit
-	// error by rereading the immutable business fact.
-	gatewayCommitHook func(operation, resourceID string) error
 }
 
 func New(pool *pgxpool.Pool) *Store {
@@ -56,31 +51,14 @@ func New(pool *pgxpool.Pool) *Store {
 		feeRateStore:  feeratepg.NewStore(pool),
 		channelStore:  channelpg.NewStore(pool),
 		ledgerStore:   ledgerpg.NewStore(pool),
+		gatewayStore:  gatewaypg.NewStore(pool),
 		c2cStore:      c2cpg.NewStore(pool),
 		pool:          pool,
 	}
 }
 
-func (s *Store) commitGatewayTransaction(ctx context.Context, tx pgx.Tx, operation, resourceID string) error {
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-	if s.gatewayCommitHook != nil {
-		return s.gatewayCommitHook(operation, resourceID)
-	}
-	return nil
-}
-
 type scanner interface {
 	Scan(...any) error
-}
-
-type rowQueryer interface {
-	QueryRow(context.Context, string, ...any) pgx.Row
-}
-
-type tierQueryer interface {
-	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
 // insertAudit stays for the domains that have not moved to sqlc yet; migrated
@@ -90,26 +68,4 @@ func insertAudit(ctx context.Context, db auditpg.DBTX, actorID, action, targetTy
 		ActorID: actorID, Action: action, TargetType: targetType, TargetID: targetID,
 		Reason: reason, Details: details,
 	})
-}
-
-// loadModelPriceTiers adapts the catalog tier loader to the narrow read-only
-// interfaces still used by the hand-written channel and gateway code. It goes
-// away when those domains are migrated and pass a full transaction instead.
-func loadModelPriceTiers(ctx context.Context, queryer tierQueryer, modelIDs []string) (map[string][]ledger.PriceTier, error) {
-	return catalogpg.PriceTiersByModel(ctx, readOnlyDB{queryer}, modelIDs)
-}
-
-func priceTiersEqual(left, right []ledger.PriceTier) bool {
-	return catalogpg.PriceTiersEqual(left, right)
-}
-
-// readOnlyDB lets a Query-only handle satisfy catalogpg.DBTX.
-type readOnlyDB struct{ tierQueryer }
-
-func (readOnlyDB) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
-	panic("postgres: readOnlyDB does not support Exec")
-}
-
-func (readOnlyDB) QueryRow(context.Context, string, ...any) pgx.Row {
-	panic("postgres: readOnlyDB does not support QueryRow")
 }

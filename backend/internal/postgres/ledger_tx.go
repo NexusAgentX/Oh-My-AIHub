@@ -11,7 +11,7 @@ import (
 type ledgerTx = ledgerpg.Tx
 
 // LedgerTransaction is the transitional bridge for the domains that are still
-// hand-written in this package (c2c, channel, gateway). It exposes the caller's
+// hand-written in this package (c2c). It exposes the caller's
 // pgx transaction for their own SQL and, through the embedded ledgerpg.Tx, the
 // full ledger.Store bound to that same transaction, so ledger postings and
 // business rows commit atomically. Delete it once those domains are migrated;

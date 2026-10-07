@@ -40,6 +40,12 @@ sql:
           - db_type: pg_catalog.int2
             nullable: true
             go_type: { type: "int16", pointer: true }
+          - db_type: pg_catalog.int4
+            nullable: true
+            go_type: { type: "int32", pointer: true }
+          # 租约时长等 interval 参数直接使用 time.Duration（pgx 原生支持）。
+          - db_type: pg_catalog.interval
+            go_type: time.Duration
           # 金额：BIGINT 纳积分（ADR-0006）。sqlc 只按列覆盖，新增金额列须在此登记，
           # 否则会生成裸 int64。
           - column: "accounts.credit_limit_nano"
@@ -102,6 +108,42 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "c2c_trades.quantity_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_calls.preauthorized_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_calls.fee_rate_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_calls.provider_charge_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_calls.platform_fee_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.input_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.output_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.cache_write_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.cache_read_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.multiplier_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_candidates.net_debit_upper_bound_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_price_tiers.input_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_price_tiers.output_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_price_tiers.cache_write_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_price_tiers.cache_read_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_settlements.provider_charge_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_settlements.platform_fee_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_compensations.provider_charge_reversed_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_call_compensations.platform_fee_reversed_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
   - <<: *domain
     queries: internal/postgres/catalogpg/queries.sql
     gen:
@@ -144,3 +186,10 @@ sql:
         <<: *gen
         package: c2cpg
         out: internal/postgres/c2cpg
+  - <<: *domain
+    queries: internal/postgres/gatewaypg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: gatewaypg
+        out: internal/postgres/gatewaypg
