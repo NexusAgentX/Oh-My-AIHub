@@ -255,4 +255,56 @@ func TestOpsIntegration(t *testing.T) {
 			t.Fatal("reversed window accepted")
 		}
 	})
+
+	t.Run("inactive days use database clock and never go negative", func(t *testing.T) {
+		skewed := createReady("ops.skewed")
+		stale := createReady("ops.stale")
+		receiver := createReady("ops.receiver")
+		for _, funder := range []identity.Account{skewed, stale} {
+			key := "ops-clock-" + funder.Username
+			if _, err := ledgerService.Transfer(ctx, key, funder.ID, receiver.ID, mustAmount(t, "5"), "clock funding", "test_funding", key); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Ledger entries are stamped by the database clock. Shift them to model a
+		// database clock running ahead of the backend, and an account idle for 3 days.
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		shift := `UPDATE ledger_entries e SET created_at = now() + $2::interval
+			FROM ledger_accounts la WHERE la.id = e.ledger_account_id AND la.identity_account_id = $1`
+		for _, statement := range []struct {
+			sql  string
+			args []any
+		}{
+			{sql: `ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_immutable`},
+			{sql: shift, args: []any{skewed.ID, "1 minute"}},
+			{sql: shift, args: []any{stale.ID, "-3 days -1 hour"}},
+			{sql: `ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_immutable`},
+		} {
+			if _, err := tx.Exec(ctx, statement.sql, statement.args...); err != nil {
+				t.Fatalf("shift ledger clock: %v", err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		snapshot, err := store.OpsMetrics(ctx, window)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inactive := map[string]int64{}
+		for _, row := range snapshot.NegativeBalances {
+			inactive[row.Username] = row.InactiveDays
+		}
+		if days, ok := inactive["ops.skewed"]; !ok || days != 0 {
+			t.Fatalf("skewed inactive days = %d (present %v), want 0: %+v", days, ok, snapshot.NegativeBalances)
+		}
+		if days, ok := inactive["ops.stale"]; !ok || days != 3 {
+			t.Fatalf("stale inactive days = %d (present %v), want 3: %+v", days, ok, snapshot.NegativeBalances)
+		}
+	})
 }

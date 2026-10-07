@@ -167,19 +167,23 @@ func (s *Store) opsNegativeBalances(ctx context.Context, result *ops.Metrics) er
 			LEFT JOIN entries e ON e.ledger_account_id = n.id
 			GROUP BY n.id, n.posted_balance_nano, n.username, n.credit_limit_nano, n.credit_frozen
 		)
-		SELECT id::text, username, posted_balance_nano, negative_since, last_activity, credit_limit_nano, credit_frozen
+		SELECT id::text, username, posted_balance_nano, negative_since, last_activity,
+			-- Ledger timestamps come from the database clock, so measure inactivity
+			-- against it too; a backend clock lagging the database must not yield -1.
+			greatest(0, floor(extract(epoch FROM now() - last_activity) / 86400))::bigint,
+			credit_limit_nano, credit_frozen
 		FROM streak ORDER BY posted_balance_nano ASC LIMIT 200`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	now := time.Now().UTC()
 	for rows.Next() {
 		var row ops.NegativeBalanceRisk
 		var posted, creditLimit int64
 		var negativeSince, lastActivity *time.Time
+		var inactiveDays *int64
 		var frozen bool
-		if err := rows.Scan(&row.AccountID, &row.Username, &posted, &negativeSince, &lastActivity, &creditLimit, &frozen); err != nil {
+		if err := rows.Scan(&row.AccountID, &row.Username, &posted, &negativeSince, &lastActivity, &inactiveDays, &creditLimit, &frozen); err != nil {
 			return err
 		}
 		row.PostedBalance = pointsString(posted)
@@ -190,7 +194,9 @@ func (s *Store) opsNegativeBalances(ctx context.Context, result *ops.Metrics) er
 		}
 		if lastActivity != nil {
 			row.LastFinancialActivity = lastActivity.UTC().Format(time.RFC3339)
-			row.InactiveDays = int64(math.Floor(now.Sub(*lastActivity).Hours() / 24))
+		}
+		if inactiveDays != nil {
+			row.InactiveDays = *inactiveDays
 		}
 		result.NegativeBalances = append(result.NegativeBalances, row)
 	}
