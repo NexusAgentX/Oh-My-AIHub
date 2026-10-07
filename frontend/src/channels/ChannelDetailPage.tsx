@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, ConfirmDialog, formatDate, PricePair, protocolLabels, ratingText, TierCountBadge, TierPriceList } from './presentation'
 import { formatPoints, formatRate } from '../gateway/presentation'
@@ -144,8 +143,8 @@ export function ChannelDetailPage() {
     }
   }
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
-  if (!channel || channel.id !== channelID) return <AppShell><InlineError>{error || '渠道不存在'}</InlineError></AppShell>
+  if (loading) return <><LoadingState /></>
+  if (!channel || channel.id !== channelID) return <><InlineError>{error || '渠道不存在'}</InlineError></>
 
   const pendingTitle = pending?.kind === 'validate' ? '验证报价'
     : pending?.kind === 'delete-offer' ? '删除协议报价'
@@ -154,7 +153,7 @@ export function ChannelDetailPage() {
           : pending?.kind === 'pause' ? '暂停渠道' : '发布渠道'
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to="/channels">← 我的渠道</Link>
       <header className="page-heading channel-detail-heading">
         <div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div>
@@ -238,7 +237,7 @@ export function ChannelDetailPage() {
       >
         {pending?.kind === 'validate' && <label className="checkbox-control validation-cost-confirm"><input checked={costConfirmed} onChange={(event) => setCostConfirmed(event.target.checked)} type="checkbox" /><span>我确认可能产生少量上游费用</span></label>}
       </ConfirmDialog>
-    </AppShell>
+    </>
   )
 }
 

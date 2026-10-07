@@ -16,7 +16,6 @@ import type {
   MarketOffer,
 } from '../api/contracts'
 import { protocolLabels } from '../channels/presentation'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { formatRate } from './presentation'
@@ -355,10 +354,10 @@ export function APIKeyEditorPage() {
     }
   }
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
+  if (loading) return <><LoadingState /></>
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to={editing && keyID ? `/keys/${keyID}` : '/keys'}>
         ← API Key
       </Link>
@@ -607,6 +606,6 @@ export function APIKeyEditorPage() {
           </div>
         </aside>
       </form>
-    </AppShell>
+    </>
   )
 }

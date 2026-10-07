@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { CatalogModel } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import {
   Button,
   InlineError,
@@ -214,7 +213,7 @@ export function AdminModelsPage() {
   }
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading">
         <div><h1>模型目录</h1></div>
         <Button aria-label="新增模型" icon={<Icon name="plus" />} onClick={startNew}>新增模型</Button>
@@ -409,7 +408,7 @@ export function AdminModelsPage() {
           </form>
         </section>
       </div>
-    </AppShell>
+    </>
   )
 }
 

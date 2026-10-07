@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import type { ProviderIncomeSnapshot } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import { formatRate } from '../gateway/presentation'
@@ -35,7 +34,7 @@ export function AdminProvidersPage() {
   }, [load])
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading">
         <div><h1>共享者收入</h1></div>
         <span className="count-badge">近 30 天</span>
@@ -116,6 +115,6 @@ export function AdminProvidersPage() {
           </section>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }

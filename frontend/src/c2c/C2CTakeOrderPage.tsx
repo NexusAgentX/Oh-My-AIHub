@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2COrder } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import { c2cFiatFen, c2cPaymentLabels, c2cSideLabels, formatC2CFiat, formatC2CPrice } from './presentation'
@@ -52,7 +51,7 @@ export function C2CTakeOrderPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading"><div><Link className="back-link" to="/c2c">← C2C 市场</Link><h1>确认{order?.side === 'sell' ? '购买' : '出售'}</h1></div></header>
       <InlineError>{error}</InlineError>
       {loading ? <LoadingState /> : order ? (
@@ -92,6 +91,6 @@ export function C2CTakeOrderPage() {
           </form>
         )
       ) : null}
-    </AppShell>
+    </>
   )
 }

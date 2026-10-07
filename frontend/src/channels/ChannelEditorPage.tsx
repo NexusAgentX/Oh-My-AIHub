@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { CatalogModel, Channel, ChannelOffer, ChannelProtocol } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { protocolLabels } from './presentation'
@@ -346,13 +345,13 @@ export function ChannelEditorPage() {
     }
   }
 
-  if (loading || loadedRouteKey !== routeKey) return <AppShell><LoadingState /></AppShell>
+  if (loading || loadedRouteKey !== routeKey) return <><LoadingState /></>
   if (editing && (!channel || channel.id !== channelID)) {
-    return <AppShell><InlineError>{error || '渠道不存在'}</InlineError></AppShell>
+    return <><InlineError>{error || '渠道不存在'}</InlineError></>
   }
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to={channelID ? `/channels/${channelID}` : '/channels'}>← 返回</Link>
       <header className="page-heading"><div><h1>{editing ? '编辑渠道' : '上架渠道'}</h1></div></header>
       <InlineError>{error}</InlineError>
@@ -440,6 +439,6 @@ export function ChannelEditorPage() {
           <Button disabled={saving} type="submit">{saving ? '正在保存' : editing ? '保存配置' : '创建草稿'}</Button>
         </div>
       </form>
-    </AppShell>
+    </>
   )
 }

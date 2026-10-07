@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { GatewayCall } from '../api/contracts'
 import { formatDate, protocolLabels } from '../channels/presentation'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { formatNullableMetric, GatewayStatusBadge, formatPoints, shortID, totalTokens } from './presentation'
 
@@ -27,11 +26,11 @@ export function CallDetailPage() {
 
   useEffect(() => { void load() }, [load])
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
-  if (!call) return <AppShell><InlineError>{error || '调用不存在'}</InlineError></AppShell>
+  if (loading) return <><LoadingState /></>
+  if (!call) return <><InlineError>{error || '调用不存在'}</InlineError></>
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to="/calls">← 调用记录</Link>
       <header className="page-heading channel-detail-heading">
         <div><h1>{call.model_id || '调用详情'}</h1><GatewayStatusBadge status={call.status} /></div>
@@ -77,6 +76,6 @@ export function CallDetailPage() {
           <div className="mobile-card-list">{call.attempts.map((attempt) => <article className="mobile-data-card" key={attempt.id}><header><div><strong>#{attempt.sequence} {attempt.channel_name}</strong><span className="mono-value">{shortID(attempt.offer_id)}</span></div><GatewayStatusBadge status={attempt.status} /></header><dl><div><dt>HTTP</dt><dd>{attempt.http_status || '—'}</dd></div><div><dt>TTFT / 耗时</dt><dd>{formatNullableMetric(attempt.ttft_milliseconds)} / {formatNullableMetric(attempt.duration_milliseconds)} ms</dd></div><div><dt>错误码</dt><dd>{attempt.error_code || '—'}</dd></div>{attempt.raw_error && <div><dt>错误消息</dt><dd className="raw-error-value">{attempt.raw_error}</dd></div>}</dl></article>)}</div>
         </>}
       </section>
-    </AppShell>
+    </>
   )
 }

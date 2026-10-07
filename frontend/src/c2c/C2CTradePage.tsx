@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2CTrade } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import { C2CState } from './C2CActivityPage'
@@ -65,7 +64,7 @@ export function C2CTradePage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading">
         <div><Link className="back-link" to="/c2c/me">← 我的 C2C</Link><h1>交易详情</h1></div>
         {trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}
@@ -135,6 +134,6 @@ export function C2CTradePage() {
           </section>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }

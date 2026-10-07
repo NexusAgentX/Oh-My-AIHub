@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2CPaymentMethodType, C2CSide } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { parseNanoPoints } from '../money/amount'
 import { Button, InlineError, TextField } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
@@ -77,7 +76,7 @@ export function C2COrderEditorPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading">
         <div><Link className="back-link" to="/c2c">← C2C 市场</Link><h1>发布挂单</h1></div>
       </header>
@@ -133,6 +132,6 @@ export function C2COrderEditorPage() {
           <div><Link className="button button-secondary" to="/c2c">取消</Link><Button disabled={submitting} type="submit">{submitting ? '正在发布' : '发布挂单'}</Button></div>
         </div>
       </form>
-    </AppShell>
+    </>
   )
 }

@@ -1,0 +1,94 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: var(--body);
+  font-size: var(--text-base);
+}
+
+.field-label,
+.form-section > legend {
+  color: var(--body);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.input:hover:not(:disabled) { border-color: #cfd2d7; }
+
+.input:focus {
+  border-color: var(--focus);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+}
+
+.input:disabled { color: var(--muted); background: var(--soft); }
+.input[aria-invalid='true'] { border-color: var(--danger); }
+
+.textarea-input { height: auto; min-height: 96px; padding-block: 10px; resize: vertical; }
+
+.password-input { position: relative; display: block; }
+.password-input .input { padding-right: 48px; }
+.password-toggle { position: absolute; top: 0; right: 0; }
+
+.field-message { color: var(--muted); font-size: var(--text-xs); line-height: 1.45; }
+.field-error { color: var(--danger); }
+
+.checkbox-control {
+  display: flex;
+  min-height: var(--control-height);
+  align-items: center;
+  gap: 10px;
+  color: var(--body);
+  cursor: pointer;
+}
+
+.checkbox-control input { width: 18px; height: 18px; accent-color: var(--ink); }
+
+.form-section {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-section > legend { margin-bottom: var(--space-3); padding: 0; }
+
+.auth-form,
+.stack-form,
+.modal-form { display: grid; gap: 18px; }
+
+.field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.field-row-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.form-actions,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@media (max-width: 960px) {
+  .field-row-three { grid-template-columns: 1fr 1fr; }
+  .field-row-three > .field:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .field-row,
+  .field-row-three { grid-template-columns: 1fr; }
+  .field-row-three > .field:last-child { grid-column: auto; }
+  .input { height: 44px; }
+  .textarea-input { height: auto; }
+}

@@ -1,3 +1,5 @@
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -16,6 +18,9 @@ import { InstanceProvider, RequireInitialized } from './auth/InstanceProvider'
 import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { canEnterAdmin, defaultDestination } from './auth/routePolicy'
+import { createQueryClient } from './api/query'
+import { AdminLayout } from './layouts/AdminLayout'
+import { ProductLayout } from './layouts/ProductLayout'
 import { AdminModelsPage } from './models/AdminModelsPage'
 import { LoadingState } from './ui/FormControls'
 import { WelcomePage } from './welcome/WelcomePage'
@@ -32,7 +37,6 @@ import { AdminLedgerPage } from './ledger/AdminLedgerPage'
 import { AdminProvidersPage } from './ledger/AdminProvidersPage'
 import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
 import { WalletPage } from './wallet/WalletPage'
-import { WalletProvider } from './wallet/WalletProvider'
 import { APIKeyEditorPage } from './gateway/APIKeyEditorPage'
 import { APIKeyPage } from './gateway/APIKeyPage'
 import { APIKeysPage } from './gateway/APIKeysPage'
@@ -76,17 +80,35 @@ function FullPageLoading() {
   )
 }
 
+const queryClient = createQueryClient()
+
+/** 登录、退出或切换账号时清空查询缓存，避免上一个账号的数据残留。 */
+function SessionQueryReset() {
+  const { account } = useAuth()
+  const client = useQueryClient()
+  const accountID = account?.id ?? ''
+  const previous = useRef(accountID)
+  useEffect(() => {
+    if (previous.current !== accountID) {
+      previous.current = accountID
+      client.clear()
+    }
+  }, [accountID, client])
+  return null
+}
+
 function AppProviders() {
   return (
-    <InstanceProvider>
-      <EphemeralCredentialProvider>
-        <AuthProvider>
-          <WalletProvider>
+    <QueryClientProvider client={queryClient}>
+      <InstanceProvider>
+        <EphemeralCredentialProvider>
+          <AuthProvider>
+            <SessionQueryReset />
             <Outlet />
-          </WalletProvider>
-        </AuthProvider>
-      </EphemeralCredentialProvider>
-    </InstanceProvider>
+          </AuthProvider>
+        </EphemeralCredentialProvider>
+      </InstanceProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -101,46 +123,50 @@ export const appRoutes = createRoutesFromElements(
     <Route element={<RequireSession />}>
       <Route element={<FirstPasswordChangePage />} path="/account/password" />
       <Route element={<RequireReadyAccount />}>
-        <Route element={<DashboardPage />} path="/dashboard" />
-        <Route element={<APIKeysPage />} path="/keys" />
-        <Route element={<APIKeyEditorPage />} path="/keys/new" />
-        <Route element={<APIKeyPage />} path="/keys/:keyID" />
-        <Route element={<APIKeyEditorPage />} path="/keys/:keyID/settings" />
-        <Route element={<CallsPage />} path="/calls" />
-        <Route element={<CallDetailPage />} path="/calls/:callID" />
-        <Route element={<AccountSettingsPage />} path="/account" />
-        <Route element={<WalletPage />} path="/wallet" />
-        <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />
-        <Route element={<C2CMarketPage />} path="/c2c" />
-        <Route element={<C2COrderEditorPage />} path="/c2c/orders/new" />
-        <Route element={<C2CTakeOrderPage />} path="/c2c/orders/:orderID/take" />
-        <Route element={<C2CActivityPage />} path="/c2c/me" />
-        <Route element={<C2CTradePage />} path="/c2c/trades/:tradeID" />
-        <Route element={<C2CDisputePage />} path="/c2c/trades/:tradeID/dispute" />
-        <Route element={<MarketPage />} path="/market" />
-        <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
-        <Route element={<AddOfferToPoolPage />} path="/market/channels/:channelID/add" />
-        <Route element={<ChannelsPage />} path="/channels" />
-        <Route element={<ChannelEditorPage />} path="/channels/new" />
-        <Route element={<ChannelDetailPage />} path="/channels/:channelID" />
-        <Route element={<ChannelEditorPage />} path="/channels/:channelID/settings" />
+        <Route element={<ProductLayout />}>
+          <Route element={<DashboardPage />} path="/dashboard" />
+          <Route element={<APIKeysPage />} path="/keys" />
+          <Route element={<APIKeyEditorPage />} path="/keys/new" />
+          <Route element={<APIKeyPage />} path="/keys/:keyID" />
+          <Route element={<APIKeyEditorPage />} path="/keys/:keyID/settings" />
+          <Route element={<CallsPage />} path="/calls" />
+          <Route element={<CallDetailPage />} path="/calls/:callID" />
+          <Route element={<AccountSettingsPage />} path="/account" />
+          <Route element={<WalletPage />} path="/wallet" />
+          <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />
+          <Route element={<C2CMarketPage />} path="/c2c" />
+          <Route element={<C2COrderEditorPage />} path="/c2c/orders/new" />
+          <Route element={<C2CTakeOrderPage />} path="/c2c/orders/:orderID/take" />
+          <Route element={<C2CActivityPage />} path="/c2c/me" />
+          <Route element={<C2CTradePage />} path="/c2c/trades/:tradeID" />
+          <Route element={<C2CDisputePage />} path="/c2c/trades/:tradeID/dispute" />
+          <Route element={<MarketPage />} path="/market" />
+          <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
+          <Route element={<AddOfferToPoolPage />} path="/market/channels/:channelID/add" />
+          <Route element={<ChannelsPage />} path="/channels" />
+          <Route element={<ChannelEditorPage />} path="/channels/new" />
+          <Route element={<ChannelDetailPage />} path="/channels/:channelID" />
+          <Route element={<ChannelEditorPage />} path="/channels/:channelID/settings" />
+        </Route>
         <Route element={<RequireAdministrator />}>
-          <Route element={<AdminLedgerPage />} path="/admin/ops" />
-          <Route element={<AdminAccountsPage />} path="/admin/accounts" />
-          <Route
-            element={<CreatedCredentialPage />}
-            path="/admin/accounts/created"
-          />
-          <Route element={<AdminModelsPage />} path="/admin/models" />
-          <Route element={<AdminChannelsPage />} path="/admin/channels" />
-          <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
-          <Route element={<AdminC2CDisputesPage />} path="/admin/c2c/disputes" />
-          <Route element={<AdminC2CDisputePage />} path="/admin/c2c/disputes/:tradeID" />
-          <Route element={<AdminProvidersPage />} path="/admin/providers" />
-          <Route
-            element={<AdminAccountLedgerPage />}
-            path="/admin/ledger/accounts/:accountID"
-          />
+          <Route element={<AdminLayout />}>
+            <Route element={<AdminLedgerPage />} path="/admin/ops" />
+            <Route element={<AdminAccountsPage />} path="/admin/accounts" />
+            <Route
+              element={<CreatedCredentialPage />}
+              path="/admin/accounts/created"
+            />
+            <Route element={<AdminModelsPage />} path="/admin/models" />
+            <Route element={<AdminChannelsPage />} path="/admin/channels" />
+            <Route element={<AdminChannelPage />} path="/admin/channels/:channelID" />
+            <Route element={<AdminC2CDisputesPage />} path="/admin/c2c/disputes" />
+            <Route element={<AdminC2CDisputePage />} path="/admin/c2c/disputes/:tradeID" />
+            <Route element={<AdminProvidersPage />} path="/admin/providers" />
+            <Route
+              element={<AdminAccountLedgerPage />}
+              path="/admin/ledger/accounts/:accountID"
+            />
+          </Route>
         </Route>
       </Route>
     </Route>

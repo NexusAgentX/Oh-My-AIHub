@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { Channel } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { ChannelStateBadge, formatDate, ratingText } from './presentation'
@@ -32,7 +31,7 @@ export function ChannelsPage() {
   }, [channels])
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading">
         <div><h1>我的渠道</h1></div>
         <Link className="button button-primary" to="/channels/new">
@@ -84,6 +83,6 @@ export function ChannelsPage() {
           </>
         )}
       </section>
-    </AppShell>
+    </>
   )
 }

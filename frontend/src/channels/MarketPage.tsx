@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { CatalogModel, ChannelProtocol, MarketOffer } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText, TierCountBadge, TierPriceList } from './presentation'
 import { formatRate } from '../gateway/presentation'
@@ -63,7 +62,7 @@ export function MarketPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading"><div><h1>API 市场</h1></div><Link className="button button-secondary" to="/channels">我的渠道</Link></header>
       <InlineError>{error}</InlineError>
       <section className="panel market-filter-panel">
@@ -102,6 +101,6 @@ export function MarketPage() {
           {next && <div className="table-pagination"><Button disabled={loading} onClick={() => void load(filters, next)} variant="secondary">{loading ? '正在加载' : '加载更多'}</Button></div>}
         </>}
       </section>
-    </AppShell>
+    </>
   )
 }

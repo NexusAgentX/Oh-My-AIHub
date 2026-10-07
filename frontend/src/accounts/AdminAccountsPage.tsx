@@ -8,7 +8,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { Account, AccountStatus, LedgerMetrics } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import {
   Button,
   InlineError,
@@ -72,7 +71,7 @@ export function AdminAccountsPage() {
   }
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading">
         <div>
           <h1>账户与信用</h1>
@@ -239,7 +238,7 @@ export function AdminAccountsPage() {
           void load(query, '账户已被其他管理员修改，已加载最新版本，请重新操作')
         }}
       />
-    </AppShell>
+    </>
   )
 }
 

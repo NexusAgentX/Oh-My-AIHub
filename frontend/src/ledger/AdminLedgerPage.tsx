@@ -9,7 +9,6 @@ import type {
   OpsTrialSummary,
   Wallet,
 } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
 import { formatPointAmount } from '../wallet/presentation'
@@ -109,7 +108,7 @@ export function AdminLedgerPage() {
   }, [apiFunnel])
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading">
         <div><h1>运营总览</h1></div>
         {metrics && (
@@ -366,7 +365,7 @@ export function AdminLedgerPage() {
         </>
       ) : null}
       <FeeRatePanel />
-    </AppShell>
+    </>
   )
 }
 

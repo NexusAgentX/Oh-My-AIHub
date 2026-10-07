@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { APIKey } from '../api/contracts'
 import { formatDate } from '../channels/presentation'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { GatewayStatusBadge } from './presentation'
@@ -30,7 +29,7 @@ export function APIKeysPage() {
   }, [load])
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading">
         <div>
           <h1>API Keys</h1>
@@ -123,6 +122,6 @@ export function APIKeysPage() {
           </>
         )}
       </section>
-    </AppShell>
+    </>
   )
 }

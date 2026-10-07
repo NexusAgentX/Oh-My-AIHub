@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2CMarket, C2COrder, C2CSide } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { formatPointAmount } from '../wallet/presentation'
@@ -38,7 +37,7 @@ export function C2CMarketPage() {
   const orders = side === 'sell' ? market?.sell_orders ?? [] : market?.buy_orders ?? []
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading">
         <div><h1>C2C 市场</h1></div>
         <div className="c2c-heading-actions">
@@ -80,7 +79,7 @@ export function C2CMarketPage() {
           </section>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }
 

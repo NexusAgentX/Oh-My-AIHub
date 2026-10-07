@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { APIKey, MarketChannel } from '../api/contracts'
 import { formatDate, PricePair, protocolLabels, ratingText } from '../channels/presentation'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { formatRate } from './presentation'
 
@@ -93,11 +92,11 @@ export function AddOfferToPoolPage() {
     }
   }
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
-  if (!channel) return <AppShell><InlineError>{error || '渠道不存在'}</InlineError></AppShell>
+  if (loading) return <><LoadingState /></>
+  if (!channel) return <><InlineError>{error || '渠道不存在'}</InlineError></>
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to={`/market/channels/${channel.id}`}>← {channel.display_name}</Link>
       <header className="page-heading channel-detail-heading">
         <div>
@@ -188,6 +187,6 @@ export function AddOfferToPoolPage() {
           </div>
         </form>
       </div>
-    </AppShell>
+    </>
   )
 }

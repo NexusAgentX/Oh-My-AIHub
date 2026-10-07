@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2COrder, C2CTrade } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import {
@@ -55,7 +54,7 @@ export function C2CActivityPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading">
         <div><Link className="back-link" to="/c2c">← C2C 市场</Link><h1>我的挂单与交易</h1></div>
         <div className="c2c-heading-actions"><Link className="button button-primary" to="/c2c/orders/new">发布挂单</Link></div>
@@ -84,7 +83,7 @@ export function C2CActivityPage() {
           </section>
         </>
       )}
-    </AppShell>
+    </>
   )
 }
 
