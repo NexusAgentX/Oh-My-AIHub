@@ -13,11 +13,10 @@ type PaymentDraft = {
   type: C2CPaymentMethodType
   contact: string
   instructions: string
-  qr: File | null
 }
 
 function emptyPaymentMethod(): PaymentDraft {
-  return { id: crypto.randomUUID(), type: 'wechat', contact: '', instructions: '', qr: null }
+  return { id: crypto.randomUUID(), type: 'wechat', contact: '', instructions: '' }
 }
 
 export function C2COrderEditorPage() {
@@ -35,7 +34,7 @@ export function C2COrderEditorPage() {
   const switchSide = (next: C2CSide) => {
     setSide(next)
     if (next === 'buy') {
-      setMethods((current) => current.map((method) => ({ ...method, qr: null })))
+      setMethods((current) => current.map((method) => ({ ...method })))
     }
   }
 
@@ -55,7 +54,7 @@ export function C2COrderEditorPage() {
       if (totalNano <= 0n || minimumNano <= 0n || maximumNano < minimumNano || maximumNano > totalNano) {
         throw new Error('invalid amount range')
       }
-      if (methods.some((method) => side === 'buy' ? !method.contact.trim() : !method.contact.trim() && !method.instructions.trim() && !method.qr)) {
+      if (methods.some((method) => side === 'buy' ? !method.contact.trim() : !method.contact.trim() && !method.instructions.trim())) {
         throw new Error('invalid payment method')
       }
     } catch {
@@ -66,7 +65,7 @@ export function C2COrderEditorPage() {
     try {
       await api.createC2COrder({
         side, unit_price_fen: unitPriceFen, total, minimum, maximum,
-        payment_methods: methods.map(({ type, contact, instructions, qr }) => ({ type, contact, instructions, qr })),
+        payment_methods: methods.map(({ type, contact, instructions }) => ({ type, contact, instructions })),
       })
       navigate('/c2c/me', { replace: true })
     } catch (caught) {
@@ -122,7 +121,6 @@ export function C2COrderEditorPage() {
                   <TextField label={side === 'sell' ? '收款账号或联系方式' : '联系方式'} onChange={(event) => updateMethod(method.id, { contact: event.target.value })} required={side === 'buy'} value={method.contact} />
                 </div>
                 <label className="field"><span className="field-label">备注</span><textarea className="input textarea-input" maxLength={1000} onChange={(event) => updateMethod(method.id, { instructions: event.target.value })} value={method.instructions} /></label>
-                {side === 'sell' && <label className="field"><span className="field-label">收款码（可选）</span><input accept="image/jpeg,image/png" className="input c2c-file-input" onChange={(event) => updateMethod(method.id, { qr: event.target.files?.[0] ?? null })} type="file" /></label>}
               </article>
             ))}
           </div>

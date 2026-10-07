@@ -490,8 +490,6 @@ export type C2CPaymentMethod = {
   position: number
   contact: string
   instructions: string
-  qr_available: boolean
-  qr_url: string
 }
 
 export type C2COrder = {
@@ -514,20 +512,6 @@ export type C2COrder = {
   created_at: string
   updated_at: string
   cancelled_at: string | null
-}
-
-export type C2CEvidence = {
-  id: string
-  uploader_account_id: string
-  uploader_name: string
-  kind: 'payment' | 'dispute'
-  mime_type: 'image/jpeg' | 'image/png'
-  size_bytes: number
-  width: number
-  height: number
-  created_at: string
-  deleted_at: string | null
-  download_url: string
 }
 
 export type C2CStatement = {
@@ -571,7 +555,6 @@ export type C2CTrade = {
   payment_deadline: string
   review_due_at: string | null
   ledger_transaction_id: string
-  evidence: C2CEvidence[]
   statements: C2CStatement[]
   events: C2CEvent[]
   created_at: string

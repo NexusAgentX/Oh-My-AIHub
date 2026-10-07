@@ -85,11 +85,10 @@ export function AdminC2CDisputePage() {
 
           <div className="c2c-admin-dispute-layout">
             <section className="panel c2c-dispute-history">
-              <header className="panel-heading"><h2>双方材料</h2></header>
+              <header className="panel-heading"><h2>双方陈述</h2></header>
               <div className="c2c-statement-list">
                 {trade.statements.map((item) => <article key={item.id}><header><strong>{item.actor_display_name}</strong><span>{formatC2CDate(item.created_at)}</span></header><p>{item.deleted_at ? '内容已按保留期清理' : item.text}</p></article>)}
-                {trade.evidence.map((item) => <a className="c2c-evidence-file" href={item.download_url} key={item.id}><strong>{item.kind === 'payment' ? '付款截图' : '争议图片'}</strong><span>{item.deleted_at ? '已清理' : `${item.uploader_name} · ${Math.ceil(item.size_bytes / 1024)} KB`}</span></a>)}
-                {trade.statements.length === 0 && trade.evidence.length === 0 && <div className="empty-state">暂无材料</div>}
+                {trade.statements.length === 0 && <div className="empty-state">暂无陈述</div>}
               </div>
             </section>
 

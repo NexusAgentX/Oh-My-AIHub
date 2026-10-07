@@ -74,7 +74,6 @@ export function C2CTakeOrderPage() {
                   <label className={paymentMethodID === method.id ? 'c2c-payment-choice c2c-payment-choice-active' : 'c2c-payment-choice'} key={method.id}>
                     <input checked={paymentMethodID === method.id} name="payment-method" onChange={() => setPaymentMethodID(method.id)} type="radio" />
                     <span><strong>{c2cPaymentLabels[method.type]}</strong>{method.contact && <small>{method.contact}</small>}{method.instructions && <small>{method.instructions}</small>}</span>
-                    {method.qr_available && <img alt={`${c2cPaymentLabels[method.type]}收款码`} src={method.qr_url} />}
                   </label>
                 ))}
               </div>

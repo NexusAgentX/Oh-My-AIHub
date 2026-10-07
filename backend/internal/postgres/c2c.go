@@ -124,7 +124,7 @@ func loadC2COrder(ctx context.Context, queryer c2cQueryer, orderID string, lock 
 
 func loadC2CPaymentMethods(ctx context.Context, queryer c2cQueryer, orderID string) ([]c2c.PaymentMethod, error) {
 	rows, err := queryer.Query(ctx, `
-		SELECT id::text, order_id::text, method_type, position, qr_available,
+		SELECT id::text, order_id::text, method_type, position,
 		       key_id, nonce, ciphertext, created_at
 		FROM c2c_payment_methods WHERE order_id = $1 ORDER BY position`, orderID)
 	if err != nil {
@@ -136,7 +136,7 @@ func loadC2CPaymentMethods(ctx context.Context, queryer c2cQueryer, orderID stri
 		var method c2c.PaymentMethod
 		var methodType string
 		if err := rows.Scan(
-			&method.ID, &method.OrderID, &methodType, &method.Position, &method.QRAvailable,
+			&method.ID, &method.OrderID, &methodType, &method.Position,
 			&method.Private.KeyID, &method.Private.Nonce, &method.Private.Ciphertext, &method.CreatedAt,
 		); err != nil {
 			return nil, mapC2CError(err)
@@ -170,9 +170,6 @@ func loadC2CTrade(ctx context.Context, queryer c2cQueryer, tradeID string, lock 
 		return c2c.Trade{}, err
 	}
 	trade.SelectedPaymentMethod = &method
-	if trade.Evidence, err = loadC2CEvidence(ctx, queryer, trade.ID); err != nil {
-		return c2c.Trade{}, err
-	}
 	if trade.Statements, err = loadC2CStatements(ctx, queryer, trade.ID); err != nil {
 		return c2c.Trade{}, err
 	}
@@ -186,54 +183,16 @@ func loadSelectedC2CPaymentMethod(ctx context.Context, queryer c2cQueryer, trade
 	var method c2c.PaymentMethod
 	var methodType string
 	err := queryer.QueryRow(ctx, `
-		SELECT pm.id::text, pm.order_id::text, pm.method_type, pm.position, pm.qr_available,
+		SELECT pm.id::text, pm.order_id::text, pm.method_type, pm.position,
 		       pm.key_id, pm.nonce, pm.ciphertext, pm.created_at
 		FROM c2c_trades t
 		JOIN c2c_payment_methods pm ON pm.id = t.selected_payment_method_id
 		WHERE t.id = $1`, tradeID).Scan(
-		&method.ID, &method.OrderID, &methodType, &method.Position, &method.QRAvailable,
+		&method.ID, &method.OrderID, &methodType, &method.Position,
 		&method.Private.KeyID, &method.Private.Nonce, &method.Private.Ciphertext, &method.CreatedAt,
 	)
 	method.Type = c2c.PaymentMethodType(methodType)
 	return method, mapC2CError(err)
-}
-
-func loadC2CEvidence(ctx context.Context, queryer c2cQueryer, tradeID string) ([]c2c.Evidence, error) {
-	rows, err := queryer.Query(ctx, `
-		SELECT e.id::text, e.trade_id::text, e.uploader_account_id::text, uploader.display_name,
-		       e.kind, e.mime_type, e.size_bytes, e.width, e.height, e.sha256,
-		       COALESCE(e.key_id, ''), COALESCE(e.nonce, ''::bytea), COALESCE(e.ciphertext, ''::bytea),
-		       e.created_at, e.deleted_at
-		FROM c2c_evidence e JOIN accounts uploader ON uploader.id = e.uploader_account_id
-		WHERE e.trade_id = $1 ORDER BY e.created_at, e.id`, tradeID)
-	if err != nil {
-		return nil, mapC2CError(err)
-	}
-	defer rows.Close()
-	items := make([]c2c.Evidence, 0)
-	for rows.Next() {
-		item, err := scanC2CEvidence(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, mapC2CError(rows.Err())
-}
-
-func scanC2CEvidence(row scanner) (c2c.Evidence, error) {
-	var evidence c2c.Evidence
-	var kind string
-	var digest []byte
-	err := row.Scan(
-		&evidence.ID, &evidence.TradeID, &evidence.UploaderAccountID, &evidence.UploaderName,
-		&kind, &evidence.MIME, &evidence.SizeBytes, &evidence.Width, &evidence.Height, &digest,
-		&evidence.Encrypted.KeyID, &evidence.Encrypted.Nonce, &evidence.Encrypted.Ciphertext,
-		&evidence.CreatedAt, &evidence.DeletedAt,
-	)
-	evidence.Kind = c2c.EvidenceKind(kind)
-	copy(evidence.SHA256[:], digest)
-	return evidence, mapC2CError(err)
 }
 
 func loadC2CStatements(ctx context.Context, queryer c2cQueryer, tradeID string) ([]c2c.Statement, error) {
@@ -428,16 +387,6 @@ func (s *Store) AdminDisputes(ctx context.Context) ([]c2c.Trade, error) {
 	return items, mapC2CError(rows.Err())
 }
 
-func (s *Store) Evidence(ctx context.Context, evidenceID string) (c2c.Evidence, error) {
-	return scanC2CEvidence(s.pool.QueryRow(ctx, `
-		SELECT e.id::text, e.trade_id::text, e.uploader_account_id::text, uploader.display_name,
-		       e.kind, e.mime_type, e.size_bytes, e.width, e.height, e.sha256,
-		       COALESCE(e.key_id, ''), COALESCE(e.nonce, ''::bytea), COALESCE(e.ciphertext, ''::bytea),
-		       e.created_at, e.deleted_at
-		FROM c2c_evidence e JOIN accounts uploader ON uploader.id = e.uploader_account_id
-		WHERE e.id = $1`, evidenceID))
-}
-
 func (s *Store) EncryptionTargets(ctx context.Context) ([]c2c.EncryptionTarget, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id::text, 'payment_method', key_id, nonce, ciphertext FROM c2c_payment_methods
@@ -448,9 +397,6 @@ func (s *Store) EncryptionTargets(ctx context.Context) ([]c2c.EncryptionTarget, 
 		UNION ALL
 		SELECT id::text, 'dispute_statement', key_id, nonce, ciphertext
 		FROM c2c_dispute_statements WHERE deleted_at IS NULL
-		UNION ALL
-		SELECT id::text, 'evidence:' || kind, key_id, nonce, ciphertext
-		FROM c2c_evidence WHERE deleted_at IS NULL
 		ORDER BY 1`)
 	if err != nil {
 		return nil, mapC2CError(err)
@@ -499,7 +445,6 @@ func cleanC2COrderSnapshot(order c2c.Order) c2c.Order {
 
 func cleanC2CTradeSnapshot(trade c2c.Trade) c2c.Trade {
 	trade.SelectedPaymentMethod = nil
-	trade.Evidence = nil
 	trade.Statements = nil
 	trade.Events = nil
 	trade.PaymentReference = ""
@@ -665,18 +610,6 @@ func insertC2CEvent(ctx context.Context, tx pgx.Tx, command c2c.Command, orderID
 	return mapC2CError(err)
 }
 
-func insertC2CEvidence(ctx context.Context, tx pgx.Tx, command c2c.Command, tradeID string, evidence c2c.NewEvidence) error {
-	_, err := tx.Exec(ctx, `
-		INSERT INTO c2c_evidence (
-			id, trade_id, uploader_account_id, kind, mime_type, size_bytes,
-			width, height, sha256, key_id, nonce, ciphertext, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		evidence.ID, tradeID, command.Actor.ID, evidence.Kind, evidence.MIME,
-		evidence.SizeBytes, evidence.Width, evidence.Height, evidence.SHA256[:],
-		evidence.Encrypted.KeyID, evidence.Encrypted.Nonce, evidence.Encrypted.Ciphertext, command.Now)
-	return mapC2CError(err)
-}
-
 func ensureC2COrderOwnerReady(ctx context.Context, tx pgx.Tx, order c2c.Order) error {
 	var status string
 	var mustChange, frozen bool
@@ -780,10 +713,10 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 		for _, method := range input.PaymentMethods {
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO c2c_payment_methods (
-					id, order_id, method_type, position, qr_available,
+					id, order_id, method_type, position,
 					key_id, nonce, ciphertext, created_at
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-				method.ID, input.ID, method.Type, method.Position, method.QRAvailable,
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				method.ID, input.ID, method.Type, method.Position,
 				method.Private.KeyID, method.Private.Nonce, method.Private.Ciphertext, command.Now); err != nil {
 				return mapC2CError(err)
 			}
@@ -1140,7 +1073,7 @@ func captureC2CTrade(ctx context.Context, tx *LedgerTransaction, command c2c.Com
 	return loadC2CTrade(ctx, tx.Tx, trade.ID, false, false)
 }
 
-func (s *Store) MarkPaid(ctx context.Context, command c2c.Command, tradeID string, evidence *c2c.NewEvidence, paymentReference *c2c.EncryptedValue, paymentReferenceChars int) (c2c.Trade, error) {
+func (s *Store) MarkPaid(ctx context.Context, command c2c.Command, tradeID string, paymentReference *c2c.EncryptedValue, paymentReferenceChars int) (c2c.Trade, error) {
 	var result c2c.Trade
 	expired := false
 	err := s.WithLedgerTransaction(ctx, func(tx *LedgerTransaction) error {
@@ -1176,11 +1109,6 @@ func (s *Store) MarkPaid(ctx context.Context, command c2c.Command, tradeID strin
 			}
 			expired = true
 			return completeC2CCommand(ctx, tx.Tx, command, cleanC2CTradeSnapshot(result))
-		}
-		if evidence != nil {
-			if err := insertC2CEvidence(ctx, tx.Tx, command, trade.ID, *evidence); err != nil {
-				return err
-			}
 		}
 		var keyID any
 		var nonce, ciphertext []byte
@@ -1303,7 +1231,7 @@ func (s *Store) ConfirmReceipt(ctx context.Context, command c2c.Command, tradeID
 	return result, mapC2CError(err)
 }
 
-func insertC2CDisputeSubmission(ctx context.Context, tx pgx.Tx, command c2c.Command, tradeID string, statement c2c.NewStatement, evidence []c2c.NewEvidence) error {
+func insertC2CDisputeSubmission(ctx context.Context, tx pgx.Tx, command c2c.Command, tradeID string, statement c2c.NewStatement) error {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO c2c_dispute_statements (
 			id, trade_id, actor_account_id, character_count,
@@ -1313,11 +1241,6 @@ func insertC2CDisputeSubmission(ctx context.Context, tx pgx.Tx, command c2c.Comm
 		statement.Encrypted.KeyID, statement.Encrypted.Nonce, statement.Encrypted.Ciphertext, command.Now); err != nil {
 		return mapC2CError(err)
 	}
-	for _, item := range evidence {
-		if err := insertC2CEvidence(ctx, tx, command, tradeID, item); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1325,7 +1248,7 @@ func c2cTradeParticipant(command c2c.Command, trade c2c.Trade) bool {
 	return command.Actor.ID == trade.BuyerAccountID || command.Actor.ID == trade.SellerAccountID
 }
 
-func (s *Store) OpenDispute(ctx context.Context, command c2c.Command, tradeID string, statement c2c.NewStatement, evidence []c2c.NewEvidence) (c2c.Trade, error) {
+func (s *Store) OpenDispute(ctx context.Context, command c2c.Command, tradeID string, statement c2c.NewStatement) (c2c.Trade, error) {
 	var result c2c.Trade
 	err := s.WithLedgerTransaction(ctx, func(tx *LedgerTransaction) error {
 		if err := lockC2CTradeMutationKeys(ctx, tx.Tx, command.Actor.ID, tradeID); err != nil {
@@ -1352,7 +1275,7 @@ func (s *Store) OpenDispute(ctx context.Context, command c2c.Command, tradeID st
 		if trade.Status != c2c.TradePaid {
 			return c2c.ErrConflict
 		}
-		if err := insertC2CDisputeSubmission(ctx, tx.Tx, command, trade.ID, statement, evidence); err != nil {
+		if err := insertC2CDisputeSubmission(ctx, tx.Tx, command, trade.ID, statement); err != nil {
 			return err
 		}
 		reviewDue := command.Now.Add(c2c.ReviewExtension)
@@ -1377,7 +1300,7 @@ func (s *Store) OpenDispute(ctx context.Context, command c2c.Command, tradeID st
 	return result, mapC2CError(err)
 }
 
-func (s *Store) AddDisputeEvidence(ctx context.Context, command c2c.Command, tradeID string, statement c2c.NewStatement, evidence []c2c.NewEvidence) (c2c.Trade, error) {
+func (s *Store) AddDisputeStatement(ctx context.Context, command c2c.Command, tradeID string, statement c2c.NewStatement) (c2c.Trade, error) {
 	var result c2c.Trade
 	err := s.WithLedgerTransaction(ctx, func(tx *LedgerTransaction) error {
 		if err := lockC2CTradeMutationKeys(ctx, tx.Tx, command.Actor.ID, tradeID); err != nil {
@@ -1404,13 +1327,13 @@ func (s *Store) AddDisputeEvidence(ctx context.Context, command c2c.Command, tra
 		if trade.Status != c2c.TradeDisputed {
 			return c2c.ErrConflict
 		}
-		if err := insertC2CDisputeSubmission(ctx, tx.Tx, command, trade.ID, statement, evidence); err != nil {
+		if err := insertC2CDisputeSubmission(ctx, tx.Tx, command, trade.ID, statement); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE c2c_trades SET updated_at = $2 WHERE id = $1`, trade.ID, command.Now); err != nil {
 			return mapC2CError(err)
 		}
-		if err := insertC2CEvent(ctx, tx.Tx, command, order.ID, trade.ID, "trade.evidence_added", "participant added C2C dispute evidence", "", ""); err != nil {
+		if err := insertC2CEvent(ctx, tx.Tx, command, order.ID, trade.ID, "trade.statement_added", "participant added C2C dispute statement", "", ""); err != nil {
 			return err
 		}
 		result, err = loadC2CTrade(ctx, tx.Tx, trade.ID, false, false)
@@ -1621,31 +1544,13 @@ func (s *Store) ExpireDue(ctx context.Context, now time.Time, limit int) (int, e
 	return expired, nil
 }
 
-func (s *Store) CleanupEvidence(ctx context.Context, now time.Time, limit int) (int, error) {
-	cutoff := now.Add(-c2c.EvidenceRetention)
+func (s *Store) CleanupPrivateData(ctx context.Context, now time.Time, limit int) (int, error) {
+	cutoff := now.Add(-c2c.PrivateRetention)
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
-	result, err := tx.Exec(ctx, `
-		WITH victims AS (
-			SELECT e.id FROM c2c_evidence e
-			JOIN c2c_trades t ON t.id = e.trade_id
-			WHERE e.deleted_at IS NULL
-			  AND t.status IN ('released_to_buyer', 'returned_to_seller', 'cancelled', 'expired')
-			  AND t.resolved_at <= $1
-			ORDER BY t.resolved_at, e.id
-			LIMIT $2
-			FOR UPDATE OF e SKIP LOCKED
-		)
-		UPDATE c2c_evidence e
-		SET key_id = NULL, nonce = NULL, ciphertext = NULL, deleted_at = $3
-		FROM victims WHERE e.id = victims.id`, cutoff, limit, now)
-	if err != nil {
-		return 0, mapC2CError(err)
-	}
-	cleaned := int(result.RowsAffected())
 	statementResult, err := tx.Exec(ctx, `
 		WITH victims AS (
 			SELECT s.id FROM c2c_dispute_statements s
@@ -1663,7 +1568,7 @@ func (s *Store) CleanupEvidence(ctx context.Context, now time.Time, limit int) (
 	if err != nil {
 		return 0, mapC2CError(err)
 	}
-	cleaned += int(statementResult.RowsAffected())
+	cleaned := int(statementResult.RowsAffected())
 	referenceResult, err := tx.Exec(ctx, `
 		WITH victims AS (
 			SELECT id FROM c2c_trades
