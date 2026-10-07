@@ -13,6 +13,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -278,7 +279,7 @@ func (s *Store) AuthenticateAPIKey(ctx context.Context, hash [32]byte) (gateway.
 func replaceAPIPools(ctx context.Context, tx pgx.Tx, keyID string, inputs []gateway.PoolInput, existingOffers map[string]int64) error {
 	keepPools := make([]string, 0, len(inputs))
 	for _, input := range inputs {
-		statuses, targets, err := resolveRoutingTargets(ctx, tx, input.OfferIDs)
+		statuses, targets, err := channelpg.ResolveRoutingTargets(ctx, tx, input.OfferIDs)
 		if err != nil {
 			return err
 		}
@@ -479,7 +480,7 @@ func loadPoolMembers(ctx context.Context, queryer gatewayQueryer, poolID string)
 			return nil, err
 		}
 		item.Multiplier = money.FromNano(multiplierNano)
-		item.Eligible, item.IneligibleReason = routingEligibility(
+		item.Eligible, item.IneligibleReason = channelpg.RoutingEligibility(
 			identity.Status(ownerStatus), mustChange, channel.Status(channelStatus), channel.OfferStatus(offerStatus),
 			catalog.Status(modelStatus), validationStatus.String, credentialConfigured,
 		)
