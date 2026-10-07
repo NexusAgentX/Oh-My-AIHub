@@ -152,6 +152,9 @@ type Order struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	CancelledAt      *time.Time
+	// Takeable is true when the order is open with available quantity and its
+	// owner is active, has changed the initial password and is not credit-frozen.
+	Takeable bool
 }
 
 type Evidence struct {

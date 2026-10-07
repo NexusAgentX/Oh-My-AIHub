@@ -412,7 +412,7 @@ func c2cOrderResponse(order c2c.Order) map[string]any {
 		"available": order.Available.String(), "allocated": order.Allocated.String(),
 		"settled": order.Settled.String(), "closed": order.Closed.String(),
 		"minimum": order.Minimum.String(), "maximum": order.Maximum.String(),
-		"status": order.Status, "payment_types": order.PaymentTypes,
+		"status": order.Status, "takeable": order.Takeable, "payment_types": order.PaymentTypes,
 		"payment_methods": methods, "created_at": order.CreatedAt,
 		"updated_at": order.UpdatedAt, "cancelled_at": order.CancelledAt,
 	}

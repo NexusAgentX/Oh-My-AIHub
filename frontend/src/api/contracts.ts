@@ -508,6 +508,7 @@ export type C2COrder = {
   minimum: string
   maximum: string
   status: C2COrderStatus
+  takeable: boolean
   payment_types: C2CPaymentMethodType[]
   payment_methods: C2CPaymentMethod[]
   created_at: string
