@@ -2,7 +2,7 @@
 
 ## 当前支持状态
 
-项目尚未正式发布，目前没有承诺长期安全支持的版本。发现的问题仍应及时处理，避免进入后续版本。
+项目以 1.0 之前的版本号持续发布（版本见 `CHANGELOG.md`），发布工作流部署生产实例 <https://ai.isok.dev>；目前没有承诺长期安全支持的版本，安全修复随后续版本发布。
 
 ## 报告安全问题
 
@@ -76,14 +76,15 @@
 
 - 平台 API Key 由密码学安全随机源生成，只保存 SHA-256 校验摘要、公开前缀、代次、active/disabled/deleted 状态和版本。完整值只在创建或轮换响应展示一次；轮换提交后旧代次立即失效，删除保留不可恢复墓碑和历史引用。
 - Key 配置、轮换、启停和删除使用版本 CAS；Key 与账户当前状态在新调用前重新校验。调用快照一旦在 `REPEATABLE READ` 事务中原子建立，后续配置变化不改写该调用历史。
-- 四协议入口只接受各自唯一平台认证头，同时携带多个或错误类型认证头、Gemini query `key`、未声明或畸形 query 都会在访问上游前拒绝。转发使用最小请求头白名单，剥离客户端认证、Cookie、Host、Forwarded/X-Forwarded、trace/baggage 和 hop-by-hop 头，再只注入当前报价的解密凭据。
-- 出站请求固定 `Accept-Encoding: identity`；非 identity 上游响应不会在删除编码头后误传压缩字节。返回客户端前只保留协议需要的最小响应头，不转发 Set-Cookie、Location、X-Accel、X-Sendfile、认证控制头或失效实体头。
+- 四协议入口只接受各自唯一平台认证头，同时携带多个或错误类型认证头、畸形查询串或 `key` 查询参数都会在访问上游前拒绝；其余查询参数原样合并进供应商 endpoint，Gemini 流式保留强制 `alt=sse`。
+- 出站请求头默认透传，只按固定黑名单剥离客户端认证（`Authorization`、`x-api-key`、`x-goog-api-key`、`Proxy-Authorization`）、Cookie、账户作用域头（`OpenAI-Organization`、`OpenAI-Project`）、客户端身份与链路头（`Forwarded`、`X-Forwarded-For/Host/Proto`、`X-Real-IP`、`Traceparent`、`Baggage`、`Idempotency-Key`）、Host、hop-by-hop 头（含 `Connection` 列出的头）与 `Accept-Encoding`，再只注入当前报价的解密凭据。请求正文以及实际转发的头名称、头值和解码后的查询串都会在注入上游认证之前检查是否含平台 Key 或其他候选的凭据，命中即判该尝试失败且不发出上游请求；放在注入之前是为了避免共用同一上游 Key 的候选误判自身凭据。
+- 出站不再固定 `Accept-Encoding: identity`，由 Go transport 协商并透明解压 gzip；解压后仍残留非 identity `Content-Encoding`（网关无法解码）的上游响应按 `unsupported_content_encoding` 判该尝试失败，不会误传压缩字节。返回客户端的响应头只保留单值且安全的 request-id 系列（`Request-Id`、`X-Request-Id`、`OpenAI-Request-Id`、`Anthropic-Request-Id`），其余上游头（包括 Set-Cookie、Location、X-Accel、X-Sendfile、认证控制头和实体头）一律不转发。
 - API 请求正文和响应正文只在有明确 32/64 MiB 上限的进程内内存中处理，不写数据库、缓存、审计、应用日志或代理临时文件。Nginx 外部协议路径关闭请求与响应缓冲；单个 SSE 事件、提交前缓冲、终止帧数、终止字节和全流总量都有独立上限。
 - 调用只保存价格与候选快照、状态、四类用量、HTTP 状态、TTFT、TPS、耗时、错误码和协议解析出的原始错误消息。原始错误按产品决定不做通用脱敏或改写，但统一转换为有效 UTF-8、移除 NUL、最多 4096 字节；完整错误 body、header、请求/响应正文和凭据禁止作为错误消息落库。
 - 消费者可以读取自己的调用；共享者只获得实际尝试其报价的专属投影，不能看到消费者 Key、池、hold 或其他候选尝试；管理员可以读取全部调用。通用 DTO 不提供 Base URL、上游模型 ID 或凭据字段。
-- 成功终结必须从已保存的完整成功尝试推导，终结载荷使用摘要幂等比对。数据库约束、行锁、部分唯一索引与 orphan 租约恢复共同阻止并行尝试、重复扣款、重复收入和误释放；已提交语义但缺少完整成功事实时保留待恢复状态，不释放为免费输出。
+- 成功终结必须从已保存的完整成功尝试推导，终结载荷使用摘要幂等比对。缺少或含非法用量而无法计价的成功响应先交付客户端，再以零收费的不完整结算终结并释放预授权，不再触发回退。数据库约束、行锁、部分唯一索引与 orphan 租约恢复共同阻止并行尝试、重复扣款、重复收入和误释放：租约过期的进行中调用只依据已持久化的尝试事实终结，没有完整成功尝试时（包括已提交语义的情况）按不完整零收费终结；已结算但下游交付未确认的调用以精确冲正补偿，不保留扣款。
 
-具体决策见 [ADR-0010](docs/adr/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)。
+具体决策见 [ADR-0010](docs/adr/0010-adopt-snapshot-gateway-and-idempotent-settlement.md) 与 [ADR-0016](docs/adr/0016-decouple-gateway-delivery-from-settlement.md)。
 
 ## 已实现的 C2C 安全边界
 
@@ -102,7 +103,7 @@
 - 私密漏洞报告渠道。
 - 正式版本的安全支持周期。
 - 正式部署方案完成后的跨组件完整威胁模型。
-- 备份加密、恢复演练、审计保留和安全告警的具体实现与数值目标。
+- 审计保留和安全告警的具体实现，以及备份与恢复的数值目标（加密备份与隔离恢复演练已实现，见下文“备份与运营数据安全边界”）。
 
 ## 备份与运营数据安全边界
 
