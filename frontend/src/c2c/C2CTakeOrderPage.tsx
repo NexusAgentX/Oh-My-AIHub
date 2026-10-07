@@ -58,6 +58,8 @@ export function C2CTakeOrderPage() {
       {loading ? <LoadingState /> : order ? (
         order.owner_account_id === account?.id ? (
           <section className="panel upcoming-panel"><h2>这是你的{c2cSideLabels[order.side]}</h2><Link className="button button-primary" to="/c2c/me">管理挂单</Link></section>
+        ) : !order.takeable ? (
+          <section className="panel upcoming-panel"><h2>该挂单暂不可承接</h2><Link className="button button-primary" to="/c2c">返回市场</Link></section>
         ) : (
           <form className="c2c-take-layout" onSubmit={submit}>
             <section className="panel c2c-take-form">

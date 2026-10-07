@@ -33,7 +33,11 @@ const c2cOrderColumns = `
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, ''), o.created_at, o.updated_at,
-	o.cancelled_at`
+	o.cancelled_at, ` + c2cOwnerReadySQL + ` AND o.status = 'open' AND o.available_nano > 0`
+
+// c2cOwnerReadySQL is the single definition of an order owner who may be taken
+// against; it must match ensureC2COrderOwnerReady.
+const c2cOwnerReadySQL = `(owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)`
 
 const c2cTradeColumns = `
 	t.id::text, t.order_id::text, o.side,
@@ -56,7 +60,7 @@ func scanC2COrder(row scanner) (c2c.Order, error) {
 		&order.ID, &order.OwnerAccountID, &order.OwnerDisplayName, &side,
 		&order.UnitPriceFen, &total, &available, &allocated, &settled, &closed,
 		&minimum, &maximum, &status, &order.ParentHoldID, &order.CreatedAt,
-		&order.UpdatedAt, &order.CancelledAt,
+		&order.UpdatedAt, &order.CancelledAt, &order.Takeable,
 	)
 	order.Side = c2c.Side(side)
 	order.Total = money.FromNano(total)
@@ -288,8 +292,8 @@ func (s *Store) Market(ctx context.Context) (c2c.Market, error) {
 	if err := s.pool.QueryRow(ctx, `
 		SELECT
 		 (SELECT unit_price_fen FROM c2c_trades WHERE status = 'released_to_buyer' ORDER BY resolved_at DESC, id DESC LIMIT 1),
-		 (SELECT max(unit_price_fen) FROM c2c_orders WHERE side = 'buy' AND status = 'open' AND available_nano > 0),
-		 (SELECT min(unit_price_fen) FROM c2c_orders WHERE side = 'sell' AND status = 'open' AND available_nano > 0)
+		 (SELECT max(o.unit_price_fen) FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id WHERE o.side = 'buy' AND o.status = 'open' AND o.available_nano > 0 AND `+c2cOwnerReadySQL+`),
+		 (SELECT min(o.unit_price_fen) FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id WHERE o.side = 'sell' AND o.status = 'open' AND o.available_nano > 0 AND `+c2cOwnerReadySQL+`)
 	`).Scan(&market.LatestPriceFen, &market.BestBidFen, &market.BestAskFen); err != nil {
 		return c2c.Market{}, mapC2CError(err)
 	}
@@ -314,7 +318,7 @@ func listC2CMarketOrders(ctx context.Context, queryer c2cQueryer, side c2c.Side)
 	rows, err := queryer.Query(ctx, `
 		SELECT `+c2cOrderColumns+`
 		FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-		WHERE o.side = $1 AND o.status = 'open' AND o.available_nano > 0
+		WHERE o.side = $1 AND o.status = 'open' AND o.available_nano > 0 AND `+c2cOwnerReadySQL+`
 		ORDER BY o.unit_price_fen `+direction+`, o.created_at, o.id LIMIT 200`, side)
 	if err != nil {
 		return nil, mapC2CError(err)
@@ -675,13 +679,13 @@ func insertC2CEvidence(ctx context.Context, tx pgx.Tx, command c2c.Command, trad
 
 func ensureC2COrderOwnerReady(ctx context.Context, tx pgx.Tx, order c2c.Order) error {
 	var status string
-	var mustChange bool
+	var mustChange, frozen bool
 	if err := tx.QueryRow(ctx, `
-		SELECT status, must_change_password FROM accounts WHERE id = $1`,
-		order.OwnerAccountID).Scan(&status, &mustChange); err != nil {
+		SELECT status, must_change_password, credit_frozen FROM accounts WHERE id = $1`,
+		order.OwnerAccountID).Scan(&status, &mustChange, &frozen); err != nil {
 		return mapC2CError(err)
 	}
-	if status != string(identity.StatusActive) || mustChange {
+	if status != string(identity.StatusActive) || mustChange || frozen {
 		return c2c.ErrConflict
 	}
 	return nil

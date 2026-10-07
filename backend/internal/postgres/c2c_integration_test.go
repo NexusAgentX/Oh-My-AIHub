@@ -721,6 +721,112 @@ func TestC2CIntegration(t *testing.T) {
 			assertHold(t, pool, order.ParentHoldID, "1", "0", "0", "1")
 		})
 
+		t.Run("credit-frozen owner orders cannot be taken or listed until unfrozen", func(t *testing.T) {
+			owner := createFundedSeller("c2c.frozenowner.seller")
+			buyer := createReady("c2c.frozenowner.buyer", "0")
+			disabledOwner := createFundedSeller("c2c.frozenowner.disabled")
+			order, err := service.CreateOrder(ctx, owner, "frozenowner-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			if err != nil {
+				t.Fatal(err)
+			}
+			disabledOrder, err := service.CreateOrder(ctx, disabledOwner, "frozenowner-disabled-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			if err != nil {
+				t.Fatal(err)
+			}
+			existing, err := service.TakeOrder(ctx, buyer, "frozenowner-take-before", order.ID, mustAmount(t, "1"), order.PaymentMethods[0].ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listed := func(id string) bool {
+				t.Helper()
+				market, err := service.Market(ctx, buyer)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, item := range market.SellOrders {
+					if item.ID == id {
+						return true
+					}
+				}
+				return false
+			}
+			countRows := func(query string, args ...any) int {
+				t.Helper()
+				var count int
+				if err := pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+				return count
+			}
+			setAccount := func(account identity.Account, update identity.AccountUpdate) {
+				t.Helper()
+				var version int64
+				if err := pool.QueryRow(ctx, `SELECT version FROM accounts WHERE id = $1`, account.ID).Scan(&version); err != nil {
+					t.Fatal(err)
+				}
+				update.ExpectedVersion = version
+				if _, err := identityService.UpdateAccount(ctx, admin, account.ID, update); err != nil {
+					t.Fatalf("update account: %v", err)
+				}
+			}
+			if !listed(order.ID) || !listed(disabledOrder.ID) {
+				t.Fatal("orders of ready owners must be listed")
+			}
+			before, err := service.Order(ctx, buyer, order.ID)
+			if err != nil || !before.Takeable {
+				t.Fatalf("order before freeze takeable = %v, %v", before.Takeable, err)
+			}
+			holdEvents := countRows(`SELECT count(*) FROM ledger_hold_events WHERE hold_id = $1`, before.ParentHoldID)
+
+			frozen := true
+			setAccount(owner, identity.AccountUpdate{CreditFrozen: &frozen})
+			if _, err := service.TakeOrder(ctx, buyer, "frozenowner-take-frozen", order.ID, mustAmount(t, "1"), order.PaymentMethods[0].ID); !errors.Is(err, c2c.ErrConflict) {
+				t.Fatalf("take frozen owner order error = %v", err)
+			}
+			if listed(order.ID) {
+				t.Fatal("frozen owner order must not be listed")
+			}
+			during, err := service.Order(ctx, buyer, order.ID)
+			if err != nil || during.Takeable {
+				t.Fatalf("frozen order takeable = %v, %v", during.Takeable, err)
+			}
+			if during.Total != before.Total || during.Available != before.Available || during.Allocated != before.Allocated || during.Settled != before.Settled || during.Closed != before.Closed || during.Status != c2c.OrderOpen || during.ParentHoldID != before.ParentHoldID {
+				t.Fatalf("frozen order changed: before %+v during %+v", before, during)
+			}
+			if got := countRows(`SELECT count(*) FROM ledger_hold_events WHERE hold_id = $1`, before.ParentHoldID); got != holdEvents {
+				t.Fatalf("parent hold events = %d, want %d", got, holdEvents)
+			}
+			if got := countRows(`SELECT count(*) FROM c2c_trades WHERE order_id = $1`, order.ID); got != 1 {
+				t.Fatalf("trades after rejected take = %d", got)
+			}
+			if trade, err := service.Trade(ctx, buyer, existing.ID); err != nil || trade.ID != existing.ID || trade.Status != existing.Status {
+				t.Fatalf("existing trade = %+v, %v", trade, err)
+			}
+
+			// A disabled owner is treated the same way as a frozen one.
+			disabled := identity.StatusDisabled
+			setAccount(disabledOwner, identity.AccountUpdate{Status: &disabled})
+			if listed(disabledOrder.ID) {
+				t.Fatal("disabled owner order must not be listed")
+			}
+			if _, err := service.TakeOrder(ctx, buyer, "frozenowner-take-disabled", disabledOrder.ID, mustAmount(t, "1"), disabledOrder.PaymentMethods[0].ID); !errors.Is(err, c2c.ErrConflict) {
+				t.Fatalf("take disabled owner order error = %v", err)
+			}
+
+			unfrozen := false
+			setAccount(owner, identity.AccountUpdate{CreditFrozen: &unfrozen})
+			if !listed(order.ID) {
+				t.Fatal("unfrozen owner order must be listed again")
+			}
+			trade, err := service.TakeOrder(ctx, buyer, "frozenowner-take-after", order.ID, mustAmount(t, "1"), order.PaymentMethods[0].ID)
+			if err != nil {
+				t.Fatalf("take after unfreeze: %v", err)
+			}
+			if trade.Quantity != mustAmount(t, "1") {
+				t.Fatalf("trade quantity = %s", trade.Quantity)
+			}
+		})
+
 		t.Run("dispute restriction freezes one party without touching the trade", func(t *testing.T) {
 			seller := createFundedSeller("c2c.restrict.seller")
 			buyer := createReady("c2c.restrict.buyer", "0")
