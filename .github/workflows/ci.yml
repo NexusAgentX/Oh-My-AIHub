@@ -29,8 +29,6 @@ jobs:
             ${{ runner.os }}-deps-
       - name: Install frontend dependencies
         run: npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000
-      - name: Check design assets
-        run: mise run check-design
       - name: Frontend tests
         run: npm --prefix frontend test
       - name: Frontend build

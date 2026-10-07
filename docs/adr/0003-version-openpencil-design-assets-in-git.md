@@ -1,6 +1,6 @@
 # ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产
 
-- 状态：已通过
+- 状态：已取代（由 ADR-0015 取代）
 - 日期：2026-09-01
 - 决策者：项目维护者
 - 关联内容：Epic #3、Feature #5、`DESIGN.md`、`design/README.md`
@@ -81,3 +81,5 @@ OpenPencil 是本项目主要 UI/UX 设计工具。具体设计的权威源文�
 ## 替代关系
 
 无。
+
+2026-10-07：由 [ADR-0015](0015-develop-directly-from-implemented-mvp.md) 取代；本文件保留历史结论，其中设计规范、源文件、预览与检查要求不再生效，历史路径不代表当前文件。

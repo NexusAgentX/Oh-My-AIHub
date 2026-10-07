@@ -33,9 +33,9 @@
 ## 索引
 
 - [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已取代（由 ADR-0004 取代）
-- [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过
-- [ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产](0003-version-openpencil-design-assets-in-git.md) — 已通过
-- [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) — 已通过
+- [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过（设计要求由 ADR-0015 取代）
+- [ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产](0003-version-openpencil-design-assets-in-git.md) — 已取代（由 ADR-0015 取代）
+- [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) — 已取代（由 ADR-0015 取代）
 - [ADR-0005：采用中心化零和复式账本作为积分清算核心](0005-adopt-centralized-zero-sum-ledger.md) — 已通过
 - [ADR-0006：采用 PostgreSQL、Goose 与九位定点金额](0006-adopt-postgresql-goose-and-fixed-point-amounts.md) — 已通过
 - [ADR-0007：采用受邀身份与服务器端 Cookie 会话](0007-adopt-invited-identity-and-server-sessions.md) — 已通过
@@ -46,3 +46,4 @@
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md) — 已通过
 - [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过
+- [ADR-0015：MVP 完成后直接基于代码开发](0015-develop-directly-from-implemented-mvp.md) — 已通过
