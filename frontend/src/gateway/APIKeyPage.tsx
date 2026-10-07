@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { APIKey } from '../api/contracts'
 import { formatDate, PricePair, protocolLabels, TierCountBadge, TierPriceList } from '../channels/presentation'
-import { AppShell } from '../layouts/AppShell'
 import {
   Button,
   InlineError,
@@ -91,13 +90,13 @@ export function APIKeyPage() {
     }
   }
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
+  if (loading) return <><LoadingState /></>
   if (!key) {
-    return <AppShell><InlineError>{error || 'API Key 不存在'}</InlineError></AppShell>
+    return <><InlineError>{error || 'API Key 不存在'}</InlineError></>
   }
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to="/keys">← API Key</Link>
       <header className="page-heading channel-detail-heading">
         <div>
@@ -282,6 +281,6 @@ export function APIKeyPage() {
                 : '启用 API Key'
         }
       />
-    </AppShell>
+    </>
   )
 }

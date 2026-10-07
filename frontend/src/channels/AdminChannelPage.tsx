@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { AdminChannel, AdminChannelOffer, AuthorizedValidationAttempt } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, ConfirmDialog, formatDate, protocolLabels, ratingText } from './presentation'
 import { createLatestRequestGate } from './requestGate'
@@ -113,10 +112,10 @@ export function AdminChannelPage() {
     }
   }
 
-  if (loading) return <AppShell admin><LoadingState /></AppShell>
-  if (!channel || channel.id !== channelID) return <AppShell admin><InlineError>{error || '渠道不存在'}</InlineError></AppShell>
+  if (loading) return <><LoadingState /></>
+  if (!channel || channel.id !== channelID) return <><InlineError>{error || '渠道不存在'}</InlineError></>
 
-  return <AppShell admin>
+  return <>
     <Link className="back-link" to="/admin/channels">← 渠道治理</Link>
     <header className="page-heading channel-detail-heading"><div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div></header>
     <InlineError>{error}</InlineError>
@@ -137,5 +136,5 @@ export function AdminChannelPage() {
     >
       {action?.kind === 'validate' ? <label className="checkbox-control validation-cost-confirm"><input checked={costConfirmed} onChange={(event) => setCostConfirmed(event.target.checked)} type="checkbox" /><span>我确认可能产生少量上游费用</span></label> : <label className="field"><span className="field-label">原因</span><textarea className="input textarea-input" onChange={(event) => setReason(event.target.value)} required value={reason} /></label>}
     </ConfirmDialog>
-  </AppShell>
+  </>
 }

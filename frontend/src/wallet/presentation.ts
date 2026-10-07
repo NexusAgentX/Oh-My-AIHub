@@ -54,3 +54,17 @@ export function walletRiskLabel(status: WalletRiskStatus) {
 export function walletRiskTone(status: WalletRiskStatus) {
   return status === 'normal' ? 'success' : status === 'insufficient' ? 'warning' : 'danger'
 }
+
+/** 信用额度剩余（不小于 0）。 */
+export function remainingCredit(limit: string, used: string) {
+  const leftover = parseNanoPoints(limit) - parseNanoPoints(used)
+  return formatNanoPoints(leftover > 0n ? leftover : 0n)
+}
+
+/** 信用已用百分比，0-100；额度为 0 时返回 0。 */
+export function creditUsagePercent(limit: string, used: string) {
+  const total = parseNanoPoints(limit)
+  if (total <= 0n) return 0
+  const percent = Number((parseNanoPoints(used) * 10000n) / total) / 100
+  return Math.max(0, Math.min(100, percent))
+}

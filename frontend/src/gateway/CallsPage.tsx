@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import type { GatewayCall } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { CallTable } from './CallTable'
 
@@ -27,13 +26,13 @@ export function CallsPage() {
   }, [load])
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading"><div><h1>调用记录</h1></div><Button disabled={loading} onClick={() => void load()} type="button" variant="secondary">刷新</Button></header>
       <InlineError>{error}</InlineError>
       <section className="panel table-panel">
         <header className="table-toolbar"><h2>最近 100 笔</h2><span className="count-badge">{calls.length}</span></header>
         {loading && calls.length === 0 ? <LoadingState /> : <CallTable calls={calls} />}
       </section>
-    </AppShell>
+    </>
   )
 }

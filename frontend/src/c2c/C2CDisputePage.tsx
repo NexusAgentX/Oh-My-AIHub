@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2CTrade } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState } from '../ui/FormControls'
 import { C2CState } from './C2CActivityPage'
 import { c2cStatusTone, c2cTradeStatusLabels, formatC2CDate } from './presentation'
@@ -41,7 +40,7 @@ export function C2CDisputePage() {
   const editable = trade?.status === 'paid' || trade?.status === 'disputed'
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading c2c-page-heading"><div><Link className="back-link" to={`/c2c/trades/${tradeID}`}>← 交易详情</Link><h1>{trade?.status === 'disputed' ? '补充陈述' : '发起争议'}</h1></div>{trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}</header>
       <InlineError>{error}</InlineError>
       {loading ? <LoadingState /> : trade ? (
@@ -62,6 +61,6 @@ export function C2CDisputePage() {
           </aside>
         </div>
       ) : null}
-    </AppShell>
+    </>
   )
 }

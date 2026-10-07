@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { AppShell } from '../layouts/AppShell'
 import { Button } from '../ui/FormControls'
 import { Icon } from '../ui/Icon'
 import { useEphemeralCredential } from './EphemeralCredentialProvider'
@@ -34,7 +33,7 @@ export function CreatedCredentialPage() {
   }
 
   return (
-    <AppShell admin>
+    <>
       <section className="credential-page">
         <div className="credential-success-mark">
           <Icon name="check" size={26} />
@@ -69,6 +68,6 @@ export function CreatedCredentialPage() {
           </Button>
         </div>
       </section>
-    </AppShell>
+    </>
   )
 }

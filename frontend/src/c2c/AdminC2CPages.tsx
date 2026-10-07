@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { C2CResolutionAction, C2CTrade } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import { C2CState } from './C2CActivityPage'
@@ -21,7 +20,7 @@ export function AdminC2CDisputesPage() {
   }, [])
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading"><div><h1>争议处理</h1></div><span className="count-badge">{trades.length}</span></header>
       <InlineError>{error}</InlineError>
       {loading ? <LoadingState /> : (
@@ -30,7 +29,7 @@ export function AdminC2CDisputesPage() {
           {trades.length === 0 ? <div className="empty-state">暂无待处理争议</div> : <div className="mobile-card-list">{trades.map((trade) => <article className="mobile-data-card" key={trade.id}><header><div><strong>{trade.buyer_display_name} / {trade.seller_display_name}</strong><span>{formatPointAmount(trade.quantity)} 积分 · {formatC2CFiat(trade.fiat_amount_fen)}</span></div><C2CState label="争议中" tone="danger" /></header><Link className="button button-primary" to={`/admin/c2c/disputes/${trade.id}`}>处理争议</Link></article>)}</div>}
         </section>
       )}
-    </AppShell>
+    </>
   )
 }
 
@@ -71,7 +70,7 @@ export function AdminC2CDisputePage() {
   }
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading c2c-page-heading"><div><Link className="back-link" to="/admin/c2c/disputes">← 争议处理</Link><h1>争议详情</h1></div>{trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}</header>
       <InlineError>{error}</InlineError>
       {loading && !trade ? <LoadingState /> : trade ? (
@@ -122,6 +121,6 @@ export function AdminC2CDisputePage() {
           </div>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }

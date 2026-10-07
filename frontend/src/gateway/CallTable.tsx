@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
 import type { GatewayCall } from '../api/contracts'
 import { formatDate, protocolLabels } from '../channels/presentation'
+import { EmptyState } from '../ui'
 import { GatewayStatusBadge, shortID, totalTokens } from './presentation'
 
 export function CallTable({ calls }: { calls: GatewayCall[] }) {
-  if (calls.length === 0) return <div className="empty-state">暂无调用记录</div>
+  if (calls.length === 0) {
+    return <EmptyState title="暂无调用记录" description="创建 API Key 并发起调用后，记录会出现在这里。" />
+  }
   return (
     <>
       <div className="desktop-table-wrap">

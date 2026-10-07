@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { MarketChannel } from '../api/contracts'
 import { useAuth } from '../auth/AuthProvider'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { ChannelStateBadge, formatDate, PricePair, protocolLabels, ratingText, StarRating } from './presentation'
 import { createLatestRequestGate } from './requestGate'
@@ -69,11 +68,11 @@ export function MarketChannelPage() {
     }
   }
 
-  if (loading) return <AppShell><LoadingState /></AppShell>
-  if (!channel || channel.id !== channelID) return <AppShell><InlineError>{error || '渠道不存在'}</InlineError></AppShell>
+  if (loading) return <><LoadingState /></>
+  if (!channel || channel.id !== channelID) return <><InlineError>{error || '渠道不存在'}</InlineError></>
 
   return (
-    <AppShell>
+    <>
       <Link className="back-link" to="/market">← API 市场</Link>
       <header className="page-heading channel-detail-heading"><div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div></header>
       <InlineError>{error}</InlineError>
@@ -91,6 +90,6 @@ export function MarketChannelPage() {
           <div className="mobile-card-list">{channel.offers.map((offer) => <article className="mobile-data-card" key={offer.offer_id}><header><div><strong>{offer.model_name}</strong><span>{offer.model_provider}</span></div><ChannelStateBadge status={offer.validation_status} /></header><dl><div><dt>API 格式</dt><dd>{protocolLabels[offer.protocol]}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>质量</dt><dd>{offer.call_success_rate === null ? '暂无调用数据' : formatRate(offer.call_success_rate)}</dd></div></dl><Link className="button button-secondary" to={`/market/channels/${channel.id}/add?offer=${offer.offer_id}`}>加入模型池</Link></article>)}</div>
         </>}
       </section>
-    </AppShell>
+    </>
   )
 }

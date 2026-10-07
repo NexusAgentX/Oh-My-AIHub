@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from '../api/contracts'
 import {
+  creditUsagePercent,
   formatPointAmount,
   ledgerCounterparties,
   ledgerEntryLabel,
+  remainingCredit,
   walletRiskLabel,
 } from './presentation'
 
@@ -48,5 +50,18 @@ describe('wallet presentation', () => {
     expect(walletRiskLabel('insufficient')).toBe('可消费额度不足')
     expect(walletRiskLabel('over_limit')).toBe('信用超限')
     expect(walletRiskLabel('credit_frozen')).toBe('信用冻结')
+  })
+})
+
+describe('credit presentation', () => {
+  it('computes remaining credit without going negative', () => {
+    expect(remainingCredit('50', '20.5')).toBe('29.5')
+    expect(remainingCredit('50', '60')).toBe('0')
+  })
+
+  it('computes a bounded usage percentage', () => {
+    expect(creditUsagePercent('50', '12.5')).toBe(25)
+    expect(creditUsagePercent('0', '0')).toBe(0)
+    expect(creditUsagePercent('10', '30')).toBe(100)
   })
 })

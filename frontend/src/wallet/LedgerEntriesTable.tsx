@@ -1,10 +1,11 @@
 import type { LedgerEntry } from '../api/contracts'
-import { Button } from '../ui/FormControls'
+import { Button, EmptyState, QueryBoundary } from '../ui'
 import {
   formatPointAmount,
   ledgerCounterparties,
   ledgerEntryLabel,
 } from './presentation'
+import { useLedgerEntriesQuery } from './queries'
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -27,7 +28,7 @@ export function LedgerEntriesTable({
   onLoadMore: () => void
 }) {
   if (entries.length === 0) {
-    return <div className="empty-state">暂无账本分录</div>
+    return <EmptyState title="暂无账本分录" description="积分发生变动后会在这里留下不可修改的记录。" />
   }
 
   return (
@@ -96,5 +97,22 @@ export function LedgerEntriesTable({
         </div>
       )}
     </>
+  )
+}
+
+/** 钱包分录面板：自带取数、加载/错误/空态与「加载更早分录」，钱包与余额不足页共用。 */
+export function LedgerEntriesPanel() {
+  const query = useLedgerEntriesQuery()
+  return (
+    <QueryBoundary errorFallback="账本分录加载失败" query={query}>
+      {(data) => (
+        <LedgerEntriesTable
+          entries={data.pages.flatMap((page) => page.entries)}
+          loadingMore={query.isFetchingNextPage}
+          nextBefore={query.hasNextPage ? 'more' : ''}
+          onLoadMore={() => void query.fetchNextPage()}
+        />
+      )}
+    </QueryBoundary>
   )
 }

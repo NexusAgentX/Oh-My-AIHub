@@ -1,0 +1,25 @@
+/*
+ * 样式入口：顺序固定——token、基础、UI 组件、外壳，最后是各领域样式。
+ * 领域样式只写本领域私有的布局；通用外观必须使用 src/ui 组件与 token。
+ */
+@import './tokens.css';
+@import './base.css';
+
+@import '../ui/Button.css';
+@import '../ui/Form.css';
+@import '../ui/Feedback.css';
+@import '../ui/Badge.css';
+@import '../ui/Card.css';
+@import '../ui/Table.css';
+@import '../ui/Dialog.css';
+@import '../ui/Tabs.css';
+
+@import '../layouts/layout.css';
+
+@import '../wallet/wallet.css';
+@import '../ledger/ledger.css';
+@import '../accounts/accounts.css';
+@import '../models/models.css';
+@import '../channels/channels.css';
+@import '../gateway/gateway.css';
+@import '../c2c/c2c.css';

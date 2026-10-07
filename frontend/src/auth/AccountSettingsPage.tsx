@@ -2,10 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useEphemeralCredential } from '../accounts/EphemeralCredentialProvider'
-import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, PasswordField, StatusBadge } from '../ui/FormControls'
 import { useAuth } from './AuthProvider'
-import { useWallet } from '../wallet/WalletProvider'
+import { useWallet } from '../wallet/queries'
 import { formatPointAmount } from '../wallet/presentation'
 
 function formatDate(value: string | null) {
@@ -70,7 +69,7 @@ export function AccountSettingsPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-heading">
         <div>
           <h1>账户设置</h1>
@@ -165,6 +164,6 @@ export function AccountSettingsPage() {
           </form>
         </section>
       </div>
-    </AppShell>
+    </>
   )
 }

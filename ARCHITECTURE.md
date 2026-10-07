@@ -30,7 +30,7 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用；提供公共落地页、身份、账户、钱包、模型目录、渠道配置、API 市场、公开渠道加入模型协议池、平台 Key/池配置、工作台、调用记录、C2C 市场与管理员运营/共享者收入界面 |
+| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包、模型目录、渠道配置、API 市场、公开渠道加入模型协议池、平台 Key/池配置、工作台、调用记录、C2C 市场与管理员运营/共享者收入界面 |
 | 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、评分、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
 | 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、评分、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
 | 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 组合根 `postgres.Store` 嵌入各领域持久化包；已迁移领域（身份、模型目录、API 手续费率，加共享的审计与事务辅助）在 `<domain>pg/` 中以 `queries.sql` 加 sqlc 生成代码实现领域服务定义的 Store 接口；其余领域暂为同包手写 SQL，逐个迁移（见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)） |

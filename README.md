@@ -40,7 +40,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 
 ## 当前工程组成
 
-- 前端：React 19、TypeScript、Vite 与 React Router。
+- 前端：React 19、TypeScript、Vite、React Router 与 TanStack Query。
 - 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、API 市场、平台 API 网关、调用结算、C2C 状态机与管理员治理 API。
 - 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
 - 本地工具链：mise。

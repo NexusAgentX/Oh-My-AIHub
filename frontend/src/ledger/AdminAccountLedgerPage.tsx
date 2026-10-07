@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { LedgerEntry, Wallet } from '../api/contracts'
-import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
 import { formatPointAmount, walletRiskLabel } from '../wallet/presentation'
@@ -45,7 +44,7 @@ export function AdminAccountLedgerPage() {
   }, [accountID])
 
   return (
-    <AppShell admin>
+    <>
       <header className="page-heading">
         <div>
           <Link className="back-link" to="/admin/accounts">← 账户与信用</Link>
@@ -71,6 +70,6 @@ export function AdminAccountLedgerPage() {
           </section>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }

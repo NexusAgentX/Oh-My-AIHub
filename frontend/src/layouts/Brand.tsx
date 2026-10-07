@@ -1,11 +1,9 @@
 export function Brand({ subtitle }: { subtitle?: string }) {
   return (
     <div className="brand">
-      <span aria-hidden="true" className="brand-mark">
-        O
-      </span>
+      <span aria-hidden="true" className="brand-mark" />
       <span className="brand-copy">
-        <strong>Oh My AIHub</strong>
+        <strong>Oh-My-AIHub</strong>
         {subtitle && <span>{subtitle}</span>}
       </span>
     </div>
