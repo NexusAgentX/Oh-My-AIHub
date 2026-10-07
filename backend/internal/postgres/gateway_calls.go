@@ -27,7 +27,7 @@ func (s *Store) BeginCall(ctx context.Context, request gateway.BeginCallRequest,
 		return gateway.CallPlan{}, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
-	ledgerTx := &LedgerTransaction{Tx: tx}
+	ledgerTx := newLedgerTransaction(tx)
 
 	var ownerID, ledgerAccountID, keyPrefix string
 	var generation int64
@@ -150,7 +150,7 @@ func (s *Store) BeginCall(ctx context.Context, request gateway.BeginCallRequest,
 		if err != nil {
 			return gateway.CallPlan{}, err
 		}
-		holdService := ledger.NewService(&LedgerTransaction{Tx: savepoint})
+		holdService := ledger.NewService(newLedgerTransaction(savepoint))
 		hold, err = holdService.CreateHold(ctx, ledger.CreateHoldRequest{
 			IdempotencyKey: "api-call-" + callID + "-authorize",
 			AccountID:      ownerID, Amount: preauthorized,
@@ -707,7 +707,7 @@ func (s *Store) FinalizeCall(ctx context.Context, callID string, outcome gateway
 		return gateway.Call{}, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
-	ledgerTx := &LedgerTransaction{Tx: tx}
+	ledgerTx := newLedgerTransaction(tx)
 	ledgerService := ledger.NewService(ledgerTx)
 
 	var consumerID, holdID, currentStatus, formulaVersion string
@@ -1164,7 +1164,7 @@ func (s *Store) CompensateCallDelivery(ctx context.Context, callID string, lease
 	reversalID := ""
 	if originalTransactionID.Valid {
 		payloadHash := sha256.Sum256([]byte("api-call-delivery-reversal-v1\x00" + callID + "\x00" + originalTransactionID.String))
-		reversal, err := (&LedgerTransaction{Tx: tx}).ReverseSystem(
+		reversal, err := (newLedgerTransaction(tx)).ReverseSystem(
 			ctx, "api-call-"+callID+"-delivery-reversal", originalTransactionID.String,
 			"reverse api charge after incomplete downstream delivery", callID+":delivery-compensation", payloadHash,
 		)
