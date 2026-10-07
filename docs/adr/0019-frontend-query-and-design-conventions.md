@@ -1,4 +1,4 @@
-# ADR-0018：前端采用 TanStack Query 与统一设计 token / 组件约定
+# ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定
 
 - 状态：已通过
 - 日期：2026-10-07

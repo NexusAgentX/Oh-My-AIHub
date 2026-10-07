@@ -1,7 +1,7 @@
 /*
  * 设计 token：前端唯一的视觉取值来源。
  * 组件与页面样式只引用这里的变量，不再写散落的颜色、圆角、字号或间距。
- * 语义约定见 docs/adr/0018-frontend-query-and-design-conventions.md。
+ * 语义约定见 docs/adr/0019-frontend-query-and-design-conventions.md。
  */
 :root {
   /* 颜色：墨色为主，芥末黄只作点缀（导航选中色条、强调徽标、进度条） */

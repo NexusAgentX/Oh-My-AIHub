@@ -6,13 +6,15 @@
 
 ### 新增
 
+- 删除 C2C 付款截图与争议证据图片（Feature #111，Epic #109）：买家声明付款与双方争议陈述只保留文字，卖家收款方式的收款码保持不变。删除付款截图和争议图片的上传、加密存储与下载；删除 `GET /api/c2c/evidence/{evidenceID}`，`POST /api/c2c/trades/{tradeID}/evidence` 改名为 `/statements`，`/paid` 与争议接口只接受 JSON，交易响应不再含 `evidence`。迁移 `0008` 删除 `c2c_evidence` 表及其触发器与函数；终态 180 天私密清理继续销毁付款参考与争议陈述。`C2C_PRIVATE_DATA_*` 密钥环仍保护收款资料与陈述，部署配置无需更改。
+
 - 管理员配置全局 API 手续费率（Feature #97）：运营总览新增手续费率面板，可查看当前费率与历史版本并设置新费率（0%～100%，最多 7 位百分比小数，即九位定点比率）；新增 `GET/PUT /api/admin/fee-rate`，每次修改追加不可变版本、按期望版本乐观并发并写入带原因与前后值的审计。新费率只影响之后的新调用，历史调用保留原快照。
 - C2C 争议裁决支持限制当事方账户（Feature #98）：管理员在争议详情页可带原因并二次确认后冻结买方或卖方信用（`POST /api/admin/c2c/trades/{tradeID}/resolve` 新增 `restrict_buyer` / `restrict_seller` 动作）。冻结复用账户信用冻结，交易状态和积分持有保持不变，可与延长核实并用；操作写入交易事件与审计，已冻结时幂等成功。信用冻结账户现在也不能发布 C2C 买单或接取卖单。管理员交易响应新增 `buyer_credit_frozen` / `seller_credit_frozen`。
 - 信用冻结账户的 C2C 挂单禁止被承接（Feature #103）：所有者信用冻结期间他人接取其挂单会被拒绝，解冻后恢复；不自动取消挂单、不释放父持有，已有交易不受影响。此类挂单与停用或未改密所有者的挂单一并从公开市场列表和最优买卖价中隐藏（此前停用所有者的挂单仍会列出但接取必然失败），订单响应新增 `takeable`，接取页对不可接取订单显示提示而非表单。
 
 ### 变更
 
-- 前端基础改版（Feature #114，ADR-0018）：新增设计 token（`styles/tokens.css`）与按组件拆分的样式，基础组件库 `src/ui/`（Button、Card、Metric、Badge、DataTable、Toolbar、EmptyState、Dialog、Drawer、Tabs/Segmented、表单控件与独立图标集）；外壳改为用户与管理员两个 react-router layout route，页面不再各自包裹 `AppShell`；用户导航分为“使用 API / 共享渠道 / 积分”三组，顶栏常驻可用积分与钱包入口，760px 以下改为底部 Tab 栏与“更多”抽屉；引入 TanStack Query，工作台与钱包迁移为样板并以 `useWallet()` 取代 `WalletProvider`。路由、权限跳转与后端接口不变；删除未使用的 `UpcomingC2CPage`。
+- 前端基础改版（Feature #114，ADR-0019）：新增设计 token（`styles/tokens.css`）与按组件拆分的样式，基础组件库 `src/ui/`（Button、Card、Metric、Badge、DataTable、Toolbar、EmptyState、Dialog、Drawer、Tabs/Segmented、表单控件与独立图标集）；外壳改为用户与管理员两个 react-router layout route，页面不再各自包裹 `AppShell`；用户导航分为“使用 API / 共享渠道 / 积分”三组，顶栏常驻可用积分与钱包入口，760px 以下改为底部 Tab 栏与“更多”抽屉；引入 TanStack Query，工作台与钱包迁移为样板并以 `useWallet()` 取代 `WalletProvider`。路由、权限跳转与后端接口不变；删除未使用的 `UpcomingC2CPage`。
 - 持久化引入 sqlc 并按领域分包（Feature #113，ADR-0017）：新增 `backend/sqlc.yaml`、`mise run generate` 与 `mise run check-sqlc`，CI 增加生成物一致性检查；身份、模型目录与 API 手续费率迁移到 `internal/postgres/{identity,catalog,feerate}pg`，共享审计与事务辅助拆为 `auditpg`、`pgkit`。服务层接口、API 与数据库结构不变，其余领域仍在 `postgres` 包内待后续迁移。
 - 网关交付与结算解耦（Feature #90，ADR-0016）：删除响应侧残留的形状门禁。事件名与 `data.type` 不一致、未知 SSE 字段、重复或空 `event:` 字段、非 JSON 的 data 帧、非 Chat 协议的 `[DONE]`、终止事件之后的意外帧、超出请求 `n` 或重复的 choice 索引、过大的 `tool_calls` 索引不再拒绝或中断流；仅未知事件、非 JSON 或无 data 帧的流在 EOF 时也照常交付；四种协议均在终止标记后继续读取至 EOF，尾帧保持安全检查且不覆盖已冻结用量；Responses 的 `incomplete` / `cancelled` 不再是错误（只有非空 `error` 对象或 `status: failed` 才算失败），非流式的 `Content-Type` 不再校验；请求头默认全量透传（只剥离凭据、`OpenAI-Organization`/`OpenAI-Project` 等账户作用域头、`Forwarded`/`X-Forwarded-*`/`Traceparent`/`Baggage`/`Idempotency-Key`、hop-by-hop 与 `Accept-Encoding`），查询串原样合并进供应商 endpoint（只拒绝畸形串与 `key`），压缩改由 transport 协商并解压。上游已返回的响应不再因为形状或用量的原因被平台错误替换。
 - 用量抽取改为三态并用不影响交付的结算路径（Feature #90，ADR-0016）：区分“上游没给 usage”与“上游给了无法计价的 usage”，首个终止事件之前的合法用量以最后一帧为准、之后（含重复终止帧）不再覆盖，非法的用量（键存在但类型或数值非法、数值互相矛盾、非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态）污染整次调用。无法计价时先把上游响应交付客户端，再以 `missing_settlement_usage` / `unpriceable_usage` 零收费终结（`CallIncomplete`），释放预授权且不再触发回退；只有“什么都没产生”的截断流才按失败回退。出站凭据检查扩展到实际转发的头名称、头值与解码后的查询串，并在注入上游认证之前执行。

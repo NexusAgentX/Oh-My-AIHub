@@ -154,8 +154,8 @@ func main() {
 				cancelJob()
 			case <-cleanupTicker.C:
 				jobContext, cancelJob := context.WithTimeout(maintenanceContext, 20*time.Second)
-				if _, cleanupErr := c2cService.CleanupEvidence(jobContext, 500); cleanupErr != nil {
-					log.Printf("clean C2C private evidence: %v", cleanupErr)
+				if _, cleanupErr := c2cService.CleanupPrivateData(jobContext, 500); cleanupErr != nil {
+					log.Printf("clean C2C private data: %v", cleanupErr)
 				}
 				cancelJob()
 			}

@@ -43,21 +43,26 @@ describe('C2C client contracts', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ quantity: '2.5', payment_method_id: 'payment-method' })
   })
 
-  it('allows repeated dispute evidence fields without manually setting multipart content type', async () => {
+  it('sends text-only payment declarations and dispute statements as JSON', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ trade: {} }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const first = new File(['one'], 'one.png', { type: 'image/png' })
-    const second = new File(['two'], 'two.jpg', { type: 'image/jpeg' })
 
-    await api.submitC2CDispute('trade', 'statement', [first, second], true)
+    await api.markC2CPaid('trade', 'ref-1')
+    await api.submitC2CDispute('trade', 'opening statement')
+    await api.submitC2CDispute('trade', 'follow-up', true)
 
-    const [, init] = fetchMock.mock.calls[0]
-    const headers = new Headers(init?.headers)
-    const form = init?.body as FormData
-    expect(headers.has('Content-Type')).toBe(false)
-    expect(form.getAll('evidence')).toEqual([first, second])
-    expect(JSON.parse(String(form.get('payload')))).toEqual({ statement: 'statement' })
+    const calls = fetchMock.mock.calls.map(([path, init]) => [path, JSON.parse(String(init?.body)), new Headers(init?.headers)] as const)
+    expect(calls.map(([path]) => path)).toEqual([
+      '/api/c2c/trades/trade/paid', '/api/c2c/trades/trade/dispute', '/api/c2c/trades/trade/statements',
+    ])
+    expect(calls.map(([, body]) => body)).toEqual([
+      { payment_reference: 'ref-1' }, { statement: 'opening statement' }, { statement: 'follow-up' },
+    ])
+    for (const [, , headers] of calls) {
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
+    }
   })
 })

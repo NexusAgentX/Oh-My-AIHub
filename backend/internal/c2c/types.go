@@ -46,13 +46,6 @@ const (
 	PaymentOther        PaymentMethodType = "other"
 )
 
-type EvidenceKind string
-
-const (
-	EvidencePayment EvidenceKind = "payment"
-	EvidenceDispute EvidenceKind = "dispute"
-)
-
 type ResolutionAction string
 
 const (
@@ -82,14 +75,13 @@ var (
 )
 
 const (
-	PaymentWindow       = 15 * time.Minute
-	ReviewExtension     = 24 * time.Hour
-	EvidenceRetention   = 180 * 24 * time.Hour
-	MaximumImageBytes   = 5 << 20
-	MaximumImagePixels  = 20_000_000
-	MaximumMethods      = 5
-	MaximumDisputeFiles = 5
-	MaximumStatement    = 2_000
+	PaymentWindow      = 15 * time.Minute
+	ReviewExtension    = 24 * time.Hour
+	PrivateRetention   = 180 * 24 * time.Hour
+	MaximumImageBytes  = 5 << 20
+	MaximumImagePixels = 20_000_000
+	MaximumMethods     = 5
+	MaximumStatement   = 2_000
 )
 
 type EncryptedValue struct {
@@ -157,22 +149,6 @@ type Order struct {
 	Takeable bool
 }
 
-type Evidence struct {
-	ID                string
-	TradeID           string
-	UploaderAccountID string
-	UploaderName      string
-	Kind              EvidenceKind
-	MIME              string
-	SizeBytes         int64
-	Width             int
-	Height            int
-	SHA256            [32]byte
-	Encrypted         EncryptedValue
-	CreatedAt         time.Time
-	DeletedAt         *time.Time
-}
-
 type Statement struct {
 	ID               string
 	TradeID          string
@@ -220,7 +196,6 @@ type Trade struct {
 	PaymentDeadline       time.Time
 	ReviewDueAt           *time.Time
 	LedgerTransactionID   string
-	Evidence              []Evidence
 	Statements            []Statement
 	Events                []Event
 	CreatedAt             time.Time
@@ -264,17 +239,6 @@ type NewTrade struct {
 	PaymentDeadline time.Time
 }
 
-type NewEvidence struct {
-	ID        string
-	Kind      EvidenceKind
-	MIME      string
-	SizeBytes int64
-	Width     int
-	Height    int
-	SHA256    [32]byte
-	Encrypted EncryptedValue
-}
-
 type NewStatement struct {
 	ID             string
 	CharacterCount int
@@ -294,19 +258,18 @@ type Store interface {
 	Trade(context.Context, string) (Trade, error)
 	MyActivity(context.Context, string) ([]Order, []Trade, error)
 	AdminDisputes(context.Context) ([]Trade, error)
-	Evidence(context.Context, string) (Evidence, error)
 	EncryptionTargets(context.Context) ([]EncryptionTarget, error)
 
 	CreateOrder(context.Context, Command, NewOrder) (Order, error)
 	TakeOrder(context.Context, Command, string, NewTrade) (Trade, error)
 	CancelOrder(context.Context, Command, string) (Order, error)
-	MarkPaid(context.Context, Command, string, *NewEvidence, *EncryptedValue, int) (Trade, error)
+	MarkPaid(context.Context, Command, string, *EncryptedValue, int) (Trade, error)
 	CancelTrade(context.Context, Command, string, bool) (Trade, error)
 	ConfirmReceipt(context.Context, Command, string) (Trade, error)
-	OpenDispute(context.Context, Command, string, NewStatement, []NewEvidence) (Trade, error)
-	AddDisputeEvidence(context.Context, Command, string, NewStatement, []NewEvidence) (Trade, error)
+	OpenDispute(context.Context, Command, string, NewStatement) (Trade, error)
+	AddDisputeStatement(context.Context, Command, string, NewStatement) (Trade, error)
 	AdminCancelOrder(context.Context, Command, string, string) (Order, error)
 	ResolveDispute(context.Context, Command, string, ResolutionAction, string, time.Time) (Trade, error)
 	ExpireDue(context.Context, time.Time, int) (int, error)
-	CleanupEvidence(context.Context, time.Time, int) (int, error)
+	CleanupPrivateData(context.Context, time.Time, int) (int, error)
 }

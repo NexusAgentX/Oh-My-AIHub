@@ -1,6 +1,6 @@
 # ADR-0011：采用 C2C 父子持有与订单交易状态机
 
-- 状态：已通过
+- 状态：已通过（证据图片相关内容已被 [ADR-0018](0018-remove-c2c-evidence-images.md) 取代）
 - 日期：2026-09-02
 - 决策者：项目维护者与 AI 产品团队
 - 关联内容：Feature #23、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)

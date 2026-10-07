@@ -42,11 +42,12 @@
 - [ADR-0008：采用不可变账本、双持有投影与计价公式 v1](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) — 已通过
 - [ADR-0009：采用版本化凭据加密与固定出站网络边界](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) — 已通过
 - [ADR-0010：采用快照化 API 网关与幂等终结状态机](0010-adopt-snapshot-gateway-and-idempotent-settlement.md) — 已通过
-- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过
+- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过（证据图片部分被 ADR-0018 取代）
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md) — 已通过
 - [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过
 - [ADR-0015：MVP 完成后直接基于代码开发](0015-develop-directly-from-implemented-mvp.md) — 已通过
 - [ADR-0016：网关交付与结算解耦](0016-decouple-gateway-delivery-from-settlement.md) — 已通过
 - [ADR-0017：采用 sqlc 与按领域分包的持久化分层](0017-adopt-sqlc-domain-persistence-layering.md) — 已通过
-- [ADR-0018：前端采用 TanStack Query 与统一设计 token / 组件约定](0018-frontend-query-and-design-conventions.md) — 已通过
+- [ADR-0018：移除 C2C 付款截图与争议证据图片](0018-remove-c2c-evidence-images.md) — 已通过
+- [ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定](0019-frontend-query-and-design-conventions.md) — 已通过
