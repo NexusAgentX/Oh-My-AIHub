@@ -24,8 +24,10 @@ export function gatewayRouteLabel(pathname: string) {
 	return '/proxy'
 }
 
+const backendOrigin = process.env.AIHUB_BACKEND_ORIGIN || 'http://127.0.0.1:8080'
+
 const backendProxy: ProxyOptions = {
-  target: 'http://127.0.0.1:8080',
+  target: backendOrigin,
   changeOrigin: false,
   timeout: 30 * 60 * 1000,
   proxyTimeout: 30 * 60 * 1000,
