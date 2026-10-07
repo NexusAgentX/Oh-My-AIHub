@@ -116,3 +116,15 @@ func TestInstanceInitializeRejectsInvalidPayload(t *testing.T) {
 		t.Fatalf("invalid payload = %d %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestInstanceInitializeRejectsMalformedBody(t *testing.T) {
+	for _, body := range []string{``, `not json`, `{"username":"a","unknown":1}`} {
+		application := newInstanceApp(t, &instanceStubStore{})
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/instance/initialize", strings.NewReader(body))
+		application.instanceInitialize(recorder, request)
+		if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "invalid_json") {
+			t.Fatalf("body %q = %d %s", body, recorder.Code, recorder.Body.String())
+		}
+	}
+}

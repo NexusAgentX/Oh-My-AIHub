@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -222,11 +221,4 @@ func normalizeRawError(raw string) (string, bool) {
 		cutoff--
 	}
 	return normalized[:cutoff], true
-}
-
-func validationErrorMessage(attempt ValidationAttempt) string {
-	if attempt.Status == ValidationPassed {
-		return ""
-	}
-	return fmt.Sprintf("%s: %s", attempt.ErrorCategory, attempt.RawError)
 }

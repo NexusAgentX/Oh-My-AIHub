@@ -54,8 +54,11 @@ func TestValidateModelPriceTiersRejectsInvalidShapes(t *testing.T) {
 		"end out of range":   func(tier *ledger.PriceTier) { tier.StartMinute, tier.EndMinute = int16Pointer(60), int16Pointer(1441) },
 		"weekday zero":       func(tier *ledger.PriceTier) { tier.Weekdays = []int{0} },
 		"weekday eight":      func(tier *ledger.PriceTier) { tier.Weekdays = []int{8} },
-		"invalid timezone":   func(tier *ledger.PriceTier) { tier.Timezone = "Not/AZone"; tier.StartMinute, tier.EndMinute = int16Pointer(60), int16Pointer(120) },
-		"name too long":      func(tier *ledger.PriceTier) { tier.Name = string(make([]byte, 65)) },
+		"invalid timezone": func(tier *ledger.PriceTier) {
+			tier.Timezone = "Not/AZone"
+			tier.StartMinute, tier.EndMinute = int16Pointer(60), int16Pointer(120)
+		},
+		"name too long": func(tier *ledger.PriceTier) { tier.Name = string(make([]byte, 65)) },
 	}
 	for note, mutate := range cases {
 		tier := validTier()

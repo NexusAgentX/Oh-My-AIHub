@@ -32,11 +32,11 @@ func priceTierResponse(tier ledger.PriceTier) map[string]any {
 		"name": tier.Name, "timezone": tier.Timezone,
 		"min_prompt_tokens": minPrompt, "max_prompt_tokens": maxPrompt,
 		"weekdays": weekdays, "start_minute_of_day": startMinute, "end_minute_of_day": endMinute,
-		"input_price":        tier.InputPrice.String(),
-		"output_price":       tier.OutputPrice.String(),
-		"cache_write_price":  tier.CacheWritePrice.String(),
-		"cache_read_price":   tier.CacheReadPrice.String(),
-		"price_unit":         "points_per_million_tokens",
+		"input_price":       tier.InputPrice.String(),
+		"output_price":      tier.OutputPrice.String(),
+		"cache_write_price": tier.CacheWritePrice.String(),
+		"cache_read_price":  tier.CacheReadPrice.String(),
+		"price_unit":        "points_per_million_tokens",
 	}
 }
 
