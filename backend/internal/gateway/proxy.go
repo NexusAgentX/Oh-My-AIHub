@@ -1085,8 +1085,11 @@ func sanitizedResponseHeaders(source http.Header) http.Header {
 
 // outboundRequestCarriesForeignCredential reports whether the request the gateway
 // is about to send would leak a platform or sibling-candidate credential through
-// a forwarded header or query parameter. It runs after authentication injection,
-// so the candidate's own credential is excluded by the caller.
+// a forwarded header or query parameter. The caller runs it before the platform
+// injects the candidate's own upstream authentication, so only forwarded client
+// data is scanned. foreignCredentials holds the platform secret and the other
+// candidates' credentials, never the candidate's own, since candidates may
+// legitimately share one upstream key.
 func outboundRequestCarriesForeignCredential(request *http.Request, foreignCredentials ...string) bool {
 	for name, values := range request.Header {
 		if headerNameCarriesCredential(name, foreignCredentials) {
