@@ -730,24 +730,14 @@ export const api = {
       )
     ).trade
   },
-  async markC2CPaid(tradeID: string, paymentReference: string, screenshot?: File | null) {
-    const payload = { payment_reference: paymentReference }
-    let body: BodyInit
-    if (screenshot) {
-      const form = new FormData()
-      form.set('payload', JSON.stringify(payload))
-      form.set('screenshot', screenshot)
-      body = form
-    } else {
-      body = JSON.stringify(payload)
-    }
+  async markC2CPaid(tradeID: string, paymentReference: string) {
     return (
       await request<{ trade: C2CTrade }>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}/paid`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body,
+          body: JSON.stringify({ payment_reference: paymentReference }),
         },
       )
     ).trade
@@ -771,26 +761,15 @@ export const api = {
   async submitC2CDispute(
     tradeID: string,
     statement: string,
-    evidence: File[],
     append = false,
   ) {
-    const payload = { statement }
-    let body: BodyInit
-    if (evidence.length > 0) {
-      const form = new FormData()
-      form.set('payload', JSON.stringify(payload))
-      evidence.forEach((file) => form.append('evidence', file))
-      body = form
-    } else {
-      body = JSON.stringify(payload)
-    }
     return (
       await request<{ trade: C2CTrade }>(
-        `/api/c2c/trades/${encodeURIComponent(tradeID)}/${append ? 'evidence' : 'dispute'}`,
+        `/api/c2c/trades/${encodeURIComponent(tradeID)}/${append ? 'statements' : 'dispute'}`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body,
+          body: JSON.stringify({ statement }),
         },
       )
     ).trade

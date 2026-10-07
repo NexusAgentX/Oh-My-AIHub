@@ -2,8 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -16,7 +14,6 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -40,10 +37,6 @@ func TestC2CDTOsNeverSerializeEncryptionEnvelopesOrHoldIdentifiers(t *testing.T)
 		Status: c2c.TradePaid, HoldID: "private-child-hold", SelectedPaymentMethod: &order.PaymentMethods[0],
 		PaymentReference: "visible-to-participants", PaymentReferenceData: encrypted,
 		PaymentDeadline: now.Add(c2c.PaymentWindow), CreatedAt: now, UpdatedAt: now,
-		Evidence: []c2c.Evidence{{
-			ID: "evidence-id", TradeID: "trade-id", UploaderAccountID: "buyer-id", Kind: c2c.EvidencePayment,
-			MIME: "image/png", SizeBytes: 123, Encrypted: encrypted, CreatedAt: now,
-		}},
 		Statements: []c2c.Statement{{
 			ID: "statement-id", TradeID: "trade-id", ActorAccountID: "buyer-id", Text: "statement",
 			CharacterCount: 9, Encrypted: encrypted, CreatedAt: now,
@@ -121,71 +114,6 @@ func TestDecodeC2CMultipartSanitizesImageAndRejectsTrailingPayload(t *testing.T)
 	}
 }
 
-type c2cEvidenceAPIStore struct {
-	c2c.Store
-	evidence c2c.Evidence
-	trade    c2c.Trade
-}
-
-func (s c2cEvidenceAPIStore) Evidence(context.Context, string) (c2c.Evidence, error) {
-	return s.evidence, nil
-}
-
-func (s c2cEvidenceAPIStore) Trade(context.Context, string) (c2c.Trade, error) {
-	return s.trade, nil
-}
-
-func TestC2CEvidenceDownloadIsAuthorizedAndNonCacheable(t *testing.T) {
-	keyring := testC2CKeyring(t)
-	plaintext := testPNG(t)
-	encrypted, err := keyring.Encrypt("evidence-id", "evidence:payment", plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store := c2cEvidenceAPIStore{
-		evidence: c2c.Evidence{
-			ID: "evidence-id", TradeID: "trade-id", Kind: c2c.EvidencePayment,
-			MIME: "image/png", Encrypted: encrypted,
-		},
-		trade: c2c.Trade{ID: "trade-id", BuyerAccountID: "buyer-id", SellerAccountID: "seller-id"},
-	}
-	service, err := c2c.NewService(store, keyring)
-	if err != nil {
-		t.Fatal(err)
-	}
-	application := &app{c2c: service}
-	request := httptest.NewRequest(http.MethodGet, "/api/c2c/evidence/evidence-id", nil)
-	request.SetPathValue("evidenceID", "evidence-id")
-	request = request.WithContext(context.WithValue(request.Context(), accountContextKey, identity.Account{
-		ID: "buyer-id", Status: identity.StatusActive,
-	}))
-	recorder := httptest.NewRecorder()
-
-	application.c2cEvidence(recorder, request)
-
-	if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), plaintext) {
-		t.Fatalf("authorized evidence response = %d %q", recorder.Code, recorder.Body.Bytes())
-	}
-	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("Cache-Control = %q", got)
-	}
-	if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Fatalf("X-Content-Type-Options = %q", got)
-	}
-	if got := recorder.Header().Get("Content-Disposition"); !strings.HasPrefix(got, "attachment;") {
-		t.Fatalf("Content-Disposition = %q", got)
-	}
-
-	request = request.WithContext(context.WithValue(request.Context(), accountContextKey, identity.Account{
-		ID: "unrelated-id", Status: identity.StatusActive,
-	}))
-	recorder = httptest.NewRecorder()
-	application.c2cEvidence(recorder, request)
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("unrelated evidence response = %d, want %d", recorder.Code, http.StatusNotFound)
-	}
-}
-
 func c2cMultipartRequest(t *testing.T, payload, field string, content []byte) (*http.Request, string) {
 	t.Helper()
 	var body bytes.Buffer
@@ -217,14 +145,4 @@ func testPNG(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	return encoded.Bytes()
-}
-
-func testC2CKeyring(t *testing.T) *c2c.Keyring {
-	t.Helper()
-	encoded := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x42}, 32))
-	keyring, err := c2c.ParseKeyring("v1="+encoded, "v1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return keyring
 }

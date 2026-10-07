@@ -1,14 +1,10 @@
 package postgres_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
 	"os"
 	"strings"
 	"sync"
@@ -100,7 +96,7 @@ func TestC2CIntegration(t *testing.T) {
 		t.Fatalf("C2C service: %v", err)
 	}
 	method := []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, Contact: "wx-private", Instructions: "pay exact amount"}}
-	var releasedTradeID, releasedEvidenceID, returnedTradeID string
+	var releasedTradeID, returnedTradeID string
 
 	t.Run("sell parent hold, partial fills, idempotency, cancellation and privacy", func(t *testing.T) {
 		forged := c2c.SanitizedImage{MIME: "image/png", Bytes: []byte("not really a PNG"), Width: 1, Height: 1}
@@ -172,8 +168,7 @@ func TestC2CIntegration(t *testing.T) {
 		assertOrderAmounts(t, order, "10", "0", "10", "0", "0", c2c.OrderAllocated)
 		assertHold(t, pool, order.ParentHoldID, "10", "10", "0", "0")
 
-		screenshot := c2cIntegrationImage(t)
-		if _, err := service.MarkPaid(ctx, buyerOne, "sell-paid", trade.ID, "wx-transaction-1", &screenshot); err != nil {
+		if _, err := service.MarkPaid(ctx, buyerOne, "sell-paid", trade.ID, "wx-transaction-1"); err != nil {
 			t.Fatalf("mark paid: %v", err)
 		}
 		released, err := service.ConfirmReceipt(ctx, seller, "sell-release", trade.ID)
@@ -182,10 +177,9 @@ func TestC2CIntegration(t *testing.T) {
 		}
 		releasedTradeID = released.ID
 		decrypted, err := service.Trade(ctx, buyerOne, released.ID)
-		if err != nil || decrypted.PaymentReference != "wx-transaction-1" || len(decrypted.PaymentReferenceData.Ciphertext) != 0 || len(decrypted.Evidence) != 1 || len(decrypted.Evidence[0].Encrypted.Ciphertext) != 0 {
+		if err != nil || decrypted.PaymentReference != "wx-transaction-1" || len(decrypted.PaymentReferenceData.Ciphertext) != 0 {
 			t.Fatalf("decrypted payment reference = %q envelope %d, %v", decrypted.PaymentReference, len(decrypted.PaymentReferenceData.Ciphertext), err)
 		}
-		releasedEvidenceID = decrypted.Evidence[0].ID
 		var encryptedReference []byte
 		if err := pool.QueryRow(ctx, `SELECT payment_reference_ciphertext FROM c2c_trades WHERE id = $1`, released.ID).Scan(&encryptedReference); err != nil || string(encryptedReference) == "wx-transaction-1" {
 			t.Fatalf("stored payment reference was not encrypted: %q, %v", encryptedReference, err)
@@ -222,24 +216,20 @@ func TestC2CIntegration(t *testing.T) {
 		if _, err := service.CancelOrder(ctx, buyerOne, "buy-cancel-parent", buyOrder.ID); err != nil {
 			t.Fatalf("cancel buy parent: %v", err)
 		}
-		if _, err := service.MarkPaid(ctx, buyerOne, "buy-paid", trade.ID, "", nil); err != nil {
+		if _, err := service.MarkPaid(ctx, buyerOne, "buy-paid", trade.ID, ""); err != nil {
 			t.Fatalf("mark buy trade paid: %v", err)
 		}
-		disputeImage := c2cIntegrationImage(t)
-		if _, err := service.OpenDispute(ctx, buyerOne, "buy-dispute", trade.ID, "seller payment details could not be verified", []c2c.SanitizedImage{disputeImage, disputeImage, disputeImage}); err != nil {
+		if _, err := service.OpenDispute(ctx, buyerOne, "buy-dispute", trade.ID, "seller payment details could not be verified"); err != nil {
 			t.Fatalf("open buy dispute: %v", err)
 		}
-		if _, err := service.AddDisputeEvidence(ctx, buyerOne, "buy-dispute-follow-up", trade.ID, "additional timeline supplied by the same participant", []c2c.SanitizedImage{disputeImage, disputeImage}); err != nil {
+		if _, err := service.AddDisputeStatement(ctx, buyerOne, "buy-dispute-follow-up", trade.ID, "additional timeline supplied by the same participant"); err != nil {
 			t.Fatalf("append dispute statement: %v", err)
 		}
-		if _, err := service.AddDisputeEvidence(ctx, buyerOne, "buy-dispute-sixth-image", trade.ID, "attempted sixth image", []c2c.SanitizedImage{disputeImage}); !errors.Is(err, c2c.ErrInvalidInput) {
-			t.Fatalf("sixth participant image error = %v", err)
-		}
-		if _, err := service.AddDisputeEvidence(ctx, buyerOne, "buy-dispute-too-long", trade.ID, strings.Repeat("x", 1_980), nil); err == nil {
+		if _, err := service.AddDisputeStatement(ctx, buyerOne, "buy-dispute-too-long", trade.ID, strings.Repeat("x", 1_980)); err == nil {
 			t.Fatal("cumulative 2,000-character statement limit unexpectedly accepted")
 		}
 		disputeView, err := service.Trade(ctx, admin, trade.ID)
-		if err != nil || len(disputeView.Statements) != 2 || len(disputeView.Evidence) != 5 || disputeView.Statements[0].Text == "" || disputeView.Statements[1].Text == "" || len(disputeView.Statements[0].Encrypted.Ciphertext) != 0 || len(disputeView.Evidence[0].Encrypted.Ciphertext) != 0 {
+		if err != nil || len(disputeView.Statements) != 2 || disputeView.Statements[0].Text == "" || disputeView.Statements[1].Text == "" || len(disputeView.Statements[0].Encrypted.Ciphertext) != 0 {
 			t.Fatalf("append-only decrypted dispute statements = %+v, %v", disputeView.Statements, err)
 		}
 		disabled := identity.StatusDisabled
@@ -352,7 +342,7 @@ func TestC2CIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("take restricted scenario: %v", err)
 		}
-		if _, err := service.MarkPaid(ctx, restrictedBuyer, "restricted-paid", trade.ID, "private-reference", nil); err != nil {
+		if _, err := service.MarkPaid(ctx, restrictedBuyer, "restricted-paid", trade.ID, "private-reference"); err != nil {
 			t.Fatalf("mark restricted scenario paid: %v", err)
 		}
 		disabled := identity.StatusDisabled
@@ -381,7 +371,7 @@ func TestC2CIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("take race trade: %v", err)
 		}
-		if _, err := service.MarkPaid(ctx, buyerOne, "race-paid", trade.ID, "", nil); err != nil {
+		if _, err := service.MarkPaid(ctx, buyerOne, "race-paid", trade.ID, ""); err != nil {
 			t.Fatalf("mark race paid: %v", err)
 		}
 		errorsOut := make(chan error, 2)
@@ -394,7 +384,7 @@ func TestC2CIntegration(t *testing.T) {
 		}()
 		go func() {
 			defer group.Done()
-			_, err := service.OpenDispute(ctx, buyerOne, "race-dispute", trade.ID, "payment requires administrator review", nil)
+			_, err := service.OpenDispute(ctx, buyerOne, "race-dispute", trade.ID, "payment requires administrator review")
 			errorsOut <- err
 		}()
 		group.Wait()
@@ -429,10 +419,10 @@ func TestC2CIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("take second race trade: %v", err)
 		}
-		if _, err := service.MarkPaid(ctx, buyerTwo, "race-second-paid", second.ID, "", nil); err != nil {
+		if _, err := service.MarkPaid(ctx, buyerTwo, "race-second-paid", second.ID, ""); err != nil {
 			t.Fatalf("mark second paid: %v", err)
 		}
-		if _, err := service.OpenDispute(ctx, buyerTwo, "race-second-dispute", second.ID, "administrator must choose terminal owner", nil); err != nil {
+		if _, err := service.OpenDispute(ctx, buyerTwo, "race-second-dispute", second.ID, "administrator must choose terminal owner"); err != nil {
 			t.Fatalf("open second dispute: %v", err)
 		}
 		resolveErrors := make(chan error, 2)
@@ -495,7 +485,7 @@ func TestC2CIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("deadline service: %v", err)
 		}
-		if _, err := deadlineService.MarkPaid(ctx, buyerThree, "deadline-paid", trade.ID, "", nil); !errors.Is(err, c2c.ErrExpired) {
+		if _, err := deadlineService.MarkPaid(ctx, buyerThree, "deadline-paid", trade.ID, ""); !errors.Is(err, c2c.ErrExpired) {
 			t.Fatalf("exact deadline mark-paid error = %v", err)
 		}
 		final, err := deadlineService.Trade(ctx, buyerThree, trade.ID)
@@ -670,7 +660,7 @@ func TestC2CIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.MarkPaid(ctx, buyer, "lock-capture-paid", trade.ID, "", nil); err != nil {
+			if _, err := service.MarkPaid(ctx, buyer, "lock-capture-paid", trade.ID, ""); err != nil {
 				t.Fatal(err)
 			}
 			disabled := identity.StatusDisabled
@@ -843,10 +833,10 @@ func TestC2CIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.MarkPaid(ctx, buyer, "restrict-paid", trade.ID, "", nil); err != nil {
+			if _, err := service.MarkPaid(ctx, buyer, "restrict-paid", trade.ID, ""); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.OpenDispute(ctx, buyer, "restrict-dispute", trade.ID, "seller denies receiving the payment", nil); err != nil {
+			if _, err := service.OpenDispute(ctx, buyer, "restrict-dispute", trade.ID, "seller denies receiving the payment"); err != nil {
 				t.Fatal(err)
 			}
 			before, err := service.Trade(ctx, admin, trade.ID)
@@ -958,8 +948,8 @@ func TestC2CIntegration(t *testing.T) {
 
 			// Restricted parties keep handling the existing dispute, and the
 			// restriction combines with extending review before a final decision.
-			if _, err := service.AddDisputeEvidence(ctx, buyer, "restricted-evidence", trade.ID, "bank record attached separately", nil); err != nil {
-				t.Fatalf("restricted buyer add evidence: %v", err)
+			if _, err := service.AddDisputeStatement(ctx, buyer, "restricted-statement", trade.ID, "bank record attached separately"); err != nil {
+				t.Fatalf("restricted buyer add statement: %v", err)
 			}
 			extended, err := service.ResolveDispute(ctx, admin, "restrict-extend", trade.ID, c2c.ResolutionExtend, "awaiting bank confirmation")
 			if err != nil || extended.Status != c2c.TradeDisputed || extended.ReviewDueAt == nil {
@@ -988,15 +978,15 @@ func TestC2CIntegration(t *testing.T) {
 	if metrics.TotalPostedBalance != "0" || metrics.PostedProjectionDifference != "0" || metrics.AssetReservationDifference != "0" || metrics.SpendAuthorizationDifference != "0" || metrics.IncentivePostedBalance != "0" {
 		t.Fatalf("ledger reconciliation after C2C = %+v", metrics)
 	}
-	if releasedTradeID == "" || releasedEvidenceID == "" || returnedTradeID == "" {
+	if releasedTradeID == "" || returnedTradeID == "" {
 		t.Fatal("expected terminal trades for retention test")
 	}
-	futureService, err := c2c.NewServiceWithClock(store, keyring, func() time.Time { return now.Add(c2c.EvidenceRetention + time.Hour) })
+	futureService, err := c2c.NewServiceWithClock(store, keyring, func() time.Time { return now.Add(c2c.PrivateRetention + time.Hour) })
 	if err != nil {
 		t.Fatalf("future C2C service: %v", err)
 	}
-	if cleaned, err := futureService.CleanupEvidence(ctx, 100); err != nil || cleaned < 3 {
-		t.Fatalf("private evidence cleanup = %d, %v", cleaned, err)
+	if cleaned, err := futureService.CleanupPrivateData(ctx, 100); err != nil || cleaned < 3 {
+		t.Fatalf("private data cleanup = %d, %v", cleaned, err)
 	}
 	var referenceCiphertext []byte
 	var referenceDeleted *time.Time
@@ -1005,28 +995,21 @@ func TestC2CIntegration(t *testing.T) {
 		FROM c2c_trades WHERE id = $1`, releasedTradeID).Scan(&referenceCiphertext, &referenceDeleted); err != nil || len(referenceCiphertext) != 0 || referenceDeleted == nil {
 		t.Fatalf("payment reference retention cleanup = bytes %d deleted %v, %v", len(referenceCiphertext), referenceDeleted, err)
 	}
-	var evidenceCiphertext []byte
-	var evidenceDeleted *time.Time
+	var statementCiphertext []byte
+	var statementDeleted *time.Time
 	if err := pool.QueryRow(ctx, `
 		SELECT COALESCE(ciphertext, ''::bytea), deleted_at
-		FROM c2c_evidence WHERE id = $1`, releasedEvidenceID).Scan(&evidenceCiphertext, &evidenceDeleted); err != nil || len(evidenceCiphertext) != 0 || evidenceDeleted == nil {
-		t.Fatalf("evidence retention cleanup = bytes %d deleted %v, %v", len(evidenceCiphertext), evidenceDeleted, err)
+		FROM c2c_dispute_statements WHERE trade_id = $1 ORDER BY created_at, id LIMIT 1`, returnedTradeID).Scan(&statementCiphertext, &statementDeleted); err != nil || len(statementCiphertext) != 0 || statementDeleted == nil {
+		t.Fatalf("statement retention cleanup = bytes %d deleted %v, %v", len(statementCiphertext), statementDeleted, err)
 	}
-}
-
-func c2cIntegrationImage(t *testing.T) c2c.SanitizedImage {
-	t.Helper()
-	pixels := image.NewNRGBA(image.Rect(0, 0, 2, 2))
-	pixels.Set(0, 0, color.NRGBA{R: 0x65, G: 0x6d, B: 0x76, A: 0xff})
-	var encoded bytes.Buffer
-	if err := png.Encode(&encoded, pixels); err != nil {
-		t.Fatalf("encode C2C integration image: %v", err)
+	var evidenceTable *string
+	var qrColumn bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass('c2c_evidence')::text,
+		       EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('c2c_payment_methods') AND attname = 'qr_available' AND NOT attisdropped)`,
+	).Scan(&evidenceTable, &qrColumn); err != nil || evidenceTable != nil || !qrColumn {
+		t.Fatalf("expected evidence table dropped and qr_available kept: table %v column %v, %v", evidenceTable, qrColumn, err)
 	}
-	clean, err := c2c.SanitizeImage(bytes.NewReader(encoded.Bytes()))
-	if err != nil {
-		t.Fatalf("sanitize C2C integration image: %v", err)
-	}
-	return clean
 }
 
 func assertOrderAmounts(t *testing.T, order c2c.Order, total, available, allocated, settled, closed string, status c2c.OrderStatus) {

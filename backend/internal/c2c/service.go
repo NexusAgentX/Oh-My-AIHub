@@ -153,9 +153,6 @@ func (s *Service) Trade(ctx context.Context, actor identity.Account, tradeID str
 		}
 		statement.Encrypted = EncryptedValue{}
 	}
-	for index := range trade.Evidence {
-		trade.Evidence[index].Encrypted = EncryptedValue{}
-	}
 	return trade, nil
 }
 
@@ -172,29 +169,6 @@ func (s *Service) AdminDisputes(ctx context.Context, actor identity.Account) ([]
 		return nil, ErrForbidden
 	}
 	return s.store.AdminDisputes(ctx)
-}
-
-func (s *Service) EvidenceFile(ctx context.Context, actor identity.Account, evidenceID string) (Evidence, []byte, error) {
-	if !readyActor(actor) {
-		return Evidence{}, nil, ErrForbidden
-	}
-	evidence, err := s.store.Evidence(ctx, evidenceID)
-	if err != nil || evidence.DeletedAt != nil {
-		return Evidence{}, nil, ErrNotFound
-	}
-	trade, err := s.store.Trade(ctx, evidence.TradeID)
-	if err != nil {
-		return Evidence{}, nil, err
-	}
-	if !actor.IsAdmin && actor.ID != trade.BuyerAccountID && actor.ID != trade.SellerAccountID {
-		return Evidence{}, nil, ErrNotFound
-	}
-	plaintext, err := s.keyring.Decrypt(evidence.ID, evidencePurpose(evidence.Kind), evidence.Encrypted)
-	if err != nil {
-		return Evidence{}, nil, err
-	}
-	evidence.Encrypted = EncryptedValue{}
-	return evidence, plaintext, nil
 }
 
 func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key string, side Side, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) (Order, error) {
@@ -298,34 +272,18 @@ func (s *Service) AdminCancelOrder(ctx context.Context, actor identity.Account, 
 	return s.store.AdminCancelOrder(ctx, command, payload.OrderID, reason)
 }
 
-func (s *Service) MarkPaid(ctx context.Context, actor identity.Account, key, tradeID, paymentReference string, screenshot *SanitizedImage) (Trade, error) {
+func (s *Service) MarkPaid(ctx context.Context, actor identity.Account, key, tradeID, paymentReference string) (Trade, error) {
 	paymentReference = strings.TrimSpace(paymentReference)
 	if len([]rune(paymentReference)) > 256 {
 		return Trade{}, ErrInvalidInput
 	}
-	if screenshot != nil {
-		clean, err := normalizeImage(screenshot)
-		if err != nil {
-			return Trade{}, err
-		}
-		screenshot = &clean
-	}
 	payload := struct {
 		TradeID          string
 		PaymentReference string
-		ScreenshotHash   string
-	}{strings.TrimSpace(tradeID), paymentReference, imageHash(screenshot)}
+	}{strings.TrimSpace(tradeID), paymentReference}
 	command, err := s.command(actor, "c2c.trade.paid", key, payload)
 	if err != nil {
 		return Trade{}, err
-	}
-	var evidence *NewEvidence
-	if screenshot != nil {
-		created, err := s.encryptEvidence(EvidencePayment, screenshot)
-		if err != nil {
-			return Trade{}, err
-		}
-		evidence = &created
 	}
 	var encryptedReference *EncryptedValue
 	if paymentReference != "" {
@@ -335,7 +293,7 @@ func (s *Service) MarkPaid(ctx context.Context, actor identity.Account, key, tra
 		}
 		encryptedReference = &encrypted
 	}
-	return s.store.MarkPaid(ctx, command, payload.TradeID, evidence, encryptedReference, len([]rune(paymentReference)))
+	return s.store.MarkPaid(ctx, command, payload.TradeID, encryptedReference, len([]rune(paymentReference)))
 }
 
 func (s *Service) CancelTrade(ctx context.Context, actor identity.Account, key, tradeID string) (Trade, error) {
@@ -354,45 +312,26 @@ func (s *Service) ConfirmReceipt(ctx context.Context, actor identity.Account, ke
 	return s.store.ConfirmReceipt(ctx, command, strings.TrimSpace(tradeID))
 }
 
-func (s *Service) OpenDispute(ctx context.Context, actor identity.Account, key, tradeID, statement string, images []SanitizedImage) (Trade, error) {
-	return s.submitDisputeEvidence(ctx, actor, key, "c2c.trade.dispute", tradeID, statement, images, true)
+func (s *Service) OpenDispute(ctx context.Context, actor identity.Account, key, tradeID, statement string) (Trade, error) {
+	return s.submitDisputeStatement(ctx, actor, key, "c2c.trade.dispute", tradeID, statement, true)
 }
 
-func (s *Service) AddDisputeEvidence(ctx context.Context, actor identity.Account, key, tradeID, statement string, images []SanitizedImage) (Trade, error) {
-	return s.submitDisputeEvidence(ctx, actor, key, "c2c.trade.dispute_evidence", tradeID, statement, images, false)
+func (s *Service) AddDisputeStatement(ctx context.Context, actor identity.Account, key, tradeID, statement string) (Trade, error) {
+	return s.submitDisputeStatement(ctx, actor, key, "c2c.trade.dispute_statement", tradeID, statement, false)
 }
 
-func (s *Service) submitDisputeEvidence(ctx context.Context, actor identity.Account, key, operation, tradeID, statement string, images []SanitizedImage, open bool) (Trade, error) {
+func (s *Service) submitDisputeStatement(ctx context.Context, actor identity.Account, key, operation, tradeID, statement string, open bool) (Trade, error) {
 	statement = strings.TrimSpace(statement)
-	if statement == "" || len([]rune(statement)) > MaximumStatement || len(images) > MaximumDisputeFiles {
+	if statement == "" || len([]rune(statement)) > MaximumStatement {
 		return Trade{}, ErrInvalidInput
-	}
-	cleanImages := make([]SanitizedImage, len(images))
-	hashes := make([]string, len(images))
-	for index := range images {
-		clean, err := normalizeImage(&images[index])
-		if err != nil {
-			return Trade{}, err
-		}
-		cleanImages[index] = clean
-		hashes[index] = hex.EncodeToString(clean.SHA256[:])
 	}
 	payload := struct {
 		TradeID   string
 		Statement string
-		Hashes    []string
-	}{strings.TrimSpace(tradeID), statement, hashes}
+	}{strings.TrimSpace(tradeID), statement}
 	command, err := s.command(actor, operation, key, payload)
 	if err != nil {
 		return Trade{}, err
-	}
-	evidence := make([]NewEvidence, 0, len(cleanImages))
-	for index := range cleanImages {
-		created, err := s.encryptEvidence(EvidenceDispute, &cleanImages[index])
-		if err != nil {
-			return Trade{}, err
-		}
-		evidence = append(evidence, created)
 	}
 	statementID, err := newID()
 	if err != nil {
@@ -404,9 +343,9 @@ func (s *Service) submitDisputeEvidence(ctx context.Context, actor identity.Acco
 	}
 	createdStatement := NewStatement{ID: statementID, CharacterCount: len([]rune(statement)), Encrypted: encryptedStatement}
 	if open {
-		return s.store.OpenDispute(ctx, command, payload.TradeID, createdStatement, evidence)
+		return s.store.OpenDispute(ctx, command, payload.TradeID, createdStatement)
 	}
-	return s.store.AddDisputeEvidence(ctx, command, payload.TradeID, createdStatement, evidence)
+	return s.store.AddDisputeStatement(ctx, command, payload.TradeID, createdStatement)
 }
 
 func (s *Service) ResolveDispute(ctx context.Context, actor identity.Account, key, tradeID string, action ResolutionAction, reason string) (Trade, error) {
@@ -433,11 +372,11 @@ func (s *Service) ExpireDue(ctx context.Context, limit int) (int, error) {
 	return s.store.ExpireDue(ctx, s.now().UTC(), limit)
 }
 
-func (s *Service) CleanupEvidence(ctx context.Context, limit int) (int, error) {
+func (s *Service) CleanupPrivateData(ctx context.Context, limit int) (int, error) {
 	if limit < 1 || limit > 1_000 {
 		return 0, ErrInvalidInput
 	}
-	return s.store.CleanupEvidence(ctx, s.now().UTC(), limit)
+	return s.store.CleanupPrivateData(ctx, s.now().UTC(), limit)
 }
 
 func FiatAmountFen(quantity money.Amount, unitPriceFen int64) (int64, error) {
@@ -478,24 +417,6 @@ func (s *Service) simpleCommand(actor identity.Account, operation, key, targetID
 	return s.command(actor, operation, key, struct{ ID string }{targetID})
 }
 
-func (s *Service) encryptEvidence(kind EvidenceKind, image *SanitizedImage) (NewEvidence, error) {
-	if image == nil || (image.MIME != "image/jpeg" && image.MIME != "image/png") || len(image.Bytes) == 0 || len(image.Bytes) > MaximumImageBytes {
-		return NewEvidence{}, ErrInvalidInput
-	}
-	id, err := newID()
-	if err != nil {
-		return NewEvidence{}, err
-	}
-	encrypted, err := s.keyring.Encrypt(id, evidencePurpose(kind), image.Bytes)
-	if err != nil {
-		return NewEvidence{}, err
-	}
-	return NewEvidence{
-		ID: id, Kind: kind, MIME: image.MIME, SizeBytes: int64(len(image.Bytes)),
-		Width: image.Width, Height: image.Height, SHA256: image.SHA256, Encrypted: encrypted,
-	}, nil
-}
-
 func (s *Service) decryptPaymentMethods(order *Order) error {
 	for index := range order.PaymentMethods {
 		method := &order.PaymentMethods[index]
@@ -522,6 +443,13 @@ func normalizeImage(image *SanitizedImage) (SanitizedImage, error) {
 	return SanitizeImage(bytes.NewReader(image.Bytes))
 }
 
+func imageHash(image *SanitizedImage) string {
+	if image == nil {
+		return ""
+	}
+	return hex.EncodeToString(image.SHA256[:])
+}
+
 func newID() (string, error) {
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {
@@ -544,15 +472,6 @@ func validKey(key string) bool {
 
 func validPaymentType(value PaymentMethodType) bool {
 	return value == PaymentWeChat || value == PaymentAlipay || value == PaymentBankTransfer || value == PaymentOther
-}
-
-func evidencePurpose(kind EvidenceKind) string { return "evidence:" + string(kind) }
-
-func imageHash(image *SanitizedImage) string {
-	if image == nil {
-		return ""
-	}
-	return hex.EncodeToString(image.SHA256[:])
 }
 
 func orderPayloadForHash(side Side, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) any {

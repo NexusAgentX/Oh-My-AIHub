@@ -202,26 +202,13 @@ func (a *app) c2cMarkPaid(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		PaymentReference string `json:"payment_reference"`
 	}
-	form, err := decodeC2CRequest(w, r, &request)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "请求格式无效")
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
 		return
-	}
-	if form != nil {
-		defer form.RemoveAll() //nolint:errcheck
-	}
-	var screenshot *c2c.SanitizedImage
-	if form != nil && len(form.File["screenshot"]) > 0 {
-		image, err := c2cMultipartImage(form, "screenshot")
-		if err != nil {
-			writeDomainError(w, err)
-			return
-		}
-		screenshot = &image
 	}
 	trade, err := a.c2c.MarkPaid(
 		r.Context(), accountFromContext(r.Context()), idempotencyKey(r), r.PathValue("tradeID"),
-		request.PaymentReference, screenshot,
+		request.PaymentReference,
 	)
 	if err != nil {
 		writeDomainError(w, err)
@@ -252,7 +239,7 @@ func (a *app) c2cOpenDispute(w http.ResponseWriter, r *http.Request) {
 	a.c2cSubmitDispute(w, r, true)
 }
 
-func (a *app) c2cAddEvidence(w http.ResponseWriter, r *http.Request) {
+func (a *app) c2cAddStatement(w http.ResponseWriter, r *http.Request) {
 	a.c2cSubmitDispute(w, r, false)
 }
 
@@ -260,50 +247,22 @@ func (a *app) c2cSubmitDispute(w http.ResponseWriter, r *http.Request, open bool
 	var request struct {
 		Statement string `json:"statement"`
 	}
-	form, err := decodeC2CRequest(w, r, &request)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "请求格式无效")
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
 		return
 	}
-	if form != nil {
-		defer form.RemoveAll() //nolint:errcheck
-	}
-	images := make([]c2c.SanitizedImage, 0)
-	if form != nil {
-		for _, header := range form.File["evidence"] {
-			image, err := c2cSanitizeFile(header)
-			if err != nil {
-				writeDomainError(w, err)
-				return
-			}
-			images = append(images, image)
-		}
-	}
 	var trade c2c.Trade
+	var err error
 	if open {
-		trade, err = a.c2c.OpenDispute(r.Context(), accountFromContext(r.Context()), idempotencyKey(r), r.PathValue("tradeID"), request.Statement, images)
+		trade, err = a.c2c.OpenDispute(r.Context(), accountFromContext(r.Context()), idempotencyKey(r), r.PathValue("tradeID"), request.Statement)
 	} else {
-		trade, err = a.c2c.AddDisputeEvidence(r.Context(), accountFromContext(r.Context()), idempotencyKey(r), r.PathValue("tradeID"), request.Statement, images)
+		trade, err = a.c2c.AddDisputeStatement(r.Context(), accountFromContext(r.Context()), idempotencyKey(r), r.PathValue("tradeID"), request.Statement)
 	}
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"trade": c2cTradeResponse(trade)})
-}
-
-func (a *app) c2cEvidence(w http.ResponseWriter, r *http.Request) {
-	evidence, content, err := a.c2c.EvidenceFile(r.Context(), accountFromContext(r.Context()), r.PathValue("evidenceID"))
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", evidence.MIME)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="c2c-evidence-%s"`, evidence.ID))
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(content)
 }
 
 func (a *app) adminC2CDisputes(w http.ResponseWriter, r *http.Request) {
@@ -447,16 +406,6 @@ func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 			"qr_url":       fmt.Sprintf("/api/c2c/orders/%s/payment-methods/%s/qr", trade.OrderID, trade.SelectedPaymentMethod.ID),
 		}
 	}
-	evidence := make([]map[string]any, 0, len(trade.Evidence))
-	for _, item := range trade.Evidence {
-		evidence = append(evidence, map[string]any{
-			"id": item.ID, "uploader_account_id": item.UploaderAccountID,
-			"uploader_name": item.UploaderName, "kind": item.Kind, "mime_type": item.MIME,
-			"size_bytes": item.SizeBytes, "width": item.Width, "height": item.Height,
-			"created_at": item.CreatedAt, "deleted_at": item.DeletedAt,
-			"download_url": "/api/c2c/evidence/" + item.ID,
-		})
-	}
 	statements := make([]map[string]any, 0, len(trade.Statements))
 	for _, item := range trade.Statements {
 		statements = append(statements, map[string]any{
@@ -487,7 +436,7 @@ func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 		"payment_reference_deleted_at": trade.PaymentReferenceGone,
 		"payment_deadline":             trade.PaymentDeadline, "review_due_at": trade.ReviewDueAt,
 		"ledger_transaction_id": trade.LedgerTransactionID,
-		"evidence":              evidence, "statements": statements, "events": events,
+		"statements":            statements, "events": events,
 		"created_at": trade.CreatedAt, "updated_at": trade.UpdatedAt,
 		"paid_at": trade.PaidAt, "resolved_at": trade.ResolvedAt,
 	}
