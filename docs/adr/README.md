@@ -48,3 +48,4 @@
 - [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过
 - [ADR-0015：MVP 完成后直接基于代码开发](0015-develop-directly-from-implemented-mvp.md) — 已通过
 - [ADR-0016：网关交付与结算解耦](0016-decouple-gateway-delivery-from-settlement.md) — 已通过
+- [ADR-0017：采用 sqlc 与按领域分包的持久化分层](0017-adopt-sqlc-domain-persistence-layering.md) — 已通过

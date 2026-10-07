@@ -1,10 +1,19 @@
 [tools]
 go = "1.27.0"
 node = "24.20.0"
+sqlc = "1.31.1"
 
 [tasks.install]
 description = "Install frontend dependencies"
 run = "npm --prefix frontend ci"
+
+[tasks.generate]
+description = "Regenerate sqlc persistence code from backend/sqlc.yaml"
+run = "sqlc -f backend/sqlc.yaml generate"
+
+[tasks.check-sqlc]
+description = "Fail when committed sqlc output differs from queries.sql and migrations"
+run = "sqlc -f backend/sqlc.yaml diff"
 
 [tasks.dev-frontend]
 description = "Run the frontend development server"
