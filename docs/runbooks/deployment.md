@@ -22,7 +22,7 @@
 
 ## 发布检查
 
-- 本地门禁：`mise run check-release`（设计资产、前端测试与构建、后端 vet 与 race、Compose 配置）。
+- 本地门禁：`mise run check-release`（前端测试与构建、后端 vet 与 race、Compose 配置）。
 - CI：PR 与 main 推送自动执行同一组门禁（`.github/workflows/ci.yml`）。
 - 部署后烟测：`GET /api/health` 返回 ok；管理员打开 `/admin/ops` 确认“账本已核对”且巡检历史最新记录全部正常。
 

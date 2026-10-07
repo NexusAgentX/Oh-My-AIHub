@@ -750,7 +750,7 @@ func TestProxyStreamingFallbackBeforeCommitAndLocksAfterCommit(t *testing.T) {
 			"offer-one": func(*http.Request) (*http.Response, error) {
 				return proxyResponse(http.StatusOK, http.Header{"Content-Type": []string{"text/event-stream"}}, strings.Join([]string{
 					`data: {"id":"first","model":"vendor-one","choices":[{"delta":{"role":"assistant"}}]}` + "\n\n",
-					"data: not-json\n\n",
+					`data: {"error":{"code":"upstream_failed","message":"failed"}}` + "\n\n",
 				}, "")), nil
 			},
 			"offer-two": func(*http.Request) (*http.Response, error) {
@@ -791,7 +791,7 @@ func TestProxyStreamingFallbackBeforeCommitAndLocksAfterCommit(t *testing.T) {
 			"offer-one": func(*http.Request) (*http.Response, error) {
 				return proxyResponse(http.StatusOK, http.Header{"Content-Type": []string{"text/event-stream"}}, `data: {"model":"vendor-one","choices":[{"delta":{"content":"committed"}}]}
 
-data: not-json
+data: {"error":{"code":"upstream_failed","message":"failed"}}
 
 `), nil
 			},
@@ -819,7 +819,7 @@ data: not-json
 	})
 }
 
-func TestProxyRejectsUnsupportedStreamingContentBeforeCommitAndFallsBack(t *testing.T) {
+func TestProxyDeliversUnrecognizedStreamingContentWithoutCharging(t *testing.T) {
 	tests := []struct {
 		name     string
 		protocol channel.Protocol
@@ -867,13 +867,13 @@ func TestProxyRejectsUnsupportedStreamingContentBeforeCommitAndFallsBack(t *test
 				canonical, stream = "canonical/model", true
 			}
 			service.ServeProtocol(recorder, request, test.protocol, canonical, stream)
-			if recorder.Code != http.StatusOK || len(outbound.snapshotRequests()) != 2 || !strings.Contains(recorder.Body.String(), "safe") {
-				t.Fatalf("unsupported response fallback = %d %s / %d", recorder.Code, recorder.Body.String(), len(outbound.snapshotRequests()))
+			if recorder.Code != http.StatusOK || len(outbound.snapshotRequests()) != 1 || !strings.Contains(recorder.Body.String(), "c2FtcGxl") || !strings.Contains(recorder.Body.String(), "not-json") {
+				t.Fatalf("unrecognized response delivery = %d %s / %d", recorder.Code, recorder.Body.String(), len(outbound.snapshotRequests()))
 			}
 			store.mu.Lock()
 			defer store.mu.Unlock()
-			if len(store.completed) != 2 || store.completed[0].Status != AttemptFailed || store.completed[0].SemanticCommitted || store.completed[1].Status != AttemptSucceeded || len(store.finalized) != 1 || store.finalized[0].Status != CallSucceeded {
-				t.Fatalf("unsupported response fallback facts = attempts:%+v final:%+v", store.completed, store.finalized)
+			if len(store.completed) != 1 || store.completed[0].Status != AttemptIncomplete || store.completed[0].SemanticCommitted || len(store.finalized) != 1 || store.finalized[0].Status != CallIncomplete || store.finalized[0].Usage != nil {
+				t.Fatalf("unrecognized response delivery facts = attempts:%+v final:%+v", store.completed, store.finalized)
 			}
 		})
 	}
@@ -1501,7 +1501,7 @@ func TestProxyDeliversStreamsThatEndWithoutATerminalFrame(t *testing.T) {
 	})
 
 	t.Run("usage-only-stream-is-billed-per-usage", func(t *testing.T) {
-		// Accepted tradeoff (ADR-0014 / ADR-0015): a 200 whose only payload is
+		// Accepted tradeoff (ADR-0014 / ADR-0016): a 200 whose only payload is
 		// usage is forwarded and settled on that usage, including as a stream.
 		store, outbound := newVendorStreamStore(`data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":2}}` + "\n\n")
 		service, _ := NewService(store, outbound)
@@ -1522,7 +1522,7 @@ func TestProxyDeliversStreamsThatEndWithoutATerminalFrame(t *testing.T) {
 // A stream that closes with nothing usable is still a failure the caller may
 // retry on the next candidate.
 func TestProxyFailsOverWhenAStreamProducesNothing(t *testing.T) {
-	store, outbound := newVendorStreamStore(`data: {"choices":[{"index":0,"delta":{"role":"assistant"}}]}` + "\n\n" + "data: keepalive\n\n")
+	store, outbound := newVendorStreamStore("")
 	service, _ := NewService(store, outbound)
 	recorder := httptest.NewRecorder()
 	service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
@@ -1849,3 +1849,95 @@ func (s *proxyStore) Dashboard(context.Context, string) (Dashboard, error) { ret
 
 var _ Store = (*proxyStore)(nil)
 var _ OutboundFactory = (*proxyOutbound)(nil)
+
+func TestProxyDeliversUnknownOnlyStreamsAtEOF(t *testing.T) {
+	for name, stream := range map[string]string{
+		"plain-data":    "data: vendor-answer\n\n",
+		"unknown-event": "event: vendor.result\ndata: {\"type\":\"vendor.result\",\"answer\":\"vendor-answer\"}\n\n",
+		"no-data":       ": vendor-answer\nretry: 1000\n\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			store, outbound := newVendorStreamStore(stream)
+			service, _ := NewService(store, outbound)
+			recorder := httptest.NewRecorder()
+			service.ServeProtocol(recorder, chatProxyRequest(context.Background(), true), channel.ProtocolOpenAIChat, "", false)
+			assertDeliveredWithoutFailover(t, recorder, outbound, "vendor-answer")
+			if len(store.finalized) != 1 || store.finalized[0].Status != CallIncomplete || store.finalized[0].Usage != nil {
+				t.Fatalf("unknown-only settlement = %+v", store.finalized)
+			}
+		})
+	}
+}
+
+func TestProxyReadsTrailersAfterProtocolEnd(t *testing.T) {
+	for _, tc := range []struct {
+		protocol channel.Protocol
+		terminal string
+		usage    string
+		path     string
+		body     string
+		auth     string
+	}{
+		{channel.ProtocolOpenAIChat, "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n", `"usage":{"prompt_tokens":100,"completion_tokens":100}`, "/v1/chat/completions", `{"model":"canonical/model","stream":true,"messages":[]}`, "Authorization"},
+		{channel.ProtocolOpenAIResponse, "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n", `"usage":{"input_tokens":100,"output_tokens":100}`, "/v1/responses", `{"model":"canonical/model","stream":true,"input":"hi"}`, "Authorization"},
+		{channel.ProtocolAnthropic, "data: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}\n\ndata: {\"type\":\"message_stop\"}\n\n", `"usage":{"input_tokens":100,"output_tokens":100}`, "/v1/messages", `{"model":"canonical/model","stream":true,"max_tokens":10,"messages":[]}`, "x-api-key"},
+		{channel.ProtocolGemini, "data: {\"candidates\":[{\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":2}}\n\n", `"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":100}`, "/v1beta/models/canonical/model:streamGenerateContent", `{"contents":[]}`, "x-goog-api-key"},
+	} {
+		for _, invalid := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/invalid=%t", tc.protocol, invalid), func(t *testing.T) {
+				usage := tc.usage
+				if invalid {
+					usage = strings.ReplaceAll(usage, "100", "-1")
+				}
+				stream := tc.terminal + "data: {\"vendor\":\"trailing-answer\"," + usage + "}\n\n"
+				store, outbound := newVendorStreamStore(stream)
+				service, _ := NewService(store, outbound)
+				request := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+				credential := "oma_live_" + strings.Repeat("z", 43)
+				if tc.auth == "Authorization" {
+					credential = "Bearer " + credential
+				}
+				request.Header.Set(tc.auth, credential)
+				recorder := httptest.NewRecorder()
+				model := ""
+				if tc.protocol == channel.ProtocolGemini {
+					model = "canonical/model"
+				}
+				service.ServeProtocol(recorder, request, tc.protocol, model, tc.protocol == channel.ProtocolGemini)
+				assertDeliveredWithoutFailover(t, recorder, outbound, "trailing-answer")
+				if len(store.finalized) != 1 {
+					t.Fatalf("finalizations = %+v", store.finalized)
+				}
+				final := store.finalized[0]
+				if invalid {
+					if final.Status != CallIncomplete || final.Usage != nil {
+						t.Fatalf("invalid trailer charged: %+v", final)
+					}
+				} else if final.Status != CallSucceeded || final.Usage == nil || final.Usage.InputTokens != 4 || final.Usage.OutputTokens != 2 {
+					t.Fatalf("trailer replaced frozen usage: %+v", final)
+				}
+			})
+		}
+	}
+}
+
+func TestProxyStillGuardsTrailersAfterProtocolEnd(t *testing.T) {
+	for name, tc := range map[string]struct{ tail, code string }{
+		"credential":     {"data: key-one\n\n", secretguard.CredentialErrorCode},
+		"flood":          {strings.Repeat("data: vendor-trailer\n\n", MaxTerminalFrames+1), "terminal_flood"},
+		"explicit-error": {"data: {\"error\":{\"code\":\"vendor_failed\",\"message\":\"failed\"}}\n\n", "vendor_failed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store, outbound := newVendorStreamStore("data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" + tc.tail)
+			service, _ := NewService(store, outbound)
+			recorder := httptest.NewRecorder()
+			service.ServeProtocol(recorder, responsesProxyRequest(context.Background(), true), channel.ProtocolOpenAIResponse, "", false)
+			if len(outbound.snapshotRequests()) != 2 || len(store.completed) != 2 || store.completed[0].ErrorCode != tc.code || store.completed[0].Status != AttemptFailed {
+				t.Fatalf("unsafe trailer was not rejected before delivery: %+v", store.completed)
+			}
+			if strings.Contains(recorder.Body.String(), "key-one") || strings.Contains(recorder.Body.String(), "vendor-trailer") {
+				t.Fatalf("unsafe trailer leaked: %s", recorder.Body.String())
+			}
+		})
+	}
+}

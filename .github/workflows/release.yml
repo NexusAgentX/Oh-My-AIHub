@@ -240,7 +240,7 @@ jobs:
       (needs.images.result == 'success' || needs.images.result == 'skipped')
     environment:
       name: production-hub
-      url: https://hub.isok.dev
+      url: https://ai.isok.dev
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -301,5 +301,5 @@ jobs:
             echo "| Tag | \`${TAG}\` |"
             echo "| Backend image | \`ghcr.io/nexusagentx/oh-my-aihub-backend:${TAG}@${BACKEND_DIGEST}\` |"
             echo "| Frontend image | \`ghcr.io/nexusagentx/oh-my-aihub-frontend:${TAG}@${FRONTEND_DIGEST}\` |"
-            echo "| Endpoint | https://hub.isok.dev |"
+            echo "| Endpoint | https://ai.isok.dev |"
           } >> "$GITHUB_STEP_SUMMARY"

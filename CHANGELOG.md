@@ -6,8 +6,10 @@
 
 ### 变更
 
-- 网关交付与结算解耦（Feature #90，ADR-0015）：删除响应侧残留的形状门禁。事件名与 `data.type` 不一致、未知 SSE 字段、重复或空 `event:` 字段、非 JSON 的 data 帧、非 Chat 协议的 `[DONE]`、终止事件之后的意外帧、超出请求 `n` 或重复的 choice 索引、过大的 `tool_calls` 索引不再拒绝或中断流；上游直接关闭连接（无终止帧、无 `[DONE]`）时已到达的输出也照常交付；Responses 的 `incomplete` / `cancelled` 不再是错误（只有非空 `error` 对象或 `status: failed` 才算失败），非流式的 `Content-Type` 不再校验；请求头默认全量透传（只剥离凭据、`OpenAI-Organization`/`OpenAI-Project` 等账户作用域头、`Forwarded`/`X-Forwarded-*`/`Traceparent`/`Baggage`/`Idempotency-Key`、hop-by-hop 与 `Accept-Encoding`），查询串原样合并进供应商 endpoint（只拒绝畸形串与 `key`），压缩改由 transport 协商并解压。上游已返回的响应不再因为形状或用量的原因被平台错误替换。
-- 用量抽取改为三态并用不影响交付的结算路径（Feature #90，ADR-0015）：区分“上游没给 usage”与“上游给了无法计价的 usage”，首个终止事件之前的合法用量以最后一帧为准、之后（含重复终止帧）不再覆盖，非法的用量（键存在但类型或数值非法、数值互相矛盾、非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态）污染整次调用。无法计价时先把上游响应交付客户端，再以 `missing_settlement_usage` / `unpriceable_usage` 零收费终结（`CallIncomplete`），释放预授权且不再触发回退；只有“什么都没产生”的截断流才按失败回退。出站凭据检查扩展到实际转发的头名称、头值与解码后的查询串，并在注入上游认证之前执行。
+- 网关交付与结算解耦（Feature #90，ADR-0016）：删除响应侧残留的形状门禁。事件名与 `data.type` 不一致、未知 SSE 字段、重复或空 `event:` 字段、非 JSON 的 data 帧、非 Chat 协议的 `[DONE]`、终止事件之后的意外帧、超出请求 `n` 或重复的 choice 索引、过大的 `tool_calls` 索引不再拒绝或中断流；仅未知事件、非 JSON 或无 data 帧的流在 EOF 时也照常交付；四种协议均在终止标记后继续读取至 EOF，尾帧保持安全检查且不覆盖已冻结用量；Responses 的 `incomplete` / `cancelled` 不再是错误（只有非空 `error` 对象或 `status: failed` 才算失败），非流式的 `Content-Type` 不再校验；请求头默认全量透传（只剥离凭据、`OpenAI-Organization`/`OpenAI-Project` 等账户作用域头、`Forwarded`/`X-Forwarded-*`/`Traceparent`/`Baggage`/`Idempotency-Key`、hop-by-hop 与 `Accept-Encoding`），查询串原样合并进供应商 endpoint（只拒绝畸形串与 `key`），压缩改由 transport 协商并解压。上游已返回的响应不再因为形状或用量的原因被平台错误替换。
+- 用量抽取改为三态并用不影响交付的结算路径（Feature #90，ADR-0016）：区分“上游没给 usage”与“上游给了无法计价的 usage”，首个终止事件之前的合法用量以最后一帧为准、之后（含重复终止帧）不再覆盖，非法的用量（键存在但类型或数值非法、数值互相矛盾、非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态）污染整次调用。无法计价时先把上游响应交付客户端，再以 `missing_settlement_usage` / `unpriceable_usage` 零收费终结（`CallIncomplete`），释放预授权且不再触发回退；只有“什么都没产生”的截断流才按失败回退。出站凭据检查扩展到实际转发的头名称、头值与解码后的查询串，并在注入上游认证之前执行。
+- MVP 完成后取消独立设计阶段与 OpenPencil 前置要求，移除设计源文件、预览、DESIGN.md 和资产校验门禁；后续直接基于需求与现有代码开发，通过实际界面与测试验收。历史决策由 ADR-0015 标注取代，第三方 MIT 许可移至 `licenses/`。
+- 发布工作流的生产环境链接和部署摘要更新为 `https://ai.isok.dev`（#92）。
 
 ## v0.4.0 - 2026-09-04
 

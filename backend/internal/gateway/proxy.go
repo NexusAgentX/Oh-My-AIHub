@@ -574,24 +574,7 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 		}
 		return streamResult{committed: downstreamStarted, code: code, message: message, err: cause}
 	}
-	// bufferedHasSemantic reports whether anything client-visible is still in the
-	// buffers, so a truncated stream that produced nothing can still fail over.
-	bufferedHasSemantic := func() bool {
-		for _, frame := range precommit {
-			if frame.semantic {
-				return true
-			}
-		}
-		for _, frame := range terminal {
-			if frame.semantic {
-				return true
-			}
-		}
-		return false
-	}
-	// Settle delivers the buffered frames and settles the call. The native
-	// terminal branch and a normal EOF both use it, because a relay may legally
-	// end a stream without a terminal frame (or without the [DONE] marker).
+	// Settle delivers buffered frames at EOF, with or without protocol end markers.
 	settle := func() streamResult {
 		usage, settleable := settlementUsage(observation, usageInvalid, terminalUsage, terminalUsageState)
 		code := "missing_settlement_usage"
@@ -657,8 +640,8 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 		frame, readErr := readSSEFrameWithTimeout(reader, response.Body, deadline)
 		if readErr != nil {
 			if errors.Is(readErr, io.EOF) {
-				if !semanticDelivered && !bufferedHasSemantic() && !terminalStarted {
-					// The upstream closed with nothing usable: a truncated stream is a
+				if !downstreamStarted && len(precommit) == 0 && len(terminal) == 0 {
+					// The upstream closed without any frames: an empty stream is a
 					// failure the caller may retry on the next candidate.
 					return fail("stream_incomplete", readErr.Error(), readErr)
 				}
@@ -753,11 +736,9 @@ func (s *Service) proxyStreamingAttempt(w http.ResponseWriter, r *http.Request, 
 				return fail("terminal_flood", ErrResponseTooBig.Error(), ErrResponseTooBig)
 			}
 			terminal = append(terminal, bufferedStreamFrame{data: analysis.Frame, semantic: analysis.Semantic})
-			if !analysis.StreamEnd {
-				continue
-			}
-			_ = response.Body.Close()
-			return settle()
+			// Protocol end markers freeze usage, but do not truncate vendor
+			// trailers. Read through EOF with the same limits and safety checks.
+			continue
 		}
 		buffered := bufferedStreamFrame{data: analysis.Frame, semantic: analysis.Semantic}
 		if !downstreamStarted {

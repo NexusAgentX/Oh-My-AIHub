@@ -1,6 +1,6 @@
 # ADR-0004：原样采用 Airtable 设计分析规范
 
-- 状态：已通过
+- 状态：已取代（由 ADR-0015 取代）
 - 日期：2026-09-01
 - 决策者：项目维护者
 - 关联内容：Issue #12、`DESIGN.md`、ADR-0001、ADR-0003
@@ -83,3 +83,5 @@
 ## 替代关系
 
 本 ADR 取代 [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md)。
+
+2026-10-07：由 [ADR-0015](0015-develop-directly-from-implemented-mvp.md) 取代；本文件保留历史结论，其中设计规范、源文件、预览与检查要求不再生效，历史路径不代表当前文件。
