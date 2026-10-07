@@ -100,3 +100,9 @@ func writeFeeRateError(w http.ResponseWriter, err error) {
 		writeDomainError(w, err)
 	}
 }
+
+// registerFeeRateRoutes 注册平台手续费率路由。
+func (a *app) registerFeeRateRoutes(r *router) {
+	r.admin("GET /api/admin/fee-rate", a.adminFeeRates)
+	r.admin("PUT /api/admin/fee-rate", a.adminSetFeeRate)
+}

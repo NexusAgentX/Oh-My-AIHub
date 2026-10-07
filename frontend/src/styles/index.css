@@ -24,3 +24,5 @@
 @import '../channels/sharing.css';
 @import '../gateway/gateway.css';
 @import '../c2c/c2c.css';
+@import '../welcome/welcome.css';
+@import '../auth/auth.css';

@@ -3,8 +3,10 @@ package api
 import (
 	"errors"
 	"net/http"
+	"regexp"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -219,4 +221,52 @@ func (a *app) resetAccountPassword(w http.ResponseWriter, r *http.Request) {
 		"account":          accountResponse(reset.Account),
 		"initial_password": reset.InitialPassword,
 	})
+}
+
+// registerIdentityRoutes 注册认证、账户与管理员账户管理路由。
+func (a *app) registerIdentityRoutes(r *router) {
+	r.public("POST /api/auth/login", a.login)
+	r.public("POST /api/auth/logout", a.logout)
+	r.session("GET /api/auth/session", a.session)
+	r.session("PUT /api/account/password", a.changePassword)
+	r.ready("GET /api/account", a.currentAccount)
+	r.admin("GET /api/admin/accounts", a.listAccounts)
+	r.admin("POST /api/admin/accounts", a.createAccount)
+	r.admin("PATCH /api/admin/accounts/{accountID}", a.updateAccount)
+	r.admin("POST /api/admin/accounts/{accountID}/password-reset", a.resetAccountPassword)
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func accountResponse(account identity.Account) map[string]any {
+	effectiveCredit := account.CreditLimit
+	if account.CreditFrozen {
+		effectiveCredit = 0
+	}
+	capacity := ledger.SpendableCapacity(account.PostedBalance, effectiveCredit, account.AssetReserved, account.SpendAuthorized)
+	if account.CreditFrozen {
+		capacity = 0
+	}
+	overLimit := ledger.IsOverLimit(account.PostedBalance, effectiveCredit)
+	return map[string]any{
+		"id":                     account.ID,
+		"username":               account.Username,
+		"display_name":           account.DisplayName,
+		"is_admin":               account.IsAdmin,
+		"status":                 account.Status,
+		"must_change_password":   account.MustChangePassword,
+		"version":                account.Version,
+		"credit_limit":           account.CreditLimit.String(),
+		"credit_frozen":          account.CreditFrozen,
+		"posted_balance":         account.PostedBalance.String(),
+		"asset_reserved":         account.AssetReserved.String(),
+		"spend_authorized":       account.SpendAuthorized.String(),
+		"effective_credit_limit": effectiveCredit.String(),
+		"credit_used":            ledger.CreditUsed(account.PostedBalance).String(),
+		"spendable_capacity":     capacity.String(),
+		"over_limit":             overLimit,
+		"created_at":             account.CreatedAt,
+		"updated_at":             account.UpdatedAt,
+		"password_changed_at":    account.PasswordChangedAt,
+	}
 }
