@@ -1,0 +1,91 @@
+# sqlc 配置；约定见 docs/adr/0017-adopt-sqlc-domain-persistence-layering.md。
+# 每个领域一个 sql 条目：queries.sql 与生成代码同处 internal/postgres/<domain>pg/。
+# 新领域复制一个条目，把 queries 和 out 改成新目录即可。
+version: "2"
+sql:
+  - &domain
+    engine: postgresql
+    schema: internal/database/migrations # goose 迁移目录；sqlc 忽略 Down 段
+    queries: internal/postgres/identitypg/queries.sql
+    gen:
+      go: &gen
+        package: identitypg
+        out: internal/postgres/identitypg
+        sql_package: pgx/v5
+        emit_methods_with_db_argument: false
+        omit_unused_structs: true
+        overrides: &overrides
+          # 标识符：uuid 一律作字符串，与领域类型保持一致。
+          - db_type: uuid
+            go_type: string
+          - db_type: uuid
+            nullable: true
+            go_type: { type: "string", pointer: true }
+          # 时间：使用标准库类型而非 pgtype.Timestamptz。
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type: { import: "time", type: "Time", pointer: true }
+          # 可空标量统一用指针，不引入 pgtype.* 包装类型。
+          - db_type: text
+            nullable: true
+            go_type: { type: "string", pointer: true }
+          - db_type: pg_catalog.bool
+            nullable: true
+            go_type: { type: "bool", pointer: true }
+          - db_type: pg_catalog.int8
+            nullable: true
+            go_type: { type: "int64", pointer: true }
+          - db_type: pg_catalog.int2
+            nullable: true
+            go_type: { type: "int16", pointer: true }
+          # 金额：BIGINT 纳积分（ADR-0006）。sqlc 只按列覆盖，新增金额列须在此登记，
+          # 否则会生成裸 int64。
+          - column: "accounts.credit_limit_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_accounts.posted_balance_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_accounts.asset_reserved_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "ledger_accounts.spend_authorized_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "models.input_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "models.output_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "models.cache_write_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "models.cache_read_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "model_price_tiers.input_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "model_price_tiers.output_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "model_price_tiers.cache_write_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "model_price_tiers.cache_read_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "api_fee_rates.fee_rate_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+  - <<: *domain
+    queries: internal/postgres/catalogpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: catalogpg
+        out: internal/postgres/catalogpg
+  - <<: *domain
+    queries: internal/postgres/feeratepg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: feeratepg
+        out: internal/postgres/feeratepg
+  - <<: *domain
+    queries: internal/postgres/auditpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: auditpg
+        out: internal/postgres/auditpg
