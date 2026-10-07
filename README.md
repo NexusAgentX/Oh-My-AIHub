@@ -98,7 +98,7 @@ mise run dev-backend
 mise run dev-frontend
 ```
 
-前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。
+前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。后端改用其他端口（`PORT`）时，可用 `AIHUB_BACKEND_ORIGIN=http://127.0.0.1:<端口>` 覆盖 Vite 的代理目标。
 
 平台代理入口只接受各协议规定的认证头：OpenAI 风格使用 `Authorization: Bearer <平台 Key>`，Anthropic 使用 `x-api-key`，Gemini 使用 `x-goog-api-key`。客户端必须提交模型目录中的 canonical model ID；平台不做跨协议转换。请求上限为 32 MiB，非流式调用最长 10 分钟，流式调用最长 30 分钟。
 
