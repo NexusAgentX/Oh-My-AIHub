@@ -14,6 +14,7 @@
 
 ### 变更
 
+- 删除交互式命令 `cmd/bootstrap-admin`（Feature #125，Epic #109）：实例初始化只保留网页 `/initialize`（`POST /api/instance/initialize`，行为不变）；同时移除 `mise run bootstrap-admin` 任务、后端镜像中的 `bootstrap-admin` 二进制与 `golang.org/x/term` 依赖。部署手册首次部署步骤改为访问 `/initialize`。
 - 前端基础改版（Feature #114，ADR-0019）：新增设计 token（`styles/tokens.css`）与按组件拆分的样式，基础组件库 `src/ui/`（Button、Card、Metric、Badge、DataTable、Toolbar、EmptyState、Dialog、Drawer、Tabs/Segmented、表单控件与独立图标集）；外壳改为用户与管理员两个 react-router layout route，页面不再各自包裹 `AppShell`；用户导航分为“使用 API / 共享渠道 / 积分”三组，顶栏常驻可用积分与钱包入口，760px 以下改为底部 Tab 栏与“更多”抽屉；引入 TanStack Query，工作台与钱包迁移为样板并以 `useWallet()` 取代 `WalletProvider`。路由、权限跳转与后端接口不变；删除未使用的 `UpcomingC2CPage`。
 - 账本持久化迁移到 sqlc（Feature #122，Epic #109，ADR-0020）：`internal/postgres/ledger.go` 由 `internal/postgres/ledgerpg` 取代，查询集中在 `queries.sql`，金额列登记为 `money.Amount`；`ledgerpg.Store` 供服务层使用，`ledgerpg.NewTx(db)` 返回绑定到调用方 `pgx.Tx` 的账本 Store，C2C 与网关仍在同一事务内原子提交账本与业务记录。API、行为与数据库结构不变。
 - 持久化引入 sqlc 并按领域分包（Feature #113，ADR-0017）：新增 `backend/sqlc.yaml`、`mise run generate` 与 `mise run check-sqlc`，CI 增加生成物一致性检查；身份、模型目录与 API 手续费率迁移到 `internal/postgres/{identity,catalog,feerate}pg`，共享审计与事务辅助拆为 `auditpg`、`pgkit`。服务层接口、API 与数据库结构不变，其余领域仍在 `postgres` 包内待后续迁移。
