@@ -66,6 +66,8 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "model_price_tiers.cache_read_price_nano_per_million"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "channel_models.multiplier_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "api_fee_rates.fee_rate_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "ledger_entries.amount_nano"
@@ -112,3 +114,10 @@ sql:
         <<: *gen
         package: ledgerpg
         out: internal/postgres/ledgerpg
+  - <<: *domain
+    queries: internal/postgres/channelpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: channelpg
+        out: internal/postgres/channelpg
