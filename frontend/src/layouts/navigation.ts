@@ -16,7 +16,7 @@ export type NavGroup = {
 
 /**
  * 用户导航：使用 API / 共享渠道 / 积分。
- * 「渠道收入」页面尚未存在，待共享渠道改版 Feature 提供路由后在「共享渠道」组补充。
+ * 「渠道收入」不单设入口：收入由「我的渠道」列表（累计）与渠道详情（按报价）呈现，现有接口没有跨渠道的收入明细。
  */
 export const productNavigation: NavGroup[] = [
   {

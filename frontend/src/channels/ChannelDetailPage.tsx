@@ -1,256 +1,383 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
 import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/contracts'
-import { Button, InlineError, LoadingState } from '../ui/FormControls'
-import { ChannelStateBadge, ConfirmDialog, formatDate, PricePair, protocolLabels, ratingText, TierCountBadge, TierPriceList } from './presentation'
+import { errorMessage } from '../api/query'
 import { formatPoints, formatRate } from '../gateway/presentation'
-import { createLatestRequestGate } from './requestGate'
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  Checkbox,
+  DataTable,
+  Drawer,
+  EmptyState,
+  InlineError,
+  Metric,
+  MetricGrid,
+  Notice,
+  PageHeader,
+  QueryBoundary,
+  Tabs,
+  type Column,
+} from '../ui'
+import {
+  ChannelStateBadge,
+  ConfirmActionDialog,
+  eligibilityLabel,
+  formatDate,
+  PricePair,
+  protocolLabels,
+  ratingText,
+  TierCountBadge,
+  TierPriceList,
+} from './presentation'
+import {
+  useChannelQuery,
+  useChannelStatusMutation,
+  useDeleteChannelMutation,
+  useDeleteOfferMutation,
+  useOfferStatusMutation,
+  useRevokeCredentialMutation,
+  useValidateOfferMutation,
+  useValidationAttemptsQuery,
+} from './queries'
+import { summarizeChannel } from './summary'
 
-type PendingAction =
-  | { kind: 'validate'; offer: ChannelOffer }
-  | { kind: 'delete-offer'; offer: ChannelOffer }
+type Pending =
+  | { kind: 'validate' | 'delete-offer'; offer: ChannelOffer }
   | { kind: 'publish' | 'pause' | 'delete-channel' | 'revoke-credential' }
+
+type DetailTab = 'offers' | 'metrics'
+
+const pendingTitles: Record<Pending['kind'], string> = {
+  validate: '校验报价',
+  'delete-offer': '删除报价',
+  publish: '发布渠道',
+  pause: '暂停渠道',
+  'delete-channel': '删除渠道',
+  'revoke-credential': '撤销平台凭据',
+}
+
+const pendingDescriptions: Partial<Record<Pending['kind'], string>> = {
+  validate: '将向上游发送一次最小请求。',
+  'delete-offer': '报价删除后不再进入市场与模型池。',
+  pause: '暂停后渠道下的报价不再接收新调用。',
+  'delete-channel': '渠道及其全部报价将被删除，此操作不可撤销。',
+  'revoke-credential': '撤销后平台不再保存上游凭据，需重新填写才能继续使用。',
+}
 
 export function ChannelDetailPage() {
   const { channelID = '' } = useParams()
+  const query = useChannelQuery(channelID)
+  return (
+    <QueryBoundary errorFallback="渠道加载失败" query={query}>
+      {(channel) => <ChannelDetail channel={channel} key={channel.id} />}
+    </QueryBoundary>
+  )
+}
+
+function ChannelDetail({ channel }: { channel: Channel }) {
   const navigate = useNavigate()
-  const [channel, setChannel] = useState<Channel | null>(null)
-  const [history, setHistory] = useState<AuthorizedValidationAttempt[]>([])
-  const [historyOffer, setHistoryOffer] = useState<ChannelOffer | null>(null)
-  const [pending, setPending] = useState<PendingAction | null>(null)
+  const [tab, setTab] = useState<DetailTab>('offers')
+  const [pending, setPending] = useState<Pending | null>(null)
   const [costConfirmed, setCostConfirmed] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const loadGate = useRef(createLatestRequestGate())
-  const historyGate = useRef(createLatestRequestGate())
-  const actionGate = useRef(createLatestRequestGate())
+  const [dialogError, setDialogError] = useState('')
+  const [pageError, setPageError] = useState('')
+  const [historyOffer, setHistoryOffer] = useState<ChannelOffer | null>(null)
+  const [validationResult, setValidationResult] = useState<AuthorizedValidationAttempt | null>(null)
 
-  const load = useCallback(async (clear = false) => {
-    const ticket = loadGate.current.begin()
-    if (clear) {
-      setLoading(true)
-      setChannel(null)
-    }
-    setError('')
-    try {
-      const loaded = await api.channel(channelID)
-      if (loadGate.current.isCurrent(ticket)) setChannel(loaded)
-    } catch (caught) {
-      if (loadGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '渠道加载失败')
-      }
-    } finally {
-      if (loadGate.current.isCurrent(ticket)) setLoading(false)
-    }
-  }, [channelID])
+  const statusMutation = useChannelStatusMutation()
+  const deleteChannel = useDeleteChannelMutation()
+  const revokeCredential = useRevokeCredentialMutation()
+  const offerStatus = useOfferStatusMutation()
+  const deleteOffer = useDeleteOfferMutation()
+  const validate = useValidateOfferMutation()
+  const busy = [statusMutation, deleteChannel, revokeCredential, offerStatus, deleteOffer, validate]
+    .some((mutation) => mutation.isPending)
 
-  useEffect(() => {
-    historyGate.current.invalidate()
-    actionGate.current.invalidate()
-    setHistory([])
-    setHistoryOffer(null)
+  const summary = summarizeChannel(channel)
+  const deleted = channel.status === 'deleted'
+  const canPublish = channel.status === 'draft' || channel.status === 'paused'
+
+  const closeDialog = () => {
+    if (busy) return
     setPending(null)
     setCostConfirmed(false)
-    setBusy(false)
-    setMessage('')
-    void load(true)
-    return () => {
-      loadGate.current.invalidate()
-      historyGate.current.invalidate()
-      actionGate.current.invalidate()
-    }
-  }, [load])
+    setDialogError('')
+  }
 
-  const activeOffers = useMemo(
-    () => channel?.offers.filter((offer) => offer.status !== 'deleted') ?? [],
-    [channel],
-  )
-  const eligibleOffers = useMemo(
-    () => activeOffers.filter((offer) => offer.eligible),
-    [activeOffers],
-  )
+  const openDialog = (next: Pending) => {
+    setDialogError('')
+    setCostConfirmed(false)
+    setPending(next)
+  }
 
-  const showHistory = async (offer: ChannelOffer) => {
-    const ticket = historyGate.current.begin()
-    setError('')
+  const confirm = async () => {
+    if (!pending) return
+    setDialogError('')
     try {
-      const attempts = await api.channelValidationAttempts(offer.id)
-      if (!historyGate.current.isCurrent(ticket)) return
-      setHistory(attempts)
-      setHistoryOffer(offer)
-    } catch (caught) {
-      if (historyGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '验证记录加载失败')
+      switch (pending.kind) {
+        case 'validate': {
+          const result = await validate.mutateAsync(pending.offer)
+          setValidationResult(result)
+          setHistoryOffer(pending.offer)
+          break
+        }
+        case 'delete-offer':
+          await deleteOffer.mutateAsync(pending.offer)
+          break
+        case 'revoke-credential':
+          await revokeCredential.mutateAsync(channel)
+          break
+        case 'delete-channel':
+          await deleteChannel.mutateAsync(channel)
+          navigate('/channels', { replace: true })
+          return
+        default:
+          await statusMutation.mutateAsync({ channel, action: pending.kind })
       }
+      setPending(null)
+      setCostConfirmed(false)
+    } catch (caught) {
+      setDialogError(errorMessage(caught, '操作失败'))
     }
   }
 
   const toggleOffer = async (offer: ChannelOffer) => {
-    const ticket = actionGate.current.begin()
-    setBusy(true)
-    setError('')
+    setPageError('')
     try {
-      await api.setChannelOfferStatus(offer.id, offer.status === 'active' ? 'disable' : 'resume', offer.version ?? 0)
-      if (!actionGate.current.isCurrent(ticket)) return
-      await load(false)
+      await offerStatus.mutateAsync(offer)
     } catch (caught) {
-      if (actionGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '报价状态更新失败')
-      }
-    } finally {
-      if (actionGate.current.isCurrent(ticket)) setBusy(false)
+      setPageError(errorMessage(caught, '报价状态更新失败'))
     }
   }
 
-  const confirm = async () => {
-    if (!pending || !channel) return
-    const ticket = actionGate.current.begin()
-    const targetChannel = channel
-    setBusy(true)
-    setError('')
-    setMessage('')
-    try {
-      if (pending.kind === 'validate') {
-        const result = await api.validateChannelOffer(pending.offer.id)
-        if (!actionGate.current.isCurrent(ticket)) return
-        setMessage(result.status === 'passed' ? '验证通过' : '验证失败')
-        await showHistory(pending.offer)
-      } else if (pending.kind === 'delete-offer') {
-        await api.deleteChannelOffer(pending.offer.id, pending.offer.version ?? 0)
-      } else if (pending.kind === 'revoke-credential') {
-        await api.revokeChannelCredential(targetChannel.id, targetChannel.version)
-      } else if (pending.kind === 'delete-channel') {
-        await api.deleteChannel(targetChannel.id, targetChannel.version)
-        if (!actionGate.current.isCurrent(ticket)) return
-        navigate('/channels', { replace: true })
-        return
-      } else {
-        await api.setChannelStatus(targetChannel.id, pending.kind, targetChannel.version)
-      }
-      if (!actionGate.current.isCurrent(ticket)) return
-      setPending(null)
-      setCostConfirmed(false)
-      await load(false)
-    } catch (caught) {
-      if (actionGate.current.isCurrent(ticket)) {
-        setError(caught instanceof ApiError ? caught.message : '操作失败')
-      }
-    } finally {
-      if (actionGate.current.isCurrent(ticket)) setBusy(false)
-    }
+  const openHistory = (offer: ChannelOffer) => {
+    setValidationResult(null)
+    setHistoryOffer(offer)
   }
 
-  if (loading) return <><LoadingState /></>
-  if (!channel || channel.id !== channelID) return <><InlineError>{error || '渠道不存在'}</InlineError></>
+  const offerLabel = (offer: ChannelOffer) => `${offer.model_name} ${protocolLabels[offer.protocol]}`
 
-  const pendingTitle = pending?.kind === 'validate' ? '验证报价'
-    : pending?.kind === 'delete-offer' ? '删除协议报价'
-      : pending?.kind === 'revoke-credential' ? '撤销平台凭据'
-        : pending?.kind === 'delete-channel' ? '删除渠道'
-          : pending?.kind === 'pause' ? '暂停渠道' : '发布渠道'
+  const modelCell = (offer: ChannelOffer) => (
+    <span className="sharing-name">
+      <strong>{offer.model_name}</strong>
+      <small>{protocolLabels[offer.protocol]} · {offer.upstream_model_id}</small>
+    </span>
+  )
+
+  const offerColumns: Column<ChannelOffer>[] = [
+    { key: 'model', header: '模型 / 协议', primary: true, cell: modelCell },
+    { key: 'multiplier', header: '倍率', numeric: true, cell: (offer) => `${offer.multiplier}×` },
+    {
+      key: 'price',
+      header: '输入 / 输出',
+      cell: (offer) => (
+        <>
+          <span className="sharing-price"><PricePair first={offer.input_price} second={offer.output_price} /><TierCountBadge tiers={offer.price_tiers} /></span>
+          <TierPriceList tiers={offer.price_tiers} />
+        </>
+      ),
+    },
+    { key: 'cache', header: '缓存写 / 读', cell: (offer) => <PricePair first={offer.cache_write_price} second={offer.cache_read_price} /> },
+    {
+      key: 'validation',
+      header: '校验',
+      cell: (offer) => (
+        <span className="sharing-name">
+          {offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : <Badge>待校验</Badge>}
+          <small>{offer.eligible ? '当前可用' : eligibilityLabel(offer.ineligible_reason)}</small>
+          {offer.latest_validation && <small>{formatDate(offer.latest_validation.completed_at)}</small>}
+        </span>
+      ),
+    },
+    ...(deleted ? [] : [{
+      key: 'actions',
+      header: '操作',
+      cell: (offer: ChannelOffer) => (
+        <span className="sharing-actions">
+          <Button
+            aria-label={`校验 ${offerLabel(offer)}`}
+            disabled={busy || !channel.credential_configured}
+            onClick={() => openDialog({ kind: 'validate', offer })}
+            size="sm"
+            variant="secondary"
+          >校验</Button>
+          <Button aria-label={`校验记录 ${offerLabel(offer)}`} onClick={() => openHistory(offer)} size="sm" variant="quiet">记录</Button>
+          <Button
+            aria-label={`${offer.status === 'active' ? '停用' : '启用'} ${offerLabel(offer)}`}
+            disabled={busy}
+            onClick={() => void toggleOffer(offer)}
+            size="sm"
+            variant="quiet"
+          >{offer.status === 'active' ? '停用' : '启用'}</Button>
+          <Button
+            aria-label={`删除 ${offerLabel(offer)}`}
+            disabled={busy}
+            onClick={() => openDialog({ kind: 'delete-offer', offer })}
+            size="sm"
+            variant="quiet"
+          >删除</Button>
+        </span>
+      ),
+    }]),
+  ]
+
+  const metricColumns: Column<ChannelOffer>[] = [
+    { key: 'model', header: '模型 / 协议', primary: true, cell: modelCell },
+    { key: 'calls', header: '调用', numeric: true, cell: (offer) => offer.call_count ?? 0 },
+    { key: 'rate', header: '成功率', numeric: true, cell: (offer) => (offer.call_success_rate == null ? '—' : formatRate(offer.call_success_rate)) },
+    { key: 'ttft', header: 'TTFT', numeric: true, cell: (offer) => (offer.ttft_milliseconds == null ? '—' : `${offer.ttft_milliseconds} ms`) },
+    { key: 'tps', header: 'TPS', numeric: true, cell: (offer) => (offer.tokens_per_second == null ? '—' : `${offer.tokens_per_second} tok/s`) },
+    { key: 'income', header: '收入', numeric: true, cell: (offer) => (offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—') },
+  ]
+
+  const empty = (
+    <EmptyState
+      action={deleted ? undefined : <ButtonLink to={`/channels/${channel.id}/settings`}>编辑配置</ButtonLink>}
+      title="没有报价"
+    />
+  )
+
+  const dangerPending = pending?.kind === 'delete-channel' || pending?.kind === 'delete-offer' || pending?.kind === 'revoke-credential'
 
   return (
     <>
-      <Link className="back-link" to="/channels">← 我的渠道</Link>
-      <header className="page-heading channel-detail-heading">
-        <div><h1>{channel.display_name}</h1><ChannelStateBadge status={channel.status} /></div>
-        {channel.status !== 'deleted' && <Link className="button button-secondary" to={`/channels/${channel.id}/settings`}>编辑配置</Link>}
-      </header>
-      <InlineError>{error}</InlineError>
-      {message && <div aria-live="polite" className="success-message">{message}</div>}
-      <section aria-label="渠道概况" className="metric-grid">
-        <article className="metric-card"><span>协议报价</span><strong>{activeOffers.length}</strong><small>未删除</small></article>
-        <article className="metric-card metric-card-accent"><span>当前可用</span><strong>{eligibleOffers.length}</strong><small>可加入模型池</small></article>
-        <article className="metric-card"><span>评分</span><strong>{channel.average_rating ?? '—'}</strong><small>{ratingText(channel.average_rating, channel.rating_count)}</small></article>
-        <article className="metric-card"><span>凭据</span><strong>{channel.credential_configured ? '已配置' : '未配置'}</strong><small>版本 {channel.credential_version}</small></article>
-      </section>
+      <PageHeader
+        actions={deleted ? undefined : (
+          <>
+            <ButtonLink to={`/channels/${channel.id}/settings`}>编辑配置</ButtonLink>
+            {canPublish && <Button disabled={busy} onClick={() => openDialog({ kind: 'publish' })}>发布</Button>}
+            {channel.status === 'published' && <Button disabled={busy} onClick={() => openDialog({ kind: 'pause' })} variant="secondary">暂停</Button>}
+          </>
+        )}
+        back={<Link className="back-link" to="/channels">← 我的渠道</Link>}
+        title={<span className="sharing-title">{channel.display_name}<ChannelStateBadge status={channel.status} /></span>}
+      />
+      <InlineError>{pageError}</InlineError>
+      {deleted && <Notice tone="danger">渠道已删除，仅可查看历史数据。</Notice>}
+      {channel.status === 'published' && summary.eligibleCount === 0 && (
+        <Notice tone="warning">暂无可用报价，渠道不会出现在市场。</Notice>
+      )}
+      <MetricGrid label="渠道指标">
+        <Metric hint={summary.successRate === null ? '暂无调用' : `成功率 ${formatRate(summary.successRate)}`} label="调用" value={summary.calls} />
+        <Metric
+          hint={summary.incomeIncludesDeleted ? '积分 · 含已删除报价' : '积分'}
+          label="收入"
+          tone="accent"
+          value={summary.income === null ? '—' : formatPoints(summary.income)}
+        />
+        <Metric hint={`已启用 ${summary.enabledCount} / ${summary.offers.length}`} label="可用报价" value={summary.eligibleCount} />
+        <Metric label="评分" value={channel.average_rating ?? '—'} hint={ratingText(channel.average_rating, channel.rating_count)} />
+      </MetricGrid>
 
-      {channel.status === 'published' && eligibleOffers.length === 0 && <div className="availability-message" role="status">暂无可用报价</div>}
+      <Card flush>
+        <Tabs
+          items={[
+            { key: 'offers', label: '报价', count: summary.offers.length },
+            { key: 'metrics', label: '调用与收入' },
+          ]}
+          label="渠道内容"
+          onChange={setTab}
+          value={tab}
+        >
+          <DataTable
+            caption={tab === 'offers' ? '渠道报价' : '报价调用与收入'}
+            columns={tab === 'offers' ? offerColumns : metricColumns}
+            empty={empty}
+            rowKey={(offer) => offer.id}
+            rows={summary.offers}
+          />
+        </Tabs>
+      </Card>
 
-      <section className="panel channel-overview-panel">
-        <header className="panel-heading"><h2>渠道概况</h2><div className="channel-action-row">
-          {(channel.status === 'draft' || channel.status === 'paused') && <Button onClick={() => setPending({ kind: 'publish' })}>发布</Button>}
-          {channel.status === 'published' && <Button onClick={() => setPending({ kind: 'pause' })} variant="secondary">暂停</Button>}
-          {channel.credential_configured && channel.status !== 'deleted' && <Button onClick={() => setPending({ kind: 'revoke-credential' })} variant="secondary">撤销凭据</Button>}
-          {channel.status !== 'deleted' && <Button onClick={() => setPending({ kind: 'delete-channel' })} variant="danger">删除渠道</Button>}
-        </div></header>
-        <dl className="detail-list">
+      <Card title="连接">
+        <dl className="sharing-facts">
           <div><dt>Base URL</dt><dd className="break-value">{channel.base_url}</dd></div>
+          <div><dt>上游凭据</dt><dd>{channel.credential_configured ? `已配置 · v${channel.credential_version}` : '未配置'}</dd></div>
           <div><dt>最近更新</dt><dd>{formatDate(channel.updated_at)}</dd></div>
-          <div><dt>渠道版本</dt><dd>{channel.version}</dd></div>
         </dl>
-      </section>
+      </Card>
 
-      <section className="panel table-panel channel-offers-panel">
-        <header className="table-toolbar"><h2>模型协议报价</h2></header>
-        {activeOffers.length === 0 ? <div className="empty-state">没有协议报价</div> : <>
-          <div className="desktop-table-wrap">
-            <table className="data-table channel-offer-table">
-              <thead><tr><th scope="col">模型 / 协议</th><th scope="col">倍率</th><th scope="col">输入 / 输出</th><th scope="col">缓存写 / 读</th><th scope="col">调用质量</th><th scope="col">收入</th><th scope="col">验证</th><th scope="col"><span className="visually-hidden">操作</span></th></tr></thead>
-              <tbody>{activeOffers.map((offer) => <tr key={offer.id}>
-                <td><strong>{offer.model_name}</strong><small>{protocolLabels[offer.protocol]} · {offer.upstream_model_id}</small></td>
-                <td>{offer.multiplier}×</td>
-                <td><span className="price-with-tiers"><PricePair first={offer.input_price} second={offer.output_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
-                <td><span className="price-with-tiers"><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /><TierCountBadge tiers={offer.price_tiers} /></span></td>
-                <td>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : <><strong>{formatRate(offer.call_success_rate)}</strong><small>{offer.call_count ?? 0} 次 · {offer.ttft_milliseconds ?? '—'} ms · {offer.tokens_per_second ?? '—'} tok/s</small></>}</td>
-                <td>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</td>
-                <td>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : '待验证'}<small>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</small><small>{formatDate(offer.latest_validation?.completed_at)}</small></td>
-                <td className="table-action"><div className="table-action-group">
-                  <Button disabled={busy} onClick={() => { setCostConfirmed(false); setPending({ kind: 'validate', offer }) }} variant="secondary">验证</Button>
-                  <Button onClick={() => void showHistory(offer)} variant="quiet">记录</Button>
-                  <Button disabled={busy} onClick={() => void toggleOffer(offer)} variant="quiet">{offer.status === 'active' ? '停用' : '启用'}</Button>
-                  <Button onClick={() => setPending({ kind: 'delete-offer', offer })} variant="quiet">删除</Button>
-                </div></td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-          <div className="mobile-card-list">{activeOffers.map((offer) => <article className="mobile-data-card" key={offer.id}>
-            <header><div><strong>{offer.model_name}</strong><span>{protocolLabels[offer.protocol]}</span></div>{offer.latest_validation ? <ChannelStateBadge status={offer.latest_validation.status} /> : <span>待验证</span>}</header>
-            <dl><div><dt>资格</dt><dd>{offer.eligible ? '当前可用' : eligibilityReason(offer.ineligible_reason)}</dd></div><div><dt>倍率</dt><dd>{offer.multiplier}×</dd></div><div><dt>输入 / 输出</dt><dd><PricePair first={offer.input_price} second={offer.output_price} /></dd></div><div><dt>缓存写 / 读</dt><dd><PricePair first={offer.cache_write_price} second={offer.cache_read_price} /></dd></div><div><dt>成功率 / 调用</dt><dd>{offer.call_success_rate === null || offer.call_success_rate === undefined ? '—' : `${formatRate(offer.call_success_rate)} / ${offer.call_count ?? 0}`}</dd></div><div><dt>收入</dt><dd>{offer.provider_income ? `${formatPoints(offer.provider_income)} 积分` : '—'}</dd></div></dl>
-            <TierPriceList tiers={offer.price_tiers} />
-            <div className="mobile-card-actions"><Button disabled={busy} onClick={() => { setCostConfirmed(false); setPending({ kind: 'validate', offer }) }} variant="secondary">验证</Button><Button onClick={() => void showHistory(offer)} variant="secondary">记录</Button><Button disabled={busy} onClick={() => void toggleOffer(offer)} variant="secondary">{offer.status === 'active' ? '停用' : '启用'}</Button><Button onClick={() => setPending({ kind: 'delete-offer', offer })} variant="danger">删除</Button></div>
-          </article>)}</div>
-        </>}
-      </section>
+      {!deleted && (
+        <Card
+          actions={(
+            <>
+              {channel.credential_configured && (
+                <Button disabled={busy} onClick={() => openDialog({ kind: 'revoke-credential' })} size="sm" variant="secondary">撤销凭据</Button>
+              )}
+              <Button disabled={busy} onClick={() => openDialog({ kind: 'delete-channel' })} size="sm" variant="danger">删除渠道</Button>
+            </>
+          )}
+          className="sharing-danger"
+          title="危险操作"
+        >
+          <p className="muted">撤销凭据与删除渠道均不可撤销。</p>
+        </Card>
+      )}
 
-      {historyOffer && <section className="panel validation-history-panel">
-        <header className="panel-heading"><h2>验证记录 · {historyOffer.model_name}</h2><Button onClick={() => setHistoryOffer(null)} variant="quiet">关闭</Button></header>
-        {history.length === 0 ? <div className="empty-state">暂无记录</div> : <div className="validation-history-list">{history.map((attempt) => <article key={attempt.id}>
-          <header><ChannelStateBadge status={attempt.status} /><span>{formatDate(attempt.completed_at ?? attempt.started_at)}</span><span>{attempt.http_status ? `HTTP ${attempt.http_status}` : attempt.error_category || '—'}</span></header>
-          {attempt.raw_error && <pre>{attempt.raw_error}</pre>}
-        </article>)}</div>}
-      </section>}
+      <Drawer
+        onClose={() => setHistoryOffer(null)}
+        open={Boolean(historyOffer)}
+        title="校验记录"
+        description={historyOffer ? `${historyOffer.model_name} · ${protocolLabels[historyOffer.protocol]}` : undefined}
+      >
+        {validationResult && (
+          <Notice tone={validationResult.status === 'passed' ? 'success' : 'danger'}>
+            {validationResult.status === 'passed' ? '校验通过' : '校验失败'}
+          </Notice>
+        )}
+        {historyOffer && <ValidationHistory offerID={historyOffer.id} />}
+      </Drawer>
 
-      <ConfirmDialog
+      <ConfirmActionDialog
         busy={busy}
         confirmDisabled={pending?.kind === 'validate' && !costConfirmed}
-        confirmLabel={pending?.kind === 'validate' ? '开始验证' : '确认'}
-        danger={pending?.kind === 'delete-channel' || pending?.kind === 'delete-offer' || pending?.kind === 'revoke-credential'}
-        description={pending?.kind === 'validate' ? '将向上游发送最小请求。' : undefined}
-        onCancel={() => { setPending(null); setCostConfirmed(false) }}
+        confirmLabel={pending?.kind === 'validate' ? '开始校验' : '确认'}
+        danger={dangerPending}
+        description={pending ? pendingDescriptions[pending.kind] : undefined}
+        error={dialogError}
+        onCancel={closeDialog}
         onConfirm={() => void confirm()}
         open={Boolean(pending)}
-        title={pendingTitle}
+        title={pending ? pendingTitles[pending.kind] : ''}
       >
-        {pending?.kind === 'validate' && <label className="checkbox-control validation-cost-confirm"><input checked={costConfirmed} onChange={(event) => setCostConfirmed(event.target.checked)} type="checkbox" /><span>我确认可能产生少量上游费用</span></label>}
-      </ConfirmDialog>
+        {pending?.kind === 'validate' && (
+          <Checkbox
+            checked={costConfirmed}
+            label="我确认可能产生少量上游费用"
+            onChange={(event) => setCostConfirmed(event.target.checked)}
+          />
+        )}
+      </ConfirmActionDialog>
     </>
   )
 }
 
-function eligibilityReason(reason: string) {
-  switch (reason) {
-    case 'credential_unavailable': return '凭据不可用'
-    case 'model_inactive': return '模型已停用'
-    case 'offer_inactive': return '报价已停用'
-    case 'validation_required': return '需要重新验证'
-    case 'channel_unpublished': return '渠道未发布'
-    case 'owner_inactive': return '账户已停用'
-    case 'owner_password_change_required': return '账户需先改密'
-    case 'price_unrepresentable': return '价格不可用'
-    default: return '当前不可用'
-  }
+function ValidationHistory({ offerID }: { offerID: string }) {
+  const query = useValidationAttemptsQuery(offerID)
+  return (
+    <QueryBoundary
+      empty={<EmptyState title="暂无记录" />}
+      errorFallback="校验记录加载失败"
+      isEmpty={(attempts) => attempts.length === 0}
+      query={query}
+    >
+      {(attempts) => (
+        <ol className="sharing-history">
+          {attempts.map((attempt) => (
+            <li key={attempt.id}>
+              <header>
+                <ChannelStateBadge status={attempt.status} />
+                <span>{formatDate(attempt.completed_at ?? attempt.started_at)}</span>
+                <span>{attempt.http_status ? `HTTP ${attempt.http_status}` : attempt.error_category || '—'}</span>
+              </header>
+              {attempt.raw_error && <pre>{attempt.raw_error}</pre>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </QueryBoundary>
+  )
 }
