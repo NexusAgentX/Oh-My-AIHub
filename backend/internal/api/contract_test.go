@@ -426,6 +426,14 @@ func TestOpenAPIHealthAndInstanceResponses(t *testing.T) {
 		t.Fatalf("initialize = %d %s", recorder.Code, recorder.Body.String())
 	}
 	spec.assertSchema(t, "InstanceInitializeResponse", recorder.Body.Bytes())
+
+	application = newInstanceApp(t, &instanceStubStore{})
+	recorder = httptest.NewRecorder()
+	application.instanceInitialize(recorder, httptest.NewRequest(http.MethodPost, "/api/instance/initialize", strings.NewReader(`not json`)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("initialize with invalid body = %d %s", recorder.Code, recorder.Body.String())
+	}
+	spec.assertSchema(t, "ErrorResponse", recorder.Body.Bytes())
 }
 
 func TestOpenAPICatalogResponses(t *testing.T) {

@@ -15,6 +15,7 @@
 
 ### 变更
 
+- 后端重构遗留清理（Feature #147，Epic #109）：删除过渡类型 `postgres.LedgerTransaction` / `Store.WithLedgerTransaction`（测试改用 `pgx.Tx` + `ledgerpg.NewTx`，断言不变）；对既有未格式化的后端文件执行 `gofmt`，CI 新增 `gofmt -l backend` 检查；`POST /api/instance/initialize` 在请求体无法解析时改为返回 `400 invalid_json`（此前返回空的 200），OpenAPI 与契约测试同步。
 - API 层按领域拆分路由并产出 OpenAPI 契约（Feature #124，ADR-0021）：`backend/internal/api` 的路由改为各领域文件内注册，中间件、限流状态与响应辅助各自独立成文件，`handler.go` 只保留组装；新增 `backend/api/openapi.yaml`（OpenAPI 3.1，覆盖全部 `/api/**` JSON 接口，外部协议入口只登记路径与认证）及契约测试（路由表与规范一一对应、响应按 schema 校验）。新增测试依赖 `jsonschema/v6` 与 `yaml/v3`。URL、方法、字段、状态码与错误文案均不变。
 - 前端改版“使用 API”（Feature #126，Epic #109）：工作台新增快速开始（选择模型与原生协议、从市场勾选一个或多个渠道，创建 Key 与路由后展示带真实 Base URL 与 Key 的 curl / Python / Node.js 调用示例，完整 Key 仍只显示一次）和待处理事项（由现有接口在前端组合：待放行/待付款 C2C 交易、校验失败或暂停的渠道、单渠道路由、需更新的路由渠道、已使用未评分渠道）；API Key 创建与设置、加入路由改为抽屉，界面用语“模型协议池”改称“路由”、优先级改称“备用顺序”并保留版本冲突提示；`/keys/new`、`/keys/:keyID/settings`、`/market/channels/:channelID/add` 改为重定向到对应抽屉；API 市场筛选以 URL 参数保存并支持清除筛选，公开渠道详情保留 1～5 分评分；调用记录与详情迁移到 TanStack Query 与基础组件。无后端与接口变化。
 - 前端改版：积分（Feature #128，Epic #109）：钱包页的风险提示条内含补足积分入口，原“余额不足”页并入钱包，`/wallet/insufficient` 重定向至 `/wallet`；账本分录改用统一数据表。C2C 全部页面迁移到 TanStack Query 与基础组件：市场页按卖单/买单分标签展示，承接挂单改为抽屉（`/c2c?take=<订单>`，旧 `/c2c/orders/:id/take` 重定向），取消挂单/交易、放行与争议陈述改为确认对话框与表单对话框（旧 `/c2c/trades/:id/dispute` 重定向至交易详情），我的挂单与交易以标签页展示并标出待你付款/待你放行，交易详情未结束时自动刷新，交易记录改为中文说明。买卖双向挂单、部分成交、卖单收款码上传与展示、文字付款声明与争议均保持不变；不改后端与 API。

@@ -25,6 +25,7 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
 		return
 	}
 	initialized, err := a.identity.HasAdministrator(r.Context())
