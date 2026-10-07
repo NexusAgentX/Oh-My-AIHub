@@ -45,7 +45,7 @@ export const adminNavigation: NavGroup[] = [
   {
     label: '运营',
     items: [
-      { label: '运营总览', to: '/admin/ops', icon: 'gauge', tab: '总览' },
+      { label: '运营台', to: '/admin/ops', icon: 'gauge', tab: '运营台' },
       { label: '账户与信用', to: '/admin/accounts', icon: 'users', tab: '账户' },
       { label: '模型目录', to: '/admin/models', icon: 'layers', tab: '模型' },
     ],
@@ -55,7 +55,6 @@ export const adminNavigation: NavGroup[] = [
     items: [
       { label: '渠道治理', to: '/admin/channels', icon: 'shield', tab: '渠道' },
       { label: '争议处理', to: '/admin/c2c/disputes', icon: 'scale' },
-      { label: '共享者收入', to: '/admin/providers', icon: 'coins' },
     ],
   },
 ]

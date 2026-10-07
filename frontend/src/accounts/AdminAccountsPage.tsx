@@ -1,213 +1,163 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
-import type { Account, AccountStatus, LedgerMetrics } from '../api/contracts'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ApiError } from '../api/client'
+import type { Account, AccountStatus } from '../api/contracts'
+import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
+import { usernameProblem } from '../auth/credentialsRules'
 import {
+  Badge,
   Button,
+  ButtonLink,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Icon,
   InlineError,
-  LoadingState,
-  StatusBadge,
+  Metric,
+  MetricGrid,
+  Notice,
+  PageHeader,
+  QueryBoundary,
+  SearchInput,
+  SelectField,
   TextField,
-} from '../ui/FormControls'
-import { Icon } from '../ui/Icon'
+  Toolbar,
+} from '../ui'
 import { accountRiskLabel } from './accountMetrics'
 import { useEphemeralCredential } from './EphemeralCredentialProvider'
-import { usernameProblem } from '../auth/credentialsRules'
+import {
+  useAccountMetricsQuery,
+  useAdminAccountsQuery,
+  useCreateAccount,
+  useResetAccountPassword,
+  useUpdateAccount,
+} from './queries'
+
+function RiskBadge({ account }: { account: Account }) {
+  const label = accountRiskLabel(account)
+  const tone = account.credit_frozen || account.over_limit ? 'danger' : label === '正常' ? 'success' : 'warning'
+  return <Badge tone={tone}>{label}</Badge>
+}
+
+function AccountMetrics() {
+  const query = useAccountMetricsQuery()
+  const metrics = query.data
+  return (
+    <MetricGrid label="账户指标">
+      <Metric label="账本账户" value={metrics?.ledger_account_count ?? '—'} />
+      <Metric label="总信用额度" tone="accent" value={metrics?.total_credit_limit ?? '—'} />
+      <Metric label="已用信用" value={metrics?.credit_capacity_used ?? '—'} />
+      <Metric
+        hint={`${metrics?.credit_frozen_accounts ?? '—'} 个信用冻结`}
+        label="信用超限账户"
+        value={metrics?.over_limit_accounts ?? '—'}
+      />
+    </MetricGrid>
+  )
+}
 
 export function AdminAccountsPage() {
   const { account: currentAccount, synchronizeAccount } = useAuth()
   const { setCredential } = useEphemeralCredential()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [metrics, setMetrics] = useState<LedgerMetrics | null>(null)
-  const initialQuery = searchParams.get('query') ?? ''
-  const [query, setQuery] = useState(initialQuery)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const search = searchParams.get('query') ?? ''
+  const [draft, setDraft] = useState(search)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
+  const [notice, setNotice] = useState('')
+  const query = useAdminAccountsQuery(search.trim())
 
-  const load = async (search = query, successMessage = '') => {
-    setLoading(true)
-    setError('')
-    try {
-      const normalizedSearch = search.trim()
-      const [items, nextMetrics] = await Promise.all([
-        api.accounts(normalizedSearch),
-        api.ledgerMetrics(),
-      ])
-      setAccounts(items)
-      setMetrics(nextMetrics)
-      setError(successMessage)
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError ? caught.message : '账户列表加载失败',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void load(initialQuery)
-  }, [])
+  useEffect(() => setDraft(search), [search])
 
   useEffect(() => {
     if (searchParams.get('create') !== '1') return
     setCreateOpen(true)
-    setSearchParams({}, { replace: true })
+    const next = new URLSearchParams(searchParams)
+    next.delete('create')
+    setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const search = (event: FormEvent) => {
+  const submitSearch = (event: FormEvent) => {
     event.preventDefault()
-    void load(query)
+    const next = new URLSearchParams()
+    if (draft.trim()) next.set('query', draft.trim())
+    setSearchParams(next, { replace: true })
   }
 
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <h1>账户与信用</h1>
-        </div>
-        <Button
-          aria-label="创建账号"
-          icon={<Icon name="plus" />}
-          onClick={() => setCreateOpen(true)}
-        >
-          创建账号
-        </Button>
-      </header>
-
-      <section className="metric-grid" aria-label="账户指标">
-        <article className="metric-card">
-          <span>账本账户</span>
-          <strong>{metrics?.ledger_account_count ?? '—'}</strong>
-          <small>个</small>
-        </article>
-        <article className="metric-card metric-card-accent">
-          <span>总信用额度</span>
-          <strong>{metrics?.total_credit_limit ?? '—'}</strong>
-          <small>积分</small>
-        </article>
-        <article className="metric-card">
-          <span>已用信用</span>
-          <strong>{metrics?.credit_capacity_used ?? '—'}</strong>
-          <small>积分</small>
-        </article>
-        <article className="metric-card">
-          <span>信用超限账户</span>
-          <strong>{metrics?.over_limit_accounts ?? '—'}</strong>
-          <small>{metrics?.credit_frozen_accounts ?? '—'} 个信用冻结</small>
-        </article>
-      </section>
-
-      <section className="panel table-panel">
-        <header className="table-toolbar">
-          <div>
-            <h2>账户</h2>
-          </div>
-          <form className="search-form" onSubmit={search}>
-            <Icon name="search" />
-            <input
-              aria-label="搜索账户"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索用户名或显示名称"
-              value={query}
-            />
-            <button className="visually-hidden" type="submit">
-              搜索
-            </button>
-          </form>
-        </header>
-        <InlineError>{error}</InlineError>
-        {loading ? (
-          <LoadingState />
-        ) : (
-          <>
-            <div className="desktop-table-wrap account-desktop-table-wrap">
-              <table className="data-table">
-                <caption className="visually-hidden">受邀账户列表</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">账户</th>
-                    <th scope="col">已入账余额</th>
-                    <th scope="col">信用额度</th>
-                    <th scope="col">已用信用</th>
-                    <th scope="col">可消费额度</th>
-                    <th scope="col">风险状态</th>
-                    <th aria-label="操作" scope="col" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <strong>{item.display_name}</strong>
-                        <small>
-                          @{item.username} · {item.is_admin ? '管理员' : '普通账户'} · {item.status === 'active' ? '启用' : '停用'}
-                        </small>
-                      </td>
-                      <td>{item.posted_balance}</td>
-                      <td>{item.credit_limit} 积分</td>
-                      <td>{item.credit_used}</td>
-                      <td>{item.spendable_capacity}</td>
-                      <td>{accountRiskLabel(item)}</td>
-                      <td className="table-action">
-                        <span className="table-action-group">
-                          <Link
-                            className="button button-secondary"
-                            to={`/admin/ledger/accounts/${item.id}`}
-                          >
-                            账本
-                          </Link>
-                          <Button
-                            onClick={() => setEditing(item)}
-                            variant="secondary"
-                          >
-                            管理
-                          </Button>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mobile-card-list account-mobile-card-list">
-              {accounts.map((item) => (
-                <article className="mobile-data-card" key={item.id}>
-                  <header>
-                    <div>
+      <PageHeader
+        actions={
+          <Button icon={<Icon name="plus" />} onClick={() => setCreateOpen(true)}>
+            创建账号
+          </Button>
+        }
+        title="账户与信用"
+      />
+      <AccountMetrics />
+      {notice && <Notice tone="warning">{notice}</Notice>}
+      <Toolbar>
+        <form onSubmit={submitSearch}>
+          <SearchInput
+            label="搜索账户"
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="搜索用户名或显示名称"
+            value={draft}
+          />
+        </form>
+      </Toolbar>
+      <Card flush>
+        <QueryBoundary errorFallback="账户列表加载失败" query={query}>
+          {(accounts) => (
+            <DataTable
+              caption="账户列表"
+              columns={[
+                {
+                  key: 'account',
+                  header: '账户',
+                  primary: true,
+                  cell: (item) => (
+                    <>
                       <strong>{item.display_name}</strong>
-                      <span>@{item.username} · {item.is_admin ? '管理员' : '普通账户'}</span>
-                    </div>
-                    <StatusBadge status={item.status} />
-                  </header>
-                  <dl>
-                    <div><dt>已入账余额</dt><dd>{item.posted_balance}</dd></div>
-                    <div><dt>信用额度</dt><dd>{item.credit_limit} 积分</dd></div>
-                    <div><dt>已用信用</dt><dd>{item.credit_used}</dd></div>
-                    <div><dt>可消费额度</dt><dd>{item.spendable_capacity}</dd></div>
-                    <div><dt>风险状态</dt><dd>{accountRiskLabel(item)}</dd></div>
-                  </dl>
-                  <div className="mobile-card-actions">
-                    <Link className="button button-secondary" to={`/admin/ledger/accounts/${item.id}`}>查看账本</Link>
-                    <Button onClick={() => setEditing(item)} variant="secondary">管理账户</Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-            {accounts.length === 0 && <div className="empty-state">没有匹配的账户</div>}
-          </>
-        )}
-      </section>
+                      <small>
+                        @{item.username}
+                        {item.is_admin ? ' · 管理员' : ''}
+                        {item.status === 'disabled' ? ' · 已停用' : ''}
+                      </small>
+                    </>
+                  ),
+                },
+                { key: 'balance', header: '已入账余额', numeric: true, cell: (item) => item.posted_balance },
+                { key: 'limit', header: '信用额度', numeric: true, cell: (item) => item.credit_limit },
+                { key: 'used', header: '已用信用', numeric: true, cell: (item) => item.credit_used },
+                { key: 'spendable', header: '可消费额度', numeric: true, cell: (item) => item.spendable_capacity },
+                { key: 'risk', header: '风险状态', cell: (item) => <RiskBadge account={item} /> },
+                {
+                  key: 'actions',
+                  header: '操作',
+                  cell: (item) => (
+                    <span className="table-action-group">
+                      <ButtonLink size="sm" to={`/admin/ledger/accounts/${item.id}`}>
+                        账本
+                      </ButtonLink>
+                      <Button onClick={() => setEditing(item)} size="sm" variant="secondary">
+                        管理
+                      </Button>
+                    </span>
+                  ),
+                },
+              ]}
+              empty={<EmptyState title="没有匹配的账户" />}
+              rowKey={(item) => item.id}
+              rows={accounts}
+            />
+          )}
+        </QueryBoundary>
+      </Card>
 
       <CreateAccountDialog
         onClose={() => setCreateOpen(false)}
@@ -225,32 +175,18 @@ export function AdminAccountsPage() {
         account={editing}
         currentAccountID={currentAccount?.id ?? ''}
         onClose={() => setEditing(null)}
-        onUpdated={(updated) => {
-          setAccounts((items) =>
-            items.map((item) => (item.id === updated.id ? updated : item)),
-          )
-          synchronizeAccount(updated)
-          setEditing(null)
-          void api.ledgerMetrics().then(setMetrics)
-        }}
         onConflict={() => {
           setEditing(null)
-          void load(query, '账户已被其他管理员修改，已加载最新版本，请重新操作')
+          setNotice('账户已被其他管理员修改，已加载最新版本，请重新操作')
+        }}
+        onUpdated={(updated) => {
+          synchronizeAccount(updated)
+          setEditing(null)
+          setNotice('')
         }}
       />
     </>
   )
-}
-
-function useDialog(open: boolean) {
-  const reference = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    const dialog = reference.current
-    if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
-    if (!open && dialog.open) dialog.close()
-  }, [open])
-  return reference
 }
 
 function CreateAccountDialog({
@@ -260,39 +196,40 @@ function CreateAccountDialog({
 }: {
   open: boolean
   onClose: () => void
-  onCreated: (created: Awaited<ReturnType<typeof api.createAccount>>) => void
+  onCreated: (created: Awaited<ReturnType<ReturnType<typeof useCreateAccount>['mutateAsync']>>) => void
 }) {
-  const reference = useDialog(open)
+  return (
+    <Dialog onClose={onClose} open={open} title="创建账号">
+      <CreateAccountForm onClose={onClose} onCreated={onCreated} />
+    </Dialog>
+  )
+}
+
+function CreateAccountForm({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: (created: Awaited<ReturnType<ReturnType<typeof useCreateAccount>['mutateAsync']>>) => void
+}) {
+  const create = useCreateAccount()
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
   const [creditLimit, setCreditLimit] = useState('0')
   const [isAdmin, setIsAdmin] = useState(false)
   const [status, setStatus] = useState<AccountStatus>('active')
   const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setDisplayName('')
-      setUsername('')
-      setCreditLimit('0')
-      setIsAdmin(false)
-      setStatus('active')
-      setError('')
-    }
-  }, [open])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
     if (usernameProblem(username)) {
-      setError(`用户名不符合规则：3-32 位，小写字母、数字、.、_ 或 -，以小写字母或数字开头`)
+      setError('用户名不符合规则：3-32 位，小写字母、数字、.、_ 或 -，以小写字母或数字开头')
       return
     }
-    setSubmitting(true)
     try {
       onCreated(
-        await api.createAccount({
+        await create.mutateAsync({
           username,
           display_name: displayName,
           credit_limit: creditLimit,
@@ -301,98 +238,63 @@ function CreateAccountDialog({
         }),
       )
     } catch (caught) {
-      setError(
-        caught instanceof ApiError ? caught.message : '账号创建失败',
-      )
-    } finally {
-      setSubmitting(false)
+      setError(errorMessage(caught, '账号创建失败'))
     }
   }
 
   return (
-    <dialog
-      aria-labelledby="create-account-title"
-      className="modal"
-      onCancel={(event) => {
-        if (submitting) event.preventDefault()
-        else onClose()
-      }}
-      onClose={onClose}
-      ref={reference}
-    >
-      <form className="modal-form" onSubmit={submit}>
-        <header className="modal-heading">
-          <div>
-            <h2 id="create-account-title">创建账号</h2>
-          </div>
-          <button
-            aria-label="关闭"
-            className="icon-button"
-            disabled={submitting}
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
-        </header>
-        <InlineError>{error}</InlineError>
+    <form className="stack-form" onSubmit={submit}>
+      <InlineError>{error}</InlineError>
+      <TextField
+        autoFocus
+        label="显示名称"
+        onChange={(event) => setDisplayName(event.target.value)}
+        required
+        value={displayName}
+      />
+      <TextField
+        autoComplete="off"
+        hint="3-32 位，小写字母、数字、.、_ 或 -"
+        label="用户名"
+        onChange={(event) => setUsername(event.target.value)}
+        pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
+        required
+        value={username}
+      />
+      <div className="field-row">
         <TextField
-          autoFocus
-          label="显示名称"
-          onChange={(event) => setDisplayName(event.target.value)}
+          inputMode="decimal"
+          label="初始信用额度"
+          min="0"
+          onChange={(event) => setCreditLimit(event.target.value)}
           required
-          value={displayName}
+          step="0.000000001"
+          type="number"
+          value={creditLimit}
         />
-        <TextField
-          autoComplete="off"
-          hint="3-32 位，小写字母、数字、.、_ 或 -"
-          label="用户名"
-          onChange={(event) => setUsername(event.target.value)}
-          pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
-          required
-          value={username}
-        />
-        <div className="field-row">
-          <TextField
-            inputMode="decimal"
-            label="初始信用额度"
-            min="0"
-            onChange={(event) => setCreditLimit(event.target.value)}
-            required
-            step="0.000000001"
-            type="number"
-            value={creditLimit}
-          />
-          <label className="field">
-            <span className="field-label">账户状态</span>
-            <select
-              className="input"
-              onChange={(event) => setStatus(event.target.value as AccountStatus)}
-              value={status}
-            >
-              <option value="active">启用</option>
-              <option value="disabled">停用</option>
-            </select>
-          </label>
-        </div>
-        <label className="checkbox-control">
-          <input
-            checked={isAdmin}
-            onChange={(event) => setIsAdmin(event.target.checked)}
-            type="checkbox"
-          />
-          <span>授予管理员权限</span>
-        </label>
-        <footer className="modal-actions">
-          <Button disabled={submitting} onClick={onClose} type="button" variant="secondary">
-            取消
-          </Button>
-          <Button disabled={submitting} type="submit">
-            {submitting ? '正在创建' : '创建账号'}
-          </Button>
-        </footer>
-      </form>
-    </dialog>
+        <SelectField
+          label="账户状态"
+          onChange={(event) => setStatus(event.target.value as AccountStatus)}
+          value={status}
+        >
+          <option value="active">启用</option>
+          <option value="disabled">停用</option>
+        </SelectField>
+      </div>
+      <Checkbox
+        checked={isAdmin}
+        label="授予管理员权限"
+        onChange={(event) => setIsAdmin(event.target.checked)}
+      />
+      <div className="modal-actions">
+        <Button disabled={create.isPending} onClick={onClose} type="button" variant="secondary">
+          取消
+        </Button>
+        <Button loading={create.isPending} type="submit">
+          创建账号
+        </Button>
+      </div>
+    </form>
   )
 }
 
@@ -409,50 +311,65 @@ function EditAccountDialog({
   onConflict: () => void
   onUpdated: (account: Account) => void
 }) {
-  const reference = useDialog(Boolean(account))
-  const [creditLimit, setCreditLimit] = useState('0')
-  const [creditFrozen, setCreditFrozen] = useState(false)
-  const [status, setStatus] = useState<AccountStatus>('active')
-  const [isAdmin, setIsAdmin] = useState(false)
+  return (
+    <Dialog
+      description={account ? `${account.display_name} · @${account.username}` : undefined}
+      onClose={onClose}
+      open={Boolean(account)}
+      title="管理账户"
+    >
+      {account && (
+        <EditAccountForm
+          account={account}
+          currentAccountID={currentAccountID}
+          key={account.id}
+          onClose={onClose}
+          onConflict={onConflict}
+          onUpdated={onUpdated}
+        />
+      )}
+    </Dialog>
+  )
+}
+
+function EditAccountForm({
+  account,
+  currentAccountID,
+  onClose,
+  onConflict,
+  onUpdated,
+}: {
+  account: Account
+  currentAccountID: string
+  onClose: () => void
+  onConflict: () => void
+  onUpdated: (account: Account) => void
+}) {
+  const update = useUpdateAccount()
+  const reset = useResetAccountPassword()
+  const [creditLimit, setCreditLimit] = useState(account.credit_limit)
+  const [creditFrozen, setCreditFrozen] = useState(account.credit_frozen)
+  const [status, setStatus] = useState<AccountStatus>(account.status)
+  const [isAdmin, setIsAdmin] = useState(account.is_admin)
   const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
-  const [resetting, setResetting] = useState(false)
   const [newInitialPassword, setNewInitialPassword] = useState('')
   const [copyState, setCopyState] = useState('')
-
-  useEffect(() => {
-    if (account) {
-      setCreditLimit(account.credit_limit)
-      setCreditFrozen(account.credit_frozen)
-      setStatus(account.status)
-      setIsAdmin(account.is_admin)
-      setError('')
-      setConfirmingReset(false)
-      setResetting(false)
-      setNewInitialPassword('')
-      setCopyState('')
-    }
-  }, [account])
-
-  if (!account) return <dialog className="modal" ref={reference} />
+  const isSelf = account.id === currentAccountID
 
   const resetPassword = async () => {
-    if (!confirmingReset || resetting) return
-    setResetting(true)
     setError('')
     try {
-      const result = await api.resetAccountPassword(account.id)
+      const result = await reset.mutateAsync(account.id)
       setNewInitialPassword(result.initial_password)
       setConfirmingReset(false)
+      reset.reset()
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'conflict') {
-        setError('该账户密码刚被其他操作修改，请重试')
-      } else {
-        setError(caught instanceof ApiError ? caught.message : '密码重置失败')
-      }
-    } finally {
-      setResetting(false)
+      setError(
+        caught instanceof ApiError && caught.code === 'conflict'
+          ? '该账户密码刚被其他操作修改，请重试'
+          : errorMessage(caught, '密码重置失败'),
+      )
     }
   }
 
@@ -467,15 +384,18 @@ function EditAccountDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    setSubmitting(true)
     setError('')
     try {
       onUpdated(
-        await api.updateAccount(account.id, account.version, {
-          credit_limit: creditLimit,
-          credit_frozen: creditFrozen,
-          status,
-          is_admin: isAdmin,
+        await update.mutateAsync({
+          accountID: account.id,
+          expectedVersion: account.version,
+          patch: {
+            credit_limit: creditLimit,
+            credit_frozen: creditFrozen,
+            status,
+            is_admin: isAdmin,
+          },
         }),
       )
     } catch (caught) {
@@ -483,137 +403,112 @@ function EditAccountDialog({
         onConflict()
         return
       }
-      setError(
-        caught instanceof ApiError ? caught.message : '账户更新失败',
-      )
-    } finally {
-      setSubmitting(false)
+      setError(errorMessage(caught, '账户更新失败'))
     }
   }
 
   return (
-    <dialog
-      aria-labelledby="edit-account-title"
-      className="modal"
-      onCancel={(event) => {
-        if (submitting) event.preventDefault()
-        else onClose()
-      }}
-      onClose={onClose}
-      ref={reference}
-    >
-      <form className="modal-form" onSubmit={submit}>
-        <header className="modal-heading">
-          <div>
-            <h2 id="edit-account-title">管理账户</h2>
-            <p>{account.display_name} · @{account.username}</p>
-          </div>
-          <button aria-label="关闭" className="icon-button" onClick={onClose} type="button">×</button>
-        </header>
-        <InlineError>{error}</InlineError>
-        <TextField
-          inputMode="decimal"
-          label="信用额度"
-          min="0"
-          onChange={(event) => setCreditLimit(event.target.value)}
-          required
-          step="0.000000001"
-          type="number"
-          value={creditLimit}
-        />
-        <label className="field">
-          <span className="field-label">账户状态</span>
-          <select
-            className="input"
-            disabled={account.id === currentAccountID && account.is_admin}
-            onChange={(event) => setStatus(event.target.value as AccountStatus)}
-            value={status}
-          >
-            <option value="active">启用</option>
-            <option value="disabled">停用</option>
-          </select>
-        </label>
-        <label className="checkbox-control">
-          <input
-            checked={creditFrozen}
-            onChange={(event) => setCreditFrozen(event.target.checked)}
-            type="checkbox"
-          />
-          <span>冻结新消费与持有</span>
-        </label>
-        <label className="checkbox-control">
-          <input
-            checked={isAdmin}
-            disabled={account.id === currentAccountID}
-            onChange={(event) => setIsAdmin(event.target.checked)}
-            type="checkbox"
-          />
-          <span>管理员权限</span>
-        </label>
-        <div className="modal-divider">
-          <span className="field-label">密码</span>
-          {account.id === currentAccountID ? (
-            <p className="modal-hint">自己的密码请在账户设置中修改。</p>
-          ) : newInitialPassword ? (
-            <>
-              <p className="modal-hint">
-                新初始密码仅显示这一次，请立即复制并通过可信渠道交付；关闭后无法再次查看。
-              </p>
-              <div className="reset-credential">
-                <strong>{newInitialPassword}</strong>
+    <form className="stack-form" onSubmit={submit}>
+      <InlineError>{error}</InlineError>
+      <TextField
+        inputMode="decimal"
+        label="信用额度"
+        min="0"
+        onChange={(event) => setCreditLimit(event.target.value)}
+        required
+        step="0.000000001"
+        type="number"
+        value={creditLimit}
+      />
+      <SelectField
+        disabled={isSelf && account.is_admin}
+        label="账户状态"
+        onChange={(event) => setStatus(event.target.value as AccountStatus)}
+        value={status}
+      >
+        <option value="active">启用</option>
+        <option value="disabled">停用</option>
+      </SelectField>
+      <Checkbox
+        checked={creditFrozen}
+        label="冻结新消费与持有"
+        onChange={(event) => setCreditFrozen(event.target.checked)}
+      />
+      <Checkbox
+        checked={isAdmin}
+        disabled={isSelf}
+        label="管理员权限"
+        onChange={(event) => setIsAdmin(event.target.checked)}
+      />
+      <div className="modal-divider">
+        <span className="field-label">密码</span>
+        {isSelf ? (
+          <p className="modal-hint">自己的密码请在账户设置中修改。</p>
+        ) : newInitialPassword ? (
+          <>
+            <p className="modal-hint">
+              新初始密码仅显示这一次，请立即复制并通过可信渠道交付；关闭后无法再次查看。
+            </p>
+            <div className="reset-credential">
+              <strong>{newInitialPassword}</strong>
+              <Button
+                icon={<Icon name="copy" />}
+                onClick={() => void copyNewPassword()}
+                type="button"
+                variant="secondary"
+              >
+                复制
+              </Button>
+            </div>
+            <p aria-live="polite" className="modal-hint">
+              {copyState}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="modal-hint">
+              重置会生成仅显示一次的新初始密码；该账户全部登录会话立即失效，用户下次登录必须修改密码。
+            </p>
+            {confirmingReset ? (
+              <div className="reset-confirm-row">
                 <Button
-                  icon={<Icon name="copy" />}
-                  onClick={() => void copyNewPassword()}
+                  loading={reset.isPending}
+                  onClick={() => void resetPassword()}
                   type="button"
-                  variant="secondary"
+                  variant="danger"
                 >
-                  复制
+                  确认重置
+                </Button>
+                <Button
+                  disabled={reset.isPending}
+                  onClick={() => setConfirmingReset(false)}
+                  type="button"
+                  variant="quiet"
+                >
+                  取消
                 </Button>
               </div>
-              <p aria-live="polite" className="modal-hint">{copyState}</p>
-            </>
-          ) : (
-            <>
-              <p className="modal-hint">
-                重置会生成仅显示一次的新初始密码；该账户全部登录会话立即失效，用户下次登录必须修改密码。
-              </p>
-              {confirmingReset ? (
-                <div className="reset-confirm-row">
-                  <Button
-                    disabled={resetting}
-                    onClick={() => void resetPassword()}
-                    type="button"
-                    variant="danger"
-                  >
-                    {resetting ? '正在重置' : '确认重置'}
-                  </Button>
-                  <Button
-                    disabled={resetting}
-                    onClick={() => setConfirmingReset(false)}
-                    type="button"
-                    variant="quiet"
-                  >
-                    取消
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  disabled={submitting || resetting}
-                  onClick={() => setConfirmingReset(true)}
-                  type="button"
-                  variant="secondary"
-                >
-                  重置密码
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-        <footer className="modal-actions">
-          <Button onClick={onClose} type="button" variant="secondary">取消</Button>
-          <Button disabled={submitting} type="submit">{submitting ? '正在保存' : '保存更改'}</Button>
-        </footer>
-      </form>
-    </dialog>
+            ) : (
+              <Button
+                disabled={update.isPending}
+                onClick={() => setConfirmingReset(true)}
+                type="button"
+                variant="secondary"
+              >
+                重置密码
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+      <div className="modal-actions">
+        <Button onClick={onClose} type="button" variant="secondary">
+          取消
+        </Button>
+        <Button loading={update.isPending} type="submit">
+          保存更改
+        </Button>
+      </div>
+    </form>
   )
 }

@@ -1,0 +1,13 @@
+/* 管理员渠道治理的领域私有布局。 */
+.admin-channel-title { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.admin-channel-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.admin-channel-facts dt { color: var(--muted); font-size: var(--text-sm); }
+.admin-channel-facts dd { margin: var(--space-1) 0 0; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.admin-attempt-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.admin-attempt-list li { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--hairline); border-radius: var(--radius-sm); }
+.admin-attempt-list header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); color: var(--muted); font-size: var(--text-xs); }
+.admin-attempt-list pre { max-height: 220px; margin: 0; padding: var(--space-3); overflow: auto; border-radius: var(--radius-xs); color: var(--code-ink); background: var(--code-bg); font: var(--text-xs) / 1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 960px) {
+  .admin-channel-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

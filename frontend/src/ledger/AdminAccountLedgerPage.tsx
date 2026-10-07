@@ -1,75 +1,71 @@
-import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, ApiError } from '../api/client'
-import type { LedgerEntry, Wallet } from '../api/contracts'
-import { InlineError, LoadingState } from '../ui/FormControls'
+import type { Wallet } from '../api/contracts'
+import { Badge, Card, Metric, MetricGrid, PageHeader, QueryBoundary } from '../ui'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
-import { formatPointAmount, walletRiskLabel } from '../wallet/presentation'
-import { WalletSummary } from '../wallet/WalletPage'
+import {
+  creditUsagePercent,
+  formatPointAmount,
+  walletRiskLabel,
+  walletRiskTone,
+} from '../wallet/presentation'
+import { useAdminAccountEntriesQuery, useAdminAccountWalletQuery } from './queries'
+
+function AccountSummary({ wallet }: { wallet: Wallet }) {
+  return (
+    <MetricGrid label="账户摘要">
+      <Metric label="已入账余额" value={formatPointAmount(wallet.posted_balance)} />
+      <Metric
+        label="可消费额度"
+        tone="accent"
+        value={formatPointAmount(wallet.spendable_capacity)}
+      />
+      <Metric
+        hint={`已用 ${formatPointAmount(wallet.credit_used)}`}
+        label="信用额度"
+        progress={creditUsagePercent(wallet.credit_limit, wallet.credit_used)}
+        value={formatPointAmount(wallet.credit_limit)}
+      />
+      <Metric
+        hint="资产冻结 / 消费授权"
+        label="持有中的积分"
+        value={`${formatPointAmount(wallet.asset_reserved)} / ${formatPointAmount(wallet.spend_authorized)}`}
+      />
+    </MetricGrid>
+  )
+}
 
 export function AdminAccountLedgerPage() {
   const { accountID = '' } = useParams()
-  const [wallet, setWallet] = useState<Wallet | null>(null)
-  const [entries, setEntries] = useState<LedgerEntry[]>([])
-  const [nextBefore, setNextBefore] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
-
-  const loadEntries = async (before = '') => {
-    before ? setLoadingMore(true) : setLoading(true)
-    try {
-      const response = await api.adminAccountEntries(accountID, before)
-      setEntries((current) => before ? [...current, ...response.entries] : response.entries)
-      setNextBefore(response.next_before)
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : '账户分录加载失败')
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
-
-  useEffect(() => {
-    void Promise.all([api.adminAccountWallet(accountID), api.adminAccountEntries(accountID)])
-      .then(([nextWallet, response]) => {
-        setWallet(nextWallet)
-        setEntries(response.entries)
-        setNextBefore(response.next_before)
-      })
-      .catch((caught) => {
-        setError(caught instanceof ApiError ? caught.message : '账户账本加载失败')
-      })
-      .finally(() => setLoading(false))
-  }, [accountID])
+  const wallet = useAdminAccountWalletQuery(accountID)
+  const entries = useAdminAccountEntriesQuery(accountID)
+  const risk = wallet.data?.risk_status
 
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <Link className="back-link" to="/admin/accounts">← 账户与信用</Link>
-          <h1>账户账本</h1>
-        </div>
-        {wallet && <span className="count-badge">{walletRiskLabel(wallet.risk_status)}</span>}
-      </header>
-      <InlineError>{error}</InlineError>
-      {loading && !wallet ? <LoadingState /> : wallet ? (
-        <>
-          <WalletSummary wallet={wallet} />
-          <section className="panel table-panel">
-            <header className="table-toolbar">
-              <h2>不可变分录</h2>
-              <span className="muted-copy">当前余额 {formatPointAmount(wallet.posted_balance)}</span>
-            </header>
+      <PageHeader
+        actions={risk && <Badge tone={walletRiskTone(risk)}>{walletRiskLabel(risk)}</Badge>}
+        back={
+          <Link className="back-link" to="/admin/accounts">
+            ← 账户与信用
+          </Link>
+        }
+        title="账户账本"
+      />
+      <QueryBoundary errorFallback="账户账本加载失败" query={wallet}>
+        {(data) => <AccountSummary wallet={data} />}
+      </QueryBoundary>
+      <Card flush title="不可变分录">
+        <QueryBoundary errorFallback="账户分录加载失败" query={entries}>
+          {(data) => (
             <LedgerEntriesTable
-              entries={entries}
-              loadingMore={loadingMore}
-              nextBefore={nextBefore}
-              onLoadMore={() => void loadEntries(nextBefore)}
+              entries={data.pages.flatMap((page) => page.entries)}
+              loadingMore={entries.isFetchingNextPage}
+              nextBefore={entries.hasNextPage ? 'more' : ''}
+              onLoadMore={() => void entries.fetchNextPage()}
             />
-          </section>
-        </>
-      ) : null}
+          )}
+        </QueryBoundary>
+      </Card>
     </>
   )
 }
