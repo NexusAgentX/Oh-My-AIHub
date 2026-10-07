@@ -19,6 +19,18 @@ type ParsedRequest struct {
 	ExpectedChoices  int
 }
 
+// UsageState separates "the upstream sent no usage at all" from "the upstream
+// sent usage this platform cannot price". Absent usage only affects settlement;
+// invalid usage must poison the whole attempt and never be replaced by an
+// earlier valid snapshot.
+type UsageState uint8
+
+const (
+	UsageAbsent UsageState = iota
+	UsageValid
+	UsageInvalid
+)
+
 type UsageObservation struct {
 	InputTokens      *int64
 	OutputTokens     *int64
@@ -72,18 +84,16 @@ func mergeUsageValue(current **int64, next *int64) bool {
 }
 
 type SSEAnalysis struct {
-	Frame                 []byte
-	Semantic              bool
-	Terminal              bool
-	StreamEnd             bool
-	FinishObserved        bool
-	AfterTerminalAllowed  bool
-	ChoiceIndexes         []int
-	FinishedChoiceIndexes []int
-	ErrorCode             string
-	ErrorMessage          string
-	CredentialFragments   []SSECredentialFragment
-	Observation           UsageObservation
+	Frame               []byte
+	Semantic            bool
+	Terminal            bool
+	StreamEnd           bool
+	ErrorCode           string
+	ErrorMessage        string
+	CredentialFragments []SSECredentialFragment
+	Observation         UsageObservation
+	UsageState          UsageState
+	EventNameMismatch   bool
 }
 
 type SSECredentialFragment struct {
@@ -169,22 +179,29 @@ func RewriteRequest(protocol channel.Protocol, original []byte, upstreamModelID 
 	return marshalJSONObjectWithin(value, MaxRequestBytes)
 }
 
-func RewriteNonStreamingResponse(protocol channel.Protocol, body []byte, canonicalModelID string, expectedChoices int) ([]byte, *ledger.UsageV1, error) {
+// RewriteNonStreamingResponse restores the canonical model id on a successful
+// upstream body and extracts its billable usage.
+//
+// Delivery and settlement are decoupled: a body the platform cannot price is
+// still forwarded verbatim and reported as usage==nil, which the caller settles
+// as an incomplete call with no charge. Only an explicit upstream error envelope
+// or an oversized body fails the attempt.
+func RewriteNonStreamingResponse(protocol channel.Protocol, body []byte, canonicalModelID string) ([]byte, *ledger.UsageV1, error) {
 	value, err := decodeJSONObject(body)
 	if err != nil {
-		return nil, nil, err
+		// Not a JSON object: pass the upstream bytes through unchanged.
+		return body, nil, nil
 	}
-	if responseErr := validateSuccessfulResponse(protocol, value, expectedChoices); responseErr != nil {
+	if responseErr := validateSuccessfulResponse(protocol, value); responseErr != nil {
 		return nil, nil, responseErr
 	}
 	rewriteModelMetadata(protocol, value, canonicalModelID)
-	observation, ok := usageObservation(protocol, value)
-	if !ok {
-		return nil, nil, ErrNoUsage
-	}
-	usage, complete := observation.Complete()
-	if !complete {
-		return nil, nil, ErrNoUsage
+	observation, state := usageObservation(protocol, value)
+	var usage *ledger.UsageV1
+	if state == UsageValid {
+		if parsed, complete := observation.Complete(); complete {
+			usage = parsed
+		}
 	}
 	rewritten, err := marshalJSONObjectWithin(value, MaxNonStreamingBytes)
 	if err != nil {
@@ -200,34 +217,37 @@ func AnalyzeSSEFrame(protocol channel.Protocol, frame []byte, canonicalModelID s
 		return SSEAnalysis{}, envelopeErr
 	}
 	if !ok {
-		analysis.Frame = nil
-		analysis.AfterTerminalAllowed = true
+		// A frame without a data field (comment or vendor keepalive) carries no
+		// billing signal; forward it untouched.
 		return analysis, nil
 	}
 	if strings.TrimSpace(string(data)) == "[DONE]" {
-		if protocol != channel.ProtocolOpenAIChat || eventName != "" {
-			return SSEAnalysis{}, ErrInvalidInput
+		if protocol == channel.ProtocolOpenAIChat {
+			analysis.Terminal = true
+			analysis.StreamEnd = true
+			return analysis, nil
 		}
-		analysis.Terminal = true
-		analysis.StreamEnd = true
+		// No other protocol defines [DONE]; forward it untouched instead of
+		// failing the stream on a relay-specific frame.
 		return analysis, nil
 	}
 	value, err := decodeJSONObject(data)
 	if err != nil {
-		return SSEAnalysis{}, err
+		// Non-object payloads (vendor keepalives, plain text) are forwarded
+		// untouched and never treated as semantic, terminal or usage.
+		return analysis, nil
 	}
 	if responseErr := streamingResponseError(protocol, value); responseErr != nil {
-		if !matchingSSEEventName(protocol, eventName, stringField(value, "type")) {
-			return SSEAnalysis{}, ErrInvalidInput
-		}
+		// An explicit error payload always fails the attempt. The event name is
+		// deliberately not consulted: relays rename events, and a renamed
+		// error must not degrade into a truncated stream.
 		analysis.ErrorCode = responseErr.Code
 		analysis.ErrorMessage = responseErr.Message
 		analysis.Frame = rebuildSSEFrame(eventName, data)
 		return analysis, nil
 	}
-	if !matchingSSEEventName(protocol, eventName, stringField(value, "type")) {
-		return SSEAnalysis{}, ErrInvalidInput
-	}
+	// Event names are observation only; a mismatch must not reject a frame.
+	analysis.EventNameMismatch = !matchingSSEEventName(protocol, eventName, stringField(value, "type"))
 	rewriteModelMetadata(protocol, value, canonicalModelID)
 	analysis.Semantic = semanticEvent(protocol, value)
 	analysis.CredentialFragments, err = streamingCredentialFragments(protocol, value)
@@ -236,12 +256,9 @@ func AnalyzeSSEFrame(protocol channel.Protocol, frame []byte, canonicalModelID s
 	}
 	analysis.Terminal = terminalEvent(protocol, value)
 	analysis.StreamEnd = streamEndEvent(protocol, value)
-	analysis.FinishObserved = finishObserved(protocol, value)
-	analysis.AfterTerminalAllowed = afterTerminalAllowed(protocol, value)
-	if protocol == channel.ProtocolOpenAIChat {
-		analysis.ChoiceIndexes, analysis.FinishedChoiceIndexes = chatChoiceProgress(value)
-	}
-	if observation, found := usageObservation(protocol, value); found {
+	observation, usageState := usageObservation(protocol, value)
+	analysis.UsageState = usageState
+	if usageState != UsageAbsent {
 		analysis.Observation = observation
 	}
 	rewritten, err := marshalJSONObjectWithin(value, MaxSSEEventBytes)
@@ -303,64 +320,12 @@ func marshalJSONObjectWithin(value map[string]any, maximum int64) ([]byte, error
 // protocol success object the gateway can settle: billing integrity comes from
 // the extracted four-bucket usage, not from policing response fields. Unknown
 // fields pass through to the client untouched.
-func validateSuccessfulResponse(protocol channel.Protocol, value map[string]any, expectedChoices int) *UpstreamResponseError {
-	if responseErr := responseEnvelopeError(protocol, value); responseErr != nil {
-		return responseErr
-	}
-	invalid := func() *UpstreamResponseError {
-		return &UpstreamResponseError{Code: "invalid_upstream_response", Message: "upstream returned no protocol success object"}
-	}
-	switch protocol {
-	case channel.ProtocolOpenAIChat:
-		choices, ok := value["choices"].([]any)
-		if !ok || expectedChoices <= 0 || len(choices) != expectedChoices || stringField(value, "object") != "chat.completion" ||
-			stringField(value, "id") == "" {
-			return invalid()
-		}
-		indexes := make(map[int64]struct{}, expectedChoices)
-		for _, raw := range choices {
-			choice, _ := raw.(map[string]any)
-			index, indexOK := intField(choice, "index")
-			if !indexOK || index < 0 || index >= int64(expectedChoices) {
-				return invalid()
-			}
-			if _, duplicate := indexes[index]; duplicate {
-				return invalid()
-			}
-			indexes[index] = struct{}{}
-			if _, messageOK := choice["message"].(map[string]any); !messageOK || stringField(choice, "finish_reason") == "" {
-				return invalid()
-			}
-		}
-	case channel.ProtocolOpenAIResponse:
-		if stringField(value, "object") != "response" || stringField(value, "status") != "completed" || stringField(value, "id") == "" {
-			return invalid()
-		}
-		if rawOutput, exists := value["output"]; exists && rawOutput != nil {
-			if _, ok := rawOutput.([]any); !ok {
-				return invalid()
-			}
-		}
-	case channel.ProtocolAnthropic:
-		if _, ok := value["content"].([]any); !ok || stringField(value, "type") != "message" || stringField(value, "role") != "assistant" ||
-			stringField(value, "stop_reason") == "" || stringField(value, "id") == "" {
-			return invalid()
-		}
-	case channel.ProtocolGemini:
-		candidates, ok := value["candidates"].([]any)
-		if !ok || len(candidates) == 0 {
-			return invalid()
-		}
-		for _, raw := range candidates {
-			candidate, _ := raw.(map[string]any)
-			if stringField(candidate, "finishReason") == "" {
-				return invalid()
-			}
-		}
-	default:
-		return invalid()
-	}
-	return nil
+// validateSuccessfulResponse reports explicit upstream failure envelopes only.
+// Response shape is deliberately not validated: an upstream that omits or
+// renames a field this platform does not bill on must not fail an otherwise
+// usable call.
+func validateSuccessfulResponse(protocol channel.Protocol, value map[string]any) *UpstreamResponseError {
+	return responseEnvelopeError(protocol, value)
 }
 
 func responseEnvelopeError(protocol channel.Protocol, value map[string]any) *UpstreamResponseError {
@@ -369,8 +334,9 @@ func responseEnvelopeError(protocol channel.Protocol, value map[string]any) *Ups
 		return &UpstreamResponseError{Code: code, Message: message}
 	}
 	if protocol == channel.ProtocolOpenAIResponse {
-		status := stringField(value, "status")
-		if status == "failed" || status == "incomplete" || status == "cancelled" {
+		// `incomplete` and `cancelled` are valid terminal states that still carry
+		// usage; only `failed` (or an explicit error object above) is a failure.
+		if status := stringField(value, "status"); status == "failed" {
 			code, message := errorDetailsFromValue(value, nestedObject(value, "error"))
 			return &UpstreamResponseError{Code: coalesce(code, "upstream_"+status), Message: message}
 		}
@@ -385,13 +351,22 @@ func streamingResponseError(protocol channel.Protocol, value map[string]any) *Up
 	switch protocol {
 	case channel.ProtocolOpenAIResponse:
 		eventType := stringField(value, "type")
-		if eventType == "error" || eventType == "response.failed" || eventType == "response.incomplete" {
+		// `response.incomplete` is a terminal event, not a failure: it carries the
+		// truncated output and the usage that produced it.
+		if eventType == "error" || eventType == "response.failed" {
 			errorValue := nestedObject(value, "error")
 			if response := nestedObject(value, "response"); len(errorValue) == 0 {
 				errorValue = nestedObject(response, "error")
 			}
 			code, message := errorDetailsFromValue(value, errorValue)
 			return &UpstreamResponseError{Code: coalesce(code, "upstream_stream_error"), Message: message}
+		}
+		// An otherwise normal event can still carry the upstream's failure
+		// envelope inside response; only an explicit failure counts.
+		if response := nestedObject(value, "response"); len(response) > 0 {
+			if responseErr := responseEnvelopeError(protocol, response); responseErr != nil {
+				return responseErr
+			}
 		}
 	case channel.ProtocolAnthropic:
 		if stringField(value, "type") == "error" {
@@ -506,60 +481,92 @@ func rewriteModelMetadata(protocol channel.Protocol, value map[string]any, canon
 	}
 }
 
-func usageObservation(protocol channel.Protocol, value map[string]any) (UsageObservation, bool) {
+// usageObservation extracts the usage snapshot carried by one frame.
+//
+// It reports three states so callers can tell "the upstream sent no usage"
+// (delivery only) from "the upstream sent usage this platform cannot price"
+// (must not be silently replaced by an earlier valid snapshot).
+func usageObservation(protocol channel.Protocol, value map[string]any) (UsageObservation, UsageState) {
 	switch protocol {
 	case channel.ProtocolOpenAIChat:
 		usage, ok := value["usage"].(map[string]any)
 		if !ok {
-			return UsageObservation{}, false
+			return UsageObservation{}, missingUsageState(value, "usage")
 		}
-		return openAIUsage(usage, "prompt_tokens", "completion_tokens", "prompt_tokens_details")
+		return openAIUsageState(usage, "prompt_tokens", "completion_tokens", "prompt_tokens_details")
 	case channel.ProtocolOpenAIResponse:
-		usage, ok := value["usage"].(map[string]any)
-		if !ok {
-			if response, responseOK := value["response"].(map[string]any); responseOK {
-				usage, ok = response["usage"].(map[string]any)
+		container := value
+		if raw, exists := value["usage"]; !exists || raw == nil {
+			response, responseOK := value["response"].(map[string]any)
+			if !responseOK {
+				if rawResponse, exists := value["response"]; exists && rawResponse != nil {
+					return UsageObservation{}, UsageInvalid
+				}
+				return UsageObservation{}, UsageAbsent
 			}
+			container = response
 		}
+		usage, ok := container["usage"].(map[string]any)
 		if !ok {
-			return UsageObservation{}, false
+			return UsageObservation{}, missingUsageState(container, "usage")
 		}
-		return openAIUsage(usage, "input_tokens", "output_tokens", "input_tokens_details")
+		return openAIUsageState(usage, "input_tokens", "output_tokens", "input_tokens_details")
 	case channel.ProtocolAnthropic:
-		usage, ok := value["usage"].(map[string]any)
-		if !ok {
-			if message, messageOK := value["message"].(map[string]any); messageOK {
-				usage, ok = message["usage"].(map[string]any)
+		container := value
+		if raw, exists := value["usage"]; !exists || raw == nil {
+			message, messageOK := value["message"].(map[string]any)
+			if !messageOK {
+				if rawMessage, exists := value["message"]; exists && rawMessage != nil {
+					return UsageObservation{}, UsageInvalid
+				}
+				return UsageObservation{}, UsageAbsent
 			}
+			container = message
 		}
+		usage, ok := container["usage"].(map[string]any)
 		if !ok {
-			return UsageObservation{}, false
+			return UsageObservation{}, missingUsageState(container, "usage")
 		}
 		if !anthropicUsageBillable(usage) {
-			return UsageObservation{}, false
+			return UsageObservation{}, UsageInvalid
 		}
 		observation := UsageObservation{}
-		if input, found := intField(usage, "input_tokens"); found {
-			observation.InputTokens = intPointer(input)
-			cacheWrite, cacheWriteOK := intFieldDefault(usage, "cache_creation_input_tokens", 0)
-			cacheRead, cacheReadOK := intFieldDefault(usage, "cache_read_input_tokens", 0)
-			if !cacheWriteOK || !cacheReadOK {
-				return UsageObservation{}, false
+		// Cache buckets are read unconditionally: a non-zero cache count without
+		// input_tokens is a shape the formula cannot express.
+		cacheWrite, cacheWriteOK := intFieldDefault(usage, "cache_creation_input_tokens", 0)
+		cacheRead, cacheReadOK := intFieldDefault(usage, "cache_read_input_tokens", 0)
+		if !cacheWriteOK || !cacheReadOK {
+			return UsageObservation{}, UsageInvalid
+		}
+		if _, exists := usage["input_tokens"]; exists {
+			input, inputOK := intField(usage, "input_tokens")
+			if !inputOK {
+				return UsageObservation{}, UsageInvalid
 			}
+			observation.InputTokens = intPointer(input)
 			observation.CacheWriteTokens = intPointer(cacheWrite)
 			observation.CacheReadTokens = intPointer(cacheRead)
+		} else if cacheWrite != 0 || cacheRead != 0 {
+			return UsageObservation{}, UsageInvalid
 		}
-		if output, found := intField(usage, "output_tokens"); found {
+		if _, exists := usage["output_tokens"]; exists {
+			output, outputOK := intField(usage, "output_tokens")
+			if !outputOK {
+				return UsageObservation{}, UsageInvalid
+			}
 			observation.OutputTokens = intPointer(output)
 		}
-		return observation, observation.InputTokens != nil || observation.OutputTokens != nil
+		if observation.InputTokens == nil && observation.OutputTokens == nil {
+			return UsageObservation{}, UsageAbsent
+		}
+		return observation, UsageValid
 	case channel.ProtocolGemini:
 		usage, ok := value["usageMetadata"].(map[string]any)
 		if !ok {
-			return UsageObservation{}, false
+			return UsageObservation{}, missingUsageState(value, "usageMetadata")
 		}
 		if !geminiUsageBillable(usage) {
-			return UsageObservation{}, false
+			return UsageObservation{}, UsageInvalid
 		}
 		prompt, promptOK := intField(usage, "promptTokenCount")
 		output, outputOK := intFieldDefault(usage, "candidatesTokenCount", 0)
@@ -568,16 +575,16 @@ func usageObservation(protocol channel.Protocol, value map[string]any) (UsageObs
 		cached, cachedOK := intFieldDefault(usage, "cachedContentTokenCount", 0)
 		if !promptOK || !outputOK || !thoughtsOK || !toolUseOK || !cachedOK || prompt < cached ||
 			output > math.MaxInt64-thoughts || prompt-cached > math.MaxInt64-toolUse {
-			return UsageObservation{}, false
+			return UsageObservation{}, UsageInvalid
 		}
 		unpartitionedTotal, totalOK := addNonnegativeTokens(prompt, output, toolUse, thoughts)
 		if !totalOK {
-			return UsageObservation{}, false
+			return UsageObservation{}, UsageInvalid
 		}
 		if _, exists := usage["totalTokenCount"]; exists {
 			total, valid := intField(usage, "totalTokenCount")
 			if !valid || total != unpartitionedTotal {
-				return UsageObservation{}, false
+				return UsageObservation{}, UsageInvalid
 			}
 		}
 		output += thoughts
@@ -585,10 +592,30 @@ func usageObservation(protocol channel.Protocol, value map[string]any) (UsageObs
 		input := prompt - cached + toolUse
 		return UsageObservation{
 			InputTokens: &input, OutputTokens: &output, CacheWriteTokens: &zero, CacheReadTokens: &cached,
-		}, true
+		}, UsageValid
 	default:
-		return UsageObservation{}, false
+		return UsageObservation{}, UsageAbsent
 	}
+}
+
+// missingUsageState reports UsageAbsent when the key is missing or explicitly
+// null, and UsageInvalid when it is present with the wrong type.
+func missingUsageState(container map[string]any, key string) UsageState {
+	raw, exists := container[key]
+	if !exists || raw == nil {
+		return UsageAbsent
+	}
+	return UsageInvalid
+}
+
+// openAIUsageState maps openAIUsage's "the usage object exists but cannot be
+// priced" result onto UsageInvalid.
+func openAIUsageState(usage map[string]any, inputKey, outputKey, detailKey string) (UsageObservation, UsageState) {
+	observation, ok := openAIUsage(usage, inputKey, outputKey, detailKey)
+	if !ok {
+		return UsageObservation{}, UsageInvalid
+	}
+	return observation, UsageValid
 }
 
 func addNonnegativeTokens(values ...int64) (int64, bool) {
@@ -772,24 +799,6 @@ func zeroOptionalTokenField(value map[string]any, key string) bool {
 }
 
 func streamingCredentialFragments(protocol channel.Protocol, value map[string]any) ([]SSECredentialFragment, error) {
-	if protocol == channel.ProtocolOpenAIChat {
-		choices, _ := value["choices"].([]any)
-		for _, rawChoice := range choices {
-			choice, _ := rawChoice.(map[string]any)
-			delta := nestedObject(choice, "delta")
-			calls, _ := delta["tool_calls"].([]any)
-			for position, rawCall := range calls {
-				call, _ := rawCall.(map[string]any)
-				callIndex, ok := intField(call, "index")
-				if !ok {
-					callIndex = int64(position)
-				}
-				if callIndex < 0 || callIndex > MaxChatToolCallIndex {
-					return nil, ErrResponseTooBig
-				}
-			}
-		}
-	}
 	fragments := make([]SSECredentialFragment, 0, min(MaxSSECredentialStreams, 32))
 	if err := appendJSONCredentialFragments(&fragments, string(protocol), value); err != nil {
 		return nil, err
@@ -973,7 +982,8 @@ func terminalEvent(protocol channel.Protocol, value map[string]any) bool {
 		// bounded terminal wind-down at the usage frame and ends at [DONE].
 		return hasUsage && len(choices) == 0
 	case channel.ProtocolOpenAIResponse:
-		return stringField(value, "type") == "response.completed"
+		eventType := stringField(value, "type")
+		return eventType == "response.completed" || eventType == "response.incomplete"
 	case channel.ProtocolAnthropic:
 		eventType := stringField(value, "type")
 		if eventType == "message_stop" {
@@ -1006,11 +1016,10 @@ func finishObserved(protocol channel.Protocol, value map[string]any) bool {
 			}
 		}
 	case channel.ProtocolOpenAIResponse:
-		if stringField(value, "type") != "response.completed" {
-			return false
-		}
-		response := nestedObject(value, "response")
-		return stringField(response, "status") == "completed" && responseEnvelopeError(protocol, response) == nil
+		// The event type itself is the end-of-stream signal; the inner response
+		// status is not required to be present.
+		eventType := stringField(value, "type")
+		return eventType == "response.completed" || eventType == "response.incomplete"
 	case channel.ProtocolAnthropic:
 		return stringField(value, "type") == "message_delta" && stringField(nestedObject(value, "delta"), "stop_reason") != ""
 	case channel.ProtocolGemini:
@@ -1027,26 +1036,6 @@ func finishObserved(protocol channel.Protocol, value map[string]any) bool {
 		return true
 	}
 	return false
-}
-
-func chatChoiceProgress(value map[string]any) (observed, finished []int) {
-	choices, _ := value["choices"].([]any)
-	for position, raw := range choices {
-		choice, _ := raw.(map[string]any)
-		index, ok := intField(choice, "index")
-		if !ok {
-			index = int64(position)
-		}
-		observed = append(observed, int(index))
-		if stringField(choice, "finish_reason") != "" {
-			finished = append(finished, int(index))
-		}
-	}
-	return observed, finished
-}
-
-func afterTerminalAllowed(protocol channel.Protocol, value map[string]any) bool {
-	return protocol == channel.ProtocolAnthropic && stringField(value, "type") == "ping"
 }
 
 func streamEndEvent(protocol channel.Protocol, value map[string]any) bool {
@@ -1074,20 +1063,22 @@ func splitSSEData(frame []byte) (data []byte, eventName string, ok bool, err err
 			part := bytes.TrimSpace(bytes.TrimPrefix(trimmed, []byte("data:")))
 			dataParts = append(dataParts, part)
 		case bytes.HasPrefix(trimmed, []byte("event:")):
-			if eventName != "" {
-				return nil, "", false, ErrInvalidInput
+			// The SSE specification lets the last event field win, and an empty
+			// event field resets the event type.
+			name := strings.TrimSpace(string(bytes.TrimPrefix(trimmed, []byte("event:"))))
+			if strings.ContainsAny(name, "\r\n") {
+				continue
 			}
-			eventName = strings.TrimSpace(string(bytes.TrimPrefix(trimmed, []byte("event:"))))
-			if eventName == "" || strings.ContainsAny(eventName, "\r\n") {
-				return nil, "", false, ErrInvalidInput
-			}
+			eventName = name
 		case bytes.HasPrefix(trimmed, []byte("id:")), bytes.HasPrefix(trimmed, []byte("retry:")):
 			// Transport metadata and comments are deliberately not forwarded. They
 			// are not part of the protocol billing contract and otherwise create a
 			// second unstructured credential-echo channel.
 			continue
 		default:
-			return nil, "", false, ErrInvalidInput
+			// Unknown SSE fields are ignored per the specification instead of
+			// failing the whole stream.
+			continue
 		}
 	}
 	if len(dataParts) == 0 {
