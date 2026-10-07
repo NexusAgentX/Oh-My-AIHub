@@ -14,6 +14,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/feeratepg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/identitypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/opspg"
 )
 
 // Each domain package names its implementation Store; the aliases give the
@@ -24,6 +25,7 @@ type (
 	feeRateStore  = feeratepg.Store
 	channelStore  = channelpg.Store
 	ledgerStore   = ledgerpg.Store
+	opsStore      = opspg.Store
 )
 
 // Store is the composition root of persistence. Domains migrated to sqlc live
@@ -37,6 +39,7 @@ type Store struct {
 	*feeRateStore
 	*channelStore
 	*ledgerStore
+	*opsStore
 
 	pool *pgxpool.Pool
 	// gatewayCommitHook is a deterministic test seam for the PostgreSQL
@@ -47,12 +50,14 @@ type Store struct {
 }
 
 func New(pool *pgxpool.Pool) *Store {
+	ledgerStore := ledgerpg.NewStore(pool)
 	return &Store{
 		identityStore: identitypg.NewStore(pool),
 		catalogStore:  catalogpg.NewStore(pool),
 		feeRateStore:  feeratepg.NewStore(pool),
 		channelStore:  channelpg.NewStore(pool),
-		ledgerStore:   ledgerpg.NewStore(pool),
+		ledgerStore:   ledgerStore,
+		opsStore:      opspg.NewStore(pool, ledgerStore),
 		pool:          pool,
 	}
 }
