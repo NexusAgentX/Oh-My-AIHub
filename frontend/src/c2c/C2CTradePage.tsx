@@ -87,6 +87,7 @@ export function C2CTradePage() {
                   <header><h3>{c2cPaymentLabels[trade.payment_method.type]}</h3></header>
                   {trade.payment_method.contact && <div><span>账号或联系方式</span><strong>{trade.payment_method.contact}</strong></div>}
                   {trade.payment_method.instructions && <div><span>备注</span><strong>{trade.payment_method.instructions}</strong></div>}
+                  {trade.payment_method.qr_available && <img alt="收款码" src={trade.payment_method.qr_url} />}
                 </section>
               )}
 

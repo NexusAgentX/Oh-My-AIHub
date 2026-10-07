@@ -1462,6 +1462,7 @@ h2 {
 .c2c-payment-editor-list { display: grid; gap: 12px; padding: 14px; background: var(--soft); }
 .c2c-payment-editor { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--canvas); }
 .c2c-payment-editor > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.c2c-file-input { height: auto; min-height: 44px; padding: 8px 10px; }
 .c2c-editor-actions { position: sticky; z-index: 10; bottom: 0; display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--canvas); box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 10%, transparent); }
 .c2c-editor-actions > span { color: #6c3d12; font-size: 13px; font-weight: 600; }
 .c2c-editor-actions > div { display: flex; gap: 8px; }
@@ -1483,6 +1484,7 @@ h2 {
 .c2c-payment-choice-active { border-color: var(--ink); box-shadow: inset 3px 0 var(--ink); }
 .c2c-payment-choice > span { display: grid; gap: 4px; }
 .c2c-payment-choice small { color: var(--muted); font-size: 12px; }
+.c2c-payment-choice img { width: 64px; height: 64px; object-fit: contain; border: 1px solid var(--hairline); border-radius: 6px; }
 .c2c-summary-actions { display: flex; gap: 8px; padding: 18px 20px; border-top: 1px solid var(--hairline); }
 .c2c-summary-actions .button { flex: 1; }
 
@@ -1500,6 +1502,7 @@ h2 {
 .c2c-reference span { color: var(--muted); font-size: 12px; }
 .c2c-payment-details strong,
 .c2c-reference strong { overflow-wrap: anywhere; }
+.c2c-payment-details img { width: min(220px, 100%); aspect-ratio: 1; object-fit: contain; border: 1px solid var(--hairline); border-radius: 8px; background: var(--canvas); }
 .c2c-paid-form { display: grid; gap: 16px; padding: 20px; border-top: 1px solid var(--hairline); }
 .c2c-release-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 20px; border-top: 1px solid var(--hairline); }
 .c2c-action-wait { display: grid; gap: 4px; padding: 18px 20px; border-top: 1px solid var(--hairline); background: var(--soft); }
@@ -1744,6 +1747,7 @@ h2 {
   .c2c-heading-actions { grid-template-columns: 1fr; }
   .c2c-heading-actions .button:last-child { grid-column: auto; }
   .c2c-payment-choice { grid-template-columns: 1fr; }
+  .c2c-payment-choice img { width: 100%; height: auto; aspect-ratio: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

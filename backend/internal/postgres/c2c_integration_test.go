@@ -99,6 +99,10 @@ func TestC2CIntegration(t *testing.T) {
 	var releasedTradeID, returnedTradeID string
 
 	t.Run("sell parent hold, partial fills, idempotency, cancellation and privacy", func(t *testing.T) {
+		forged := c2c.SanitizedImage{MIME: "image/png", Bytes: []byte("not really a PNG"), Width: 1, Height: 1}
+		if _, err := service.CreateOrder(ctx, seller, "forged-image", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, QR: &forged}}); !errors.Is(err, c2c.ErrInvalidInput) {
+			t.Fatalf("forged pre-sanitized image error = %v", err)
+		}
 		order, err := service.CreateOrder(ctx, seller, "sell-create", c2c.SideSell, 100, mustAmount(t, "10"), mustAmount(t, "2"), mustAmount(t, "6"), method)
 		if err != nil {
 			t.Fatalf("create sell: %v", err)
@@ -998,12 +1002,13 @@ func TestC2CIntegration(t *testing.T) {
 		FROM c2c_dispute_statements WHERE trade_id = $1 ORDER BY created_at, id LIMIT 1`, returnedTradeID).Scan(&statementCiphertext, &statementDeleted); err != nil || len(statementCiphertext) != 0 || statementDeleted == nil {
 		t.Fatalf("statement retention cleanup = bytes %d deleted %v, %v", len(statementCiphertext), statementDeleted, err)
 	}
-	var evidenceTable, qrColumn *string
+	var evidenceTable *string
+	var qrColumn bool
 	if err := pool.QueryRow(ctx, `
 		SELECT to_regclass('c2c_evidence')::text,
-		       (SELECT column_name FROM information_schema.columns WHERE table_name = 'c2c_payment_methods' AND column_name = 'qr_available')`,
-	).Scan(&evidenceTable, &qrColumn); err != nil || evidenceTable != nil || qrColumn != nil {
-		t.Fatalf("legacy C2C image schema remains: table %v column %v, %v", evidenceTable, qrColumn, err)
+		       EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('c2c_payment_methods') AND attname = 'qr_available' AND NOT attisdropped)`,
+	).Scan(&evidenceTable, &qrColumn); err != nil || evidenceTable != nil || !qrColumn {
+		t.Fatalf("expected evidence table dropped and qr_available kept: table %v column %v, %v", evidenceTable, qrColumn, err)
 	}
 }
 

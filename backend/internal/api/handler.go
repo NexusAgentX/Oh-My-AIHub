@@ -147,6 +147,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/c2c/market", application.requireReadyAccount(http.HandlerFunc(application.c2cMarket)))
 	mux.Handle("POST /api/c2c/orders", application.requireReadyAccount(http.HandlerFunc(application.c2cCreateOrder)))
 	mux.Handle("GET /api/c2c/orders/{orderID}", application.requireReadyAccount(http.HandlerFunc(application.c2cOrder)))
+	mux.Handle("GET /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr", application.requireReadyAccount(http.HandlerFunc(application.c2cPaymentQR)))
 	mux.Handle("POST /api/c2c/orders/{orderID}/take", application.requireReadyAccount(http.HandlerFunc(application.c2cTakeOrder)))
 	mux.Handle("POST /api/c2c/orders/{orderID}/cancel", application.requireReadyAccount(http.HandlerFunc(application.c2cCancelOrder)))
 	mux.Handle("GET /api/c2c/me", application.requireReadyAccount(http.HandlerFunc(application.c2cMyActivity)))

@@ -124,7 +124,7 @@ func loadC2COrder(ctx context.Context, queryer c2cQueryer, orderID string, lock 
 
 func loadC2CPaymentMethods(ctx context.Context, queryer c2cQueryer, orderID string) ([]c2c.PaymentMethod, error) {
 	rows, err := queryer.Query(ctx, `
-		SELECT id::text, order_id::text, method_type, position,
+		SELECT id::text, order_id::text, method_type, position, qr_available,
 		       key_id, nonce, ciphertext, created_at
 		FROM c2c_payment_methods WHERE order_id = $1 ORDER BY position`, orderID)
 	if err != nil {
@@ -136,7 +136,7 @@ func loadC2CPaymentMethods(ctx context.Context, queryer c2cQueryer, orderID stri
 		var method c2c.PaymentMethod
 		var methodType string
 		if err := rows.Scan(
-			&method.ID, &method.OrderID, &methodType, &method.Position,
+			&method.ID, &method.OrderID, &methodType, &method.Position, &method.QRAvailable,
 			&method.Private.KeyID, &method.Private.Nonce, &method.Private.Ciphertext, &method.CreatedAt,
 		); err != nil {
 			return nil, mapC2CError(err)
@@ -183,12 +183,12 @@ func loadSelectedC2CPaymentMethod(ctx context.Context, queryer c2cQueryer, trade
 	var method c2c.PaymentMethod
 	var methodType string
 	err := queryer.QueryRow(ctx, `
-		SELECT pm.id::text, pm.order_id::text, pm.method_type, pm.position,
+		SELECT pm.id::text, pm.order_id::text, pm.method_type, pm.position, pm.qr_available,
 		       pm.key_id, pm.nonce, pm.ciphertext, pm.created_at
 		FROM c2c_trades t
 		JOIN c2c_payment_methods pm ON pm.id = t.selected_payment_method_id
 		WHERE t.id = $1`, tradeID).Scan(
-		&method.ID, &method.OrderID, &methodType, &method.Position,
+		&method.ID, &method.OrderID, &methodType, &method.Position, &method.QRAvailable,
 		&method.Private.KeyID, &method.Private.Nonce, &method.Private.Ciphertext, &method.CreatedAt,
 	)
 	method.Type = c2c.PaymentMethodType(methodType)
@@ -713,10 +713,10 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 		for _, method := range input.PaymentMethods {
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO c2c_payment_methods (
-					id, order_id, method_type, position,
+					id, order_id, method_type, position, qr_available,
 					key_id, nonce, ciphertext, created_at
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-				method.ID, input.ID, method.Type, method.Position,
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				method.ID, input.ID, method.Type, method.Position, method.QRAvailable,
 				method.Private.KeyID, method.Private.Nonce, method.Private.Ciphertext, command.Now); err != nil {
 				return mapC2CError(err)
 			}

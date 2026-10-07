@@ -1,16 +1,25 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
+const c2cMultipartLimit = 32 << 20
+
 type c2cPaymentMethodRequest struct {
 	Type         c2c.PaymentMethodType `json:"type"`
 	Contact      string                `json:"contact"`
 	Instructions string                `json:"instructions"`
+	QRField      string                `json:"qr_field"`
 }
 
 type c2cCreateOrderRequest struct {
@@ -51,9 +60,13 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) c2cCreateOrder(w http.ResponseWriter, r *http.Request) {
 	var request c2cCreateOrderRequest
-	if err := decodeJSON(w, r, &request); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
+	form, err := decodeC2CRequest(w, r, &request)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "请求格式无效")
 		return
+	}
+	if form != nil {
+		defer form.RemoveAll() //nolint:errcheck
 	}
 	total, err := money.Parse(request.Total)
 	if err != nil {
@@ -73,6 +86,18 @@ func (a *app) c2cCreateOrder(w http.ResponseWriter, r *http.Request) {
 	methods := make([]c2c.PaymentMethodInput, 0, len(request.PaymentMethods))
 	for _, item := range request.PaymentMethods {
 		method := c2c.PaymentMethodInput{Type: item.Type, Contact: item.Contact, Instructions: item.Instructions}
+		if item.QRField != "" {
+			if form == nil {
+				writeDomainError(w, c2c.ErrInvalidInput)
+				return
+			}
+			image, err := c2cMultipartImage(form, item.QRField)
+			if err != nil {
+				writeDomainError(w, err)
+				return
+			}
+			method.QR = &image
+		}
 		methods = append(methods, method)
 	}
 	created, err := a.c2c.CreateOrder(
@@ -93,6 +118,20 @@ func (a *app) c2cOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"order": c2cOrderResponse(order)})
+}
+
+func (a *app) c2cPaymentQR(w http.ResponseWriter, r *http.Request) {
+	image, err := a.c2c.PaymentQR(
+		r.Context(), accountFromContext(r.Context()), r.PathValue("orderID"), r.PathValue("methodID"),
+	)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", image.MIME)
+	w.Header().Set("Content-Disposition", `inline; filename="payment-qr"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(image.Bytes)
 }
 
 func (a *app) c2cTakeOrder(w http.ResponseWriter, r *http.Request) {
@@ -274,12 +313,55 @@ func (a *app) adminC2CResolve(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"trade": c2cAdminTradeResponse(trade)})
 }
 
+func decodeC2CRequest(w http.ResponseWriter, r *http.Request, target any) (*multipart.Form, error) {
+	if !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/form-data") {
+		return nil, decodeJSON(w, r, target)
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, c2cMultipartLimit)
+	if err := r.ParseMultipartForm(c2cMultipartLimit); err != nil {
+		return nil, err
+	}
+	payload := r.FormValue("payload")
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if payload == "" || decoder.Decode(target) != nil {
+		return r.MultipartForm, errors.New("invalid multipart payload")
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return r.MultipartForm, errors.New("multipart payload has trailing content")
+	}
+	return r.MultipartForm, nil
+}
+
+func c2cMultipartImage(form *multipart.Form, field string) (c2c.SanitizedImage, error) {
+	files := form.File[field]
+	if len(files) != 1 {
+		return c2c.SanitizedImage{}, c2c.ErrInvalidInput
+	}
+	return c2cSanitizeFile(files[0])
+}
+
+func c2cSanitizeFile(header *multipart.FileHeader) (c2c.SanitizedImage, error) {
+	if header == nil || header.Size < 1 || header.Size > c2c.MaximumImageBytes {
+		return c2c.SanitizedImage{}, c2c.ErrInvalidInput
+	}
+	file, err := header.Open()
+	if err != nil {
+		return c2c.SanitizedImage{}, c2c.ErrInvalidInput
+	}
+	defer file.Close() //nolint:errcheck
+	return c2c.SanitizeImage(file)
+}
+
 func c2cOrderResponse(order c2c.Order) map[string]any {
 	methods := make([]map[string]any, 0, len(order.PaymentMethods))
 	for _, method := range order.PaymentMethods {
 		methods = append(methods, map[string]any{
 			"id": method.ID, "type": method.Type, "position": method.Position,
 			"contact": method.Contact, "instructions": method.Instructions,
+			"qr_available": method.QRAvailable,
+			"qr_url":       fmt.Sprintf("/api/c2c/orders/%s/payment-methods/%s/qr", order.ID, method.ID),
 		})
 	}
 	return map[string]any{
@@ -320,6 +402,8 @@ func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 			"id": trade.SelectedPaymentMethod.ID, "type": trade.SelectedPaymentMethod.Type,
 			"contact":      trade.SelectedPaymentMethod.Contact,
 			"instructions": trade.SelectedPaymentMethod.Instructions,
+			"qr_available": trade.SelectedPaymentMethod.QRAvailable,
+			"qr_url":       fmt.Sprintf("/api/c2c/orders/%s/payment-methods/%s/qr", trade.OrderID, trade.SelectedPaymentMethod.ID),
 		}
 	}
 	statements := make([]map[string]any, 0, len(trade.Statements))

@@ -490,6 +490,8 @@ export type C2CPaymentMethod = {
   position: number
   contact: string
   instructions: string
+  qr_available: boolean
+  qr_url: string
 }
 
 export type C2COrder = {

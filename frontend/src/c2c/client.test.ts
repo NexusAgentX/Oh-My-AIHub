@@ -4,23 +4,27 @@ import { api } from '../api/client'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('C2C client contracts', () => {
-  it('sends JSON orders with an idempotency key and no file fields', async () => {
+  it('uses multipart boundaries from the browser and carries idempotency for image orders', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ order: {} }), {
       status: 201, headers: { 'Content-Type': 'application/json' },
     }))
     vi.stubGlobal('fetch', fetchMock)
+    const image = new File([new Uint8Array([1, 2, 3])], 'qr.png', { type: 'image/png' })
 
     await api.createC2COrder({
       side: 'sell', unit_price_fen: 100, total: '10', minimum: '1', maximum: '10',
-      payment_methods: [{ type: 'wechat', contact: 'wx', instructions: '' }],
+      payment_methods: [{ type: 'wechat', contact: '', instructions: '', qr: image }],
     })
 
     const [path, init] = fetchMock.mock.calls[0]
     const headers = new Headers(init?.headers)
     expect(path).toBe('/api/c2c/orders')
-    expect(headers.get('Content-Type')).toBe('application/json')
+    expect(init?.body).toBeInstanceOf(FormData)
+    expect(headers.has('Content-Type')).toBe(false)
     expect(headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
-    expect(JSON.parse(String(init?.body)).payment_methods).toEqual([{ type: 'wechat', contact: 'wx', instructions: '' }])
+    const form = init?.body as FormData
+    expect(JSON.parse(String(form.get('payload'))).payment_methods[0].qr_field).toBe('payment_qr_0')
+    expect(form.get('payment_qr_0')).toBe(image)
   })
 
   it('sends JSON take commands with an idempotency key', async () => {

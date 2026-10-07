@@ -1,6 +1,7 @@
 package c2c
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -79,6 +80,41 @@ func (s *Service) Order(ctx context.Context, actor identity.Account, orderID str
 	return order, nil
 }
 
+func (s *Service) PaymentQR(ctx context.Context, actor identity.Account, orderID, methodID string) (SanitizedImage, error) {
+	if !readyActor(actor) || strings.TrimSpace(orderID) == "" || strings.TrimSpace(methodID) == "" {
+		return SanitizedImage{}, ErrForbidden
+	}
+	order, err := s.store.Order(ctx, orderID)
+	if err != nil {
+		return SanitizedImage{}, err
+	}
+	allowPrivate := actor.IsAdmin || actor.ID == order.OwnerAccountID || (order.Status == OrderOpen && order.Available > 0)
+	if !allowPrivate {
+		allowPrivate, err = s.store.OrderParticipant(ctx, order.ID, actor.ID)
+		if err != nil {
+			return SanitizedImage{}, err
+		}
+	}
+	if !allowPrivate {
+		return SanitizedImage{}, ErrNotFound
+	}
+	for _, method := range order.PaymentMethods {
+		if method.ID != methodID {
+			continue
+		}
+		plaintext, err := s.keyring.Decrypt(method.ID, "payment_method", method.Private)
+		if err != nil {
+			return SanitizedImage{}, err
+		}
+		var private PaymentPrivate
+		if err := json.Unmarshal(plaintext, &private); err != nil || len(private.QRBytes) == 0 || (private.QRMIME != "image/jpeg" && private.QRMIME != "image/png") {
+			return SanitizedImage{}, ErrNotFound
+		}
+		return SanitizedImage{MIME: private.QRMIME, Bytes: private.QRBytes, SHA256: sha256.Sum256(private.QRBytes)}, nil
+	}
+	return SanitizedImage{}, ErrNotFound
+}
+
 func (s *Service) Trade(ctx context.Context, actor identity.Account, tradeID string) (Trade, error) {
 	if !readyActor(actor) || strings.TrimSpace(tradeID) == "" {
 		return Trade{}, ErrForbidden
@@ -143,7 +179,14 @@ func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key s
 	for index, method := range methods {
 		method.Contact = strings.TrimSpace(method.Contact)
 		method.Instructions = strings.TrimSpace(method.Instructions)
-		if !validPaymentType(method.Type) || len(method.Contact) > 256 || len(method.Instructions) > 1_000 || (method.Contact == "" && method.Instructions == "") || (side == SideBuy && method.Contact == "") {
+		if method.QR != nil {
+			clean, err := normalizeImage(method.QR)
+			if err != nil {
+				return Order{}, err
+			}
+			method.QR = &clean
+		}
+		if !validPaymentType(method.Type) || len(method.Contact) > 256 || len(method.Instructions) > 1_000 || (method.Contact == "" && method.Instructions == "" && method.QR == nil) || (side == SideBuy && method.Contact == "") {
 			return Order{}, ErrInvalidInput
 		}
 		normalized[index] = method
@@ -164,6 +207,9 @@ func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key s
 			return Order{}, err
 		}
 		private := PaymentPrivate{Contact: method.Contact, Instructions: method.Instructions}
+		if method.QR != nil {
+			private.QRMIME, private.QRBytes = method.QR.MIME, append([]byte(nil), method.QR.Bytes...)
+		}
 		encoded, err := json.Marshal(private)
 		if err != nil {
 			return Order{}, err
@@ -174,7 +220,7 @@ func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key s
 		}
 		createdMethods = append(createdMethods, PaymentMethod{
 			ID: methodID, OrderID: orderID, Type: method.Type, Position: index + 1,
-			Private: encrypted,
+			Private: encrypted, QRAvailable: method.QR != nil,
 		})
 	}
 	return s.store.CreateOrder(ctx, command, NewOrder{
@@ -384,9 +430,24 @@ func (s *Service) decryptPaymentMethods(order *Order) error {
 		}
 		method.Contact = private.Contact
 		method.Instructions = private.Instructions
+		method.QRAvailable = len(private.QRBytes) > 0
 		method.Private = EncryptedValue{}
 	}
 	return nil
+}
+
+func normalizeImage(image *SanitizedImage) (SanitizedImage, error) {
+	if image == nil || len(image.Bytes) == 0 {
+		return SanitizedImage{}, ErrInvalidInput
+	}
+	return SanitizeImage(bytes.NewReader(image.Bytes))
+}
+
+func imageHash(image *SanitizedImage) string {
+	if image == nil {
+		return ""
+	}
+	return hex.EncodeToString(image.SHA256[:])
 }
 
 func newID() (string, error) {
@@ -415,11 +476,11 @@ func validPaymentType(value PaymentMethodType) bool {
 
 func orderPayloadForHash(side Side, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) any {
 	type methodHash struct {
-		Type, Contact, Instructions string
+		Type, Contact, Instructions, QRHash string
 	}
 	items := make([]methodHash, len(methods))
 	for index, method := range methods {
-		items[index] = methodHash{string(method.Type), method.Contact, method.Instructions}
+		items[index] = methodHash{string(method.Type), method.Contact, method.Instructions, imageHash(method.QR)}
 	}
 	return struct {
 		Side                    Side

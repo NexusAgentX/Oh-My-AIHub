@@ -6,7 +6,7 @@
 
 ### 新增
 
-- 删除 C2C 付款截图能力（Feature #111，Epic #109）：买家声明付款与双方争议陈述只保留文字。移除付款截图、争议证据图片与卖家收款码的上传、JPEG/PNG 净化、加密存储和下载代码；删除 `GET /api/c2c/orders/{orderID}/payment-methods/{methodID}/qr` 与 `GET /api/c2c/evidence/{evidenceID}`，`POST /api/c2c/trades/{tradeID}/evidence` 改名为 `/statements`，C2C 写接口不再接受 multipart，订单与交易响应不再含 `qr_*` 与 `evidence`。迁移 `0008` 删除 `c2c_evidence` 表及其触发器、`c2c_payment_methods.qr_available` 列；终态 180 天私密清理继续销毁付款参考与争议陈述。`C2C_PRIVATE_DATA_*` 密钥环仍保护收款资料与陈述，部署配置无需更改；既有收款方式密文内若含历史收款码字节，不会再被读取或提供。
+- 删除 C2C 付款截图与争议证据图片（Feature #111，Epic #109）：买家声明付款与双方争议陈述只保留文字，卖家收款方式的收款码保持不变。删除付款截图和争议图片的上传、加密存储与下载；删除 `GET /api/c2c/evidence/{evidenceID}`，`POST /api/c2c/trades/{tradeID}/evidence` 改名为 `/statements`，`/paid` 与争议接口只接受 JSON，交易响应不再含 `evidence`。迁移 `0008` 删除 `c2c_evidence` 表及其触发器与函数；终态 180 天私密清理继续销毁付款参考与争议陈述。`C2C_PRIVATE_DATA_*` 密钥环仍保护收款资料与陈述，部署配置无需更改。
 
 - 管理员配置全局 API 手续费率（Feature #97）：运营总览新增手续费率面板，可查看当前费率与历史版本并设置新费率（0%～100%，最多 7 位百分比小数，即九位定点比率）；新增 `GET/PUT /api/admin/fee-rate`，每次修改追加不可变版本、按期望版本乐观并发并写入带原因与前后值的审计。新费率只影响之后的新调用，历史调用保留原快照。
 - C2C 争议裁决支持限制当事方账户（Feature #98）：管理员在争议详情页可带原因并二次确认后冻结买方或卖方信用（`POST /api/admin/c2c/trades/{tradeID}/resolve` 新增 `restrict_buyer` / `restrict_seller` 动作）。冻结复用账户信用冻结，交易状态和积分持有保持不变，可与延长核实并用；操作写入交易事件与审计，已冻结时幂等成功。信用冻结账户现在也不能发布 C2C 买单或接取卖单。管理员交易响应新增 `buyer_credit_frozen` / `seller_credit_frozen`。

@@ -75,11 +75,13 @@ var (
 )
 
 const (
-	PaymentWindow    = 15 * time.Minute
-	ReviewExtension  = 24 * time.Hour
-	PrivateRetention = 180 * 24 * time.Hour
-	MaximumMethods   = 5
-	MaximumStatement = 2_000
+	PaymentWindow      = 15 * time.Minute
+	ReviewExtension    = 24 * time.Hour
+	PrivateRetention   = 180 * 24 * time.Hour
+	MaximumImageBytes  = 5 << 20
+	MaximumImagePixels = 20_000_000
+	MaximumMethods     = 5
+	MaximumStatement   = 2_000
 )
 
 type EncryptedValue struct {
@@ -88,15 +90,26 @@ type EncryptedValue struct {
 	Ciphertext []byte
 }
 
+type SanitizedImage struct {
+	MIME   string
+	Bytes  []byte
+	SHA256 [32]byte
+	Width  int
+	Height int
+}
+
 type PaymentPrivate struct {
 	Contact      string `json:"contact,omitempty"`
 	Instructions string `json:"instructions,omitempty"`
+	QRMIME       string `json:"qr_mime,omitempty"`
+	QRBytes      []byte `json:"qr_bytes,omitempty"`
 }
 
 type PaymentMethodInput struct {
 	Type         PaymentMethodType
 	Contact      string
 	Instructions string
+	QR           *SanitizedImage
 }
 
 type PaymentMethod struct {
@@ -107,6 +120,7 @@ type PaymentMethod struct {
 	Private      EncryptedValue
 	Contact      string
 	Instructions string
+	QRAvailable  bool
 	CreatedAt    time.Time
 }
 

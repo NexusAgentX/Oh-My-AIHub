@@ -4,11 +4,8 @@ DROP FUNCTION verify_c2c_evidence_limits();
 DROP TRIGGER c2c_evidence_guard ON c2c_evidence;
 DROP FUNCTION guard_c2c_evidence();
 DROP TABLE c2c_evidence;
-ALTER TABLE c2c_payment_methods DROP COLUMN qr_available;
 
 -- +goose Down
-ALTER TABLE c2c_payment_methods ADD COLUMN qr_available boolean NOT NULL DEFAULT false;
-
 CREATE TABLE c2c_evidence (
     id uuid PRIMARY KEY,
     trade_id uuid NOT NULL REFERENCES c2c_trades(id) ON DELETE RESTRICT,
