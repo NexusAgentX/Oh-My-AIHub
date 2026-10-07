@@ -181,7 +181,7 @@ func (s *Service) CreateBootstrapAdmin(ctx context.Context, username, displayNam
 		PasswordHash:       hash,
 		IsAdmin:            true,
 		Status:             StatusActive,
-		// 密码由创始人自设（网页初始化或 CLI 交互输入），无第三方经手，
+		// 密码由创始人自设（网页初始化），无第三方经手，
 		// 不适用受邀账户的首登强制改密规则。
 		MustChangePassword: false,
 		CreditLimit:        0,
