@@ -31,23 +31,20 @@ import { ChannelEditorPage } from './channels/ChannelEditorPage'
 import { ChannelsPage } from './channels/ChannelsPage'
 import { MarketChannelPage } from './channels/MarketChannelPage'
 import { MarketPage } from './channels/MarketPage'
-import { AddOfferToPoolPage } from './gateway/AddOfferToPoolPage'
 import { AdminAccountLedgerPage } from './ledger/AdminAccountLedgerPage'
 import { AdminLedgerPage } from './ledger/AdminLedgerPage'
-import { InsufficientBalancePage } from './wallet/InsufficientBalancePage'
 import { WalletPage } from './wallet/WalletPage'
-import { APIKeyEditorPage } from './gateway/APIKeyEditorPage'
 import { APIKeyPage } from './gateway/APIKeyPage'
 import { APIKeysPage } from './gateway/APIKeysPage'
 import { CallDetailPage } from './gateway/CallDetailPage'
 import { CallsPage } from './gateway/CallsPage'
 import { DashboardPage } from './gateway/DashboardPage'
+import { RedirectAddOffer, RedirectKeySettings, RedirectNewKey } from './gateway/redirects'
 import { C2CActivityPage } from './c2c/C2CActivityPage'
-import { C2CDisputePage } from './c2c/C2CDisputePage'
 import { C2CMarketPage } from './c2c/C2CMarketPage'
 import { C2COrderEditorPage } from './c2c/C2COrderEditorPage'
-import { C2CTakeOrderPage } from './c2c/C2CTakeOrderPage'
 import { C2CTradePage } from './c2c/C2CTradePage'
+import { DisputeRedirect, TakeOrderRedirect } from './c2c/redirects'
 import { AdminC2CDisputePage, AdminC2CDisputesPage } from './c2c/AdminC2CPages'
 
 function RequireSession() {
@@ -125,23 +122,23 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<ProductLayout />}>
           <Route element={<DashboardPage />} path="/dashboard" />
           <Route element={<APIKeysPage />} path="/keys" />
-          <Route element={<APIKeyEditorPage />} path="/keys/new" />
+          <Route element={<RedirectNewKey />} path="/keys/new" />
           <Route element={<APIKeyPage />} path="/keys/:keyID" />
-          <Route element={<APIKeyEditorPage />} path="/keys/:keyID/settings" />
+          <Route element={<RedirectKeySettings />} path="/keys/:keyID/settings" />
           <Route element={<CallsPage />} path="/calls" />
           <Route element={<CallDetailPage />} path="/calls/:callID" />
           <Route element={<AccountSettingsPage />} path="/account" />
           <Route element={<WalletPage />} path="/wallet" />
-          <Route element={<InsufficientBalancePage />} path="/wallet/insufficient" />
+          <Route element={<Navigate replace to="/wallet" />} path="/wallet/insufficient" />
           <Route element={<C2CMarketPage />} path="/c2c" />
           <Route element={<C2COrderEditorPage />} path="/c2c/orders/new" />
-          <Route element={<C2CTakeOrderPage />} path="/c2c/orders/:orderID/take" />
+          <Route element={<TakeOrderRedirect />} path="/c2c/orders/:orderID/take" />
           <Route element={<C2CActivityPage />} path="/c2c/me" />
           <Route element={<C2CTradePage />} path="/c2c/trades/:tradeID" />
-          <Route element={<C2CDisputePage />} path="/c2c/trades/:tradeID/dispute" />
+          <Route element={<DisputeRedirect />} path="/c2c/trades/:tradeID/dispute" />
           <Route element={<MarketPage />} path="/market" />
           <Route element={<MarketChannelPage />} path="/market/channels/:channelID" />
-          <Route element={<AddOfferToPoolPage />} path="/market/channels/:channelID/add" />
+          <Route element={<RedirectAddOffer />} path="/market/channels/:channelID/add" />
           <Route element={<ChannelsPage />} path="/channels" />
           <Route element={<ChannelEditorPage />} path="/channels/new" />
           <Route element={<ChannelDetailPage />} path="/channels/:channelID" />

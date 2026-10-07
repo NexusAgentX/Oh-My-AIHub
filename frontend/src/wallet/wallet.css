@@ -1,30 +1,8 @@
-.ledger-table td:nth-child(4), .ledger-table td:nth-child(5) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ledger-time, .ledger-reference-id { color: var(--muted); font-size: var(--text-xs); }
+.ledger-kind { display: grid; gap: var(--space-1); }
+.ledger-kind small { color: var(--muted); font-size: var(--text-xs); }
+.ledger-reference { display: grid; gap: var(--space-1); }
+.ledger-reference small { color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .amount-positive { color: var(--positive) !important; }
 .amount-negative { color: var(--danger) !important; }
-.ledger-reference { display: block; color: var(--body); font-weight: 600; }
-.wallet-risk { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin: -8px 0 24px; padding: 12px 16px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); font-size: var(--text-base); }
-.wallet-risk-warning { background: var(--warning-soft); }
-.wallet-risk-danger { color: var(--danger-ink); border-color: var(--danger-border); background: var(--danger-soft); }
-.wallet-risk-success { background: var(--positive-soft); }
-.wallet-recovery-section { display: grid; gap: 14px; margin-top: 24px; }
-.recovery-grid { display: grid; gap: 10px; }
-.recovery-card { display: grid; min-height: 76px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 12px 14px; border: 1px solid var(--hairline); border-radius: var(--radius-md); color: var(--body); background: var(--canvas); text-decoration: none; }
-.recovery-card:active { background: var(--soft); }
-.recovery-card > span:nth-child(2) { display: grid; gap: 3px; }
-.recovery-card small { color: var(--muted); font-size: var(--text-xs); }
-.recovery-card-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: var(--radius-sm); background: var(--warning-soft); }
-.insufficient-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.7fr); gap: var(--space-4); }
-.recovery-panel { align-self: start; overflow: hidden; }
-.recovery-panel .recovery-grid { padding: 14px; }
-.upcoming-panel { display: grid; width: min(680px, 100%); margin: clamp(24px, 10vh, 110px) auto 0; justify-items: start; gap: var(--space-4); padding: clamp(28px, 6vw, 48px); }
-.upcoming-panel p { max-width: 48ch; margin: 0; color: var(--muted); line-height: 1.7; }
-
-@media (max-width: 1180px) {
-  .insufficient-layout { grid-template-columns: 1fr; }
-  .recovery-panel { align-self: stretch; }
-}
-
-@media (max-width: 760px) {
-  .wallet-risk { align-items: flex-start; flex-direction: column; }
-}
-
+.wallet-recovery { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }

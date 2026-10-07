@@ -100,3 +100,13 @@ func (a *app) opsTrialSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"trial_summary": summary})
 }
+
+// registerOpsRoutes 注册运营指标与巡检路由。
+func (a *app) registerOpsRoutes(r *router) {
+	r.admin("GET /api/admin/ops/metrics", a.opsMetrics)
+	r.admin("GET /api/admin/ops/providers", a.opsProviderIncome)
+	r.admin("GET /api/admin/ops/anomalies", a.opsAnomalies)
+	r.admin("GET /api/admin/ops/inspections", a.opsListInspections)
+	r.admin("POST /api/admin/ops/inspections", a.opsRunInspection)
+	r.admin("GET /api/admin/ops/trial-summary", a.opsTrialSummary)
+}

@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 )
@@ -53,5 +55,27 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"initialized": true,
 		"account":     accountResponse(result.Account),
+	})
+}
+
+// registerInstanceRoutes 注册实例与健康检查路由。
+func (a *app) registerInstanceRoutes(r *router) {
+	r.public("GET /api/health", a.health)
+	r.public("GET /api/instance", a.instanceState)
+	r.public("POST /api/instance/initialize", a.instanceInitialize)
+}
+
+func (a *app) health(w http.ResponseWriter, r *http.Request) {
+	if a.databaseReady != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
+		if err := a.databaseReady(ctx); err != nil {
+			writeError(w, http.StatusServiceUnavailable, "database_unavailable", "服务暂不可用")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"service": "oh-my-aihub-backend",
+		"status":  "ok",
 	})
 }

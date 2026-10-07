@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Channel, ChannelOffer, ChannelProtocol } from '../api/contracts'
-import { channelGroups, rebaseChannelFields, rebaseGroups } from './ChannelEditorPage'
+import { channelGroups, createInput, rebaseChannelFields, rebaseGroups, validateDraft } from './editorModel'
 
 function offer(
   id: string,
@@ -127,5 +127,52 @@ describe('channel editor conflict rebase', () => {
     ]))
     expect(touched[0]).toMatchObject({ multiplier: '3' })
     expect(touched[0].offers.openai_chat_completions.upstreamModelID).toBe('provider/local')
+  })
+})
+
+describe('validateDraft', () => {
+  const base = () => {
+    const groups = channelGroups(channel([offer('chat', 'openai_chat_completions')]))
+    return { displayName: 'Relay', baseURL: 'https://relay.example.com', credential: 'sk-test', groups }
+  }
+
+  it('accepts a complete draft', () => {
+    expect(validateDraft(base(), false)).toBe('')
+  })
+
+  it('requires a credential only when creating', () => {
+    const draft = { ...base(), credential: '' }
+    expect(validateDraft(draft, false)).toBe('请输入上游 API Key')
+    expect(validateDraft(draft, true)).toBe('')
+  })
+
+  it('requires at least one enabled protocol', () => {
+    const draft = base()
+    draft.groups[0].offers.openai_chat_completions.selected = false
+    expect(validateDraft(draft, false)).toBe('至少启用一个模型协议')
+  })
+
+  it('rejects an invalid multiplier and a missing upstream model id', () => {
+    const draft = base()
+    draft.groups[0].multiplier = '1001'
+    expect(validateDraft(draft, false)).toBe('Model 的倍率无效')
+    draft.groups[0].multiplier = ''
+    expect(validateDraft(draft, false)).toBe('Model 的倍率无效')
+    draft.groups[0].multiplier = '1'
+    draft.groups[0].offers.openai_chat_completions.upstreamModelID = ' '
+    expect(validateDraft(draft, false)).toBe('Model 缺少上游模型 ID')
+  })
+})
+
+describe('createInput', () => {
+  it('sends only selected protocols with trimmed values', () => {
+    const groups = channelGroups(channel([offer('chat', 'openai_chat_completions')]))
+    groups[0].offers.openai_responses.upstreamModelID = 'unused'
+    expect(createInput({ displayName: ' Relay ', baseURL: ' https://relay.example.com ', credential: 'k', groups })).toEqual({
+      display_name: 'Relay',
+      base_url: 'https://relay.example.com',
+      credential: 'k',
+      offers: [{ model_id: 'provider/model', protocol: 'openai_chat_completions', upstream_model_id: 'provider/model', multiplier: '1' }],
+    })
   })
 })

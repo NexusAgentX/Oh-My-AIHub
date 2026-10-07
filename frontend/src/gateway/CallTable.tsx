@@ -1,68 +1,57 @@
-import { Link } from 'react-router-dom'
 import type { GatewayCall } from '../api/contracts'
-import { formatDate, protocolLabels } from '../channels/presentation'
-import { EmptyState } from '../ui'
-import { GatewayStatusBadge, shortID, totalTokens } from './presentation'
+import { DataTable, EmptyState, type Column } from '../ui'
+import {
+  GatewayStatusBadge,
+  formatDate,
+  protocolLabels,
+  shortID,
+  totalTokens,
+} from './presentation'
+
+const columns: Column<GatewayCall>[] = [
+  {
+    key: 'call',
+    header: '调用 / 模型',
+    primary: true,
+    cell: (call) => (
+      <>
+        <strong>{call.model_id || '受限调用视图'}</strong>
+        <small className="mono">{shortID(call.id)}</small>
+      </>
+    ),
+  },
+  { key: 'status', header: '状态', cell: (call) => <GatewayStatusBadge status={call.status} /> },
+  {
+    key: 'protocol',
+    header: 'API 格式',
+    cell: (call) => (call.protocol ? protocolLabels[call.protocol] : '—'),
+  },
+  {
+    key: 'key',
+    header: 'Key',
+    hideOnMobile: true,
+    cell: (call) => <span className="mono">{call.key_prefix ? `${call.key_prefix}…` : '—'}</span>,
+  },
+  { key: 'channel', header: '渠道', cell: (call) => call.final_channel_name || '—' },
+  { key: 'attempts', header: '尝试', numeric: true, hideOnMobile: true, cell: (call) => call.attempt_count },
+  { key: 'tokens', header: 'Tokens', numeric: true, cell: (call) => totalTokens(call) },
+  { key: 'time', header: '时间', cell: (call) => formatDate(call.created_at) },
+]
 
 export function CallTable({ calls }: { calls: GatewayCall[] }) {
-  if (calls.length === 0) {
-    return <EmptyState title="暂无调用记录" description="创建 API Key 并发起调用后，记录会出现在这里。" />
-  }
   return (
-    <>
-      <div className="desktop-table-wrap">
-        <table className="data-table gateway-call-table">
-          <thead>
-            <tr>
-              <th scope="col">调用 / 模型</th>
-              <th scope="col">状态</th>
-              <th scope="col">API 格式</th>
-              <th scope="col">Key</th>
-              <th scope="col">渠道</th>
-              <th scope="col">尝试</th>
-              <th scope="col">Tokens</th>
-              <th scope="col">时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            {calls.map((call) => (
-              <tr key={call.id}>
-                <td>
-                  <Link className="table-row-link" to={`/calls/${call.id}`}>
-                    <strong>{call.model_id || '受限调用视图'}</strong>
-                    <small className="mono-value">{shortID(call.id)}</small>
-                    <span className="visually-hidden">调用详情</span>
-                  </Link>
-                </td>
-                <td><GatewayStatusBadge status={call.status} /></td>
-                <td>{call.protocol ? protocolLabels[call.protocol] : '—'}</td>
-                <td className="mono-value">{call.key_prefix ? `${call.key_prefix}…` : '—'}</td>
-                <td>{call.final_channel_name || '—'}</td>
-                <td>{call.attempt_count}</td>
-                <td>{totalTokens(call)}</td>
-                <td>{formatDate(call.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mobile-card-list">
-        {calls.map((call) => (
-          <Link className="mobile-data-card mobile-data-card-link" key={call.id} to={`/calls/${call.id}`}>
-            <header>
-              <div><strong>{call.model_id || '受限调用视图'}</strong><span className="mono-value">{shortID(call.id)}</span></div>
-              <GatewayStatusBadge status={call.status} />
-            </header>
-            <dl>
-              <div><dt>API 格式</dt><dd>{call.protocol ? protocolLabels[call.protocol] : '—'}</dd></div>
-              <div><dt>渠道</dt><dd>{call.final_channel_name || '—'}</dd></div>
-              <div><dt>尝试 / Tokens</dt><dd>{call.attempt_count} / {totalTokens(call)}</dd></div>
-              <div><dt>时间</dt><dd>{formatDate(call.created_at)}</dd></div>
-            </dl>
-            <span className="visually-hidden">调用详情</span>
-          </Link>
-        ))}
-      </div>
-    </>
+    <DataTable
+      caption="调用记录"
+      columns={columns}
+      empty={
+        <EmptyState
+          description="发起调用后，记录会出现在这里。"
+          title="暂无调用记录"
+        />
+      }
+      rowHref={(call) => `/calls/${call.id}`}
+      rowKey={(call) => call.id}
+      rows={calls}
+    />
   )
 }
