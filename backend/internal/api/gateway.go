@@ -184,18 +184,22 @@ func (a *app) gatewayDashboard(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, dashboardResponse(dashboard))
+}
+
+func dashboardResponse(dashboard gateway.Dashboard) map[string]any {
 	recent := make([]map[string]any, 0, len(dashboard.RecentCalls))
 	for _, item := range dashboard.RecentCalls {
 		recent = append(recent, gatewayCallResponse(item))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"consumer_spent": dashboard.ConsumerSpent.String(), "provider_income": dashboard.ProviderIncome.String(),
 		"today_spent": dashboard.TodaySpent.String(), "today_succeeded_calls": dashboard.TodaySucceededCalls,
 		"today_external_provider_income": dashboard.TodayExternalProviderIncome.String(),
 		"active_key_count":               dashboard.ActiveKeyCount, "pool_count": dashboard.PoolCount,
 		"healthy_offer_count": dashboard.HealthyOfferCount, "unhealthy_offer_count": dashboard.UnhealthyOfferCount,
 		"pending_items": dashboard.PendingItems, "recent_calls": recent,
-	})
+	}
 }
 
 func (a *app) proxyChatCompletions(w http.ResponseWriter, r *http.Request) {

@@ -37,6 +37,10 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, c2cMarketResponse(market))
+}
+
+func c2cMarketResponse(market c2c.Market) map[string]any {
 	sell := make([]map[string]any, 0, len(market.SellOrders))
 	for _, order := range market.SellOrders {
 		sell = append(sell, c2cOrderResponse(order))
@@ -45,7 +49,7 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 	for _, order := range market.BuyOrders {
 		buy = append(buy, c2cOrderResponse(order))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"metrics": map[string]any{
 			"guidance_price_fen": market.GuidancePriceFen,
 			"latest_price_fen":   market.LatestPriceFen,
@@ -55,7 +59,7 @@ func (a *app) c2cMarket(w http.ResponseWriter, r *http.Request) {
 		},
 		"sell_orders": sell,
 		"buy_orders":  buy,
-	})
+	}
 }
 
 func (a *app) c2cCreateOrder(w http.ResponseWriter, r *http.Request) {
