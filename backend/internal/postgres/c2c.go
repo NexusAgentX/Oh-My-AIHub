@@ -39,6 +39,7 @@ const c2cTradeColumns = `
 	t.id::text, t.order_id::text, o.side,
 	t.buyer_account_id::text, buyer.display_name,
 	t.seller_account_id::text, seller.display_name,
+	buyer.credit_frozen, seller.credit_frozen,
 	t.quantity_nano, t.unit_price_fen, t.fiat_amount_fen, t.status,
 	t.hold_id::text, t.payment_reference_chars,
 	COALESCE(t.payment_reference_key_id, ''), COALESCE(t.payment_reference_nonce, ''::bytea),
@@ -77,6 +78,7 @@ func scanC2CTrade(row scanner) (c2c.Trade, error) {
 		&trade.ID, &trade.OrderID, &side,
 		&trade.BuyerAccountID, &trade.BuyerDisplayName,
 		&trade.SellerAccountID, &trade.SellerDisplayName,
+		&trade.BuyerCreditFrozen, &trade.SellerCreditFrozen,
 		&quantity, &trade.UnitPriceFen, &trade.FiatAmountFen, &status,
 		&trade.HoldID, &trade.PaymentReferenceChars,
 		&trade.PaymentReferenceData.KeyID, &trade.PaymentReferenceData.Nonce,
@@ -736,6 +738,9 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 			result, err = decodeC2CSnapshot[c2c.Order](snapshot)
 			return err
 		}
+		if err := ensureC2CCreditActive(ctx, tx.Tx, command.Actor.ID); err != nil {
+			return err
+		}
 		parentHoldID := ""
 		if input.Side == c2c.SideSell {
 			hold, err := ledger.NewService(tx).CreateHold(ctx, ledger.CreateHoldRequest{
@@ -818,6 +823,9 @@ func (s *Store) TakeOrder(ctx context.Context, command c2c.Command, orderID stri
 		}
 		if order.OwnerAccountID == command.Actor.ID {
 			return c2c.ErrForbidden
+		}
+		if err := ensureC2CCreditActive(ctx, tx.Tx, command.Actor.ID); err != nil {
+			return err
 		}
 		if err := ensureC2COrderOwnerReady(ctx, tx.Tx, order); err != nil {
 			return err
@@ -1459,6 +1467,10 @@ func (s *Store) ResolveDispute(ctx context.Context, command c2c.Command, tradeID
 				return err
 			}
 			result, err = loadC2CTrade(ctx, tx.Tx, trade.ID, false, false)
+		case c2c.ResolutionRestrictBuyer:
+			result, err = restrictC2CParty(ctx, tx.Tx, command, order, trade, "buyer", trade.BuyerAccountID, reason)
+		case c2c.ResolutionRestrictSeller:
+			result, err = restrictC2CParty(ctx, tx.Tx, command, order, trade, "seller", trade.SellerAccountID, reason)
 		default:
 			return c2c.ErrInvalidInput
 		}
@@ -1468,6 +1480,64 @@ func (s *Store) ResolveDispute(ctx context.Context, command c2c.Command, tradeID
 		return completeC2CCommand(ctx, tx.Tx, command, cleanC2CTradeSnapshot(result))
 	})
 	return result, mapC2CError(err)
+}
+
+// restrictC2CParty freezes one trade party's credit as part of dispute
+// handling. The caller already holds the stable per-account advisory keys for
+// the actor, buyer, and seller plus the order and trade row locks; this then
+// follows the account-policy order (ledger account row, then identity row) used
+// by UpdateAccount. The trade row, its status, and its ledger holds are left
+// untouched. An already frozen party is not updated again, but the decision is
+// still recorded on the trade timeline and in the audit log.
+func restrictC2CParty(ctx context.Context, tx pgx.Tx, command c2c.Command, order c2c.Order, trade c2c.Trade, party, accountID, reason string) (c2c.Trade, error) {
+	var lockedLedgerAccount int
+	if err := tx.QueryRow(ctx, `
+		SELECT 1 FROM ledger_accounts WHERE identity_account_id = $1 FOR UPDATE`, accountID).Scan(&lockedLedgerAccount); err != nil {
+		return c2c.Trade{}, mapC2CError(err)
+	}
+	var alreadyFrozen bool
+	var version int64
+	if err := tx.QueryRow(ctx, `
+		SELECT credit_frozen, version FROM accounts WHERE id = $1 FOR UPDATE`, accountID).Scan(&alreadyFrozen, &version); err != nil {
+		return c2c.Trade{}, mapC2CError(err)
+	}
+	if !alreadyFrozen {
+		if err := tx.QueryRow(ctx, `
+			UPDATE accounts
+			SET credit_frozen = true, version = version + 1, updated_at = $3
+			WHERE id = $1 AND version = $2
+			RETURNING version`, accountID, version, command.Now).Scan(&version); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return c2c.Trade{}, c2c.ErrConflict
+			}
+			return c2c.Trade{}, mapC2CError(err)
+		}
+	}
+	details := map[string]any{
+		"trade_id": trade.ID, "party": party, "credit_frozen": true,
+		"changed": !alreadyFrozen, "version": version,
+	}
+	if err := insertAudit(ctx, tx, command.Actor.ID, "c2c.dispute.party_restricted", "account", accountID, reason, details); err != nil {
+		return c2c.Trade{}, err
+	}
+	if err := insertC2CEvent(ctx, tx, command, order.ID, trade.ID, "dispute."+party+"_restricted", reason, "", ""); err != nil {
+		return c2c.Trade{}, err
+	}
+	return loadC2CTrade(ctx, tx, trade.ID, false, false)
+}
+
+// ensureC2CCreditActive blocks new C2C exposure (publishing or taking an
+// order) for an account whose credit is frozen. Commands on existing trades do
+// not call it, so a restricted party can still finish or dispute them.
+func ensureC2CCreditActive(ctx context.Context, tx pgx.Tx, accountID string) error {
+	var frozen bool
+	if err := tx.QueryRow(ctx, `SELECT credit_frozen FROM accounts WHERE id = $1`, accountID).Scan(&frozen); err != nil {
+		return mapC2CError(err)
+	}
+	if frozen {
+		return ledger.ErrCreditFrozen
+	}
+	return nil
 }
 
 func c2cExpiryCommand(tradeID string, now time.Time) c2c.Command {

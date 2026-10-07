@@ -191,6 +191,10 @@ func (a *app) c2cTrade(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	if accountFromContext(r.Context()).IsAdmin {
+		writeJSON(w, http.StatusOK, map[string]any{"trade": c2cAdminTradeResponse(trade)})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"trade": c2cTradeResponse(trade)})
 }
 
@@ -310,7 +314,7 @@ func (a *app) adminC2CDisputes(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(trades))
 	for _, trade := range trades {
-		items = append(items, c2cTradeResponse(trade))
+		items = append(items, c2cAdminTradeResponse(trade))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"trades": items})
 }
@@ -347,7 +351,7 @@ func (a *app) adminC2CResolve(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"trade": c2cTradeResponse(trade)})
+	writeJSON(w, http.StatusOK, map[string]any{"trade": c2cAdminTradeResponse(trade)})
 }
 
 func decodeC2CRequest(w http.ResponseWriter, r *http.Request, target any) (*multipart.Form, error) {
@@ -414,7 +418,25 @@ func c2cOrderResponse(order c2c.Order) map[string]any {
 	}
 }
 
+// c2cAdminTradeResponse adds party account policy state that only
+// administrators may see while handling a dispute.
+// Party restriction events stay out of participant responses for the same reason.
+func c2cAdminTradeResponse(trade c2c.Trade) map[string]any {
+	response := c2cTradeResponseFor(trade, true)
+	response["buyer_credit_frozen"] = trade.BuyerCreditFrozen
+	response["seller_credit_frozen"] = trade.SellerCreditFrozen
+	return response
+}
+
 func c2cTradeResponse(trade c2c.Trade) map[string]any {
+	return c2cTradeResponseFor(trade, false)
+}
+
+func c2cAdminOnlyEvent(action string) bool {
+	return action == "dispute.buyer_restricted" || action == "dispute.seller_restricted"
+}
+
+func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 	var method any
 	if trade.SelectedPaymentMethod != nil {
 		method = map[string]any{
@@ -446,6 +468,9 @@ func c2cTradeResponse(trade c2c.Trade) map[string]any {
 	}
 	events := make([]map[string]any, 0, len(trade.Events))
 	for _, item := range trade.Events {
+		if !admin && c2cAdminOnlyEvent(item.Action) {
+			continue
+		}
 		events = append(events, map[string]any{
 			"id": item.ID, "actor_account_id": item.ActorAccountID,
 			"action": item.Action, "reason": item.Reason,

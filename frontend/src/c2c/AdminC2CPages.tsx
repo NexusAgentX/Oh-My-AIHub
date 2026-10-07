@@ -6,7 +6,7 @@ import { AppShell } from '../layouts/AppShell'
 import { Button, InlineError, LoadingState, TextField } from '../ui/FormControls'
 import { formatPointAmount } from '../wallet/presentation'
 import { C2CState } from './C2CActivityPage'
-import { c2cStatusTone, c2cTradeStatusLabels, formatC2CDate, formatC2CFiat } from './presentation'
+import { c2cDisputeParties, c2cStatusTone, c2cTradeStatusLabels, canRestrictC2CParty, formatC2CDate, formatC2CFiat, type C2CDisputeParty } from './presentation'
 
 export function AdminC2CDisputesPage() {
   const [trades, setTrades] = useState<C2CTrade[]>([])
@@ -64,6 +64,12 @@ export function AdminC2CDisputePage() {
     void run(action, () => api.resolveC2CDispute(tradeID, action, reason))
   }
 
+  const restrict = (party: C2CDisputeParty) => {
+    if (!reason.trim()) { setError('请填写裁决原因'); return }
+    if (!window.confirm(`冻结${party.label}「${party.displayName}」的信用？冻结后无法发起新调用、挂单或接单，本交易状态不变。`)) return
+    void run(party.restrictAction, () => api.resolveC2CDispute(tradeID, party.restrictAction, reason))
+  }
+
   return (
     <AppShell admin>
       <header className="page-heading c2c-page-heading"><div><Link className="back-link" to="/admin/c2c/disputes">← 争议处理</Link><h1>争议详情</h1></div>{trade && <C2CState label={c2cTradeStatusLabels[trade.status]} tone={c2cStatusTone(trade.status)} />}</header>
@@ -91,12 +97,20 @@ export function AdminC2CDisputePage() {
               <header className="panel-heading"><h2>仲裁处理</h2></header>
               <div className="c2c-form-section">
                 <TextField label="处理原因" maxLength={512} onChange={(event) => setReason(event.target.value)} required value={reason} />
-                <div className="c2c-admin-account-links">
+                <div className="c2c-admin-parties" aria-label="账户处置" role="group">
                   <span>账户处置</span>
-                  <div>
-                    <Link className="button button-secondary" to={`/admin/accounts?query=${encodeURIComponent(trade.buyer_account_id)}`}>管理买家账户</Link>
-                    <Link className="button button-secondary" to={`/admin/accounts?query=${encodeURIComponent(trade.seller_account_id)}`}>管理卖家账户</Link>
-                  </div>
+                  {c2cDisputeParties(trade).map((party) => (
+                    <div className="c2c-admin-party" key={party.role}>
+                      <div>
+                        <strong>{party.label} · {party.displayName}</strong>
+                        {party.creditFrozen !== undefined && <C2CState label={party.creditFrozen ? '信用已冻结' : '信用正常'} tone={party.creditFrozen ? 'danger' : 'neutral'} />}
+                      </div>
+                      <div>
+                        <Button disabled={Boolean(acting) || party.creditFrozen === true || !canRestrictC2CParty(trade.status)} onClick={() => restrict(party)} variant="danger">限制{party.label}</Button>
+                        <Link className="button button-secondary" to={`/admin/accounts?query=${encodeURIComponent(party.accountID)}`}>管理账户</Link>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="c2c-admin-actions">
                   <Button disabled={Boolean(acting)} onClick={() => resolve('release_to_buyer')}>放行给买家</Button>

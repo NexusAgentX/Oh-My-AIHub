@@ -1,5 +1,7 @@
 import type {
   C2COrderStatus,
+  C2CResolutionAction,
+  C2CTrade,
   C2CPaymentMethodType,
   C2CSide,
   C2CTradeStatus,
@@ -76,4 +78,32 @@ export function formatC2CDate(value: string | null) {
 
 export function isC2CTradeTerminal(status: C2CTradeStatus) {
   return status === 'released_to_buyer' || status === 'returned_to_seller' || status === 'cancelled' || status === 'expired'
+}
+
+export type C2CDisputeParty = {
+  role: 'buyer' | 'seller'
+  label: string
+  accountID: string
+  displayName: string
+  creditFrozen: boolean | undefined
+  restrictAction: Extract<C2CResolutionAction, 'restrict_buyer' | 'restrict_seller'>
+}
+
+export function c2cDisputeParties(trade: C2CTrade): C2CDisputeParty[] {
+  return [
+    {
+      role: 'buyer', label: '买家', accountID: trade.buyer_account_id,
+      displayName: trade.buyer_display_name, creditFrozen: trade.buyer_credit_frozen,
+      restrictAction: 'restrict_buyer',
+    },
+    {
+      role: 'seller', label: '卖家', accountID: trade.seller_account_id,
+      displayName: trade.seller_display_name, creditFrozen: trade.seller_credit_frozen,
+      restrictAction: 'restrict_seller',
+    },
+  ]
+}
+
+export function canRestrictC2CParty(status: C2CTradeStatus) {
+  return status === 'paid' || status === 'disputed'
 }

@@ -411,7 +411,7 @@ func (s *Service) submitDisputeEvidence(ctx context.Context, actor identity.Acco
 
 func (s *Service) ResolveDispute(ctx context.Context, actor identity.Account, key, tradeID string, action ResolutionAction, reason string) (Trade, error) {
 	reason = strings.TrimSpace(reason)
-	if !actor.IsAdmin || reason == "" || len(reason) > 512 || (action != ResolutionRelease && action != ResolutionReturn && action != ResolutionExtend) {
+	if !actor.IsAdmin || reason == "" || len(reason) > 512 || !action.Valid() {
 		return Trade{}, ErrInvalidInput
 	}
 	payload := struct {

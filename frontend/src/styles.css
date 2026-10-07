@@ -1531,9 +1531,11 @@ h2 {
 .c2c-statement-input { min-height: 180px; }
 .c2c-admin-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .c2c-admin-actions .button { min-width: 0; padding-inline: 10px; }
-.c2c-admin-account-links { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.c2c-admin-account-links > span { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
-.c2c-admin-account-links > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.c2c-admin-parties { display: grid; gap: 8px; }
+.c2c-admin-parties > span { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+.c2c-admin-party { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.c2c-admin-party > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.c2c-admin-party strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .c2c-admin-metrics .metric-card strong { overflow: hidden; font-size: clamp(1.15rem, 2vw, 1.6rem); text-overflow: ellipsis; white-space: nowrap; }
 
 .mobile-menu-button,
@@ -1560,8 +1562,7 @@ h2 {
   .key-config-summary { position: static; }
   .c2c-market-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .c2c-admin-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .c2c-admin-account-links { align-items: flex-start; flex-direction: column; }
-  .c2c-admin-account-links > div { justify-content: flex-start; }
+  .c2c-admin-party { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 960px) {

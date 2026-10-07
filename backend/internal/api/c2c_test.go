@@ -66,6 +66,32 @@ func TestC2CDTOsNeverSerializeEncryptionEnvelopesOrHoldIdentifiers(t *testing.T)
 	}
 }
 
+func TestC2CPartyCreditStateIsAdminOnly(t *testing.T) {
+	trade := c2c.Trade{ID: "trade-id", BuyerCreditFrozen: true, SellerCreditFrozen: false, Events: []c2c.Event{
+		{ID: 1, Action: "trade.disputed", Reason: "participant opened C2C dispute"},
+		{ID: 2, Action: "dispute.buyer_restricted", Reason: "private administrator restriction reason"},
+	}}
+	participant, err := json.Marshal(c2cTradeResponse(trade))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"credit_frozen", "buyer_restricted", "private administrator restriction reason"} {
+		if strings.Contains(string(participant), forbidden) {
+			t.Fatalf("participant DTO leaked %q: %s", forbidden, participant)
+		}
+	}
+	if !strings.Contains(string(participant), "trade.disputed") {
+		t.Fatalf("participant DTO dropped ordinary events: %s", participant)
+	}
+	admin := c2cAdminTradeResponse(trade)
+	if admin["buyer_credit_frozen"] != true || admin["seller_credit_frozen"] != false {
+		t.Fatalf("admin DTO credit state = %v / %v", admin["buyer_credit_frozen"], admin["seller_credit_frozen"])
+	}
+	if events, _ := admin["events"].([]map[string]any); len(events) != 2 {
+		t.Fatalf("admin DTO events = %v", admin["events"])
+	}
+}
+
 func TestDecodeC2CMultipartSanitizesImageAndRejectsTrailingPayload(t *testing.T) {
 	imageBytes := testPNG(t)
 	request, _ := c2cMultipartRequest(t, `{"value":"ok"}`, "qr", imageBytes)
