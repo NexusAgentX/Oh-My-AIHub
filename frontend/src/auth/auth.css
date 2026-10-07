@@ -1,0 +1,43 @@
+/* 身份页面：登录、初始化、首次改密与账户设置 */
+.identity-page {
+  display: grid;
+  min-height: 100vh;
+  padding: var(--space-8) var(--space-5);
+  place-items: center;
+  background: var(--soft);
+}
+
+.identity-card {
+  width: min(440px, 100%);
+  padding: clamp(24px, 6vw, 40px);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.identity-brand { display: inline-block; margin-bottom: var(--space-8); }
+.identity-brand:hover { text-decoration: none; }
+
+.identity-heading { margin-bottom: var(--space-6); }
+.identity-heading p { margin: var(--space-1) 0 0; color: var(--muted); }
+
+.identity-form { display: grid; gap: var(--space-4); }
+.identity-form > .button { width: 100%; margin-top: var(--space-1); }
+
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(320px, 1.2fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .account-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .identity-page { padding: 0; background: var(--canvas); }
+  .identity-card { min-height: 100vh; border: 0; border-radius: 0; }
+}
+
+.account-grid .success-message { margin-bottom: var(--space-4); }
