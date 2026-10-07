@@ -4,6 +4,10 @@
 
 ## 未发布
 
+### 新增
+
+- 管理员配置全局 API 手续费率（Feature #97）：运营总览新增手续费率面板，可查看当前费率与历史版本并设置新费率（0%～100%，最多 7 位百分比小数，即九位定点比率）；新增 `GET/PUT /api/admin/fee-rate`，每次修改追加不可变版本、按期望版本乐观并发并写入带原因与前后值的审计。新费率只影响之后的新调用，历史调用保留原快照。
+
 ### 变更
 
 - 网关交付与结算解耦（Feature #90，ADR-0016）：删除响应侧残留的形状门禁。事件名与 `data.type` 不一致、未知 SSE 字段、重复或空 `event:` 字段、非 JSON 的 data 帧、非 Chat 协议的 `[DONE]`、终止事件之后的意外帧、超出请求 `n` 或重复的 choice 索引、过大的 `tool_calls` 索引不再拒绝或中断流；仅未知事件、非 JSON 或无 data 帧的流在 EOF 时也照常交付；四种协议均在终止标记后继续读取至 EOF，尾帧保持安全检查且不覆盖已冻结用量；Responses 的 `incomplete` / `cancelled` 不再是错误（只有非空 `error` 对象或 `status: failed` 才算失败），非流式的 `Content-Type` 不再校验；请求头默认全量透传（只剥离凭据、`OpenAI-Organization`/`OpenAI-Project` 等账户作用域头、`Forwarded`/`X-Forwarded-*`/`Traceparent`/`Baggage`/`Idempotency-Key`、hop-by-hop 与 `Accept-Encoding`），查询串原样合并进供应商 endpoint（只拒绝畸形串与 `key`），压缩改由 transport 协商并解压。上游已返回的响应不再因为形状或用量的原因被平台错误替换。

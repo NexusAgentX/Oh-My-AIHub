@@ -13,6 +13,7 @@ import { AppShell } from '../layouts/AppShell'
 import { InlineError, LoadingState } from '../ui/FormControls'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
 import { formatPointAmount } from '../wallet/presentation'
+import { FeeRatePanel } from './FeeRatePanel'
 
 type SystemAccountView = {
   wallet: Wallet
@@ -242,6 +243,8 @@ export function AdminLedgerPage() {
               </dl>
             </article>
           </section>
+
+          <FeeRatePanel />
 
           <section className="ops-grid">
             <article className="panel projection-panel">
