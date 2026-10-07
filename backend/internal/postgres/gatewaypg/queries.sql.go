@@ -2237,16 +2237,17 @@ const rotatedAPIKeyMatches = `-- name: RotatedAPIKeyMatches :one
 SELECT EXISTS (
 	SELECT 1 FROM api_keys
 	WHERE id = $1 AND owner_account_id = $2 AND key_prefix = $3
-		AND key_hash = $4 AND version = $5AND generation > 1 AND status <> 'deleted'
+		AND key_hash = $4 AND version = $5
+		AND generation > 1 AND status <> 'deleted'
 )::boolean
 `
 
 type RotatedAPIKeyMatchesParams struct {
-	ID                           string
-	OwnerAccountID               string
-	KeyPrefix                    string
-	KeyHash                      []byte
-	ExpectedVersionpgCatalogint8 int64
+	ID             string
+	OwnerAccountID string
+	KeyPrefix      string
+	KeyHash        []byte
+	NextVersion    int64
 }
 
 func (q *Queries) RotatedAPIKeyMatches(ctx context.Context, arg RotatedAPIKeyMatchesParams) (bool, error) {
@@ -2255,7 +2256,7 @@ func (q *Queries) RotatedAPIKeyMatches(ctx context.Context, arg RotatedAPIKeyMat
 		arg.OwnerAccountID,
 		arg.KeyPrefix,
 		arg.KeyHash,
-		arg.ExpectedVersionpgCatalogint8,
+		arg.NextVersion,
 	)
 	var column_1 bool
 	err := row.Scan(&column_1)

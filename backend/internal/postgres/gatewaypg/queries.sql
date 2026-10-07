@@ -74,7 +74,7 @@ SELECT EXISTS (
 SELECT EXISTS (
 	SELECT 1 FROM api_keys
 	WHERE id = @id AND owner_account_id = @owner_account_id AND key_prefix = @key_prefix
-		AND key_hash = @key_hash AND version = @expected_version::bigint + 1
+		AND key_hash = @key_hash AND version = @next_version
 		AND generation > 1 AND status <> 'deleted'
 )::boolean;
 
