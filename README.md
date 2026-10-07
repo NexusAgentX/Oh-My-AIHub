@@ -46,7 +46,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与四类外部协议请求，迁移完成后再启动后端。
 
-管理员运营总览提供 UTC 时间窗口的统一指标、硬异常下钻、跨模块巡检历史与试用证据摘要；发布准备包含 `mise run check-release` 门禁、CI、加密备份与隔离恢复演练，操作手册见 `docs/runbooks/`。当前可运行能力包括作为首页的公开 SaaS 落地页（`/`）、未初始化实例的 `/initialize` 网页引导（也可继续用 `cmd/bootstrap-admin` CLI）、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、评分、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 市场支持固定价格买卖单、部分成交、多种支付方式、可选付款截图、争议和管理员裁决；卖单积分由账本父持有担保，买单按成交冻结卖家的积分。
+管理员运营总览提供 UTC 时间窗口的统一指标、硬异常下钻、跨模块巡检历史与试用证据摘要；发布准备包含 `mise run check-release` 门禁、CI、加密备份与隔离恢复演练，操作手册见 `docs/runbooks/`。当前可运行能力包括作为首页的公开 SaaS 落地页（`/`，`/welcome` 与未知路径同样显示）、未初始化实例的 `/initialize` 网页引导（也可继续用 `cmd/bootstrap-admin` CLI）、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、评分、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 市场支持固定价格买卖单、部分成交、多种支付方式、可选付款截图、争议和管理员裁决；卖单积分由账本父持有担保，买单按成交冻结卖家的积分。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 
@@ -98,7 +98,7 @@ mise run dev-backend
 mise run dev-frontend
 ```
 
-前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/welcome>，并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。
+前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。
 
 平台代理入口只接受各协议规定的认证头：OpenAI 风格使用 `Authorization: Bearer <平台 Key>`，Anthropic 使用 `x-api-key`，Gemini 使用 `x-goog-api-key`。客户端必须提交模型目录中的 canonical model ID；平台不做跨协议转换。请求上限为 32 MiB，非流式调用最长 10 分钟，流式调用最长 30 分钟。
 
@@ -143,8 +143,10 @@ mise run check-proxy-trust # 需要已按上文启动安全栈
 .
 ├── backend/       Go 后端
 ├── frontend/      React 前端
-├── scripts/       仓库聚焦检查脚本
+├── scripts/       数据库加密备份与隔离恢复演练脚本
 ├── docs/adr/      架构决策记录
+├── docs/runbooks/ 部署、发布、备份恢复、故障处理与小圈子试用操作手册
+├── licenses/      第三方许可
 ├── compose.yaml   容器编排配置
 └── mise.toml      工具版本与常用任务
 ```
