@@ -10,6 +10,8 @@ import type {
   ChannelOffer,
   ChannelOfferInput,
   ChannelProtocol,
+  FeeRateSnapshot,
+  FeeRateVersion,
   GatewayCall,
   GatewayDashboard,
   ProviderIncomeSnapshot,
@@ -253,6 +255,17 @@ export const api = {
   },
   async opsTrialSummary() {
     return (await request<{ trial_summary: OpsTrialSummary }>('/api/admin/ops/trial-summary')).trial_summary
+  },
+  adminFeeRates(limit = 10) {
+    return request<FeeRateSnapshot>(`/api/admin/fee-rate?limit=${limit}`)
+  },
+  async setAdminFeeRate(expectedVersion: number, feeRate: string, reason: string) {
+    return (
+      await request<{ fee_rate: FeeRateVersion }>('/api/admin/fee-rate', {
+        method: 'PUT',
+        body: JSON.stringify({ expected_version: expectedVersion, fee_rate: feeRate, reason }),
+      })
+    ).fee_rate
   },
   async adminAccountWallet(accountID: string) {
     return (

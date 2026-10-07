@@ -17,6 +17,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -37,6 +38,7 @@ type Dependencies struct {
 	Ledger            *ledger.Service
 	C2C               *c2c.Service
 	Ops               OpsStore
+	FeeRates          *feerate.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -60,6 +62,7 @@ type app struct {
 	ledger               *ledger.Service
 	c2c                  *c2c.Service
 	ops                  OpsStore
+	feeRates             *feerate.Service
 	databaseReady        func(context.Context) error
 	cookieSecure         bool
 	cookieName           string
@@ -83,6 +86,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 		ledger:               dependencies.Ledger,
 		c2c:                  dependencies.C2C,
 		ops:                  dependencies.Ops,
+		feeRates:             dependencies.FeeRates,
 		databaseReady:        dependencies.DatabaseReady,
 		cookieSecure:         dependencies.CookieSecure,
 		cookieName:           defaultSessionCookie,
@@ -169,6 +173,8 @@ func NewHandler(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsListInspections)))
 	mux.Handle("POST /api/admin/ops/inspections", application.requireAdmin(http.HandlerFunc(application.opsRunInspection)))
 	mux.Handle("GET /api/admin/ops/trial-summary", application.requireAdmin(http.HandlerFunc(application.opsTrialSummary)))
+	mux.Handle("GET /api/admin/fee-rate", application.requireAdmin(http.HandlerFunc(application.adminFeeRates)))
+	mux.Handle("PUT /api/admin/fee-rate", application.requireAdmin(http.HandlerFunc(application.adminSetFeeRate)))
 	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountWallet)))
 	mux.Handle("GET /api/admin/ledger/accounts/{accountID}/entries", application.requireAdmin(http.HandlerFunc(application.adminLedgerAccountEntries)))
 	mux.Handle("GET /api/admin/ledger/system-accounts/{systemKind}/wallet", application.requireAdmin(http.HandlerFunc(application.adminLedgerSystemWallet)))
