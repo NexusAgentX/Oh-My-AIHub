@@ -1,4 +1,5 @@
 import type {
+  C2COrder,
   C2COrderStatus,
   C2CResolutionAction,
   C2CTrade,
@@ -106,4 +107,97 @@ export function c2cDisputeParties(trade: C2CTrade): C2CDisputeParty[] {
 
 export function canRestrictC2CParty(status: C2CTradeStatus) {
   return status === 'paid' || status === 'disputed'
+}
+
+/** 挂单发布方向对应的承接动作：卖单由买家承接（购买），买单由卖家承接（出售）。 */
+export function c2cTakeLabel(side: C2CSide) {
+  return side === 'sell' ? '购买' : '出售'
+}
+
+export function isC2COrderCancellable(order: Pick<C2COrder, 'status'>) {
+  return order.status === 'open' || order.status === 'allocated'
+}
+
+/** 我在交易中的角色；与交易无关时返回 null。 */
+export function c2cTradeRole(trade: C2CTrade, accountID: string) {
+  if (trade.buyer_account_id === accountID) return 'buyer' as const
+  if (trade.seller_account_id === accountID) return 'seller' as const
+  return null
+}
+
+/** 需要当前用户处理的交易提示：买家待付款、卖家待放行；其余返回空串。 */
+export function c2cTradeActionHint(trade: C2CTrade, accountID: string) {
+  const role = c2cTradeRole(trade, accountID)
+  if (trade.status === 'awaiting_payment' && role === 'buyer') return '待你付款'
+  if (trade.status === 'paid' && role === 'seller') return '待你放行'
+  return ''
+}
+
+/** 承接数量校验：返回错误文案，合法时返回空串。 */
+export function c2cTakeQuantityError(order: C2COrder, quantity: string) {
+  let value: bigint
+  try {
+    value = parseNanoPoints(quantity)
+  } catch {
+    return '请输入有效的积分数量'
+  }
+  if (value <= 0n) return '请输入有效的积分数量'
+  const available = parseNanoPoints(order.available)
+  if (value > available) return '超过可成交数量'
+  if (value > parseNanoPoints(order.maximum)) return '数量不在单次限额内'
+  // 剩余量不足单次最少时，允许一次吃完。
+  if (value < parseNanoPoints(order.minimum) && value !== available) return '数量不在单次限额内'
+  return ''
+}
+
+/** 返回表单校验错误文案；合法时返回空串。买单必须填写联系方式，卖单至少填写账号、备注或收款码之一。 */
+export function validateOrderDraft(input: {
+  side: C2CSide
+  price: string
+  total: string
+  minimum: string
+  maximum: string
+  methods: Array<{ contact: string; instructions: string; qr: File | null }>
+}) {
+  try {
+    parseC2CPriceFen(input.price)
+    const total = parseNanoPoints(input.total)
+    const minimum = parseNanoPoints(input.minimum)
+    const maximum = parseNanoPoints(input.maximum)
+    if (total <= 0n || minimum <= 0n || maximum < minimum || maximum > total) {
+      return '请检查数量范围：0 < 单次最少 ≤ 单次最多 ≤ 挂单数量'
+    }
+  } catch {
+    return '请检查单价与数量格式'
+  }
+  const incomplete = input.methods.some((method) =>
+    input.side === 'buy'
+      ? !method.contact.trim()
+      : !method.contact.trim() && !method.instructions.trim() && !method.qr,
+  )
+  if (incomplete) {
+    return input.side === 'buy' ? '请填写联系方式' : '请至少填写收款账号、备注或上传收款码'
+  }
+  return ''
+}
+
+const c2cEventLabels: Record<string, string> = {
+  'order.created': '挂单已发布',
+  'order.cancelled': '挂单已取消',
+  'order.admin_cancelled': '管理员取消挂单',
+  'trade.created': '交易已创建',
+  'trade.paid': '买家声明已付款',
+  'trade.released': '卖家确认收款，积分已放行',
+  'trade.cancelled': '交易已取消',
+  'trade.expired': '付款超时，交易已过期',
+  'trade.disputed': '已发起争议',
+  'trade.statement_added': '补充了陈述',
+  'dispute.extended': '管理员延长核实',
+  'dispute.released': '管理员裁决：放行给买家',
+  'dispute.returned': '管理员裁决：退回卖家',
+}
+
+/** 交易记录的中文说明；未知动作回退为后端原因或动作名。 */
+export function c2cEventLabel(event: { action: string; reason: string }) {
+  return c2cEventLabels[event.action] ?? (event.reason || event.action)
 }

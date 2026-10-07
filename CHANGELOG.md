@@ -14,6 +14,8 @@
 
 ### 变更
 
+- 前端改版：积分（Feature #128，Epic #109）：钱包页的风险提示条内含补足积分入口，原“余额不足”页并入钱包，`/wallet/insufficient` 重定向至 `/wallet`；账本分录改用统一数据表。C2C 全部页面迁移到 TanStack Query 与基础组件：市场页按卖单/买单分标签展示，承接挂单改为抽屉（`/c2c?take=<订单>`，旧 `/c2c/orders/:id/take` 重定向），取消挂单/交易、放行与争议陈述改为确认对话框与表单对话框（旧 `/c2c/trades/:id/dispute` 重定向至交易详情），我的挂单与交易以标签页展示并标出待你付款/待你放行，交易详情未结束时自动刷新，交易记录改为中文说明。买卖双向挂单、部分成交、卖单收款码上传与展示、文字付款声明与争议均保持不变；不改后端与 API。
+
 - 前端基础改版（Feature #114，ADR-0019）：新增设计 token（`styles/tokens.css`）与按组件拆分的样式，基础组件库 `src/ui/`（Button、Card、Metric、Badge、DataTable、Toolbar、EmptyState、Dialog、Drawer、Tabs/Segmented、表单控件与独立图标集）；外壳改为用户与管理员两个 react-router layout route，页面不再各自包裹 `AppShell`；用户导航分为“使用 API / 共享渠道 / 积分”三组，顶栏常驻可用积分与钱包入口，760px 以下改为底部 Tab 栏与“更多”抽屉；引入 TanStack Query，工作台与钱包迁移为样板并以 `useWallet()` 取代 `WalletProvider`。路由、权限跳转与后端接口不变；删除未使用的 `UpcomingC2CPage`。
 - 持久化引入 sqlc 并按领域分包（Feature #113，ADR-0017）：新增 `backend/sqlc.yaml`、`mise run generate` 与 `mise run check-sqlc`，CI 增加生成物一致性检查；身份、模型目录与 API 手续费率迁移到 `internal/postgres/{identity,catalog,feerate}pg`，共享审计与事务辅助拆为 `auditpg`、`pgkit`。服务层接口、API 与数据库结构不变，其余领域仍在 `postgres` 包内待后续迁移。
 - 网关交付与结算解耦（Feature #90，ADR-0016）：删除响应侧残留的形状门禁。事件名与 `data.type` 不一致、未知 SSE 字段、重复或空 `event:` 字段、非 JSON 的 data 帧、非 Chat 协议的 `[DONE]`、终止事件之后的意外帧、超出请求 `n` 或重复的 choice 索引、过大的 `tool_calls` 索引不再拒绝或中断流；仅未知事件、非 JSON 或无 data 帧的流在 EOF 时也照常交付；四种协议均在终止标记后继续读取至 EOF，尾帧保持安全检查且不覆盖已冻结用量；Responses 的 `incomplete` / `cancelled` 不再是错误（只有非空 `error` 对象或 `status: failed` 才算失败），非流式的 `Content-Type` 不再校验；请求头默认全量透传（只剥离凭据、`OpenAI-Organization`/`OpenAI-Project` 等账户作用域头、`Forwarded`/`X-Forwarded-*`/`Traceparent`/`Baggage`/`Idempotency-Key`、hop-by-hop 与 `Accept-Encoding`），查询串原样合并进供应商 endpoint（只拒绝畸形串与 `key`），压缩改由 transport 协商并解压。上游已返回的响应不再因为形状或用量的原因被平台错误替换。
