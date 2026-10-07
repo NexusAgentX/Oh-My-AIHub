@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { C2COrder, C2CTrade } from '../api/contracts'
+import type { C2CAdminTrade, C2COrder, C2CTrade, C2CTradeView } from '../api/types'
 import {
   c2cDisputeParties,
   c2cEventLabel,
@@ -42,12 +42,12 @@ describe('C2C presentation', () => {
     const trade = {
       buyer_account_id: 'buyer-id', buyer_display_name: '买家A', buyer_credit_frozen: true,
       seller_account_id: 'seller-id', seller_display_name: '卖家B', seller_credit_frozen: false,
-    } as C2CTrade
+    } as C2CAdminTrade
     expect(c2cDisputeParties(trade).map((party) => [party.accountID, party.restrictAction, party.creditFrozen])).toEqual([
       ['buyer-id', 'restrict_buyer', true],
       ['seller-id', 'restrict_seller', false],
     ])
-    const participantView = { ...trade, buyer_credit_frozen: undefined, seller_credit_frozen: undefined }
+    const participantView = { ...trade, buyer_credit_frozen: undefined, seller_credit_frozen: undefined } as unknown as C2CTradeView
     expect(c2cDisputeParties(participantView).every((party) => party.creditFrozen === undefined)).toBe(true)
   })
 

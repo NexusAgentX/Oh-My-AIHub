@@ -5,7 +5,7 @@ import type {
   Channel,
   GatewayCall,
   MarketChannel,
-} from '../api/contracts'
+} from '../api/types'
 import { derivePendingItems, usedChannelIDs } from './pendingDerive'
 
 const member = (offer: string, channel: string, eligible = true) => ({

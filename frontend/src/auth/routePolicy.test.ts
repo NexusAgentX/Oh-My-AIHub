@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Account } from '../api/contracts'
+import type { Account } from '../api/types'
 import { canEnterAdmin, defaultDestination } from './routePolicy'
 
 const account: Account = {

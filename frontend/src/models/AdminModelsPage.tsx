@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import type { CatalogModel } from '../api/contracts'
+import type { CatalogModel } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Button,

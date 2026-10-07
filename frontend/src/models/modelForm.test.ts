@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CatalogModel } from '../api/contracts'
+import type { CatalogModel } from '../api/types'
 import {
   moveTier,
   setTierCondition,

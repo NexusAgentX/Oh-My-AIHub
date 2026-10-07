@@ -1,0 +1,14 @@
+{
+  "name": "oh-my-aihub-openapi-types",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generates frontend API types from backend/api/openapi.yaml. Isolated because openapi-typescript needs the TypeScript 5 compiler API, which the TypeScript 7 used by the app does not provide.",
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript ../../../backend/api/openapi.yaml -o ../../src/api/schema.gen.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

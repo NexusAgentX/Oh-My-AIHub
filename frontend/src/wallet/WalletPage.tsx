@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { Wallet, WalletRecoveryAction } from '../api/contracts'
+import type { Wallet, WalletRecoveryAction } from '../api/types'
 import {
   Button,
   ButtonLink,

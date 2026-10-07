@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { api, ApiError, setAuthFailureHandler } from '../api/client'
-import type { Account } from '../api/contracts'
+import type { Account } from '../api/types'
 
 type AuthContextValue = {
   account: Account | null

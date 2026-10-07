@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
-import type { APIKey, ChannelProtocol } from '../api/contracts'
+import type { APIKey, ChannelProtocol } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   useAllMarketOffersQuery,

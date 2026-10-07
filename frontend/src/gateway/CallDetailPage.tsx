@@ -10,7 +10,7 @@ import {
   QueryBoundary,
   type Column,
 } from '../ui'
-import type { GatewayAttempt } from '../api/contracts'
+import type { GatewayAttempt } from '../api/types'
 import {
   GatewayStatusBadge,
   formatDate,

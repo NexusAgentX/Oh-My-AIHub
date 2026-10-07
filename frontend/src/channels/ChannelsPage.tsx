@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Channel } from '../api/contracts'
+import type { Channel } from '../api/types'
 import { formatPoints } from '../gateway/presentation'
 import {
   ButtonLink,

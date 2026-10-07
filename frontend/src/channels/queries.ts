@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { Channel, ChannelOffer } from '../api/contracts'
+import type { Channel, ChannelOffer } from '../api/types'
 import { gatewayKeys } from '../gateway/queries'
 import { applyDraft, createInput, type ChannelDraft } from './editorModel'
 

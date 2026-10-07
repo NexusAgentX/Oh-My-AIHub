@@ -4,7 +4,7 @@ import type {
   Channel,
   GatewayCall,
   MarketChannel,
-} from '../api/contracts'
+} from '../api/types'
 import { protocolLabels } from './presentation'
 
 function formatFiat(fen: number) {

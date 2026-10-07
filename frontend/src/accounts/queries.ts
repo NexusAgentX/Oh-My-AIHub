@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { AccountStatus } from '../api/contracts'
+import type { AccountStatus } from '../api/types'
 import { adminLedgerKeys } from '../ledger/queries'
 
 /** 管理员账户领域的 key 工厂：失效整个领域用 adminAccountKeys.all。 */

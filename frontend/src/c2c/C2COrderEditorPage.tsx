@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { C2CPaymentMethodType, C2CSide } from '../api/contracts'
+import type { C2CPaymentMethodType, C2CSide } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Button,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
-import type { CatalogModel, Channel, ChannelProtocol } from '../api/contracts'
+import type { CatalogModel, Channel, ChannelProtocol } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Button,

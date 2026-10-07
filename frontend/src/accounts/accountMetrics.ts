@@ -1,4 +1,4 @@
-import type { Account } from '../api/contracts'
+import type { Account } from '../api/types'
 
 export function accountRiskLabel(account: Account) {
   if (account.credit_frozen) return '信用冻结'

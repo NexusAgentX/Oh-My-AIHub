@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { ChannelProtocol, MarketOffer } from '../api/contracts'
+import type { ChannelProtocol, MarketOffer } from '../api/types'
 
 export type MarketSort =
   | 'input_price'

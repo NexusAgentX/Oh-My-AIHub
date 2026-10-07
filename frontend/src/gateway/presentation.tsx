@@ -5,7 +5,7 @@ import type {
   GatewayCall,
   GatewayCallStatus,
   PriceTier,
-} from '../api/contracts'
+} from '../api/types'
 import { Badge, type BadgeTone } from '../ui'
 import { formatPointAmount } from '../wallet/presentation'
 

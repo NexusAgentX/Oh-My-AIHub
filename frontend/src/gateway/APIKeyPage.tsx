@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { APIKey, APIKeyPool, APIKeyPoolMember } from '../api/contracts'
+import type { APIKey, APIKeyPool, APIKeyPoolMember } from '../api/types'
 import { ApiError } from '../api/client'
 import { errorMessage } from '../api/query'
 import {

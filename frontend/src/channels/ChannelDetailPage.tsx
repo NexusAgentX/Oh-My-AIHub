@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/contracts'
+import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/types'
 import { errorMessage } from '../api/query'
 import { formatPoints, formatRate } from '../gateway/presentation'
 import {

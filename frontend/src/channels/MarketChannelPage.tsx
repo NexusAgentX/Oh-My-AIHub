@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import type { MarketOffer } from '../api/contracts'
+import type { MarketOffer } from '../api/types'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { JoinRouteDrawer } from '../gateway/JoinRouteDrawer'

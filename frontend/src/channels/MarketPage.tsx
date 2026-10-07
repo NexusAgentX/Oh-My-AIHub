@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { MarketOffer } from '../api/contracts'
+import type { MarketOffer } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import {
   formatDate,

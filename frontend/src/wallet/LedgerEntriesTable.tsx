@@ -1,4 +1,4 @@
-import type { LedgerEntry } from '../api/contracts'
+import type { LedgerEntry } from '../api/types'
 import { Button, DataTable, EmptyState, QueryBoundary, type Column } from '../ui'
 import {
   formatPointAmount,

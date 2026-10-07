@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
-import type { APIKey, MarketChannel, MarketOffer } from '../api/contracts'
+import type { APIKey, MarketChannel, MarketOffer } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Badge,

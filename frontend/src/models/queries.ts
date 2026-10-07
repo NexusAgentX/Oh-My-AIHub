@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { ModelInput } from '../api/contracts'
+import type { ModelInput } from '../api/types'
 
 /** 管理员模型目录的 key 工厂：失效整个领域用 adminModelKeys.all。 */
 export const adminModelKeys = {

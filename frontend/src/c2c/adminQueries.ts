@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { C2CResolutionAction } from '../api/contracts'
+import type { C2CResolutionAction } from '../api/types'
 
 /** 管理员 C2C 争议的 key 工厂：失效整个领域用 adminC2CKeys.all。 */
 export const adminC2CKeys = {

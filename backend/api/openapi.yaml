@@ -1024,8 +1024,10 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "排序方式。"
-          schema: {type: string}
+          description: "排序方式，缺省为 input_price。"
+          schema:
+            type: string
+            enum: [input_price, output_price, cache_write_price, cache_read_price, rating, success_rate, ttft, tps]
         - name: after
           in: query
           required: false
@@ -2447,7 +2449,7 @@ components:
         max_prompt_tokens: {type: [integer, "null"]}
         timezone: {type: string}
         weekdays:
-          type: array
+          type: [array, "null"]
           items: {type: integer}
         start_minute_of_day: {type: [integer, "null"]}
         end_minute_of_day: {type: [integer, "null"]}

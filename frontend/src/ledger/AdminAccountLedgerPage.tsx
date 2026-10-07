@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import type { Wallet } from '../api/contracts'
+import type { Wallet } from '../api/types'
 import { Badge, Card, Metric, MetricGrid, PageHeader, QueryBoundary } from '../ui'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
 import {

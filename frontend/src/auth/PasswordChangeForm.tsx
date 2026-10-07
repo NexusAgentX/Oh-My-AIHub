@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
-import type { Account } from '../api/contracts'
+import type { Account } from '../api/types'
 import { Button, InlineError, PasswordField } from '../ui'
 import { passwordProblem, passwordRuleText } from './credentialsRules'
 import { useChangePasswordMutation } from './queries'

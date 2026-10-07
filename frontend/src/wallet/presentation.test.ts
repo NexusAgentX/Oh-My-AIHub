@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LedgerEntry } from '../api/contracts'
+import type { LedgerEntry } from '../api/types'
 import {
   creditUsagePercent,
   formatPointAmount,

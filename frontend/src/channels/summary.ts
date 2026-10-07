@@ -1,4 +1,4 @@
-import type { Channel, ChannelOffer } from '../api/contracts'
+import type { Channel, ChannelOffer } from '../api/types'
 import { formatNanoPoints, parseNanoPoints } from '../money/amount'
 
 export type ChannelSummary = {

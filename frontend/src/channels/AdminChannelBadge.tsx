@@ -1,4 +1,4 @@
-import type { ChannelOfferStatus, ChannelStatus, ValidationStatus } from '../api/contracts'
+import type { ChannelOfferStatus, ChannelStatus, ValidationStatus } from '../api/types'
 import { Badge, type BadgeTone } from '../ui'
 
 type State = ChannelStatus | ChannelOfferStatus | ValidationStatus

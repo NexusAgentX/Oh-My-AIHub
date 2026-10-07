@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Channel, ChannelOffer, ChannelProtocol } from '../api/contracts'
+import type { Channel, ChannelOffer, ChannelProtocol } from '../api/types'
 import { channelGroups, createInput, rebaseChannelFields, rebaseGroups, validateDraft } from './editorModel'
 
 function offer(
@@ -21,7 +21,19 @@ function offer(
     version: 1,
     eligible: false,
     ineligible_reason: 'validation_required',
+    input_price: null,
+    output_price: null,
+    cache_write_price: null,
+    cache_read_price: null,
+    price_tiers: [],
+    call_success_rate: null,
+    ttft_milliseconds: null,
+    tokens_per_second: null,
+    call_count: null,
+    provider_income: null,
     latest_validation: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
   }
 }
 
@@ -40,6 +52,8 @@ function channel(offers: ChannelOffer[]): Channel {
     offers,
     average_rating: null,
     rating_count: 0,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
   }
 }
 

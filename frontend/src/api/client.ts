@@ -1,38 +1,14 @@
 import type {
-  Account,
-  AccountStatus,
-  AdminChannel,
-  APIKey,
   APIKeyPoolInput,
-  AuthorizedValidationAttempt,
-  CatalogModel,
-  Channel,
-  ChannelOffer,
+  C2CPaymentMethodRequest,
+  C2CResolutionAction,
   ChannelOfferInput,
   ChannelProtocol,
-  FeeRateSnapshot,
-  FeeRateVersion,
-  GatewayCall,
-  GatewayDashboard,
-  ProviderIncomeSnapshot,
-  C2CMarket,
-  C2COrder,
-  C2CPaymentMethodType,
-  C2CResolutionAction,
-  C2CSide,
-  C2CTrade,
-  LedgerEntry,
-  LedgerMetrics,
-  OpsMetrics,
-  OpsAnomalies,
-  OpsInspection,
-  OpsTrialSummary,
-  MarketChannel,
-  MarketOffer,
   ModelInput,
-  Wallet,
-  WalletRecoveryAction,
-} from './contracts'
+  RequestBody,
+  ResponseBody,
+} from './types'
+import type { operations } from './schema.gen'
 
 type ErrorPayload = {
   error?: {
@@ -79,19 +55,15 @@ export function ledgerEntriesPath(
   return `${path}?${query.toString()}`
 }
 
+type MarketOfferSort = NonNullable<
+  NonNullable<operations['listMarketOffers']['parameters']['query']>['sort']
+>
+
 export function marketOffersPath(input: {
   modelID?: string
   protocol?: ChannelProtocol | ''
   owner?: string
-  sort?:
-    | 'input_price'
-    | 'output_price'
-    | 'cache_write_price'
-    | 'cache_read_price'
-    | 'rating'
-    | 'success_rate'
-    | 'ttft'
-    | 'tps'
+  sort?: MarketOfferSort
   after?: string
   limit?: number
 } = {}) {
@@ -102,6 +74,11 @@ export function marketOffersPath(input: {
   if (input.sort) query.set('sort', input.sort)
   if (input.after) query.set('after', input.after)
   return `/api/market/offers?${query.toString()}`
+}
+
+/** 序列化 JSON 请求体，并按 operationId 对照规范校验其结构。 */
+function jsonBody<Op extends keyof operations>(body: RequestBody<Op>) {
+  return JSON.stringify(body)
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -137,22 +114,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   async session() {
-    return (await request<{ account: Account }>('/api/auth/session')).account
+    return (await request<ResponseBody<'getSession'>>('/api/auth/session')).account
   },
   async instanceState() {
-    return request<{ initialized: boolean }>('/api/instance')
+    return request<ResponseBody<'getInstance'>>('/api/instance')
   },
   async initializeInstance(username: string, displayName: string, password: string) {
-    return request<{ initialized: boolean; account: Account }>('/api/instance/initialize', {
+    return request<ResponseBody<'initializeInstance'>>('/api/instance/initialize', {
       method: 'POST',
-      body: JSON.stringify({ username, display_name: displayName, password }),
+      body: jsonBody<'initializeInstance'>({ username, display_name: displayName, password }),
     })
   },
   async login(username: string, password: string) {
     return (
-      await request<{ account: Account }>('/api/auth/login', {
+      await request<ResponseBody<'login'>>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: jsonBody<'login'>({ username, password }),
       })
     ).account
   },
@@ -161,9 +138,9 @@ export const api = {
   },
   async changePassword(currentPassword: string, newPassword: string) {
     return (
-      await request<{ account: Account }>('/api/account/password', {
+      await request<ResponseBody<'changePassword'>>('/api/account/password', {
         method: 'PUT',
-        body: JSON.stringify({
+        body: jsonBody<'changePassword'>({
           current_password: currentPassword,
           new_password: newPassword,
         }),
@@ -171,111 +148,100 @@ export const api = {
     ).account
   },
   async account() {
-    return (await request<{ account: Account }>('/api/account')).account
+    return (await request<ResponseBody<'getAccount'>>('/api/account')).account
   },
   async accounts(query = '') {
     const suffix = query ? `?q=${encodeURIComponent(query)}` : ''
     return (
-      await request<{ accounts: Account[] }>(`/api/admin/accounts${suffix}`)
+      await request<ResponseBody<'listAccounts'>>(`/api/admin/accounts${suffix}`)
     ).accounts
   },
-  async createAccount(input: {
-    username: string
-    display_name: string
-    credit_limit: string
-    is_admin: boolean
-    status: AccountStatus
-  }) {
-    return request<{ account: Account; initial_password: string }>(
+  async createAccount(input: RequestBody<'createAccount'>) {
+    return request<ResponseBody<'createAccount'>>(
       '/api/admin/accounts',
-      { method: 'POST', body: JSON.stringify(input) },
+      { method: 'POST', body: jsonBody<'createAccount'>(input) },
     )
   },
   async updateAccount(
     accountID: string,
     expectedVersion: number,
-    input: {
-      status?: AccountStatus
-      credit_limit?: string
-      credit_frozen?: boolean
-      is_admin?: boolean
-    },
+    input: Omit<RequestBody<'updateAccount'>, 'expected_version'>,
   ) {
     return (
-      await request<{ account: Account }>(
+      await request<ResponseBody<'updateAccount'>>(
         `/api/admin/accounts/${encodeURIComponent(accountID)}`,
         {
           method: 'PATCH',
-          body: JSON.stringify({ ...input, expected_version: expectedVersion }),
+          body: jsonBody<'updateAccount'>({ ...input, expected_version: expectedVersion }),
         },
       )
     ).account
   },
   async resetAccountPassword(accountID: string) {
-    return request<{ account: Account; initial_password: string }>(
+    return request<ResponseBody<'resetAccountPassword'>>(
       `/api/admin/accounts/${encodeURIComponent(accountID)}/password-reset`,
-      { method: 'POST', body: JSON.stringify({}) },
+      { method: 'POST', body: jsonBody<'resetAccountPassword'>({}) },
     )
   },
   wallet() {
-    return request<{ wallet: Wallet; recovery_actions: WalletRecoveryAction[] }>(
+    return request<ResponseBody<'getWallet'>>(
       '/api/wallet',
     )
   },
   walletEntries(before = '', limit = 20) {
-    return request<{ entries: LedgerEntry[]; next_before: string }>(
+    return request<ResponseBody<'listWalletEntries'>>(
       ledgerEntriesPath('/api/wallet/entries', before, limit),
     )
   },
   async ledgerMetrics() {
     return (
-      await request<{ metrics: LedgerMetrics }>('/api/admin/ledger/metrics')
+      await request<ResponseBody<'getLedgerMetrics'>>('/api/admin/ledger/metrics')
     ).metrics
   },
   async opsMetrics(from: string, to: string) {
     const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-    return (await request<{ metrics: OpsMetrics }>(`/api/admin/ops/metrics${query}`)).metrics
+    return (await request<ResponseBody<'getOpsMetrics'>>(`/api/admin/ops/metrics${query}`)).metrics
   },
   async opsProviderIncome(from: string, to: string) {
     const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     return (
-      await request<{ provider_income: ProviderIncomeSnapshot }>(
+      await request<ResponseBody<'getOpsProviderIncome'>>(
         `/api/admin/ops/providers${query}`,
       )
     ).provider_income
   },
   async opsAnomalies() {
-    return (await request<{ anomalies: OpsAnomalies }>('/api/admin/ops/anomalies')).anomalies
+    return (await request<ResponseBody<'getOpsAnomalies'>>('/api/admin/ops/anomalies')).anomalies
   },
   async opsInspections(limit = 20) {
-    return (await request<{ inspections: OpsInspection[] }>(`/api/admin/ops/inspections?limit=${limit}`)).inspections
+    return (await request<ResponseBody<'listOpsInspections'>>(`/api/admin/ops/inspections?limit=${limit}`)).inspections
   },
   async runOpsInspection() {
-    return (await request<{ inspection: OpsInspection }>('/api/admin/ops/inspections', { method: 'POST' })).inspection
+    return (await request<ResponseBody<'runOpsInspection'>>('/api/admin/ops/inspections', { method: 'POST' })).inspection
   },
   async opsTrialSummary() {
-    return (await request<{ trial_summary: OpsTrialSummary }>('/api/admin/ops/trial-summary')).trial_summary
+    return (await request<ResponseBody<'getOpsTrialSummary'>>('/api/admin/ops/trial-summary')).trial_summary
   },
   adminFeeRates(limit = 10) {
-    return request<FeeRateSnapshot>(`/api/admin/fee-rate?limit=${limit}`)
+    return request<ResponseBody<'getFeeRates'>>(`/api/admin/fee-rate?limit=${limit}`)
   },
   async setAdminFeeRate(expectedVersion: number, feeRate: string, reason: string) {
     return (
-      await request<{ fee_rate: FeeRateVersion }>('/api/admin/fee-rate', {
+      await request<ResponseBody<'setFeeRate'>>('/api/admin/fee-rate', {
         method: 'PUT',
-        body: JSON.stringify({ expected_version: expectedVersion, fee_rate: feeRate, reason }),
+        body: jsonBody<'setFeeRate'>({ expected_version: expectedVersion, fee_rate: feeRate, reason }),
       })
     ).fee_rate
   },
   async adminAccountWallet(accountID: string) {
     return (
-      await request<{ wallet: Wallet }>(
+      await request<ResponseBody<'getAdminLedgerAccountWallet'>>(
         `/api/admin/ledger/accounts/${encodeURIComponent(accountID)}/wallet`,
       )
     ).wallet
   },
   adminAccountEntries(accountID: string, before = '', limit = 20) {
-    return request<{ entries: LedgerEntry[]; next_before: string }>(
+    return request<ResponseBody<'listAdminLedgerAccountEntries'>>(
       ledgerEntriesPath(
         `/api/admin/ledger/accounts/${encodeURIComponent(accountID)}/entries`,
         before,
@@ -285,7 +251,7 @@ export const api = {
   },
   async adminSystemWallet(systemKind: 'platform_incentive' | 'platform_loss') {
     return (
-      await request<{ wallet: Wallet }>(
+      await request<ResponseBody<'getAdminLedgerSystemWallet'>>(
         `/api/admin/ledger/system-accounts/${systemKind}/wallet`,
       )
     ).wallet
@@ -295,7 +261,7 @@ export const api = {
     before = '',
     limit = 20,
   ) {
-    return request<{ entries: LedgerEntry[]; next_before: string }>(
+    return request<ResponseBody<'listAdminLedgerSystemEntries'>>(
       ledgerEntriesPath(
         `/api/admin/ledger/system-accounts/${systemKind}/entries`,
         before,
@@ -307,20 +273,20 @@ export const api = {
     const suffix = query ? `?q=${encodeURIComponent(query)}` : ''
     const prefix = admin ? '/api/admin/models' : '/api/models'
     return (
-      await request<{ models: CatalogModel[] }>(`${prefix}${suffix}`)
+      await request<ResponseBody<'listModels'>>(`${prefix}${suffix}`)
     ).models
   },
   async model(modelID: string, admin = false) {
     const prefix = admin ? '/api/admin/models' : '/api/models'
     return (
-      await request<{ model: CatalogModel }>(`${prefix}/${modelID}`)
+      await request<ResponseBody<'getModel'>>(`${prefix}/${modelID}`)
     ).model
   },
   async createModel(input: ModelInput) {
     return (
-      await request<{ model: CatalogModel }>('/api/admin/models', {
+      await request<ResponseBody<'createModel'>>('/api/admin/models', {
         method: 'POST',
-        body: JSON.stringify(input),
+        body: jsonBody<'createModel'>(input),
       })
     ).model
   },
@@ -330,48 +296,38 @@ export const api = {
     input: Omit<ModelInput, 'id'>,
   ) {
     return (
-      await request<{ model: CatalogModel }>(`/api/admin/models/${modelID}`, {
+      await request<ResponseBody<'updateModel'>>(`/api/admin/models/${modelID}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...input, expected_version: expectedVersion }),
+        body: jsonBody<'updateModel'>({ ...input, expected_version: expectedVersion }),
       })
     ).model
   },
   async channels() {
-    return (await request<{ channels: Channel[] }>('/api/channels')).channels
+    return (await request<ResponseBody<'listChannels'>>('/api/channels')).channels
   },
   async channel(channelID: string) {
     return (
-      await request<{ channel: Channel }>(
+      await request<ResponseBody<'getChannel'>>(
         `/api/channels/${encodeURIComponent(channelID)}`,
       )
     ).channel
   },
-  async createChannel(input: {
-    display_name: string
-    base_url: string
-    credential: string
-    offers: ChannelOfferInput[]
-  }) {
+  async createChannel(input: RequestBody<'createChannel'>) {
     return (
-      await request<{ channel: Channel }>('/api/channels', {
+      await request<ResponseBody<'createChannel'>>('/api/channels', {
         method: 'POST',
-        body: JSON.stringify(input),
+        body: jsonBody<'createChannel'>(input),
       })
     ).channel
   },
   async updateChannel(
     channelID: string,
-    input: {
-      display_name: string
-      base_url: string
-      credential?: string
-      expected_version: number
-    },
+    input: RequestBody<'updateChannel'>,
   ) {
     return (
-      await request<{ channel: Channel }>(
+      await request<ResponseBody<'updateChannel'>>(
         `/api/channels/${encodeURIComponent(channelID)}`,
-        { method: 'PATCH', body: JSON.stringify(input) },
+        { method: 'PATCH', body: jsonBody<'updateChannel'>(input) },
       )
     ).channel
   },
@@ -382,33 +338,33 @@ export const api = {
     reason = '',
   ) {
     return (
-      await request<{ channel: Channel }>(
+      await request<ResponseBody<'publishChannel'>>(
         `/api/channels/${encodeURIComponent(channelID)}/${action}`,
         {
           method: 'POST',
-          body: JSON.stringify({ expected_version: expectedVersion, reason }),
+          body: jsonBody<'publishChannel'>({ expected_version: expectedVersion, reason }),
         },
       )
     ).channel
   },
   async deleteChannel(channelID: string, expectedVersion: number, reason = '') {
     return (
-      await request<{ channel: Channel }>(
+      await request<ResponseBody<'deleteChannel'>>(
         `/api/channels/${encodeURIComponent(channelID)}`,
         {
           method: 'DELETE',
-          body: JSON.stringify({ expected_version: expectedVersion, reason }),
+          body: jsonBody<'deleteChannel'>({ expected_version: expectedVersion, reason }),
         },
       )
     ).channel
   },
   async revokeChannelCredential(channelID: string, expectedVersion: number) {
     return (
-      await request<{ channel: Channel }>(
+      await request<ResponseBody<'revokeChannelCredential'>>(
         `/api/channels/${encodeURIComponent(channelID)}/credential-revoke`,
         {
           method: 'POST',
-          body: JSON.stringify({ expected_version: expectedVersion }),
+          body: jsonBody<'revokeChannelCredential'>({ expected_version: expectedVersion }),
         },
       )
     ).channel
@@ -419,11 +375,11 @@ export const api = {
     input: ChannelOfferInput,
   ) {
     return (
-      await request<{ offer: ChannelOffer }>(
+      await request<ResponseBody<'addChannelOffer'>>(
         `/api/channels/${encodeURIComponent(channelID)}/offers`,
         {
           method: 'POST',
-          body: JSON.stringify({
+          body: jsonBody<'addChannelOffer'>({
             ...input,
             expected_version: expectedChannelVersion,
           }),
@@ -438,11 +394,11 @@ export const api = {
     multiplier: string,
   ) {
     return (
-      await request<{ offer: ChannelOffer }>(
+      await request<ResponseBody<'updateChannelOffer'>>(
         `/api/channel-offers/${encodeURIComponent(offerID)}`,
         {
           method: 'PATCH',
-          body: JSON.stringify({
+          body: jsonBody<'updateChannelOffer'>({
             expected_version: expectedVersion,
             upstream_model_id: upstreamModelID,
             multiplier,
@@ -457,22 +413,22 @@ export const api = {
     expectedVersion: number,
   ) {
     return (
-      await request<{ offer: ChannelOffer }>(
+      await request<ResponseBody<'disableChannelOffer'>>(
         `/api/channel-offers/${encodeURIComponent(offerID)}/${action}`,
         {
           method: 'POST',
-          body: JSON.stringify({ expected_version: expectedVersion }),
+          body: jsonBody<'disableChannelOffer'>({ expected_version: expectedVersion }),
         },
       )
     ).offer
   },
   async deleteChannelOffer(offerID: string, expectedVersion: number) {
     return (
-      await request<{ offer: ChannelOffer }>(
+      await request<ResponseBody<'deleteChannelOffer'>>(
         `/api/channel-offers/${encodeURIComponent(offerID)}`,
         {
           method: 'DELETE',
-          body: JSON.stringify({ expected_version: expectedVersion }),
+          body: jsonBody<'deleteChannelOffer'>({ expected_version: expectedVersion }),
         },
       )
     ).offer
@@ -480,11 +436,11 @@ export const api = {
   async validateChannelOffer(offerID: string, admin = false) {
     const prefix = admin ? '/api/admin/channel-offers' : '/api/channel-offers'
     return (
-      await request<{ validation: AuthorizedValidationAttempt }>(
+      await request<ResponseBody<'validateChannelOffer'>>(
         `${prefix}/${encodeURIComponent(offerID)}/validation-attempts`,
         {
           method: 'POST',
-          body: JSON.stringify({ confirmed_upstream_cost: true }),
+          body: jsonBody<'validateChannelOffer'>({ confirmed_upstream_cost: true }),
         },
       )
     ).validation
@@ -492,45 +448,45 @@ export const api = {
   async channelValidationAttempts(offerID: string, admin = false, limit = 50) {
     const prefix = admin ? '/api/admin/channel-offers' : '/api/channel-offers'
     return (
-      await request<{ validation_attempts: AuthorizedValidationAttempt[] }>(
+      await request<ResponseBody<'listOfferValidationAttempts'>>(
         `${prefix}/${encodeURIComponent(offerID)}/validation-attempts?limit=${limit}`,
       )
     ).validation_attempts
   },
   marketOffers(input: Parameters<typeof marketOffersPath>[0] = {}) {
-    return request<{ offers: MarketOffer[]; next_after: string }>(
+    return request<ResponseBody<'listMarketOffers'>>(
       marketOffersPath(input),
     )
   },
   async marketChannel(channelID: string) {
     return (
-      await request<{ channel: MarketChannel }>(
+      await request<ResponseBody<'getMarketChannel'>>(
         `/api/market/channels/${encodeURIComponent(channelID)}`,
       )
     ).channel
   },
   async rateChannel(channelID: string, score: number) {
     return (
-      await request<{ channel: MarketChannel }>(
+      await request<ResponseBody<'rateMarketChannel'>>(
         `/api/market/channels/${encodeURIComponent(channelID)}/rating`,
-        { method: 'PUT', body: JSON.stringify({ score }) },
+        { method: 'PUT', body: jsonBody<'rateMarketChannel'>({ score }) },
       )
     ).channel
   },
   async apiKeys() {
-    return (await request<{ keys: APIKey[] }>('/api/keys')).keys
+    return (await request<ResponseBody<'listAPIKeys'>>('/api/keys')).keys
   },
   async apiKey(keyID: string) {
     return (
-      await request<{ key: APIKey }>(
+      await request<ResponseBody<'getAPIKey'>>(
         `/api/keys/${encodeURIComponent(keyID)}`,
       )
     ).key
   },
   createAPIKey(displayName: string, pools: APIKeyPoolInput[]) {
-    return request<{ key: APIKey; secret: string }>('/api/keys', {
+    return request<ResponseBody<'createAPIKey'>>('/api/keys', {
       method: 'POST',
-      body: JSON.stringify({ display_name: displayName, pools }),
+      body: jsonBody<'createAPIKey'>({ display_name: displayName, pools }),
     })
   },
   async updateAPIKey(
@@ -540,11 +496,11 @@ export const api = {
     pools: APIKeyPoolInput[],
   ) {
     return (
-      await request<{ key: APIKey }>(
+      await request<ResponseBody<'updateAPIKey'>>(
         `/api/keys/${encodeURIComponent(keyID)}`,
         {
           method: 'PATCH',
-          body: JSON.stringify({
+          body: jsonBody<'updateAPIKey'>({
             display_name: displayName,
             pools,
             expected_version: expectedVersion,
@@ -554,11 +510,11 @@ export const api = {
     ).key
   },
   rotateAPIKey(keyID: string, expectedVersion: number) {
-    return request<{ key: APIKey; secret: string }>(
+    return request<ResponseBody<'rotateAPIKey'>>(
       `/api/keys/${encodeURIComponent(keyID)}/rotate`,
       {
         method: 'POST',
-        body: JSON.stringify({ expected_version: expectedVersion }),
+        body: jsonBody<'rotateAPIKey'>({ expected_version: expectedVersion }),
       },
     )
   },
@@ -568,22 +524,22 @@ export const api = {
     expectedVersion: number,
   ) {
     return (
-      await request<{ key: APIKey }>(
+      await request<ResponseBody<'disableAPIKey'>>(
         `/api/keys/${encodeURIComponent(keyID)}/${action}`,
         {
           method: 'POST',
-          body: JSON.stringify({ expected_version: expectedVersion }),
+          body: jsonBody<'disableAPIKey'>({ expected_version: expectedVersion }),
         },
       )
     ).key
   },
   async deleteAPIKey(keyID: string, expectedVersion: number) {
     return (
-      await request<{ key: APIKey }>(
+      await request<ResponseBody<'deleteAPIKey'>>(
         `/api/keys/${encodeURIComponent(keyID)}`,
         {
           method: 'DELETE',
-          body: JSON.stringify({ expected_version: expectedVersion }),
+          body: jsonBody<'deleteAPIKey'>({ expected_version: expectedVersion }),
         },
       )
     ).key
@@ -591,44 +547,39 @@ export const api = {
   async addAPIKeyPoolMember(
     keyID: string,
     expectedVersion: number,
-    input: {
-      model_id: string
-      protocol: ChannelProtocol
-      offer_id: string
-      priority: number
-    },
+    input: Omit<RequestBody<'addAPIKeyPoolMember'>, 'expected_version'>,
   ) {
     return (
-      await request<{ key: APIKey }>(
+      await request<ResponseBody<'addAPIKeyPoolMember'>>(
         `/api/keys/${encodeURIComponent(keyID)}/pool-members`,
         {
           method: 'POST',
-          body: JSON.stringify({ ...input, expected_version: expectedVersion }),
+          body: jsonBody<'addAPIKeyPoolMember'>({ ...input, expected_version: expectedVersion }),
         },
       )
     ).key
   },
   async gatewayCalls(limit = 50) {
     return (
-      await request<{ calls: GatewayCall[] }>(`/api/calls?limit=${limit}`)
+      await request<ResponseBody<'listGatewayCalls'>>(`/api/calls?limit=${limit}`)
     ).calls
   },
   async gatewayCall(callID: string) {
     return (
-      await request<{ call: GatewayCall }>(
+      await request<ResponseBody<'getGatewayCall'>>(
         `/api/calls/${encodeURIComponent(callID)}`,
       )
     ).call
   },
   gatewayDashboard() {
-    return request<GatewayDashboard>('/api/dashboard')
+    return request<ResponseBody<'getDashboard'>>('/api/dashboard')
   },
   async adminChannels() {
-    return (await request<{ channels: AdminChannel[] }>('/api/admin/channels')).channels
+    return (await request<ResponseBody<'listAdminChannels'>>('/api/admin/channels')).channels
   },
   async adminChannel(channelID: string) {
     return (
-      await request<{ channel: AdminChannel }>(
+      await request<ResponseBody<'getAdminChannel'>>(
         `/api/admin/channels/${encodeURIComponent(channelID)}`,
       )
     ).channel
@@ -641,38 +592,32 @@ export const api = {
   ) {
     const path = `/api/admin/channels/${encodeURIComponent(channelID)}${action === 'pause' ? '/pause' : ''}`
     return (
-      await request<{ channel: AdminChannel }>(path, {
+      await request<ResponseBody<'adminPauseChannel'>>(path, {
         method: action === 'delete' ? 'DELETE' : 'POST',
-        body: JSON.stringify({ expected_version: expectedVersion, reason }),
+        body: jsonBody<'adminPauseChannel'>({ expected_version: expectedVersion, reason }),
       })
     ).channel
   },
   c2cMarket() {
-    return request<C2CMarket>('/api/c2c/market')
+    return request<ResponseBody<'getC2CMarket'>>('/api/c2c/market')
   },
   async c2cOrder(orderID: string) {
     return (
-      await request<{ order: C2COrder }>(
+      await request<ResponseBody<'getC2COrder'>>(
         `/api/c2c/orders/${encodeURIComponent(orderID)}`,
       )
     ).order
   },
-  async createC2COrder(input: {
-    side: C2CSide
-    unit_price_fen: number
-    total: string
-    minimum: string
-    maximum: string
-    payment_methods: Array<{
-      type: C2CPaymentMethodType
-      contact: string
-      instructions: string
-      qr?: File | null
-    }>
-  }) {
+  async createC2COrder(
+    input: Omit<RequestBody<'createC2COrder'>, 'payment_methods'> & {
+      payment_methods: Array<
+        Omit<C2CPaymentMethodRequest, 'qr_field'> & { qr?: File | null }
+      >
+    },
+  ) {
     const key = crypto.randomUUID()
     const hasFiles = input.payment_methods.some((method) => method.qr)
-    const payload = {
+    const payload: RequestBody<'createC2COrder'> = {
       ...input,
       payment_methods: input.payment_methods.map((method, index) => ({
         type: method.type,
@@ -684,16 +629,16 @@ export const api = {
     let body: BodyInit
     if (hasFiles) {
       const form = new FormData()
-      form.set('payload', JSON.stringify(payload))
+      form.set('payload', jsonBody<'createC2COrder'>(payload))
       input.payment_methods.forEach((method, index) => {
         if (method.qr) form.set(`payment_qr_${index}`, method.qr)
       })
       body = form
     } else {
-      body = JSON.stringify(payload)
+      body = jsonBody<'createC2COrder'>(payload)
     }
     return (
-      await request<{ order: C2COrder }>('/api/c2c/orders', {
+      await request<ResponseBody<'createC2COrder'>>('/api/c2c/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': key },
         body,
@@ -702,49 +647,49 @@ export const api = {
   },
   async takeC2COrder(orderID: string, quantity: string, paymentMethodID: string) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'takeC2COrder'>>(
         `/api/c2c/orders/${encodeURIComponent(orderID)}/take`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ quantity, payment_method_id: paymentMethodID }),
+          body: jsonBody<'takeC2COrder'>({ quantity, payment_method_id: paymentMethodID }),
         },
       )
     ).trade
   },
   async cancelC2COrder(orderID: string) {
     return (
-      await request<{ order: C2COrder }>(
+      await request<ResponseBody<'cancelC2COrder'>>(
         `/api/c2c/orders/${encodeURIComponent(orderID)}/cancel`,
         { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
       )
     ).order
   },
   async c2cActivity() {
-    return request<{ orders: C2COrder[]; trades: C2CTrade[] }>('/api/c2c/me')
+    return request<ResponseBody<'getC2CMyActivity'>>('/api/c2c/me')
   },
   async c2cTrade(tradeID: string) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'getC2CTrade'>>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}`,
       )
     ).trade
   },
   async markC2CPaid(tradeID: string, paymentReference: string) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'markC2CTradePaid'>>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}/paid`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ payment_reference: paymentReference }),
+          body: jsonBody<'markC2CTradePaid'>({ payment_reference: paymentReference }),
         },
       )
     ).trade
   },
   async cancelC2CTrade(tradeID: string) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'cancelC2CTrade'>>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}/cancel`,
         { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
       )
@@ -752,7 +697,7 @@ export const api = {
   },
   async releaseC2CTrade(tradeID: string) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'confirmC2CReceipt'>>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}/release`,
         { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
       )
@@ -764,29 +709,29 @@ export const api = {
     append = false,
   ) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'openC2CDispute'>>(
         `/api/c2c/trades/${encodeURIComponent(tradeID)}/${append ? 'statements' : 'dispute'}`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ statement }),
+          body: jsonBody<'openC2CDispute'>({ statement }),
         },
       )
     ).trade
   },
   async adminC2CDisputes() {
     return (
-      await request<{ trades: C2CTrade[] }>('/api/admin/c2c/disputes')
+      await request<ResponseBody<'listC2CDisputes'>>('/api/admin/c2c/disputes')
     ).trades
   },
   async adminCancelC2COrder(orderID: string, reason: string) {
     return (
-      await request<{ order: C2COrder }>(
+      await request<ResponseBody<'adminCancelC2COrder'>>(
         `/api/admin/c2c/orders/${encodeURIComponent(orderID)}/cancel`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ reason }),
+          body: jsonBody<'adminCancelC2COrder'>({ reason }),
         },
       )
     ).order
@@ -797,12 +742,12 @@ export const api = {
     reason: string,
   ) {
     return (
-      await request<{ trade: C2CTrade }>(
+      await request<ResponseBody<'resolveC2CDispute'>>(
         `/api/admin/c2c/trades/${encodeURIComponent(tradeID)}/resolve`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ action, reason }),
+          body: jsonBody<'resolveC2CDispute'>({ action, reason }),
         },
       )
     ).trade

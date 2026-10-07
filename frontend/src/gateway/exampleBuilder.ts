@@ -1,4 +1,4 @@
-import type { ChannelProtocol } from '../api/contracts'
+import type { ChannelProtocol } from '../api/types'
 
 export type ExampleLanguage = 'curl' | 'python' | 'node'
 

@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { APIKey } from '../api/contracts'
+import type { APIKey } from '../api/types'
 import {
   Button,
   Card,

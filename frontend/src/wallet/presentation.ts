@@ -2,7 +2,7 @@ import type {
   LedgerCounterparty,
   LedgerEntry,
   WalletRiskStatus,
-} from '../api/contracts'
+} from '../api/types'
 import { formatNanoPoints, parseNanoPoints } from '../money/amount'
 
 const transactionLabels: Record<string, string> = {
