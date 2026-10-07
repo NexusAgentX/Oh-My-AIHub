@@ -9,6 +9,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ops"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
 )
 
 func pointsString(nano int64) string {
@@ -358,7 +359,7 @@ func (s *Store) opsConcentration(ctx context.Context, result *ops.Metrics) error
 		Scan(&count, &total, &top1, &top5, &hhi); err != nil {
 		return err
 	}
-	result.Concentration = ops.ConcentrationMetrics{PositiveUserCount: count, TotalPositive: nanoIntegerToPoints(total), Top1Share: top1, Top5Share: top5, HHI: hhi}
+	result.Concentration = ops.ConcentrationMetrics{PositiveUserCount: count, TotalPositive: ledgerpg.NanoIntegerToPoints(total), Top1Share: top1, Top5Share: top5, HHI: hhi}
 	return nil
 }
 
