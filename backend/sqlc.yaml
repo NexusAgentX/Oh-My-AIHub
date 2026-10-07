@@ -92,6 +92,21 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "ledger_hold_events.amount_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.total_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.available_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.allocated_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.settled_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.closed_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.minimum_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_orders.maximum_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "c2c_trades.quantity_nano"
           - column: "api_calls.preauthorized_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "api_calls.fee_rate_nano"
@@ -163,6 +178,13 @@ sql:
         <<: *gen
         package: channelpg
         out: internal/postgres/channelpg
+  - <<: *domain
+    queries: internal/postgres/c2cpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: c2cpg
+        out: internal/postgres/c2cpg
   - <<: *domain
     queries: internal/postgres/gatewaypg/queries.sql
     gen:

@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/feeratepg"
@@ -23,6 +24,7 @@ type (
 	channelStore  = channelpg.Store
 	ledgerStore   = ledgerpg.Store
 	gatewayStore  = gatewaypg.Store
+	c2cStore      = c2cpg.Store
 )
 
 // Store is the composition root of persistence. Domains migrated to sqlc live
@@ -37,6 +39,7 @@ type Store struct {
 	*channelStore
 	*ledgerStore
 	*gatewayStore
+	*c2cStore
 
 	pool *pgxpool.Pool
 }
@@ -49,6 +52,7 @@ func New(pool *pgxpool.Pool) *Store {
 		channelStore:  channelpg.NewStore(pool),
 		ledgerStore:   ledgerpg.NewStore(pool),
 		gatewayStore:  gatewaypg.NewStore(pool),
+		c2cStore:      c2cpg.NewStore(pool),
 		pool:          pool,
 	}
 }
