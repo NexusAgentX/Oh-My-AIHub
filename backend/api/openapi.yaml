@@ -3788,7 +3788,7 @@ components:
           description: dispute 申诉中的交易；over_limit 超出信用额度的账户；negative_balance 负余额超过 30 天；credit_concentration 单个用户持有超过 50% 流通积分；channel_failing 渠道 1 小时成功率低于 80% 且调用不少于 20 次；unbilled_usage 24 小时内读不到用量的成功调用占比超过 5% 或超过 20 次；ledger_unbalanced 账户合计不为 0；reconciliation_failed 记账失败或其余核对不通过；channel_suspended 与 stuck_call 暂不产生。
         severity: {type: string, enum: [warning, critical]}
         title: {type: string}
-        count: {type: integer}
+        count: {type: integer, description: 该项涉及的条目数（账户、渠道、交易、调用或未通过的核对项的数量），每个渠道异常算 1 条。}
         link: {type: string}
       required: [kind, severity, title, count, link]
       additionalProperties: false
