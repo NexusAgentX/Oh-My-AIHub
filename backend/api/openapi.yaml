@@ -3280,11 +3280,10 @@ components:
         pool_count: {type: integer}
         healthy_offer_count: {type: integer}
         unhealthy_offer_count: {type: integer}
-        pending_items: {type: integer}
         recent_calls:
           type: array
           items: {$ref: "#/components/schemas/GatewayCall"}
-      required: [consumer_spent, provider_income, today_spent, today_succeeded_calls, today_external_provider_income, active_key_count, pool_count, healthy_offer_count, unhealthy_offer_count, pending_items, recent_calls]
+      required: [consumer_spent, provider_income, today_spent, today_succeeded_calls, today_external_provider_income, active_key_count, pool_count, healthy_offer_count, unhealthy_offer_count, recent_calls]
       additionalProperties: false
     C2CPaymentMethod:
       type: object

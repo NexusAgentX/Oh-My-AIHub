@@ -11,6 +11,7 @@
 ### 移除
 
 - 删除渠道 1～5 分评分（Feature #160，Epic #158）：删除 `PUT /api/market/channels/{channelID}/rating`、市场 / 渠道 / 管理员响应中的 `average_rating`、`rating_count`、`current_user_rating` 字段和 `rating` 排序选项，以及市场列表、公开渠道详情、共享者与管理员渠道页的评分展示和 `MarketRating` 组件；迁移 `0010_remove_channel_ratings.sql` 删除 `channel_ratings` 表，已有评分数据随迁移删除。工作台不再有“待评分”事项。
+- 删除 `GET /api/dashboard` 响应中不再使用的整数字段 `pending_items`（不健康报价计数），避免与新的 `GET /api/dashboard/pending-items` 混淆（Feature #160）。
 
 ## v0.5.0 - 2026-10-07
 

@@ -2077,7 +2077,6 @@ export interface components {
             pool_count: number;
             healthy_offer_count: number;
             unhealthy_offer_count: number;
-            pending_items: number;
             recent_calls: components["schemas"]["GatewayCall"][];
         };
         C2CPaymentMethod: {
