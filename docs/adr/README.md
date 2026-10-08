@@ -55,3 +55,4 @@
 - [ADR-0021：以 OpenAPI 作为前后端唯一契约来源](0021-openapi-as-single-api-contract.md) — 已通过
 - [ADR-0022：取消用户验证环节](0022-drop-user-validation-stage.md) — 已通过
 - [ADR-0023：删除 C2C 买单，只保留卖单](0023-remove-c2c-buy-orders.md) — 已通过
+- [ADR-0024：数据库迁移压缩为单一基线](0024-squash-migrations-to-single-baseline.md) — 已通过

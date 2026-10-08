@@ -967,14 +967,6 @@ func TestC2CIntegration(t *testing.T) {
 		FROM c2c_dispute_statements WHERE trade_id = $1 ORDER BY created_at, id LIMIT 1`, returnedTradeID).Scan(&statementCiphertext, &statementDeleted); err != nil || len(statementCiphertext) != 0 || statementDeleted == nil {
 		t.Fatalf("statement retention cleanup = bytes %d deleted %v, %v", len(statementCiphertext), statementDeleted, err)
 	}
-	var evidenceTable *string
-	var qrColumn bool
-	if err := pool.QueryRow(ctx, `
-		SELECT to_regclass('c2c_evidence')::text,
-		       EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('c2c_payment_methods') AND attname = 'qr_available' AND NOT attisdropped)`,
-	).Scan(&evidenceTable, &qrColumn); err != nil || evidenceTable != nil || !qrColumn {
-		t.Fatalf("expected evidence table dropped and qr_available kept: table %v column %v, %v", evidenceTable, qrColumn, err)
-	}
 }
 
 func assertOrderAmounts(t *testing.T, order c2c.Order, total, available, allocated, settled, closed string, status c2c.OrderStatus) {

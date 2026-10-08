@@ -1145,7 +1145,7 @@ func TestLedgerIntegration(t *testing.T) {
 	}
 }
 
-func TestLedgerMigrationUpgradesExistingIdentityData(t *testing.T) {
+func TestLedgerBaselineSystemAccounts(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
@@ -1156,63 +1156,35 @@ func TestLedgerMigrationUpgradesExistingIdentityData(t *testing.T) {
 		t.Fatalf("open test database: %v", err)
 	}
 	t.Cleanup(basePool.Close)
-	schema := "ledger_upgrade_" + randomHex(t, 8)
+	schema := "ledger_baseline_" + randomHex(t, 8)
 	if _, err := basePool.Exec(ctx, fmt.Sprintf(`CREATE SCHEMA %q`, schema)); err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
 	t.Cleanup(func() { _, _ = basePool.Exec(context.Background(), fmt.Sprintf(`DROP SCHEMA %q CASCADE`, schema)) })
 	schemaURL := withSearchPath(t, databaseURL, schema)
-	if err := database.MigrateTo(ctx, schemaURL, 1); err != nil {
-		t.Fatalf("migrate to identity schema: %v", err)
+	if err := database.Migrate(ctx, schemaURL); err != nil {
+		t.Fatalf("migrate: %v", err)
 	}
-	pool, err := database.Open(ctx, schemaURL)
-	if err != nil {
-		t.Fatalf("open identity schema: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	var activeID, disabledID string
-	if err := pool.QueryRow(ctx, `
-		INSERT INTO accounts (username, display_name, password_hash, status, credit_limit_nano)
-		VALUES ('upgrade.active', 'Upgrade Active', 'placeholder', 'active', 5000000000)
-		RETURNING id::text`).Scan(&activeID); err != nil {
-		t.Fatalf("insert active account: %v", err)
-	}
-	if err := pool.QueryRow(ctx, `
-		INSERT INTO accounts (username, display_name, password_hash, status, disabled_at)
-		VALUES ('upgrade.disabled', 'Upgrade Disabled', 'placeholder', 'disabled', now())
-		RETURNING id::text`).Scan(&disabledID); err != nil {
-		t.Fatalf("insert disabled account: %v", err)
-	}
-	if _, err := pool.Exec(ctx, `
-		INSERT INTO sessions (token_hash, account_id, password_version, expires_at)
-		VALUES (decode(repeat('11', 32), 'hex'), $1, 1, now() + interval '1 hour')`, activeID); err != nil {
-		t.Fatalf("insert existing session: %v", err)
-	}
-	if err := database.MigrateTo(ctx, schemaURL, 2); err != nil {
-		t.Fatalf("upgrade ledger schema: %v", err)
-	}
+	// Migrating again is a no-op.
 	if err := database.Migrate(ctx, schemaURL); err != nil {
 		t.Fatalf("repeat migrations: %v", err)
 	}
-	var accounts, userLedgers, systems, sessions int
+	pool, err := database.Open(ctx, schemaURL)
+	if err != nil {
+		t.Fatalf("open schema: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	var users, incentive, loss int
 	if err := pool.QueryRow(ctx, `
 		SELECT
-			(SELECT count(*) FROM accounts),
-			(SELECT count(*) FROM ledger_accounts WHERE kind = 'user'),
-			(SELECT count(*) FROM ledger_accounts WHERE kind <> 'user'),
-			(SELECT count(*) FROM sessions)`).Scan(&accounts, &userLedgers, &systems, &sessions); err != nil {
-		t.Fatalf("query upgraded counts: %v", err)
+			count(*) FILTER (WHERE kind = 'user'),
+			count(*) FILTER (WHERE kind = 'platform_incentive' AND system_code = 'platform_incentive'),
+			count(*) FILTER (WHERE kind = 'platform_loss' AND system_code = 'platform_loss')
+		FROM ledger_accounts`).Scan(&users, &incentive, &loss); err != nil {
+		t.Fatalf("query baseline ledger accounts: %v", err)
 	}
-	if accounts != 2 || userLedgers != 2 || systems != 2 || sessions != 1 {
-		t.Fatalf("upgraded counts = accounts %d, ledgers %d, systems %d, sessions %d", accounts, userLedgers, systems, sessions)
-	}
-	var frozen bool
-	var posted int64
-	if err := pool.QueryRow(ctx, `
-		SELECT a.credit_frozen, la.posted_balance_nano
-		FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
-		WHERE a.id = $1`, disabledID).Scan(&frozen, &posted); err != nil || frozen || posted != 0 {
-		t.Fatalf("disabled account ledger = frozen %v, posted %d, err %v", frozen, posted, err)
+	if users != 0 || incentive != 1 || loss != 1 {
+		t.Fatalf("baseline ledger accounts = users %d, incentive %d, loss %d", users, incentive, loss)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO ledger_accounts (kind) VALUES ('platform_loss')`); err == nil {
 		t.Fatal("system account without system_code unexpectedly inserted")

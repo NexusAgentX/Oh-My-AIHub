@@ -70,6 +70,8 @@ mise run install
 mise run dev-database
 ```
 
+迁移已压缩为单一基线 `0001_baseline.sql`（ADR-0024）。更早创建的开发数据库与它不兼容，须先用 `docker compose down -v` 删除数据卷再重新启动。
+
 首次运行时，启动后端与前端后访问 `/initialize`，在网页上创建唯一的初始管理员。
 
 启动后端：
