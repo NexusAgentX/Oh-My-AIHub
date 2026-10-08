@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -24,6 +25,7 @@ type Dependencies struct {
 	Ledger            *ledger.Service
 	Settings          *settings.Service
 	Audit             *audit.Service
+	C2C               *c2c.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -35,6 +37,7 @@ type app struct {
 	ledger            *ledger.Service
 	settings          *settings.Service
 	audit             *audit.Service
+	c2c               *c2c.Service
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
 	cookieName        string
@@ -56,6 +59,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		ledger:            dependencies.Ledger,
 		settings:          dependencies.Settings,
 		audit:             dependencies.Audit,
+		c2c:               dependencies.C2C,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
 		cookieName:        defaultSessionCookie,
@@ -70,6 +74,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerAdminAccountRoutes(routes)
 	application.registerAdminModelRoutes(routes)
 	application.registerAdminSettingsRoutes(routes)
+	application.registerC2CRoutes(routes)
 	registerPlannedRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table

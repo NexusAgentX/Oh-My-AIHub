@@ -55,6 +55,12 @@ func (r *router) handle(pattern string, level access, handler http.HandlerFunc) 
 	r.mux.Handle(pattern, r.wrap(level, handler))
 }
 
+// implement registers a route owned by a later feature once it is built.
+func (r *router) implement(feature string, pattern string, level access, handler http.HandlerFunc) {
+	r.table = append(r.table, route{pattern: pattern, access: level, feature: feature, implemented: true})
+	r.mux.Handle(pattern, r.wrap(level, handler))
+}
+
 func (r *router) public(pattern string, handler http.HandlerFunc) {
 	r.handle(pattern, accessPublic, handler)
 }

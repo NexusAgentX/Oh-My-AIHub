@@ -840,12 +840,10 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     post:
       operationId: createC2COrder
       tags: [c2c]
       summary: 挂卖单
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -866,19 +864,19 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/my/orders:
     get:
       operationId: listMyC2COrders
       tags: [c2c]
-      summary: 我的卖单
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
+      summary: 我的卖单（可按状态筛选）
       x-access: ready
       x-feature: C
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/orderStatus'}
       - {$ref: '#/components/parameters/cursor'}
       - {$ref: '#/components/parameters/limit'}
       responses:
@@ -890,13 +888,11 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/orders/{orderID}/close:
     post:
       operationId: closeC2COrder
       tags: [c2c]
       summary: 关闭卖单（剩余积分退回）
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -914,13 +910,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/orders/{orderID}/trades:
     post:
       operationId: createC2CTrade
       tags: [c2c]
       summary: 买入（下单）
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -945,13 +939,11 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/my/trades:
     get:
       operationId: listMyC2CTrades
       tags: [c2c]
       summary: 我的交易
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -959,6 +951,7 @@ paths:
       parameters:
       - {$ref: '#/components/parameters/tradeRole'}
       - {$ref: '#/components/parameters/tradeStatus'}
+      - {$ref: '#/components/parameters/tradePending'}
       - {$ref: '#/components/parameters/cursor'}
       - {$ref: '#/components/parameters/limit'}
       responses:
@@ -970,13 +963,11 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/trades/{tradeID}:
     get:
       operationId: getC2CTrade
       tags: [c2c]
       summary: 交易详情
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -992,13 +983,11 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/trades/{tradeID}/paid:
     post:
       operationId: markC2CTradePaid
       tags: [c2c]
       summary: 我已付款
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -1021,13 +1010,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/trades/{tradeID}/release:
     post:
       operationId: releaseC2CTrade
       tags: [c2c]
       summary: 确认收款放行
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -1045,13 +1032,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/trades/{tradeID}/cancel:
     post:
       operationId: cancelC2CTrade
       tags: [c2c]
       summary: 取消交易
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -1069,13 +1054,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/c2c/trades/{tradeID}/dispute:
     post:
       operationId: disputeC2CTrade
       tags: [c2c]
       summary: 申诉
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: C
       security:
@@ -1099,7 +1082,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/accounts:
     get:
       operationId: listAdminAccounts
@@ -1508,7 +1490,6 @@ paths:
       operationId: listAdminDisputes
       tags: [admin-c2c]
       summary: 申诉列表
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: C
       security:
@@ -1526,13 +1507,11 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/c2c/trades/{tradeID}/resolve:
     post:
       operationId: resolveAdminC2CTrade
       tags: [admin-c2c]
       summary: 仲裁
-      description: 由 Feature C 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: C
       security:
@@ -1556,7 +1535,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/overview:
     get:
       operationId: getAdminOverview
@@ -2004,6 +1982,18 @@ components:
       required: false
       description: 交易状态。
       schema: {$ref: '#/components/schemas/TradeStatus'}
+    orderStatus:
+      name: status
+      in: query
+      required: false
+      description: 卖单状态。
+      schema: {$ref: '#/components/schemas/OrderStatus'}
+    tradePending:
+      name: pending
+      in: query
+      required: false
+      description: 为 true 时只返回待我处理的交易：我是买家且待付款，或我是卖家且已付款待放行。
+      schema: {type: boolean}
     auditAction:
       name: action
       in: query
@@ -2106,6 +2096,7 @@ components:
     AccountStatus: {type: string, enum: [active, disabled]}
     ChannelStatus: {type: string, enum: [listed, unlisted, suspended], description: 上架、下架（所有者）、强制下架（管理员）。}
     TransactionType: {type: string, enum: [api_call, c2c_list, c2c_release, c2c_return, admin_adjust, bad_debt_writeoff]}
+    OrderStatus: {type: string, enum: [open, closed, filled]}
     TradeStatus: {type: string, enum: [awaiting_payment, paid, released, cancelled, disputed, resolved_to_buyer, resolved_to_seller]}
     ErrorResponse:
       type: object
@@ -3333,18 +3324,18 @@ components:
       additionalProperties: false
     C2COrderCreateRequest:
       type: object
-      description: 只能卖正余额；挂单时积分转入 C2C 托管账户。
+      description: 只能卖正余额，不能卖信用额度；挂单时积分转入 C2C 托管账户。min_per_trade、max_per_trade 省略或为 null 表示不限（最少按最小单位 0.000000001 存储）。
       properties:
         amount: {$ref: '#/components/schemas/Amount'}
         unit_price_fen: {type: integer, minimum: 1}
-        min_per_trade: {$ref: '#/components/schemas/Amount'}
+        min_per_trade: {$ref: '#/components/schemas/NullableAmount'}
         max_per_trade: {$ref: '#/components/schemas/NullableAmount'}
         payment_methods:
           type: array
           items: {$ref: '#/components/schemas/PaymentMethod'}
           minItems: 1
           maxItems: 5
-      required: [amount, unit_price_fen, min_per_trade, payment_methods]
+      required: [amount, unit_price_fen, payment_methods]
       additionalProperties: false
     C2CTradeCreateRequest:
       type: object
@@ -3405,7 +3396,7 @@ components:
     C2CDisputeRequest:
       type: object
       properties:
-        statement: {type: string, minLength: 1, maxLength: 2000}
+        statement: {type: string, minLength: 1, maxLength: 1000}
       required: [statement]
       additionalProperties: false
     C2CResolveRequest:

@@ -147,3 +147,20 @@ func points(ctx context.Context, db DBTX, accountID string) (ledger.Points, erro
 	}
 	return ledger.Points{Balance: row.BalanceNano, CreditLimit: row.CreditLimitNano, UpdatedAt: row.UpdatedAt}, nil
 }
+
+// LockBalance locks the user's ledger account row for the rest of tx and
+// returns its balance. Callers that check a balance rule before Post (a C2C
+// listing needs balance >= amount) lock first, so concurrent requests cannot
+// both pass the check.
+func LockBalance(ctx context.Context, tx pgx.Tx, accountID string) (money.Amount, error) {
+	rows, err := New(tx).LockLedgerAccounts(ctx, LockLedgerAccountsParams{UserIds: []string{accountID}, SystemCodes: []string{}})
+	if err != nil {
+		return 0, err
+	}
+	for _, row := range rows {
+		if row.AccountID != nil && *row.AccountID == accountID {
+			return row.BalanceNano, nil
+		}
+	}
+	return 0, ledger.ErrNotFound
+}
