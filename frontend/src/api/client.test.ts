@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, changesAuthenticatedAccount } from './client'
+import { api, ApiError, apiGet, apiSend, changesAuthenticatedAccount, withQuery } from './client'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -19,18 +19,38 @@ describe('changesAuthenticatedAccount', () => {
   })
 })
 
+describe('typed helpers', () => {
+  it('builds query strings without empty values', () => {
+    expect(withQuery('/api/calls', { model: 'gpt-5', outcome: '', cursor: undefined, limit: 50 })).toBe('/api/calls?model=gpt-5&limit=50')
+    expect(withQuery('/api/calls', {})).toBe('/api/calls')
+  })
+
+  it('sends the Idempotency-Key header for ledger writes', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+      JSON.stringify({ trade: { id: 't' } }),
+      { status: 201, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+    await apiSend<'createC2CTrade'>('POST', '/api/c2c/orders/o/trades', { amount: '1' }, { idempotencyKey: 'abc' })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('abc')
+    expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
+    expect(init?.body).toBe('{"amount":"1"}')
+  })
+})
+
 describe('request errors', () => {
   it('reads the flat error shape', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ error: 'not_implemented', message: '该功能尚未实现' }),
       { status: 501, headers: { 'Content-Type': 'application/json' } },
     )))
-    await expect(api.points()).rejects.toMatchObject({ status: 501, code: 'not_implemented', message: '该功能尚未实现' })
+    await expect(apiGet<'getHome'>('/api/home')).rejects.toMatchObject({ status: 501, code: 'not_implemented', message: '该功能尚未实现' })
   })
 
   it('falls back to a generic message when the body is not JSON', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('bad gateway', { status: 502 })))
-    await expect(api.points()).rejects.toMatchObject({ status: 502, code: 'request_failed' })
+    await expect(apiGet<'getPoints'>('/api/points')).rejects.toMatchObject({ status: 502, code: 'request_failed' })
   })
 
   it('changes passwords through POST /api/me/password', async () => {

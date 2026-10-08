@@ -21,7 +21,18 @@
 .call-model { display: block; overflow-wrap: anywhere; }
 .call-format small,
 .data-table td .call-format small { display: inline; margin-left: 6px; color: var(--muted); font-size: var(--text-xs); }
-.call-error { color: var(--danger-ink); font-size: var(--text-sm); }
+.call-error { display: grid; max-width: 320px; color: var(--danger-ink); font-size: var(--text-sm); }
+.call-error strong { color: inherit; }
+.call-error-message {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
+}
 .call-table td:first-child { min-width: 120px; }
 .call-row-selectable { position: relative; cursor: pointer; }
 .call-row-selectable:hover { background: var(--soft); }

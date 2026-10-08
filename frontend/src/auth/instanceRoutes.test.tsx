@@ -9,6 +9,17 @@ describe('instance routes', () => {
     ['/initialize', '/initialize'],
     ['/welcome', '/welcome'],
     ['/home', '/home'],
+    ['/models', '/models'],
+    ['/models/gpt-5', '/models/:model'],
+    ['/keys', '/keys'],
+    ['/usage', '/usage'],
+    ['/channels', '/channels'],
+    ['/channels/new', '/channels/new'],
+    ['/channels/abc', '/channels/:id'],
+    ['/points', '/points'],
+    ['/points/trades/abc', '/points/trades/:id'],
+    ['/account', '/account'],
+    ['/me', '/me'],
   ])('matches %s to route %s', (pathname, expectedRoute) => {
     expect(matchRoutes(appRoutes, pathname)?.at(-1)?.route.path).toBe(expectedRoute)
   })

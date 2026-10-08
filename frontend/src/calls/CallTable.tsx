@@ -122,7 +122,8 @@ export function channelCallColumns(): CallColumn<ChannelCall>[] {
       cell: (row) =>
         row.error ? (
           <span className="call-error" title={row.error.error_message ?? undefined}>
-            {[row.error.status_code, row.error.error_code].filter(Boolean).join(' · ') || '错误'}
+            <strong>{[row.error.status_code, row.error.error_code].filter(Boolean).join(' · ') || '错误'}</strong>
+            {row.error.error_message && <small className="call-error-message">{row.error.error_message}</small>}
           </span>
         ) : (
           '—'

@@ -15,7 +15,15 @@ import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { AccountPage } from './account/AccountPage'
 import { MePage } from './account/MePage'
+import { ChannelEditorPage } from './channels/ChannelEditorPage'
+import { ChannelsPage } from './channels/ChannelsPage'
 import { HomePage } from './home/HomePage'
+import { UsagePage } from './usage/UsagePage'
+import { PointsPage } from './points/PointsPage'
+import { TradeDetailPage } from './points/TradeDetailPage'
+import { KeysPage } from './keys/KeysPage'
+import { ModelDetailPage } from './models/ModelDetailPage'
+import { ModelsPage } from './models/ModelsPage'
 import { createQueryClient } from './api/query'
 import { ProductLayout } from './layouts/ProductLayout'
 import { LoadingState } from './ui'
@@ -87,6 +95,15 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireReadyAccount />}>
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
+          <Route element={<ModelsPage />} path="/models" />
+          <Route element={<ModelDetailPage />} path="/models/:model" />
+          <Route element={<KeysPage />} path="/keys" />
+          <Route element={<ChannelsPage />} path="/channels" />
+          <Route element={<ChannelEditorPage />} path="/channels/new" />
+          <Route element={<ChannelEditorPage />} path="/channels/:id" />
+          <Route element={<PointsPage />} path="/points" />
+          <Route element={<TradeDetailPage />} path="/points/trades/:id" />
+          <Route element={<UsagePage />} path="/usage" />
           <Route element={<MePage />} path="/me" />
           <Route element={<AccountPage />} path="/account" />
         </Route>

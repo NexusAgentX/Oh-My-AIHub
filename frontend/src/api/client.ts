@@ -144,7 +144,4 @@ export const api = {
       })
     ).account
   },
-  points() {
-    return request<ResponseBody<'getPoints'>>('/api/points')
-  },
 }

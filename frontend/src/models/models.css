@@ -1,0 +1,82 @@
+/* 模型列表、模型详情与路由编辑器 */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.model-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  color: inherit;
+  background: var(--canvas);
+}
+.model-card:hover { border-color: #cfd2d7; text-decoration: none; box-shadow: var(--shadow-sm); }
+.model-card header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.model-card header strong { overflow-wrap: anywhere; }
+.model-card-id { color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.model-card-meta { color: var(--muted); font-size: var(--text-sm); }
+.model-card-meta:empty,
+.model-card-caps:empty { display: none; }
+.model-card-caps { display: flex; flex-wrap: wrap; gap: 4px; }
+.model-card-prices { display: flex; justify-content: space-between; gap: var(--space-3); margin: 0; }
+.model-card-prices dt { color: var(--muted); font-size: var(--text-xs); }
+.model-card-prices dd { margin: 0; color: var(--ink); font-weight: 600; }
+
+.model-summary { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.model-summary-formats { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.price-rules { display: grid; margin: 0; }
+.price-rules > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--space-3); padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
+.price-rules > div:last-child { border-bottom: 0; }
+.price-rules dt { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--ink); font-weight: 600; }
+.price-rules dd { display: grid; gap: 2px; margin: 0; }
+
+.routing-editor { display: grid; gap: var(--space-4); }
+.routing-mode { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.routing-list { display: grid; gap: 0; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: var(--radius-md); list-style: none; }
+.routing-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+.routing-row:first-child { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.routing-row:last-child { border-bottom: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.routing-list-manual .routing-row { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.routing-row-off .routing-name,
+.routing-row-off .routing-metrics { opacity: 0.5; }
+.routing-row-dragging { background: var(--mustard-soft); }
+.routing-use { display: grid; width: 32px; height: 32px; place-items: center; cursor: pointer; }
+.routing-use input { width: 18px; height: 18px; accent-color: var(--ink); }
+.routing-handle {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--soft);
+  cursor: grab;
+}
+.routing-name { display: grid; min-width: 0; gap: 4px; }
+.routing-name strong { overflow-wrap: anywhere; }
+.routing-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.routing-metrics { display: grid; grid-template-columns: repeat(4, minmax(72px, auto)); gap: var(--space-4); margin: 0; font-size: var(--text-sm); }
+.routing-metrics dt { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
+.routing-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+
+@media (max-width: 960px) {
+  .routing-row,
+  .routing-list-manual .routing-row { grid-template-columns: auto minmax(0, 1fr); }
+  .routing-list-manual .routing-row { grid-template-columns: auto auto minmax(0, 1fr); }
+  .routing-metrics { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); }
+}
+@media (max-width: 760px) {
+  .price-rules > div { grid-template-columns: 1fr; gap: 2px; }
+  .routing-use,
+  .routing-handle { width: 44px; height: 44px; }
+}
