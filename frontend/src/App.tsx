@@ -13,6 +13,8 @@ import { InstanceInitializePage } from './auth/InstanceInitializePage'
 import { InstanceProvider, RequireInitialized } from './auth/InstanceProvider'
 import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
+import { AccountPage } from './account/AccountPage'
+import { MePage } from './account/MePage'
 import { HomePage } from './home/HomePage'
 import { createQueryClient } from './api/query'
 import { ProductLayout } from './layouts/ProductLayout'
@@ -85,6 +87,8 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireReadyAccount />}>
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
+          <Route element={<MePage />} path="/me" />
+          <Route element={<AccountPage />} path="/account" />
         </Route>
       </Route>
     </Route>

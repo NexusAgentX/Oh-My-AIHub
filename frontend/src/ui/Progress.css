@@ -1,0 +1,2 @@
+.progress-calm > i { background: var(--muted); }
+.progress-warn > i { background: var(--mustard); }

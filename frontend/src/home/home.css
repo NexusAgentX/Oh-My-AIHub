@@ -1,0 +1,42 @@
+/* 首页 */
+.start-card .panel-body { display: grid; gap: var(--space-4); }
+.start-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.start-key-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: 4px; font-size: var(--text-sm); }
+.code-sample { position: relative; }
+.code-sample pre {
+  margin: 0;
+  padding: var(--space-4);
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  color: var(--code-ink);
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.code-sample-copy { position: absolute; top: var(--space-2); right: var(--space-2); }
+.code-sample-copy .button { color: var(--code-ink); background: rgb(255 255 255 / 8%); }
+.cherry-fields { display: grid; gap: 0; margin: 0; }
+.cherry-fields > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--space-3); padding: 8px 0; border-bottom: 1px solid var(--hairline); }
+.cherry-fields dt { color: var(--muted); }
+.cherry-fields dd { margin: 0; overflow-wrap: anywhere; }
+.cherry-fields code { color: var(--ink); font-family: var(--font-mono); font-size: var(--text-sm); }
+
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-4); }
+.balance-body { display: grid; gap: var(--space-2); }
+.balance-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
+.balance-value small { margin-left: 6px; color: var(--muted); font-size: var(--text-sm); font-weight: 500; }
+.balance-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.today-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.today-grid dt { color: var(--muted); font-size: var(--text-sm); }
+.today-grid dd { margin: 2px 0 0; color: var(--ink); font-size: var(--text-xl); font-weight: 600; }
+.today-grid dd.amount-positive { color: var(--positive); }
+
+@media (max-width: 960px) {
+  .home-grid,
+  .start-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .balance-value { font-size: var(--text-2xl); }
+  .today-grid dd { font-size: var(--text-lg); }
+}

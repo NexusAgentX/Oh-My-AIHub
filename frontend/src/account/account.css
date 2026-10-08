@@ -1,0 +1,48 @@
+/* 我的（移动端）与账户设置 */
+.me-page { display: grid; gap: var(--space-4); }
+.me-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+  padding: var(--space-5);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+.me-profile h1 { font-size: var(--text-xl); }
+.avatar-lg { width: 48px; height: 48px; font-size: var(--text-lg); }
+.me-balance {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+}
+.me-balance:hover { text-decoration: none; }
+.me-balance strong { color: var(--ink); font-size: var(--text-xl); }
+.me-links { display: grid; overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--canvas); }
+.me-link {
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  background: var(--canvas);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.me-link:last-child { border-bottom: 0; }
+.me-link:hover { background: var(--soft); text-decoration: none; }
+.me-link > span { flex: 1; }
+.me-link > .icon:first-child { color: var(--muted); }
+.me-link > .icon:last-child { color: var(--muted); }
+.me-signout { border: 1px solid var(--hairline); border-radius: var(--radius-lg); color: var(--danger); }

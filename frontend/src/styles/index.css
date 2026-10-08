@@ -13,8 +13,16 @@
 @import '../ui/Table.css';
 @import '../ui/Dialog.css';
 @import '../ui/Tabs.css';
+@import '../ui/Disclosure.css';
+@import '../ui/Copy.css';
+@import '../ui/Switch.css';
+@import '../ui/Progress.css';
+@import '../ui/Chart.css';
 
 @import '../layouts/layout.css';
+@import '../calls/calls.css';
+@import '../home/home.css';
+@import '../account/account.css';
 
 @import '../welcome/welcome.css';
 @import '../auth/auth.css';
