@@ -16,9 +16,9 @@ export function errorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-/** 4xx 是确定性的业务/权限错误，重试无意义；网络与 5xx 最多重试 2 次。 */
+/** 4xx 与 501（接口尚未实现）是确定性错误，重试无意义；网络与其余 5xx 最多重试 2 次。 */
 export function shouldRetry(failureCount: number, error: unknown) {
-  if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+  if (error instanceof ApiError && ((error.status >= 400 && error.status < 500) || error.status === 501)) {
     return false
   }
   return failureCount < 2
