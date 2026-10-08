@@ -8,8 +8,13 @@ import {
   type ReactNode,
 } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { CreatedCredential } from '../api/contracts'
 import { shouldClearCredential } from './ephemeralCredential'
+
+/** 仅存于界面内存的一次性凭据；不是 API 响应结构。 */
+export type CreatedCredential = {
+  username: string
+  initialPassword: string
+}
 
 type EphemeralCredentialContextValue = {
   credential: CreatedCredential | null

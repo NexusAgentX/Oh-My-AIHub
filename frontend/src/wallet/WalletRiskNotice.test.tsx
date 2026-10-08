@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import type { Wallet, WalletRecoveryAction } from '../api/contracts'
+import type { Wallet, WalletRecoveryAction } from '../api/types'
 import { WalletRiskNotice } from './WalletPage'
 
 const wallet: Wallet = {

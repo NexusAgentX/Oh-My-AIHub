@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { C2CTrade } from '../api/contracts'
+import type { C2CTrade } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Badge,

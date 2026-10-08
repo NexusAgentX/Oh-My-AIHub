@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ChannelOffer } from '../api/contracts'
+import type { ChannelOffer } from '../api/types'
 import { sumIncome, summarizeChannel } from './summary'
 
 function offer(partial: Partial<ChannelOffer>): ChannelOffer {
@@ -14,7 +14,21 @@ function offer(partial: Partial<ChannelOffer>): ChannelOffer {
     validation_version: 1,
     eligible: false,
     ineligible_reason: '',
+    upstream_model_id: 'upstream',
+    version: 1,
+    input_price: null,
+    output_price: null,
+    cache_write_price: null,
+    cache_read_price: null,
+    price_tiers: [],
+    call_success_rate: null,
+    ttft_milliseconds: null,
+    tokens_per_second: null,
+    call_count: null,
+    provider_income: null,
     latest_validation: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
     ...partial,
   }
 }

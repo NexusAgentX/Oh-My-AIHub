@@ -3,7 +3,7 @@ import type {
   APIKeyPoolInput,
   APIKeyPoolMember,
   ChannelProtocol,
-} from '../api/contracts'
+} from '../api/types'
 
 /** 编辑中的路由：一把 Key 下「模型 + 原生协议」对应的渠道列表，顺序即备用顺序。 */
 export type DraftRoute = APIKeyPoolInput & { draft_id: string }

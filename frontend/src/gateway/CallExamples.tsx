@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ChannelProtocol } from '../api/contracts'
+import type { ChannelProtocol } from '../api/types'
 import { Button, Icon, Segmented } from '../ui'
 import {
   buildCallExample,

@@ -8,8 +8,18 @@ description = "Install frontend dependencies"
 run = "npm --prefix frontend ci"
 
 [tasks.generate]
-description = "Regenerate sqlc persistence code from backend/sqlc.yaml"
-run = "sqlc -f backend/sqlc.yaml generate"
+description = "Regenerate sqlc persistence code and frontend API types from backend/api/openapi.yaml"
+run = [
+  "sqlc -f backend/sqlc.yaml generate",
+  "npm --prefix frontend run generate:api",
+]
+
+[tasks.check-api-types]
+description = "Fail when frontend/src/api/schema.gen.ts differs from backend/api/openapi.yaml"
+run = [
+  "npm --prefix frontend run generate:api",
+  "git diff --exit-code -- frontend/src/api/schema.gen.ts",
+]
 
 [tasks.check-sqlc]
 description = "Fail when committed sqlc output differs from queries.sql and migrations"

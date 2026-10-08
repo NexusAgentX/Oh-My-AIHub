@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { api } from '../api/client'
-import type { APIKeyPoolInput, ChannelProtocol } from '../api/contracts'
+import type { APIKeyPoolInput, ChannelProtocol } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { marketKeys } from '../channels/marketQueries'
 import { derivePendingItems, usedChannelIDs } from './pendingDerive'

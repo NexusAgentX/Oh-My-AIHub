@@ -1,4 +1,4 @@
-import type { CatalogModel, ModelInput, PriceTier } from '../api/contracts'
+import type { CatalogModel, ModelInput, PriceTier, PriceTierInput } from '../api/types'
 
 export type TierForm = {
   name: string
@@ -20,7 +20,8 @@ export type TierForm = {
   cacheReadPrice: string
 }
 
-export type TierInput = ModelInput['price_tiers'][number]
+/** 提交时总是显式给出全部条件字段（未启用的条件为 null）。 */
+export type TierInput = Required<PriceTierInput>
 
 export const emptyTierForm: TierForm = {
   name: '',

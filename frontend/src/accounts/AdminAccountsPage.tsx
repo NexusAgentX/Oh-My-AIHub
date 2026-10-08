@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import type { Account, AccountStatus } from '../api/contracts'
+import type { Account, AccountStatus } from '../api/types'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { usernameProblem } from '../auth/credentialsRules'

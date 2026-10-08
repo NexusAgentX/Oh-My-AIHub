@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
-import type { C2COrder, C2CTrade } from '../api/contracts'
+import type { C2COrder, C2CTrade } from '../api/types'
 import { formatPointAmount } from '../wallet/presentation'
 import {
   Badge,

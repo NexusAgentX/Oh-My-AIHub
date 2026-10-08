@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import type { AdminChannelOffer } from '../api/contracts'
+import type { AdminChannelOffer } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Button,

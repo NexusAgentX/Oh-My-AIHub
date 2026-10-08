@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { C2COrder } from '../api/contracts'
+import type { C2COrder } from '../api/types'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { formatPointAmount } from '../wallet/presentation'

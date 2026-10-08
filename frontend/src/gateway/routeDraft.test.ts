@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { APIKey } from '../api/contracts'
+import type { APIKey } from '../api/types'
 import { APIKeyConflictBanner } from './KeyEditorDrawer'
 import {
   draftID,

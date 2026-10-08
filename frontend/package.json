@@ -9,6 +9,7 @@
     "test:issue-21": "vitest run src/auth/routePolicy.test.ts src/models/modelForm.test.ts src/accounts/ephemeralCredential.test.ts",
     "test:welcome": "vitest run src/welcome/WelcomePage.test.tsx",
     "build": "tsc -b && vite build",
+    "generate:api": "npm --prefix tools/openapi-types ci --no-audit --no-fund --fetch-timeout=60000 && npm --prefix tools/openapi-types run generate",
     "preview": "vite preview"
   },
   "dependencies": {

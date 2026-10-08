@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { APIKey, ChannelProtocol } from '../api/contracts'
+import type { APIKey, ChannelProtocol } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   useCatalogModelsQuery,

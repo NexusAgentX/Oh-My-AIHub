@@ -11,3 +11,4 @@ backend/bin/
 backups/
 *.dump.aes
 *.manifest.json
+frontend/tools/openapi-types/node_modules/

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { C2CMarket, C2COrder, C2CSide } from '../api/contracts'
+import type { C2CMarket, C2COrder, C2CSide } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { formatPointAmount } from '../wallet/presentation'
 import {

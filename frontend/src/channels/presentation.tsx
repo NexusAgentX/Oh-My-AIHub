@@ -5,7 +5,7 @@ import type {
   ChannelStatus,
   PriceTier,
   ValidationStatus,
-} from '../api/contracts'
+} from '../api/types'
 import { Button } from '../ui/FormControls'
 import { Badge, type BadgeTone } from '../ui/Badge'
 import { Dialog } from '../ui/Dialog'

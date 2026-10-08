@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import type { OpsMetrics } from '../api/contracts'
+import type { OpsMetrics } from '../api/types'
 import { Card, DataTable, EmptyState, Metric, MetricGrid, QueryBoundary } from '../ui'
 import { formatPointAmount } from '../wallet/presentation'
 import { formatDateTime, formatFen, formatShare } from './opsFormat'

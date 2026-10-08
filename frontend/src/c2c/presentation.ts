@@ -3,10 +3,11 @@ import type {
   C2COrderStatus,
   C2CResolutionAction,
   C2CTrade,
+  C2CTradeView,
   C2CPaymentMethodType,
   C2CSide,
   C2CTradeStatus,
-} from '../api/contracts'
+} from '../api/types'
 import { parseNanoPoints } from '../money/amount'
 
 export const c2cSideLabels: Record<C2CSide, string> = {
@@ -90,16 +91,16 @@ export type C2CDisputeParty = {
   restrictAction: Extract<C2CResolutionAction, 'restrict_buyer' | 'restrict_seller'>
 }
 
-export function c2cDisputeParties(trade: C2CTrade): C2CDisputeParty[] {
+export function c2cDisputeParties(trade: C2CTradeView): C2CDisputeParty[] {
   return [
     {
       role: 'buyer', label: '买家', accountID: trade.buyer_account_id,
-      displayName: trade.buyer_display_name, creditFrozen: trade.buyer_credit_frozen,
+      displayName: trade.buyer_display_name, creditFrozen: 'buyer_credit_frozen' in trade ? trade.buyer_credit_frozen : undefined,
       restrictAction: 'restrict_buyer',
     },
     {
       role: 'seller', label: '卖家', accountID: trade.seller_account_id,
-      displayName: trade.seller_display_name, creditFrozen: trade.seller_credit_frozen,
+      displayName: trade.seller_display_name, creditFrozen: 'seller_credit_frozen' in trade ? trade.seller_credit_frozen : undefined,
       restrictAction: 'restrict_seller',
     },
   ]

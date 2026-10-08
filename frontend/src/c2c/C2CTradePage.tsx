@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
-import type { C2CTrade } from '../api/contracts'
+import type { C2CTrade } from '../api/types'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { formatPointAmount } from '../wallet/presentation'

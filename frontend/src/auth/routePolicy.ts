@@ -1,4 +1,4 @@
-import type { Account } from '../api/contracts'
+import type { Account } from '../api/types'
 
 export function defaultDestination(account: Account | null) {
   if (!account) return '/login'

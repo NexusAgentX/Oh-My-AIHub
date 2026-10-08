@@ -1,4 +1,4 @@
-import type { GatewayCall } from '../api/contracts'
+import type { GatewayCall } from '../api/types'
 import { DataTable, EmptyState, type Column } from '../ui'
 import {
   GatewayStatusBadge,

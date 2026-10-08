@@ -1,5 +1,5 @@
 import { api, ApiError } from '../api/client'
-import type { Channel, ChannelOffer, ChannelProtocol } from '../api/contracts'
+import type { Channel, ChannelOffer, ChannelProtocol } from '../api/types'
 
 export const protocols: ChannelProtocol[] = [
   'openai_chat_completions',
