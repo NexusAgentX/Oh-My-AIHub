@@ -652,7 +652,7 @@ func attention(data OverviewData) []AttentionItem {
 	for _, channel := range data.Failing {
 		percent := 100 * float64(channel.Successes) / float64(channel.Attempts)
 		items = append(items, AttentionItem{AttentionChannelFail, "warning",
-			fmt.Sprintf("渠道「%s」1 小时成功率 %.0f%%（%d 次尝试）", channel.Name, percent, channel.Attempts), int(channel.Attempts), "/admin/channels/" + channel.ID})
+			fmt.Sprintf("渠道「%s」1 小时成功率 %.0f%%（%d 次尝试）", channel.Name, percent, channel.Attempts), 1, "/admin/channels/" + channel.ID})
 	}
 	if unbilledAbnormal(data.Last24h) {
 		items = append(items, AttentionItem{AttentionUnbilled, "warning",
@@ -664,7 +664,7 @@ func attention(data OverviewData) []AttentionItem {
 	var failed []string
 	for _, name := range data.Checks.FailedChecks() {
 		if name != "zero_sum" {
-			failed = append(failed, name)
+			failed = append(failed, checkLabels[name])
 		}
 	}
 	if len(failed) > 0 {
@@ -672,6 +672,15 @@ func attention(data OverviewData) []AttentionItem {
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Severity == "critical" && items[j].Severity != "critical" })
 	return items
+}
+
+// checkLabels names the reconciliation checks for administrators; the keys
+// stay the Prometheus label values.
+var checkLabels = map[string]string{
+	"account_balances": "账户余额与分录不一致",
+	"escrow":           "C2C 托管余额不符",
+	"billing_calls":    "成功调用漏记账",
+	"released_trades":  "已放行交易漏记账",
 }
 
 // unbilledAbnormal flags too many successful calls whose usage was not read:

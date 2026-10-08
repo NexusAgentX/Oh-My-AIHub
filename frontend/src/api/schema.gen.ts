@@ -2415,6 +2415,7 @@ export interface components {
             /** @enum {string} */
             severity: "warning" | "critical";
             title: string;
+            /** @description 该项涉及的条目数（账户、渠道、交易、调用或未通过的核对项的数量），每个渠道异常算 1 条。 */
             count: number;
             link: string;
         };

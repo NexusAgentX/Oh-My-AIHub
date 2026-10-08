@@ -515,11 +515,20 @@ func TestObserveChecksReportEachInjectedInconsistency(t *testing.T) {
 	// The overview names the failures.
 	overview := o.get(o.admin, "/api/admin/overview")
 	kinds := map[string]bool{}
+	reconcileTitle := ""
 	for _, item := range asList(t, overview["attention"]) {
-		kinds[asMap(t, item)["kind"].(string)] = true
+		kind := asMap(t, item)["kind"].(string)
+		kinds[kind] = true
+		if kind == "reconciliation_failed" {
+			reconcileTitle = asMap(t, item)["title"].(string)
+		}
 	}
 	if !kinds["reconciliation_failed"] || kinds["ledger_unbalanced"] || asMap(t, overview["ledger"])["balanced"] != true {
 		t.Fatalf("overview attention = %v", overview["attention"])
+	}
+	// Administrators read check names, not metric label values.
+	if strings.Contains(reconcileTitle, "_") || !strings.Contains(reconcileTitle, "已放行交易漏记账") {
+		t.Fatalf("reconciliation title = %q", reconcileTitle)
 	}
 }
 
@@ -773,7 +782,7 @@ func TestObserveOverviewFlagsAFailingChannel(t *testing.T) {
 			found = asMap(t, item)
 		}
 	}
-	if found == nil || found["link"] != "/admin/channels/"+channelID || !strings.Contains(found["title"].(string), "shaky") {
+	if found == nil || found["link"] != "/admin/channels/"+channelID || !strings.Contains(found["title"].(string), "shaky") || found["count"] != float64(1) {
 		t.Fatalf("failing channel not flagged: %v", found)
 	}
 	// Failed calls count against the platform's success rate and each failed one is listed.

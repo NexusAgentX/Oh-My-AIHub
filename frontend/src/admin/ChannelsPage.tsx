@@ -14,6 +14,7 @@ import {
   type BadgeTone,
   type Column,
 } from '../ui'
+import { ChannelStatsPanel } from '../channels/ChannelStatsPanel'
 import { ConfirmActionDialog, DetailList, LoadMore } from './components'
 import { formatCount, formatDateTime, formatPoints, formatRatio } from './format'
 import { useAdminChannel, useAdminChannels, useChannelSuspension } from './queries'
@@ -187,6 +188,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
           />
         </Card>
       </div>
+      <ChannelStatsPanel channelId={channel.id} />
       <Card flush title={`模型（${channel.models.length}）`}>
         <DataTable
           caption="渠道模型"
