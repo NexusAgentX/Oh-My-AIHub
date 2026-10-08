@@ -13,7 +13,6 @@ export const adminLedgerKeys = {
   providers: (hours: number) => [...adminLedgerKeys.all, 'providers', hours] as const,
   anomalies: () => [...adminLedgerKeys.all, 'anomalies'] as const,
   inspections: () => [...adminLedgerKeys.all, 'inspections'] as const,
-  trial: () => [...adminLedgerKeys.all, 'trial'] as const,
   system: (kind: SystemKind) => [...adminLedgerKeys.all, 'system', kind] as const,
   feeRate: () => [...adminLedgerKeys.all, 'fee-rate'] as const,
   account: (accountID: string) => [...adminLedgerKeys.all, 'account', accountID] as const,
@@ -62,14 +61,7 @@ export function useOpsInspectionsQuery() {
   })
 }
 
-export function useOpsTrialSummaryQuery() {
-  return useQuery({
-    queryKey: adminLedgerKeys.trial(),
-    queryFn: () => api.opsTrialSummary(),
-  })
-}
-
-/** 手动巡检后刷新整个运营领域（指标、异常、巡检记录、试用证据）。 */
+/** 手动巡检后刷新整个运营领域（指标、异常、巡检记录）。 */
 export function useRunInspection() {
   const client = useQueryClient()
   return useMutation({

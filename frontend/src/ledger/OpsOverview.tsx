@@ -4,6 +4,7 @@ import type { OpsMetrics } from '../api/types'
 import { Card, DataTable, EmptyState, Metric, MetricGrid, QueryBoundary } from '../ui'
 import { formatPointAmount } from '../wallet/presentation'
 import { formatDateTime, formatFen, formatShare } from './opsFormat'
+import { OpsProviders } from './OpsProviders'
 import { useOpsMetricsQuery } from './queries'
 
 function Rows({ children }: { children: ReactNode }) {
@@ -23,12 +24,12 @@ export function OpsOverview({ hours }: { hours: number }) {
   const query = useOpsMetricsQuery(hours)
   return (
     <QueryBoundary errorFallback="运营指标加载失败" query={query}>
-      {(metrics) => <OverviewContent metrics={metrics} />}
+      {(metrics) => <OverviewContent hours={hours} metrics={metrics} />}
     </QueryBoundary>
   )
 }
 
-function OverviewContent({ metrics }: { metrics: OpsMetrics }) {
+function OverviewContent({ hours, metrics }: { hours: number; metrics: OpsMetrics }) {
   const { ledger, api, consumption, concentration, c2c } = metrics
   const successRate =
     api.success_rate === null ? '空样本' : `${(Number(api.success_rate) * 100).toFixed(2)}%`
@@ -165,6 +166,7 @@ function OverviewContent({ metrics }: { metrics: OpsMetrics }) {
           />
         </Card>
       </div>
+      <OpsProviders hours={hours} />
     </div>
   )
 }

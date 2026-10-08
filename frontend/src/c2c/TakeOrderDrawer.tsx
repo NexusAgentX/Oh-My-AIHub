@@ -116,7 +116,7 @@ function TakeContent({ order, take, onClose }: { order: C2COrder; take: Take; on
   return <TakeForm key={order.id} onClose={onClose} order={order} take={take} />
 }
 
-/** 承接挂单抽屉：由市场页的 ?take=<orderID> 驱动，旧的 /c2c/orders/:id/take 路由重定向至此。 */
+/** 承接挂单抽屉：由市场页的 ?take=<orderID> 驱动。 */
 export function TakeOrderDrawer({ orderID, onClose }: { orderID: string; onClose: () => void }) {
   const { account } = useAuth()
   const query = useC2COrderQuery(orderID)

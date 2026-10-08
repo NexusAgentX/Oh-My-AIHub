@@ -1276,23 +1276,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/ops/trial-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 试运行摘要 */
-        get: operations["getOpsTrialSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/chat/completions": {
         parameters: {
             query?: never;
@@ -2419,29 +2402,6 @@ export interface components {
         };
         OpsInspectionList: {
             inspections: components["schemas"]["OpsInspection"][];
-        };
-        OpsTrialSummary: {
-            generated_at: components["schemas"]["Timestamp"];
-            non_admin_accounts: number;
-            published_channels: number;
-            passed_offers: number;
-            active_api_keys: number;
-            calls_succeeded: number;
-            calls_failed: number;
-            calls_incomplete: number;
-            first_call_at: components["schemas"]["Timestamp"] | null;
-            last_terminal_call_at: components["schemas"]["Timestamp"] | null;
-            c2c_open_orders: number;
-            c2c_released_trades: number;
-            c2c_disputed_open: number;
-            ledger_zero_sum_ok: boolean;
-            last_inspection_ok: boolean | null;
-            last_inspection_at: components["schemas"]["Timestamp"] | null;
-            inspection_pass_count: number;
-            inspection_total_count: number;
-        };
-        OpsTrialSummaryEnvelope: {
-            trial_summary: components["schemas"]["OpsTrialSummary"];
         };
     };
     responses: {
@@ -5058,28 +5018,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpsInspectionEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getOpsTrialSummary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsTrialSummaryEnvelope"];
                 };
             };
             401: components["responses"]["Unauthorized"];

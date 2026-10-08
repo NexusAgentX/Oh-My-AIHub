@@ -2,6 +2,7 @@ import { Card, QueryBoundary } from '../ui'
 import { LedgerEntriesTable } from '../wallet/LedgerEntriesTable'
 import { formatPointAmount } from '../wallet/presentation'
 import { FeeRatePanel } from './FeeRatePanel'
+import { OpsInspections } from './OpsInspections'
 import { useOpsMetricsQuery, useSystemAccountQuery, type SystemKind } from './queries'
 
 function SystemAccountCard({ kind, label }: { kind: SystemKind; label: string }) {
@@ -21,7 +22,7 @@ function SystemAccountCard({ kind, label }: { kind: SystemKind; label: string })
   )
 }
 
-/** 一致性校验、持有中积分、平台系统账户与全局手续费率。 */
+/** 一致性校验、巡检历史、持有中积分、平台系统账户与全局手续费率。 */
 export function OpsLedger() {
   const query = useOpsMetricsQuery(24)
   return (
@@ -48,6 +49,7 @@ export function OpsLedger() {
           </div>
         )}
       </QueryBoundary>
+      <OpsInspections />
       <FeeRatePanel />
       <SystemAccountCard kind="platform_incentive" label="平台激励账户" />
       <SystemAccountCard kind="platform_loss" label="平台损失账户" />

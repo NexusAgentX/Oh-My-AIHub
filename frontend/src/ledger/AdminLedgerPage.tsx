@@ -11,10 +11,8 @@ import {
   Toolbar,
 } from '../ui'
 import { OpsAnomalies } from './OpsAnomalies'
-import { OpsEvidence } from './OpsEvidence'
 import { OpsLedger } from './OpsLedger'
 import { OpsOverview } from './OpsOverview'
-import { OpsProviders } from './OpsProviders'
 import {
   isWindowedTab,
   opsTabs,
@@ -27,7 +25,7 @@ import {
 } from './opsFormat'
 import { useOpsMetricsQuery, useRunInspection } from './queries'
 
-/** 运营台：时间窗口、硬异常与固定下钻常驻；总览、共享者收入、试用与巡检、账本与费率分区切换。 */
+/** 运营台：时间窗口、硬异常与固定下钻常驻；总览（含共享者收入）与账本与费率（含巡检）分区切换。 */
 export function AdminLedgerPage() {
   const [params, setParams] = useSearchParams()
   const tab = parseTab(params.get('tab'))
@@ -87,8 +85,6 @@ export function AdminLedgerPage() {
         value={tab}
       >
         {tab === 'overview' && <OpsOverview hours={hours} />}
-        {tab === 'providers' && <OpsProviders hours={hours} />}
-        {tab === 'evidence' && <OpsEvidence />}
         {tab === 'ledger' && <OpsLedger />}
       </Tabs>
     </>

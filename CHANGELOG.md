@@ -4,6 +4,10 @@
 
 ## 未发布
 
+### 变更
+
+- 运营台精简、删除旧重定向与精简产品文档（Feature #161，Epic #158）：运营台只保留「总览」（含共享者收入）与「账本与费率」（含巡检历史）两个分区，`tab` 参数只接受这两个值；删除试用证据摘要与 `GET /api/admin/ops/trial-summary`（含 OpenAPI 路径与 schema、sqlc 查询、前端查询）；巡检逻辑、硬异常与收入口径不变。删除 7 条旧 URL 重定向：`/keys/new`、`/keys/:keyID/settings`、`/market/channels/:channelID/add`、`/wallet/insufficient`、`/c2c/orders/:orderID/take`、`/c2c/trades/:tradeID/dispute`、`/admin/providers`，旧地址不再重定向（落到公开落地页）。`PRODUCT.md` 删除「待验证假设」「待真实使用回答」，改为简短「已知风险」，`ROADMAP.md` 删除真实验证表述。无数据库迁移。
+
 ## v0.5.0 - 2026-10-07
 
 ### 新增

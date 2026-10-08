@@ -59,13 +59,6 @@ func optionalInt(value int64, ok bool) *int64 {
 	return &value
 }
 
-func optionalTime(value time.Time, ok bool) *time.Time {
-	if !ok {
-		return nil
-	}
-	return &value
-}
-
 func subtractPoints(total, used string) (string, error) {
 	totalNano, err := money.Parse(total)
 	if err != nil {
@@ -408,45 +401,4 @@ func (s *Store) OpsListInspections(ctx context.Context, limit int64) ([]ops.Insp
 		records = append(records, toInspection(InsertInspectionRow(row)))
 	}
 	return records, nil
-}
-
-// OpsTrialSummary aggregates non-sensitive trial evidence counts.
-func (s *Store) OpsTrialSummary(ctx context.Context) (ops.TrialSummary, error) {
-	summary := ops.TrialSummary{GeneratedAt: time.Now().UTC()}
-	ledgerSnapshot, err := s.ledger.Metrics(ctx)
-	if err != nil {
-		return ops.TrialSummary{}, err
-	}
-	summary.LedgerZeroSumOK = ledgerSnapshot.TotalPostedBalance == "0"
-
-	counts, err := s.q.GetTrialCounts(ctx)
-	if err != nil {
-		return ops.TrialSummary{}, err
-	}
-	summary.NonAdminAccounts = counts.NonAdminAccounts
-	summary.PublishedChannels = counts.PublishedChannels
-	summary.PassedOffers = counts.PassedOffers
-	summary.ActiveAPIKeys = counts.ActiveApiKeys
-	summary.CallsSucceeded = counts.CallsSucceeded
-	summary.CallsFailed = counts.CallsFailed
-	summary.CallsIncomplete = counts.CallsIncomplete
-	summary.FirstCallAt = optionalTime(counts.FirstCallAt, counts.HasFirstCallAt)
-	summary.LastTerminalCallAt = optionalTime(counts.LastTerminalCallAt, counts.HasLastTerminalCallAt)
-	summary.C2COpenOrders = counts.C2cOpenOrders
-	summary.C2CReleasedTrades = counts.C2cReleasedTrades
-	summary.C2CDisputedOpen = counts.C2cDisputedOpen
-
-	inspections, err := s.q.GetInspectionSummary(ctx)
-	if err != nil {
-		return ops.TrialSummary{}, err
-	}
-	summary.InspectionPassCount = inspections.PassCount
-	summary.InspectionTotalCount = inspections.TotalCount
-	if inspections.TotalCount > 0 {
-		last := inspections.LastAt
-		ok := inspections.LastOk
-		summary.LastInspectionAt = &last
-		summary.LastInspectionOK = &ok
-	}
-	return summary, nil
 }

@@ -49,7 +49,7 @@ function ChannelDetail({
   const rate = useRateChannelMutation(channel.id)
   const [message, setMessage] = useState<{ text: string; keyID?: string } | null>(null)
 
-  // ?add=<offerID> 打开加入路由抽屉；旧的整页入口重定向到这里
+  // ?add=<offerID> 打开加入路由抽屉
   const addParam = searchParams.get('add')
   const joining = addParam
     ? (channel.offers.find((offer) => offer.offer_id === addParam) ?? channel.offers[0] ?? null)
