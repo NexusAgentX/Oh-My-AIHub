@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -69,7 +70,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
-	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound):
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, identity.ErrLastAdministrator):
 		writeError(w, http.StatusConflict, "last_administrator", "不能移除最后一个启用的管理员")
@@ -81,7 +82,29 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "idempotency_conflict", "幂等键已用于其他操作")
 	case errors.Is(err, ledger.ErrNothingToWriteOff):
 		writeError(w, http.StatusUnprocessableEntity, "nothing_to_write_off", "余额不为负，无需核销")
-	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
+	case errors.Is(err, c2c.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, c2c.ErrAccountInactive):
+		writeError(w, http.StatusForbidden, "account_inactive", "账户已停用")
+	case errors.Is(err, c2c.ErrInvalidState):
+		writeError(w, http.StatusConflict, "invalid_state", "当前状态不允许该操作")
+	case errors.Is(err, c2c.ErrOrderNotOpen):
+		writeError(w, http.StatusConflict, "order_not_open", "卖单已关闭或已售完")
+	case errors.Is(err, c2c.ErrAmountUnavailable):
+		writeError(w, http.StatusConflict, "amount_unavailable", "卖单剩余数量不足")
+	case errors.Is(err, c2c.ErrDuplicateTrade):
+		writeError(w, http.StatusConflict, "duplicate_trade", "你在该卖单上已有未完成的交易")
+	case errors.Is(err, c2c.ErrPaymentExpired):
+		writeError(w, http.StatusConflict, "payment_expired", "付款时间已过")
+	case errors.Is(err, c2c.ErrInsufficientBalance):
+		writeError(w, http.StatusUnprocessableEntity, "insufficient_balance", "只能出售账户正余额，余额不足")
+	case errors.Is(err, c2c.ErrAmountOutOfRange):
+		writeError(w, http.StatusUnprocessableEntity, "amount_out_of_range", "数量不在卖家设置的单笔范围内")
+	case errors.Is(err, c2c.ErrOwnOrder):
+		writeError(w, http.StatusUnprocessableEntity, "own_order", "不能购买自己的卖单")
+	case errors.Is(err, c2c.ErrInvalidCursor):
+		writeBadCursor(w)
+	case errors.Is(err, c2c.ErrInvalidInput), errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
 		errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount),
 		errors.Is(err, settings.ErrInvalidInput), errors.Is(err, audit.ErrInvalidInput):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")

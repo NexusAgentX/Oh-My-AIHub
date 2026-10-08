@@ -1,6 +1,6 @@
 # 架构说明
 
-> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；网关、渠道、Key、C2C 与观测接口已在契约中定义并返回 501，由后续 Feature 实现。
+> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature C（#173）已交付 C2C 卖单市场；网关、渠道、Key 与观测接口已在契约中定义并返回 501，由后续 Feature 实现。
 
 本文档描述仓库当前真实存在的系统结构，再单独列出已确认但尚未实现的目标约束。不得把目标约束当作当前代码能力。
 
@@ -51,7 +51,7 @@
 | `internal/audit` | 审计日志读取；写入由各领域在自己的事务内调用 `auditpg.Record` |
 | `internal/money` | 九位定点纳积分 `Amount` 与十进制字符串解析/格式化 |
 | `internal/channel` | 目前只保留上游凭据版本化密钥环（ADR-0009）与固定出站策略（HTTPS、DNS/IP 校验、端口白名单、禁用主机、禁止重定向）；渠道领域由 Feature B 在其上重建 |
-| `internal/c2c` | 目前只保留 C2C 私密数据密钥环；卖单与交易由 Feature C 重建 |
+| `internal/c2c` | C2C 卖单市场领域：词汇与错误（`types.go`）、纯状态机（`machine.go`：数量恒等式、各转换的前置检查与幂等判断、应付金额向上取整）、`Service`（输入校验、收款方式加解密与可见性、游标分页、超时任务入口）、C2C 私密数据密钥环 |
 | `internal/secretguard` | 凭据泄露检测辅助 |
 
 ## 当前请求链路
@@ -89,14 +89,33 @@
 - 停用账户在同一事务内删除其全部会话；重置密码提升密码版本并删除全部会话（ADR-0013）。移除管理员身份的修改在事务级 advisory lock 下检查剩余启用管理员数。
 - 模型目录写入在 `FOR UPDATE` 锁内合并部分更新并整组替换价格档；创建、修改模型与平台设置均写审计（含修改前后值）。
 - 用户只能读取本人积分与账单；账单按分录 id 倒序游标分页，可按交易类型、Key、时间筛选，`format=csv` 由 Feature G 实现（当前 501）。
-- 上游凭据密钥环与出站策略在启动时校验配置，供 Feature B 使用；C2C 私密数据密钥环同样在启动时校验。
+- 上游凭据密钥环与出站策略在启动时校验配置，供 Feature B 使用；C2C 私密数据密钥环在启动时校验并用于加密卖单收款方式。
+
+## C2C 卖单市场（Feature C）
+
+积分的托管全部落在系统账户 `c2c_escrow`（ADR-0025）。`internal/postgres/c2cpg` 实现 `c2c.Store`：每个状态转换在一个数据库事务内完成加锁、状态检查、数量更新和 `ledgerpg.Post` 过账；纯规则在 `internal/c2c/machine.go`，持久化只负责加锁、读取、写入。
+
+| 动作 | 过账（幂等键） | 数量变化 |
+| --- | --- | --- |
+| 挂单 | `c2c_list`：卖家 −总量，托管 +总量（`c2c:order:<id>:list`） | available = total |
+| 买入 | 无 | available −= 数量，in_trade += 数量 |
+| 放行 / 判给买家 | `c2c_release`：托管 −数量，买家 +数量（`c2c:trade:<id>:release`） | in_trade −= 数量，sold += 数量；开放且 available、in_trade 均为 0 时订单为 filled |
+| 取消 / 超时 / 退回卖家（订单开放） | 无 | in_trade −= 数量，available += 数量 |
+| 取消 / 超时 / 退回卖家（订单已关闭） | `c2c_return`：托管 −数量，卖家 +数量（`c2c:trade:<id>:return`） | in_trade −= 数量，closed += 数量 |
+| 关闭卖单 | `c2c_return`：托管 −可买量，卖家 +可买量（`c2c:order:<id>:close`） | closed += available，available = 0，状态 closed |
+
+- **恒等式**：`total = available + in_trade + sold + closed` 由数据库 CHECK 保证；`c2c_escrow` 余额始终等于所有订单 `available + in_trade` 之和（Feature G 做实时核对，集成测试在每条路径后断言）。
+- **加锁顺序**：订单行 → 交易行 → 账本账户行（`Post` 内按 id 升序）。挂单先锁卖家账本账户再检查「余额 ≥ 总量」，并发挂单不会重复花同一笔余额；并发买入在订单行锁上串行，不会超卖，同一买家同一卖单的未完成交易唯一性在同一锁内检查。
+- **幂等**：状态转换重复请求返回当前状态、不重复记账（放行已放行的交易、取消已取消的交易等）；挂单与买入带 `Idempotency-Key` 时，订单、交易 ID 由卖家/买家与该键派生，重复请求返回同一对象。
+- **收款方式**：JSON 经 `C2C_PRIVATE_DATA_KEYRING` 以订单 ID 为附加数据加密保存；列表只解密出渠道名称，账号只在交易详情中按可见性规则返回（买家仅在交易未结束时）。
+- **超时任务**：`cmd/server` 启动后每分钟调用 `Service.ExpireDue`，取消 `awaiting_payment` 且已过 `payment_deadline` 的交易（每批 100 笔，逐笔独立事务，锁内复查状态）；`paid`、`disputed` 不受影响。进程重启后下一轮继续处理。
+- **仲裁**：管理员判给买家复用放行路径（`resolved_to_buyer`），退回卖家复用取消路径（`resolved_to_seller`）；原因必填并写入审计 `c2c.resolve`。
 
 ## 已确认但未实现的目标边界
 
 以下由后续 Feature 实现，契约已在 `openapi.yaml` 中定义：
 
 - Feature B：透明网关（换鉴权、可选换 UA 与请求头规则、字节级替换顶层 `model`、OpenAI Chat 流式补 `include_usage`）、按格式选渠道、按用户按模型路由、无预扣的事后一次记账、渠道发现与格式测试、API Key 可逆加密与预算、首页、管理员渠道治理。
-- Feature C：C2C 卖单、托管账户过账、部分成交、付款超时、申诉与仲裁。
 - Feature G：调用与用量查询、SSE 实时流、渠道统计、Prometheus 指标、管理员概览与积分全局、账本交易浏览与调用修复、积分走势与 CSV 导出。
 
 ## 架构原则

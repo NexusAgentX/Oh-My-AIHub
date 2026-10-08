@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/identitypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
@@ -19,6 +20,7 @@ type Store struct {
 	Settings *settingspg.Store
 	Audit    *auditpg.Store
 	Ledger   *ledgerpg.Store
+	C2C      *c2cpg.Store
 }
 
 func New(pool *pgxpool.Pool) *Store {
@@ -28,5 +30,6 @@ func New(pool *pgxpool.Pool) *Store {
 		Settings: settingspg.NewStore(pool),
 		Audit:    auditpg.NewStore(pool),
 		Ledger:   ledgerpg.NewStore(pool),
+		C2C:      c2cpg.NewStore(pool),
 	}
 }

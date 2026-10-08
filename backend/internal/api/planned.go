@@ -41,28 +41,6 @@ func registerPlannedRoutes(r *router) {
 		r.planned("B", entry.pattern, entry.level)
 	}
 
-	// Feature C：C2C 卖单市场与仲裁。
-	for _, entry := range []struct {
-		pattern string
-		level   access
-	}{
-		{"GET /api/c2c/orders", accessReady},
-		{"POST /api/c2c/orders", accessReady},
-		{"GET /api/c2c/my/orders", accessReady},
-		{"POST /api/c2c/orders/{orderID}/close", accessReady},
-		{"POST /api/c2c/orders/{orderID}/trades", accessReady},
-		{"GET /api/c2c/my/trades", accessReady},
-		{"GET /api/c2c/trades/{tradeID}", accessReady},
-		{"POST /api/c2c/trades/{tradeID}/paid", accessReady},
-		{"POST /api/c2c/trades/{tradeID}/release", accessReady},
-		{"POST /api/c2c/trades/{tradeID}/cancel", accessReady},
-		{"POST /api/c2c/trades/{tradeID}/dispute", accessReady},
-		{"GET /api/admin/disputes", accessAdmin},
-		{"POST /api/admin/c2c/trades/{tradeID}/resolve", accessAdmin},
-	} {
-		r.planned("C", entry.pattern, entry.level)
-	}
-
 	// Feature G：调用与积分可观测性。
 	for _, entry := range []struct {
 		pattern string
