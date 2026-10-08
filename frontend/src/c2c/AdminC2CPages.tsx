@@ -217,7 +217,7 @@ export function AdminC2CDisputePage() {
                   >
                     延长复核
                   </Button>
-                  <Button disabled={busy || !c2cAdminDisputeActions(trade.status).cancelOrder} onClick={() => request({ kind: 'cancel-order', orderID: trade.order_id })} variant="danger">
+                  <Button disabled={busy} onClick={() => request({ kind: 'cancel-order', orderID: trade.order_id })} variant="danger">
                     取消剩余挂单
                   </Button>
                 </div>

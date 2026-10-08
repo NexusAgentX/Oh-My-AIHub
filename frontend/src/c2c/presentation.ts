@@ -111,15 +111,12 @@ export type C2CAdminDisputeActions = {
   resolve: boolean
   /** 延长复核：后端仅接受 disputed。 */
   extendReview: boolean
-  /** 取消剩余挂单：交易进入终态后不再提供。 */
-  cancelOrder: boolean
 }
 
 export function c2cAdminDisputeActions(status: C2CTradeStatus): C2CAdminDisputeActions {
   return {
     resolve: status === 'paid' || status === 'disputed',
     extendReview: status === 'disputed',
-    cancelOrder: !isC2CTradeTerminal(status),
   }
 }
 

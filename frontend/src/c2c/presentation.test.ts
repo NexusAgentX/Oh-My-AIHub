@@ -52,11 +52,11 @@ describe('C2C presentation', () => {
   })
 
   it('enables dispute actions exactly as the backend accepts them for each trade status', () => {
-    expect(c2cAdminDisputeActions('disputed')).toEqual({ resolve: true, extendReview: true, cancelOrder: true })
-    expect(c2cAdminDisputeActions('paid')).toEqual({ resolve: true, extendReview: false, cancelOrder: true })
-    expect(c2cAdminDisputeActions('awaiting_payment')).toEqual({ resolve: false, extendReview: false, cancelOrder: true })
+    expect(c2cAdminDisputeActions('disputed')).toEqual({ resolve: true, extendReview: true })
+    expect(c2cAdminDisputeActions('paid')).toEqual({ resolve: true, extendReview: false })
+    expect(c2cAdminDisputeActions('awaiting_payment')).toEqual({ resolve: false, extendReview: false })
     for (const status of ['released_to_buyer', 'returned_to_seller', 'cancelled', 'expired'] as const) {
-      expect(c2cAdminDisputeActions(status)).toEqual({ resolve: false, extendReview: false, cancelOrder: false })
+      expect(c2cAdminDisputeActions(status)).toEqual({ resolve: false, extendReview: false })
     }
   })
 })
