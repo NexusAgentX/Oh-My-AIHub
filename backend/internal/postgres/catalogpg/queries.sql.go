@@ -21,7 +21,7 @@ func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
 }
 
 const getModel = `-- name: GetModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1
 `
 
 func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
@@ -34,6 +34,7 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 		&i.OutputPriceNanoPerMillion,
 		&i.CacheWritePriceNanoPerMillion,
 		&i.CacheReadPriceNanoPerMillion,
+		&i.TokenPrices,
 		&i.Enabled,
 		&i.SortOrder,
 		&i.Provider,
@@ -56,9 +57,9 @@ INSERT INTO models (
     input_price_nano_per_million, output_price_nano_per_million,
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
-    supports_tools, supports_structured_output, supports_vision, parameter_info
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
 `
 
 type InsertModelParams struct {
@@ -78,6 +79,7 @@ type InsertModelParams struct {
 	SupportsStructuredOutput      bool
 	SupportsVision                bool
 	ParameterInfo                 string
+	TokenPrices                   []byte
 }
 
 func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model, error) {
@@ -98,6 +100,7 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		arg.SupportsStructuredOutput,
 		arg.SupportsVision,
 		arg.ParameterInfo,
+		arg.TokenPrices,
 	)
 	var i Model
 	err := row.Scan(
@@ -107,6 +110,7 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		&i.OutputPriceNanoPerMillion,
 		&i.CacheWritePriceNanoPerMillion,
 		&i.CacheReadPriceNanoPerMillion,
+		&i.TokenPrices,
 		&i.Enabled,
 		&i.SortOrder,
 		&i.Provider,
@@ -128,8 +132,8 @@ INSERT INTO model_price_tiers (
     model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
     start_minute_of_day, end_minute_of_day,
     input_price_nano_per_million, output_price_nano_per_million,
-    cache_write_price_nano_per_million, cache_read_price_nano_per_million
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier, thinking_mode
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 `
 
 type InsertTierParams struct {
@@ -146,6 +150,9 @@ type InsertTierParams struct {
 	OutputPriceNanoPerMillion     money.Amount
 	CacheWritePriceNanoPerMillion money.Amount
 	CacheReadPriceNanoPerMillion  money.Amount
+	TokenPrices                   []byte
+	ServiceTier                   string
+	ThinkingMode                  string
 }
 
 func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
@@ -163,12 +170,15 @@ func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
 		arg.OutputPriceNanoPerMillion,
 		arg.CacheWritePriceNanoPerMillion,
 		arg.CacheReadPriceNanoPerMillion,
+		arg.TokenPrices,
+		arg.ServiceTier,
+		arg.ThinkingMode,
 	)
 	return err
 }
 
 const listModels = `-- name: ListModels :many
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models
 WHERE enabled OR $1::boolean
 ORDER BY sort_order, id
 `
@@ -189,6 +199,7 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 			&i.OutputPriceNanoPerMillion,
 			&i.CacheWritePriceNanoPerMillion,
 			&i.CacheReadPriceNanoPerMillion,
+			&i.TokenPrices,
 			&i.Enabled,
 			&i.SortOrder,
 			&i.Provider,
@@ -213,7 +224,7 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 }
 
 const listTiers = `-- name: ListTiers :many
-SELECT model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million FROM model_price_tiers
+SELECT model_id, seq, token_prices, service_tier, thinking_mode, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million FROM model_price_tiers
 WHERE model_id = ANY($1::text[])
 ORDER BY model_id, seq
 `
@@ -230,6 +241,9 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 		if err := rows.Scan(
 			&i.ModelID,
 			&i.Seq,
+			&i.TokenPrices,
+			&i.ServiceTier,
+			&i.ThinkingMode,
 			&i.Name,
 			&i.MinPromptTokens,
 			&i.MaxPromptTokens,
@@ -253,7 +267,7 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 }
 
 const lockModel = `-- name: LockModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1 FOR UPDATE
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
@@ -266,6 +280,7 @@ func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
 		&i.OutputPriceNanoPerMillion,
 		&i.CacheWritePriceNanoPerMillion,
 		&i.CacheReadPriceNanoPerMillion,
+		&i.TokenPrices,
 		&i.Enabled,
 		&i.SortOrder,
 		&i.Provider,
@@ -299,9 +314,10 @@ UPDATE models SET
     supports_structured_output = $14,
     supports_vision = $15,
     parameter_info = $16,
+ token_prices = $17,
     updated_at = now()
 WHERE id = $1
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
 `
 
 type UpdateModelParams struct {
@@ -321,6 +337,7 @@ type UpdateModelParams struct {
 	SupportsStructuredOutput      bool
 	SupportsVision                bool
 	ParameterInfo                 string
+	TokenPrices                   []byte
 }
 
 func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model, error) {
@@ -341,6 +358,7 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		arg.SupportsStructuredOutput,
 		arg.SupportsVision,
 		arg.ParameterInfo,
+		arg.TokenPrices,
 	)
 	var i Model
 	err := row.Scan(
@@ -350,6 +368,7 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		&i.OutputPriceNanoPerMillion,
 		&i.CacheWritePriceNanoPerMillion,
 		&i.CacheReadPriceNanoPerMillion,
+		&i.TokenPrices,
 		&i.Enabled,
 		&i.SortOrder,
 		&i.Provider,

@@ -64,7 +64,7 @@ func catalogModelResponse(model catalog.Model, online []gateway.OnlineChannel, n
 		"input_modalities": model.InputModalities, "output_modalities": model.OutputModalities,
 		"supports_tools": model.SupportsTools, "supports_structured_output": model.SupportsStructuredOutput,
 		"supports_vision": model.SupportsVision, "parameter_info": model.ParameterInfo,
-		"base_prices":  pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice),
+		"base_prices":  pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
 		"current_tier": tier, "lowest_prices": lowest, "formats": ordered, "online_channels": len(online),
 	}
 }

@@ -32,13 +32,16 @@ func (o *optional[T]) UnmarshalJSON(data []byte) error {
 }
 
 type pricesRequest struct {
-	Input      string `json:"input"`
-	Output     string `json:"output"`
-	CacheWrite string `json:"cache_write"`
-	CacheRead  string `json:"cache_read"`
+	TokenPrices map[string]string `json:"token_prices"`
+	Input       string            `json:"input"`
+	Output      string            `json:"output"`
+	CacheWrite  string            `json:"cache_write"`
+	CacheRead   string            `json:"cache_read"`
 }
 
 type priceTierRequest struct {
+	ServiceTier     string        `json:"service_tier"`
+	ThinkingMode    string        `json:"thinking_mode"`
 	Name            string        `json:"name"`
 	MinPromptTokens *int64        `json:"min_prompt_tokens"`
 	MaxPromptTokens *int64        `json:"max_prompt_tokens"`
@@ -101,7 +104,12 @@ func parsePriceTiers(requests []priceTierRequest) ([]ledger.PriceTier, error) {
 		if err != nil {
 			return nil, err
 		}
+		specific, err := request.Prices.parseTokens()
+		if err != nil {
+			return nil, err
+		}
 		tiers = append(tiers, ledger.PriceTier{
+			TokenPrices: specific, ServiceTier: request.ServiceTier, ThinkingMode: request.ThinkingMode,
 			Name: request.Name, MinPromptTokens: request.MinPromptTokens, MaxPromptTokens: request.MaxPromptTokens,
 			Timezone: request.Timezone, Weekdays: request.Weekdays, StartMinute: request.StartMinute, EndMinute: request.EndMinute,
 			InputPrice: prices[0], OutputPrice: prices[1], CacheWritePrice: prices[2], CacheReadPrice: prices[3],
@@ -126,6 +134,11 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 		if err != nil {
 			return patch, err
 		}
+		specific, err := request.BasePrices.parseTokens()
+		if err != nil {
+			return patch, err
+		}
+		patch.TokenPrices = &specific
 		patch.InputPrice, patch.OutputPrice, patch.CacheWritePrice, patch.CacheReadPrice = &prices[0], &prices[1], &prices[2], &prices[3]
 	}
 	if request.PriceTiers != nil {
@@ -138,9 +151,16 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 	return patch, nil
 }
 
-func pricesResponse(input, output, cacheWrite, cacheRead money.Amount) map[string]any {
+func pricesResponse(input, output, cacheWrite, cacheRead money.Amount, extras ...map[string]money.Amount) map[string]any {
+	specific := map[string]string{}
+	if len(extras) > 0 {
+		for key, value := range extras[0] {
+			specific[key] = value.String()
+		}
+	}
 	return map[string]any{
-		"input": input.String(), "output": output.String(),
+		"token_prices": specific,
+		"input":        input.String(), "output": output.String(),
 		"cache_write": cacheWrite.String(), "cache_read": cacheRead.String(),
 	}
 }
@@ -151,10 +171,11 @@ func priceTierResponse(seq int, tier ledger.PriceTier) map[string]any {
 		weekdays = tier.Weekdays
 	}
 	return map[string]any{
+		"service_tier": tier.ServiceTier, "thinking_mode": tier.ThinkingMode,
 		"seq": seq, "name": tier.Name, "timezone": tier.Timezone,
 		"min_prompt_tokens": tier.MinPromptTokens, "max_prompt_tokens": tier.MaxPromptTokens,
 		"weekdays": weekdays, "start_minute_of_day": tier.StartMinute, "end_minute_of_day": tier.EndMinute,
-		"prices": pricesResponse(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice),
+		"prices": pricesResponse(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
 	}
 }
 
@@ -165,7 +186,7 @@ func adminModelResponse(model catalog.Model) map[string]any {
 	}
 	return map[string]any{
 		"id": model.ID, "display_name": model.DisplayName,
-		"base_prices": pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice),
+		"base_prices": pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
 		"price_tiers": tiers, "enabled": model.Enabled, "sort_order": model.SortOrder,
 		"provider": model.Provider, "context_window": model.ContextWindow,
 		"input_modalities": model.InputModalities, "output_modalities": model.OutputModalities,
@@ -249,4 +270,19 @@ func (a *app) registerAdminModelRoutes(r *router) {
 	r.admin("POST /api/admin/models", a.createAdminModel)
 	r.admin("PATCH /api/admin/models/{modelID}", a.updateAdminModel)
 	r.admin("DELETE /api/admin/models/{modelID}", a.deleteAdminModel)
+}
+
+func (p pricesRequest) parseTokens() (map[string]money.Amount, error) {
+	result := map[string]money.Amount{}
+	for key, value := range p.TokenPrices {
+		if ledger.TokenBucket(key) < 0 {
+			return nil, catalog.ErrInvalidInput
+		}
+		amount, err := parseModelPrice(value)
+		if err != nil {
+			return nil, err
+		}
+		result[key] = amount
+	}
+	return result, nil
 }

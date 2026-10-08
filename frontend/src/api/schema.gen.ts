@@ -1381,10 +1381,14 @@ export interface components {
             seq: number;
             name: string;
         };
-        /** @description 四个单价，积分/百万 token。 */
+        /** @description 通用及可选细分单价，积分/百万 token。细分未配置时继承对应通用桶价格，零表示免费。 */
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
+            /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
+            token_prices?: {
+                [key: string]: components["schemas"]["Price"];
+            };
             cache_write: components["schemas"]["Price"];
             cache_read: components["schemas"]["Price"];
         };
@@ -1512,6 +1516,10 @@ export interface components {
         /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
         PriceTier: {
             seq: number;
+            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            service_tier?: string;
+            /** @enum {string} */
+            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens: number | null;
@@ -1527,6 +1535,10 @@ export interface components {
             prices: components["schemas"]["ModelPrices"];
         };
         PriceTierInput: {
+            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            service_tier?: string;
+            /** @enum {string} */
+            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name?: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens?: number | null;
@@ -1944,6 +1956,23 @@ export interface components {
             duration_ms: number | null;
         };
         PriceSnapshot: {
+            selected_prices?: components["schemas"]["ModelPrices"];
+            token_prices?: {
+                [key: string]: string;
+            };
+            base_token_prices?: {
+                [key: string]: string;
+            };
+            detail?: {
+                tokens?: {
+                    [key: string]: number;
+                };
+                requested_service_tier?: string;
+                service_tier?: string;
+                thinking_mode?: string;
+                tool_prompt_tokens?: number;
+                notes?: string[];
+            } | null;
             base_prices: components["schemas"]["ModelPrices"];
             tier: components["schemas"]["TierRef"] | null;
             multiplier: components["schemas"]["Multiplier"];

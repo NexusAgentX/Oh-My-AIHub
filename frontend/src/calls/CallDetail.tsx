@@ -1,3 +1,4 @@
+import { PriceSnapshotView } from '../admin/transactions'
 import type { CallDetail } from '../api/types'
 import { formatMs, formatMultiplier, formatPoints, formatTokens } from '../money/format'
 import { formatDateTime } from '../money/time'
@@ -78,6 +79,12 @@ export function CallDetailView({ call }: { call: CallDetail }) {
           </span>
         </Row>
       </dl>
+      {snapshot && (
+        <section className="call-detail-section" aria-label="计价明细">
+          <h3>计价明细</h3>
+          <PriceSnapshotView snapshot={snapshot} />
+        </section>
+      )}
       <section className="call-detail-section" aria-label="尝试时间线">
         <h3>尝试 {call.attempts.length} 次</h3>
         <AttemptTimeline attempts={call.attempts} call={call} />

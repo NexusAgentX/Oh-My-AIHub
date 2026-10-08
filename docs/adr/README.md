@@ -61,3 +61,5 @@
 - [ADR-0027：网关透明转发、事后记账与按用户按模型路由](0027-adopt-transparent-gateway-with-post-hoc-billing.md) — 已通过
 - [ADR-0028：平台 API Key 可逆加密保存](0028-store-platform-api-keys-reversibly-encrypted.md) — 已通过
 - [ADR-0029：观测现算不存快照，指标走内网端口](0029-compute-observability-on-demand-with-internal-metrics.md) — 已通过
+
+- [ADR-0030：以可靠 token 细分与实际响应事实定价](0030-price-reliable-token-breakdowns.md)

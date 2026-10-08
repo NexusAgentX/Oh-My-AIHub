@@ -1,3 +1,4 @@
+import { tokenPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { formatMultiplier } from '../money/format'
@@ -5,7 +6,14 @@ import { Badge, QueryBoundary, type BadgeTone } from '../ui'
 import { DetailList } from './components'
 import { feeRateToPercent, formatDateTime, formatPoints, isNegative, shortID } from './format'
 import { useAdminTransaction } from './queries'
-import type { AuditEntry, LedgerAccountRef, LedgerRelated, LedgerTransaction, PriceSnapshot, TransactionType } from './types'
+import type {
+  AuditEntry,
+  LedgerAccountRef,
+  LedgerRelated,
+  LedgerTransaction,
+  PriceSnapshot,
+  TransactionType,
+} from './types'
 
 export const transactionTypeLabels: Record<TransactionType, [string, BadgeTone]> = {
   api_call: ['API 调用', 'info'],
@@ -34,9 +42,7 @@ export function ledgerAccountLabel(ref: LedgerAccountRef) {
 
 /** 借贷合计（正常为 0）。 */
 export function entriesTotal(transaction: Pick<LedgerTransaction, 'entries'>) {
-  return formatNanoPoints(
-    transaction.entries.reduce((sum, entry) => sum + parseNanoPoints(entry.amount), 0n),
-  )
+  return formatNanoPoints(transaction.entries.reduce((sum, entry) => sum + parseNanoPoints(entry.amount), 0n))
 }
 
 /** 交易规模：正向分录之和。 */
@@ -111,11 +117,28 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
     <DetailList
       items={[
         ['价格档', snapshot.tier?.name ?? '基准价'],
+        ['实际服务档位', snapshot.detail?.service_tier || '未提供'],
+        ['请求服务档位', snapshot.detail?.requested_service_tier || '未指定'],
+        [
+          '百炼思考模式',
+          snapshot.detail?.thinking_mode === 'qwen_thinking'
+            ? '已输出思考'
+            : snapshot.detail?.thinking_mode === 'qwen_non_thinking'
+              ? '未输出思考'
+              : '未判定',
+        ],
+        ...Object.entries(snapshot.detail?.tokens ?? {}).map(([key, count]): [string, string] => [
+          tokenPriceLabels[key] || key,
+          `${count} tokens · 原单价 ${snapshot.selected_prices?.token_prices?.[key] ?? snapshot.token_prices?.[key] ?? '继承通用价'}`,
+        ]),
+        ...(snapshot.detail?.notes ?? []).map((note): [string, string] => ['计价说明', note]),
         ['倍率', formatMultiplier(snapshot.multiplier)],
         ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`],
         ...priceLabels.map(([key, label]): [string, string] => [
           `${label}现价`,
-          `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
+          snapshot.selected_prices
+            ? `${snapshot.selected_prices[key]} × ${snapshot.multiplier}`
+            : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
         ]),
       ]}
     />
@@ -208,7 +231,5 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
 
 export function TransactionDrawerBody({ transactionID }: { transactionID: string }) {
   const detail = useAdminTransaction(transactionID)
-  return (
-    <QueryBoundary query={detail}>{(data) => <TransactionDetail transaction={data.transaction} />}</QueryBoundary>
-  )
+  return <QueryBoundary query={detail}>{(data) => <TransactionDetail transaction={data.transaction} />}</QueryBoundary>
 }

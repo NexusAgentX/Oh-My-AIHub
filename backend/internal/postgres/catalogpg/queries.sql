@@ -20,8 +20,8 @@ INSERT INTO models (
     input_price_nano_per_million, output_price_nano_per_million,
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
-    supports_tools, supports_structured_output, supports_vision, parameter_info
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 RETURNING *;
 
 -- name: UpdateModel :one
@@ -41,6 +41,7 @@ UPDATE models SET
     supports_structured_output = $14,
     supports_vision = $15,
     parameter_info = $16,
+ token_prices = $17,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -53,5 +54,5 @@ INSERT INTO model_price_tiers (
     model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
     start_minute_of_day, end_minute_of_day,
     input_price_nano_per_million, output_price_nano_per_million,
-    cache_write_price_nano_per_million, cache_read_price_nano_per_million
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier, thinking_mode
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);

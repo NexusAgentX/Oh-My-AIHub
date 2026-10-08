@@ -2285,10 +2285,14 @@ components:
       additionalProperties: false
     ModelPrices:
       type: object
-      description: 四个单价，积分/百万 token。
+      description: 通用及可选细分单价，积分/百万 token。细分未配置时继承对应通用桶价格，零表示免费。
       properties:
         input: {$ref: '#/components/schemas/Price'}
         output: {$ref: '#/components/schemas/Price'}
+        token_prices:
+          description: 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/Price'}
         cache_write: {$ref: '#/components/schemas/Price'}
         cache_read: {$ref: '#/components/schemas/Price'}
       required: [input, output, cache_write, cache_read]
@@ -2476,6 +2480,8 @@ components:
       description: 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。
       properties:
         seq: {type: integer, minimum: 1, maximum: 16}
+        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。'}
+        thinking_mode: {type: string, enum: ['', qwen_thinking, qwen_non_thinking]}
         name: {type: string, maxLength: 64}
         min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
         max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
@@ -2492,6 +2498,8 @@ components:
     PriceTierInput:
       type: object
       properties:
+        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。'}
+        thinking_mode: {type: string, enum: ['', qwen_thinking, qwen_non_thinking]}
         name: {type: string, maxLength: 64}
         min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
         max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
@@ -3132,6 +3140,19 @@ components:
     PriceSnapshot:
       type: object
       properties:
+        selected_prices: {$ref: '#/components/schemas/ModelPrices'}
+        token_prices: {type: object, additionalProperties: {type: string}}
+        base_token_prices: {type: object, additionalProperties: {type: string}}
+        detail:
+          type: [object, 'null']
+          properties:
+            tokens: {type: object, additionalProperties: {type: integer}}
+            requested_service_tier: {type: string}
+            service_tier: {type: string}
+            thinking_mode: {type: string}
+            tool_prompt_tokens: {type: integer}
+            notes: {type: array, items: {type: string}}
+          additionalProperties: false
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         tier:
           anyOf:

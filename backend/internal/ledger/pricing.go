@@ -17,6 +17,7 @@ type Usage struct {
 	OutputTokens     int64
 	CacheWriteTokens int64
 	CacheReadTokens  int64
+	Detail           *UsageDetail
 }
 
 // Prices are four per-million-token prices in nano-points.
@@ -25,6 +26,7 @@ type Prices struct {
 	OutputPerMillion     money.Amount
 	CacheWritePerMillion money.Amount
 	CacheReadPerMillion  money.Amount
+	TokenPrices          map[string]money.Amount
 }
 
 // PriceResult is the settlement of one call: the channel cost paid to the
@@ -46,7 +48,7 @@ func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time
 	if err != nil {
 		return PriceResult{}, err
 	}
-	prices, tierSeq := SelectPriceTier(basePrices, tiers, promptTokens, at)
+	prices, tierSeq := SelectPriceTier(basePrices, tiers, promptTokens, at, usage.Detail)
 	usageValues := []int64{usage.InputTokens, usage.OutputTokens, usage.CacheWriteTokens, usage.CacheReadTokens}
 	priceValues := []money.Amount{prices.InputPerMillion, prices.OutputPerMillion, prices.CacheWritePerMillion, prices.CacheReadPerMillion}
 	if multiplierNano < 0 || feeRateNano < 0 || feeRateNano > FixedPointScale {
@@ -59,6 +61,23 @@ func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time
 			return PriceResult{}, ErrInvalidInput
 		}
 		weightedUsage.Add(weightedUsage, new(big.Int).Mul(big.NewInt(tokenCount), big.NewInt(priceValues[index].Nano())))
+	}
+	if usage.Detail != nil {
+		remaining := append([]int64(nil), usageValues...)
+		for key, count := range usage.Detail.Tokens {
+			bucket := TokenBucket(key)
+			if bucket < 0 || count < 0 || count > remaining[bucket] {
+				return PriceResult{}, ErrInvalidInput
+			}
+			remaining[bucket] -= count
+			if specific, ok := prices.TokenPrices[key]; ok {
+				if specific < 0 {
+					return PriceResult{}, ErrInvalidInput
+				}
+				delta := new(big.Int).Sub(big.NewInt(specific.Nano()), big.NewInt(priceValues[bucket].Nano()))
+				weightedUsage.Add(weightedUsage, delta.Mul(delta, big.NewInt(count)))
+			}
+		}
 	}
 	cost, err := ceilNonNegative(
 		new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano)),

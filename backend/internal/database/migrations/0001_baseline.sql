@@ -90,6 +90,7 @@ CREATE TABLE models (
     output_price_nano_per_million bigint NOT NULL CHECK (output_price_nano_per_million BETWEEN 0 AND 100000000000000),
     cache_write_price_nano_per_million bigint NOT NULL CHECK (cache_write_price_nano_per_million BETWEEN 0 AND 100000000000000),
     cache_read_price_nano_per_million bigint NOT NULL CHECK (cache_read_price_nano_per_million BETWEEN 0 AND 100000000000000),
+    token_prices jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(token_prices)='object'),
     enabled boolean NOT NULL DEFAULT true,
     sort_order integer NOT NULL DEFAULT 0,
     -- 可选展示信息。
@@ -111,6 +112,9 @@ CREATE INDEX models_enabled_order_idx ON models(enabled, sort_order, id);
 CREATE TABLE model_price_tiers (
     model_id text NOT NULL REFERENCES models(id) ON DELETE CASCADE,
     seq integer NOT NULL CHECK (seq BETWEEN 1 AND 16),
+    token_prices jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(token_prices)='object'),
+    service_tier text NOT NULL DEFAULT '',
+    thinking_mode text NOT NULL DEFAULT '',
     name text NOT NULL DEFAULT '' CHECK (length(name) <= 64),
     min_prompt_tokens bigint CHECK (min_prompt_tokens IS NULL OR min_prompt_tokens >= 0),
     max_prompt_tokens bigint CHECK (max_prompt_tokens IS NULL OR max_prompt_tokens >= 0),

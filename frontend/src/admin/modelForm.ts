@@ -7,10 +7,18 @@ import type { AdminModel, ModelPrices, PriceTier, PriceTierInput } from './types
 
 export const maxPriceTiers = 16
 
-export type PricesForm = { input: string; output: string; cache_write: string; cache_read: string }
+export type PricesForm = {
+  input: string
+  output: string
+  cache_write: string
+  cache_read: string
+  token_prices?: Record<string, string>
+}
 
 export type TierForm = {
   name: string
+  serviceTier?: string
+  thinkingMode?: string
   useTokens: boolean
   minPromptTokens: string
   maxPromptTokens: string
@@ -68,6 +76,8 @@ export function tierToForm(tier: PriceTier): TierForm {
   const hasWindow = tier.start_minute_of_day !== null && tier.end_minute_of_day !== null
   return {
     name: tier.name,
+    serviceTier: tier.service_tier,
+    thinkingMode: tier.thinking_mode,
     useTokens: tier.min_prompt_tokens !== null || tier.max_prompt_tokens !== null,
     minPromptTokens: tier.min_prompt_tokens === null ? '' : String(tier.min_prompt_tokens),
     maxPromptTokens: tier.max_prompt_tokens === null ? '' : String(tier.max_prompt_tokens),
@@ -92,6 +102,8 @@ export function formToTierInput(form: TierForm): PriceTierInput {
   const weekdays = form.useTime && form.weekdays.length > 0 ? [...form.weekdays].sort((a, b) => a - b) : null
   return {
     name: form.name.trim(),
+    service_tier: form.serviceTier?.trim() || undefined,
+    thinking_mode: (form.thinkingMode || undefined) as PriceTierInput['thinking_mode'],
     timezone: form.timezone.trim() || 'UTC',
     min_prompt_tokens: form.useTokens ? tokenValue(form.minPromptTokens) : null,
     max_prompt_tokens: form.useTokens ? tokenValue(form.maxPromptTokens) : null,
@@ -104,6 +116,15 @@ export function formToTierInput(form: TierForm): PriceTierInput {
 
 function trimPrices(prices: PricesForm): ModelPrices {
   return {
+    ...(prices.token_prices
+      ? {
+          token_prices: Object.fromEntries(
+            Object.entries(prices.token_prices)
+              .filter(([, v]) => v.trim() !== '')
+              .map(([k, v]) => [k, v.trim()]),
+          ),
+        }
+      : {}),
     input: prices.input.trim(),
     output: prices.output.trim(),
     cache_write: prices.cache_write.trim(),
@@ -132,7 +153,15 @@ export function isValidTimezone(timezone: string) {
 export type TierErrors = Partial<Record<'name' | 'tokens' | 'time' | 'timezone' | 'prices' | 'condition', string>>
 
 export function validatePrices(prices: PricesForm) {
-  return Object.values(prices).every(isValidPrice) ? '' : '单价为 0～100000，最多 9 位小数'
+  return [
+    prices.input,
+    prices.output,
+    prices.cache_read,
+    prices.cache_write,
+    ...Object.values(prices.token_prices ?? {}).filter((v) => v.trim() !== ''),
+  ].every(isValidPrice)
+    ? ''
+    : '单价为 0～100000，最多 9 位小数'
 }
 
 export function validateTier(form: TierForm): TierErrors {
@@ -165,6 +194,7 @@ export function validateTier(form: TierForm): TierErrors {
     if (!isValidTimezone(form.timezone.trim() || 'UTC')) errors.timezone = '无效的时区'
   }
   const hasPredicate =
+    Boolean(input.service_tier || input.thinking_mode) ||
     input.min_prompt_tokens != null ||
     input.max_prompt_tokens != null ||
     input.start_minute_of_day != null ||
@@ -206,6 +236,8 @@ function weekdaysSummary(weekdays: number[]) {
 /** 条件摘要，例如「输入侧 > 200k」「每天 00:30–08:30 北京时间」「每天 22:00–次日 06:00 北京时间」。 */
 export function tierConditionSummary(tier: PriceTierInput) {
   const parts: string[] = []
+  if (tier.service_tier) parts.push(`服务档位 ${tier.service_tier}`)
+  if (tier.thinking_mode) parts.push(tier.thinking_mode === 'qwen_thinking' ? '百炼实际思考' : '百炼未输出思考')
   const min = tier.min_prompt_tokens ?? null
   const max = tier.max_prompt_tokens ?? null
   if (min !== null && max !== null) parts.push(`输入侧 ${formatTokenBound(min)}–${formatTokenBound(max)}`)
@@ -276,6 +308,8 @@ export function emptyModelForm(): ModelForm {
 export function tierToInput(tier: PriceTier): PriceTierInput {
   return {
     name: tier.name,
+    service_tier: tier.service_tier,
+    thinking_mode: tier.thinking_mode,
     timezone: tier.timezone,
     min_prompt_tokens: tier.min_prompt_tokens,
     max_prompt_tokens: tier.max_prompt_tokens,
@@ -322,7 +356,9 @@ export function changedModelAdvanced(form: ModelForm) {
 
 const modelIDPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 
-export type ModelErrors = Partial<Record<'id' | 'displayName' | 'prices' | 'sortOrder' | 'contextWindow' | 'parameterInfo' | 'tiers', string>>
+export type ModelErrors = Partial<
+  Record<'id' | 'displayName' | 'prices' | 'sortOrder' | 'contextWindow' | 'parameterInfo' | 'tiers', string>
+>
 
 export function validateModelForm(form: ModelForm, creating: boolean): ModelErrors {
   const errors: ModelErrors = {}

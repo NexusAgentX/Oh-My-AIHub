@@ -52,14 +52,30 @@ describe('price tier validation (mirrors catalog.validatePriceTiers)', () => {
     expect(isValidPrice('100000.5')).toBe(false)
     expect(isValidPrice('1.123456789')).toBe(true)
     expect(isValidPrice('1.1234567891')).toBe(false)
-    expect(validateTier(tier({ minPromptTokens: '1', prices: { input: '-1', output: '0', cache_read: '0', cache_write: '0' } })).prices).toBeTruthy()
+    expect(
+      validateTier(
+        tier({ minPromptTokens: '1', prices: { input: '-1', output: '0', cache_read: '0', cache_write: '0' } }),
+      ).prices,
+    ).toBeTruthy()
   })
 
   it('only submits enabled conditions', () => {
     const input = formToTierInput(
-      tier({ minPromptTokens: '1000', useTime: false, weekdays: [1], useWindow: true, startTime: '01:00', endTime: '02:00' }),
+      tier({
+        minPromptTokens: '1000',
+        useTime: false,
+        weekdays: [1],
+        useWindow: true,
+        startTime: '01:00',
+        endTime: '02:00',
+      }),
     )
-    expect(input).toMatchObject({ min_prompt_tokens: 1000, weekdays: null, start_minute_of_day: null, end_minute_of_day: null })
+    expect(input).toMatchObject({
+      min_prompt_tokens: 1000,
+      weekdays: null,
+      start_minute_of_day: null,
+      end_minute_of_day: null,
+    })
   })
 
   it('round-trips saved tiers through the form', () => {
@@ -134,4 +150,23 @@ describe('price tier list', () => {
     expect(validateModelForm({ ...form, id: 'claude-sonnet-4.5' }, true).id).toBeUndefined()
     expect(validateModelForm({ ...form, id: '' }, false).id).toBeUndefined()
   })
+})
+
+it('keeps explicit zero, omits inherited detail prices and accepts response conditions', () => {
+  const form = {
+    ...emptyTier(),
+    name: '实际服务档',
+    useTokens: false,
+    serviceTier: 'openai:default',
+    prices: {
+      input: '1',
+      output: '2',
+      cache_read: '0',
+      cache_write: '0',
+      token_prices: { input_audio: '0', output_audio: '' },
+    },
+  }
+  expect(validateTier(form)).toEqual({})
+  expect(formToTierInput(form).prices.token_prices).toEqual({ input_audio: '0' })
+  expect(formToTierInput(form).service_tier).toBe('openai:default')
 })
