@@ -7,7 +7,7 @@ import { DisputeRedirect, TakeOrderRedirect } from './redirects'
 describe('C2C routes', () => {
   it.each([
     ['/c2c', '/c2c'],
-    ['/c2c/orders/new?side=sell', '/c2c/orders/new'],
+    ['/c2c/orders/new', '/c2c/orders/new'],
     ['/c2c/orders/order-id/take', '/c2c/orders/:orderID/take'],
     ['/c2c/me', '/c2c/me'],
     ['/c2c/trades/trade-id', '/c2c/trades/:tradeID'],

@@ -19,7 +19,6 @@ import { C2CState } from './C2CState'
 import { ConfirmDialog } from './ConfirmDialog'
 import {
   c2cOrderStatusLabels,
-  c2cSideLabels,
   c2cStatusTone,
   c2cTradeActionHint,
   c2cTradeRole,
@@ -39,12 +38,12 @@ type ActivityTab = 'orders' | 'trades'
 function OrdersTable({ orders, onCancel }: { orders: C2COrder[]; onCancel: (order: C2COrder) => void }) {
   const columns: Column<C2COrder>[] = [
     {
-      key: 'side',
-      header: '方向',
+      key: 'order',
+      header: '挂单',
       primary: true,
       cell: (order) => (
         <span className="c2c-owner">
-          <strong>{c2cSideLabels[order.side]}</strong>
+          <strong>卖单</strong>
           <C2CState label={c2cOrderStatusLabels[order.status]} tone={c2cStatusTone(order.status)} />
         </span>
       ),
@@ -68,7 +67,7 @@ function OrdersTable({ orders, onCancel }: { orders: C2COrder[]; onCancel: (orde
       header: '操作',
       cell: (order) =>
         isC2COrderCancellable(order) ? (
-          <Button onClick={() => onCancel(order)} size="sm" variant="danger">取消挂单</Button>
+          <Button onClick={() => onCancel(order)} size="sm" variant="danger">取消卖单</Button>
         ) : null,
     },
   ]
@@ -158,15 +157,15 @@ function ActivityTabs({ orders, trades, accountID }: { orders: C2COrder[]; trade
       </Tabs>
       <ConfirmDialog
         busy={cancel.isPending}
-        confirmLabel="取消挂单"
+        confirmLabel="取消卖单"
         danger
         error={cancel.isError ? errorMessage(cancel.error, '挂单取消失败') : ''}
         onClose={close}
         onConfirm={() => target && cancel.mutate(target.id, { onSuccess: close })}
         open={target !== null}
-        title={`取消${target ? c2cSideLabels[target.side] : '挂单'}`}
+        title="取消卖单"
       >
-        未成交的数量将不再展示{target?.side === 'sell' ? '，冻结的积分会解冻' : ''}；进行中的交易不受影响。
+        未成交的数量将不再展示，冻结的积分会解冻；进行中的交易不受影响。
       </ConfirmDialog>
     </>
   )
