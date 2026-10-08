@@ -8,7 +8,6 @@ import {
   isProtocol,
   PricePair,
   protocolLabels,
-  ratingText,
 } from '../gateway/presentation'
 import {
   Badge,
@@ -39,7 +38,6 @@ const sortOptions: Array<{ key: MarketSort; label: string }> = [
   { key: 'output_price', label: '输出价格' },
   { key: 'cache_write_price', label: '缓存写价格' },
   { key: 'cache_read_price', label: '缓存读价格' },
-  { key: 'rating', label: '用户评分' },
   { key: 'success_rate', label: '成功率' },
   { key: 'ttft', label: '首字响应' },
   { key: 'tps', label: '输出速度' },
@@ -142,11 +140,6 @@ export function MarketPage() {
             </small>
           </>
         ),
-    },
-    {
-      key: 'rating',
-      header: '评分',
-      cell: (offer) => ratingText(offer.average_rating, offer.rating_count),
     },
   ]
 

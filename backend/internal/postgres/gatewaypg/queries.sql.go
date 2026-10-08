@@ -357,25 +357,7 @@ SELECT
 		LEFT JOIN channel_validation_attempts attempt ON attempt.offer_id = offer.id
 			AND attempt.validation_version = offer.validation_version AND attempt.attempt_seq = offer.validation_attempt_seq
 		WHERE channel.owner_account_id = $1 AND offer.status <> 'deleted'
-			AND NOT (channel.status = 'published' AND offer.status = 'active' AND attempt.status = 'passed'))::bigint AS unhealthy_offer_count,
-	(SELECT count(*) FROM api_pool_members member
-		JOIN api_model_pools pool ON pool.id = member.pool_id
-		JOIN api_keys key ON key.id = pool.api_key_id
-		JOIN channel_offers offer ON offer.id = member.offer_id
-		JOIN channel_models channel_model ON channel_model.id = offer.channel_model_id
-		JOIN channels channel ON channel.id = channel_model.channel_id
-		JOIN accounts channel_owner ON channel_owner.id = channel.owner_account_id
-		JOIN models catalog_model ON catalog_model.id = channel_model.model_id
-		LEFT JOIN channel_credentials credential ON credential.channel_id = channel.id
-			AND credential.credential_version = channel.credential_version
-		LEFT JOIN channel_validation_attempts attempt ON attempt.offer_id = offer.id
-			AND attempt.validation_version = offer.validation_version AND attempt.attempt_seq = offer.validation_attempt_seq
-		WHERE key.owner_account_id = $1 AND key.status <> 'deleted' AND pool.status = 'active'
-			AND (member.added_validation_version <> offer.validation_version
-				OR channel_owner.status <> 'active' OR channel_owner.must_change_password
-				OR channel.status <> 'published' OR catalog_model.status <> 'active'
-				OR offer.status <> 'active' OR credential.channel_id IS NULL
-				OR attempt.status IS DISTINCT FROM 'passed'))::bigint AS pending_items
+			AND NOT (channel.status = 'published' AND offer.status = 'active' AND attempt.status = 'passed'))::bigint AS unhealthy_offer_count
 `
 
 type DashboardTotalsRow struct {
@@ -388,7 +370,6 @@ type DashboardTotalsRow struct {
 	PoolCount           int64
 	HealthyOfferCount   int64
 	UnhealthyOfferCount int64
-	PendingItems        int64
 }
 
 func (q *Queries) DashboardTotals(ctx context.Context, accountID string) (DashboardTotalsRow, error) {
@@ -404,7 +385,6 @@ func (q *Queries) DashboardTotals(ctx context.Context, accountID string) (Dashbo
 		&i.PoolCount,
 		&i.HealthyOfferCount,
 		&i.UnhealthyOfferCount,
-		&i.PendingItems,
 	)
 	return i, err
 }

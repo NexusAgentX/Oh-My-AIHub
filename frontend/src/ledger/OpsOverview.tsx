@@ -111,12 +111,9 @@ function OverviewContent({ hours, metrics }: { hours: number; metrics: OpsMetric
         <Card title="C2C 市场">
           <Rows>
             <Row label="最近成交">{formatFen(c2c.quote.last_traded_price_fen)}</Row>
-            <Row label="买一 / 卖一">
-              {formatFen(c2c.quote.best_bid_price_fen)} / {formatFen(c2c.quote.best_ask_price_fen)}
-            </Row>
-            <Row label="价差">{formatFen(c2c.quote.spread_fen)}</Row>
+            <Row label="卖一">{formatFen(c2c.quote.best_ask_price_fen)}</Row>
             {c2c.orders.map((row) => (
-              <Row key={`${row.side}-${row.status}`} label={`${row.side === 'sell' ? '卖单' : '买单'} · ${row.status}`}>
+              <Row key={row.status} label={`卖单 · ${row.status}`}>
                 {row.count}
               </Row>
             ))}

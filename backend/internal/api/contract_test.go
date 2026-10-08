@@ -19,6 +19,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/dashboard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -322,8 +323,7 @@ func contractChannel() channel.Channel {
 		ID: "chan-1", OwnerAccountID: "acct-1", OwnerDisplayName: "分享者", DisplayName: "我的渠道",
 		NormalizedBaseURL: "https://api.example.com/v1", CredentialConfigured: true, CredentialVersion: 2,
 		CredentialUpdatedAt: &contractTime, Status: channel.StatusPublished, Version: 5,
-		Offers: []channel.Offer{contractOffer()}, AverageRating: contractPointer("4.5"), RatingCount: 2,
-		CurrentUserRating: contractPointer(5), CreatedAt: contractTime, UpdatedAt: contractTime,
+		Offers: []channel.Offer{contractOffer()}, CreatedAt: contractTime, UpdatedAt: contractTime,
 	}
 }
 
@@ -352,7 +352,7 @@ func contractCall() gateway.Call {
 
 func contractC2COrder() c2c.Order {
 	return c2c.Order{
-		ID: "order-1", OwnerAccountID: "acct-1", OwnerDisplayName: "卖家", Side: c2c.SideSell, UnitPriceFen: 100,
+		ID: "order-1", OwnerAccountID: "acct-1", OwnerDisplayName: "卖家", UnitPriceFen: 100,
 		Total: 10 * unit, Available: 5 * unit, Allocated: unit, Settled: 3 * unit, Closed: unit,
 		Minimum: unit, Maximum: 5 * unit, Status: c2c.OrderOpen, Takeable: true,
 		PaymentTypes:   []c2c.PaymentMethodType{c2c.PaymentWeChat},
@@ -363,7 +363,7 @@ func contractC2COrder() c2c.Order {
 
 func contractC2CTrade() c2c.Trade {
 	return c2c.Trade{
-		ID: "trade-1", OrderID: "order-1", OrderSide: c2c.SideSell, BuyerAccountID: "acct-2", BuyerDisplayName: "买家",
+		ID: "trade-1", OrderID: "order-1", BuyerAccountID: "acct-2", BuyerDisplayName: "买家",
 		SellerAccountID: "acct-1", SellerDisplayName: "卖家", BuyerCreditFrozen: true, Quantity: unit,
 		UnitPriceFen: 100, FiatAmountFen: 100, Status: c2c.TradeDisputed,
 		SelectedPaymentMethod: &c2c.PaymentMethod{ID: "pm-1", Type: c2c.PaymentAlipay, Contact: "ali", QRAvailable: false},
@@ -483,7 +483,7 @@ func TestOpenAPIChannelResponses(t *testing.T) {
 	spec.assertSchema(t, "OwnerOffer", ownerOfferResponse(item.Offers[0]))
 	bare := item
 	bare.Offers = []channel.Offer{{ID: "o2", ModelID: "m", Protocol: channel.ProtocolGemini, Status: channel.OfferDisabled, Multiplier: unit}}
-	bare.AverageRating, bare.CredentialUpdatedAt = nil, nil
+	bare.CredentialUpdatedAt = nil
 	spec.assertSchema(t, "OwnerChannel", ownerChannelResponse(bare))
 	spec.assertSchema(t, "AdminChannel", adminChannelResponse(item))
 	spec.assertSchema(t, "AdminChannel", adminChannelResponse(bare))
@@ -528,19 +528,29 @@ func TestOpenAPIGatewayResponses(t *testing.T) {
 	}))
 }
 
+func TestOpenAPIPendingItemResponses(t *testing.T) {
+	spec := loadOpenAPI(t)
+	items := []dashboard.PendingItem{
+		{ID: "c2c-release-t1", Kind: dashboard.KindC2CRelease, Label: "待放行", Tone: dashboard.ToneWarning, Title: "买家 已付款 ¥10.00", Detail: "确认收款后放行 10 积分", To: "/c2c/trades/t1"},
+		{ID: "route-single-k1-p1", Kind: dashboard.KindRouteSingle, Label: "单渠道", Tone: dashboard.ToneInfo, Title: "GPT-5", Detail: "主力", To: "/market?model=m&protocol=openai_responses"},
+	}
+	spec.assertSchema(t, "PendingItemList", pendingItemListResponse(items))
+	spec.assertSchema(t, "PendingItemList", pendingItemListResponse(nil))
+}
+
 func TestOpenAPIC2CResponses(t *testing.T) {
 	spec := loadOpenAPI(t)
 	order := contractC2COrder()
 	spec.assertSchema(t, "C2COrder", c2cOrderResponse(order))
-	spec.assertSchema(t, "C2COrder", c2cOrderResponse(c2c.Order{ID: "o", Side: c2c.SideBuy, Status: c2c.OrderCancelled, CreatedAt: contractTime, UpdatedAt: contractTime, CancelledAt: &contractTime,
+	spec.assertSchema(t, "C2COrder", c2cOrderResponse(c2c.Order{ID: "o", Status: c2c.OrderCancelled, CreatedAt: contractTime, UpdatedAt: contractTime, CancelledAt: &contractTime,
 		PaymentTypes: []c2c.PaymentMethodType{}}))
 	trade := contractC2CTrade()
 	spec.assertSchema(t, "C2CTrade", c2cTradeResponse(trade))
 	spec.assertSchema(t, "C2CAdminTrade", c2cAdminTradeResponse(trade))
-	plain := c2c.Trade{ID: "t", OrderSide: c2c.SideBuy, Status: c2c.TradeAwaitingPayment, PaymentDeadline: contractTime, CreatedAt: contractTime, UpdatedAt: contractTime}
+	plain := c2c.Trade{ID: "t", Status: c2c.TradeAwaitingPayment, PaymentDeadline: contractTime, CreatedAt: contractTime, UpdatedAt: contractTime}
 	spec.assertSchema(t, "C2CTrade", c2cTradeResponse(plain))
 	spec.assertSchema(t, "C2CMarket", c2cMarketResponse(c2c.Market{
-		GuidancePriceFen: 100, LatestPriceFen: contractPointer(int64(101)), SellOrders: []c2c.Order{order}, BuyOrders: []c2c.Order{order},
+		GuidancePriceFen: 100, LatestPriceFen: contractPointer(int64(101)), SellOrders: []c2c.Order{order},
 	}))
 	adminJSON, _ := json.Marshal(c2cAdminTradeResponse(trade))
 	if !bytes.Contains(adminJSON, []byte("dispute.buyer_restricted")) {
@@ -573,8 +583,8 @@ func TestOpenAPIOpsResponses(t *testing.T) {
 				LastFinancialActivity: "2026-10-02T00:00:00Z", InactiveDays: 3, OverLimit: true, CreditLimit: "10"}},
 			API:         ops.APIMetrics{SuccessRate: contractPointer("0.5"), AverageTTFTMillis: contractPointer(int64(100))},
 			Consumption: ops.ConsumptionMetrics{ConsumerSpend: "1", ProviderIncome: "1", OwnUsageIncome: "0", OtherConsumerIncome: "1", PlatformFee: "0"},
-			C2C: ops.C2CMetrics{Orders: []ops.C2COrderStatusCount{{Side: "sell", Status: "open", Count: 1}},
-				Trades: []ops.C2CTradeStatusCount{{Status: "paid", Count: 1}}, Quote: ops.C2CMarketQuote{BestBidPriceFen: contractPointer(int64(99))}},
+			C2C: ops.C2CMetrics{Orders: []ops.C2COrderStatusCount{{Status: "open", Count: 1}},
+				Trades: []ops.C2CTradeStatusCount{{Status: "paid", Count: 1}}, Quote: ops.C2CMarketQuote{BestAskPriceFen: contractPointer(int64(99))}},
 			Concentration: ops.ConcentrationMetrics{TotalPositive: "1", HHI: contractPointer("1")},
 		},
 		providers: ops.ProviderIncomeSnapshot{TotalIncome: "1", OtherConsumerIncome: "1", OwnUsageIncome: "0", ActiveProviders: 1,

@@ -20,7 +20,7 @@ const wallet: Wallet = {
 
 const actions: WalletRecoveryAction[] = [
   { kind: 'market', href: '/c2c' },
-  { kind: 'create_buy_order', href: '/c2c/orders/new?side=buy' },
+  { kind: 'my_orders', href: '/c2c/me' },
 ]
 
 function render(status: Wallet['risk_status']) {
@@ -39,8 +39,8 @@ describe('WalletRiskNotice', () => {
   it.each(['insufficient', 'over_limit'] as const)('offers C2C recovery actions when %s', (status) => {
     const markup = render(status)
     expect(markup).toContain('href="/c2c"')
-    expect(markup).toContain('href="/c2c/orders/new?side=buy"')
-    expect(markup).toContain('发布买单')
+    expect(markup).toContain('href="/c2c/me"')
+    expect(markup).toContain('我的挂单')
   })
 
   it('asks for administrator help instead of offering recovery when credit is frozen', () => {

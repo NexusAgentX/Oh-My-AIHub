@@ -171,8 +171,8 @@ func (s *Service) AdminDisputes(ctx context.Context, actor identity.Account) ([]
 	return s.store.AdminDisputes(ctx)
 }
 
-func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key string, side Side, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) (Order, error) {
-	if !readyActor(actor) || !validKey(key) || (side != SideSell && side != SideBuy) || unitPriceFen <= 0 || total <= 0 || minimum <= 0 || maximum < minimum || maximum > total || len(methods) < 1 || len(methods) > MaximumMethods {
+func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key string, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) (Order, error) {
+	if !readyActor(actor) || !validKey(key) || unitPriceFen <= 0 || total <= 0 || minimum <= 0 || maximum < minimum || maximum > total || len(methods) < 1 || len(methods) > MaximumMethods {
 		return Order{}, ErrInvalidInput
 	}
 	normalized := make([]PaymentMethodInput, len(methods))
@@ -186,12 +186,12 @@ func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key s
 			}
 			method.QR = &clean
 		}
-		if !validPaymentType(method.Type) || len(method.Contact) > 256 || len(method.Instructions) > 1_000 || (method.Contact == "" && method.Instructions == "" && method.QR == nil) || (side == SideBuy && method.Contact == "") {
+		if !validPaymentType(method.Type) || len(method.Contact) > 256 || len(method.Instructions) > 1_000 || (method.Contact == "" && method.Instructions == "" && method.QR == nil) {
 			return Order{}, ErrInvalidInput
 		}
 		normalized[index] = method
 	}
-	payload := orderPayloadForHash(side, unitPriceFen, total, minimum, maximum, normalized)
+	payload := orderPayloadForHash(unitPriceFen, total, minimum, maximum, normalized)
 	command, err := s.command(actor, "c2c.order.create", key, payload)
 	if err != nil {
 		return Order{}, err
@@ -224,7 +224,7 @@ func (s *Service) CreateOrder(ctx context.Context, actor identity.Account, key s
 		})
 	}
 	return s.store.CreateOrder(ctx, command, NewOrder{
-		ID: orderID, Side: side, UnitPriceFen: unitPriceFen, Total: total,
+		ID: orderID, UnitPriceFen: unitPriceFen, Total: total,
 		Minimum: minimum, Maximum: maximum, PaymentMethods: createdMethods,
 	})
 }
@@ -474,7 +474,7 @@ func validPaymentType(value PaymentMethodType) bool {
 	return value == PaymentWeChat || value == PaymentAlipay || value == PaymentBankTransfer || value == PaymentOther
 }
 
-func orderPayloadForHash(side Side, unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) any {
+func orderPayloadForHash(unitPriceFen int64, total, minimum, maximum money.Amount, methods []PaymentMethodInput) any {
 	type methodHash struct {
 		Type, Contact, Instructions, QRHash string
 	}
@@ -483,9 +483,8 @@ func orderPayloadForHash(side Side, unitPriceFen int64, total, minimum, maximum 
 		items[index] = methodHash{string(method.Type), method.Contact, method.Instructions, imageHash(method.QR)}
 	}
 	return struct {
-		Side                    Side
 		UnitPriceFen            int64
 		Total, Minimum, Maximum money.Amount
 		Methods                 []methodHash
-	}{side, unitPriceFen, total, minimum, maximum, items}
+	}{unitPriceFen, total, minimum, maximum, items}
 }

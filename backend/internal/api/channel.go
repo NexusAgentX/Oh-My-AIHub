@@ -46,10 +46,6 @@ type validationRequest struct {
 	ConfirmedUpstreamCost bool `json:"confirmed_upstream_cost"`
 }
 
-type ratingRequest struct {
-	Score int `json:"score"`
-}
-
 func (a *app) listChannels(w http.ResponseWriter, r *http.Request) {
 	items, err := a.channels.ListMine(r.Context(), accountFromContext(r.Context()))
 	if err != nil {
@@ -282,20 +278,6 @@ func (a *app) getMarketChannel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"channel": marketChannelResponse(item)})
 }
 
-func (a *app) rateMarketChannel(w http.ResponseWriter, r *http.Request) {
-	var request ratingRequest
-	if err := decodeJSON(w, r, &request); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
-		return
-	}
-	item, err := a.channels.Rate(r.Context(), accountFromContext(r.Context()), r.PathValue("channelID"), request.Score)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"channel": marketChannelResponse(item)})
-}
-
 func (a *app) listAdminChannels(w http.ResponseWriter, r *http.Request) {
 	items, err := a.channels.ListAdmin(r.Context(), accountFromContext(r.Context()))
 	if err != nil {
@@ -395,7 +377,7 @@ func ownerChannelResponse(item channel.Channel) map[string]any {
 		"display_name": item.DisplayName, "base_url": item.NormalizedBaseURL,
 		"credential_configured": item.CredentialConfigured, "credential_version": item.CredentialVersion,
 		"credential_updated_at": item.CredentialUpdatedAt, "status": item.Status, "version": item.Version,
-		"offers": offers, "average_rating": item.AverageRating, "rating_count": item.RatingCount,
+		"offers":     offers,
 		"created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
 	}
 }
@@ -434,7 +416,7 @@ func marketOfferResponse(item channel.MarketOffer) map[string]any {
 		"protocol": item.Protocol, "multiplier": item.Multiplier.String(), "input_price": item.InputPrice.String(),
 		"output_price": item.OutputPrice.String(), "cache_write_price": item.CacheWritePrice.String(), "cache_read_price": item.CacheReadPrice.String(),
 		"price_tiers":       effectivePriceTierResponses(item.Multiplier, item.PriceTiers),
-		"validation_status": item.ValidationStatus, "average_rating": item.AverageRating, "rating_count": item.RatingCount,
+		"validation_status": item.ValidationStatus,
 		"last_tested_at":    item.LastTestedAt,
 		"call_success_rate": item.CallSuccessRate, "ttft_milliseconds": item.TTFTMilliseconds,
 		"tokens_per_second": item.TokensPerSecond, "call_count": item.CallCount,
@@ -454,9 +436,8 @@ func marketChannelResponse(item channel.Channel) map[string]any {
 			ModelID: offer.ModelID, ModelName: offer.ModelName, ModelProvider: offer.ModelProvider,
 			Protocol: offer.Protocol, Multiplier: offer.Multiplier, InputPrice: prices.Input, OutputPrice: prices.Output,
 			CacheWritePrice: prices.CacheWrite, CacheReadPrice: prices.CacheRead, ValidationStatus: channel.ValidationPassed,
-			PriceTiers:    offer.PriceTiers,
-			LastTestedAt:  offer.LatestValidation.CompletedAt,
-			AverageRating: item.AverageRating, RatingCount: item.RatingCount,
+			PriceTiers:      offer.PriceTiers,
+			LastTestedAt:    offer.LatestValidation.CompletedAt,
 			CallSuccessRate: offer.CallSuccessRate, TTFTMilliseconds: offer.TTFTMilliseconds,
 			TokensPerSecond: offer.TokensPerSecond, CallCount: offer.CallCount,
 		}))
@@ -464,7 +445,6 @@ func marketChannelResponse(item channel.Channel) map[string]any {
 	return map[string]any{
 		"id": item.ID, "display_name": item.DisplayName, "owner_account_id": item.OwnerAccountID,
 		"owner_display_name": item.OwnerDisplayName, "status": item.Status, "offers": offers,
-		"average_rating": item.AverageRating, "rating_count": item.RatingCount, "current_user_rating": item.CurrentUserRating,
 	}
 }
 
@@ -482,7 +462,7 @@ func adminChannelResponse(item channel.Channel) map[string]any {
 		"display_name": item.DisplayName, "credential_configured": item.CredentialConfigured,
 		"credential_version": item.CredentialVersion, "credential_updated_at": item.CredentialUpdatedAt,
 		"status": item.Status, "version": item.Version, "offers": offers,
-		"average_rating": item.AverageRating, "rating_count": item.RatingCount, "created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
+		"created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
 	}
 }
 
@@ -534,7 +514,6 @@ func (a *app) registerChannelRoutes(r *router) {
 	r.ready("GET /api/channel-offers/{offerID}/validation-attempts", a.listOfferValidationAttempts)
 	r.ready("GET /api/market/offers", a.listMarketOffers)
 	r.ready("GET /api/market/channels/{channelID}", a.getMarketChannel)
-	r.ready("PUT /api/market/channels/{channelID}/rating", a.rateMarketChannel)
 	r.admin("GET /api/admin/channels", a.listAdminChannels)
 	r.admin("GET /api/admin/channels/{channelID}", a.getAdminChannel)
 	r.admin("POST /api/admin/channels/{channelID}/pause", a.adminPauseChannel)

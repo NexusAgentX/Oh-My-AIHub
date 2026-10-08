@@ -68,8 +68,8 @@ func mapError(err error) error {
 func toOrder(row GetOrderRow) c2c.Order {
 	return c2c.Order{
 		ID: row.ID, OwnerAccountID: row.OwnerAccountID, OwnerDisplayName: row.OwnerDisplayName,
-		Side: c2c.Side(row.Side), UnitPriceFen: row.UnitPriceFen,
-		Total: row.TotalNano, Available: row.AvailableNano, Allocated: row.AllocatedNano,
+		UnitPriceFen: row.UnitPriceFen,
+		Total:        row.TotalNano, Available: row.AvailableNano, Allocated: row.AllocatedNano,
 		Settled: row.SettledNano, Closed: row.ClosedNano, Minimum: row.MinimumNano, Maximum: row.MaximumNano,
 		Status: c2c.OrderStatus(row.Status), ParentHoldID: row.ParentHoldID,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, CancelledAt: row.CancelledAt,
@@ -80,7 +80,7 @@ func toOrder(row GetOrderRow) c2c.Order {
 // toTrade maps the trade projection; callers convert their row type to GetTradeRow.
 func toTrade(row GetTradeRow) c2c.Trade {
 	return c2c.Trade{
-		ID: row.ID, OrderID: row.OrderID, OrderSide: c2c.Side(row.OrderSide),
+		ID: row.ID, OrderID: row.OrderID,
 		BuyerAccountID: row.BuyerAccountID, BuyerDisplayName: row.BuyerDisplayName,
 		SellerAccountID: row.SellerAccountID, SellerDisplayName: row.SellerDisplayName,
 		BuyerCreditFrozen: row.BuyerCreditFrozen, SellerCreditFrozen: row.SellerCreditFrozen,
@@ -244,10 +244,6 @@ func (s *Store) Market(ctx context.Context) (c2c.Market, error) {
 	if err != nil {
 		return c2c.Market{}, mapError(err)
 	}
-	buys, err := s.q.ListMarketBuyOrders(ctx)
-	if err != nil {
-		return c2c.Market{}, mapError(err)
-	}
 	latest, err := s.q.GetLatestTradePrice(ctx)
 	switch {
 	case err == nil:
@@ -259,22 +255,10 @@ func (s *Store) Market(ctx context.Context) (c2c.Market, error) {
 	if err != nil {
 		return c2c.Market{}, err
 	}
-	market.BuyOrders, err = s.withPaymentTypes(ctx, len(buys), func(i int) GetOrderRow { return GetOrderRow(buys[i]) })
-	if err != nil {
-		return c2c.Market{}, err
-	}
-	// Both lists are ordered best price first.
-	if len(market.BuyOrders) > 0 {
-		price := market.BuyOrders[0].UnitPriceFen
-		market.BestBidFen = &price
-	}
+	// The list is ordered best (lowest) price first.
 	if len(market.SellOrders) > 0 {
 		price := market.SellOrders[0].UnitPriceFen
 		market.BestAskFen = &price
-	}
-	if market.BestBidFen != nil && market.BestAskFen != nil {
-		spread := *market.BestAskFen - *market.BestBidFen
-		market.SpreadFen = &spread
 	}
 	return market, nil
 }

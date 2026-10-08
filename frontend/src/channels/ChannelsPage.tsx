@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Channel } from '../api/types'
-import { formatDate, formatPoints, ratingText } from '../gateway/presentation'
+import { formatDate, formatPoints } from '../gateway/presentation'
 import {
   ButtonLink,
   Card,
@@ -49,7 +49,6 @@ const columns: Column<Row>[] = [
     numeric: true,
     cell: ({ summary }) => (summary.income === null ? '—' : `${formatPoints(summary.income)} 积分`),
   },
-  { key: 'rating', header: '评分', cell: ({ channel }) => ratingText(channel.average_rating, channel.rating_count) },
   { key: 'updated', header: '更新', cell: ({ channel }) => formatDate(channel.updated_at) },
 ]
 

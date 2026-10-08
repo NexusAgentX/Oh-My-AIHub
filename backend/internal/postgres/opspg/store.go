@@ -222,7 +222,7 @@ func (s *Store) c2c(ctx context.Context, window ops.Window, result *ops.Metrics)
 		return err
 	}
 	for _, row := range orders {
-		result.C2C.Orders = append(result.C2C.Orders, ops.C2COrderStatusCount{Side: row.Side, Status: row.Status, Count: row.Count})
+		result.C2C.Orders = append(result.C2C.Orders, ops.C2COrderStatusCount{Status: row.Status, Count: row.Count})
 	}
 	trades, err := s.q.ListC2CTradeStatusCounts(ctx, ListC2CTradeStatusCountsParams{FromAt: window.From, ToAt: window.To})
 	if err != nil {
@@ -237,13 +237,8 @@ func (s *Store) c2c(ctx context.Context, window ops.Window, result *ops.Metrics)
 		return err
 	}
 	last := optionalInt(quote.LastPrice, quote.HasLastPrice)
-	bid := optionalInt(quote.BestBid, quote.HasBestBid)
 	ask := optionalInt(quote.BestAsk, quote.HasBestAsk)
-	result.C2C.Quote = ops.C2CMarketQuote{LastTradedPriceFen: last, BestBidPriceFen: bid, BestAskPriceFen: ask}
-	if bid != nil && ask != nil {
-		spread := *ask - *bid
-		result.C2C.Quote.SpreadFen = &spread
-	}
+	result.C2C.Quote = ops.C2CMarketQuote{LastTradedPriceFen: last, BestAskPriceFen: ask}
 	return nil
 }
 

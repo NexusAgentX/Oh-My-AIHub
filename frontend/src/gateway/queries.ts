@@ -1,15 +1,10 @@
 import {
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { api } from '../api/client'
 import type { APIKeyPoolInput, ChannelProtocol } from '../api/types'
-import { useAuth } from '../auth/AuthProvider'
-import { marketKeys } from '../channels/marketQueries'
-import { derivePendingItems, usedChannelIDs } from './pendingDerive'
 
 /** 网关领域的 key 工厂：失效整个领域用 gatewayKeys.all。 */
 export const gatewayKeys = {
@@ -19,8 +14,7 @@ export const gatewayKeys = {
   key: (keyID: string) => [...gatewayKeys.keys(), keyID] as const,
   calls: (limit: number) => [...gatewayKeys.all, 'calls', limit] as const,
   call: (callID: string) => [...gatewayKeys.all, 'call', callID] as const,
-  pendingC2C: () => [...gatewayKeys.all, 'pending', 'c2c'] as const,
-  pendingChannels: () => [...gatewayKeys.all, 'pending', 'channels'] as const,
+  pendingItems: () => [...gatewayKeys.all, 'pending-items'] as const,
 }
 
 export function useGatewayDashboardQuery() {
@@ -131,63 +125,10 @@ export function useAddPoolMemberMutation() {
   })
 }
 
-const maxRatingChecks = 8
-
-/**
- * 工作台待处理事项：由现有接口在前端组合，不依赖专门的后端接口。
- * 数据来源：C2C 活动（待放行 / 待付款）、我的渠道（校验失败 / 暂停）、
- * API Key（单渠道路由 / 渠道需更新）、最近调用 + 市场渠道详情（已使用未评分）。
- */
-export function usePendingItems() {
-  const { account } = useAuth()
-  const accountID = account?.id ?? ''
-  const keys = useAPIKeysQuery()
-  const calls = useGatewayCallsQuery(100)
-  const c2c = useQuery({
-    queryKey: gatewayKeys.pendingC2C(),
-    queryFn: () => api.c2cActivity(),
+/** 工作台待处理事项：由后端单一接口按当前用户聚合，前端只负责展示。 */
+export function usePendingItemsQuery() {
+  return useQuery({
+    queryKey: gatewayKeys.pendingItems(),
+    queryFn: () => api.pendingItems(),
   })
-  const channels = useQuery({
-    queryKey: gatewayKeys.pendingChannels(),
-    queryFn: () => api.channels(),
-  })
-
-  const channelIDs = useMemo(
-    () => usedChannelIDs(keys.data ?? [], calls.data ?? []).slice(0, maxRatingChecks),
-    [keys.data, calls.data],
-  )
-  const ratingQueries = useQueries({
-    queries: channelIDs.map((channelID) => ({
-      queryKey: marketKeys.channel(channelID),
-      queryFn: () => api.marketChannel(channelID),
-      retry: false,
-    })),
-  })
-
-  const marketChannels = ratingQueries.flatMap((query) => (query.data ? [query.data] : []))
-  const items = useMemo(
-    () =>
-      derivePendingItems({
-        accountID,
-        keys: keys.data ?? [],
-        trades: c2c.data?.trades ?? [],
-        channels: channels.data ?? [],
-        marketChannels,
-      }),
-    [accountID, keys.data, c2c.data, channels.data, ...ratingQueries.map((query) => query.data)],
-  )
-
-  const sources = [keys, calls, c2c, channels]
-  const failed = sources.filter((query) => query.isError).length
-  return {
-    items,
-    loading: sources.some((query) => query.isPending),
-    failed,
-    allFailed: failed === sources.length,
-    refetch: () => {
-      for (const query of sources) {
-        if (query.isError) void query.refetch()
-      }
-    },
-  }
 }

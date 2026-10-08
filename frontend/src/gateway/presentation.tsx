@@ -65,10 +65,6 @@ export function formatDate(value?: string | null) {
   }).format(date)
 }
 
-export function ratingText(rating: string | null, count: number) {
-  return rating ? `${rating} · ${count}` : '暂无评分'
-}
-
 /** 价格对：单位为 积分 / 百万 tokens。 */
 export function PricePair({
   first,

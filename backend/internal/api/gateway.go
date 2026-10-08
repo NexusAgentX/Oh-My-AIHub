@@ -198,7 +198,7 @@ func dashboardResponse(dashboard gateway.Dashboard) map[string]any {
 		"today_external_provider_income": dashboard.TodayExternalProviderIncome.String(),
 		"active_key_count":               dashboard.ActiveKeyCount, "pool_count": dashboard.PoolCount,
 		"healthy_offer_count": dashboard.HealthyOfferCount, "unhealthy_offer_count": dashboard.UnhealthyOfferCount,
-		"pending_items": dashboard.PendingItems, "recent_calls": recent,
+		"recent_calls": recent,
 	}
 }
 

@@ -136,11 +136,9 @@ const getC2CQuote = `-- name: GetC2CQuote :one
 WITH quote AS (
 	SELECT
 		(SELECT unit_price_fen FROM c2c_trades WHERE status = 'released_to_buyer' ORDER BY resolved_at DESC, id DESC LIMIT 1) AS last_price,
-		(SELECT max(unit_price_fen) FROM c2c_orders WHERE side = 'buy' AND status IN ('open', 'allocated') AND available_nano > 0) AS best_bid,
-		(SELECT min(unit_price_fen) FROM c2c_orders WHERE side = 'sell' AND status IN ('open', 'allocated') AND available_nano > 0) AS best_ask
+		(SELECT min(unit_price_fen) FROM c2c_orders WHERE status IN ('open', 'allocated') AND available_nano > 0) AS best_ask
 )
 SELECT COALESCE(last_price, 0)::bigint AS last_price, (last_price IS NOT NULL)::boolean AS has_last_price,
-	COALESCE(best_bid, 0)::bigint AS best_bid, (best_bid IS NOT NULL)::boolean AS has_best_bid,
 	COALESCE(best_ask, 0)::bigint AS best_ask, (best_ask IS NOT NULL)::boolean AS has_best_ask
 FROM quote
 `
@@ -148,8 +146,6 @@ FROM quote
 type GetC2CQuoteRow struct {
 	LastPrice    int64
 	HasLastPrice bool
-	BestBid      int64
-	HasBestBid   bool
 	BestAsk      int64
 	HasBestAsk   bool
 }
@@ -160,8 +156,6 @@ func (q *Queries) GetC2CQuote(ctx context.Context) (GetC2CQuoteRow, error) {
 	err := row.Scan(
 		&i.LastPrice,
 		&i.HasLastPrice,
-		&i.BestBid,
-		&i.HasBestBid,
 		&i.BestAsk,
 		&i.HasBestAsk,
 	)
@@ -337,11 +331,10 @@ func (q *Queries) InsertInspection(ctx context.Context, arg InsertInspectionPara
 }
 
 const listC2COrderStatusCounts = `-- name: ListC2COrderStatusCounts :many
-SELECT side, status, count(*)::bigint AS count FROM c2c_orders GROUP BY side, status ORDER BY side, status
+SELECT status, count(*)::bigint AS count FROM c2c_orders GROUP BY status ORDER BY status
 `
 
 type ListC2COrderStatusCountsRow struct {
-	Side   string
 	Status string
 	Count  int64
 }
@@ -355,7 +348,7 @@ func (q *Queries) ListC2COrderStatusCounts(ctx context.Context) ([]ListC2COrderS
 	var items []ListC2COrderStatusCountsRow
 	for rows.Next() {
 		var i ListC2COrderStatusCountsRow
-		if err := rows.Scan(&i.Side, &i.Status, &i.Count); err != nil {
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

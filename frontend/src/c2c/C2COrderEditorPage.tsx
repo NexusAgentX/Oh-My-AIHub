@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { C2CPaymentMethodType, C2CSide } from '../api/types'
+import { useNavigate } from 'react-router-dom'
+import type { C2CPaymentMethodType } from '../api/types'
 import { errorMessage } from '../api/query'
 import {
   Button,
@@ -10,12 +10,11 @@ import {
   InlineError,
   Notice,
   PageHeader,
-  Segmented,
   SelectField,
   TextareaField,
   TextField,
 } from '../ui'
-import { c2cPaymentLabels, c2cSideLabels, parseC2CPriceFen, validateOrderDraft } from './presentation'
+import { c2cPaymentLabels, parseC2CPriceFen, validateOrderDraft } from './presentation'
 import { useCreateC2COrder } from './queries'
 
 type PaymentDraft = {
@@ -34,9 +33,7 @@ function emptyMethod(): PaymentDraft {
 
 export function C2COrderEditorPage() {
   const navigate = useNavigate()
-  const [search] = useSearchParams()
   const create = useCreateC2COrder()
-  const [side, setSide] = useState<C2CSide>(search.get('side') === 'buy' ? 'buy' : 'sell')
   const [price, setPrice] = useState('1.00')
   const [total, setTotal] = useState('100')
   const [minimum, setMinimum] = useState('10')
@@ -44,24 +41,17 @@ export function C2COrderEditorPage() {
   const [methods, setMethods] = useState<PaymentDraft[]>([emptyMethod()])
   const [formError, setFormError] = useState('')
 
-  const switchSide = (next: C2CSide) => {
-    setSide(next)
-    // 买单只提供联系方式，不上传收款码。
-    if (next === 'buy') setMethods((current) => current.map((method) => ({ ...method, qr: null })))
-  }
-
   const updateMethod = (id: string, update: Partial<PaymentDraft>) => {
     setMethods((current) => current.map((method) => (method.id === id ? { ...method, ...update } : method)))
   }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    const problem = validateOrderDraft({ side, price, total, minimum, maximum, methods })
+    const problem = validateOrderDraft({ price, total, minimum, maximum, methods })
     setFormError(problem)
     if (problem) return
     create.mutate(
       {
-        side,
         unit_price_fen: parseC2CPriceFen(price),
         total,
         minimum,
@@ -72,30 +62,17 @@ export function C2COrderEditorPage() {
     )
   }
 
-  const sell = side === 'sell'
   const error = formError || (create.isError ? errorMessage(create.error, '挂单发布失败') : '')
 
   return (
     <>
       <PageHeader
         back={<ButtonLink size="sm" to="/c2c" variant="quiet">← C2C 市场</ButtonLink>}
-        title="发布挂单"
+        title="发布卖单"
       />
       <form className="c2c-editor" onSubmit={submit}>
-        <Card title="方向与价格">
+        <Card title="价格与数量">
           <div className="c2c-editor-grid">
-            <div className="c2c-editor-side">
-              <span className="field-label">交易方向</span>
-              <Segmented
-                label="交易方向"
-                onChange={switchSide}
-                options={[
-                  { key: 'sell', label: '卖单 · 出售积分' },
-                  { key: 'buy', label: '买单 · 购买积分' },
-                ]}
-                value={side}
-              />
-            </div>
             <TextField inputMode="decimal" label="单价（人民币 / 积分）" onChange={(event) => setPrice(event.target.value)} required value={price} />
             <TextField inputMode="decimal" label="挂单数量（积分）" onChange={(event) => setTotal(event.target.value)} required value={total} />
             <TextField inputMode="decimal" label="单次最少" onChange={(event) => setMinimum(event.target.value)} required value={minimum} />
@@ -116,7 +93,7 @@ export function C2COrderEditorPage() {
               添加
             </Button>
           }
-          title={sell ? '收款方式' : '联系方式'}
+          title="收款方式"
         >
           <div className="c2c-methods">
             {methods.map((method, index) => (
@@ -133,9 +110,8 @@ export function C2COrderEditorPage() {
                     ))}
                   </SelectField>
                   <TextField
-                    label={sell ? '收款账号或联系方式' : '联系方式'}
+                    label="收款账号或联系方式"
                     onChange={(event) => updateMethod(method.id, { contact: event.target.value })}
-                    required={!sell}
                     value={method.contact}
                   />
                 </div>
@@ -145,17 +121,15 @@ export function C2COrderEditorPage() {
                   onChange={(event) => updateMethod(method.id, { instructions: event.target.value })}
                   value={method.instructions}
                 />
-                {sell && (
-                  <label className="field">
-                    <span className="field-label">收款码（可选，JPG / PNG）</span>
-                    <input
-                      accept="image/jpeg,image/png"
-                      className="input c2c-file-input"
-                      onChange={(event) => updateMethod(method.id, { qr: event.target.files?.[0] ?? null })}
-                      type="file"
-                    />
-                  </label>
-                )}
+                <label className="field">
+                  <span className="field-label">收款码（可选，JPG / PNG）</span>
+                  <input
+                    accept="image/jpeg,image/png"
+                    className="input c2c-file-input"
+                    onChange={(event) => updateMethod(method.id, { qr: event.target.files?.[0] ?? null })}
+                    type="file"
+                  />
+                </label>
                 {methods.length > 1 && (
                   <Button
                     onClick={() => setMethods((current) => current.filter((item) => item.id !== method.id))}
@@ -171,11 +145,11 @@ export function C2COrderEditorPage() {
           </div>
         </Card>
 
-        {sell && <Notice tone="info">发布{c2cSideLabels.sell}后立即冻结 {total || '0'} 积分，取消时解冻未成交部分。</Notice>}
+        <Notice tone="info">发布卖单后立即冻结 {total || '0'} 积分，取消时解冻未成交部分。</Notice>
         <InlineError>{error}</InlineError>
         <div className="c2c-editor-actions">
           <ButtonLink to="/c2c">取消</ButtonLink>
-          <Button loading={create.isPending} type="submit">发布挂单</Button>
+          <Button loading={create.isPending} type="submit">发布卖单</Button>
         </div>
       </form>
     </>

@@ -9,6 +9,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/dashboard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -51,6 +52,7 @@ type app struct {
 	gateway           *gateway.Service
 	ledger            *ledger.Service
 	c2c               *c2c.Service
+	dashboard         *dashboard.Service
 	ops               OpsStore
 	feeRates          *feerate.Service
 	databaseReady     func(context.Context) error
@@ -75,6 +77,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		gateway:           dependencies.Gateway,
 		ledger:            dependencies.Ledger,
 		c2c:               dependencies.C2C,
+		dashboard:         dashboard.New(dependencies.Gateway, dependencies.Channels, dependencies.C2C),
 		ops:               dependencies.Ops,
 		feeRates:          dependencies.FeeRates,
 		databaseReady:     dependencies.DatabaseReady,
@@ -91,6 +94,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerLedgerRoutes(routes)
 	application.registerChannelRoutes(routes)
 	application.registerGatewayRoutes(routes)
+	application.registerDashboardRoutes(routes)
 	application.registerC2CRoutes(routes)
 	application.registerFeeRateRoutes(routes)
 	application.registerOpsRoutes(routes)

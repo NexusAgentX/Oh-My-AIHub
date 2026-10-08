@@ -269,26 +269,12 @@ SELECT c.id, c.owner_account_id, owner.display_name AS owner_display_name,
 	c.display_name, c.normalized_base_url,
 	(credential.channel_id IS NOT NULL)::boolean AS credential_configured,
 	c.credential_version, c.credential_updated_at, c.status, c.version,
-	COALESCE(rating.average_rating, '')::text AS average_rating,
-	COALESCE(rating.rating_count, 0)::bigint AS rating_count,
-	current_rating.score AS current_rating,
 	c.created_at, c.updated_at
 FROM channels c
 JOIN accounts owner ON owner.id = c.owner_account_id
 LEFT JOIN channel_credentials credential ON credential.channel_id = c.id
-LEFT JOIN LATERAL (
-	SELECT round(avg(score)::numeric, 2)::text AS average_rating, count(*) AS rating_count
-	FROM channel_ratings WHERE channel_id = c.id
-) rating ON true
-LEFT JOIN channel_ratings current_rating
-	ON current_rating.channel_id = c.id AND current_rating.account_id = $1::uuid
-WHERE c.id = $2
+WHERE c.id = $1
 `
-
-type GetChannelParams struct {
-	ViewerID *string
-	ID       string
-}
 
 type GetChannelRow struct {
 	ID                      string
@@ -303,16 +289,13 @@ type GetChannelRow struct {
 	CredentialUpdatedAt     *time.Time
 	Status                  string
 	Version                 int64
-	AverageRating           string
-	RatingCount             int64
-	CurrentRating           *int16
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 }
 
 // 渠道领域全部 SQL。锁顺序（先渠道、再渠道模型/报价）由 store.go 中的调用顺序保证。
-func (q *Queries) GetChannel(ctx context.Context, arg GetChannelParams) (GetChannelRow, error) {
-	row := q.db.QueryRow(ctx, getChannel, arg.ViewerID, arg.ID)
+func (q *Queries) GetChannel(ctx context.Context, id string) (GetChannelRow, error) {
+	row := q.db.QueryRow(ctx, getChannel, id)
 	var i GetChannelRow
 	err := row.Scan(
 		&i.ID,
@@ -327,9 +310,6 @@ func (q *Queries) GetChannel(ctx context.Context, arg GetChannelParams) (GetChan
 		&i.CredentialUpdatedAt,
 		&i.Status,
 		&i.Version,
-		&i.AverageRating,
-		&i.RatingCount,
-		&i.CurrentRating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -481,8 +461,7 @@ SELECT cm.channel_id, c.display_name AS channel_display_name, c.owner_account_id
 	m.context_window, m.input_price_nano_per_million, m.output_price_nano_per_million,
 	m.cache_write_price_nano_per_million, m.cache_read_price_nano_per_million,
 	attempt.status AS validation_status, credential.credential_version, credential.key_id,
-	credential.nonce, credential.ciphertext, c.normalized_base_url, o.upstream_model_id,
-	COALESCE(rating.average_rating::text, '')::text AS average_rating, COALESCE(rating.rating_count, 0)::bigint AS rating_count
+	credential.nonce, credential.ciphertext, c.normalized_base_url, o.upstream_model_id
 FROM channel_offers o
 JOIN channel_models cm ON cm.id = o.channel_model_id
 JOIN channels c ON c.id = cm.channel_id
@@ -493,10 +472,6 @@ LEFT JOIN channel_credentials credential
 LEFT JOIN channel_validation_attempts attempt
 	ON attempt.offer_id = o.id AND attempt.validation_version = o.validation_version
 	AND attempt.attempt_seq = o.validation_attempt_seq
-LEFT JOIN LATERAL (
-	SELECT round(avg(score)::numeric, 2) AS average_rating, count(*) AS rating_count
-	FROM channel_ratings WHERE channel_id = c.id
-) rating ON true
 WHERE o.id = $1
 `
 
@@ -528,8 +503,6 @@ type GetRoutingRowRow struct {
 	Ciphertext                    []byte
 	NormalizedBaseUrl             string
 	UpstreamModelID               string
-	AverageRating                 string
-	RatingCount                   int64
 }
 
 func (q *Queries) GetRoutingRow(ctx context.Context, offerID string) (GetRoutingRowRow, error) {
@@ -563,8 +536,6 @@ func (q *Queries) GetRoutingRow(ctx context.Context, offerID string) (GetRouting
 		&i.Ciphertext,
 		&i.NormalizedBaseUrl,
 		&i.UpstreamModelID,
-		&i.AverageRating,
-		&i.RatingCount,
 	)
 	return i, err
 }
@@ -974,7 +945,7 @@ WITH offer_metrics AS (
 		CASE WHEN m.cache_read_price_nano_per_million BETWEEN 0 AND 100000000000000
 				AND COALESCE(o.deleted_multiplier_nano, cm.multiplier_nano) BETWEEN 0 AND 1000000000000
 			THEN ceil(m.cache_read_price_nano_per_million::numeric * COALESCE(o.deleted_multiplier_nano, cm.multiplier_nano)::numeric / 1000000000)::bigint END AS cache_read_price_nano,
-		rating.average_rating, COALESCE(rating.rating_count, 0)::bigint AS rating_count, attempt.completed_at AS last_tested_at,
+		attempt.completed_at AS last_tested_at,
 		gateway_metrics.success_rate,
 		gateway_metrics.ttft_milliseconds,
 		gateway_metrics.tokens_per_second,
@@ -997,16 +968,12 @@ WITH offer_metrics AS (
 	LEFT JOIN channel_validation_attempts attempt
 		ON attempt.offer_id = o.id AND attempt.validation_version = o.validation_version
 		AND attempt.attempt_seq = o.validation_attempt_seq
-	LEFT JOIN LATERAL (
-		SELECT round(avg(score)::numeric, 2) AS average_rating, count(*) AS rating_count
-		FROM channel_ratings WHERE channel_id = c.id
-	) rating ON true
 	LEFT JOIN offer_metrics gateway_metrics ON gateway_metrics.offer_id = o.id
 ), keyed AS (
 	SELECT offer_id, channel_id, channel_name, owner_account_id, owner_name, model_id, model_name,
 		model_provider, protocol, multiplier_nano,
 		input_price_nano, output_price_nano, cache_write_price_nano, cache_read_price_nano,
-		average_rating, rating_count, last_tested_at, success_rate, ttft_milliseconds, tokens_per_second,
+		last_tested_at, success_rate, ttft_milliseconds, tokens_per_second,
 		call_count, eligible,
 		CASE $5::text
 			WHEN 'output_price' THEN output_price_nano
@@ -1027,7 +994,7 @@ SELECT offer_id, channel_id, channel_name, owner_account_id, owner_name,
 	COALESCE(output_price_nano, 0)::bigint AS output_price_nano,
 	COALESCE(cache_write_price_nano, 0)::bigint AS cache_write_price_nano,
 	COALESCE(cache_read_price_nano, 0)::bigint AS cache_read_price_nano,
-	COALESCE(average_rating::text, '')::text AS average_rating, rating_count, last_tested_at,
+	last_tested_at,
 	success_rate, ttft_milliseconds, tokens_per_second, call_count
 FROM keyed
 WHERE eligible
@@ -1035,16 +1002,6 @@ WHERE eligible
 	AND ($2::text = '' OR protocol = $2::text)
 	AND ($3::text = '' OR owner_name ILIKE '%' || $3::text || '%')
 	AND ($4::uuid IS NULL OR CASE
-		WHEN $5::text = 'rating' THEN (
-			($6::text::numeric IS NOT NULL AND (
-				average_rating IS NULL OR average_rating < $6::text::numeric OR
-				(average_rating = $6::text::numeric AND (
-					rating_count < $7::bigint OR
-					(rating_count = $7::bigint AND offer_id > $4::uuid)))))
-			OR ($6::text::numeric IS NULL AND average_rating IS NULL AND (
-				rating_count < $7::bigint OR
-				(rating_count = $7::bigint AND offer_id > $4::uuid)))
-		)
 		WHEN $5::text IN ('success_rate', 'ttft', 'tps') THEN (
 			($6::text::numeric IS NOT NULL AND (
 				metric_key IS NULL
@@ -1054,29 +1011,26 @@ WHERE eligible
 				OR (metric_key = $6::text::numeric AND offer_id > $4::uuid)))
 			OR ($6::text::numeric IS NULL AND metric_key IS NULL AND offer_id > $4::uuid)
 		)
-		ELSE (price_key > $8::bigint
-			OR (price_key = $8::bigint AND offer_id > $4::uuid))
+		ELSE (price_key > $7::bigint
+			OR (price_key = $7::bigint AND offer_id > $4::uuid))
 	END)
 ORDER BY
-	CASE WHEN $5::text NOT IN ('rating', 'success_rate', 'ttft', 'tps') THEN price_key END ASC,
-	CASE WHEN $5::text = 'rating' THEN average_rating END DESC NULLS LAST,
-	CASE WHEN $5::text = 'rating' THEN rating_count END DESC,
+	CASE WHEN $5::text NOT IN ('success_rate', 'ttft', 'tps') THEN price_key END ASC,
 	CASE WHEN $5::text IN ('success_rate', 'tps') THEN metric_key END DESC NULLS LAST,
 	CASE WHEN $5::text = 'ttft' THEN metric_key END ASC NULLS LAST,
 	offer_id ASC
-LIMIT $9::bigint
+LIMIT $8::bigint
 `
 
 type ListMarketOffersParams struct {
-	ModelID           string
-	Protocol          string
-	OwnerQuery        string
-	CursorOfferID     *string
-	Sort              string
-	CursorMetric      *string
-	CursorRatingCount int64
-	CursorPrice       int64
-	RowLimit          int64
+	ModelID       string
+	Protocol      string
+	OwnerQuery    string
+	CursorOfferID *string
+	Sort          string
+	CursorMetric  *string
+	CursorPrice   int64
+	RowLimit      int64
 }
 
 type ListMarketOffersRow struct {
@@ -1094,8 +1048,6 @@ type ListMarketOffersRow struct {
 	OutputPriceNano     int64
 	CacheWritePriceNano int64
 	CacheReadPriceNano  int64
-	AverageRating       string
-	RatingCount         int64
 	LastTestedAt        *time.Time
 	SuccessRate         *string
 	TtftMilliseconds    *int64
@@ -1103,12 +1055,11 @@ type ListMarketOffersRow struct {
 	CallCount           *int64
 }
 
-// 市场列表保留为单条查询：八种排序用 sort 参数选择排序键，ORDER BY 与键集游标条件
+// 市场列表保留为单条查询：七种排序用 sort 参数选择排序键，ORDER BY 与键集游标条件
 // 都以 CASE 分支表达。原手写版本按排序拼接 SQL 文本，这里改为固定文本以便 sqlc 检查。
 // 排序键与方向（与旧实现一致，末位总是 offer_id ASC）：
 //
 //	价格类（input/output/cache_write/cache_read，其余未知值按 input_price）：price ASC
-//	rating：average_rating DESC NULLS LAST, rating_count DESC
 //	success_rate / tps：metric DESC NULLS LAST；ttft：metric ASC NULLS LAST
 func (q *Queries) ListMarketOffers(ctx context.Context, arg ListMarketOffersParams) ([]ListMarketOffersRow, error) {
 	rows, err := q.db.Query(ctx, listMarketOffers,
@@ -1118,7 +1069,6 @@ func (q *Queries) ListMarketOffers(ctx context.Context, arg ListMarketOffersPara
 		arg.CursorOfferID,
 		arg.Sort,
 		arg.CursorMetric,
-		arg.CursorRatingCount,
 		arg.CursorPrice,
 		arg.RowLimit,
 	)
@@ -1144,8 +1094,6 @@ func (q *Queries) ListMarketOffers(ctx context.Context, arg ListMarketOffersPara
 			&i.OutputPriceNano,
 			&i.CacheWritePriceNano,
 			&i.CacheReadPriceNano,
-			&i.AverageRating,
-			&i.RatingCount,
 			&i.LastTestedAt,
 			&i.SuccessRate,
 			&i.TtftMilliseconds,
@@ -1533,26 +1481,6 @@ func (q *Queries) LockOwnerChannel(ctx context.Context, arg LockOwnerChannelPara
 	return i, err
 }
 
-const lockRatableChannel = `-- name: LockRatableChannel :one
-SELECT c.id
-FROM channels c JOIN accounts actor ON actor.id = $1
-WHERE c.id = $2 AND c.status IN ('published', 'paused')
-	AND actor.status = 'active' AND NOT actor.must_change_password
-FOR UPDATE OF c
-`
-
-type LockRatableChannelParams struct {
-	AccountID string
-	ID        string
-}
-
-func (q *Queries) LockRatableChannel(ctx context.Context, arg LockRatableChannelParams) (string, error) {
-	row := q.db.QueryRow(ctx, lockRatableChannel, arg.AccountID, arg.ID)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
 const replaceCredentialCiphertext = `-- name: ReplaceCredentialCiphertext :execrows
 UPDATE channel_credentials SET key_id = $1, nonce = $2, ciphertext = $3, updated_at = now()
 WHERE channel_id = $4 AND credential_version = $5
@@ -1771,22 +1699,5 @@ func (q *Queries) UpsertCredential(ctx context.Context, arg UpsertCredentialPara
 		arg.Nonce,
 		arg.Ciphertext,
 	)
-	return err
-}
-
-const upsertRating = `-- name: UpsertRating :exec
-INSERT INTO channel_ratings (channel_id, account_id, score)
-VALUES ($1, $2, $3)
-ON CONFLICT (channel_id, account_id) DO UPDATE SET score = EXCLUDED.score, updated_at = now()
-`
-
-type UpsertRatingParams struct {
-	ChannelID string
-	AccountID string
-	Score     int16
-}
-
-func (q *Queries) UpsertRating(ctx context.Context, arg UpsertRatingParams) error {
-	_, err := q.db.Exec(ctx, upsertRating, arg.ChannelID, arg.AccountID, arg.Score)
 	return err
 }

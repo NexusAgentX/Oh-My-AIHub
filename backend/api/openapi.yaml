@@ -1028,7 +1028,7 @@ paths:
           description: "排序方式，缺省为 input_price。"
           schema:
             type: string
-            enum: [input_price, output_price, cache_write_price, cache_read_price, rating, success_rate, ttft, tps]
+            enum: [input_price, output_price, cache_write_price, cache_read_price, success_rate, ttft, tps]
         - name: after
           in: query
           required: false
@@ -1067,32 +1067,6 @@ paths:
         '401': {$ref: "#/components/responses/Unauthorized"}
         '403': {$ref: "#/components/responses/Forbidden"}
         '404': {$ref: "#/components/responses/NotFound"}
-  /api/market/channels/{channelID}/rating:
-    put:
-      operationId: rateMarketChannel
-      tags: [market]
-      summary: "为渠道评分"
-      x-access: ready
-      security:
-        - sessionCookie: []
-      parameters:
-        - $ref: "#/components/parameters/channelID"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/RatingRequest"}
-      responses:
-        '200':
-          description: "成功"
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/MarketChannelEnvelope"}
-        '400': {$ref: "#/components/responses/BadRequest"}
-        '401': {$ref: "#/components/responses/Unauthorized"}
-        '403': {$ref: "#/components/responses/Forbidden"}
-        '404': {$ref: "#/components/responses/NotFound"}
-        '422': {$ref: "#/components/responses/Unprocessable"}
   /api/admin/channels:
     get:
       operationId: listAdminChannels
@@ -1535,6 +1509,23 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Dashboard"}
+        '401': {$ref: "#/components/responses/Unauthorized"}
+        '403': {$ref: "#/components/responses/Forbidden"}
+  /api/dashboard/pending-items:
+    get:
+      operationId: listPendingItems
+      tags: [calls]
+      summary: "工作台待处理事项"
+      description: "服务端聚合当前用户的待处理事项：待放行 / 待付款的 C2C 交易、校验失败或已暂停的渠道、含不可用渠道的路由、只有一个渠道的路由。按种类固定排序，不分页。"
+      x-access: ready
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: "成功"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PendingItemList"}
         '401': {$ref: "#/components/responses/Unauthorized"}
         '403': {$ref: "#/components/responses/Forbidden"}
   /api/c2c/market:
@@ -2549,7 +2540,7 @@ components:
           items:
             type: object
             properties:
-              kind: {type: string, enum: [market, create_buy_order, my_orders]}
+              kind: {type: string, enum: [market, my_orders]}
               href: {type: string}
             required: [kind, href]
             additionalProperties: false
@@ -2830,11 +2821,9 @@ components:
         offers:
           type: array
           items: {$ref: "#/components/schemas/OwnerOffer"}
-        average_rating: {type: [string, "null"]}
-        rating_count: {type: integer}
         created_at: {$ref: "#/components/schemas/Timestamp"}
         updated_at: {$ref: "#/components/schemas/Timestamp"}
-      required: [id, owner_account_id, owner_display_name, display_name, base_url, credential_configured, credential_version, credential_updated_at, status, version, offers, average_rating, rating_count, created_at, updated_at]
+      required: [id, owner_account_id, owner_display_name, display_name, base_url, credential_configured, credential_version, credential_updated_at, status, version, offers, created_at, updated_at]
       additionalProperties: false
     OwnerChannelEnvelope:
       type: object
@@ -2885,11 +2874,9 @@ components:
         offers:
           type: array
           items: {$ref: "#/components/schemas/AdminChannelOffer"}
-        average_rating: {type: [string, "null"]}
-        rating_count: {type: integer}
         created_at: {$ref: "#/components/schemas/Timestamp"}
         updated_at: {$ref: "#/components/schemas/Timestamp"}
-      required: [id, owner_account_id, owner_display_name, display_name, credential_configured, credential_version, credential_updated_at, status, version, offers, average_rating, rating_count, created_at, updated_at]
+      required: [id, owner_account_id, owner_display_name, display_name, credential_configured, credential_version, credential_updated_at, status, version, offers, created_at, updated_at]
       additionalProperties: false
     AdminChannelEnvelope:
       type: object
@@ -2926,8 +2913,6 @@ components:
           type: array
           items: {$ref: "#/components/schemas/PriceTier"}
         validation_status: {type: string, enum: [in_progress, passed, failed]}
-        average_rating: {type: [string, "null"]}
-        rating_count: {type: integer}
         last_tested_at:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
@@ -2936,7 +2921,7 @@ components:
         ttft_milliseconds: {type: [integer, "null"]}
         tokens_per_second: {type: [string, "null"]}
         call_count: {type: [integer, "null"]}
-      required: [offer_id, channel_id, channel_display_name, owner_account_id, owner_display_name, model_id, model_name, model_provider, protocol, multiplier, input_price, output_price, cache_write_price, cache_read_price, price_tiers, validation_status, average_rating, rating_count, last_tested_at, call_success_rate, ttft_milliseconds, tokens_per_second, call_count]
+      required: [offer_id, channel_id, channel_display_name, owner_account_id, owner_display_name, model_id, model_name, model_provider, protocol, multiplier, input_price, output_price, cache_write_price, cache_read_price, price_tiers, validation_status, last_tested_at, call_success_rate, ttft_milliseconds, tokens_per_second, call_count]
       additionalProperties: false
     MarketOfferPage:
       type: object
@@ -2958,10 +2943,7 @@ components:
         offers:
           type: array
           items: {$ref: "#/components/schemas/MarketOffer"}
-        average_rating: {type: [string, "null"]}
-        rating_count: {type: integer}
-        current_user_rating: {type: [integer, "null"]}
-      required: [id, display_name, owner_account_id, owner_display_name, status, offers, average_rating, rating_count, current_user_rating]
+      required: [id, display_name, owner_account_id, owner_display_name, status, offers]
       additionalProperties: false
     MarketChannelEnvelope:
       type: object
@@ -3028,12 +3010,6 @@ components:
       properties:
         confirmed_upstream_cost: {type: boolean}
       required: []
-      additionalProperties: false
-    RatingRequest:
-      type: object
-      properties:
-        score: {type: integer, minimum: 1, maximum: 5}
-      required: [score]
       additionalProperties: false
     ReencryptRequest:
       type: object
@@ -3256,6 +3232,26 @@ components:
           items: {$ref: "#/components/schemas/GatewayCall"}
       required: [calls]
       additionalProperties: false
+    PendingItem:
+      type: object
+      properties:
+        id: {type: string}
+        kind: {type: string, enum: [c2c_release, c2c_payment, channel_failed, channel_paused, route_ineligible, route_single]}
+        label: {type: string, description: "事项类别徽标文字。"}
+        tone: {type: string, enum: [danger, warning, info]}
+        title: {type: string}
+        detail: {type: string}
+        to: {type: string, description: "前端路由。"}
+      required: [id, kind, label, tone, title, detail, to]
+      additionalProperties: false
+    PendingItemList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/PendingItem"}
+      required: [items]
+      additionalProperties: false
     Dashboard:
       type: object
       properties:
@@ -3268,11 +3264,10 @@ components:
         pool_count: {type: integer}
         healthy_offer_count: {type: integer}
         unhealthy_offer_count: {type: integer}
-        pending_items: {type: integer}
         recent_calls:
           type: array
           items: {$ref: "#/components/schemas/GatewayCall"}
-      required: [consumer_spent, provider_income, today_spent, today_succeeded_calls, today_external_provider_income, active_key_count, pool_count, healthy_offer_count, unhealthy_offer_count, pending_items, recent_calls]
+      required: [consumer_spent, provider_income, today_spent, today_succeeded_calls, today_external_provider_income, active_key_count, pool_count, healthy_offer_count, unhealthy_offer_count, recent_calls]
       additionalProperties: false
     C2CPaymentMethod:
       type: object
@@ -3303,7 +3298,6 @@ components:
         id: {type: string}
         owner_account_id: {type: string}
         owner_display_name: {type: string}
-        side: {type: string, enum: [sell, buy]}
         unit_price_fen: {type: integer}
         total: {$ref: "#/components/schemas/Amount"}
         available: {$ref: "#/components/schemas/Amount"}
@@ -3326,7 +3320,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
-      required: [id, owner_account_id, owner_display_name, side, unit_price_fen, total, available, allocated, settled, closed, minimum, maximum, status, takeable, payment_types, payment_methods, created_at, updated_at, cancelled_at]
+      required: [id, owner_account_id, owner_display_name, unit_price_fen, total, available, allocated, settled, closed, minimum, maximum, status, takeable, payment_types, payment_methods, created_at, updated_at, cancelled_at]
       additionalProperties: false
     C2COrderEnvelope:
       type: object
@@ -3340,7 +3334,6 @@ components:
       properties:
         id: {type: string}
         order_id: {type: string}
-        order_side: {type: string, enum: [sell, buy]}
         buyer_account_id: {type: string}
         buyer_display_name: {type: string}
         seller_account_id: {type: string}
@@ -3404,7 +3397,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
-      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at]
+      required: [id, order_id, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at]
       additionalProperties: false
     C2CAdminTrade:
       type: object
@@ -3412,7 +3405,6 @@ components:
       properties:
         id: {type: string}
         order_id: {type: string}
-        order_side: {type: string, enum: [sell, buy]}
         buyer_account_id: {type: string}
         buyer_display_name: {type: string}
         seller_account_id: {type: string}
@@ -3478,7 +3470,7 @@ components:
             - type: "null"
         buyer_credit_frozen: {type: boolean}
         seller_credit_frozen: {type: boolean}
-      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at, buyer_credit_frozen, seller_credit_frozen]
+      required: [id, order_id, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at, buyer_credit_frozen, seller_credit_frozen]
       additionalProperties: false
     C2CTradeEnvelope:
       type: object
@@ -3518,18 +3510,13 @@ components:
           properties:
             guidance_price_fen: {type: integer}
             latest_price_fen: {type: [integer, "null"]}
-            best_bid_fen: {type: [integer, "null"]}
             best_ask_fen: {type: [integer, "null"]}
-            spread_fen: {type: [integer, "null"]}
-          required: [guidance_price_fen, latest_price_fen, best_bid_fen, best_ask_fen, spread_fen]
+          required: [guidance_price_fen, latest_price_fen, best_ask_fen]
           additionalProperties: false
         sell_orders:
           type: array
           items: {$ref: "#/components/schemas/C2COrder"}
-        buy_orders:
-          type: array
-          items: {$ref: "#/components/schemas/C2COrder"}
-      required: [metrics, sell_orders, buy_orders]
+      required: [metrics, sell_orders]
       additionalProperties: false
     C2CMyActivity:
       type: object
@@ -3554,7 +3541,6 @@ components:
     C2CCreateOrderRequest:
       type: object
       properties:
-        side: {type: string, enum: [sell, buy]}
         unit_price_fen: {type: integer}
         total: {$ref: "#/components/schemas/Amount"}
         minimum: {$ref: "#/components/schemas/Amount"}
@@ -3562,7 +3548,7 @@ components:
         payment_methods:
           type: array
           items: {$ref: "#/components/schemas/C2CPaymentMethodRequest"}
-      required: [side, unit_price_fen, total, minimum, maximum, payment_methods]
+      required: [unit_price_fen, total, minimum, maximum, payment_methods]
       additionalProperties: false
     C2CTakeOrderRequest:
       type: object
@@ -3693,10 +3679,9 @@ components:
               items:
                 type: object
                 properties:
-                  side: {type: string}
                   status: {type: string}
                   count: {type: integer}
-                required: [side, status, count]
+                required: [status, count]
                 additionalProperties: false
             trades:
               type: array
@@ -3711,10 +3696,8 @@ components:
               type: object
               properties:
                 last_traded_price_fen: {type: [integer, "null"]}
-                best_bid_price_fen: {type: [integer, "null"]}
                 best_ask_price_fen: {type: [integer, "null"]}
-                spread_fen: {type: [integer, "null"]}
-              required: [last_traded_price_fen, best_bid_price_fen, best_ask_price_fen, spread_fen]
+              required: [last_traded_price_fen, best_ask_price_fen]
               additionalProperties: false
           required: [orders, trades, quote]
           additionalProperties: false

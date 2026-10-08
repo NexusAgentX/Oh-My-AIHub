@@ -93,7 +93,7 @@ func TestOpsIntegration(t *testing.T) {
 		if snapshot.Concentration.Top1Share != nil || snapshot.Concentration.Top5Share != nil || snapshot.Concentration.HHI != nil {
 			t.Fatalf("empty concentration fabricated = %+v", snapshot.Concentration)
 		}
-		if snapshot.C2C.Quote.LastTradedPriceFen != nil || snapshot.C2C.Quote.BestBidPriceFen != nil || snapshot.C2C.Quote.BestAskPriceFen != nil || snapshot.C2C.Quote.SpreadFen != nil {
+		if snapshot.C2C.Quote.LastTradedPriceFen != nil || snapshot.C2C.Quote.BestAskPriceFen != nil {
 			t.Fatalf("empty quote fabricated = %+v", snapshot.C2C.Quote)
 		}
 		if snapshot.Ledger.TotalPostedBalance != "0" {
@@ -160,7 +160,7 @@ func TestOpsIntegration(t *testing.T) {
 			t.Fatalf("c2c service: %v", err)
 		}
 		method := []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, Contact: "wx-ops"}}
-		if _, err := c2cService.CreateOrder(ctx, seller, "ops-sell", c2c.SideSell, 100, mustAmount(t, "10"), mustAmount(t, "1"), mustAmount(t, "5"), method); err != nil {
+		if _, err := c2cService.CreateOrder(ctx, seller, "ops-sell", 100, mustAmount(t, "10"), mustAmount(t, "1"), mustAmount(t, "5"), method); err != nil {
 			t.Fatal(err)
 		}
 		snapshot, err := store.OpsMetrics(ctx, window)
@@ -169,7 +169,7 @@ func TestOpsIntegration(t *testing.T) {
 		}
 		found := false
 		for _, row := range snapshot.C2C.Orders {
-			if row.Side == "sell" && row.Status == "open" && row.Count == 1 {
+			if row.Status == "open" && row.Count == 1 {
 				found = true
 			}
 		}
@@ -178,9 +178,6 @@ func TestOpsIntegration(t *testing.T) {
 		}
 		if snapshot.C2C.Quote.BestAskPriceFen == nil || *snapshot.C2C.Quote.BestAskPriceFen != 100 {
 			t.Fatalf("best ask missing: %+v", snapshot.C2C.Quote)
-		}
-		if snapshot.C2C.Quote.BestBidPriceFen != nil || snapshot.C2C.Quote.SpreadFen != nil {
-			t.Fatalf("one-sided book fabricated bid/spread: %+v", snapshot.C2C.Quote)
 		}
 		if snapshot.Consumption.ConsumerSpend != "0" || snapshot.Consumption.PlatformFee != "0" {
 			t.Fatalf("consumption fabricated: %+v", snapshot.Consumption)

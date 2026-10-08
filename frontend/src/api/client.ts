@@ -462,13 +462,8 @@ export const api = {
       )
     ).channel
   },
-  async rateChannel(channelID: string, score: number) {
-    return (
-      await request<ResponseBody<'rateMarketChannel'>>(
-        `/api/market/channels/${encodeURIComponent(channelID)}/rating`,
-        { method: 'PUT', body: jsonBody<'rateMarketChannel'>({ score }) },
-      )
-    ).channel
+  async pendingItems() {
+    return (await request<ResponseBody<'listPendingItems'>>('/api/dashboard/pending-items')).items
   },
   async apiKeys() {
     return (await request<ResponseBody<'listAPIKeys'>>('/api/keys')).keys

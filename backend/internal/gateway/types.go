@@ -273,7 +273,6 @@ type Dashboard struct {
 	PoolCount                   int64
 	HealthyOfferCount           int64
 	UnhealthyOfferCount         int64
-	PendingItems                int64
 	RecentCalls                 []Call
 }
 

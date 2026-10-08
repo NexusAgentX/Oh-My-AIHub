@@ -8,8 +8,6 @@ import { Button, ButtonLink, Drawer, InlineError, Notice, QueryBoundary, TextFie
 import {
   c2cFiatFen,
   c2cPaymentLabels,
-  c2cSideLabels,
-  c2cTakeLabel,
   c2cTakeQuantityError,
   formatC2CFiat,
   formatC2CPrice,
@@ -33,7 +31,6 @@ function TakeForm({ order, take, onClose }: { order: C2COrder; take: Take; onClo
   const [quantity, setQuantity] = useState(order.minimum)
   const [paymentMethodID, setPaymentMethodID] = useState(order.payment_methods[0]?.id ?? '')
   const [touched, setTouched] = useState(false)
-  const sellOrder = order.side === 'sell'
   const quantityError = c2cTakeQuantityError(order, quantity)
 
   const submit = (event: FormEvent) => {
@@ -68,7 +65,7 @@ function TakeForm({ order, take, onClose }: { order: C2COrder; take: Take; onClo
         value={quantity}
       />
       <fieldset className="c2c-choice-group">
-        <legend>{sellOrder ? '收款方式' : '买家联系方式'}</legend>
+        <legend>收款方式</legend>
         {order.payment_methods.map((method) => (
           <label
             className={paymentMethodID === method.id ? 'c2c-choice c2c-choice-active' : 'c2c-choice'}
@@ -92,12 +89,9 @@ function TakeForm({ order, take, onClose }: { order: C2COrder; take: Take; onClo
         ))}
       </fieldset>
       <div className="c2c-take-total">
-        <span>{sellOrder ? '应付' : '应收'}</span>
+        <span>应付</span>
         <strong className="num">{fiatText(order, quantity)}</strong>
       </div>
-      {!sellOrder && (
-        <Notice tone="warning">承接后将冻结你的 {quantity || '0'} 积分，直至交易结束。</Notice>
-      )}
       <InlineError>{take.isError ? errorMessage(take.error, '成交创建失败') : ''}</InlineError>
     </form>
   )
@@ -108,7 +102,7 @@ function TakeContent({ order, take, onClose }: { order: C2COrder; take: Take; on
   if (order.owner_account_id === account?.id) {
     return (
       <Notice action={<ButtonLink size="sm" to="/c2c/me">管理</ButtonLink>} tone="info">
-        这是你的{c2cSideLabels[order.side]}
+        这是你的卖单
       </Notice>
     )
   }
@@ -137,14 +131,14 @@ export function TakeOrderDrawer({ orderID, onClose }: { orderID: string; onClose
               取消
             </Button>
             <Button form={formID} loading={take.isPending} type="submit">
-              确认{order ? c2cTakeLabel(order.side) : '成交'}
+              确认购买
             </Button>
           </>
         ) : undefined
       }
       onClose={close}
       open={Boolean(orderID)}
-      title={order ? `${c2cTakeLabel(order.side)}积分` : '承接挂单'}
+      title="购买积分"
     >
       <QueryBoundary errorFallback="挂单加载失败" query={query}>
         {(data) => <TakeContent onClose={close} order={data} take={take} />}

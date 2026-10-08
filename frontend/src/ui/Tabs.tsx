@@ -82,7 +82,7 @@ export function Tabs<K extends string>({
 }
 
 /**
- * 分段选择：切换同一数据的视图或筛选（如时间窗口、买/卖方向），不切换整块内容。
+ * 分段选择：切换同一数据的视图或筛选（如时间窗口），不切换整块内容。
  * 语义为单选按钮组（aria-pressed）。
  */
 export function Segmented<K extends string>({

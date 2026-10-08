@@ -3,15 +3,3 @@
 .tier-price-list { display: grid; gap: var(--space-1); margin: 6px 0 0; padding: 0; list-style: none; }
 .tier-price-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: 4px 8px; border: 1px solid var(--hairline); border-radius: var(--radius-xs); background: var(--soft); }
 .tier-price-list .tier-condition { color: var(--muted); font-size: var(--text-xs); }
-.star-rating { min-width: 0; margin: 0; padding: 0; border: 0; }
-.star-rating legend { margin-bottom: 4px; color: var(--muted); font-size: var(--text-xs); }
-.star-rating > div { display: flex; gap: 2px; }
-.star-rating label { position: relative; display: grid; width: 44px; height: 44px; place-items: center; cursor: pointer; }
-.star-rating input { position: absolute; opacity: 0; }
-.star-rating label > span[aria-hidden] { color: var(--muted); font-size: 23px; }
-.star-rating input:checked ~ span[aria-hidden] { color: var(--mustard); }
-.star-rating input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--focus) 38%, transparent); outline-offset: 2px; }
-
-@media (max-width: 760px) {
-  .star-rating label { width: 48px; }
-}

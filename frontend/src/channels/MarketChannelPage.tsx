@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { MarketOffer } from '../api/types'
-import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { JoinRouteDrawer } from '../gateway/JoinRouteDrawer'
 import {
@@ -10,7 +9,6 @@ import {
   formatRate,
   protocolLabels,
   qualitySummary,
-  ratingText,
 } from '../gateway/presentation'
 import {
   Badge,
@@ -20,14 +18,12 @@ import {
   CountBadge,
   DataTable,
   EmptyState,
-  InlineError,
   PageHeader,
   QueryBoundary,
   SuccessMessage,
   type Column,
 } from '../ui'
-import { MarketRating } from './MarketRating'
-import { useMarketChannelQuery, useRateChannelMutation } from './marketQueries'
+import { useMarketChannelQuery } from './marketQueries'
 
 export function MarketChannelPage() {
   const { channelID = '' } = useParams()
@@ -46,7 +42,6 @@ function ChannelDetail({
 }) {
   const { account } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const rate = useRateChannelMutation(channel.id)
   const [message, setMessage] = useState<{ text: string; keyID?: string } | null>(null)
 
   // ?add=<offerID> 打开加入路由抽屉
@@ -144,7 +139,6 @@ function ChannelDetail({
           )}
         </SuccessMessage>
       )}
-      <InlineError>{rate.isError ? errorMessage(rate.error, '评分保存失败') : ''}</InlineError>
 
       <Card className="market-channel-summary">
         <div className="market-owner-info">
@@ -156,17 +150,6 @@ function ChannelDetail({
             <small>共享者</small>
             {own && <Badge tone="info">我的 · 0 手续费</Badge>}
           </div>
-        </div>
-        <div className="market-rating-info">
-          <strong className="num">{ratingText(channel.average_rating, channel.rating_count)}</strong>
-          <MarketRating
-            disabled={rate.isPending}
-            onChange={(score) => {
-              setMessage(null)
-              rate.mutate(score, { onSuccess: () => setMessage({ text: '评分已保存' }) })
-            }}
-            value={channel.current_user_rating}
-          />
         </div>
       </Card>
 

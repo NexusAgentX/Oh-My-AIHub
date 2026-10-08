@@ -1,8 +1,6 @@
 import {
   useInfiniteQuery,
-  useMutation,
   useQuery,
-  useQueryClient,
 } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { ChannelProtocol, MarketOffer } from '../api/types'
@@ -12,7 +10,6 @@ export type MarketSort =
   | 'output_price'
   | 'cache_write_price'
   | 'cache_read_price'
-  | 'rating'
   | 'success_rate'
   | 'ttft'
   | 'tps'
@@ -24,7 +21,7 @@ export type MarketFilters = {
   sort: MarketSort
 }
 
-/** API 市场与模型目录的 key 工厂；评分与加入路由后按 marketKeys.all 失效。 */
+/** API 市场与模型目录的 key 工厂；加入路由后按 marketKeys.all 失效。 */
 export const marketKeys = {
   all: ['market'] as const,
   models: () => [...marketKeys.all, 'models'] as const,
@@ -88,17 +85,5 @@ export function useMarketChannelQuery(channelID: string) {
     queryKey: marketKeys.channel(channelID),
     queryFn: () => api.marketChannel(channelID),
     enabled: Boolean(channelID),
-  })
-}
-
-/** 1～5 分评分；成功后用返回的渠道更新缓存并失效市场列表中的评分。 */
-export function useRateChannelMutation(channelID: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (score: number) => api.rateChannel(channelID, score),
-    onSuccess: (channel) => {
-      client.setQueryData(marketKeys.channel(channelID), channel)
-      void client.invalidateQueries({ queryKey: [...marketKeys.all, 'offers'] })
-    },
   })
 }

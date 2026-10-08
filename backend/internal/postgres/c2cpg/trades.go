@@ -11,9 +11,9 @@ import (
 )
 
 // returnAllocation gives a trade's quantity back to its order and ends the
-// trade (cancelled, expired or returned to the seller). A buy-order trade hold,
-// or any hold of an already cancelled order, is released in the same
-// transaction; otherwise the quantity stays inside the sell order's parent hold.
+// trade (cancelled, expired or returned to the seller). The quantity is released
+// from the parent hold in the same transaction when the order is already
+// cancelled; otherwise it stays inside the order's parent hold.
 func (x *session) returnAllocation(ctx context.Context, command c2c.Command, order c2c.Order, trade c2c.Trade, terminal c2c.TradeStatus, action, reason string) (c2c.Trade, error) {
 	if trade.Status != c2c.TradeAwaitingPayment && trade.Status != c2c.TradePaid && trade.Status != c2c.TradeDisputed {
 		return c2c.Trade{}, c2c.ErrConflict
@@ -29,7 +29,7 @@ func (x *session) returnAllocation(ctx context.Context, command c2c.Command, ord
 	}
 
 	releasedHold := false
-	if order.Side == c2c.SideBuy || order.Status == c2c.OrderCancelled {
+	if order.Status == c2c.OrderCancelled {
 		if _, err := x.ledger.ReleaseHold(ctx, ledger.MutateHoldRequest{
 			IdempotencyKey: derivedLedgerKey(command, "trade-release"),
 			HoldID:         trade.HoldID,

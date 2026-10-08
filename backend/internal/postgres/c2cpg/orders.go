@@ -7,8 +7,8 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 )
 
-// CreateOrder publishes an order. A sell order freezes its total in a parent
-// hold inside the same transaction.
+// CreateOrder publishes a sell order and freezes its total in a parent hold
+// inside the same transaction.
 //
 // Lock order: actor advisory key, command row, ledger account (inside the hold).
 func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.NewOrder) (c2c.Order, error) {
@@ -28,28 +28,24 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 		if err := x.ensureCreditActive(ctx, command.Actor.ID); err != nil {
 			return err
 		}
-		var parentHoldID *string
-		if input.Side == c2c.SideSell {
-			hold, err := x.ledger.CreateHold(ctx, ledger.CreateHoldRequest{
-				IdempotencyKey: derivedLedgerKey(command, "parent-hold"),
-				AccountID:      command.Actor.ID,
-				Amount:         input.Total,
-				FundingPolicy:  ledger.HoldFundingSettledBalanceOnly,
-				Purpose:        ledger.HoldPurposeAssetReservation,
-				Reason:         "reserve points for C2C sell order",
-				BusinessType:   "c2c_sell_order",
-				BusinessID:     input.ID,
-			})
-			if err != nil {
-				return err
-			}
-			parentHoldID = &hold.ID
+		hold, err := x.ledger.CreateHold(ctx, ledger.CreateHoldRequest{
+			IdempotencyKey: derivedLedgerKey(command, "parent-hold"),
+			AccountID:      command.Actor.ID,
+			Amount:         input.Total,
+			FundingPolicy:  ledger.HoldFundingSettledBalanceOnly,
+			Purpose:        ledger.HoldPurposeAssetReservation,
+			Reason:         "reserve points for C2C sell order",
+			BusinessType:   "c2c_sell_order",
+			BusinessID:     input.ID,
+		})
+		if err != nil {
+			return err
 		}
 		if err := x.q.InsertOrder(ctx, InsertOrderParams{
-			ID: input.ID, OwnerAccountID: command.Actor.ID, Side: string(input.Side),
+			ID: input.ID, OwnerAccountID: command.Actor.ID,
 			UnitPriceFen: input.UnitPriceFen, TotalNano: input.Total,
 			MinimumNano: input.Minimum, MaximumNano: input.Maximum,
-			ParentHoldID: parentHoldID, CreatedAt: command.Now,
+			ParentHoldID: &hold.ID, CreatedAt: command.Now,
 		}); err != nil {
 			return mapError(err)
 		}
@@ -75,8 +71,8 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 	return result, mapError(err)
 }
 
-// TakeOrder allocates part of an open order to a new trade. Taking a buy order
-// freezes the quantity from the taker (the seller) in a trade hold.
+// TakeOrder allocates part of an open sell order to a new trade; the quantity
+// stays inside the order's parent hold.
 //
 // Lock order: actor and owner advisory keys (sorted), command row, order row,
 // ledger account (inside the hold).
@@ -132,34 +128,15 @@ func (s *Store) TakeOrder(ctx context.Context, command c2c.Command, orderID stri
 			return err
 		}
 
-		buyerID, sellerID, holdID := command.Actor.ID, order.OwnerAccountID, order.ParentHoldID
-		if order.Side == c2c.SideBuy {
-			buyerID, sellerID = order.OwnerAccountID, command.Actor.ID
-			hold, err := x.ledger.CreateHold(ctx, ledger.CreateHoldRequest{
-				IdempotencyKey: derivedLedgerKey(command, "trade-hold"),
-				AccountID:      sellerID,
-				Amount:         input.Quantity,
-				FundingPolicy:  ledger.HoldFundingSettledBalanceOnly,
-				Purpose:        ledger.HoldPurposeAssetReservation,
-				Reason:         "reserve points for C2C buy-order trade",
-				BusinessType:   "c2c_trade",
-				BusinessID:     input.ID,
-			})
-			if err != nil {
-				return err
-			}
-			holdID = hold.ID
-		}
-
 		order.Available -= input.Quantity
 		order.Allocated += input.Quantity
 		if err := x.persistOrderAmounts(ctx, order, command.Now); err != nil {
 			return err
 		}
 		if err := x.q.InsertTrade(ctx, InsertTradeParams{
-			ID: input.ID, OrderID: order.ID, BuyerAccountID: buyerID, SellerAccountID: sellerID,
+			ID: input.ID, OrderID: order.ID, BuyerAccountID: command.Actor.ID, SellerAccountID: order.OwnerAccountID,
 			QuantityNano: input.Quantity, UnitPriceFen: order.UnitPriceFen, FiatAmountFen: fiatAmount,
-			HoldID: holdID, SelectedPaymentMethodID: input.PaymentMethodID,
+			HoldID: order.ParentHoldID, SelectedPaymentMethodID: input.PaymentMethodID,
 			PaymentDeadline: input.PaymentDeadline, CreatedAt: command.Now,
 		}); err != nil {
 			return mapError(err)
@@ -187,8 +164,8 @@ func (s *Store) AdminCancelOrder(ctx context.Context, command c2c.Command, order
 	return s.cancelOrder(ctx, command, orderID, true, "order.admin_cancelled", reason, reason)
 }
 
-// cancelOrder closes the unallocated quantity of an order and, for a sell
-// order, releases that quantity from the parent hold. Trades already allocated
+// cancelOrder closes the unallocated quantity of an order and releases that
+// quantity from the parent hold. Trades already allocated
 // keep their own holds.
 //
 // Lock order: actor and owner advisory keys (sorted), command row, order row,
@@ -221,7 +198,7 @@ func (s *Store) cancelOrder(ctx context.Context, command c2c.Command, orderID st
 			return c2c.ErrConflict
 		}
 		closing := order.Available
-		if order.Side == c2c.SideSell && closing > 0 {
+		if closing > 0 {
 			if _, err := x.ledger.ReleaseHold(ctx, ledger.MutateHoldRequest{
 				IdempotencyKey: derivedLedgerKey(command, "parent-release"),
 				HoldID:         order.ParentHoldID,

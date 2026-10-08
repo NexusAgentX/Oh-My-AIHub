@@ -23,7 +23,6 @@ type c2cPaymentMethodRequest struct {
 }
 
 type c2cCreateOrderRequest struct {
-	Side           c2c.Side                  `json:"side"`
 	UnitPriceFen   int64                     `json:"unit_price_fen"`
 	Total          string                    `json:"total"`
 	Minimum        string                    `json:"minimum"`
@@ -45,20 +44,13 @@ func c2cMarketResponse(market c2c.Market) map[string]any {
 	for _, order := range market.SellOrders {
 		sell = append(sell, c2cOrderResponse(order))
 	}
-	buy := make([]map[string]any, 0, len(market.BuyOrders))
-	for _, order := range market.BuyOrders {
-		buy = append(buy, c2cOrderResponse(order))
-	}
 	return map[string]any{
 		"metrics": map[string]any{
 			"guidance_price_fen": market.GuidancePriceFen,
 			"latest_price_fen":   market.LatestPriceFen,
-			"best_bid_fen":       market.BestBidFen,
 			"best_ask_fen":       market.BestAskFen,
-			"spread_fen":         market.SpreadFen,
 		},
 		"sell_orders": sell,
-		"buy_orders":  buy,
 	}
 }
 
@@ -106,7 +98,7 @@ func (a *app) c2cCreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := a.c2c.CreateOrder(
 		r.Context(), accountFromContext(r.Context()), idempotencyKey(r),
-		request.Side, request.UnitPriceFen, total, minimum, maximum, methods,
+		request.UnitPriceFen, total, minimum, maximum, methods,
 	)
 	if err != nil {
 		writeDomainError(w, err)
@@ -370,8 +362,8 @@ func c2cOrderResponse(order c2c.Order) map[string]any {
 	}
 	return map[string]any{
 		"id": order.ID, "owner_account_id": order.OwnerAccountID,
-		"owner_display_name": order.OwnerDisplayName, "side": order.Side,
-		"unit_price_fen": order.UnitPriceFen, "total": order.Total.String(),
+		"owner_display_name": order.OwnerDisplayName,
+		"unit_price_fen":     order.UnitPriceFen, "total": order.Total.String(),
 		"available": order.Available.String(), "allocated": order.Allocated.String(),
 		"settled": order.Settled.String(), "closed": order.Closed.String(),
 		"minimum": order.Minimum.String(), "maximum": order.Maximum.String(),
@@ -431,7 +423,7 @@ func c2cTradeResponseFor(trade c2c.Trade, admin bool) map[string]any {
 		})
 	}
 	return map[string]any{
-		"id": trade.ID, "order_id": trade.OrderID, "order_side": trade.OrderSide,
+		"id": trade.ID, "order_id": trade.OrderID,
 		"buyer_account_id": trade.BuyerAccountID, "buyer_display_name": trade.BuyerDisplayName,
 		"seller_account_id": trade.SellerAccountID, "seller_display_name": trade.SellerDisplayName,
 		"quantity": trade.Quantity.String(), "unit_price_fen": trade.UnitPriceFen,

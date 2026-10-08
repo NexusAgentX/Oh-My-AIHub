@@ -19,7 +19,6 @@ func (a *app) wallet(w http.ResponseWriter, r *http.Request) {
 		"wallet": walletResponse(wallet),
 		"recovery_actions": []map[string]string{
 			{"kind": "market", "href": "/c2c"},
-			{"kind": "create_buy_order", "href": "/c2c/orders/new?side=buy"},
 			{"kind": "my_orders", "href": "/c2c/me"},
 		},
 	})

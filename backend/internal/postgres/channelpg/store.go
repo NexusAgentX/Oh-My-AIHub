@@ -55,15 +55,7 @@ func toChannel(row GetChannelRow) channel.Channel {
 		DisplayName: row.DisplayName, NormalizedBaseURL: row.NormalizedBaseUrl,
 		CredentialConfigured: row.CredentialConfigured, CredentialVersion: row.CredentialVersion,
 		CredentialUpdatedAt: row.CredentialUpdatedAt, Status: channel.Status(row.Status), Version: row.Version,
-		RatingCount: row.RatingCount, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
-	}
-	if row.AverageRating != "" {
-		value := row.AverageRating
-		result.AverageRating = &value
-	}
-	if row.CurrentRating != nil {
-		value := int(*row.CurrentRating)
-		result.CurrentUserRating = &value
+		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 	return result
 }
@@ -143,13 +135,9 @@ func offerRoutingLease(offer channel.Offer) channel.RoutingLease {
 
 // loadChannel loads one channel with its offers, price tiers and routing
 // eligibility. db may be a pool or a transaction.
-func loadChannel(ctx context.Context, db DBTX, channelID, viewerID string) (channel.Channel, error) {
+func loadChannel(ctx context.Context, db DBTX, channelID string) (channel.Channel, error) {
 	q := New(db)
-	var viewer *string
-	if viewerID != "" {
-		viewer = &viewerID
-	}
-	row, err := q.GetChannel(ctx, GetChannelParams{ViewerID: viewer, ID: channelID})
+	row, err := q.GetChannel(ctx, channelID)
 	if err != nil {
 		return channel.Channel{}, mapChannelError(err)
 	}
@@ -218,10 +206,10 @@ func offerByID(ctx context.Context, db DBTX, offerID string) (channel.Offer, err
 	return offers[0], nil
 }
 
-func loadChannels(ctx context.Context, db DBTX, ids []string, viewerID string) ([]channel.Channel, error) {
+func loadChannels(ctx context.Context, db DBTX, ids []string) ([]channel.Channel, error) {
 	result := make([]channel.Channel, 0, len(ids))
 	for _, id := range ids {
-		value, err := loadChannel(ctx, db, id, viewerID)
+		value, err := loadChannel(ctx, db, id)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +284,7 @@ func (s *Store) CreateChannel(ctx context.Context, command channel.CreateCommand
 		}); err != nil {
 			return err
 		}
-		created, err = loadChannel(ctx, tx, command.ChannelID, command.OwnerAccountID)
+		created, err = loadChannel(ctx, tx, command.ChannelID)
 		return err
 	})
 	if err != nil {
@@ -310,7 +298,7 @@ func (s *Store) ListOwnerChannels(ctx context.Context, ownerID string) ([]channe
 	if err != nil {
 		return nil, err
 	}
-	return loadChannels(ctx, s.pool, ids, ownerID)
+	return loadChannels(ctx, s.pool, ids)
 }
 
 func (s *Store) GetOwnerChannel(ctx context.Context, ownerID, channelID string) (channel.Channel, error) {
@@ -321,7 +309,7 @@ func (s *Store) GetOwnerChannel(ctx context.Context, ownerID, channelID string) 
 	if !allowed {
 		return channel.Channel{}, channel.ErrNotFound
 	}
-	return loadChannel(ctx, s.pool, channelID, ownerID)
+	return loadChannel(ctx, s.pool, channelID)
 }
 
 func (s *Store) UpdateChannel(ctx context.Context, command channel.UpdateCommand) (channel.Channel, error) {
@@ -372,7 +360,7 @@ func (s *Store) UpdateChannel(ctx context.Context, command channel.UpdateCommand
 		}); err != nil {
 			return err
 		}
-		updated, err = loadChannel(ctx, tx, command.ChannelID, command.ActorAccountID)
+		updated, err = loadChannel(ctx, tx, command.ChannelID)
 		return err
 	})
 	if err != nil {
@@ -385,20 +373,20 @@ func (s *Store) SetChannelStatus(ctx context.Context, command channel.StatusComm
 	var updated channel.Channel
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
-		var currentStatus, ownerID string
+		var currentStatus string
 		var currentVersion int64
 		if command.Administrator {
 			row, err := q.LockChannelForAdmin(ctx, LockChannelForAdminParams{ID: command.ChannelID, ActorAccountID: command.ActorAccountID})
 			if err != nil {
 				return mapChannelError(err)
 			}
-			currentStatus, currentVersion, ownerID = row.Status, row.Version, row.OwnerAccountID
+			currentStatus, currentVersion = row.Status, row.Version
 		} else {
 			row, err := q.LockChannelForOwner(ctx, LockChannelForOwnerParams{ID: command.ChannelID, ActorAccountID: command.ActorAccountID})
 			if err != nil {
 				return mapChannelError(err)
 			}
-			currentStatus, currentVersion, ownerID = row.Status, row.Version, row.OwnerAccountID
+			currentStatus, currentVersion = row.Status, row.Version
 		}
 		if currentVersion != command.ExpectedVersion || !validChannelTransition(channel.Status(currentStatus), command.Status, command.Administrator) {
 			return channel.ErrConflict
@@ -436,7 +424,7 @@ func (s *Store) SetChannelStatus(ctx context.Context, command channel.StatusComm
 			return err
 		}
 		var err error
-		updated, err = loadChannel(ctx, tx, command.ChannelID, ownerID)
+		updated, err = loadChannel(ctx, tx, command.ChannelID)
 		return err
 	})
 	if err != nil {
@@ -484,7 +472,7 @@ func (s *Store) RevokeCredential(ctx context.Context, actorID, channelID string,
 		}); err != nil {
 			return err
 		}
-		updated, err = loadChannel(ctx, tx, channelID, locked.OwnerAccountID)
+		updated, err = loadChannel(ctx, tx, channelID)
 		return err
 	})
 	if err != nil {
@@ -780,42 +768,19 @@ func (s *Store) ListValidationAttempts(ctx context.Context, actor identity.Accou
 }
 
 // ---------------------------------------------------------------------------
-// Ratings and administration
+// Administration
 // ---------------------------------------------------------------------------
-
-func (s *Store) UpsertRating(ctx context.Context, accountID, channelID string, score int) (channel.Channel, error) {
-	var updated channel.Channel
-	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		q := s.q.WithTx(tx)
-		lockedChannelID, err := q.LockRatableChannel(ctx, LockRatableChannelParams{ID: channelID, AccountID: accountID})
-		if err != nil {
-			return mapChannelError(err)
-		}
-		if err := q.UpsertRating(ctx, UpsertRatingParams{ChannelID: lockedChannelID, AccountID: accountID, Score: int16(score)}); err != nil {
-			return mapChannelError(err)
-		}
-		if err := audit(ctx, tx, accountID, "channel.rating_upserted", "channel", channelID, "account holder set channel rating", map[string]any{"score": score}); err != nil {
-			return err
-		}
-		updated, err = getMarketChannel(ctx, tx, accountID, channelID)
-		return err
-	})
-	if err != nil {
-		return channel.Channel{}, err
-	}
-	return updated, nil
-}
 
 func (s *Store) ListAdminChannels(ctx context.Context) ([]channel.Channel, error) {
 	ids, err := s.q.ListAllChannelIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return loadChannels(ctx, s.pool, ids, "")
+	return loadChannels(ctx, s.pool, ids)
 }
 
 func (s *Store) GetAdminChannel(ctx context.Context, channelID string) (channel.Channel, error) {
-	return loadChannel(ctx, s.pool, channelID, "")
+	return loadChannel(ctx, s.pool, channelID)
 }
 
 func (s *Store) CredentialInventory(ctx context.Context) ([]channel.ReencryptTarget, error) {

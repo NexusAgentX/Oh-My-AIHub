@@ -598,10 +598,6 @@ func TestGatewayIntegrationStateMachineAndRecovery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		baselineDashboard, err := gatewayService.Dashboard(ctx, consumer)
-		if err != nil {
-			t.Fatal(err)
-		}
 		updatedOffer, err := channelService.UpdateOffer(ctx, providerOne, staleOffer.ID, staleOffer.Version, "vendor-stale-v2", money.FromNano(money.Scale))
 		if err != nil {
 			t.Fatal(err)
@@ -614,10 +610,6 @@ func TestGatewayIntegrationStateMachineAndRecovery(t *testing.T) {
 		member := loaded.Pools[0].Members[0]
 		if member.Eligible || member.IneligibleReason != "validation_version_changed" || member.AddedValidationVersion == member.CurrentValidationVersion {
 			t.Fatalf("stale pool member projection = %+v", member)
-		}
-		staleDashboard, err := gatewayService.Dashboard(ctx, consumer)
-		if err != nil || staleDashboard.PendingItems != baselineDashboard.PendingItems+1 {
-			t.Fatalf("stale pool dashboard = %+v, baseline=%+v, err=%v", staleDashboard, baselineDashboard, err)
 		}
 		staleAuthentication, err := gatewayService.Authenticate(ctx, staleKey.Secret)
 		if err != nil {
@@ -648,10 +640,6 @@ func TestGatewayIntegrationStateMachineAndRecovery(t *testing.T) {
 		if err != nil || !refreshed.Pools[0].Members[0].Eligible || refreshed.Pools[0].Members[0].AddedValidationVersion != refreshed.Pools[0].Members[0].CurrentValidationVersion {
 			t.Fatalf("explicitly re-added pool member = %+v, %v", refreshed, err)
 		}
-		refreshedDashboard, err := gatewayService.Dashboard(ctx, consumer)
-		if err != nil || refreshedDashboard.PendingItems != baselineDashboard.PendingItems {
-			t.Fatalf("refreshed pool dashboard = %+v, baseline=%+v, err=%v", refreshedDashboard, baselineDashboard, err)
-		}
 		resumed := beginGatewayCall(t, ctx, gatewayService, staleAuthentication, model.ID)
 		if len(resumed.Candidates) != 1 || resumed.Candidates[0].Lease.ValidationVersion != refreshed.Pools[0].Members[0].AddedValidationVersion {
 			t.Fatalf("refreshed call candidates = %+v", resumed.Candidates)
@@ -666,10 +654,6 @@ func TestGatewayIntegrationStateMachineAndRecovery(t *testing.T) {
 		paused, err := channelService.SetStatus(ctx, providerOne, managedChannel.ID, managedChannel.Version, channel.StatusPaused, "")
 		if err != nil {
 			t.Fatal(err)
-		}
-		pausedDashboard, err := gatewayService.Dashboard(ctx, consumer)
-		if err != nil || pausedDashboard.PendingItems != baselineDashboard.PendingItems+1 {
-			t.Fatalf("paused member dashboard = %+v, baseline=%+v, err=%v", pausedDashboard, baselineDashboard, err)
 		}
 		pausedCall, err := gatewayService.BeginCall(ctx, staleAuthentication, channel.ProtocolOpenAIChat, model.ID)
 		if !errors.Is(err, gateway.ErrRejected) || pausedCall.Call.DecisionCode != "no_eligible_offer" {
