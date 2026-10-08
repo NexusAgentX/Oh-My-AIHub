@@ -17,7 +17,22 @@
   white-space: nowrap;
 }
 .admin-back-link:hover { color: var(--ink); background: var(--soft); text-decoration: none; }
-.admin-shell .sidebar-account { flex-wrap: wrap; }
+.admin-sidebar-footer { display: grid; gap: var(--space-2); margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--hairline); }
+.admin-identity { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 0 var(--space-2); }
+.admin-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--soft);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.admin-topbar-back:hover { border-color: #cfd2d7; color: var(--ink); text-decoration: none; }
 
 .empty-pad { padding: var(--space-5); }
 .badge-row { display: inline-flex; flex-wrap: wrap; gap: 6px; }
@@ -146,14 +161,14 @@
   .admin-two-column { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .metric-grid-five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-grid-five > :first-child { grid-column: 1 / -1; }
   .price-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tier-row { grid-template-columns: 24px minmax(0, 1fr); }
   .tier-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .tier-time { padding-left: 0; }
-  .admin-shell .topbar .wallet-chip span { display: none; }
+  .admin-topbar-back span { display: none; }
   .chart-card .panel-actions { width: 100%; margin-left: 0; }
   .chart-controls { width: 100%; }
 }

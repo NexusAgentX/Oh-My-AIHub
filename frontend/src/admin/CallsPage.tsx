@@ -28,7 +28,7 @@ export function adminStreamPath(accountID: string, channelID: string) {
 }
 
 function adminColumns(): CallColumn<AdminCall>[] {
-  const [time, ...rest] = summaryColumns<AdminCall>()
+  const [time, ...rest] = summaryColumns<AdminCall>({ showFormat: false })
   return [
     time,
     { key: 'user', header: '用户', cell: (row) => row.account.display_name },

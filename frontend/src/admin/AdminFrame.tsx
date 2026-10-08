@@ -27,8 +27,8 @@ function NavItems({ items, onNavigate }: { items: AdminNavItem[]; onNavigate?: (
 function BackToProduct({ onNavigate }: { onNavigate?: () => void }) {
   const { account } = useAuth()
   return (
-    <div className="sidebar-account">
-      <Link className="sidebar-account-link" onClick={onNavigate} to="/home">
+    <div className="admin-sidebar-footer">
+      <div className="admin-identity">
         <span aria-hidden="true" className="avatar">
           {account?.display_name.slice(0, 1) || '管'}
         </span>
@@ -36,7 +36,7 @@ function BackToProduct({ onNavigate }: { onNavigate?: () => void }) {
           <strong>{account?.display_name}</strong>
           <span>管理员</span>
         </span>
-      </Link>
+      </div>
       <Link className="admin-back-link" onClick={onNavigate} to="/home">
         <Icon name="back" />
         <span>返回产品</span>
@@ -64,7 +64,7 @@ export function AdminFrame() {
   }, [location.pathname])
 
   useEffect(() => {
-    const desktop = window.matchMedia('(min-width: 761px)')
+    const desktop = window.matchMedia('(min-width: 768px)')
     const close = (event: MediaQueryListEvent) => {
       if (event.matches) setMoreOpen(false)
     }
@@ -86,7 +86,7 @@ export function AdminFrame() {
         <header className="topbar">
           <span className="topbar-brand"><Brand /></span>
           <span className="topbar-crumb">管理后台{current ? ` · ${current.label}` : ''}</span>
-          <Link aria-label="返回产品" className="wallet-chip" to="/home">
+          <Link aria-label="返回产品" className="admin-topbar-back" to="/home">
             <Icon name="back" />
             <span>返回产品</span>
           </Link>
