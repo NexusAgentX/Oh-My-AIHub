@@ -15,9 +15,10 @@ import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { HomePage } from './home/HomePage'
 import { createQueryClient } from './api/query'
+import { adminRoutes } from './admin/routes'
 import { ProductLayout } from './layouts/ProductLayout'
 import { LoadingState } from './ui'
-import { WelcomePage } from './welcome/WelcomePage'
+import { LandingRoute, WelcomePage } from './welcome/WelcomePage'
 
 function RequireSession() {
   const { account, loading } = useAuth()
@@ -77,8 +78,8 @@ export const appRoutes = createRoutesFromElements(
     <Route element={<InstanceInitializePage />} path="/initialize" />
     <Route element={<RequireInitialized />}>
     <Route element={<WelcomePage />} path="/welcome" />
-    <Route element={<WelcomePage />} path="/" />
-    <Route element={<WelcomePage />} path="*" />
+    <Route element={<LandingRoute />} path="/" />
+    <Route element={<LandingRoute />} path="*" />
     <Route element={<LoginPage />} path="/login" />
     <Route element={<RequireSession />}>
       <Route element={<FirstPasswordChangePage />} path="/account/password" />
@@ -86,6 +87,7 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
         </Route>
+        {adminRoutes}
       </Route>
     </Route>
     </Route>

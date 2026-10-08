@@ -40,7 +40,7 @@ function jsonBody<Op extends keyof operations>(body: RequestBody<Op>) {
   return JSON.stringify(body)
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   if (init?.body) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, {
