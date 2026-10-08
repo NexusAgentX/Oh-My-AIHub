@@ -17,6 +17,10 @@ const balances: AdminPointsBalances = {
   platform_revenue: '0.03',
   bad_debt: '-100.5',
   total: '0',
+  total_credit_limit: '800',
+  bad_debt_writeoffs: 1,
+  escrow_orders: 1,
+  escrow_trades_in_progress: 0,
 }
 
 describe('ledger equation', () => {

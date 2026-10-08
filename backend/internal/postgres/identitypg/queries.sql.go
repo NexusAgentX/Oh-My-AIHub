@@ -148,7 +148,9 @@ func (q *Queries) GetAccountByUsername(ctx context.Context, username string) (Ac
 }
 
 const getAdminAccount = `-- name: GetAdminAccount :one
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano
+SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano,
+       (SELECT max(created_at) FROM sessions WHERE account_id = a.id) AS last_login_at,
+       (SELECT max(created_at) FROM calls WHERE account_id = a.id) AS last_call_at
 FROM accounts a
 LEFT JOIN ledger_accounts l ON l.account_id = a.id
 WHERE a.id = $1
@@ -157,6 +159,8 @@ WHERE a.id = $1
 type GetAdminAccountRow struct {
 	Account     Account
 	BalanceNano int64
+	LastLoginAt interface{}
+	LastCallAt  interface{}
 }
 
 func (q *Queries) GetAdminAccount(ctx context.Context, id string) (GetAdminAccountRow, error) {
@@ -177,6 +181,8 @@ func (q *Queries) GetAdminAccount(ctx context.Context, id string) (GetAdminAccou
 		&i.Account.CreatedAt,
 		&i.Account.UpdatedAt,
 		&i.BalanceNano,
+		&i.LastLoginAt,
+		&i.LastCallAt,
 	)
 	return i, err
 }
@@ -258,7 +264,9 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 }
 
 const listAdminAccounts = `-- name: ListAdminAccounts :many
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano
+SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano,
+       (SELECT max(created_at) FROM sessions WHERE account_id = a.id) AS last_login_at,
+       (SELECT max(created_at) FROM calls WHERE account_id = a.id) AS last_call_at
 FROM accounts a
 LEFT JOIN ledger_accounts l ON l.account_id = a.id
 WHERE ($1::text = '' OR a.username ILIKE '%' || $1 || '%' OR a.display_name ILIKE '%' || $1 || '%' OR a.id::text = $1)
@@ -278,6 +286,8 @@ type ListAdminAccountsParams struct {
 type ListAdminAccountsRow struct {
 	Account     Account
 	BalanceNano int64
+	LastLoginAt interface{}
+	LastCallAt  interface{}
 }
 
 func (q *Queries) ListAdminAccounts(ctx context.Context, arg ListAdminAccountsParams) ([]ListAdminAccountsRow, error) {
@@ -309,6 +319,8 @@ func (q *Queries) ListAdminAccounts(ctx context.Context, arg ListAdminAccountsPa
 			&i.Account.CreatedAt,
 			&i.Account.UpdatedAt,
 			&i.BalanceNano,
+			&i.LastLoginAt,
+			&i.LastCallAt,
 		); err != nil {
 			return nil, err
 		}

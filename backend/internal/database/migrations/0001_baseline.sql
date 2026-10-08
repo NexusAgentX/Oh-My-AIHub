@@ -300,6 +300,10 @@ CREATE INDEX calls_channel_created_idx ON calls(final_channel_id, created_at DES
 CREATE INDEX calls_key_created_idx ON calls(api_key_id, created_at DESC) WHERE api_key_id IS NOT NULL;
 CREATE INDEX calls_created_idx ON calls(created_at DESC);
 CREATE INDEX calls_upstream_response_idx ON calls(upstream_response_id) WHERE upstream_response_id IS NOT NULL;
+-- 渠道统计与渠道所有者的调用列表按“尝试过该渠道”查找（Feature G）。
+CREATE INDEX calls_attempts_idx ON calls USING gin (attempts jsonb_path_ops);
+-- 漏记核对：已结束、应计费但没有账本交易的调用。
+CREATE INDEX calls_unbilled_idx ON calls(created_at) WHERE ledger_tx_id IS NULL AND outcome IN ('succeeded', 'interrupted', 'client_disconnected') AND cost_nano + fee_nano > 0;
 
 -- ============================================================================
 -- 六、零和账本（ADR-0005、ADR-0025）

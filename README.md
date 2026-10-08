@@ -46,7 +46,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
 
-产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、路由、模型浏览与首页（Feature B）和 C2C（Feature C）已实现，观测接口当前返回 `501 not_implemented`；前端用户界面、管理后台与落地页已按新信息架构重写，依赖观测接口的区块显示可重试的错误态。进度见 `PRODUCT.md`。
+产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、路由、模型浏览与首页（Feature B）、C2C（Feature C）以及调用与积分可观测性（Feature G：调用查询与实时流、用量、渠道统计、积分对账与核对、管理员概览、Prometheus 指标）的后端已实现；前端用户界面、管理后台与落地页已按新信息架构重写，与 Feature G 新增契约字段的对齐由 Feature H 完成。进度见 `PRODUCT.md`。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 
@@ -99,6 +99,16 @@ mise run dev-frontend
 外部模型 API 入口（OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini 与两个模型列表）已实现：用首页给出的平台 API Key 指向后端地址即可调用，请求按原生格式透传，不做格式转换。
 
 本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
+
+## 查看指标
+
+后端在独立的内网端口提供 Prometheus 指标（`METRICS_ADDR`，默认 `:9090`，只有 `GET /metrics`）。Compose 只在容器网络内 `expose` 该端口，不发布到宿主机，Nginx 也不代理；同一 Compose 网络内的 Prometheus 可以抓取 `backend:9090`。本地开发时直接访问：
+
+```bash
+curl http://127.0.0.1:9090/metrics | grep '^aihub_'
+```
+
+指标不带用户或 Key 标签：`aihub_requests_total`、`aihub_active_requests`、`aihub_upstream_attempts_total`、`aihub_upstream_latency_seconds`、`aihub_first_token_latency_seconds`、`aihub_inter_token_latency_seconds`、`aihub_tokens_total`、`aihub_cost_points_total`、`aihub_channel_up`、`aihub_channel_cooldowns_total`，以及积分与核对类的 `aihub_points_*`、`aihub_ledger_imbalance`（应恒为 0）、`aihub_ledger_transactions_total`、`aihub_ledger_amount_total`、`aihub_settlement_failures_total`、`aihub_reconciliation_failed{check}`。积分类指标每分钟计算一次。
 
 ## Docker Compose 运行
 

@@ -24,11 +24,14 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
@@ -141,6 +144,10 @@ type env struct {
 	people  map[string]person
 	logs    *syncBuffer
 	service *identity.Service
+	observe *observe.Service
+	feed    *observe.Feed
+	metrics *metrics.Metrics
+	runtime *gateway.Runtime
 }
 
 type syncBuffer struct {
@@ -197,6 +204,12 @@ func newEnv(t *testing.T) *env {
 		return ids, err
 	}
 
+	c2cSecret := make([]byte, 32)
+	_, _ = rand.Read(c2cSecret)
+	c2cKeyring, err := c2c.ParseKeyring("k1="+base64.StdEncoding.EncodeToString(c2cSecret), "k1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	outbound := testOutbound{client: &http.Client{Transport: testTransport}}
@@ -204,10 +217,20 @@ func newEnv(t *testing.T) *env {
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		_ = store.Gateway.RecordChannelEvent(context.Background(), channelID, kind, reason)
 	})
+	bus := gateway.NewBus()
+	e.runtime = runtime
 	e.engine = gateway.NewEngine(gateway.Dependencies{
 		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
-		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime,
+		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: bus,
 	})
+	e.observe = observe.NewService(store.Observe)
+	e.feed = observe.NewFeed(e.observe, bus, logger)
+	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
+	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
+	e.feed.AddObserver(e.metrics)
+	feedContext, stopFeed := context.WithCancel(context.Background())
+	t.Cleanup(stopFeed)
+	go e.feed.Run(feedContext)
 	e.handler = api.NewHandler(api.Dependencies{
 		Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,
 		Audit: audit.NewService(store.Audit), Keys: apikey.NewService(store.Keys, keyring, modelIDs),
@@ -218,7 +241,7 @@ func newEnv(t *testing.T) *env {
 				return value.ExtraBlockedHosts, err
 			},
 		}),
-		Routing: store.Routes, Gateway: e.engine, Browse: store.Gateway, CookieSecure: false,
+		Routing: store.Routes, Gateway: e.engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
 	})
 	e.admin = e.login(admin.Username, "Founder-password-2026", admin.ID, false)
 	return e
@@ -275,6 +298,7 @@ func (e *env) api(p person, method, path string, body any) *httptest.ResponseRec
 	request.AddCookie(&http.Cookie{Name: "oma_session", Value: p.token})
 	recorder := httptest.NewRecorder()
 	e.handler.ServeHTTP(recorder, request)
+	assertContract(e.t, method, path, recorder)
 	return recorder
 }
 

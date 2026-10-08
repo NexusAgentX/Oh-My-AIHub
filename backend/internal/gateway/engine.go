@@ -903,6 +903,7 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 	outcome, err := e.Store.FinishCall(ctx, finish)
 	if err != nil {
 		e.Logger.Error("gateway: booking call failed", "request_id", call.id, "error", err)
+		e.Events.Publish(Event{Kind: EventSettlementFailed, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format)})
 		fallback := finish
 		fallback.Bill = nil
 		if _, retryErr := e.Store.FinishCall(ctx, fallback); retryErr != nil {

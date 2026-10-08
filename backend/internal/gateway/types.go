@@ -223,6 +223,10 @@ type CallSummary struct {
 	Fee            money.Amount
 	TTFTMS         *int32
 	DurationMS     *int32
+	AttemptCount   int
+	// Booked is true once the call has a ledger transaction: only then was the
+	// caller actually debited (a call on the caller's own channel never is).
+	Booked bool
 }
 
 // Browse is the read side behind the model pages and the home page.
@@ -230,4 +234,6 @@ type Browse interface {
 	OnlineChannels(ctx context.Context) ([]OnlineChannel, error)
 	Home(ctx context.Context, accountID string, dayStart time.Time) (HomeStats, error)
 	RecentCalls(ctx context.Context, accountID string, limit int) ([]CallSummary, error)
+	// ChannelRevenue is the revenue booked on a channel since the given time.
+	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 }

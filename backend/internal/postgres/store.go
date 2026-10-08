@@ -14,6 +14,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/identitypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/keypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/observepg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 )
 
@@ -28,6 +29,7 @@ type Store struct {
 	Routes   *keypg.Routes
 	Gateway  *gatewaypg.Store
 	C2C      *c2cpg.Store
+	Observe  *observepg.Store
 }
 
 func New(pool *pgxpool.Pool) *Store {
@@ -42,5 +44,6 @@ func New(pool *pgxpool.Pool) *Store {
 		Routes:   keypg.NewRoutes(pool),
 		Gateway:  gatewaypg.NewStore(pool),
 		C2C:      c2cpg.NewStore(pool),
+		Observe:  observepg.NewStore(pool),
 	}
 }

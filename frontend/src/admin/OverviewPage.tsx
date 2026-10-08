@@ -12,6 +12,9 @@ const attentionKinds: Record<AttentionItem['kind'], { label: string; action: str
   channel_failing: { label: '渠道异常', action: '查看渠道' },
   ledger_unbalanced: { label: '核对不通过', action: '去核对' },
   stuck_call: { label: '调用未结束', action: '查看调用' },
+  credit_concentration: { label: '积分集中', action: '查看用户' },
+  unbilled_usage: { label: '用量未读到', action: '查看调用' },
+  reconciliation_failed: { label: '记账或核对异常', action: '去核对' },
 }
 
 function attentionMeta(item: AttentionItem) {

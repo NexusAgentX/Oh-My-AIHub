@@ -45,6 +45,8 @@ type Account struct {
 type AdminAccount struct {
 	Account
 	Balance money.Amount
+	// LastActiveAt is the later of the latest login and the latest API call.
+	LastActiveAt *time.Time
 }
 
 type AccountWithPassword struct {

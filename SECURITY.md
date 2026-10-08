@@ -65,8 +65,15 @@
 - 所有出站请求（发现、格式测试、网关转发）走固定出站策略：只允许 HTTPS 与白名单端口、每次访问重新解析 DNS 并拒绝受保护地址、固定连接地址、禁止环境代理与重定向、`api.openai.com` 永久禁用、叠加管理员维护的 `settings.extra_blocked_hosts`（[ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)）。发现与测试对每个账号限流（每分钟 10 次）。
 - 渠道请求头规则不能设置或删除 `Host`、`Content-Length`、hop-by-hop 头、`Authorization`、`x-api-key`、`x-goog-api-key`、`Cookie`、`Accept-Encoding`。网关转发时丢弃客户端的 Cookie、`X-AIHub-Tag` 与 `X-Forwarded-*`/`Forwarded`/`Via`，不向上游泄露站内会话与客户端地址。
 - 平台 API Key 以 SHA-256 查找、以上游凭据密钥环可逆加密保存，使用户可以再次复制（[ADR-0028](docs/adr/0028-store-platform-api-keys-reversibly-encrypted.md)）：完整 Key 只返回给所有者，每次读取明文写入审计 `api_key.reveal`；列表与详情只含前缀；持有密钥环与数据库的人可以解出全部平台 Key，与上游 Key 的威胁模型一致。
-- 网关不持久化请求或响应正文，不记录客户端 IP；每个请求一行结构化日志，只含请求 ID、账号、Key 前缀、模型、格式、渠道、结果、状态码、耗时、token 与费用。上游原始错误（调用尝试里的 `error_message`）最多 4KB（30 天清理由 Feature G 实现）。
+- 网关不持久化请求或响应正文，不记录客户端 IP；每个请求一行结构化日志，只含请求 ID、账号、Key 前缀、模型、格式、渠道、结果、状态码、耗时、token 与费用。上游原始错误（调用尝试里的 `error_message`）最多 4KB，后台任务每天把 30 天前的原始错误文本置空（保留状态码与错误码）。
 - 不预扣费意味着并发请求可能让单个账号透支超过信用额度若干次请求的费用，已接受（[ADR-0027](docs/adr/0027-adopt-transparent-gateway-with-post-hoc-billing.md)）。
+
+## 已实现的观测与指标安全边界
+
+- Prometheus `/metrics` 只在独立的内网端口（`METRICS_ADDR`，默认 `:9090`）上提供：Compose 只 `expose` 该端口，不发布到宿主机，Nginx 不代理，公网入口访问不到。若在 Compose 之外部署，必须由防火墙或绑定地址（如 `127.0.0.1:9090`）保证该端口不对外开放。
+- 指标不带用户、账户或 API Key 标签；`model` 标签只取模型目录中存在的名称，调用者自定义的未知模型名一律归为 `other`，不会成为标签值。渠道以 ID 标识，不含渠道名、Base URL 或 Key。
+- 调用详情与列表只对调用者、渠道所有者（受限视图：只看到自己渠道相关的尝试，看不到消费者、Key 名、标签、User-Agent 与路由）与管理员开放，其他人得到 404，不泄露调用是否存在。实时流在服务端按同样的范围过滤；慢消费者的消息被丢弃，不会拖慢网关。
+- 管理员的账本核对、补记与交易浏览只读取聚合与账本事实，补记（`ledger.repair_call`）必须填写原因、写审计且幂等；账单 CSV 的文本单元格以单引号前缀中和公式注入。
 
 ## 已实现的 C2C 安全边界
 

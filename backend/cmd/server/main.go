@@ -24,6 +24,8 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
@@ -123,6 +125,21 @@ func main() {
 	defer stopBackground()
 	go runC2CExpiry(backgroundContext, c2cService)
 
+	observeService := observe.NewService(store.Observe)
+	feed := observe.NewFeed(observeService, bus, logger)
+	platformMetrics := metrics.New(func(channelID string, now time.Time) bool { return !runtime.CooldownUntil(channelID, now).IsZero() })
+	feed.AddObserver(platformMetrics)
+	go feed.Run(backgroundContext)
+	go platformMetrics.Run(backgroundContext, observeService, time.Minute, logger)
+	go refreshMetricModels(backgroundContext, platformMetrics, modelIDs, logger)
+	go runErrorScrub(backgroundContext, observeService, logger)
+	metricsServer := newMetricsServer(os.Getenv("METRICS_ADDR"), platformMetrics.Handler())
+	go func() {
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("metrics listener stopped: %v", err)
+		}
+	}()
+
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
@@ -143,6 +160,8 @@ func main() {
 			Gateway:           engine,
 			Browse:            store.Gateway,
 			C2C:               c2cService,
+			Observe:           observeService,
+			Feed:              feed,
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
@@ -172,6 +191,60 @@ func main() {
 		defer cancelShutdown()
 		if err := server.Shutdown(shutdownContext); err != nil {
 			log.Printf("graceful shutdown failed: %v", err)
+		}
+		_ = metricsServer.Shutdown(shutdownContext)
+	}
+}
+
+// newMetricsServer builds the internal Prometheus listener. METRICS_ADDR
+// defaults to :9090; Compose never publishes or proxies it.
+func newMetricsServer(addr string, handler http.Handler) *http.Server {
+	if strings.TrimSpace(addr) == "" {
+		addr = ":9090"
+	}
+	return &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+}
+
+// refreshMetricModels keeps the model label of the metrics bounded to the
+// catalog, so arbitrary requested model names never become label values.
+func refreshMetricModels(ctx context.Context, target *metrics.Metrics, modelIDs func(context.Context) ([]string, error), logger *slog.Logger) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		refreshContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+		ids, err := modelIDs(refreshContext)
+		cancel()
+		if err != nil && ctx.Err() == nil {
+			logger.Error("metrics: reading the model catalog failed", "error", err)
+		} else if err == nil {
+			target.SetModels(ids)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// runErrorScrub clears raw upstream error text older than 30 days, once a day.
+func runErrorScrub(ctx context.Context, service *observe.Service, logger *slog.Logger) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		runContext, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		cleared, err := service.ScrubRawErrors(runContext)
+		cancel()
+		switch {
+		case err != nil && ctx.Err() == nil:
+			logger.Error("raw error cleanup failed", "error", err)
+		case cleared > 0:
+			logger.Info("raw error cleanup", "calls", cleared)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
 	}
 }

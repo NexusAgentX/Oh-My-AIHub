@@ -572,12 +572,20 @@ paths:
       operationId: listCalls
       tags: [calls]
       summary: 我的调用记录
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 我的调用记录，响应同时返回当前筛选下的汇总（请求数、成功率、首字 p50/p95、tokens、费用）。筛选均为 AND；cursor 为 created_at 与 id 的键集游标。
       x-access: ready
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/requestID'}
+      - {$ref: '#/components/parameters/minDurationMs'}
+      - {$ref: '#/components/parameters/maxDurationMs'}
+      - {$ref: '#/components/parameters/minTokens'}
+      - {$ref: '#/components/parameters/maxTokens'}
+      - {$ref: '#/components/parameters/minCost'}
+      - {$ref: '#/components/parameters/maxCost'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
       - {$ref: '#/components/parameters/modelQuery'}
       - {$ref: '#/components/parameters/outcome'}
       - {$ref: '#/components/parameters/apiKeyIDQuery'}
@@ -596,32 +604,36 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/calls/stream:
     get:
       operationId: streamCalls
       tags: [calls]
       summary: 我的调用实时流
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 订阅进程内事件总线：调用开始与结束各推送一次摘要。事件名 call.started / call.finished；每 15 秒一行注释心跳；慢消费者的事件被丢弃，断线由前端重连。
       x-access: ready
       x-feature: G
       security:
       - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/modelQuery'}
+      - {$ref: '#/components/parameters/apiKeyIDQuery'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
+      - {$ref: '#/components/parameters/outcome'}
       responses:
         '200':
           description: Server-Sent Events 流；每个 event 的 data 为一条 JSON（CallSummary）。
           content:
             text/event-stream:
               schema: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/calls/{callID}:
     get:
       operationId: getCall
       tags: [calls]
       summary: 调用详情
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 调用详情：全部字段、尝试时间线、价格快照与关联账本交易。调用者、该调用最终渠道或尝试渠道的所有者（只看到自己渠道的尝试，不含 Key 名、标签与调用者信息）、管理员可见。
       x-access: ready
       x-feature: G
       security:
@@ -634,21 +646,23 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/CallDetailEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/usage:
     get:
       operationId: getUsage
       tags: [calls]
       summary: 用量聚合
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 按天 / 模型 / Key / 标签聚合；view=revenue 时改为渠道收入视角（我的渠道被调用的收入，group_by 可选 day / model / channel）。日期按 Asia/Shanghai 自然日；默认最近 30 天。
       x-access: ready
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/usageView'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
       - {$ref: '#/components/parameters/groupBy'}
       - {$ref: '#/components/parameters/from'}
       - {$ref: '#/components/parameters/to'}
@@ -664,13 +678,12 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels/{channelID}/stats:
     get:
       operationId: getChannelStats
       tags: [channels]
       summary: 渠道统计
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日收入与每日上限进度。渠道所有者或管理员可见。
       x-access: ready
       x-feature: G
       security:
@@ -685,21 +698,27 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ChannelStats'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels/{channelID}/calls:
     get:
       operationId: listChannelCalls
       tags: [channels]
       summary: 渠道上的调用
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 渠道所有者（或管理员）视角：最终渠道或任一次尝试为该渠道的调用，不含调用者身份、Key 名与标签。
       x-access: ready
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/format'}
+      - {$ref: '#/components/parameters/requestID'}
+      - {$ref: '#/components/parameters/minDurationMs'}
+      - {$ref: '#/components/parameters/maxDurationMs'}
+      - {$ref: '#/components/parameters/minTokens'}
+      - {$ref: '#/components/parameters/maxTokens'}
       - {$ref: '#/components/parameters/channelID'}
       - {$ref: '#/components/parameters/modelQuery'}
       - {$ref: '#/components/parameters/outcome'}
@@ -717,18 +736,19 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels/{channelID}/calls/stream:
     get:
       operationId: streamChannelCalls
       tags: [channels]
       summary: 渠道调用实时流
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 渠道所有者（或管理员）的调用实时流，规则同 /api/calls/stream；数据不含调用者身份。调用结束前无法知道会触达哪些渠道，因此只推送 call.finished。
       x-access: ready
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/modelQuery'}
+      - {$ref: '#/components/parameters/outcome'}
       - {$ref: '#/components/parameters/channelID'}
       responses:
         '200':
@@ -736,26 +756,30 @@ paths:
           content:
             text/event-stream:
               schema: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/points:
     get:
       operationId: getPoints
       tags: [points]
       summary: 我的积分
-      description: Feature A 返回余额、信用额度与可透支额度；Feature G 补充 30 天走势（trend）与期间对账（period）。
+      description: 余额、信用额度与可透支额度，30 天每日余额走势（trend）与指定期间（默认本月）的对账（period，等式必须成立）。
       x-access: ready
       x-feature: A
       security:
       - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/from'}
+      - {$ref: '#/components/parameters/to'}
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Points'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /api/points/entries:
@@ -763,12 +787,13 @@ paths:
       operationId: listPointsEntries
       tags: [points]
       summary: 我的积分账单
-      description: 按时间倒序。Feature G 补充 summary（按天/按 Key 汇总）与 format=csv 导出；在此之前 format=csv 返回 501。
+      description: 按时间倒序的账单。可按类型、Key、时间筛选；group=day|key 时在 summary 中返回对应汇总；format=csv 导出全部匹配记录（UTF-8 BOM，最多 50000 行）。
       x-access: ready
       x-feature: A
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/pointsGroup'}
       - {$ref: '#/components/parameters/transactionType'}
       - {$ref: '#/components/parameters/apiKeyIDQuery'}
       - {$ref: '#/components/parameters/from'}
@@ -782,6 +807,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/PointsEntryPage'}
+            text/csv:
+              schema: {type: string, description: 'format=csv：UTF-8（带 BOM），列为 时间、类型、说明、关联、变动、余额、Key。'}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
@@ -1500,11 +1527,12 @@ paths:
       operationId: getAdminOverview
       tags: [admin-observe]
       summary: 概览：需要处理与账本核对
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 概览：需要处理的列表与四个指标块（账本、信用占用、24 小时调用、24 小时 C2C 成交）。
       x-access: admin
       x-feature: G
       security:
       - {sessionCookie: []}
+      parameters:
       responses:
         '200':
           description: 成功
@@ -1513,18 +1541,24 @@ paths:
               schema: {$ref: '#/components/schemas/AdminOverview'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/calls:
     get:
       operationId: listAdminCalls
       tags: [admin-observe]
       summary: 全部调用
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 全部用户的调用记录，筛选同 /api/calls，另可按账户与渠道筛选。
       x-access: admin
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/requestID'}
+      - {$ref: '#/components/parameters/minDurationMs'}
+      - {$ref: '#/components/parameters/maxDurationMs'}
+      - {$ref: '#/components/parameters/minTokens'}
+      - {$ref: '#/components/parameters/maxTokens'}
+      - {$ref: '#/components/parameters/minCost'}
+      - {$ref: '#/components/parameters/maxCost'}
       - {$ref: '#/components/parameters/modelQuery'}
       - {$ref: '#/components/parameters/outcome'}
       - {$ref: '#/components/parameters/apiKeyIDQuery'}
@@ -1545,56 +1579,65 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/calls/stream:
     get:
       operationId: streamAdminCalls
       tags: [admin-observe]
       summary: 全部调用实时流
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 全部调用实时流，规则同 /api/calls/stream。
       x-access: admin
       x-feature: G
       security:
       - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/modelQuery'}
+      - {$ref: '#/components/parameters/apiKeyIDQuery'}
+      - {$ref: '#/components/parameters/accountIDQuery'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
+      - {$ref: '#/components/parameters/outcome'}
       responses:
         '200':
           description: Server-Sent Events 流；每个 event 的 data 为一条 JSON（AdminCall）。
           content:
             text/event-stream:
               schema: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/points:
     get:
       operationId: getAdminPoints
       tags: [admin-observe]
       summary: 积分全局
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 积分全局：余额结构、五项实时核对（现算，不存历史）、按天走势（7/30/90 天）与风险。
       x-access: admin
       x-feature: G
       security:
       - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/trendDays'}
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AdminPoints'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/ledger/transactions:
     get:
       operationId: listAdminLedgerTransactions
       tags: [admin-observe]
       summary: 账本交易浏览
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 按用户、类型、关联对象、时间筛选账本交易。
       x-access: admin
       x-feature: G
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/relatedType'}
+      - {$ref: '#/components/parameters/relatedID'}
       - {$ref: '#/components/parameters/transactionType'}
       - {$ref: '#/components/parameters/accountIDQuery'}
       - {$ref: '#/components/parameters/from'}
@@ -1610,13 +1653,12 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/ledger/transactions/{transactionID}:
     get:
       operationId: getAdminLedgerTransaction
       tags: [admin-observe]
       summary: 账本交易详情
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 交易详情：分录与前后余额、关联对象摘要、价格快照、相关用户最近的人工操作。
       x-access: admin
       x-feature: G
       security:
@@ -1629,16 +1671,16 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/LedgerTransactionEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/ledger/repair-call/{callID}:
     post:
       operationId: repairAdminLedgerCall
       tags: [admin-observe]
       summary: 修复未记账调用
-      description: 由 Feature G 实现；当前处理器返回 501 not_implemented。
+      description: 对未记账的调用按其用量与价格快照补记（幂等键与正常记账相同，重复补记无效），写审计；void 将其标为不收费的中断。
       x-access: admin
       x-feature: G
       security:
@@ -1662,7 +1704,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /v1/chat/completions:
     post:
       operationId: proxyOpenAIChat
@@ -1898,8 +1939,8 @@ components:
       name: group_by
       in: query
       required: false
-      description: 聚合维度。
-      schema: {type: string, enum: [day, model, key, tag], default: day}
+      description: 聚合维度；channel 仅在 view=revenue 时有效。
+      schema: {type: string, enum: [day, model, key, tag, channel], default: day}
     transactionType:
       name: type
       in: query
@@ -1910,7 +1951,7 @@ components:
       name: format
       in: query
       required: false
-      description: json（默认）或 csv（Feature G）。
+      description: json（默认）或 csv。
       schema: {type: string, enum: [json, csv], default: json}
     accountStatus:
       name: status
@@ -1977,6 +2018,78 @@ components:
       in: query
       required: false
       description: 操作者账户 ID。
+      schema: {type: string, format: uuid}
+    requestID:
+      name: request_id
+      in: query
+      required: false
+      description: 请求 ID，精确匹配。
+      schema: {type: string, format: uuid}
+    minDurationMs:
+      name: min_duration_ms
+      in: query
+      required: false
+      description: 总耗时下限（毫秒，含）。
+      schema: {type: integer, minimum: 0}
+    maxDurationMs:
+      name: max_duration_ms
+      in: query
+      required: false
+      description: 总耗时上限（毫秒，含）。
+      schema: {type: integer, minimum: 0}
+    minTokens:
+      name: min_tokens
+      in: query
+      required: false
+      description: 总 tokens（输入 + 输出 + 缓存读写）下限（含）。
+      schema: {type: integer, minimum: 0}
+    maxTokens:
+      name: max_tokens
+      in: query
+      required: false
+      description: 总 tokens 上限（含）。
+      schema: {type: integer, minimum: 0}
+    minCost:
+      name: min_cost
+      in: query
+      required: false
+      description: 实际扣除（费用 + 手续费）下限（含）。
+      schema: {$ref: '#/components/schemas/Amount'}
+    maxCost:
+      name: max_cost
+      in: query
+      required: false
+      description: 实际扣除（费用 + 手续费）上限（含）。
+      schema: {$ref: '#/components/schemas/Amount'}
+    usageView:
+      name: view
+      in: query
+      required: false
+      description: spend 为我的消费（默认）；revenue 为我的渠道收入。
+      schema: {type: string, enum: [spend, revenue], default: spend}
+    pointsGroup:
+      name: group
+      in: query
+      required: false
+      description: 汇总方式：day 或 key；省略则不返回 summary。
+      schema: {type: string, enum: [day, key]}
+    trendDays:
+      name: days
+      in: query
+      required: false
+      description: 走势时间窗（天），7、30 或 90。
+      schema: {type: integer, enum: [7, 30, 90], default: 30}
+    relatedType:
+      name: related_type
+      in: query
+      required: false
+      description: 关联对象类型，需与 related_id 同时给出。
+      schema: {type: string, enum: [call, c2c_order, c2c_trade, account]}
+    relatedID:
+      name: related_id
+      in: query
+      required: false
+      description: 关联对象 ID。
       schema: {type: string, format: uuid}
     Idempotency-Key:
       name: Idempotency-Key
@@ -2201,7 +2314,7 @@ components:
       additionalProperties: false
     PointsPeriod:
       type: object
-      description: 期间对账：期初 + 收入 - 支出 = 期末，difference 正常为 "0"。
+      description: 期间对账（默认本月）：期初 + 调用支出 + 渠道收入 + C2C 买入 + C2C 卖出（挂单转入托管）+ 退回 + 调账 + 核销 = 期末，difference 为期末减去等式左侧，正常为 "0"。income 与 spend 为全部正向与负向变动的合计（spend 以正数表示）。自己的渠道调用不产生账本交易，故不计入。
       properties:
         from: {$ref: '#/components/schemas/Timestamp'}
         to: {$ref: '#/components/schemas/Timestamp'}
@@ -2209,12 +2322,19 @@ components:
         closing_balance: {$ref: '#/components/schemas/Amount'}
         income: {$ref: '#/components/schemas/Amount'}
         spend: {$ref: '#/components/schemas/Amount'}
+        call_spend: {$ref: '#/components/schemas/Amount', description: 调用支出（≤ 0，含手续费）。}
+        channel_income: {$ref: '#/components/schemas/Amount', description: 渠道收入（≥ 0）。}
+        c2c_buy: {$ref: '#/components/schemas/Amount', description: C2C 买入：卖家放行或仲裁判给买家到账（≥ 0）。}
+        c2c_sell: {$ref: '#/components/schemas/Amount', description: C2C 卖出：挂单转入托管（≤ 0）。}
+        c2c_return: {$ref: '#/components/schemas/Amount', description: 挂单关闭、取消或仲裁退回（≥ 0）。}
+        adjustments: {$ref: '#/components/schemas/Amount', description: 管理员调账（带符号）。}
+        write_offs: {$ref: '#/components/schemas/Amount', description: 坏账核销补平的金额（≥ 0）。}
         difference: {$ref: '#/components/schemas/Amount'}
-      required: [from, to, opening_balance, closing_balance, income, spend, difference]
+      required: [from, to, opening_balance, closing_balance, income, spend, call_spend, channel_income, c2c_buy, c2c_sell, c2c_return, adjustments, write_offs, difference]
       additionalProperties: false
     Points:
       type: object
-      description: 积分概况。trend 与 period 由 Feature G 补充，Feature A 不返回。
+      description: 积分概况；trend 为最近 30 天每日走势，period 为指定期间对账。
       properties:
         balance: {$ref: '#/components/schemas/Amount'}
         credit_limit: {$ref: '#/components/schemas/Amount'}
@@ -2223,7 +2343,7 @@ components:
         trend:
           type: array
           items: {$ref: '#/components/schemas/PointsTrendPoint'}
-          description: '[G] 最近 30 天每日走势，由 Feature G 提供。'
+          description: 最近 30 天（Asia/Shanghai 自然日）每日期末余额、收入与支出。
         period: {$ref: '#/components/schemas/PointsPeriod'}
       required: [balance, credit_limit, available, updated_at]
       additionalProperties: false
@@ -2256,7 +2376,7 @@ components:
       additionalProperties: false
     PointsEntrySummary:
       type: object
-      description: '[G] 按天与按 Key 汇总。'
+      description: 按天与按 Key 汇总；仅返回 group 参数指定的那一种，另一种为空数组。按 Key 汇总只含调用支出（api_call 的负向分录）；调用没有 Key 归属时 api_key 为 null。
       properties:
         by_day:
           type: array
@@ -2521,7 +2641,12 @@ components:
         ttft_p50_ms: {type: [integer, 'null']}
         state: {type: string, enum: [available, cooldown, limited], description: available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM/每日收入上限。}
         cooldown_remaining_seconds: {type: [integer, 'null']}
-      required: [id, name, owner, is_mine, formats, multiplier, current_prices, success_rate_24h, ttft_p50_ms, state, cooldown_remaining_seconds]
+        daily_cap_remaining:
+          anyOf:
+          - {$ref: '#/components/schemas/Ratio'}
+          - {type: 'null'}
+          description: 渠道设置了每日收入上限时，今日剩余比例（0～1）；未设置上限为 null。state 为 limited 时可据此显示剩余额度。
+      required: [id, name, owner, is_mine, formats, multiplier, current_prices, success_rate_24h, ttft_p50_ms, state, cooldown_remaining_seconds, daily_cap_remaining]
       additionalProperties: false
     RoutingPreference:
       type: object
@@ -2977,13 +3102,14 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/ChannelRef'}
           - {type: 'null'}
+        attempt_count: {type: integer, minimum: 0, description: 尝试次数（含换渠道重试）；大于 1 表示换过渠道。}
         usage: {$ref: '#/components/schemas/Usage'}
         cost: {$ref: '#/components/schemas/Amount'}
         fee: {$ref: '#/components/schemas/Amount'}
         charged: {$ref: '#/components/schemas/Amount'}
         ttft_ms: {type: [integer, 'null']}
         duration_ms: {type: [integer, 'null']}
-      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, usage, cost, fee, charged, ttft_ms, duration_ms]
+      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, attempt_count, usage, cost, fee, charged, ttft_ms, duration_ms]
       additionalProperties: false
     PriceSnapshot:
       type: object
@@ -3018,6 +3144,7 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/ChannelRef'}
           - {type: 'null'}
+        attempt_count: {type: integer, minimum: 0, description: 尝试次数（含换渠道重试）；大于 1 表示换过渠道。}
         usage: {$ref: '#/components/schemas/Usage'}
         cost: {$ref: '#/components/schemas/Amount'}
         fee: {$ref: '#/components/schemas/Amount'}
@@ -3042,7 +3169,7 @@ components:
         inter_token_p95_ms: {type: [integer, 'null']}
         response_bytes: {type: [integer, 'null']}
         ledger_transaction_id: {type: [string, 'null'], format: uuid}
-      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, usage, cost, fee, charged, ttft_ms, duration_ms, routing_mode, routing_source, client_user_agent, attempts, price_snapshot, output_tokens_per_second, inter_token_p50_ms, inter_token_p95_ms, response_bytes, ledger_transaction_id]
+      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, attempt_count, usage, cost, fee, charged, ttft_ms, duration_ms, routing_mode, routing_source, client_user_agent, attempts, price_snapshot, output_tokens_per_second, inter_token_p50_ms, inter_token_p95_ms, response_bytes, ledger_transaction_id]
       additionalProperties: false
     CallDetailEnvelope:
       type: object
@@ -3052,7 +3179,7 @@ components:
       additionalProperties: false
     CallStats:
       type: object
-      description: 当前筛选条件下的汇总。
+      description: 当前筛选条件下的汇总。succeeded 含 succeeded_unbilled；failed 为已结束且未成功的调用（in_progress 不计）；success_rate = succeeded / (succeeded + failed)；首字百分位按已读到首字的调用计算。
       properties:
         calls: {type: integer}
         succeeded: {type: integer}
@@ -3064,8 +3191,10 @@ components:
         charged: {$ref: '#/components/schemas/Amount'}
         input_tokens: {type: integer}
         output_tokens: {type: integer}
+        total_tokens: {type: integer, description: 输入、输出与缓存读写 tokens 合计。}
         ttft_p50_ms: {type: [integer, 'null']}
-      required: [calls, succeeded, failed, success_rate, charged, input_tokens, output_tokens, ttft_p50_ms]
+        ttft_p95_ms: {type: [integer, 'null']}
+      required: [calls, succeeded, failed, success_rate, charged, input_tokens, output_tokens, total_tokens, ttft_p50_ms, ttft_p95_ms]
       additionalProperties: false
     CallPage:
       type: object
@@ -3080,7 +3209,7 @@ components:
     UsageRow:
       type: object
       properties:
-        key: {type: string, description: 分组键：日期、模型名、Key ID 或标签（空标签为 ""）。}
+        key: {type: string, description: 分组键：日期、模型名、Key ID、标签（空标签为 ""）或渠道 ID。}
         label: {type: string}
         calls: {type: integer}
         succeeded: {type: integer}
@@ -3088,23 +3217,48 @@ components:
         output_tokens: {type: integer}
         cache_write_tokens: {type: integer}
         cache_read_tokens: {type: integer}
-        charged: {$ref: '#/components/schemas/Amount'}
+        charged: {$ref: '#/components/schemas/Amount', description: 消费视角为实际扣除（费用 + 手续费）；收入视角为渠道收入（费用部分，不含手续费）。}
       required: [key, label, calls, succeeded, input_tokens, output_tokens, cache_write_tokens, cache_read_tokens, charged]
       additionalProperties: false
     UsageReport:
       type: object
       properties:
-        group_by: {type: string, enum: [day, model, key, tag]}
+        view: {type: string, enum: [spend, revenue]}
+        group_by: {type: string, enum: [day, model, key, tag, channel]}
         from: {$ref: '#/components/schemas/Timestamp'}
         to: {$ref: '#/components/schemas/Timestamp'}
         items:
           type: array
           items: {$ref: '#/components/schemas/UsageRow'}
         total: {$ref: '#/components/schemas/UsageRow'}
-      required: [group_by, from, to, items, total]
+      required: [view, group_by, from, to, items, total]
+      additionalProperties: false
+    ChannelWindow:
+      type: object
+      properties:
+        calls: {type: integer}
+        succeeded: {type: integer}
+        success_rate:
+          anyOf:
+          - {$ref: '#/components/schemas/Ratio'}
+          - {type: 'null'}
+      required: [calls, succeeded, success_rate]
+      additionalProperties: false
+    ChannelFailure:
+      type: object
+      properties:
+        call_id: {type: string, format: uuid}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        model_id: {type: [string, 'null']}
+        status_code: {type: [integer, 'null']}
+        error_code: {type: [string, 'null']}
+        error_message: {type: [string, 'null'], maxLength: 4096, description: 上游原始错误；30 天后清理为 null。}
+        end_reason: {type: string}
+      required: [call_id, created_at, model_id, status_code, error_code, error_message, end_reason]
       additionalProperties: false
     ChannelStats:
       type: object
+      description: 渠道统计。calls 与 succeeded 为到达该渠道的尝试次数与成功次数（不含客户端自己取消的尝试）；窗口默认最近 7 天，daily 按 Asia/Shanghai 自然日。
       properties:
         from: {$ref: '#/components/schemas/Timestamp'}
         to: {$ref: '#/components/schemas/Timestamp'}
@@ -3116,7 +3270,49 @@ components:
           - {type: 'null'}
         revenue: {$ref: '#/components/schemas/Amount'}
         ttft_p50_ms: {type: [integer, 'null']}
+        ttft_p95_ms: {type: [integer, 'null']}
         output_tokens_per_second_p50: {type: [number, 'null']}
+        output_tokens_per_second_p95: {type: [number, 'null']}
+        last_24h: {$ref: '#/components/schemas/ChannelWindow'}
+        last_7d: {$ref: '#/components/schemas/ChannelWindow'}
+        hourly:
+          type: array
+          description: 最近 24 小时按小时的尝试量与成功量（含没有调用的小时）。
+          items:
+            type: object
+            properties:
+              hour: {$ref: '#/components/schemas/Timestamp'}
+              calls: {type: integer}
+              succeeded: {type: integer}
+            required: [hour, calls, succeeded]
+            additionalProperties: false
+        status_codes:
+          type: array
+          description: 失败尝试按上游状态码的分布（status_code 为 null 表示没有拿到响应，例如连接失败或超时），按次数降序。
+          items:
+            type: object
+            properties:
+              status_code: {type: [integer, 'null']}
+              count: {type: integer}
+            required: [status_code, count]
+            additionalProperties: false
+        recent_failures:
+          type: array
+          description: 最近 20 次失败尝试，含上游原始错误（30 天后清理）。
+          items: {$ref: '#/components/schemas/ChannelFailure'}
+        today:
+          type: object
+          description: 今日收入与每日收入上限进度。
+          properties:
+            revenue: {$ref: '#/components/schemas/Amount'}
+            daily_cap: {$ref: '#/components/schemas/NullableAmount'}
+            progress:
+              anyOf:
+              - {$ref: '#/components/schemas/Ratio'}
+              - {type: 'null'}
+              description: 今日收入占上限的比例（封顶为 1）；未设置上限为 null。
+          required: [revenue, daily_cap, progress]
+          additionalProperties: false
         by_model:
           type: array
           items:
@@ -3142,11 +3338,11 @@ components:
         events:
           type: array
           items: {$ref: '#/components/schemas/ChannelEvent'}
-      required: [from, to, calls, succeeded, success_rate, revenue, ttft_p50_ms, output_tokens_per_second_p50, by_model, daily, events]
+      required: [from, to, calls, succeeded, success_rate, revenue, ttft_p50_ms, ttft_p95_ms, output_tokens_per_second_p50, output_tokens_per_second_p95, last_24h, last_7d, hourly, status_codes, recent_failures, today, by_model, daily, events]
       additionalProperties: false
     ChannelCall:
       type: object
-      description: 渠道所有者视角的调用，不含调用者身份。
+      description: 渠道所有者视角的调用，不含调用者身份。error 为该渠道上最近一次失败尝试（没有失败为 null）。
       properties:
         id: {type: string, format: uuid}
         created_at: {$ref: '#/components/schemas/Timestamp'}
@@ -3156,6 +3352,7 @@ components:
         outcome: {$ref: '#/components/schemas/CallOutcome'}
         usage: {$ref: '#/components/schemas/Usage'}
         revenue: {$ref: '#/components/schemas/Amount'}
+        served: {type: boolean, description: 该渠道是否为最终提供服务的渠道；false 表示只有失败尝试，随后换了别的渠道（或最终失败）。}
         ttft_ms: {type: [integer, 'null']}
         duration_ms: {type: [integer, 'null']}
         error:
@@ -3166,7 +3363,7 @@ components:
             error_message: {type: [string, 'null']}
           required: [status_code, error_code, error_message]
           additionalProperties: false
-      required: [id, created_at, model_id, format, stream, outcome, usage, revenue, ttft_ms, duration_ms, error]
+      required: [id, created_at, model_id, format, stream, outcome, usage, revenue, served, ttft_ms, duration_ms, error]
       additionalProperties: false
     ChannelCallPage:
       type: object
@@ -3197,6 +3394,7 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/ChannelRef'}
           - {type: 'null'}
+        attempt_count: {type: integer, minimum: 0, description: 尝试次数（含换渠道重试）；大于 1 表示换过渠道。}
         usage: {$ref: '#/components/schemas/Usage'}
         cost: {$ref: '#/components/schemas/Amount'}
         fee: {$ref: '#/components/schemas/Amount'}
@@ -3204,7 +3402,7 @@ components:
         ttft_ms: {type: [integer, 'null']}
         duration_ms: {type: [integer, 'null']}
         account: {$ref: '#/components/schemas/AccountRef'}
-      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, usage, cost, fee, charged, ttft_ms, duration_ms, account]
+      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, attempt_count, usage, cost, fee, charged, ttft_ms, duration_ms, account]
       additionalProperties: false
     AdminCallPage:
       type: object
@@ -3384,7 +3582,8 @@ components:
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
         password_changed_at: {$ref: '#/components/schemas/NullableTimestamp'}
-      required: [id, username, display_name, is_admin, status, must_change_password, credit_limit, balance, available, created_at, updated_at, password_changed_at]
+        last_active_at: {$ref: '#/components/schemas/NullableTimestamp', description: 最近活跃：最近一次登录或调用，取较晚者；从未活跃为 null。}
+      required: [id, username, display_name, is_admin, status, must_change_password, credit_limit, balance, available, created_at, updated_at, password_changed_at, last_active_at]
       additionalProperties: false
     AdminAccountPage:
       type: object
@@ -3585,7 +3784,8 @@ components:
       properties:
         kind:
           type: string
-          enum: [dispute, over_limit, negative_balance, channel_suspended, channel_failing, ledger_unbalanced, stuck_call]
+          enum: [dispute, over_limit, negative_balance, credit_concentration, channel_suspended, channel_failing, unbilled_usage, ledger_unbalanced, reconciliation_failed, stuck_call]
+          description: dispute 申诉中的交易；over_limit 超出信用额度的账户；negative_balance 负余额超过 30 天；credit_concentration 单个用户持有超过 50% 流通积分；channel_failing 渠道 1 小时成功率低于 80% 且调用不少于 20 次；unbilled_usage 24 小时内读不到用量的成功调用占比超过 5% 或超过 20 次；ledger_unbalanced 账户合计不为 0；reconciliation_failed 记账失败或其余核对不通过；channel_suspended 与 stuck_call 暂不产生。
         severity: {type: string, enum: [warning, critical]}
         title: {type: string}
         count: {type: integer}
@@ -3618,13 +3818,36 @@ components:
             open_orders: {type: integer}
             awaiting_payment: {type: integer}
             open_disputes: {type: integer}
-          required: [open_orders, awaiting_payment, open_disputes]
+            trades_24h: {type: integer, description: 最近 24 小时成交（放行或判给买家）笔数。}
+            volume_24h: {$ref: '#/components/schemas/Amount', description: 最近 24 小时成交积分数量。}
+            avg_price_fen_24h: {type: [number, 'null'], description: 最近 24 小时成交均价（分/积分，按数量加权）；无成交为 null。}
+          required: [open_orders, awaiting_payment, open_disputes, trades_24h, volume_24h, avg_price_fen_24h]
           additionalProperties: false
-      required: [attention, ledger, today, c2c]
+        credit:
+          type: object
+          description: 信用占用。
+          properties:
+            issued: {$ref: '#/components/schemas/Amount', description: 信用发行：全部用户负余额合计的绝对值（已占用的信用）。}
+            limit: {$ref: '#/components/schemas/Amount', description: 总信用额度：全部用户信用额度合计。}
+          required: [issued, limit]
+          additionalProperties: false
+        last_24h:
+          type: object
+          description: 最近 24 小时调用（含被拒绝的调用）。
+          properties:
+            calls: {type: integer}
+            succeeded: {type: integer}
+            success_rate:
+              anyOf:
+              - {$ref: '#/components/schemas/Ratio'}
+              - {type: 'null'}
+          required: [calls, succeeded, success_rate]
+          additionalProperties: false
+      required: [attention, ledger, today, c2c, credit, last_24h]
       additionalProperties: false
     AdminPointsBalances:
       type: object
-      description: user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。
+      description: user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_revenue 为平台收入；bad_debt 为已核销坏账。
       properties:
         user_positive: {$ref: '#/components/schemas/Amount'}
         user_negative: {$ref: '#/components/schemas/Amount'}
@@ -3633,7 +3856,11 @@ components:
         platform_revenue: {$ref: '#/components/schemas/Amount'}
         bad_debt: {$ref: '#/components/schemas/Amount'}
         total: {$ref: '#/components/schemas/Amount'}
-      required: [user_positive, user_negative, credit_issued, c2c_escrow, platform_revenue, bad_debt, total]
+        total_credit_limit: {$ref: '#/components/schemas/Amount', description: 总信用额度：全部用户信用额度合计。}
+        bad_debt_writeoffs: {type: integer, description: 已核销坏账笔数。}
+        escrow_orders: {type: integer, description: 托管中的卖单数（available 或 in_trade 大于 0）。}
+        escrow_trades_in_progress: {type: integer, description: 托管中进行中的交易笔数（待付款、已付款、申诉中）。}
+      required: [user_positive, user_negative, credit_issued, c2c_escrow, platform_revenue, bad_debt, total, total_credit_limit, bad_debt_writeoffs, escrow_orders, escrow_trades_in_progress]
       additionalProperties: false
     AdminPointsRisk:
       type: object
@@ -3642,31 +3869,133 @@ components:
         balance: {$ref: '#/components/schemas/Amount'}
         credit_limit: {$ref: '#/components/schemas/Amount'}
         available: {$ref: '#/components/schemas/Amount'}
-        kind: {type: string, enum: [over_limit, negative_inactive]}
+        kind: {type: string, enum: [over_limit, negative_long], description: over_limit 余额低于 −信用额度；negative_long 负余额已持续超过 30 天。}
+        negative_days: {type: [integer, 'null'], description: 负余额持续天数：从最近一次由非负变为负算起；当前非负为 null。}
         last_activity_at: {$ref: '#/components/schemas/NullableTimestamp'}
-      required: [account, balance, credit_limit, available, kind, last_activity_at]
+      required: [account, balance, credit_limit, available, kind, negative_days, last_activity_at]
       additionalProperties: false
     AdminPoints:
       type: object
       properties:
         balances: {$ref: '#/components/schemas/AdminPointsBalances'}
-        check: {$ref: '#/components/schemas/LedgerCheck'}
+        check: {$ref: '#/components/schemas/LedgerCheck', description: 核对①：全部账户余额合计为 0。}
         trend:
           type: array
           items:
             type: object
             properties:
               date: {$ref: '#/components/schemas/Date'}
-              circulation: {$ref: '#/components/schemas/Amount'}
+              circulation: {$ref: '#/components/schemas/Amount', description: 当日期末流通积分（用户正余额合计）。}
+              credit_issued: {$ref: '#/components/schemas/Amount', description: 当日期末信用发行（用户负余额合计的绝对值）。}
               platform_revenue: {$ref: '#/components/schemas/Amount'}
               bad_debt: {$ref: '#/components/schemas/Amount'}
               c2c_escrow: {$ref: '#/components/schemas/Amount'}
-            required: [date, circulation, platform_revenue, bad_debt, c2c_escrow]
+              api_volume: {$ref: '#/components/schemas/Amount', description: 当日 API 结算量（调用费用 + 手续费）。}
+              api_fee: {$ref: '#/components/schemas/Amount', description: 当日 API 手续费收入。}
+              c2c_volume: {$ref: '#/components/schemas/Amount', description: 当日 C2C 成交积分数量（放行或判给买家）。}
+              c2c_avg_price_fen: {type: [number, 'null'], description: 当日 C2C 成交均价（分/积分，按数量加权）；无成交为 null。}
+            required: [date, circulation, credit_issued, platform_revenue, bad_debt, c2c_escrow, api_volume, api_fee, c2c_volume, c2c_avg_price_fen]
             additionalProperties: false
         risks:
           type: array
           items: {$ref: '#/components/schemas/AdminPointsRisk'}
-      required: [balances, check, trend, risks]
+        concentration:
+          type: object
+          description: 持有集中度：前 5 名用户持有的积分占流通积分的比例。
+          properties:
+            top5_share:
+              anyOf:
+              - {$ref: '#/components/schemas/Ratio'}
+              - {type: 'null'}
+            top:
+              type: array
+              items:
+                type: object
+                properties:
+                  account: {$ref: '#/components/schemas/AccountRef'}
+                  balance: {$ref: '#/components/schemas/Amount'}
+                  share: {$ref: '#/components/schemas/Ratio'}
+                required: [account, balance, share]
+                additionalProperties: false
+          required: [top5_share, top]
+          additionalProperties: false
+        checks: {$ref: '#/components/schemas/LedgerChecks'}
+      required: [balances, check, trend, risks, concentration, checks]
+      additionalProperties: false
+    LedgerChecks:
+      type: object
+      description: 五项实时核对中除①（零和，见 check）外的四项，每次请求现算，不存历史。自己的渠道调用不产生账本交易，漏记核对已排除。
+      properties:
+        checked_at: {$ref: '#/components/schemas/Timestamp'}
+        all_passed: {type: boolean, description: 五项（含 check）全部通过。}
+        account_balances:
+          type: object
+          description: ②每个账户 balance 等于其分录合计。
+          properties:
+            passed: {type: boolean}
+            mismatches:
+              type: array
+              items:
+                type: object
+                properties:
+                  ledger_account: {$ref: '#/components/schemas/LedgerAccountRef'}
+                  balance: {$ref: '#/components/schemas/Amount'}
+                  entries_total: {$ref: '#/components/schemas/Amount'}
+                required: [ledger_account, balance, entries_total]
+                additionalProperties: false
+          required: [passed, mismatches]
+          additionalProperties: false
+        escrow:
+          type: object
+          description: ③c2c_escrow 余额等于全部卖单 available + in_trade 之和。
+          properties:
+            passed: {type: boolean}
+            escrow_balance: {$ref: '#/components/schemas/Amount'}
+            orders_total: {$ref: '#/components/schemas/Amount'}
+            difference: {$ref: '#/components/schemas/Amount'}
+          required: [passed, escrow_balance, orders_total, difference]
+          additionalProperties: false
+        billing_calls:
+          type: object
+          description: ④每次应计费的成功调用都有 ledger_tx_id（succeeded、interrupted、client_disconnected 且费用大于 0，排除渠道所有者即调用者的调用）。missing 最多列出 100 条。
+          properties:
+            passed: {type: boolean}
+            missing_count: {type: integer}
+            missing:
+              type: array
+              items:
+                type: object
+                properties:
+                  call_id: {type: string, format: uuid}
+                  created_at: {$ref: '#/components/schemas/Timestamp'}
+                  account: {$ref: '#/components/schemas/AccountRef'}
+                  channel: {$ref: '#/components/schemas/ChannelRef'}
+                  outcome: {$ref: '#/components/schemas/CallOutcome'}
+                  charged: {$ref: '#/components/schemas/Amount'}
+                required: [call_id, created_at, account, channel, outcome, charged]
+                additionalProperties: false
+          required: [passed, missing_count, missing]
+          additionalProperties: false
+        released_trades:
+          type: object
+          description: ⑤每笔 released 与 resolved_to_buyer 的 C2C 交易都有账本记账。missing 最多列出 100 条。
+          properties:
+            passed: {type: boolean}
+            missing_count: {type: integer}
+            missing:
+              type: array
+              items:
+                type: object
+                properties:
+                  trade_id: {type: string, format: uuid}
+                  status: {$ref: '#/components/schemas/TradeStatus'}
+                  amount: {$ref: '#/components/schemas/Amount'}
+                  resolved_at: {$ref: '#/components/schemas/NullableTimestamp'}
+                required: [trade_id, status, amount, resolved_at]
+                additionalProperties: false
+          required: [passed, missing_count, missing]
+          additionalProperties: false
+      required: [checked_at, all_passed, account_balances, escrow, billing_calls, released_trades]
       additionalProperties: false
     LedgerAccountRef:
       type: object
@@ -3684,8 +4013,9 @@ components:
       properties:
         ledger_account: {$ref: '#/components/schemas/LedgerAccountRef'}
         amount: {$ref: '#/components/schemas/Amount'}
+        balance_before: {$ref: '#/components/schemas/Amount'}
         balance_after: {$ref: '#/components/schemas/Amount'}
-      required: [ledger_account, amount, balance_after]
+      required: [ledger_account, amount, balance_before, balance_after]
       additionalProperties: false
     LedgerTransaction:
       type: object
@@ -3703,10 +4033,20 @@ components:
           - {type: 'null'}
         reason: {type: string}
         created_at: {$ref: '#/components/schemas/Timestamp'}
+        related_summary: {type: [string, 'null'], description: 关联对象的一句话摘要（调用的模型与渠道、C2C 卖单与交易的数量与单价、账户的用户名）。}
         entries:
           type: array
           items: {$ref: '#/components/schemas/LedgerTransactionEntry'}
-      required: [id, type, idempotency_key, related, actor, reason, created_at, entries]
+        price_snapshot:
+          anyOf:
+          - {$ref: '#/components/schemas/PriceSnapshot'}
+          - {type: 'null'}
+          description: 仅详情接口返回：调用类交易记录的价格快照；其他为 null。
+        recent_actions:
+          type: array
+          items: {$ref: '#/components/schemas/AuditEntry'}
+          description: 仅详情接口返回：交易涉及用户最近的人工操作（审计），最多 10 条。
+      required: [id, type, idempotency_key, related, actor, reason, created_at, related_summary, entries]
       additionalProperties: false
     LedgerTransactionPage:
       type: object

@@ -66,13 +66,17 @@ WHERE id = $1
 RETURNING *;
 
 -- name: GetAdminAccount :one
-SELECT sqlc.embed(a), coalesce(l.balance_nano, 0)::bigint AS balance_nano
+SELECT sqlc.embed(a), coalesce(l.balance_nano, 0)::bigint AS balance_nano,
+       (SELECT max(created_at) FROM sessions WHERE account_id = a.id) AS last_login_at,
+       (SELECT max(created_at) FROM calls WHERE account_id = a.id) AS last_call_at
 FROM accounts a
 LEFT JOIN ledger_accounts l ON l.account_id = a.id
 WHERE a.id = $1;
 
 -- name: ListAdminAccounts :many
-SELECT sqlc.embed(a), coalesce(l.balance_nano, 0)::bigint AS balance_nano
+SELECT sqlc.embed(a), coalesce(l.balance_nano, 0)::bigint AS balance_nano,
+       (SELECT max(created_at) FROM sessions WHERE account_id = a.id) AS last_login_at,
+       (SELECT max(created_at) FROM calls WHERE account_id = a.id) AS last_call_at
 FROM accounts a
 LEFT JOIN ledger_accounts l ON l.account_id = a.id
 WHERE (sqlc.arg(query)::text = '' OR a.username ILIKE '%' || sqlc.arg(query) || '%' OR a.display_name ILIKE '%' || sqlc.arg(query) || '%' OR a.id::text = sqlc.arg(query))

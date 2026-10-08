@@ -22,6 +22,7 @@ const channel = (id: string): ModelChannel => ({
   success_rate_24h: null,
   ttft_p50_ms: null,
   state: 'available',
+  daily_cap_remaining: null,
   cooldown_remaining_seconds: null,
 })
 

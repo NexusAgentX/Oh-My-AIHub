@@ -373,7 +373,7 @@ export interface paths {
         };
         /**
          * 我的调用记录
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 我的调用记录，响应同时返回当前筛选下的汇总（请求数、成功率、首字 p50/p95、tokens、费用）。筛选均为 AND；cursor 为 created_at 与 id 的键集游标。
          */
         get: operations["listCalls"];
         put?: never;
@@ -393,7 +393,7 @@ export interface paths {
         };
         /**
          * 我的调用实时流
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 订阅进程内事件总线：调用开始与结束各推送一次摘要。事件名 call.started / call.finished；每 15 秒一行注释心跳；慢消费者的事件被丢弃，断线由前端重连。
          */
         get: operations["streamCalls"];
         put?: never;
@@ -413,7 +413,7 @@ export interface paths {
         };
         /**
          * 调用详情
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 调用详情：全部字段、尝试时间线、价格快照与关联账本交易。调用者、该调用最终渠道或尝试渠道的所有者（只看到自己渠道的尝试，不含 Key 名、标签与调用者信息）、管理员可见。
          */
         get: operations["getCall"];
         put?: never;
@@ -433,7 +433,7 @@ export interface paths {
         };
         /**
          * 用量聚合
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 按天 / 模型 / Key / 标签聚合；view=revenue 时改为渠道收入视角（我的渠道被调用的收入，group_by 可选 day / model / channel）。日期按 Asia/Shanghai 自然日；默认最近 30 天。
          */
         get: operations["getUsage"];
         put?: never;
@@ -453,7 +453,7 @@ export interface paths {
         };
         /**
          * 渠道统计
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日收入与每日上限进度。渠道所有者或管理员可见。
          */
         get: operations["getChannelStats"];
         put?: never;
@@ -473,7 +473,7 @@ export interface paths {
         };
         /**
          * 渠道上的调用
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 渠道所有者（或管理员）视角：最终渠道或任一次尝试为该渠道的调用，不含调用者身份、Key 名与标签。
          */
         get: operations["listChannelCalls"];
         put?: never;
@@ -493,7 +493,7 @@ export interface paths {
         };
         /**
          * 渠道调用实时流
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 渠道所有者（或管理员）的调用实时流，规则同 /api/calls/stream；数据不含调用者身份。调用结束前无法知道会触达哪些渠道，因此只推送 call.finished。
          */
         get: operations["streamChannelCalls"];
         put?: never;
@@ -513,7 +513,7 @@ export interface paths {
         };
         /**
          * 我的积分
-         * @description Feature A 返回余额、信用额度与可透支额度；Feature G 补充 30 天走势（trend）与期间对账（period）。
+         * @description 余额、信用额度与可透支额度，30 天每日余额走势（trend）与指定期间（默认本月）的对账（period，等式必须成立）。
          */
         get: operations["getPoints"];
         put?: never;
@@ -533,7 +533,7 @@ export interface paths {
         };
         /**
          * 我的积分账单
-         * @description 按时间倒序。Feature G 补充 summary（按天/按 Key 汇总）与 format=csv 导出；在此之前 format=csv 返回 501。
+         * @description 按时间倒序的账单。可按类型、Key、时间筛选；group=day|key 时在 summary 中返回对应汇总；format=csv 导出全部匹配记录（UTF-8 BOM，最多 50000 行）。
          */
         get: operations["listPointsEntries"];
         put?: never;
@@ -1002,7 +1002,7 @@ export interface paths {
         };
         /**
          * 概览：需要处理与账本核对
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 概览：需要处理的列表与四个指标块（账本、信用占用、24 小时调用、24 小时 C2C 成交）。
          */
         get: operations["getAdminOverview"];
         put?: never;
@@ -1022,7 +1022,7 @@ export interface paths {
         };
         /**
          * 全部调用
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 全部用户的调用记录，筛选同 /api/calls，另可按账户与渠道筛选。
          */
         get: operations["listAdminCalls"];
         put?: never;
@@ -1042,7 +1042,7 @@ export interface paths {
         };
         /**
          * 全部调用实时流
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 全部调用实时流，规则同 /api/calls/stream。
          */
         get: operations["streamAdminCalls"];
         put?: never;
@@ -1062,7 +1062,7 @@ export interface paths {
         };
         /**
          * 积分全局
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 积分全局：余额结构、五项实时核对（现算，不存历史）、按天走势（7/30/90 天）与风险。
          */
         get: operations["getAdminPoints"];
         put?: never;
@@ -1082,7 +1082,7 @@ export interface paths {
         };
         /**
          * 账本交易浏览
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 按用户、类型、关联对象、时间筛选账本交易。
          */
         get: operations["listAdminLedgerTransactions"];
         put?: never;
@@ -1102,7 +1102,7 @@ export interface paths {
         };
         /**
          * 账本交易详情
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 交易详情：分录与前后余额、关联对象摘要、价格快照、相关用户最近的人工操作。
          */
         get: operations["getAdminLedgerTransaction"];
         put?: never;
@@ -1124,7 +1124,7 @@ export interface paths {
         put?: never;
         /**
          * 修复未记账调用
-         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         * @description 对未记账的调用按其用量与价格快照补记（幂等键与正常记账相同，重复补记无效），写审计；void 将其标为不收费的中断。
          */
         post: operations["repairAdminLedgerCall"];
         delete?: never;
@@ -1409,7 +1409,7 @@ export interface components {
             income: components["schemas"]["Amount"];
             spend: components["schemas"]["Amount"];
         };
-        /** @description 期间对账：期初 + 收入 - 支出 = 期末，difference 正常为 "0"。 */
+        /** @description 期间对账（默认本月）：期初 + 调用支出 + 渠道收入 + C2C 买入 + C2C 卖出（挂单转入托管）+ 退回 + 调账 + 核销 = 期末，difference 为期末减去等式左侧，正常为 "0"。income 与 spend 为全部正向与负向变动的合计（spend 以正数表示）。自己的渠道调用不产生账本交易，故不计入。 */
         PointsPeriod: {
             from: components["schemas"]["Timestamp"];
             to: components["schemas"]["Timestamp"];
@@ -1417,15 +1417,29 @@ export interface components {
             closing_balance: components["schemas"]["Amount"];
             income: components["schemas"]["Amount"];
             spend: components["schemas"]["Amount"];
+            /** @description 调用支出（≤ 0，含手续费）。 */
+            call_spend: components["schemas"]["Amount"];
+            /** @description 渠道收入（≥ 0）。 */
+            channel_income: components["schemas"]["Amount"];
+            /** @description C2C 买入：卖家放行或仲裁判给买家到账（≥ 0）。 */
+            c2c_buy: components["schemas"]["Amount"];
+            /** @description C2C 卖出：挂单转入托管（≤ 0）。 */
+            c2c_sell: components["schemas"]["Amount"];
+            /** @description 挂单关闭、取消或仲裁退回（≥ 0）。 */
+            c2c_return: components["schemas"]["Amount"];
+            /** @description 管理员调账（带符号）。 */
+            adjustments: components["schemas"]["Amount"];
+            /** @description 坏账核销补平的金额（≥ 0）。 */
+            write_offs: components["schemas"]["Amount"];
             difference: components["schemas"]["Amount"];
         };
-        /** @description 积分概况。trend 与 period 由 Feature G 补充，Feature A 不返回。 */
+        /** @description 积分概况；trend 为最近 30 天每日走势，period 为指定期间对账。 */
         Points: {
             balance: components["schemas"]["Amount"];
             credit_limit: components["schemas"]["Amount"];
             available: components["schemas"]["Amount"];
             updated_at: components["schemas"]["Timestamp"];
-            /** @description [G] 最近 30 天每日走势，由 Feature G 提供。 */
+            /** @description 最近 30 天（Asia/Shanghai 自然日）每日期末余额、收入与支出。 */
             trend?: components["schemas"]["PointsTrendPoint"][];
             period?: components["schemas"]["PointsPeriod"];
         };
@@ -1448,7 +1462,7 @@ export interface components {
             balance_after: components["schemas"]["Amount"];
             api_key: components["schemas"]["KeyRef"] | null;
         };
-        /** @description [G] 按天与按 Key 汇总。 */
+        /** @description 按天与按 Key 汇总；仅返回 group 参数指定的那一种，另一种为空数组。按 Key 汇总只含调用支出（api_call 的负向分录）；调用没有 Key 归属时 api_key 为 null。 */
         PointsEntrySummary: {
             by_day: {
                 date: components["schemas"]["Date"];
@@ -1618,6 +1632,8 @@ export interface components {
              */
             state: "available" | "cooldown" | "limited";
             cooldown_remaining_seconds: number | null;
+            /** @description 渠道设置了每日收入上限时，今日剩余比例（0～1）；未设置上限为 null。state 为 limited 时可据此显示剩余额度。 */
+            daily_cap_remaining: components["schemas"]["Ratio"] | null;
         };
         RoutingPreference: {
             model_id: string;
@@ -1914,6 +1930,8 @@ export interface components {
             api_key: components["schemas"]["KeyRef"] | null;
             outcome: components["schemas"]["CallOutcome"];
             channel: components["schemas"]["ChannelRef"] | null;
+            /** @description 尝试次数（含换渠道重试）；大于 1 表示换过渠道。 */
+            attempt_count: number;
             usage: components["schemas"]["Usage"];
             cost: components["schemas"]["Amount"];
             fee: components["schemas"]["Amount"];
@@ -1944,6 +1962,8 @@ export interface components {
             api_key: components["schemas"]["KeyRef"] | null;
             outcome: components["schemas"]["CallOutcome"];
             channel: components["schemas"]["ChannelRef"] | null;
+            /** @description 尝试次数（含换渠道重试）；大于 1 表示换过渠道。 */
+            attempt_count: number;
             usage: components["schemas"]["Usage"];
             cost: components["schemas"]["Amount"];
             fee: components["schemas"]["Amount"];
@@ -1966,7 +1986,7 @@ export interface components {
         CallDetailEnvelope: {
             call: components["schemas"]["CallDetail"];
         };
-        /** @description 当前筛选条件下的汇总。 */
+        /** @description 当前筛选条件下的汇总。succeeded 含 succeeded_unbilled；failed 为已结束且未成功的调用（in_progress 不计）；success_rate = succeeded / (succeeded + failed)；首字百分位按已读到首字的调用计算。 */
         CallStats: {
             calls: number;
             succeeded: number;
@@ -1975,7 +1995,10 @@ export interface components {
             charged: components["schemas"]["Amount"];
             input_tokens: number;
             output_tokens: number;
+            /** @description 输入、输出与缓存读写 tokens 合计。 */
+            total_tokens: number;
             ttft_p50_ms: number | null;
+            ttft_p95_ms: number | null;
         };
         CallPage: {
             items: components["schemas"]["CallSummary"][];
@@ -1984,7 +2007,7 @@ export interface components {
             summary: components["schemas"]["CallStats"];
         };
         UsageRow: {
-            /** @description 分组键：日期、模型名、Key ID 或标签（空标签为 ""）。 */
+            /** @description 分组键：日期、模型名、Key ID、标签（空标签为 ""）或渠道 ID。 */
             key: string;
             label: string;
             calls: number;
@@ -1993,16 +2016,36 @@ export interface components {
             output_tokens: number;
             cache_write_tokens: number;
             cache_read_tokens: number;
+            /** @description 消费视角为实际扣除（费用 + 手续费）；收入视角为渠道收入（费用部分，不含手续费）。 */
             charged: components["schemas"]["Amount"];
         };
         UsageReport: {
             /** @enum {string} */
-            group_by: "day" | "model" | "key" | "tag";
+            view: "spend" | "revenue";
+            /** @enum {string} */
+            group_by: "day" | "model" | "key" | "tag" | "channel";
             from: components["schemas"]["Timestamp"];
             to: components["schemas"]["Timestamp"];
             items: components["schemas"]["UsageRow"][];
             total: components["schemas"]["UsageRow"];
         };
+        ChannelWindow: {
+            calls: number;
+            succeeded: number;
+            success_rate: components["schemas"]["Ratio"] | null;
+        };
+        ChannelFailure: {
+            /** Format: uuid */
+            call_id: string;
+            created_at: components["schemas"]["Timestamp"];
+            model_id: string | null;
+            status_code: number | null;
+            error_code: string | null;
+            /** @description 上游原始错误；30 天后清理为 null。 */
+            error_message: string | null;
+            end_reason: string;
+        };
+        /** @description 渠道统计。calls 与 succeeded 为到达该渠道的尝试次数与成功次数（不含客户端自己取消的尝试）；窗口默认最近 7 天，daily 按 Asia/Shanghai 自然日。 */
         ChannelStats: {
             from: components["schemas"]["Timestamp"];
             to: components["schemas"]["Timestamp"];
@@ -2011,7 +2054,31 @@ export interface components {
             success_rate: components["schemas"]["Ratio"] | null;
             revenue: components["schemas"]["Amount"];
             ttft_p50_ms: number | null;
+            ttft_p95_ms: number | null;
             output_tokens_per_second_p50: number | null;
+            output_tokens_per_second_p95: number | null;
+            last_24h: components["schemas"]["ChannelWindow"];
+            last_7d: components["schemas"]["ChannelWindow"];
+            /** @description 最近 24 小时按小时的尝试量与成功量（含没有调用的小时）。 */
+            hourly: {
+                hour: components["schemas"]["Timestamp"];
+                calls: number;
+                succeeded: number;
+            }[];
+            /** @description 失败尝试按上游状态码的分布（status_code 为 null 表示没有拿到响应，例如连接失败或超时），按次数降序。 */
+            status_codes: {
+                status_code: number | null;
+                count: number;
+            }[];
+            /** @description 最近 20 次失败尝试，含上游原始错误（30 天后清理）。 */
+            recent_failures: components["schemas"]["ChannelFailure"][];
+            /** @description 今日收入与每日收入上限进度。 */
+            today: {
+                revenue: components["schemas"]["Amount"];
+                daily_cap: components["schemas"]["NullableAmount"];
+                /** @description 今日收入占上限的比例（封顶为 1）；未设置上限为 null。 */
+                progress: components["schemas"]["Ratio"] | null;
+            };
             by_model: {
                 model_id: string;
                 calls: number;
@@ -2026,7 +2093,7 @@ export interface components {
             }[];
             events: components["schemas"]["ChannelEvent"][];
         };
-        /** @description 渠道所有者视角的调用，不含调用者身份。 */
+        /** @description 渠道所有者视角的调用，不含调用者身份。error 为该渠道上最近一次失败尝试（没有失败为 null）。 */
         ChannelCall: {
             /** Format: uuid */
             id: string;
@@ -2037,6 +2104,8 @@ export interface components {
             outcome: components["schemas"]["CallOutcome"];
             usage: components["schemas"]["Usage"];
             revenue: components["schemas"]["Amount"];
+            /** @description 该渠道是否为最终提供服务的渠道；false 表示只有失败尝试，随后换了别的渠道（或最终失败）。 */
+            served: boolean;
             ttft_ms: number | null;
             duration_ms: number | null;
             error: {
@@ -2066,6 +2135,8 @@ export interface components {
             api_key: components["schemas"]["KeyRef"] | null;
             outcome: components["schemas"]["CallOutcome"];
             channel: components["schemas"]["ChannelRef"] | null;
+            /** @description 尝试次数（含换渠道重试）；大于 1 表示换过渠道。 */
+            attempt_count: number;
             usage: components["schemas"]["Usage"];
             cost: components["schemas"]["Amount"];
             fee: components["schemas"]["Amount"];
@@ -2206,6 +2277,8 @@ export interface components {
             created_at: components["schemas"]["Timestamp"];
             updated_at: components["schemas"]["Timestamp"];
             password_changed_at: components["schemas"]["NullableTimestamp"];
+            /** @description 最近活跃：最近一次登录或调用，取较晚者；从未活跃为 null。 */
+            last_active_at: components["schemas"]["NullableTimestamp"];
         };
         AdminAccountPage: {
             items: components["schemas"]["AdminAccount"][];
@@ -2334,8 +2407,11 @@ export interface components {
             checked_at: components["schemas"]["Timestamp"];
         };
         AttentionItem: {
-            /** @enum {string} */
-            kind: "dispute" | "over_limit" | "negative_balance" | "channel_suspended" | "channel_failing" | "ledger_unbalanced" | "stuck_call";
+            /**
+             * @description dispute 申诉中的交易；over_limit 超出信用额度的账户；negative_balance 负余额超过 30 天；credit_concentration 单个用户持有超过 50% 流通积分；channel_failing 渠道 1 小时成功率低于 80% 且调用不少于 20 次；unbilled_usage 24 小时内读不到用量的成功调用占比超过 5% 或超过 20 次；ledger_unbalanced 账户合计不为 0；reconciliation_failed 记账失败或其余核对不通过；channel_suspended 与 stuck_call 暂不产生。
+             * @enum {string}
+             */
+            kind: "dispute" | "over_limit" | "negative_balance" | "credit_concentration" | "channel_suspended" | "channel_failing" | "unbilled_usage" | "ledger_unbalanced" | "reconciliation_failed" | "stuck_call";
             /** @enum {string} */
             severity: "warning" | "critical";
             title: string;
@@ -2356,9 +2432,28 @@ export interface components {
                 open_orders: number;
                 awaiting_payment: number;
                 open_disputes: number;
+                /** @description 最近 24 小时成交（放行或判给买家）笔数。 */
+                trades_24h: number;
+                /** @description 最近 24 小时成交积分数量。 */
+                volume_24h: components["schemas"]["Amount"];
+                /** @description 最近 24 小时成交均价（分/积分，按数量加权）；无成交为 null。 */
+                avg_price_fen_24h: number | null;
+            };
+            /** @description 信用占用。 */
+            credit: {
+                /** @description 信用发行：全部用户负余额合计的绝对值（已占用的信用）。 */
+                issued: components["schemas"]["Amount"];
+                /** @description 总信用额度：全部用户信用额度合计。 */
+                limit: components["schemas"]["Amount"];
+            };
+            /** @description 最近 24 小时调用（含被拒绝的调用）。 */
+            last_24h: {
+                calls: number;
+                succeeded: number;
+                success_rate: components["schemas"]["Ratio"] | null;
             };
         };
-        /** @description user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。 */
+        /** @description user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_revenue 为平台收入；bad_debt 为已核销坏账。 */
         AdminPointsBalances: {
             user_positive: components["schemas"]["Amount"];
             user_negative: components["schemas"]["Amount"];
@@ -2367,27 +2462,110 @@ export interface components {
             platform_revenue: components["schemas"]["Amount"];
             bad_debt: components["schemas"]["Amount"];
             total: components["schemas"]["Amount"];
+            /** @description 总信用额度：全部用户信用额度合计。 */
+            total_credit_limit: components["schemas"]["Amount"];
+            /** @description 已核销坏账笔数。 */
+            bad_debt_writeoffs: number;
+            /** @description 托管中的卖单数（available 或 in_trade 大于 0）。 */
+            escrow_orders: number;
+            /** @description 托管中进行中的交易笔数（待付款、已付款、申诉中）。 */
+            escrow_trades_in_progress: number;
         };
         AdminPointsRisk: {
             account: components["schemas"]["AccountRef"];
             balance: components["schemas"]["Amount"];
             credit_limit: components["schemas"]["Amount"];
             available: components["schemas"]["Amount"];
-            /** @enum {string} */
-            kind: "over_limit" | "negative_inactive";
+            /**
+             * @description over_limit 余额低于 −信用额度；negative_long 负余额已持续超过 30 天。
+             * @enum {string}
+             */
+            kind: "over_limit" | "negative_long";
+            /** @description 负余额持续天数：从最近一次由非负变为负算起；当前非负为 null。 */
+            negative_days: number | null;
             last_activity_at: components["schemas"]["NullableTimestamp"];
         };
         AdminPoints: {
             balances: components["schemas"]["AdminPointsBalances"];
+            /** @description 核对①：全部账户余额合计为 0。 */
             check: components["schemas"]["LedgerCheck"];
             trend: {
                 date: components["schemas"]["Date"];
+                /** @description 当日期末流通积分（用户正余额合计）。 */
                 circulation: components["schemas"]["Amount"];
+                /** @description 当日期末信用发行（用户负余额合计的绝对值）。 */
+                credit_issued: components["schemas"]["Amount"];
                 platform_revenue: components["schemas"]["Amount"];
                 bad_debt: components["schemas"]["Amount"];
                 c2c_escrow: components["schemas"]["Amount"];
+                /** @description 当日 API 结算量（调用费用 + 手续费）。 */
+                api_volume: components["schemas"]["Amount"];
+                /** @description 当日 API 手续费收入。 */
+                api_fee: components["schemas"]["Amount"];
+                /** @description 当日 C2C 成交积分数量（放行或判给买家）。 */
+                c2c_volume: components["schemas"]["Amount"];
+                /** @description 当日 C2C 成交均价（分/积分，按数量加权）；无成交为 null。 */
+                c2c_avg_price_fen: number | null;
             }[];
             risks: components["schemas"]["AdminPointsRisk"][];
+            /** @description 持有集中度：前 5 名用户持有的积分占流通积分的比例。 */
+            concentration: {
+                top5_share: components["schemas"]["Ratio"] | null;
+                top: {
+                    account: components["schemas"]["AccountRef"];
+                    balance: components["schemas"]["Amount"];
+                    share: components["schemas"]["Ratio"];
+                }[];
+            };
+            checks: components["schemas"]["LedgerChecks"];
+        };
+        /** @description 五项实时核对中除①（零和，见 check）外的四项，每次请求现算，不存历史。自己的渠道调用不产生账本交易，漏记核对已排除。 */
+        LedgerChecks: {
+            checked_at: components["schemas"]["Timestamp"];
+            /** @description 五项（含 check）全部通过。 */
+            all_passed: boolean;
+            /** @description ②每个账户 balance 等于其分录合计。 */
+            account_balances: {
+                passed: boolean;
+                mismatches: {
+                    ledger_account: components["schemas"]["LedgerAccountRef"];
+                    balance: components["schemas"]["Amount"];
+                    entries_total: components["schemas"]["Amount"];
+                }[];
+            };
+            /** @description ③c2c_escrow 余额等于全部卖单 available + in_trade 之和。 */
+            escrow: {
+                passed: boolean;
+                escrow_balance: components["schemas"]["Amount"];
+                orders_total: components["schemas"]["Amount"];
+                difference: components["schemas"]["Amount"];
+            };
+            /** @description ④每次应计费的成功调用都有 ledger_tx_id（succeeded、interrupted、client_disconnected 且费用大于 0，排除渠道所有者即调用者的调用）。missing 最多列出 100 条。 */
+            billing_calls: {
+                passed: boolean;
+                missing_count: number;
+                missing: {
+                    /** Format: uuid */
+                    call_id: string;
+                    created_at: components["schemas"]["Timestamp"];
+                    account: components["schemas"]["AccountRef"];
+                    channel: components["schemas"]["ChannelRef"];
+                    outcome: components["schemas"]["CallOutcome"];
+                    charged: components["schemas"]["Amount"];
+                }[];
+            };
+            /** @description ⑤每笔 released 与 resolved_to_buyer 的 C2C 交易都有账本记账。missing 最多列出 100 条。 */
+            released_trades: {
+                passed: boolean;
+                missing_count: number;
+                missing: {
+                    /** Format: uuid */
+                    trade_id: string;
+                    status: components["schemas"]["TradeStatus"];
+                    amount: components["schemas"]["Amount"];
+                    resolved_at: components["schemas"]["NullableTimestamp"];
+                }[];
+            };
         };
         LedgerAccountRef: {
             /** @enum {string} */
@@ -2399,6 +2577,7 @@ export interface components {
         LedgerTransactionEntry: {
             ledger_account: components["schemas"]["LedgerAccountRef"];
             amount: components["schemas"]["Amount"];
+            balance_before: components["schemas"]["Amount"];
             balance_after: components["schemas"]["Amount"];
         };
         LedgerTransaction: {
@@ -2410,7 +2589,13 @@ export interface components {
             actor: components["schemas"]["AccountRef"] | null;
             reason: string;
             created_at: components["schemas"]["Timestamp"];
+            /** @description 关联对象的一句话摘要（调用的模型与渠道、C2C 卖单与交易的数量与单价、账户的用户名）。 */
+            related_summary: string | null;
             entries: components["schemas"]["LedgerTransactionEntry"][];
+            /** @description 仅详情接口返回：调用类交易记录的价格快照；其他为 null。 */
+            price_snapshot?: components["schemas"]["PriceSnapshot"] | null;
+            /** @description 仅详情接口返回：交易涉及用户最近的人工操作（审计），最多 10 条。 */
+            recent_actions?: components["schemas"]["AuditEntry"][];
         };
         LedgerTransactionPage: {
             items: components["schemas"]["LedgerTransaction"][];
@@ -2569,11 +2754,11 @@ export interface components {
         tag: string;
         /** @description API 格式。 */
         format: components["schemas"]["Format"];
-        /** @description 聚合维度。 */
-        groupBy: "day" | "model" | "key" | "tag";
+        /** @description 聚合维度；channel 仅在 view=revenue 时有效。 */
+        groupBy: "day" | "model" | "key" | "tag" | "channel";
         /** @description 交易类型。 */
         transactionType: components["schemas"]["TransactionType"];
-        /** @description json（默认）或 csv（Feature G）。 */
+        /** @description json（默认）或 csv。 */
         exportFormat: "json" | "csv";
         /** @description 账户状态。 */
         accountStatus: components["schemas"]["AccountStatus"];
@@ -2597,6 +2782,30 @@ export interface components {
         targetID: string;
         /** @description 操作者账户 ID。 */
         actorID: string;
+        /** @description 请求 ID，精确匹配。 */
+        requestID: string;
+        /** @description 总耗时下限（毫秒，含）。 */
+        minDurationMs: number;
+        /** @description 总耗时上限（毫秒，含）。 */
+        maxDurationMs: number;
+        /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+        minTokens: number;
+        /** @description 总 tokens 上限（含）。 */
+        maxTokens: number;
+        /** @description 实际扣除（费用 + 手续费）下限（含）。 */
+        minCost: components["schemas"]["Amount"];
+        /** @description 实际扣除（费用 + 手续费）上限（含）。 */
+        maxCost: components["schemas"]["Amount"];
+        /** @description spend 为我的消费（默认）；revenue 为我的渠道收入。 */
+        usageView: "spend" | "revenue";
+        /** @description 汇总方式：day 或 key；省略则不返回 summary。 */
+        pointsGroup: "day" | "key";
+        /** @description 走势时间窗（天），7、30 或 90。 */
+        trendDays: 7 | 30 | 90;
+        /** @description 关联对象类型，需与 related_id 同时给出。 */
+        relatedType: "call" | "c2c_order" | "c2c_trade" | "account";
+        /** @description 关联对象 ID。 */
+        relatedID: string;
         /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
         "Idempotency-Key": string;
     };
@@ -3295,6 +3504,22 @@ export interface operations {
     listCalls: {
         parameters: {
             query?: {
+                /** @description 请求 ID，精确匹配。 */
+                request_id?: components["parameters"]["requestID"];
+                /** @description 总耗时下限（毫秒，含）。 */
+                min_duration_ms?: components["parameters"]["minDurationMs"];
+                /** @description 总耗时上限（毫秒，含）。 */
+                max_duration_ms?: components["parameters"]["maxDurationMs"];
+                /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+                min_tokens?: components["parameters"]["minTokens"];
+                /** @description 总 tokens 上限（含）。 */
+                max_tokens?: components["parameters"]["maxTokens"];
+                /** @description 实际扣除（费用 + 手续费）下限（含）。 */
+                min_cost?: components["parameters"]["minCost"];
+                /** @description 实际扣除（费用 + 手续费）上限（含）。 */
+                max_cost?: components["parameters"]["maxCost"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
                 /** @description 模型名。 */
                 model?: components["parameters"]["modelQuery"];
                 /** @description 结果分类。 */
@@ -3332,12 +3557,20 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     streamCalls: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3353,9 +3586,9 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getCall: {
@@ -3379,16 +3612,20 @@ export interface operations {
                     "application/json": components["schemas"]["CallDetailEnvelope"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getUsage: {
         parameters: {
             query?: {
-                /** @description 聚合维度。 */
+                /** @description spend 为我的消费（默认）；revenue 为我的渠道收入。 */
+                view?: components["parameters"]["usageView"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 聚合维度；channel 仅在 view=revenue 时有效。 */
                 group_by?: components["parameters"]["groupBy"];
                 /** @description 开始时间（含）。 */
                 from?: components["parameters"]["from"];
@@ -3419,7 +3656,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getChannelStats: {
@@ -3448,15 +3684,27 @@ export interface operations {
                     "application/json": components["schemas"]["ChannelStats"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listChannelCalls: {
         parameters: {
             query?: {
+                /** @description API 格式。 */
+                format?: components["parameters"]["format"];
+                /** @description 请求 ID，精确匹配。 */
+                request_id?: components["parameters"]["requestID"];
+                /** @description 总耗时下限（毫秒，含）。 */
+                min_duration_ms?: components["parameters"]["minDurationMs"];
+                /** @description 总耗时上限（毫秒，含）。 */
+                max_duration_ms?: components["parameters"]["maxDurationMs"];
+                /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+                min_tokens?: components["parameters"]["minTokens"];
+                /** @description 总 tokens 上限（含）。 */
+                max_tokens?: components["parameters"]["maxTokens"];
                 /** @description 模型名。 */
                 model?: components["parameters"]["modelQuery"];
                 /** @description 结果分类。 */
@@ -3492,12 +3740,16 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     streamChannelCalls: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+            };
             header?: never;
             path: {
                 /** @description 渠道 ID。 */
@@ -3516,15 +3768,20 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getPoints: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3540,6 +3797,7 @@ export interface operations {
                     "application/json": components["schemas"]["Points"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
@@ -3547,6 +3805,8 @@ export interface operations {
     listPointsEntries: {
         parameters: {
             query?: {
+                /** @description 汇总方式：day 或 key；省略则不返回 summary。 */
+                group?: components["parameters"]["pointsGroup"];
                 /** @description 交易类型。 */
                 type?: components["parameters"]["transactionType"];
                 /** @description API Key ID。 */
@@ -3559,7 +3819,7 @@ export interface operations {
                 cursor?: components["parameters"]["cursor"];
                 /** @description 每页条数，1～100，默认 20。 */
                 limit?: components["parameters"]["limit"];
-                /** @description json（默认）或 csv（Feature G）。 */
+                /** @description json（默认）或 csv。 */
                 format?: components["parameters"]["exportFormat"];
             };
             header?: never;
@@ -3575,6 +3835,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PointsEntryPage"];
+                    "text/csv": string;
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -4492,12 +4753,25 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listAdminCalls: {
         parameters: {
             query?: {
+                /** @description 请求 ID，精确匹配。 */
+                request_id?: components["parameters"]["requestID"];
+                /** @description 总耗时下限（毫秒，含）。 */
+                min_duration_ms?: components["parameters"]["minDurationMs"];
+                /** @description 总耗时上限（毫秒，含）。 */
+                max_duration_ms?: components["parameters"]["maxDurationMs"];
+                /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+                min_tokens?: components["parameters"]["minTokens"];
+                /** @description 总 tokens 上限（含）。 */
+                max_tokens?: components["parameters"]["maxTokens"];
+                /** @description 实际扣除（费用 + 手续费）下限（含）。 */
+                min_cost?: components["parameters"]["minCost"];
+                /** @description 实际扣除（费用 + 手续费）上限（含）。 */
+                max_cost?: components["parameters"]["maxCost"];
                 /** @description 模型名。 */
                 model?: components["parameters"]["modelQuery"];
                 /** @description 结果分类。 */
@@ -4539,12 +4813,22 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     streamAdminCalls: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 账户 ID。 */
+                account_id?: components["parameters"]["accountIDQuery"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4560,14 +4844,17 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getAdminPoints: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 走势时间窗（天），7、30 或 90。 */
+                days?: components["parameters"]["trendDays"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4583,14 +4870,18 @@ export interface operations {
                     "application/json": components["schemas"]["AdminPoints"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listAdminLedgerTransactions: {
         parameters: {
             query?: {
+                /** @description 关联对象类型，需与 related_id 同时给出。 */
+                related_type?: components["parameters"]["relatedType"];
+                /** @description 关联对象 ID。 */
+                related_id?: components["parameters"]["relatedID"];
                 /** @description 交易类型。 */
                 type?: components["parameters"]["transactionType"];
                 /** @description 账户 ID。 */
@@ -4622,7 +4913,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getAdminLedgerTransaction: {
@@ -4646,10 +4936,10 @@ export interface operations {
                     "application/json": components["schemas"]["LedgerTransactionEnvelope"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     repairAdminLedgerCall: {
@@ -4683,7 +4973,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     proxyOpenAIChat: {
