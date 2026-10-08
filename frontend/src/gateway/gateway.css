@@ -35,7 +35,6 @@
 .pending-copy { display: grid; gap: 2px; min-width: 0; }
 .pending-copy strong, .pending-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pending-copy small { color: var(--muted); font-size: var(--text-xs); }
-.pending-partial { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-5); border-top: 1px solid var(--hairline); color: var(--muted); font-size: var(--text-sm); }
 
 /* Key 详情 */
 .key-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }

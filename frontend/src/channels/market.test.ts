@@ -8,13 +8,13 @@ import {
 describe('market filters', () => {
   it('reads model, protocol, owner and sort from the URL', () => {
     const filters = filtersFromParams(
-      new URLSearchParams('model=openai%2Fgpt-5&protocol=openai_responses&owner=ann&sort=rating'),
+      new URLSearchParams('model=openai%2Fgpt-5&protocol=openai_responses&owner=ann&sort=success_rate'),
     )
     expect(filters).toEqual({
       modelID: 'openai/gpt-5',
       protocol: 'openai_responses',
       owner: 'ann',
-      sort: 'rating',
+      sort: 'success_rate',
     })
     expect(hasActiveFilters(filters)).toBe(true)
   })

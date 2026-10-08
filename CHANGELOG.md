@@ -4,6 +4,14 @@
 
 ## 未发布
 
+### 变更
+
+- 工作台待处理事项改由后端单一聚合接口提供（Feature #160，Epic #158）：新增 `GET /api/dashboard/pending-items`，服务端按当前用户一次计算待放行 / 待付款的 C2C 交易（只看交易买卖双方身份与状态）、校验失败与已暂停的渠道、含不可用渠道的路由和只有一个渠道的路由，不再受“最近 100 笔调用”分页限制；前端删除 `pendingDerive.ts` 的多接口拼接推导，只渲染接口返回的条目。
+
+### 移除
+
+- 删除渠道 1～5 分评分（Feature #160，Epic #158）：删除 `PUT /api/market/channels/{channelID}/rating`、市场 / 渠道 / 管理员响应中的 `average_rating`、`rating_count`、`current_user_rating` 字段和 `rating` 排序选项，以及市场列表、公开渠道详情、共享者与管理员渠道页的评分展示和 `MarketRating` 组件；迁移 `0010_remove_channel_ratings.sql` 删除 `channel_ratings` 表，已有评分数据随迁移删除。工作台不再有“待评分”事项。
+
 ## v0.5.0 - 2026-10-07
 
 ### 新增

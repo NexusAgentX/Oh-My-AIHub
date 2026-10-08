@@ -359,7 +359,7 @@ func TestChannelIntegration(t *testing.T) {
 	if _, _, err := service.ListMarket(ctx, consumer, channel.MarketQuery{Cursor: "not-a-market-cursor", Limit: 1}); !errors.Is(err, channel.ErrInvalidInput) {
 		t.Fatalf("malformed market cursor error = %v", err)
 	}
-	if _, _, err := service.ListMarket(ctx, consumer, channel.MarketQuery{Cursor: cursor, Sort: "rating", Limit: 1}); !errors.Is(err, channel.ErrInvalidInput) {
+	if _, _, err := service.ListMarket(ctx, consumer, channel.MarketQuery{Cursor: cursor, Sort: "output_price", Limit: 1}); !errors.Is(err, channel.ErrInvalidInput) {
 		t.Fatalf("market cursor reused across sort error = %v", err)
 	}
 	currentForCursor, err := service.GetMine(ctx, owner, created.ID)
@@ -426,39 +426,6 @@ func TestChannelIntegration(t *testing.T) {
 		t.Fatalf("validation completion audit count = %d", completedAuditCount)
 	}
 
-	type ratingResult struct {
-		channel channel.Channel
-		err     error
-	}
-	ratingResults := make(chan ratingResult, 2)
-	ratingStart := make(chan struct{})
-	for _, input := range []struct {
-		actor identity.Account
-		score int
-	}{{owner, 5}, {consumer, 3}} {
-		input := input
-		go func() {
-			<-ratingStart
-			value, rateErr := service.Rate(context.Background(), input.actor, created.ID, input.score)
-			ratingResults <- ratingResult{channel: value, err: rateErr}
-		}()
-	}
-	close(ratingStart)
-	observedRatingCounts := map[int64]bool{}
-	for range 2 {
-		result := <-ratingResults
-		if result.err != nil {
-			t.Fatal(result.err)
-		}
-		observedRatingCounts[result.channel.RatingCount] = true
-	}
-	if !observedRatingCounts[1] || !observedRatingCounts[2] {
-		t.Fatalf("concurrent rating responses did not serialize: %#v", observedRatingCounts)
-	}
-	rated, err := service.GetMarketChannel(ctx, consumer, created.ID)
-	if err != nil || rated.AverageRating == nil || *rated.AverageRating != "4.00" || rated.RatingCount != 2 {
-		t.Fatalf("ratings = %+v, %v", rated, err)
-	}
 	paused, err := service.SetStatus(ctx, owner, created.ID, updatedChannel.Version, channel.StatusPaused, "")
 	if err != nil {
 		t.Fatal(err)
@@ -474,8 +441,8 @@ func TestChannelIntegration(t *testing.T) {
 		t.Fatalf("disable consumer: %+v, %v", consumerDisabled, err)
 	}
 	ownerView, err := service.GetMine(ctx, owner, created.ID)
-	if err != nil || ownerView.RatingCount != 2 {
-		t.Fatalf("disabled rater disappeared: %+v, %v", ownerView, err)
+	if err != nil {
+		t.Fatalf("owner view after consumer disabled: %+v, %v", ownerView, err)
 	}
 	pausedOwnerOffer := findOffer(t, ownerView.Offers, created.Offers[0].ID)
 	if pausedOwnerOffer.Eligible || pausedOwnerOffer.IneligibleReason != "channel_unpublished" {

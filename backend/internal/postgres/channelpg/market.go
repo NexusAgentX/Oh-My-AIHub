@@ -19,15 +19,13 @@ import (
 // issued for (sort, model, protocol and owner filter), so a cursor cannot be
 // replayed against a different listing.
 type marketCursor struct {
-	Sort        string           `json:"sort"`
-	ModelID     string           `json:"model_id,omitempty"`
-	Protocol    channel.Protocol `json:"protocol,omitempty"`
-	OwnerQuery  string           `json:"owner,omitempty"`
-	OfferID     string           `json:"offer_id"`
-	PriceNano   int64            `json:"price_nano,omitempty"`
-	Rating      *string          `json:"rating,omitempty"`
-	RatingCount int64            `json:"rating_count,omitempty"`
-	Metric      *string          `json:"metric,omitempty"`
+	Sort       string           `json:"sort"`
+	ModelID    string           `json:"model_id,omitempty"`
+	Protocol   channel.Protocol `json:"protocol,omitempty"`
+	OwnerQuery string           `json:"owner,omitempty"`
+	OfferID    string           `json:"offer_id"`
+	PriceNano  int64            `json:"price_nano,omitempty"`
+	Metric     *string          `json:"metric,omitempty"`
 }
 
 func encodeMarketCursor(value marketCursor) (string, error) {
@@ -56,7 +54,7 @@ func decodeMarketCursor(raw string, query channel.MarketQuery) (marketCursor, er
 
 func isMetricSort(sort string) bool { return sort == "success_rate" || sort == "ttft" || sort == "tps" }
 
-func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query channel.MarketQuery) ([]channel.MarketOffer, string, error) {
+func (s *Store) ListMarketOffers(ctx context.Context, query channel.MarketQuery) ([]channel.MarketOffer, string, error) {
 	cursor, err := decodeMarketCursor(query.Cursor, query)
 	if err != nil {
 		return nil, "", err
@@ -68,8 +66,6 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 	if cursor.OfferID != "" {
 		params.CursorOfferID = &cursor.OfferID
 		switch {
-		case query.Sort == "rating":
-			params.CursorMetric, params.CursorRatingCount = cursor.Rating, cursor.RatingCount
 		case isMetricSort(query.Sort):
 			params.CursorMetric = cursor.Metric
 		default:
@@ -90,12 +86,8 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 			InputPrice: money.FromNano(row.InputPriceNano), OutputPrice: money.FromNano(row.OutputPriceNano),
 			CacheWritePrice: money.FromNano(row.CacheWritePriceNano), CacheReadPrice: money.FromNano(row.CacheReadPriceNano),
 			ValidationStatus: channel.ValidationPassed, LastTestedAt: row.LastTestedAt,
-			RatingCount: row.RatingCount, CallSuccessRate: row.SuccessRate, TTFTMilliseconds: row.TtftMilliseconds,
+			CallSuccessRate: row.SuccessRate, TTFTMilliseconds: row.TtftMilliseconds,
 			TokensPerSecond: row.TokensPerSecond, CallCount: row.CallCount,
-		}
-		if row.AverageRating != "" {
-			value := row.AverageRating
-			item.AverageRating = &value
 		}
 		items = append(items, item)
 	}
@@ -117,7 +109,7 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 		last := items[query.Limit-1]
 		nextCursor := marketCursor{
 			Sort: query.Sort, ModelID: query.ModelID, Protocol: query.Protocol, OwnerQuery: query.OwnerQuery,
-			OfferID: last.OfferID, Rating: last.AverageRating, RatingCount: last.RatingCount,
+			OfferID: last.OfferID,
 		}
 		switch query.Sort {
 		case "output_price":
@@ -147,13 +139,13 @@ func (s *Store) ListMarketOffers(ctx context.Context, viewerID string, query cha
 	return items, next, nil
 }
 
-func (s *Store) GetMarketChannel(ctx context.Context, viewerID, channelID string) (channel.Channel, error) {
+func (s *Store) GetMarketChannel(ctx context.Context, channelID string) (channel.Channel, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return channel.Channel{}, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
-	result, err := getMarketChannel(ctx, tx, viewerID, channelID)
+	result, err := getMarketChannel(ctx, tx, channelID)
 	if err != nil {
 		return channel.Channel{}, err
 	}
@@ -165,8 +157,8 @@ func (s *Store) GetMarketChannel(ctx context.Context, viewerID, channelID string
 
 // getMarketChannel is the public view of a channel: only published or paused
 // channels, and only the offers that are currently routable.
-func getMarketChannel(ctx context.Context, db DBTX, viewerID, channelID string) (channel.Channel, error) {
-	result, err := loadChannel(ctx, db, channelID, viewerID)
+func getMarketChannel(ctx context.Context, db DBTX, channelID string) (channel.Channel, error) {
+	result, err := loadChannel(ctx, db, channelID)
 	if err != nil {
 		return channel.Channel{}, err
 	}

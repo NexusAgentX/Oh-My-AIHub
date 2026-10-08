@@ -66,6 +66,7 @@ export type GatewayAttemptStatus = GatewayAttempt['status']
 export type GatewayCall = Schemas['GatewayCall']
 export type GatewayCallStatus = GatewayCall['status']
 export type GatewayDashboard = Schemas['Dashboard']
+export type PendingItem = Schemas['PendingItem']
 
 export type C2CPaymentMethod = Schemas['C2CPaymentMethod']
 export type C2CPaymentMethodRequest = Schemas['C2CPaymentMethodRequest']

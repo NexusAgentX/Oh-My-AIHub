@@ -23,7 +23,7 @@ import {
   useValidateOffer,
   useValidationAttemptsQuery,
 } from './adminQueries'
-import { formatDate, protocolLabels, ratingText } from '../gateway/presentation'
+import { formatDate, protocolLabels } from '../gateway/presentation'
 
 type Action = { kind: 'validate'; offer: AdminChannelOffer } | { kind: 'pause' | 'delete' }
 
@@ -116,7 +116,6 @@ export function AdminChannelPage() {
               <dl className="admin-channel-facts">
                 <div><dt>共享者</dt><dd>{channel.owner_display_name}</dd></div>
                 <div><dt>凭据</dt><dd>{channel.credential_configured ? `已配置 · v${channel.credential_version}` : '未配置'}</dd></div>
-                <div><dt>评分</dt><dd>{ratingText(channel.average_rating, channel.rating_count)}</dd></div>
                 <div><dt>最近更新</dt><dd>{formatDate(channel.updated_at)}</dd></div>
               </dl>
             </Card>
