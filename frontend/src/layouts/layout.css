@@ -1,5 +1,5 @@
 /* 应用外壳：侧边栏 + 顶栏 + 内容区 + 移动端底部 Tab 栏 */
-.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: var(--soft); }
+.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: linear-gradient(to right, var(--canvas) var(--sidebar-width), var(--soft) 0); }
 
 .skip-link {
   position: absolute;
@@ -220,7 +220,7 @@
 }
 
 @media (max-width: 767px) {
-  .app-shell { display: block; }
+  .app-shell { display: block; background: var(--soft); }
   .sidebar { display: none; }
   .topbar { height: 56px; padding-inline: var(--space-4); }
   .topbar-brand { display: block; }

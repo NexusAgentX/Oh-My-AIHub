@@ -66,7 +66,7 @@ export function StartCard() {
           </div>
         ) : defaultKey ? (
           <div className="copy-field">
-            <span className="copy-field-label">默认 Key · {defaultKey.name}</span>
+            <span className="copy-field-label">{defaultKey.name === '默认 Key' ? '默认 Key' : `默认 Key · ${defaultKey.name}`}</span>
             <div className="copy-field-row">
               <code className={`copy-field-value ${secret ? '' : 'copy-field-masked'}`}>
                 {secret ?? `${defaultKey.prefix}••••••••`}

@@ -1,5 +1,7 @@
 /* 首页 */
 .start-card .panel-body { display: grid; gap: var(--space-4); }
+.start-card .panel-body > *,
+.tabs { min-width: 0; }
 .start-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .start-key-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: 4px; font-size: var(--text-sm); }
 .code-sample { position: relative; }
