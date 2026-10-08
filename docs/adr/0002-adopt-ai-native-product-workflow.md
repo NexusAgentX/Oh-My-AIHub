@@ -1,6 +1,6 @@
 # ADR-0002：采用人类定向、AI 执行的持续产品研发模型
 
-- 状态：已通过（设计阶段及资产要求由 ADR-0015 取代）
+- 状态：已通过（设计阶段及资产要求由 ADR-0015 取代；Done/Validated 分离与真实用户验证要求由 [ADR-0022](0022-drop-user-validation-stage.md) 取代）
 - 日期：2026-09-01
 - 决策者：项目维护者
 - 关联内容：Epic #3、Feature #4、`AGENTS.md`
