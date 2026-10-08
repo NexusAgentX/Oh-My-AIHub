@@ -1,5 +1,0 @@
-.break-value { max-width: 70ch; overflow-wrap: anywhere; }
-.tier-count-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: var(--radius-xs); color: var(--ink); background: var(--positive-soft); font-size: var(--text-2xs); font-weight: 500; white-space: nowrap; }
-.tier-price-list { display: grid; gap: var(--space-1); margin: 6px 0 0; padding: 0; list-style: none; }
-.tier-price-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: 4px 8px; border: 1px solid var(--hairline); border-radius: var(--radius-xs); background: var(--soft); }
-.tier-price-list .tier-condition { color: var(--muted); font-size: var(--text-xs); }

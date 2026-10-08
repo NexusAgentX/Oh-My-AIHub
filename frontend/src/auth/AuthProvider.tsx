@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const current = await api.session()
+      const current = await api.me()
       setAccount(current)
       setSessionError('')
       return current
