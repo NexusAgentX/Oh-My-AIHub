@@ -13,13 +13,6 @@ func partyResponse(p c2c.Party) map[string]any {
 	return map[string]any{"id": p.ID, "display_name": p.DisplayName}
 }
 
-func nullableAmount(a *money.Amount) any {
-	if a == nil {
-		return nil
-	}
-	return a.String()
-}
-
 func methodsResponse(methods []c2c.PaymentMethod) []map[string]string {
 	items := make([]map[string]string, 0, len(methods))
 	for _, method := range methods {
@@ -77,16 +70,6 @@ func writePage[T any](w http.ResponseWriter, page c2c.Page[T], item func(T) map[
 		next = &page.Next
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
-}
-
-// pathUUID returns a UUID path value, answering 404 for anything else.
-func pathUUID(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
-	id := r.PathValue(name)
-	if !uuidPattern.MatchString(id) {
-		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
-		return "", false
-	}
-	return id, true
 }
 
 func clientIdempotencyKey(w http.ResponseWriter, r *http.Request) (string, bool) {

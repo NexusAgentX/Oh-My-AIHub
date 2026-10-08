@@ -6,11 +6,15 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -25,6 +29,11 @@ type Dependencies struct {
 	Ledger            *ledger.Service
 	Settings          *settings.Service
 	Audit             *audit.Service
+	Keys              *apikey.Service
+	Channels          *channel.Service
+	Routing           routing.Store
+	Gateway           *gateway.Engine
+	Browse            gateway.Browse
 	C2C               *c2c.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
@@ -37,6 +46,11 @@ type app struct {
 	ledger            *ledger.Service
 	settings          *settings.Service
 	audit             *audit.Service
+	keys              *apikey.Service
+	channels          *channel.Service
+	routing           routing.Store
+	gateway           *gateway.Engine
+	browse            gateway.Browse
 	c2c               *c2c.Service
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
@@ -59,6 +73,11 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		ledger:            dependencies.Ledger,
 		settings:          dependencies.Settings,
 		audit:             dependencies.Audit,
+		keys:              dependencies.Keys,
+		channels:          dependencies.Channels,
+		routing:           dependencies.Routing,
+		gateway:           dependencies.Gateway,
+		browse:            dependencies.Browse,
 		c2c:               dependencies.C2C,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
@@ -74,6 +93,10 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerAdminAccountRoutes(routes)
 	application.registerAdminModelRoutes(routes)
 	application.registerAdminSettingsRoutes(routes)
+	application.registerKeyRoutes(routes)
+	application.registerBrowseRoutes(routes)
+	application.registerChannelRoutes(routes)
+	application.registerGatewayRoutes(routes)
 	application.registerC2CRoutes(routes)
 	registerPlannedRoutes(routes)
 

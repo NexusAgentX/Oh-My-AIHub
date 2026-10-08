@@ -9,10 +9,10 @@
 | Feature | 内容 | 状态 |
 | --- | --- | --- |
 | A [#171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171) | 新基线迁移、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置、审计、用户积分基础接口 | 已实现 |
-| B [#172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172) | 透明网关、渠道、API Key 与路由、首页 | 待实现（接口返回 501） |
+| B [#172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172) | 透明网关、渠道、API Key 与路由、首页 | 已实现 |
 | C [#173](https://github.com/NexusAgentX/Oh-My-AIHub/issues/173) | C2C 卖单市场与仲裁 | 已实现 |
-| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；依赖 B/G 接口的区块在其合并前显示 501 错误态） |
-| E [#175](https://github.com/NexusAgentX/Oh-My-AIHub/issues/175) | 管理后台与落地页 | 已实现（依赖 B/G 接口的区块在其合并前显示 501 错误态） |
+| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；依赖 G 接口的区块在其合并前显示 501 错误态） |
+| E [#175](https://github.com/NexusAgentX/Oh-My-AIHub/issues/175) | 管理后台与落地页 | 已实现（依赖 G 接口的区块在其合并前显示 501 错误态） |
 | G [#176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176) | 调用与积分可观测性 | 待实现（接口返回 501） |
 | F [#177](https://github.com/NexusAgentX/Oh-My-AIHub/issues/177) | 文档收尾、发版与生产重建 | 待实现 |
 
@@ -74,7 +74,7 @@ Oh-My-AIHub 是受邀小圈子使用的「**API 市场 + 积分 C2C 市场**」�
 
 手续费率（默认 0.1%）、C2C 付款超时（默认 30 分钟）、新账户默认信用额度（默认 0）、默认最大尝试次数（3）、默认首字超时（30 秒）、默认总超时（10 分钟）、默认冷却阈值（连续 3 次失败）与冷却时长（300 秒）、额外出站禁用主机。修改写审计。
 
-### 网关、渠道、Key 与路由（目标要求，Feature B）
+### 网关、渠道、Key 与路由（Feature B 已实现）
 
 - 四种原生格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini；不做格式转换。渠道的每个模型声明支持的格式（按模型族预选 + 「测试格式」自动修正）；网关按请求路径识别格式，只选支持该格式的渠道。平台自己回答 `GET /v1/models` 与 `GET /v1beta/models`；其他路径返回「不支持的接口」。不做向量、图片、语音、Realtime。
 - 透明转发只做四件事：换鉴权（放在客户端原来的位置）、换 User-Agent（渠道可选）、按渠道规则设置/覆写/删除请求头、把请求体顶层 `model` 换成渠道的上游名称（字节级替换）。唯一例外：OpenAI Chat 流式请求补 `stream_options.include_usage=true`。响应全部原样返回。

@@ -94,3 +94,15 @@ func ceilNonNegative(numerator, denominator *big.Int) (int64, error) {
 	}
 	return quotient.Int64(), nil
 }
+
+// ScalePrice multiplies a per-million price by a channel multiplier (1e9 = 1x)
+// for display, truncating below one nano and clamping at the representable
+// maximum. Billing never uses it: CalculatePriceV2 rounds up on the total.
+func ScalePrice(price money.Amount, multiplierNano int64) money.Amount {
+	scaled := new(big.Int).Mul(big.NewInt(price.Nano()), big.NewInt(multiplierNano))
+	scaled.Quo(scaled, big.NewInt(FixedPointScale))
+	if !scaled.IsInt64() {
+		return money.FromNano(math.MaxInt64)
+	}
+	return money.FromNano(scaled.Int64())
+}

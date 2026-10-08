@@ -142,10 +142,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 首页
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 首页 */
         get: operations["getHome"];
         put?: never;
         post?: never;
@@ -162,10 +159,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 可用模型列表
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 可用模型列表 */
         get: operations["listModels"];
         put?: never;
         post?: never;
@@ -182,10 +176,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 模型详情、渠道与我的路由
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 模型详情、渠道与我的路由 */
         get: operations["getModel"];
         put?: never;
         post?: never;
@@ -206,8 +197,6 @@ export interface paths {
         /**
          * 设置账号级路由
          * @description 对该用户所有未单独设置路由的 Key 生效。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         put: operations["setRouting"];
         post?: never;
@@ -224,17 +213,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 我的 API Key
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 我的 API Key */
         get: operations["listKeys"];
         put?: never;
         /**
          * 创建 API Key
          * @description 每个用户最多 20 把未删除的 Key（超过返回 409 key_limit_reached）。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["createKey"];
         delete?: never;
@@ -250,24 +234,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * API Key 详情
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** API Key 详情 */
         get: operations["getKey"];
         put?: never;
         post?: never;
-        /**
-         * 删除 API Key
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 删除 API Key */
         delete: operations["deleteKey"];
         options?: never;
         head?: never;
-        /**
-         * 修改 API Key
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 修改 API Key */
         patch: operations["updateKey"];
         trace?: never;
     };
@@ -281,8 +256,6 @@ export interface paths {
         /**
          * 复制完整 Key
          * @description 每次读取写入审计（查看 API Key 明文）。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         get: operations["getKeySecret"];
         put?: never;
@@ -301,16 +274,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * 设置该 Key 的单独路由
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 设置该 Key 的单独路由 */
         put: operations["setKeyRouting"];
         post?: never;
-        /**
-         * 删除该 Key 的单独路由
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 删除该 Key 的单独路由 */
         delete: operations["deleteKeyRouting"];
         options?: never;
         head?: never;
@@ -324,16 +291,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 我的渠道
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 我的渠道 */
         get: operations["listChannels"];
         put?: never;
-        /**
-         * 添加渠道
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 添加渠道 */
         post: operations["createChannel"];
         delete?: never;
         options?: never;
@@ -353,8 +314,6 @@ export interface paths {
         /**
          * 读取上游模型列表并匹配目录
          * @description Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["discoverChannel"];
         delete?: never;
@@ -370,25 +329,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 渠道详情
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 渠道详情 */
         get: operations["getChannel"];
         put?: never;
         post?: never;
-        /**
-         * 删除渠道
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 删除渠道 */
         delete: operations["deleteChannel"];
         options?: never;
         head?: never;
         /**
          * 修改渠道
          * @description 被管理员强制下架的渠道不能由所有者重新上架（409）。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         patch: operations["updateChannel"];
         trace?: never;
@@ -405,8 +356,6 @@ export interface paths {
         /**
          * 按模型逐个格式测试
          * @description 会向上游发出真实请求，可能产生少量费用。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["testChannel"];
         delete?: never;
@@ -949,10 +898,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 全部渠道
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 全部渠道 */
         get: operations["listAdminChannels"];
         put?: never;
         post?: never;
@@ -969,10 +915,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 渠道详情
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 渠道详情 */
         get: operations["getAdminChannel"];
         put?: never;
         post?: never;
@@ -991,10 +934,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 强制下架
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 强制下架 */
         post: operations["suspendAdminChannel"];
         delete?: never;
         options?: never;
@@ -1011,10 +951,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 恢复
-         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 恢复 */
         post: operations["unsuspendAdminChannel"];
         delete?: never;
         options?: never;
@@ -1208,8 +1145,6 @@ export interface paths {
         /**
          * OpenAI Chat Completions
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyOpenAIChat"];
         delete?: never;
@@ -1230,8 +1165,6 @@ export interface paths {
         /**
          * OpenAI Responses
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyOpenAIResponses"];
         delete?: never;
@@ -1252,8 +1185,6 @@ export interface paths {
         /**
          * Anthropic Messages
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyAnthropicMessages"];
         delete?: never;
@@ -1274,8 +1205,6 @@ export interface paths {
         /**
          * Gemini generateContent / streamGenerateContent
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyGemini"];
         delete?: never;
@@ -1294,8 +1223,6 @@ export interface paths {
         /**
          * OpenAI / Anthropic 风格模型列表
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         get: operations["listGatewayModels"];
         put?: never;
@@ -1316,8 +1243,6 @@ export interface paths {
         /**
          * Gemini 风格模型列表
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
-         *
-         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         get: operations["listGeminiModels"];
         put?: never;
@@ -1931,6 +1856,7 @@ export interface components {
             status?: "listed" | "unlisted";
             /** @description 提供时整组替换。 */
             models?: components["schemas"]["ChannelModelInput"][];
+            /** @description 提供时整块替换高级设置；省略或为 null 的字段恢复平台默认。 */
             advanced?: components["schemas"]["ChannelAdvancedInput"];
         };
         ChannelTestRequest: {
@@ -2868,7 +2794,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listModels: {
@@ -2891,7 +2816,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getModel: {
@@ -2918,7 +2842,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     setRouting: {
@@ -2951,7 +2874,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listKeys: {
@@ -2974,7 +2896,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     createKey: {
@@ -3004,7 +2925,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getKey: {
@@ -3031,7 +2951,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     deleteKey: {
@@ -3057,7 +2976,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     updateKey: {
@@ -3090,7 +3008,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getKeySecret: {
@@ -3117,7 +3034,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     setKeyRouting: {
@@ -3152,7 +3068,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     deleteKeyRouting: {
@@ -3180,7 +3095,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listChannels: {
@@ -3203,7 +3117,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     createChannel: {
@@ -3232,7 +3145,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     discoverChannel: {
@@ -3261,7 +3173,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
             502: components["responses"]["BadGateway"];
         };
     };
@@ -3289,7 +3200,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     deleteChannel: {
@@ -3315,7 +3225,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     updateChannel: {
@@ -3349,7 +3258,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     testChannel: {
@@ -3382,7 +3290,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listCalls: {
@@ -4408,7 +4315,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getAdminChannel: {
@@ -4435,7 +4341,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     suspendAdminChannel: {
@@ -4469,7 +4374,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     unsuspendAdminChannel: {
@@ -4503,7 +4407,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listAdminDisputes: {

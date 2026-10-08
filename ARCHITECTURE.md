@@ -1,6 +1,6 @@
 # 架构说明
 
-> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature C（#173）已交付 C2C 卖单市场；网关、渠道、Key 与观测接口已在契约中定义并返回 501，由后续 Feature 实现。
+> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature B（#172）已交付透明网关、渠道、API Key、路由、模型浏览与首页；Feature C（#173）已交付 C2C 卖单市场；Feature D（#174）、E（#175）已交付用户界面、管理后台与落地页；观测接口已在契约中定义并返回 501，由 Feature G 实现。
 
 本文档描述仓库当前真实存在的系统结构，再单独列出已确认但尚未实现的目标约束。不得把目标约束当作当前代码能力。
 
@@ -32,9 +32,9 @@
 | --- | --- | --- |
 | 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。外壳为 `src/layouts/`：桌面左侧分组侧栏（使用 API / 共享 / 积分，底部账户菜单与余额），<768px 为顶部条 + 底部 5 个 Tab（首页、模型、渠道、积分、我的）。用户页面按领域分目录，查询在各自 `queries.ts`，类型来自 `schema.gen.ts`：`home/`（`/home`）、`models/`（`/models`、`/models/:model`，含账号级与 Key 级共用的路由编辑器）、`keys/`（`/keys` 与抽屉）、`usage/`（`/usage`）、`channels/`（`/channels`、`/channels/new` 三步向导、`/channels/:id`）、`points/`（`/points` 各 Tab、`/points/trades/:id`、买卖抽屉）、`account/`（`/account`、移动端 `/me`）。`src/calls/` 是调用观测的共享组件（列表、筛选、汇总、SSE 实时 hook、调用详情抽屉与尝试时间线），按接口路径参数化，供用户用量、渠道编辑页与管理后台复用。依赖尚未实现（501）接口的区块显示可重试的错误态。实例初始化、登录与首次改密沿用原流程。公开落地页在 `src/welcome/`（已登录访问 `/` 跳到 `/home`）。管理后台在 `src/admin/`（Feature E）：自带外壳 `AdminFrame`（复用 `layout.css` 的侧栏与底部 Tab 样式，移动端前 4 项进 Tab、其余进「更多」）与 `RequireAdmin` 门禁，`/admin` 下有概览、调用、积分、用户、模型、渠道、申诉、设置 8 页；查询与写操作集中在 `admin/api.ts` 与 `admin/queries.ts`（写成功后失效 `['admin']` 前缀），调用页复用 `src/calls/`，需要原因的操作统一用两步确认对话框，一次性密码关闭即丢弃 |
 | 后端 | `backend/` | Go `net/http` 服务。`cmd/server` 组装服务并在启动时校验 `UPSTREAM_CREDENTIAL_*`、`UPSTREAM_*` 出站配置与 `C2C_PRIVATE_DATA_*` 密钥环；`cmd/migrate` 执行迁移 |
-| API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是唯一契约（ADR-0021），定义约 70 个 JSON 接口与 6 个外部模型 API 入口；`x-access` 声明门禁，`x-feature` 标明负责实现的 Feature。`internal/api` 的 `router` 按 access 包裹会话、首次改密与管理员门禁；未实现的路由经 `planned` 注册，保留门禁并返回 `501 {"error":"not_implemented"}`。契约测试逐项对照路由表、门禁、Feature 与实现状态，并用规范 schema 校验每个真实响应。前端类型由它生成为已提交的 `frontend/src/api/schema.gen.ts` |
+| API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是唯一契约（ADR-0021），定义约 70 个 JSON 接口与 6 个外部模型 API 入口；`x-access` 声明门禁，`x-feature` 标明负责实现的 Feature。`internal/api` 的 `router` 按 access 包裹会话、首次改密与管理员门禁；已实现的路由经 `handle`（A）或 `feature`（B 起）注册，未实现的路由经 `planned` 注册，保留门禁并返回 `501 {"error":"not_implemented"}`。契约测试逐项对照路由表、门禁、Feature 与实现状态，并用规范 schema 校验每个真实响应。前端类型由它生成为已提交的 `frontend/src/api/schema.gen.ts` |
 | 数据库 | PostgreSQL 18 | 18 张表，见下文“数据与状态” |
-| 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 每个领域一个 `<domain>pg/`（`queries.sql` + sqlc 生成代码 + 领域 Store，ADR-0017）：`identitypg`、`catalogpg`、`settingspg`、`auditpg`、`ledgerpg`；共享事务辅助在 `pgkit`。组合根 `postgres.Store` 以字段持有各领域 Store。跨领域原子提交由调用方持有 `pgx.Tx`（ADR-0020）：创建账户在同一事务内写身份行、用户账本账户与审计；账本过账 `ledgerpg.Post(ctx, tx, …)` 总在调用方事务内执行 |
+| 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 每个领域一个 `<domain>pg/`（`queries.sql` + sqlc 生成代码 + 领域 Store，ADR-0017）：`identitypg`、`catalogpg`、`settingspg`、`auditpg`、`ledgerpg`、`channelpg`（渠道与健康事件）、`keypg`（API Key 与路由偏好）、`gatewaypg`（网关热路径：Key 查找、候选渠道、调用记录与记账、首页读取）；共享事务辅助在 `pgkit`。组合根 `postgres.Store` 以字段持有各领域 Store。跨领域原子提交由调用方持有 `pgx.Tx`（ADR-0020）：创建账户在同一事务内写身份行、用户账本账户与审计；账本过账 `ledgerpg.Post(ctx, tx, …)` 总在调用方事务内执行 |
 | 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 只有一份原地重写的基线 `0001_baseline.sql`（ADR-0024、ADR-0026） |
 | 开发任务 | `mise.toml` | 固定工具版本并提供安装、开发、测试、生成与构建命令 |
 | 容器编排 | `compose.yaml` | 运行 PostgreSQL、一次性迁移、后端与前端 |
@@ -50,7 +50,11 @@
 | `internal/settings` | 单行平台设置的校验与更新 |
 | `internal/audit` | 审计日志读取；写入由各领域在自己的事务内调用 `auditpg.Record` |
 | `internal/money` | 九位定点纳积分 `Amount` 与十进制字符串解析/格式化 |
-| `internal/channel` | 目前只保留上游凭据版本化密钥环（ADR-0009）与固定出站策略（HTTPS、DNS/IP 校验、端口白名单、禁用主机、禁止重定向）；渠道领域由 Feature B 在其上重建 |
+| `internal/channel` | 渠道领域：渠道与模型的校验（倍率 0～1000、四种格式、请求头规则不得触碰鉴权与分帧头）、创建/修改/软删除、上游 Key 加密（不回显）、`discover`（读取上游模型列表并按精确、去日期后缀、大小写不敏感匹配目录，按模型族预选格式）、`test`（四种格式最小请求，写回 `format_tests` 与可选的 `formats`）、管理员强制下架与恢复；以及上游凭据版本化密钥环（ADR-0009）与固定出站策略（HTTPS、DNS/IP 校验、端口白名单、禁用主机 + `settings.extra_blocked_hosts`、禁止重定向）。`Outbound` 接口让测试替换出站边界 |
+| `internal/apikey` | 平台 API Key：`sk-aih-` + 32 字节随机数，SHA-256 查找、凭据密钥环可逆加密（ADR-0028）；每人最多 20 把、首次访问首页惰性创建“默认 Key”、预算/可用模型/别名/过期时间校验、再次复制写审计 |
+| `internal/routing` | 每个用户每个模型的路由偏好（便宜/稳定/快速/手动、取消勾选、最大尝试次数、首字超时），账号级与 Key 级覆盖 |
+| `internal/gateway` | 透明网关（ADR-0027）：`bodyscan` 对顶层 JSON 做词法扫描与字节拼接（替换 `model`、补 `include_usage`）；`usage` 旁路读取四种格式的用量与流式指标；`rank` 按四种模式排序候选并处理粘性；`runtime` 保存进程内并发/RPM/冷却/连续失败/当日收入与 Key 花费缓存；`engine` 实现认证、模型解析、余额与预算检查、回退、原样回写、事后记账与 `slog` 日志；`events` 为非阻塞进程内事件总线；`models` 回答 `GET /v1/models` 与 `/v1beta/models` 并运行超时调用清理 |
+| `internal/localtime` | 记账日历：Asia/Shanghai 的自然日与自然月（预算窗口与“今日”统计） |
 | `internal/c2c` | C2C 卖单市场领域：词汇与错误（`types.go`）、纯状态机（`machine.go`：数量恒等式、各转换的前置检查与幂等判断、应付金额向上取整）、`Service`（输入校验、收款方式加解密与可见性、游标分页、超时任务入口）、C2C 私密数据密钥环 |
 | `internal/secretguard` | 凭据泄露检测辅助 |
 
@@ -60,7 +64,18 @@
 2. 开发环境由 Vite、Compose 环境由 Nginx 把 `/api`、`/v1`、`/v1beta` 代理到后端。
 3. 后端中间件链为“写超时 → 安全头 → 同源校验 → mux”；只对可信内部代理采信转发头，对非安全方法校验同源 `Origin`（`/v1`、`/v1beta` 外部入口除外）；路由层执行会话、首次改密与管理员门禁。
 4. 错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`。
-5. 外部模型 API 入口（`POST /v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/{model}`，`GET /v1/models`、`/v1beta/models`）已登记路由，当前返回 501。
+5. 外部模型 API 入口（`POST /v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/{model}:generateContent|:streamGenerateContent`，`GET /v1/models`、`/v1beta/models`）由 `internal/gateway` 处理，凭平台 API Key 认证（`Authorization: Bearer`、`x-api-key`、`x-goog-api-key` 或 `?key=`），不走会话与同源校验；其他 `/v1`、`/v1beta` 路径返回 404“不支持的接口”。
+
+## 网关一次请求
+
+1. **认证**：按 Key 的 SHA-256 查找；不存在/停用/过期/已删除返回 401，账号停用返回 403。认出 Key 之后每次调用都有一行 `calls`（先 `in_progress`，结束时更新），响应头 `X-AIHub-Request-Id`，平台错误正文含 `request_id`。
+2. **格式与模型**：路径决定格式；顶层 `model` 经 Key 别名与可用范围，再对照启用的目录模型（Gemini 的模型取自路径）。
+3. **余额与预算**：`余额 > −信用额度`，且 Key 的每日/每月/总额预算（窗口为 Asia/Shanghai 自然日与月，已用额从 `calls` 汇总后缓存并在记账后增量更新）未用完，否则 402；不预扣、不冻结。
+4. **排渠道**：候选是该模型 `listed`、格式匹配、所有者账号启用的渠道模型；去掉取消勾选的、冷却中、达到并发/RPM/当日收入上限的；按路由模式排序（自己的渠道视为 0 价最前；样本少于 20 次的成功率按平台中位数处理；手动模式未出现在列表中的渠道视为取消勾选）；Responses 的 `previous_response_id` 把上一轮渠道提到最前；取前 `max_attempts` 个。
+5. **转发**：URL = 渠道 Base URL + 原路径与查询（Gemini 路径换上游模型名，`key` 参数换成渠道 Key）；请求头去掉 hop-by-hop、`Host`、`Content-Length`、`Cookie`、`Accept-Encoding`、平台 Key 头、`X-AIHub-Tag` 与 `X-Forwarded-*`，应用渠道请求头规则与 UA，再把上游 Key 写回客户端原来的位置；请求体只替换顶层 `model`（OpenAI Chat 流式再补 `include_usage`）。
+6. **失败就换**：尚未写出任何字节前，连接失败、首字超时、5xx/429/401/403/404/405 换下一个候选；其他 4xx 原样返回且不收费；全部失败返回最后一次上游的状态码与正文（`upstream_failed`）。连续失败达到阈值的渠道进入冷却并写 `channel_events`。
+7. **回写与旁路**：响应头（去掉 hop-by-hop 与 `Set-Cookie`）与正文逐块原样写回并 flush，旁路解析器读取用量与首字/速度/token 间隔，解析失败不影响返回。
+8. **记账**：结束时在一个事务内关闭 `calls` 并过账（见 ADR-0027）；读不到用量为 `succeeded_unbilled`；客户端断开或上游输出后中断按已读到的用量记账。后台每分钟把超过一小时零一分钟仍为 `in_progress` 的调用标为 `interrupted`。
 
 ## 数据与状态
 
@@ -89,7 +104,10 @@
 - 停用账户在同一事务内删除其全部会话；重置密码提升密码版本并删除全部会话（ADR-0013）。移除管理员身份的修改在事务级 advisory lock 下检查剩余启用管理员数。
 - 模型目录写入在 `FOR UPDATE` 锁内合并部分更新并整组替换价格档；创建、修改模型与平台设置均写审计（含修改前后值）。
 - 用户只能读取本人积分与账单；账单按分录 id 倒序游标分页，可按交易类型、Key、时间筛选，`format=csv` 由 Feature G 实现（当前 501）。
-- 上游凭据密钥环与出站策略在启动时校验配置，供 Feature B 使用；C2C 私密数据密钥环在启动时校验并用于加密卖单收款方式。
+- 上游凭据密钥环与出站策略在启动时校验配置，供渠道与网关使用；C2C 私密数据密钥环在启动时校验并用于加密卖单收款方式。
+- 渠道公开信息（模型详情里的渠道列表）只含渠道名、所有者显示名、格式、倍率、现价、成功率、首字与状态，不含 Base URL、Key 与请求头规则；上游 Key 在任何读取接口都不回显。
+- 渠道的并发、每分钟请求数、冷却、连续失败计数保存在进程内（单实例）；每日收入与 Key 预算已用额从数据库汇总并缓存。
+- 自己的渠道调用手续费为 0，消费者与共享者是同一个账本账户，账本不允许一笔交易中同一账户出现两次，因此这类调用不产生账本交易（`calls.ledger_tx_id` 为空，费用仍记录）；Feature G 的记账核对须排除它们。
 
 ## C2C 卖单市场（Feature C）
 
@@ -115,7 +133,6 @@
 
 以下由后续 Feature 实现，契约已在 `openapi.yaml` 中定义：
 
-- Feature B：透明网关（换鉴权、可选换 UA 与请求头规则、字节级替换顶层 `model`、OpenAI Chat 流式补 `include_usage`）、按格式选渠道、按用户按模型路由、无预扣的事后一次记账、渠道发现与格式测试、API Key 可逆加密与预算、首页、管理员渠道治理。
 - Feature G：调用与用量查询、SSE 实时流、渠道统计、Prometheus 指标、管理员概览与积分全局、账本交易浏览与调用修复、积分走势与 CSV 导出。
 
 ## 架构原则

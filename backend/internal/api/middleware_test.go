@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 )
 
@@ -49,12 +50,30 @@ func TestHandlerSetsABoundedDefaultWriteDeadline(t *testing.T) {
 	}
 }
 
-func TestGatewayEntriesSkipSameOriginAndAreNotImplementedYet(t *testing.T) {
+func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
+	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
 	for _, path := range []string{"/v1/chat/completions", "/v1/responses", "/v1/messages", "/v1beta/models/gemini-2.5-flash:generateContent"} {
 		recorder := httptest.NewRecorder()
-		NewHandler(Dependencies{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
-		if recorder.Code != http.StatusNotImplemented || !strings.Contains(recorder.Body.String(), `"error":"not_implemented"`) {
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
+		if recorder.Code != http.StatusUnauthorized || !strings.Contains(recorder.Body.String(), `"error":"invalid_api_key"`) {
 			t.Fatalf("POST %s = %d %s", path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
+	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
+	for _, target := range []struct{ method, path string }{
+		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/images/generations"}, {http.MethodGet, "/v1/chat/completions"},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-flash:countTokens"}, {http.MethodPost, "/v1beta/other"},
+	} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(target.method, target.path, strings.NewReader(`{}`)))
+		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), `"error":"unsupported_endpoint"`) {
+			// A Gemini operation is rejected after authentication, so it may answer 401 first.
+			if !(strings.Contains(target.path, "countTokens") && recorder.Code == http.StatusUnauthorized) {
+				t.Fatalf("%s %s = %d %s", target.method, target.path, recorder.Code, recorder.Body.String())
+			}
 		}
 	}
 }

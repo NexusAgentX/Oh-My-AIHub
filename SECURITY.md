@@ -59,12 +59,18 @@
 - 过账只经 `ledgerpg.Post`：幂等键唯一，重复提交返回已有交易而不重复记账，同键用于其他操作返回冲突；按账本账户 id 升序加行锁，避免并发死锁与丢失更新。
 - 普通账户只能读取本人积分与账单；调账与坏账核销只有管理员能执行，必须填写原因并写入审计，浏览器不提供通用记账入口。坏账核销只能把用户既有负余额转入坏账账户。
 
-## 重写中的渠道、网关与 C2C 安全边界
+## 已实现的渠道与网关安全边界
 
-Epic #170 重写期间，v0.6.0 的渠道、API 网关与 C2C 代码已删除（Feature #171），对应安全边界由 Feature B、C 按以下仍然有效的基线重新实现，并在实现后在此写明：
+- 上游 Key 以版本化 AES-256-GCM 加密保存（AAD 绑定渠道 ID、版本与密钥 ID），任何读取接口都不回显；测试与发现的错误文本会先抹掉上游 Key。渠道的 Base URL、Key 与请求头规则只对所有者与管理员可见，模型详情里的公开渠道信息不含这些字段。
+- 所有出站请求（发现、格式测试、网关转发）走固定出站策略：只允许 HTTPS 与白名单端口、每次访问重新解析 DNS 并拒绝受保护地址、固定连接地址、禁止环境代理与重定向、`api.openai.com` 永久禁用、叠加管理员维护的 `settings.extra_blocked_hosts`（[ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)）。发现与测试对每个账号限流（每分钟 10 次）。
+- 渠道请求头规则不能设置或删除 `Host`、`Content-Length`、hop-by-hop 头、`Authorization`、`x-api-key`、`x-goog-api-key`、`Cookie`、`Accept-Encoding`。网关转发时丢弃客户端的 Cookie、`X-AIHub-Tag` 与 `X-Forwarded-*`/`Forwarded`/`Via`，不向上游泄露站内会话与客户端地址。
+- 平台 API Key 以 SHA-256 查找、以上游凭据密钥环可逆加密保存，使用户可以再次复制（[ADR-0028](docs/adr/0028-store-platform-api-keys-reversibly-encrypted.md)）：完整 Key 只返回给所有者，每次读取明文写入审计 `api_key.reveal`；列表与详情只含前缀；持有密钥环与数据库的人可以解出全部平台 Key，与上游 Key 的威胁模型一致。
+- 网关不持久化请求或响应正文，不记录客户端 IP；每个请求一行结构化日志，只含请求 ID、账号、Key 前缀、模型、格式、渠道、结果、状态码、耗时、token 与费用。上游原始错误（调用尝试里的 `error_message`）最多 4KB（30 天清理由 Feature G 实现）。
+- 不预扣费意味着并发请求可能让单个账号透支超过信用额度若干次请求的费用，已接受（[ADR-0027](docs/adr/0027-adopt-transparent-gateway-with-post-hoc-billing.md)）。
 
-- 保留并在启动时校验：上游凭据版本化 AES-256-GCM 密钥环与固定出站策略（只允许 HTTPS 与白名单端口、每次访问重新解析 DNS 并拒绝受保护地址、固定连接地址、禁止环境代理与重定向、`api.openai.com` 永久禁用，见 [ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)）；独立的 C2C 私密数据密钥环。
-- 目标要求（Epic #170）：平台 API Key 以摘要查找、以上游凭据密钥环可逆加密保存，读取明文写审计；不持久化请求或响应正文，不记录客户端 IP，日志与错误不包含任何 Key 或正文；原始上游错误最多 4KB 并在 30 天后清理；C2C 收款方式只存文字并加密，只对交易双方与管理员可见（Feature C 已实现：JSON 以 C2C 私密数据密钥环和订单 ID 作为附加数据加密保存，市场列表只返回渠道名称，买家仅在交易未结束时看到账号，非交易双方的普通用户访问交易返回 404，管理员仲裁写审计 `c2c.resolve`）。
+## 已实现的 C2C 安全边界
+
+- 独立的 C2C 私密数据密钥环在启动时校验；收款方式只存文字，JSON 以该密钥环和订单 ID 作为附加数据加密保存；市场列表只返回渠道名称，买家仅在交易未结束时看到账号，非交易双方的普通用户访问交易返回 404，管理员仲裁写审计 `c2c.resolve`。
 
 ## 待补充
 

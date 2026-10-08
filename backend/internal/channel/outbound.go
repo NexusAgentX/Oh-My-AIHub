@@ -295,6 +295,11 @@ func unsafeAddress(address netip.Addr) bool {
 }
 
 func (p *OutboundPolicy) Endpoint(baseURL string, format Format, upstreamModelID string, stream bool) (*url.URL, error) {
+	return BuildEndpoint(baseURL, format, upstreamModelID, stream)
+}
+
+// BuildEndpoint is the default request URL of a format under a Base URL.
+func BuildEndpoint(baseURL string, format Format, upstreamModelID string, stream bool) (*url.URL, error) {
 	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, ErrInvalidInput
@@ -335,6 +340,32 @@ func (p *OutboundPolicy) ClientForProxy(ctx context.Context, normalizedBaseURL s
 		responseHeaderTimeout = totalTimeout
 	}
 	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, responseHeaderTimeout)
+}
+
+// ClientForGateway builds the client of one gateway attempt: the same pinned
+// dial, TLS and redirect rules as every other outbound call, but without a
+// response-header deadline, because a non-streaming completion legitimately
+// sends its first byte only when generation ends. The caller enforces the
+// first-byte timeout itself; totalTimeout bounds the whole exchange.
+func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
+	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, 0)
+}
+
+// WithExtraBlockedHosts returns a policy that additionally refuses the given
+// hosts (settings.extra_blocked_hosts), leaving the receiver untouched.
+func (p *OutboundPolicy) WithExtraBlockedHosts(hosts []string) (Outbound, error) {
+	blocked := append([]string(nil), p.blockedHosts...)
+	for _, value := range hosts {
+		normalized, err := normalizeHostname(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid blocked upstream host %q: %w", value, err)
+		}
+		blocked = append(blocked, normalized)
+	}
+	slices.Sort(blocked)
+	copied := *p
+	copied.blockedHosts = slices.Compact(blocked)
+	return &copied, nil
 }
 
 func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string, totalTimeout, responseHeaderTimeout time.Duration) (*http.Client, error) {
@@ -383,6 +414,8 @@ func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string
 	}, nil
 }
 
+// ApplyAuthentication writes the default credential location of a format; the
+// gateway itself writes the credential where the client put the platform key.
 func ApplyAuthentication(request *http.Request, format Format, credential string) {
 	switch format {
 	case FormatAnthropic:
@@ -393,4 +426,29 @@ func ApplyAuthentication(request *http.Request, format Format, credential string
 	default:
 		request.Header.Set("Authorization", "Bearer "+credential)
 	}
+}
+
+// Outbound is the pinned egress boundary (ADR-0009) as the channel service and
+// the gateway use it. OutboundPolicy implements it; tests substitute a fake
+// that reaches loopback servers.
+type Outbound interface {
+	NormalizeBaseURL(raw string) (string, error)
+	// ValidateBaseURL normalizes and additionally checks DNS resolution.
+	ValidateBaseURL(ctx context.Context, raw string) (string, error)
+	// Client returns a client for short, bounded calls (discovery, tests).
+	Client(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
+	// GatewayClient returns the client of one forwarded request.
+	GatewayClient(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
+	// WithExtraBlockedHosts adds the administrator-managed host block list.
+	WithExtraBlockedHosts(hosts []string) (Outbound, error)
+}
+
+// Client implements Outbound.
+func (p *OutboundPolicy) Client(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
+	return p.ClientFor(ctx, normalizedBaseURL, totalTimeout)
+}
+
+// GatewayClient implements Outbound.
+func (p *OutboundPolicy) GatewayClient(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
+	return p.ClientForGateway(ctx, normalizedBaseURL, totalTimeout)
 }

@@ -162,7 +162,6 @@ paths:
       operationId: getHome
       tags: [home]
       summary: 首页
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -175,13 +174,11 @@ paths:
               schema: {$ref: '#/components/schemas/HomeResponse'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/models:
     get:
       operationId: listModels
       tags: [models]
       summary: 可用模型列表
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -194,13 +191,11 @@ paths:
               schema: {$ref: '#/components/schemas/CatalogModelList'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/models/{modelID}:
     get:
       operationId: getModel
       tags: [models]
       summary: 模型详情、渠道与我的路由
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -216,13 +211,12 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/routing/{modelID}:
     put:
       operationId: setRouting
       tags: [models]
       summary: 设置账号级路由
-      description: "对该用户所有未单独设置路由的 Key 生效。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "对该用户所有未单独设置路由的 Key 生效。"
       x-access: ready
       x-feature: B
       security:
@@ -245,13 +239,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/keys:
     get:
       operationId: listKeys
       tags: [keys]
       summary: 我的 API Key
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -264,12 +256,11 @@ paths:
               schema: {$ref: '#/components/schemas/ApiKeyList'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     post:
       operationId: createKey
       tags: [keys]
       summary: 创建 API Key
-      description: "每个用户最多 20 把未删除的 Key（超过返回 409 key_limit_reached）。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "每个用户最多 20 把未删除的 Key（超过返回 409 key_limit_reached）。"
       x-access: ready
       x-feature: B
       security:
@@ -290,13 +281,11 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/keys/{keyID}:
     get:
       operationId: getKey
       tags: [keys]
       summary: API Key 详情
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -312,12 +301,10 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     patch:
       operationId: updateKey
       tags: [keys]
       summary: 修改 API Key
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -340,12 +327,10 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     delete:
       operationId: deleteKey
       tags: [keys]
       summary: 删除 API Key
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -358,13 +343,12 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/keys/{keyID}/secret:
     get:
       operationId: getKeySecret
       tags: [keys]
       summary: 复制完整 Key
-      description: "每次读取写入审计（查看 API Key 明文）。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "每次读取写入审计（查看 API Key 明文）。"
       x-access: ready
       x-feature: B
       security:
@@ -380,13 +364,11 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/keys/{keyID}/routing/{modelID}:
     put:
       operationId: setKeyRouting
       tags: [keys]
       summary: 设置该 Key 的单独路由
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -410,12 +392,10 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     delete:
       operationId: deleteKeyRouting
       tags: [keys]
       summary: 删除该 Key 的单独路由
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -429,13 +409,11 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels:
     get:
       operationId: listChannels
       tags: [channels]
       summary: 我的渠道
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -448,12 +426,10 @@ paths:
               schema: {$ref: '#/components/schemas/ChannelList'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     post:
       operationId: createChannel
       tags: [channels]
       summary: 添加渠道
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -473,13 +449,12 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels/discover:
     post:
       operationId: discoverChannel
       tags: [channels]
       summary: 读取上游模型列表并匹配目录
-      description: "Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。"
       x-access: ready
       x-feature: B
       security:
@@ -499,14 +474,12 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
         '502': {$ref: '#/components/responses/BadGateway'}
   /api/channels/{channelID}:
     get:
       operationId: getChannel
       tags: [channels]
       summary: 渠道详情
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -522,12 +495,11 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     patch:
       operationId: updateChannel
       tags: [channels]
       summary: 修改渠道
-      description: "被管理员强制下架的渠道不能由所有者重新上架（409）。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "被管理员强制下架的渠道不能由所有者重新上架（409）。"
       x-access: ready
       x-feature: B
       security:
@@ -551,12 +523,10 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     delete:
       operationId: deleteChannel
       tags: [channels]
       summary: 删除渠道
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: ready
       x-feature: B
       security:
@@ -569,13 +539,12 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/channels/{channelID}/test:
     post:
       operationId: testChannel
       tags: [channels]
       summary: 按模型逐个格式测试
-      description: "会向上游发出真实请求，可能产生少量费用。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "会向上游发出真实请求，可能产生少量费用。"
       x-access: ready
       x-feature: B
       security:
@@ -598,7 +567,6 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/calls:
     get:
       operationId: listCalls
@@ -1382,7 +1350,6 @@ paths:
       operationId: listAdminChannels
       tags: [admin-channels]
       summary: 全部渠道
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: B
       security:
@@ -1402,13 +1369,11 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/channels/{channelID}:
     get:
       operationId: getAdminChannel
       tags: [admin-channels]
       summary: 渠道详情
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: B
       security:
@@ -1424,13 +1389,11 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/channels/{channelID}/suspend:
     post:
       operationId: suspendAdminChannel
       tags: [admin-channels]
       summary: 强制下架
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: B
       security:
@@ -1454,13 +1417,11 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/channels/{channelID}/unsuspend:
     post:
       operationId: unsuspendAdminChannel
       tags: [admin-channels]
       summary: 恢复
-      description: 由 Feature B 实现；当前处理器返回 501 not_implemented。
       x-access: admin
       x-feature: B
       security:
@@ -1484,7 +1445,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /api/admin/disputes:
     get:
       operationId: listAdminDisputes
@@ -1708,7 +1668,7 @@ paths:
       operationId: proxyOpenAIChat
       tags: [gateway]
       summary: OpenAI Chat Completions
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -1725,7 +1685,7 @@ paths:
       operationId: proxyOpenAIResponses
       tags: [gateway]
       summary: OpenAI Responses
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -1742,7 +1702,7 @@ paths:
       operationId: proxyAnthropicMessages
       tags: [gateway]
       summary: Anthropic Messages
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -1759,7 +1719,7 @@ paths:
       operationId: proxyGemini
       tags: [gateway]
       summary: Gemini generateContent / streamGenerateContent
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -1779,7 +1739,7 @@ paths:
       operationId: listGatewayModels
       tags: [gateway]
       summary: OpenAI / Anthropic 风格模型列表
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -1792,7 +1752,7 @@ paths:
       operationId: listGeminiModels
       tags: [gateway]
       summary: Gemini 风格模型列表
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。\n\n由 Feature B 实现；当前处理器返回 501 not_implemented。"
+      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
       x-access: gateway_key
       x-feature: B
       security:
@@ -2931,7 +2891,10 @@ components:
           items: {$ref: '#/components/schemas/ChannelModelInput'}
           minItems: 1
           description: 提供时整组替换。
-        advanced: {$ref: '#/components/schemas/ChannelAdvancedInput'}
+        advanced:
+          allOf:
+          - {$ref: '#/components/schemas/ChannelAdvancedInput'}
+          description: 提供时整块替换高级设置；省略或为 null 的字段恢复平台默认。
       required: []
       additionalProperties: false
       minProperties: 1

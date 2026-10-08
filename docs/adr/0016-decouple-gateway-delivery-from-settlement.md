@@ -1,6 +1,6 @@
 # ADR-0016：网关交付与结算解耦
 
-- 状态：已通过
+- 状态：已取代（由 [ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md) 取代）
 - 日期：2026-09-23
 - 决策者：仓库维护者
 - 关联内容：[ADR-0014](0014-adopt-native-passthrough-gateway.md)、[ADR-0010](0010-adopt-snapshot-gateway-and-idempotent-settlement.md)、[Feature #90](https://github.com/NexusAgentX/Oh-My-AIHub/issues/90)

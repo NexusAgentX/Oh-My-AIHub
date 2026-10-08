@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte(" { \"mod\\u0065l\" : \"q\" , \"stream_options\" : { \"include_usAge\" : false } } ")
