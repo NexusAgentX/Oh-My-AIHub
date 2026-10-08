@@ -224,25 +224,6 @@ func TestOpsIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("trial summary aggregates without sensitive fields", func(t *testing.T) {
-		summary, err := store.OpsTrialSummary(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if summary.NonAdminAccounts != 2 || summary.C2COpenOrders != 1 {
-			t.Fatalf("trial summary counts = %+v", summary)
-		}
-		if !summary.LedgerZeroSumOK {
-			t.Fatalf("trial summary zero-sum flag false: %+v", summary)
-		}
-		if summary.LastInspectionOK == nil || !*summary.LastInspectionOK {
-			t.Fatalf("trial summary inspection flag = %+v", summary)
-		}
-		if summary.InspectionPassCount != 2 || summary.InspectionTotalCount != 2 {
-			t.Fatalf("trial summary inspection counts = %+v", summary)
-		}
-	})
-
 	t.Run("window validation", func(t *testing.T) {
 		instant := time.Now().UTC()
 		if (ops.Window{From: instant, To: instant}).Validate() {

@@ -14,12 +14,10 @@ export function windowHours(key: WindowKey) {
   return windowOptions.find((option) => option.key === key)?.hours ?? 24
 }
 
-export type OpsTab = 'overview' | 'providers' | 'evidence' | 'ledger'
+export type OpsTab = 'overview' | 'ledger'
 
 export const opsTabs: Array<{ key: OpsTab; label: string }> = [
   { key: 'overview', label: '总览' },
-  { key: 'providers', label: '共享者收入' },
-  { key: 'evidence', label: '试用与巡检' },
   { key: 'ledger', label: '账本与费率' },
 ]
 
@@ -27,9 +25,9 @@ export function parseTab(value: string | null): OpsTab {
   return opsTabs.find((tab) => tab.key === value)?.key ?? 'overview'
 }
 
-/** 仅这两个分区随时间窗口变化。 */
+/** 仅总览随时间窗口变化。 */
 export function isWindowedTab(tab: OpsTab) {
-  return tab === 'overview' || tab === 'providers'
+  return tab === 'overview'
 }
 
 export function formatFen(fen: number | null) {

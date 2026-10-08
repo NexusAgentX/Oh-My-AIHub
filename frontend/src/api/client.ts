@@ -219,9 +219,6 @@ export const api = {
   async runOpsInspection() {
     return (await request<ResponseBody<'runOpsInspection'>>('/api/admin/ops/inspections', { method: 'POST' })).inspection
   },
-  async opsTrialSummary() {
-    return (await request<ResponseBody<'getOpsTrialSummary'>>('/api/admin/ops/trial-summary')).trial_summary
-  },
   adminFeeRates(limit = 10) {
     return request<ResponseBody<'getFeeRates'>>(`/api/admin/fee-rate?limit=${limit}`)
   },

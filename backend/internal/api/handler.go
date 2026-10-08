@@ -43,7 +43,6 @@ type OpsStore interface {
 	OpsAnomalies(ctx context.Context) (ops.Anomalies, error)
 	OpsRunInspection(ctx context.Context, triggeredBy string) (ops.InspectionRecord, error)
 	OpsListInspections(ctx context.Context, limit int64) ([]ops.InspectionRecord, error)
-	OpsTrialSummary(ctx context.Context) (ops.TrialSummary, error)
 }
 
 type app struct {

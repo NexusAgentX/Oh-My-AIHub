@@ -227,30 +227,6 @@ type InspectionRecord struct {
 	CheckedAt                        time.Time `json:"checked_at"`
 }
 
-// TrialSummary is the maintainer-facing aggregate evidence entry. It contains
-// only counts, times and statuses, never raw errors or credentials, and never
-// claims participants are real people or that external CNY arrived.
-type TrialSummary struct {
-	GeneratedAt          time.Time  `json:"generated_at"`
-	NonAdminAccounts     int64      `json:"non_admin_accounts"`
-	PublishedChannels    int64      `json:"published_channels"`
-	PassedOffers         int64      `json:"passed_offers"`
-	ActiveAPIKeys        int64      `json:"active_api_keys"`
-	CallsSucceeded       int64      `json:"calls_succeeded"`
-	CallsFailed          int64      `json:"calls_failed"`
-	CallsIncomplete      int64      `json:"calls_incomplete"`
-	FirstCallAt          *time.Time `json:"first_call_at"`
-	LastTerminalCallAt   *time.Time `json:"last_terminal_call_at"`
-	C2COpenOrders        int64      `json:"c2c_open_orders"`
-	C2CReleasedTrades    int64      `json:"c2c_released_trades"`
-	C2CDisputedOpen      int64      `json:"c2c_disputed_open"`
-	LedgerZeroSumOK      bool       `json:"ledger_zero_sum_ok"`
-	LastInspectionOK     *bool      `json:"last_inspection_ok"`
-	LastInspectionAt     *time.Time `json:"last_inspection_at"`
-	InspectionPassCount  int64      `json:"inspection_pass_count"`
-	InspectionTotalCount int64      `json:"inspection_total_count"`
-}
-
 // NormalizeUsername keeps usernames trimmed for risk rows.
 func NormalizeUsername(value string) string {
 	return strings.TrimSpace(value)

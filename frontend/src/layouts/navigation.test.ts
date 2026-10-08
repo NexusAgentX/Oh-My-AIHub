@@ -33,9 +33,9 @@ describe('navigation', () => {
   })
 
   it('matches nested routes to their navigation item', () => {
-    expect(findNavItem(productNavigation, '/keys/new')?.label).toBe('API Keys')
+    expect(findNavItem(productNavigation, '/keys/abc')?.label).toBe('API Keys')
     expect(findNavItem(productNavigation, '/market/channels/abc')?.label).toBe('API 市场')
-    expect(findNavItem(productNavigation, '/wallet/insufficient')?.label).toBe('钱包')
+    expect(findNavItem(productNavigation, '/wallet')?.label).toBe('钱包')
     expect(findNavItem(adminNavigation, '/admin/c2c/disputes/1')?.label).toBe('争议处理')
     expect(findNavItem(productNavigation, '/account')).toBeUndefined()
   })

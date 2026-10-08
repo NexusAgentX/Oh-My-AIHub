@@ -2066,22 +2066,6 @@ paths:
               schema: {$ref: "#/components/schemas/OpsInspectionEnvelope"}
         '401': {$ref: "#/components/responses/Unauthorized"}
         '403': {$ref: "#/components/responses/Forbidden"}
-  /api/admin/ops/trial-summary:
-    get:
-      operationId: getOpsTrialSummary
-      tags: [admin-ops]
-      summary: "试运行摘要"
-      x-access: admin
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: "成功"
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/OpsTrialSummaryEnvelope"}
-        '401': {$ref: "#/components/responses/Unauthorized"}
-        '403': {$ref: "#/components/responses/Forbidden"}
   /v1/chat/completions:
     post:
       operationId: proxyOpenAIChat
@@ -3836,42 +3820,4 @@ components:
           type: array
           items: {$ref: "#/components/schemas/OpsInspection"}
       required: [inspections]
-      additionalProperties: false
-    OpsTrialSummary:
-      type: object
-      properties:
-        generated_at: {$ref: "#/components/schemas/Timestamp"}
-        non_admin_accounts: {type: integer}
-        published_channels: {type: integer}
-        passed_offers: {type: integer}
-        active_api_keys: {type: integer}
-        calls_succeeded: {type: integer}
-        calls_failed: {type: integer}
-        calls_incomplete: {type: integer}
-        first_call_at:
-          anyOf:
-            - $ref: "#/components/schemas/Timestamp"
-            - type: "null"
-        last_terminal_call_at:
-          anyOf:
-            - $ref: "#/components/schemas/Timestamp"
-            - type: "null"
-        c2c_open_orders: {type: integer}
-        c2c_released_trades: {type: integer}
-        c2c_disputed_open: {type: integer}
-        ledger_zero_sum_ok: {type: boolean}
-        last_inspection_ok: {type: [boolean, "null"]}
-        last_inspection_at:
-          anyOf:
-            - $ref: "#/components/schemas/Timestamp"
-            - type: "null"
-        inspection_pass_count: {type: integer}
-        inspection_total_count: {type: integer}
-      required: [generated_at, non_admin_accounts, published_channels, passed_offers, active_api_keys, calls_succeeded, calls_failed, calls_incomplete, first_call_at, last_terminal_call_at, c2c_open_orders, c2c_released_trades, c2c_disputed_open, ledger_zero_sum_ok, last_inspection_ok, last_inspection_at, inspection_pass_count, inspection_total_count]
-      additionalProperties: false
-    OpsTrialSummaryEnvelope:
-      type: object
-      properties:
-        trial_summary: {$ref: "#/components/schemas/OpsTrialSummary"}
-      required: [trial_summary]
       additionalProperties: false

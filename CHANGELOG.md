@@ -6,6 +6,7 @@
 
 ### 变更
 
+- 运营台精简、删除旧重定向与精简产品文档（Feature #161，Epic #158）：运营台只保留「总览」（含共享者收入）与「账本与费率」（含巡检历史）两个分区，`tab` 参数只接受这两个值；删除试用证据摘要与 `GET /api/admin/ops/trial-summary`（含 OpenAPI 路径与 schema、sqlc 查询、前端查询）；巡检逻辑、硬异常与收入口径不变。删除 7 条旧 URL 重定向：`/keys/new`、`/keys/:keyID/settings`、`/market/channels/:channelID/add`、`/wallet/insufficient`、`/c2c/orders/:orderID/take`、`/c2c/trades/:tradeID/dispute`、`/admin/providers`，旧地址不再重定向（落到公开落地页）。`PRODUCT.md` 删除「待验证假设」「待真实使用回答」，改为简短「已知风险」，`ROADMAP.md` 删除真实验证表述。无数据库迁移。
 - 工作台待处理事项改由后端单一聚合接口提供（Feature #160，Epic #158）：新增 `GET /api/dashboard/pending-items`，服务端按当前用户一次计算待放行 / 待付款的 C2C 交易（只看交易买卖双方身份与状态）、校验失败与已暂停的渠道、含不可用渠道的路由和只有一个渠道的路由，不再受“最近 100 笔调用”分页限制；前端删除 `pendingDerive.ts` 的多接口拼接推导，只渲染接口返回的条目。
 - C2C 只保留卖单（Feature #159，Epic #158）：删除买单（`side=buy`）。创建挂单不再接受 `side`；订单、交易与行情响应删除 `side`、`order_side`、`buy_orders`、`best_bid_fen`、`spread_fen`，运营指标的订单计数不再按方向分组、报价不含买一与价差；钱包恢复动作删除 `create_buy_order`。市场页直接列出卖单，挂单编辑器无方向切换，承接按钮统一为“购买”。迁移 `0009` 在存在 `open` / `allocated` 买单或买单下未终结交易时失败并提示，需先在旧版本中取消或处理；仅有终态历史买单时保留其行与账本，并禁止此后写入买单。迁移不可逆，升级前请备份。见 ADR-0023。
 

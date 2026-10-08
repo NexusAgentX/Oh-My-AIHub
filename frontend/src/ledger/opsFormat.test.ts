@@ -14,14 +14,14 @@ describe('ops console url state', () => {
     expect(parseWindow(null)).toBe('24')
     expect(parseWindow('999')).toBe('24')
     expect(windowHours(parseWindow('720'))).toBe(720)
-    expect(parseTab('providers')).toBe('providers')
+    expect(parseTab('ledger')).toBe('ledger')
+    expect(parseTab('providers')).toBe('overview')
+    expect(parseTab('evidence')).toBe('overview')
     expect(parseTab('x')).toBe('overview')
   })
 
   it('applies the time window only to overview and provider income', () => {
     expect(isWindowedTab('overview')).toBe(true)
-    expect(isWindowedTab('providers')).toBe(true)
-    expect(isWindowedTab('evidence')).toBe(false)
     expect(isWindowedTab('ledger')).toBe(false)
   })
 })

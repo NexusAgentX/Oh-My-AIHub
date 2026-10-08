@@ -592,7 +592,6 @@ func TestOpenAPIOpsResponses(t *testing.T) {
 		anomalies: ops.Anomalies{Hard: []ops.Anomaly{{Kind: "zero_sum", Count: 1, Detail: "d", Drilldown: "/admin/ledger"}}, Attention: []ops.Anomaly{}, CheckedAt: contractTime},
 		records: []ops.InspectionRecord{{ID: "i1", InspectionVersion: ops.InspectionVersion, TriggeredBy: "manual", ZeroSumDifference: "0",
 			PostedProjectionDifference: "0", AssetProjectionDifference: "0", AuthorizationProjectionDiff: "0", CheckedAt: contractTime}},
-		summary: ops.TrialSummary{GeneratedAt: contractTime, FirstCallAt: &contractTime, LastInspectionOK: contractPointer(true)},
 	}
 	application := &app{ops: store}
 	window := "?from=2026-10-07T00:00:00Z&to=2026-10-08T00:00:00Z"
@@ -608,7 +607,6 @@ func TestOpenAPIOpsResponses(t *testing.T) {
 	spec.assertSchema(t, "OpsProviderIncomeEnvelope", call(application.opsProviderIncome, http.MethodGet, "/api/admin/ops/providers"+window))
 	spec.assertSchema(t, "OpsAnomaliesEnvelope", call(application.opsAnomalies, http.MethodGet, "/api/admin/ops/anomalies"))
 	spec.assertSchema(t, "OpsInspectionList", call(application.opsListInspections, http.MethodGet, "/api/admin/ops/inspections"))
-	spec.assertSchema(t, "OpsTrialSummaryEnvelope", call(application.opsTrialSummary, http.MethodGet, "/api/admin/ops/trial-summary"))
 	spec.assertSchema(t, "OpsInspectionEnvelope", map[string]any{"inspection": store.records[0]})
 	recorder := httptest.NewRecorder()
 	application.opsRunInspection(recorder, httptest.NewRequest(http.MethodPost, "/api/admin/ops/inspections", nil))

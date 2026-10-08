@@ -16,7 +16,6 @@ type fakeOpsStore struct {
 	metrics   ops.Metrics
 	providers ops.ProviderIncomeSnapshot
 	records   []ops.InspectionRecord
-	summary   ops.TrialSummary
 	anomalies ops.Anomalies
 }
 
@@ -39,9 +38,6 @@ func (fake *fakeOpsStore) OpsRunInspection(_ context.Context, triggeredBy string
 }
 func (fake *fakeOpsStore) OpsListInspections(context.Context, int64) ([]ops.InspectionRecord, error) {
 	return fake.records, nil
-}
-func (fake *fakeOpsStore) OpsTrialSummary(context.Context) (ops.TrialSummary, error) {
-	return fake.summary, nil
 }
 
 func callOpsMetrics(query string) *httptest.ResponseRecorder {
@@ -114,23 +110,11 @@ func TestOpsProviderIncomeWindowValidation(t *testing.T) {
 
 func TestOpsResponsesUseExplicitContracts(t *testing.T) {
 	application := &app{ops: &fakeOpsStore{
-		summary:   ops.TrialSummary{NonAdminAccounts: 3},
 		anomalies: ops.Anomalies{Hard: []ops.Anomaly{{Kind: "k", Count: 1, Drilldown: "/admin/ops?drilldown=x"}}},
 		records:   []ops.InspectionRecord{{ID: "r1"}},
 	}}
 
 	recorder := httptest.NewRecorder()
-	application.opsTrialSummary(recorder, httptest.NewRequest(http.MethodGet, "/api/admin/ops/trial-summary", nil))
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"non_admin_accounts":3`) {
-		t.Fatalf("trial summary = %d: %s", recorder.Code, recorder.Body.String())
-	}
-	for _, forbidden := range []string{"raw_error", "credential", "base_url"} {
-		if strings.Contains(recorder.Body.String(), forbidden) {
-			t.Fatalf("trial summary leaked %q: %s", forbidden, recorder.Body.String())
-		}
-	}
-
-	recorder = httptest.NewRecorder()
 	application.opsRunInspection(recorder, httptest.NewRequest(http.MethodPost, "/api/admin/ops/inspections", nil))
 	if recorder.Code != http.StatusCreated || !strings.Contains(recorder.Body.String(), "inspection-manual") {
 		t.Fatalf("manual inspection = %d: %s", recorder.Code, recorder.Body.String())

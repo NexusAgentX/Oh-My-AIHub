@@ -179,28 +179,3 @@ SELECT id::text AS id, inspection_version, triggered_by, zero_sum_ok, projection
 	asset_projection_difference_nano::text AS asset_projection_difference, authorization_projection_difference_nano::text AS authorization_projection_difference,
 	successful_calls_without_settlement, settlements_without_ledger_transaction, c2c_quantity_violations, c2c_hold_violations, checked_at
 FROM ops_inspections ORDER BY checked_at DESC, id DESC LIMIT @row_limit;
-
--- name: GetTrialCounts :one
-SELECT
-	(SELECT count(*) FROM accounts WHERE is_admin = false)::bigint AS non_admin_accounts,
-	(SELECT count(*) FROM channels WHERE status = 'published')::bigint AS published_channels,
-	(SELECT count(DISTINCT offer_id) FROM channel_validation_attempts WHERE status = 'passed')::bigint AS passed_offers,
-	(SELECT count(*) FROM api_keys WHERE status = 'active')::bigint AS active_api_keys,
-	(SELECT count(*) FROM api_calls WHERE status = 'succeeded')::bigint AS calls_succeeded,
-	(SELECT count(*) FROM api_calls WHERE status = 'failed')::bigint AS calls_failed,
-	(SELECT count(*) FROM api_calls WHERE status = 'incomplete')::bigint AS calls_incomplete,
-	COALESCE((SELECT min(created_at) FROM api_calls), 'epoch'::timestamptz)::timestamptz AS first_call_at,
-	((SELECT count(*) FROM api_calls) > 0)::boolean AS has_first_call_at,
-	COALESCE((SELECT max(completed_at) FROM api_calls WHERE status IN ('succeeded', 'failed', 'incomplete', 'cancelled')), 'epoch'::timestamptz)::timestamptz AS last_terminal_call_at,
-	EXISTS (SELECT 1 FROM api_calls WHERE status IN ('succeeded', 'failed', 'incomplete', 'cancelled') AND completed_at IS NOT NULL)::boolean AS has_last_terminal_call_at,
-	(SELECT count(*) FROM c2c_orders WHERE status IN ('open', 'allocated'))::bigint AS c2c_open_orders,
-	(SELECT count(*) FROM c2c_trades WHERE status = 'released_to_buyer')::bigint AS c2c_released_trades,
-	(SELECT count(*) FROM c2c_trades WHERE status = 'disputed')::bigint AS c2c_disputed_open;
-
--- name: GetInspectionSummary :one
--- 无巡检记录时 last_at/last_ok 为哨兵值，由 total_count = 0 判定为空。
-SELECT (count(*) FILTER (WHERE zero_sum_ok AND projection_ok AND call_settlement_ok AND c2c_consistency_ok))::bigint AS pass_count,
-	count(*)::bigint AS total_count,
-	COALESCE(max(checked_at), 'epoch'::timestamptz)::timestamptz AS last_at,
-	COALESCE(bool_and(zero_sum_ok AND projection_ok AND call_settlement_ok AND c2c_consistency_ok) FILTER (WHERE checked_at = (SELECT max(checked_at) FROM ops_inspections)), false)::boolean AS last_ok
-FROM ops_inspections;

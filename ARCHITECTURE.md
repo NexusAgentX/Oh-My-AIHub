@@ -30,7 +30,7 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包（含余额不足提示）、模型目录、渠道配置、API 市场（筛选条件存于 URL，查询在 `channels/marketQueries.ts`）、公开渠道详情与加入路由抽屉、平台 Key 与路由（模型协议池）设置抽屉、含快速开始与待处理事项的工作台（待处理事项由后端 `GET /api/dashboard/pending-items` 聚合，前端只渲染）、调用记录、C2C 市场（承接抽屉、交易详情与确认对话框）与管理员后台界面（运营台 `/admin/ops` 以分区合并总览、共享者收入、试用与巡检、账本与费率，`/admin/providers` 重定向；账户、模型目录含条件价格档抽屉编辑器、渠道治理与争议处理） |
+| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包（含余额不足提示）、模型目录、渠道配置、API 市场（筛选条件存于 URL，查询在 `channels/marketQueries.ts`）、公开渠道详情与加入路由抽屉、平台 Key 与路由（模型协议池）设置抽屉、含快速开始与待处理事项的工作台（待处理事项由后端 `GET /api/dashboard/pending-items` 聚合，前端只渲染）、调用记录、C2C 市场（承接抽屉、交易详情与确认对话框）与管理员后台界面（运营台 `/admin/ops` 仅「总览」（含共享者收入）与「账本与费率」（含巡检历史与手动巡检）两个分区，`tab` 参数只接受这两个值；账户、模型目录含条件价格档抽屉编辑器、渠道治理与争议处理） |
 | 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、工作台待处理事项聚合、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
 | API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是 `/api/**` JSON 契约的唯一来源（`/v1`、`/v1beta` 只登记路径与认证），`x-access` 声明各路由门禁；`internal/api` 按领域文件注册路由，`router` 依 access 包裹会话、首次改密与管理员门禁，全局中间件链为“写超时 → 安全头 → 同源校验 → mux”，限流状态集中在 `rateLimits`；契约测试对照路由表并用规范 schema 校验响应（见 [ADR-0021](docs/adr/0021-openapi-as-single-api-contract.md)）；前端 API 类型由它经 `openapi-typescript` 生成为已提交的 `frontend/src/api/schema.gen.ts`（生成器隔离在 `frontend/tools/openapi-types/`，因其需要 TypeScript 5 编译器 API；`npm --prefix frontend run generate:api` 或 `mise run generate`），`frontend/src/api/types.ts` 提供简洁别名与 `RequestBody` / `ResponseBody`，`client.ts` 据此对请求体与响应做类型校验，CI 以 `git diff --exit-code` 校验生成物与规范一致 |
 | 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
@@ -78,7 +78,7 @@
 
 实例生命周期：不存在任何管理员时前端将一切路由重定向到 `/initialize`，由 `POST /api/instance/initialize` 复用既有 bootstrap 事务（advisory lock + 冲突拒绝）创建首个管理员；已初始化实例该端点返回 409。初始化窗口期不做防陌生人抢注的技术屏障（站长负责）。
 
-后端维护循环在启动、每小时和手动触发时执行跨模块巡检并持久化历史：零和与三类投影、成功调用结算链路、C2C 数量与父持有一致性。管理员运营总览按显式 UTC 时间窗口提供统一指标（账本、信用、API 漏斗、消费与收入、C2C、负余额风险与集中度），硬异常带固定下钻；试用证据摘要只聚合计数、时间与状态。空样本保持空值，不伪造为零或成功。
+后端维护循环在启动、每小时和手动触发时执行跨模块巡检并持久化历史：零和与三类投影、成功调用结算链路、C2C 数量与父持有一致性。管理员运营总览按显式 UTC 时间窗口提供统一指标（账本、信用、API 漏斗、消费与收入、C2C、负余额风险与集中度），硬异常带固定下钻。空样本保持空值，不伪造为零或成功。
 
 PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可能产生费用后才访问第三方中转站；消费者使用平台 Key 发起真实调用时，网关会按其模型协议池访问共享者配置的第三方上游。公开市场和普通管理读取不会调用上游。C2C 人民币付款发生在用户选择的外部支付工具中，平台不接入支付机构、不托管人民币，也不根据付款声明自动确认到账。
 
