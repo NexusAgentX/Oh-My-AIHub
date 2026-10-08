@@ -131,7 +131,7 @@ function TierEditForm({
       </p>
       <Checkbox
         checked={form.useTokens}
-        label="按输入侧 token 区间（输入 + 缓存写 + 缓存读）"
+        label="按输入总量分档（含缓存读写，不含输出）"
         onChange={(event) =>
           set(
             event.target.checked ? { useTokens: true } : { useTokens: false, minPromptTokens: '', maxPromptTokens: '' },
