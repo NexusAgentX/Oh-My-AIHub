@@ -9,13 +9,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-type Side string
-
-const (
-	SideSell Side = "sell"
-	SideBuy  Side = "buy"
-)
-
 type OrderStatus string
 
 const (
@@ -128,7 +121,6 @@ type Order struct {
 	ID               string
 	OwnerAccountID   string
 	OwnerDisplayName string
-	Side             Side
 	UnitPriceFen     int64
 	Total            money.Amount
 	Available        money.Amount
@@ -176,7 +168,6 @@ type Event struct {
 type Trade struct {
 	ID                    string
 	OrderID               string
-	OrderSide             Side
 	BuyerAccountID        string
 	BuyerDisplayName      string
 	SellerAccountID       string
@@ -207,11 +198,8 @@ type Trade struct {
 type Market struct {
 	GuidancePriceFen int64
 	LatestPriceFen   *int64
-	BestBidFen       *int64
 	BestAskFen       *int64
-	SpreadFen        *int64
 	SellOrders       []Order
-	BuyOrders        []Order
 }
 
 type Command struct {
@@ -224,7 +212,6 @@ type Command struct {
 
 type NewOrder struct {
 	ID             string
-	Side           Side
 	UnitPriceFen   int64
 	Total          money.Amount
 	Minimum        money.Amount

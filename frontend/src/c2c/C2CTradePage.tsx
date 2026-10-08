@@ -95,7 +95,7 @@ function PaymentDetails({ trade }: { trade: C2CTrade }) {
   if (!method) return null
   return (
     <div className="c2c-payment-details">
-      <h3>{trade.order_side === 'sell' ? '收款方式' : '买家联系方式'} · {c2cPaymentLabels[method.type]}</h3>
+      <h3>收款方式 · {c2cPaymentLabels[method.type]}</h3>
       {method.contact && <p><span>账号或联系方式</span><strong>{method.contact}</strong></p>}
       {method.instructions && <p><span>备注</span><strong>{method.instructions}</strong></p>}
       {method.qr_available && <img alt="收款码" src={method.qr_url} />}

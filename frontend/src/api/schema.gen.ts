@@ -1573,7 +1573,7 @@ export interface components {
             wallet: components["schemas"]["Wallet"];
             recovery_actions: {
                 /** @enum {string} */
-                kind: "market" | "create_buy_order" | "my_orders";
+                kind: "market" | "my_orders";
                 href: string;
             }[];
         };
@@ -2096,8 +2096,6 @@ export interface components {
             id: string;
             owner_account_id: string;
             owner_display_name: string;
-            /** @enum {string} */
-            side: "sell" | "buy";
             unit_price_fen: number;
             total: components["schemas"]["Amount"];
             available: components["schemas"]["Amount"];
@@ -2122,8 +2120,6 @@ export interface components {
         C2CTrade: {
             id: string;
             order_id: string;
-            /** @enum {string} */
-            order_side: "sell" | "buy";
             buyer_account_id: string;
             buyer_display_name: string;
             seller_account_id: string;
@@ -2165,8 +2161,6 @@ export interface components {
         C2CAdminTrade: {
             id: string;
             order_id: string;
-            /** @enum {string} */
-            order_side: "sell" | "buy";
             buyer_account_id: string;
             buyer_display_name: string;
             seller_account_id: string;
@@ -2223,12 +2217,9 @@ export interface components {
             metrics: {
                 guidance_price_fen: number;
                 latest_price_fen: number | null;
-                best_bid_fen: number | null;
                 best_ask_fen: number | null;
-                spread_fen: number | null;
             };
             sell_orders: components["schemas"]["C2COrder"][];
-            buy_orders: components["schemas"]["C2COrder"][];
         };
         C2CMyActivity: {
             orders: components["schemas"]["C2COrder"][];
@@ -2243,8 +2234,6 @@ export interface components {
             qr_field?: string;
         };
         C2CCreateOrderRequest: {
-            /** @enum {string} */
-            side: "sell" | "buy";
             unit_price_fen: number;
             total: components["schemas"]["Amount"];
             minimum: components["schemas"]["Amount"];
@@ -2330,7 +2319,6 @@ export interface components {
             };
             c2c: {
                 orders: {
-                    side: string;
                     status: string;
                     count: number;
                 }[];
@@ -2340,9 +2328,7 @@ export interface components {
                 }[];
                 quote: {
                     last_traded_price_fen: number | null;
-                    best_bid_price_fen: number | null;
                     best_ask_price_fen: number | null;
-                    spread_fen: number | null;
                 };
             };
             concentration: {

@@ -73,6 +73,7 @@ func TestC2CIntegration(t *testing.T) {
 	sellerTwo := createReady("c2c.seller.two", "0")
 	sellerThree := createReady("c2c.seller.three", "0")
 	restrictedSeller := createReady("c2c.seller.restricted", "0")
+	disputeSeller := createReady("c2c.seller.dispute", "0")
 	buyerOne := createReady("c2c.buyer.one", "0")
 	buyerTwo := createReady("c2c.buyer.two", "0")
 	buyerThree := createReady("c2c.buyer.three", "0")
@@ -81,7 +82,7 @@ func TestC2CIntegration(t *testing.T) {
 	for index, funded := range []struct {
 		account identity.Account
 		amount  string
-	}{{seller, "30"}, {sellerTwo, "10"}, {sellerThree, "3"}, {restrictedSeller, "5"}} {
+	}{{seller, "30"}, {sellerTwo, "10"}, {sellerThree, "3"}, {restrictedSeller, "5"}, {disputeSeller, "10"}} {
 		if _, err := ledgerService.Transfer(ctx, fmt.Sprintf("fund-seller-%d", index), funder.ID, funded.account.ID, mustAmount(t, funded.amount), "fund C2C integration seller", "test_funding", fmt.Sprintf("seller-%d", index)); err != nil {
 			t.Fatalf("fund seller %d: %v", index, err)
 		}
@@ -100,10 +101,10 @@ func TestC2CIntegration(t *testing.T) {
 
 	t.Run("sell parent hold, partial fills, idempotency, cancellation and privacy", func(t *testing.T) {
 		forged := c2c.SanitizedImage{MIME: "image/png", Bytes: []byte("not really a PNG"), Width: 1, Height: 1}
-		if _, err := service.CreateOrder(ctx, seller, "forged-image", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, QR: &forged}}); !errors.Is(err, c2c.ErrInvalidInput) {
+		if _, err := service.CreateOrder(ctx, seller, "forged-image", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, QR: &forged}}); !errors.Is(err, c2c.ErrInvalidInput) {
 			t.Fatalf("forged pre-sanitized image error = %v", err)
 		}
-		order, err := service.CreateOrder(ctx, seller, "sell-create", c2c.SideSell, 100, mustAmount(t, "10"), mustAmount(t, "2"), mustAmount(t, "6"), method)
+		order, err := service.CreateOrder(ctx, seller, "sell-create", 100, mustAmount(t, "10"), mustAmount(t, "2"), mustAmount(t, "6"), method)
 		if err != nil {
 			t.Fatalf("create sell: %v", err)
 		}
@@ -203,29 +204,30 @@ func TestC2CIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("buy child hold survives parent cancel and account restriction", func(t *testing.T) {
-		buyOrder, err := service.CreateOrder(ctx, buyerOne, "buy-create", c2c.SideBuy, 99, mustAmount(t, "8"), mustAmount(t, "2"), mustAmount(t, "5"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "buyer-contact"}})
+	t.Run("disputed trade survives parent cancel and seller restriction", func(t *testing.T) {
+		sellOrder, err := service.CreateOrder(ctx, disputeSeller, "dispute-create", 99, mustAmount(t, "8"), mustAmount(t, "2"), mustAmount(t, "5"), method)
 		if err != nil {
-			t.Fatalf("create buy: %v", err)
+			t.Fatalf("create sell: %v", err)
 		}
-		trade, err := service.TakeOrder(ctx, seller, "buy-take", buyOrder.ID, mustAmount(t, "3"), buyOrder.PaymentMethods[0].ID)
+		trade, err := service.TakeOrder(ctx, buyerOne, "dispute-take", sellOrder.ID, mustAmount(t, "3"), sellOrder.PaymentMethods[0].ID)
 		if err != nil {
-			t.Fatalf("take buy: %v", err)
+			t.Fatalf("take sell: %v", err)
 		}
-		assertHold(t, pool, trade.HoldID, "3", "3", "0", "0")
-		if _, err := service.CancelOrder(ctx, buyerOne, "buy-cancel-parent", buyOrder.ID); err != nil {
-			t.Fatalf("cancel buy parent: %v", err)
+		assertHold(t, pool, sellOrder.ParentHoldID, "8", "8", "0", "0")
+		if _, err := service.CancelOrder(ctx, disputeSeller, "dispute-cancel-parent", sellOrder.ID); err != nil {
+			t.Fatalf("cancel sell parent: %v", err)
 		}
-		if _, err := service.MarkPaid(ctx, buyerOne, "buy-paid", trade.ID, ""); err != nil {
-			t.Fatalf("mark buy trade paid: %v", err)
+		assertHold(t, pool, sellOrder.ParentHoldID, "8", "3", "0", "5")
+		if _, err := service.MarkPaid(ctx, buyerOne, "dispute-paid", trade.ID, ""); err != nil {
+			t.Fatalf("mark trade paid: %v", err)
 		}
-		if _, err := service.OpenDispute(ctx, buyerOne, "buy-dispute", trade.ID, "seller payment details could not be verified"); err != nil {
-			t.Fatalf("open buy dispute: %v", err)
+		if _, err := service.OpenDispute(ctx, buyerOne, "dispute-open", trade.ID, "seller never confirmed the payment"); err != nil {
+			t.Fatalf("open dispute: %v", err)
 		}
-		if _, err := service.AddDisputeStatement(ctx, buyerOne, "buy-dispute-follow-up", trade.ID, "additional timeline supplied by the same participant"); err != nil {
+		if _, err := service.AddDisputeStatement(ctx, buyerOne, "dispute-follow-up", trade.ID, "additional timeline supplied by the same participant"); err != nil {
 			t.Fatalf("append dispute statement: %v", err)
 		}
-		if _, err := service.AddDisputeStatement(ctx, buyerOne, "buy-dispute-too-long", trade.ID, strings.Repeat("x", 1_980)); err == nil {
+		if _, err := service.AddDisputeStatement(ctx, buyerOne, "dispute-too-long", trade.ID, strings.Repeat("x", 1_980)); err == nil {
 			t.Fatal("cumulative 2,000-character statement limit unexpectedly accepted")
 		}
 		disputeView, err := service.Trade(ctx, admin, trade.ID)
@@ -233,33 +235,25 @@ func TestC2CIntegration(t *testing.T) {
 			t.Fatalf("append-only decrypted dispute statements = %+v, %v", disputeView.Statements, err)
 		}
 		disabled := identity.StatusDisabled
-		updatedSeller, err := identityService.UpdateAccount(ctx, admin, seller.ID, identity.AccountUpdate{ExpectedVersion: seller.Version, Status: &disabled})
+		updatedSeller, err := identityService.UpdateAccount(ctx, admin, disputeSeller.ID, identity.AccountUpdate{ExpectedVersion: disputeSeller.Version, Status: &disabled})
 		if err != nil || updatedSeller.Status != identity.StatusDisabled {
 			t.Fatalf("disable seller = %+v, %v", updatedSeller, err)
 		}
-		returned, err := service.ResolveDispute(ctx, admin, "buy-return", trade.ID, c2c.ResolutionReturn, "seller prevailed after administrator review")
+		returned, err := service.ResolveDispute(ctx, admin, "dispute-return", trade.ID, c2c.ResolutionReturn, "seller prevailed after administrator review")
 		if err != nil || returned.Status != c2c.TradeReturnedToSeller || returned.LedgerTransactionID != "" {
 			t.Fatalf("admin return = %+v, %v", returned, err)
 		}
 		returnedTradeID = returned.ID
-		assertHold(t, pool, trade.HoldID, "3", "0", "0", "3")
-		buyOrder, err = service.Order(ctx, buyerOne, buyOrder.ID)
+		assertHold(t, pool, sellOrder.ParentHoldID, "8", "0", "0", "8")
+		sellOrder, err = service.Order(ctx, disputeSeller, sellOrder.ID)
 		if err != nil {
-			t.Fatalf("reload cancelled buy: %v", err)
+			t.Fatalf("reload cancelled sell: %v", err)
 		}
-		assertOrderAmounts(t, buyOrder, "8", "0", "0", "0", "8", c2c.OrderCancelled)
-
-		otherBuy, err := service.CreateOrder(ctx, buyerTwo, "buy-create-disabled-test", c2c.SideBuy, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "2"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "buyer-two-contact"}})
-		if err != nil {
-			t.Fatalf("create second buy: %v", err)
-		}
-		if _, err := service.TakeOrder(ctx, seller, "disabled-seller-take", otherBuy.ID, mustAmount(t, "1"), otherBuy.PaymentMethods[0].ID); !errors.Is(err, c2c.ErrForbidden) {
-			t.Fatalf("disabled seller new hold error = %v", err)
-		}
+		assertOrderAmounts(t, sellOrder, "8", "0", "0", "0", "8", c2c.OrderCancelled)
 	})
 
 	t.Run("open and cancelled parent returns preserve exact hold quantities", func(t *testing.T) {
-		openOrder, err := service.CreateOrder(ctx, sellerTwo, "open-return-create", c2c.SideSell, 100, mustAmount(t, "5"), mustAmount(t, "2"), mustAmount(t, "4"), method)
+		openOrder, err := service.CreateOrder(ctx, sellerTwo, "open-return-create", 100, mustAmount(t, "5"), mustAmount(t, "2"), mustAmount(t, "4"), method)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -287,7 +281,7 @@ func TestC2CIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cancelledOrder, err := service.CreateOrder(ctx, sellerTwo, "cancelled-return-create", c2c.SideSell, 100, mustAmount(t, "5"), mustAmount(t, "2"), mustAmount(t, "4"), method)
+		cancelledOrder, err := service.CreateOrder(ctx, sellerTwo, "cancelled-return-create", 100, mustAmount(t, "5"), mustAmount(t, "2"), mustAmount(t, "4"), method)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,31 +304,10 @@ func TestC2CIntegration(t *testing.T) {
 		}
 		assertOrderAmounts(t, cancelledOrder, "5", "0", "0", "0", "5", c2c.OrderCancelled)
 		assertHold(t, pool, cancelledOrder.ParentHoldID, "5", "0", "0", "5")
-
-		buyOrder, err := service.CreateOrder(ctx, buyerThree, "open-buy-return-create", c2c.SideBuy, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "2"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "buyer-three-contact"}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		buyTrade, err := service.TakeOrder(ctx, sellerTwo, "open-buy-return-take", buyOrder.ID, mustAmount(t, "1"), buyOrder.PaymentMethods[0].ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := service.CancelTrade(ctx, buyerThree, "open-buy-return-cancel", buyTrade.ID); err != nil {
-			t.Fatal(err)
-		}
-		buyOrder, err = service.Order(ctx, buyerThree, buyOrder.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assertOrderAmounts(t, buyOrder, "2", "2", "0", "0", "0", c2c.OrderOpen)
-		assertHold(t, pool, buyTrade.HoldID, "1", "0", "0", "1")
-		if _, err := service.CancelOrder(ctx, buyerThree, "open-buy-return-close", buyOrder.ID); err != nil {
-			t.Fatal(err)
-		}
 	})
 
 	t.Run("administrator can close restricted accounts without reactivation", func(t *testing.T) {
-		order, err := service.CreateOrder(ctx, restrictedSeller, "restricted-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "2"), method)
+		order, err := service.CreateOrder(ctx, restrictedSeller, "restricted-create", 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "2"), method)
 		if err != nil {
 			t.Fatalf("create restricted scenario: %v", err)
 		}
@@ -363,7 +336,7 @@ func TestC2CIntegration(t *testing.T) {
 	})
 
 	t.Run("terminal races create one hold effect", func(t *testing.T) {
-		order, err := service.CreateOrder(ctx, sellerTwo, "race-sell-create", c2c.SideSell, 100, mustAmount(t, "4"), mustAmount(t, "1"), mustAmount(t, "2"), method)
+		order, err := service.CreateOrder(ctx, sellerTwo, "race-sell-create", 100, mustAmount(t, "4"), mustAmount(t, "1"), mustAmount(t, "2"), method)
 		if err != nil {
 			t.Fatalf("create race sell: %v", err)
 		}
@@ -472,8 +445,8 @@ func TestC2CIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("exact deadline expires and concurrent buy holds cannot oversubscribe", func(t *testing.T) {
-		order, err := service.CreateOrder(ctx, sellerTwo, "deadline-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+	t.Run("exact deadline expires and concurrent sell parent holds cannot oversubscribe", func(t *testing.T) {
+		order, err := service.CreateOrder(ctx, sellerTwo, "deadline-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 		if err != nil {
 			t.Fatalf("create deadline order: %v", err)
 		}
@@ -493,23 +466,15 @@ func TestC2CIntegration(t *testing.T) {
 			t.Fatalf("deadline final = %+v, %v", final, err)
 		}
 
-		buyA, err := service.CreateOrder(ctx, buyerOne, "capacity-buy-a", c2c.SideBuy, 100, mustAmount(t, "2"), mustAmount(t, "2"), mustAmount(t, "2"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "capacity-a"}})
-		if err != nil {
-			t.Fatalf("create capacity buy A: %v", err)
-		}
-		buyB, err := service.CreateOrder(ctx, buyerTwo, "capacity-buy-b", c2c.SideBuy, 100, mustAmount(t, "2"), mustAmount(t, "2"), mustAmount(t, "2"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "capacity-b"}})
-		if err != nil {
-			t.Fatalf("create capacity buy B: %v", err)
-		}
 		capacityErrors := make(chan error, 2)
 		var group sync.WaitGroup
-		for index, buy := range []c2c.Order{buyA, buyB} {
+		for index := 0; index < 2; index++ {
 			group.Add(1)
-			go func(index int, buy c2c.Order) {
+			go func(index int) {
 				defer group.Done()
-				_, err := service.TakeOrder(ctx, sellerThree, fmt.Sprintf("capacity-take-%d", index), buy.ID, mustAmount(t, "2"), buy.PaymentMethods[0].ID)
+				_, err := service.CreateOrder(ctx, sellerThree, fmt.Sprintf("capacity-sell-%d", index), 100, mustAmount(t, "2"), mustAmount(t, "2"), mustAmount(t, "2"), method)
 				capacityErrors <- err
-			}(index, buy)
+			}(index)
 		}
 		group.Wait()
 		close(capacityErrors)
@@ -582,7 +547,7 @@ func TestC2CIntegration(t *testing.T) {
 		t.Run("disable order owner against take", func(t *testing.T) {
 			seller := createFundedSeller("c2c.lock.take.seller")
 			buyer := createReady("c2c.lock.take.buyer", "0")
-			order, err := service.CreateOrder(ctx, seller, "lock-take-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, seller, "lock-take-create", 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -622,7 +587,7 @@ func TestC2CIntegration(t *testing.T) {
 		t.Run("freeze buyer against cancel trade", func(t *testing.T) {
 			seller := createFundedSeller("c2c.lock.cancel.seller")
 			buyer := createReady("c2c.lock.cancel.buyer", "0")
-			order, err := service.CreateOrder(ctx, seller, "lock-cancel-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, seller, "lock-cancel-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -652,7 +617,7 @@ func TestC2CIntegration(t *testing.T) {
 		t.Run("disable seller against capture", func(t *testing.T) {
 			seller := createFundedSeller("c2c.lock.capture.seller")
 			buyer := createReady("c2c.lock.capture.buyer", "0")
-			order, err := service.CreateOrder(ctx, seller, "lock-capture-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, seller, "lock-capture-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -690,7 +655,7 @@ func TestC2CIntegration(t *testing.T) {
 
 		t.Run("freeze seller against release available hold", func(t *testing.T) {
 			seller := createFundedSeller("c2c.lock.release.seller")
-			order, err := service.CreateOrder(ctx, seller, "lock-release-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, seller, "lock-release-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -715,11 +680,11 @@ func TestC2CIntegration(t *testing.T) {
 			owner := createFundedSeller("c2c.frozenowner.seller")
 			buyer := createReady("c2c.frozenowner.buyer", "0")
 			disabledOwner := createFundedSeller("c2c.frozenowner.disabled")
-			order, err := service.CreateOrder(ctx, owner, "frozenowner-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, owner, "frozenowner-create", 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
-			disabledOrder, err := service.CreateOrder(ctx, disabledOwner, "frozenowner-disabled-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			disabledOrder, err := service.CreateOrder(ctx, disabledOwner, "frozenowner-disabled-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -821,11 +786,11 @@ func TestC2CIntegration(t *testing.T) {
 			seller := createFundedSeller("c2c.restrict.seller")
 			buyer := createReady("c2c.restrict.buyer", "0")
 			otherSeller := createFundedSeller("c2c.restrict.other.seller")
-			order, err := service.CreateOrder(ctx, seller, "restrict-create", c2c.SideSell, 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			order, err := service.CreateOrder(ctx, seller, "restrict-create", 100, mustAmount(t, "2"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
-			otherOrder, err := service.CreateOrder(ctx, otherSeller, "restrict-other-create", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
+			otherOrder, err := service.CreateOrder(ctx, otherSeller, "restrict-other-create", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -936,13 +901,13 @@ func TestC2CIntegration(t *testing.T) {
 			}
 			assertHold(t, pool, order.ParentHoldID, "2", "2", "0", "0")
 
-			if _, err := service.CreateOrder(ctx, buyer, "restricted-buyer-buy", c2c.SideBuy, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), []c2c.PaymentMethodInput{{Type: c2c.PaymentOther, Contact: "restricted"}}); !errors.Is(err, ledger.ErrCreditFrozen) {
-				t.Fatalf("frozen buyer create buy order error = %v", err)
+			if _, err := service.CreateOrder(ctx, buyer, "restricted-buyer-sell", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method); !errors.Is(err, ledger.ErrCreditFrozen) {
+				t.Fatalf("frozen buyer create sell order error = %v", err)
 			}
 			if _, err := service.TakeOrder(ctx, buyer, "restricted-buyer-take", otherOrder.ID, mustAmount(t, "1"), otherOrder.PaymentMethods[0].ID); !errors.Is(err, ledger.ErrCreditFrozen) {
 				t.Fatalf("frozen buyer take sell order error = %v", err)
 			}
-			if _, err := service.CreateOrder(ctx, seller, "restricted-seller-sell", c2c.SideSell, 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method); !errors.Is(err, ledger.ErrCreditFrozen) {
+			if _, err := service.CreateOrder(ctx, seller, "restricted-seller-sell", 100, mustAmount(t, "1"), mustAmount(t, "1"), mustAmount(t, "1"), method); !errors.Is(err, ledger.ErrCreditFrozen) {
 				t.Fatalf("frozen seller create sell order error = %v", err)
 			}
 

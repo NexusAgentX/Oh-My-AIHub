@@ -42,7 +42,7 @@
 - [ADR-0008：采用不可变账本、双持有投影与计价公式 v1](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) — 已通过
 - [ADR-0009：采用版本化凭据加密与固定出站网络边界](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) — 已通过
 - [ADR-0010：采用快照化 API 网关与幂等终结状态机](0010-adopt-snapshot-gateway-and-idempotent-settlement.md) — 已通过
-- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过（证据图片部分被 ADR-0018 取代）
+- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过（证据图片部分被 ADR-0018 取代，买单部分被 ADR-0023 取代）
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md) — 已通过
 - [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过
@@ -54,3 +54,4 @@
 - [ADR-0020：跨领域原子提交由调用方持有事务](0020-adopt-caller-owned-transactions-across-persistence-domains.md) — 已通过
 - [ADR-0021：以 OpenAPI 作为前后端唯一契约来源](0021-openapi-as-single-api-contract.md) — 已通过
 - [ADR-0022：取消用户验证环节](0022-drop-user-validation-stage.md) — 已通过
+- [ADR-0023：删除 C2C 买单，只保留卖单](0023-remove-c2c-buy-orders.md) — 已通过
