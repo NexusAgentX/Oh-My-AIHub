@@ -2565,7 +2565,7 @@ components:
           items:
             type: object
             properties:
-              kind: {type: string}
+              kind: {type: string, enum: [market, create_buy_order, my_orders]}
               href: {type: string}
             required: [kind, href]
             additionalProperties: false

@@ -29,6 +29,10 @@ jobs:
             ${{ runner.os }}-deps-
       - name: Install frontend dependencies
         run: npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000
+      - name: API types are generated from openapi.yaml
+        run: |
+          npm --prefix frontend run generate:api
+          git diff --exit-code -- frontend/src/api/schema.gen.ts
       - name: Frontend tests
         run: npm --prefix frontend test
       - name: Frontend build

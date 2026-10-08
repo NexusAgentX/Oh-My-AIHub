@@ -49,7 +49,7 @@ export interface paths {
         put?: never;
         /**
          * 初始化实例并创建首个管理员
-         * @description 仅在实例尚无管理员时可用；成功后建立会话并设置会话 Cookie。 注意：请求体无法解析时当前实现不写入响应（返回空的 200），属于既有行为，待单独修复。
+         * @description 仅在实例尚无管理员时可用；成功后建立会话并设置会话 Cookie。
          */
         post: operations["initializeInstance"];
         delete?: never;
@@ -1572,7 +1572,8 @@ export interface components {
         WalletResponse: {
             wallet: components["schemas"]["Wallet"];
             recovery_actions: {
-                kind: string;
+                /** @enum {string} */
+                kind: "market" | "create_buy_order" | "my_orders";
                 href: string;
             }[];
         };
@@ -2612,6 +2613,7 @@ export interface operations {
                     "application/json": components["schemas"]["InstanceInitializeResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
