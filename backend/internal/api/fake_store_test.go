@@ -16,6 +16,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -441,6 +442,10 @@ func newFakeHandler(store *fakeStore) http.Handler {
 	return NewHandler(Dependencies{
 		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
 		Settings: settings.NewService(store), Audit: audit.NewService(store), CookieSecure: true,
+		Observe: observe.NewService(fakeObserveStore{exported: []observe.ExportEntry{
+			{CreatedAt: time.Date(2026, 10, 8, 4, 30, 0, 0, time.UTC), Type: "admin_adjust", Reason: "=SUM(A1)", RelatedType: "account", RelatedID: "00000000-0000-4000-8000-000000000001", Amount: money.FromNano(-30_030_000_000), BalanceAfter: money.FromNano(-30_030_000_000)},
+			{CreatedAt: time.Date(2026, 10, 8, 5, 0, 0, 0, time.UTC), Type: "api_call", Reason: "", Amount: money.FromNano(-1_500_000_000), BalanceAfter: money.FromNano(-31_530_000_000), KeyName: "默认 Key"},
+		}}),
 	})
 }
 

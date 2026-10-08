@@ -36,6 +36,7 @@ func adminAccountResponse(account identity.AdminAccount) map[string]any {
 		"created_at":           account.CreatedAt,
 		"updated_at":           account.UpdatedAt,
 		"password_changed_at":  account.PasswordChangedAt,
+		"last_active_at":       account.LastActiveAt,
 	}
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -142,8 +143,18 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		if state == gateway.StateCooldown {
 			cooldown = int64(remaining.Seconds()) + 1
 		}
+		var capRemaining any
+		if cap := entry.Advanced.DailyRevenueCap; cap != nil && *cap > 0 {
+			revenue, err := a.browse.ChannelRevenue(ctx, entry.ChannelID, localtime.DayStart(now))
+			if err != nil {
+				writeDomainError(w, err)
+				return
+			}
+			remaining := 1 - float64(revenue.Nano())/float64(cap.Nano())
+			capRemaining = ratio(math.Min(1, math.Max(0, remaining)))
+		}
 		channels = append(channels, map[string]any{
-			"id": entry.ChannelID, "name": entry.ChannelName,
+			"id": entry.ChannelID, "name": entry.ChannelName, "daily_cap_remaining": capRemaining,
 			"owner":   map[string]any{"id": entry.OwnerID, "display_name": entry.OwnerName},
 			"is_mine": entry.OwnerID == accountID, "formats": entry.Formats,
 			"multiplier":       money.FromNano(entry.MultiplierNano).String(),
@@ -180,15 +191,19 @@ func callSummaryResponse(call gateway.CallSummary) map[string]any {
 		}
 		channelRef = map[string]any{"id": *call.ChannelID, "name": name}
 	}
+	charged := money.Amount(0)
+	if call.Booked {
+		charged = money.FromNano((call.Cost + call.Fee).Nano())
+	}
 	return map[string]any{
-		"id": call.ID, "created_at": call.CreatedAt, "completed_at": call.CompletedAt, "model_id": call.ModelID,
+		"id": call.ID, "created_at": call.CreatedAt, "completed_at": call.CompletedAt, "model_id": call.ModelID, "attempt_count": call.AttemptCount,
 		"requested_model": call.RequestedModel, "format": call.Format, "stream": call.Stream, "tag": call.Tag,
 		"api_key": apiKey, "outcome": call.Outcome, "channel": channelRef,
 		"usage": map[string]int64{
 			"input_tokens": call.Usage.InputTokens, "output_tokens": call.Usage.OutputTokens,
 			"cache_write_tokens": call.Usage.CacheWriteTokens, "cache_read_tokens": call.Usage.CacheReadTokens,
 		},
-		"cost": call.Cost.String(), "fee": call.Fee.String(), "charged": money.FromNano((call.Cost + call.Fee).Nano()).String(),
+		"cost": call.Cost.String(), "fee": call.Fee.String(), "charged": charged.String(),
 		"ttft_ms": call.TTFTMS, "duration_ms": call.DurationMS,
 	}
 }

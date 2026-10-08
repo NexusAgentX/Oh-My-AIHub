@@ -120,7 +120,8 @@ WHERE (buyer_id = $1 AND status = 'awaiting_payment') OR (seller_id = $1 AND sta
 SELECT c.id, c.created_at, c.completed_at, c.model_id, c.requested_model, c.format, c.stream, c.tag,
        c.api_key_id, k.name AS key_name, c.outcome, c.final_channel_id, ch.name AS channel_name,
        c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens,
-       c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms
+       c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms,
+       jsonb_array_length(c.attempts)::int AS attempt_count, (c.ledger_tx_id IS NOT NULL)::boolean AS booked
 FROM calls c
 LEFT JOIN api_keys k ON k.id = c.api_key_id
 LEFT JOIN channels ch ON ch.id = c.final_channel_id

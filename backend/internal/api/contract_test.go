@@ -159,6 +159,12 @@ func (spec *openAPISpec) assertResponse(t *testing.T, method, path string, recor
 		spec.assertSchema(t, "ErrorResponse", recorder.Body.Bytes())
 		return
 	}
+	if strings.HasPrefix(recorder.Header().Get("Content-Type"), "text/csv") {
+		if declared["content"].(map[string]any)["text/csv"] == nil {
+			t.Fatalf("%s %s 返回 CSV，但规范未登记 text/csv", method, path)
+		}
+		return
+	}
 	schemaRef := declared["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)["$ref"].(string)
 	spec.assertSchema(t, strings.TrimPrefix(schemaRef, "#/components/schemas/"), recorder.Body.Bytes())
 }
@@ -191,10 +197,6 @@ func TestOpenAPIPathsMatchRouteTable(t *testing.T) {
 		}
 		if got := operation.body["x-feature"]; got != entry.feature {
 			t.Errorf("%s: x-feature = %v，路由登记为 Feature %s", key, got, entry.feature)
-		}
-		responses, _ := operation.body["responses"].(map[string]any)
-		if !entry.implemented && entry.access != accessGatewayKey && responses["501"] == nil {
-			t.Errorf("%s: 未实现的路由须登记 501", key)
 		}
 	}
 	for key := range operations {
@@ -290,41 +292,5 @@ func TestOpenAPISchemasCompile(t *testing.T) {
 	spec := loadOpenAPI(t)
 	for _, name := range spec.schemaKeys {
 		spec.schema(t, name)
-	}
-}
-
-// TestPlannedRoutesKeepTheirGateAndAnswerNotImplemented 对每条尚未实现的路由：
-// 未登录时被门禁拒绝，管理员登录后返回契约登记的 501。
-func TestPlannedRoutesKeepTheirGateAndAnswerNotImplemented(t *testing.T) {
-	spec := loadOpenAPI(t)
-	store := newFakeStore()
-	handler := newFakeHandler(store)
-	admin := bootstrap(t, spec, handler)
-	_, routes := buildHandler(Dependencies{})
-	for _, entry := range routes {
-		if entry.implemented {
-			continue
-		}
-		method, path, _ := strings.Cut(entry.pattern, " ")
-		concrete := strings.NewReplacer(
-			"{modelID}", "gpt-5", "{model}", "gemini-2.5-flash:generateContent",
-			"{keyID}", "00000000-0000-4000-8000-0000000000aa", "{channelID}", "00000000-0000-4000-8000-0000000000bb",
-			"{callID}", "00000000-0000-4000-8000-0000000000cc", "{orderID}", "00000000-0000-4000-8000-0000000000dd",
-			"{tradeID}", "00000000-0000-4000-8000-0000000000ee", "{transactionID}", "00000000-0000-4000-8000-0000000000ff",
-		).Replace(path)
-		if entry.access != accessGatewayKey {
-			anonymous := admin.call(t, method, concrete, nil, withoutCookie)
-			if anonymous.Code != http.StatusUnauthorized {
-				t.Errorf("%s %s 未登录 = %d", method, concrete, anonymous.Code)
-			}
-		}
-		recorder := admin.call(t, method, concrete, nil)
-		if recorder.Code != http.StatusNotImplemented || !strings.Contains(recorder.Body.String(), `"error":"not_implemented"`) {
-			t.Errorf("%s %s = %d %s", method, concrete, recorder.Code, recorder.Body.String())
-			continue
-		}
-		if entry.access != accessGatewayKey {
-			spec.assertResponse(t, method, concrete, recorder)
-		}
 	}
 }

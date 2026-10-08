@@ -185,8 +185,20 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 	if len(items) != 1 || items[0].(map[string]any)["amount"] != "-30.03" || items[0].(map[string]any)["type"] != "admin_adjust" {
 		t.Fatalf("entries = %v", entries)
 	}
-	if recorder := wang.call(t, http.MethodGet, "/api/points/entries?format=csv", nil); recorder.Code != http.StatusNotImplemented {
-		t.Fatalf("csv export = %d", recorder.Code)
+	csvResponse := wang.call(t, http.MethodGet, "/api/points/entries?format=csv", nil)
+	if csvResponse.Code != http.StatusOK || !strings.HasPrefix(csvResponse.Header().Get("Content-Type"), "text/csv") ||
+		!strings.HasPrefix(csvResponse.Body.String(), "\ufeff时间,类型,说明,关联,变动,余额,Key\n") {
+		t.Fatalf("csv export = %d %q", csvResponse.Code, csvResponse.Body.String())
+	}
+	if body := csvResponse.Body.String(); !strings.Contains(body, "2026-10-08 12:30:00,管理员调账,'=SUM(A1),account:") || !strings.Contains(body, "调用支出,,,-1.5,-31.53,默认 Key") {
+		t.Fatalf("csv rows = %q", body)
+	}
+	if recorder := wang.call(t, http.MethodGet, "/api/points/entries?group=week", nil); recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid group = %d", recorder.Code)
+	}
+	summary := wang.expect(t, http.StatusOK, http.MethodGet, "/api/points/entries?group=day", nil)
+	if _, ok := summary["summary"].(map[string]any)["by_day"]; !ok {
+		t.Fatalf("summary = %v", summary)
 	}
 	if recorder := wang.call(t, http.MethodGet, "/api/points/entries?limit=1000", nil); recorder.Code != http.StatusBadRequest {
 		t.Fatalf("oversized limit = %d", recorder.Code)

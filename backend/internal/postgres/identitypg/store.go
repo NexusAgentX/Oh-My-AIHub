@@ -44,8 +44,21 @@ func toAccount(a Account) identity.Account {
 	}
 }
 
-func toAdminAccount(a Account, balance int64) identity.AdminAccount {
-	return identity.AdminAccount{Account: toAccount(a), Balance: money.FromNano(balance)}
+// latestTime picks the later of two nullable timestamps scanned as interface
+// values (sqlc cannot infer the nullability of scalar max() subqueries).
+func latestTime(values ...any) *time.Time {
+	var latest *time.Time
+	for _, value := range values {
+		if at, ok := value.(time.Time); ok && (latest == nil || at.After(*latest)) {
+			copied := at
+			latest = &copied
+		}
+	}
+	return latest
+}
+
+func toAdminAccount(a Account, balance int64, lastActive *time.Time) identity.AdminAccount {
+	return identity.AdminAccount{Account: toAccount(a), Balance: money.FromNano(balance), LastActiveAt: lastActive}
 }
 
 func (s *Store) FindAccountByUsername(ctx context.Context, username string) (identity.AccountWithPassword, error) {
@@ -143,7 +156,7 @@ func (s *Store) ResetPassword(ctx context.Context, actorID, accountID, passwordH
 		if err != nil {
 			return err
 		}
-		result = toAdminAccount(row.Account, row.BalanceNano)
+		result = toAdminAccount(row.Account, row.BalanceNano, latestTime(row.LastLoginAt, row.LastCallAt))
 		return nil
 	})
 	return result, err
@@ -186,7 +199,7 @@ func (s *Store) CreateAccount(ctx context.Context, account identity.NewAccount) 
 	var created identity.AdminAccount
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		row, err := s.insertAccount(ctx, tx, account)
-		created = toAdminAccount(row, 0)
+		created = toAdminAccount(row, 0, nil)
 		return err
 	})
 	return created, err
@@ -231,7 +244,7 @@ func (s *Store) ListAccounts(ctx context.Context, filter identity.AccountFilter)
 	}
 	accounts := make([]identity.AdminAccount, 0, len(rows))
 	for _, row := range rows {
-		accounts = append(accounts, toAdminAccount(row.Account, row.BalanceNano))
+		accounts = append(accounts, toAdminAccount(row.Account, row.BalanceNano, latestTime(row.LastLoginAt, row.LastCallAt)))
 	}
 	return accounts, nil
 }
@@ -241,7 +254,7 @@ func (s *Store) GetAccount(ctx context.Context, accountID string) (identity.Admi
 	if err != nil {
 		return identity.AdminAccount{}, mapError(err)
 	}
-	return toAdminAccount(row.Account, row.BalanceNano), nil
+	return toAdminAccount(row.Account, row.BalanceNano, latestTime(row.LastLoginAt, row.LastCallAt)), nil
 }
 
 func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, update identity.AccountUpdate) (identity.AdminAccount, error) {
@@ -317,7 +330,7 @@ func (s *Store) UpdateAccount(ctx context.Context, actorID, accountID string, up
 		if err != nil {
 			return err
 		}
-		result = toAdminAccount(admin.Account, admin.BalanceNano)
+		result = toAdminAccount(admin.Account, admin.BalanceNano, latestTime(admin.LastLoginAt, admin.LastCallAt))
 		return nil
 	})
 	return result, err

@@ -18,6 +18,9 @@ const (
 	EventChannelCooldown EventKind = "channel_cooldown_started"
 	EventChannelRecover  EventKind = "channel_cooldown_ended"
 	EventChannelLimit    EventKind = "channel_limit_reached"
+	// EventSettlementFailed reports a call whose ledger booking failed; the
+	// call is closed without a ledger transaction and awaits repair.
+	EventSettlementFailed EventKind = "settlement_failed"
 )
 
 // Event carries identifiers and outcomes only: never request or response

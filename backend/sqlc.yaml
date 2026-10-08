@@ -158,3 +158,12 @@ sql:
         <<: *gen
         package: c2cpg
         out: internal/postgres/c2cpg
+  - <<: *domain
+    queries:
+      - internal/postgres/observepg/queries.sql
+      - internal/postgres/observepg/points.sql
+    gen:
+      go:
+        <<: *gen
+        package: observepg
+        out: internal/postgres/observepg

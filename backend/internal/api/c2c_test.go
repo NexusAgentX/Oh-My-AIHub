@@ -15,6 +15,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -308,6 +309,7 @@ func newC2CHandler(store *fakeStore, c2cStore *fakeC2CStore) http.Handler {
 	return NewHandler(Dependencies{
 		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
 		Settings: settings.NewService(store), Audit: audit.NewService(store), C2C: c2c.NewService(c2cStore, keyring), CookieSecure: true,
+		Observe: observe.NewService(fakeObserveStore{}),
 	})
 }
 

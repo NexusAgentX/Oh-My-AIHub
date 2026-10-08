@@ -17,7 +17,7 @@ import { useModels } from '../models/queries'
 import { formatPoints, formatTokens } from '../money/format'
 import { BarChart, Card, EmptyState, MetricGrid, Metric, PageHeader, QueryBoundary, Segmented } from '../ui'
 
-type GroupBy = UsageReport['group_by']
+type GroupBy = Exclude<UsageReport['group_by'], 'channel'>
 
 const groupOptions: Array<{ key: GroupBy; label: string }> = [
   { key: 'day', label: '按天' },

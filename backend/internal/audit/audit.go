@@ -26,6 +26,7 @@ const (
 	ActionChannelSuspended      = "channel.suspended"
 	ActionChannelUnsuspended    = "channel.unsuspended"
 	ActionAPIKeyReveal          = "api_key.reveal"
+	ActionLedgerRepairCall      = "ledger.repair_call"
 )
 
 type Actor struct {

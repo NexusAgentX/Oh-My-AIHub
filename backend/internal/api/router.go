@@ -19,12 +19,11 @@ const (
 )
 
 // route 是路由表的一行，契约测试用它与 OpenAPI 规范逐项对照。
-// feature 为负责实现的 Feature（Epic #170）；implemented 为 false 时 handler 返回 501。
+// feature 为负责实现的 Feature（Epic #170）。
 type route struct {
-	pattern     string
-	access      access
-	feature     string
-	implemented bool
+	pattern string
+	access  access
+	feature string
 }
 
 // router 按领域注册路由，并按声明的 access 套上会话与权限门禁。
@@ -51,13 +50,13 @@ func (r *router) wrap(level access, handler http.HandlerFunc) http.Handler {
 }
 
 func (r *router) handle(pattern string, level access, handler http.HandlerFunc) {
-	r.table = append(r.table, route{pattern: pattern, access: level, feature: "A", implemented: true})
+	r.table = append(r.table, route{pattern: pattern, access: level, feature: "A"})
 	r.mux.Handle(pattern, r.wrap(level, handler))
 }
 
 // implement registers a route owned by a later feature once it is built.
 func (r *router) implement(feature string, pattern string, level access, handler http.HandlerFunc) {
-	r.table = append(r.table, route{pattern: pattern, access: level, feature: feature, implemented: true})
+	r.table = append(r.table, route{pattern: pattern, access: level, feature: feature})
 	r.mux.Handle(pattern, r.wrap(level, handler))
 }
 
@@ -75,11 +74,4 @@ func (r *router) ready(pattern string, handler http.HandlerFunc) {
 
 func (r *router) admin(pattern string, handler http.HandlerFunc) {
 	r.handle(pattern, accessAdmin, handler)
-}
-
-// planned registers a contract route owned by a later feature: it keeps the
-// access gate and answers 501 not_implemented until that feature lands.
-func (r *router) planned(feature string, pattern string, level access) {
-	r.table = append(r.table, route{pattern: pattern, access: level, feature: feature})
-	r.mux.Handle(pattern, r.wrap(level, notImplemented))
 }

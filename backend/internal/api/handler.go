@@ -14,6 +14,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
@@ -35,6 +36,8 @@ type Dependencies struct {
 	Gateway           *gateway.Engine
 	Browse            gateway.Browse
 	C2C               *c2c.Service
+	Observe           *observe.Service
+	Feed              *observe.Feed
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -52,6 +55,8 @@ type app struct {
 	gateway           *gateway.Engine
 	browse            gateway.Browse
 	c2c               *c2c.Service
+	observe           *observe.Service
+	feed              *observe.Feed
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
 	cookieName        string
@@ -79,6 +84,8 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		gateway:           dependencies.Gateway,
 		browse:            dependencies.Browse,
 		c2c:               dependencies.C2C,
+		observe:           dependencies.Observe,
+		feed:              dependencies.Feed,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
 		cookieName:        defaultSessionCookie,
@@ -98,7 +105,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerChannelRoutes(routes)
 	application.registerGatewayRoutes(routes)
 	application.registerC2CRoutes(routes)
-	registerPlannedRoutes(routes)
+	application.registerObserveRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

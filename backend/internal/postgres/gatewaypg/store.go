@@ -278,7 +278,7 @@ func (s *Store) RecentCalls(ctx context.Context, accountID string, limit int) ([
 			Format: channel.Format(row.Format), Stream: row.Stream, Tag: row.Tag, KeyID: row.ApiKeyID, KeyName: row.KeyName,
 			Outcome: row.Outcome, ChannelID: row.FinalChannelID, ChannelName: row.ChannelName,
 			Usage: ledger.Usage{InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, CacheWriteTokens: row.CacheWriteTokens, CacheReadTokens: row.CacheReadTokens},
-			Cost:  row.CostNano, Fee: row.FeeNano, TTFTMS: row.TtftMs, DurationMS: row.DurationMs,
+			Cost:  row.CostNano, Fee: row.FeeNano, TTFTMS: row.TtftMs, DurationMS: row.DurationMs, AttemptCount: int(row.AttemptCount), Booked: row.Booked,
 		})
 	}
 	return calls, nil
