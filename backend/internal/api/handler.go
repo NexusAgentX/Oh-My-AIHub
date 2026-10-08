@@ -6,15 +6,11 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/dashboard"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ops"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
 const (
@@ -25,36 +21,20 @@ const (
 type Dependencies struct {
 	Identity          *identity.Service
 	Catalog           *catalog.Service
-	Channels          *channel.Service
-	Gateway           *gateway.Service
 	Ledger            *ledger.Service
-	C2C               *c2c.Service
-	Ops               OpsStore
-	FeeRates          *feerate.Service
+	Settings          *settings.Service
+	Audit             *audit.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
 }
 
-// OpsStore is the operations data surface consumed by the admin API.
-type OpsStore interface {
-	OpsMetrics(ctx context.Context, window ops.Window) (ops.Metrics, error)
-	OpsProviderIncome(ctx context.Context, window ops.Window) (ops.ProviderIncomeSnapshot, error)
-	OpsAnomalies(ctx context.Context) (ops.Anomalies, error)
-	OpsRunInspection(ctx context.Context, triggeredBy string) (ops.InspectionRecord, error)
-	OpsListInspections(ctx context.Context, limit int64) ([]ops.InspectionRecord, error)
-}
-
 type app struct {
 	identity          *identity.Service
 	catalog           *catalog.Service
-	channels          *channel.Service
-	gateway           *gateway.Service
 	ledger            *ledger.Service
-	c2c               *c2c.Service
-	dashboard         *dashboard.Service
-	ops               OpsStore
-	feeRates          *feerate.Service
+	settings          *settings.Service
+	audit             *audit.Service
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
 	cookieName        string
@@ -73,13 +53,9 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
 		identity:          dependencies.Identity,
 		catalog:           dependencies.Catalog,
-		channels:          dependencies.Channels,
-		gateway:           dependencies.Gateway,
 		ledger:            dependencies.Ledger,
-		c2c:               dependencies.C2C,
-		dashboard:         dashboard.New(dependencies.Gateway, dependencies.Channels, dependencies.C2C),
-		ops:               dependencies.Ops,
-		feeRates:          dependencies.FeeRates,
+		settings:          dependencies.Settings,
+		audit:             dependencies.Audit,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
 		cookieName:        defaultSessionCookie,
@@ -90,14 +66,11 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	routes := newRouter(application)
 	application.registerInstanceRoutes(routes)
 	application.registerIdentityRoutes(routes)
-	application.registerCatalogRoutes(routes)
-	application.registerLedgerRoutes(routes)
-	application.registerChannelRoutes(routes)
-	application.registerGatewayRoutes(routes)
-	application.registerDashboardRoutes(routes)
-	application.registerC2CRoutes(routes)
-	application.registerFeeRateRoutes(routes)
-	application.registerOpsRoutes(routes)
+	application.registerPointsRoutes(routes)
+	application.registerAdminAccountRoutes(routes)
+	application.registerAdminModelRoutes(routes)
+	application.registerAdminSettingsRoutes(routes)
+	registerPlannedRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

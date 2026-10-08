@@ -1,6 +1,6 @@
 # ADR-0024：数据库迁移压缩为单一基线
 
-- 状态：已通过
+- 状态：已通过（由 [ADR-0026](0026-rewrite-baseline-migration-in-place.md) 补充：Epic #170 发版前原地重写基线）
 - 日期：2026-10-08
 - 决策者：项目维护者与 AI 产品团队
 - 关联内容：Feature #165、[ADR-0006](0006-adopt-postgresql-goose-and-fixed-point-amounts.md)、[ADR-0017](0017-adopt-sqlc-domain-persistence-layering.md)、[ADR-0023](0023-remove-c2c-buy-orders.md)

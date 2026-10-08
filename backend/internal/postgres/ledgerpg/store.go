@@ -1,153 +1,149 @@
-// Package ledgerpg is the PostgreSQL implementation of ledger.Store. SQL lives
-// in queries.sql; the generated code is committed beside it.
-//
-// Two entry points share one implementation:
-//
-//   - Store runs each ledger operation in its own transaction (or, for reads,
-//     directly on the pool). It is what the services embed.
-//   - Tx runs the same operations on a caller-owned transaction. Business
-//     domains that must commit ledger postings atomically with their own rows
-//     (c2c, gateway) open one pgx.Tx, wrap it with NewTx and hand it to
-//     ledger.NewService. Tx never begins, commits or rolls back; the caller
-//     owns the transaction, its isolation level and its commit.
 package ledgerpg
 
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 )
 
+// Store implements ledger.Store: user reads and administrator postings that
+// own their transaction.
 type Store struct {
 	pool *pgxpool.Pool
 	q    *Queries
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool, q: New(pool)}
+func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool)} }
+
+func (s *Store) Points(ctx context.Context, accountID string) (ledger.Points, error) {
+	return points(ctx, s.pool, accountID)
 }
 
-var _ ledger.Store = (*Store)(nil)
-
-// WithTransaction opens a transaction, runs work against a Tx bound to it and
-// commits. The commit error is mapped like every other ledger error; the work
-// error is returned unchanged.
-func (s *Store) WithTransaction(ctx context.Context, work func(*Tx) error) error {
-	tx, err := s.pool.Begin(ctx)
+func (s *Store) ListEntries(ctx context.Context, filter ledger.EntryFilter) ([]ledger.EntryView, error) {
+	rows, err := s.q.ListUserEntries(ctx, ListUserEntriesParams{
+		AccountID: &filter.AccountID, Type: string(filter.Type), ApiKeyID: filter.APIKeyID,
+		FromTime: filter.From, ToTime: filter.To, BeforeID: filter.BeforeID, RowLimit: int32(filter.Limit),
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if err := work(NewTx(tx)); err != nil {
-		return err
+	entries := make([]ledger.EntryView, 0, len(rows))
+	for _, row := range rows {
+		entry := ledger.EntryView{
+			ID: row.ID, TransactionID: row.TransactionID, Type: ledger.TransactionType(row.Type), Reason: row.Reason,
+			Amount: row.AmountNano, BalanceAfter: row.BalanceAfterNano, APIKeyID: row.ApiKeyID, APIKeyName: row.ApiKeyName,
+			CreatedAt: row.CreatedAt,
+		}
+		if row.RelatedType != nil && row.RelatedID != nil {
+			entry.RelatedType, entry.RelatedID = *row.RelatedType, *row.RelatedID
+		}
+		entries = append(entries, entry)
 	}
-	return MapError(tx.Commit(ctx))
+	return entries, nil
 }
 
-func (s *Store) Wallet(ctx context.Context, accountID string) (ledger.Wallet, error) {
-	return walletByRef(ctx, s.q, ledger.UserAccount(accountID))
-}
-
-func (s *Store) WalletByRef(ctx context.Context, account ledger.AccountRef) (ledger.Wallet, error) {
-	return walletByRef(ctx, s.q, account)
-}
-
-func (s *Store) Entries(ctx context.Context, accountID string, beforeID int64, limit int) ([]ledger.Entry, error) {
-	return entriesByRef(ctx, s.q, ledger.UserAccount(accountID), beforeID, limit)
-}
-
-func (s *Store) EntriesByRef(ctx context.Context, account ledger.AccountRef, beforeID int64, limit int) ([]ledger.Entry, error) {
-	return entriesByRef(ctx, s.q, account, beforeID, limit)
-}
-
-func (s *Store) Metrics(ctx context.Context) (ledger.Metrics, error) {
-	return ledgerMetrics(ctx, s.q)
-}
-
-func (s *Store) Post(ctx context.Context, request ledger.PostRequest, hash [32]byte) (ledger.Transaction, error) {
-	var result ledger.Transaction
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.Post(ctx, request, hash)
-		return err
-	})
-	return result, err
-}
-
-func (s *Store) Reverse(ctx context.Context, key, originalID, reason, referenceID, actorID string, hash [32]byte) (ledger.Transaction, error) {
-	var result ledger.Transaction
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.Reverse(ctx, key, originalID, reason, referenceID, actorID, hash)
-		return err
-	})
-	return result, err
-}
-
-func (s *Store) CreateHold(ctx context.Context, request ledger.CreateHoldRequest, hash [32]byte) (ledger.Hold, error) {
-	var result ledger.Hold
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.CreateHold(ctx, request, hash)
-		return err
-	})
-	return result, err
-}
-
-func (s *Store) ReleaseHold(ctx context.Context, request ledger.MutateHoldRequest, hash [32]byte) (ledger.Hold, error) {
-	var result ledger.Hold
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.ReleaseHold(ctx, request, hash)
-		return err
-	})
-	return result, err
-}
-
-func (s *Store) CaptureHold(ctx context.Context, request ledger.CaptureHoldRequest, hash [32]byte) (ledger.CaptureResult, error) {
-	var result ledger.CaptureResult
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.CaptureHold(ctx, request, hash)
-		return err
-	})
-	return result, err
-}
-
-func (s *Store) TransferBadDebt(ctx context.Context, accountID string, amount money.Amount, key, reason, referenceID, actorID string, hash [32]byte) (ledger.Transaction, error) {
-	var result ledger.Transaction
-	err := s.WithTransaction(ctx, func(tx *Tx) error {
-		var err error
-		result, err = tx.TransferBadDebt(ctx, accountID, amount, key, reason, referenceID, actorID, hash)
-		return err
-	})
-	return result, err
-}
-
-// MapError converts PostgreSQL errors to ledger errors. It is exported for the
-// callers that commit a transaction they share with the ledger.
-func MapError(err error) error {
-	if err == nil {
-		return nil
-	}
+// existing returns the stored transaction when key was already used.
+func existing(ctx context.Context, q *Queries, key string, want ledger.TransactionType, accountID string) (ledger.Posted, bool, error) {
+	row, err := q.GetTransactionByKey(ctx, key)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ledger.ErrNotFound
+		return ledger.Posted{}, false, nil
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505":
-			return ledger.ErrConflict
-		case "23514", "22003":
-			return ledger.ErrInvalidInput
+	if err != nil {
+		return ledger.Posted{}, false, err
+	}
+	if row.Type != string(want) || row.RelatedID == nil || *row.RelatedID != accountID {
+		return ledger.Posted{}, false, ledger.ErrConflict
+	}
+	posted, err := loadPosted(ctx, q, row)
+	return posted, true, err
+}
+
+func (s *Store) Adjust(ctx context.Context, adjustment ledger.Adjustment) (ledger.Posted, error) {
+	var posted ledger.Posted
+	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		posted, err = Post(ctx, tx, ledger.Transaction{
+			Type: ledger.TypeAdminAdjust, IdempotencyKey: adjustment.IdempotencyKey,
+			Related: &ledger.Related{Type: "account", ID: adjustment.AccountID},
+			ActorID: adjustment.ActorID, Reason: adjustment.Reason,
+			Entries: []ledger.Line{
+				{Account: ledger.User(adjustment.AccountID), Amount: adjustment.Amount},
+				{Account: ledger.System(ledger.SystemPlatformRevenue), Amount: -adjustment.Amount},
+			},
+		})
+		if err != nil || posted.Replayed {
+			return err
+		}
+		return auditpg.Record(ctx, tx, auditpg.Event{
+			ActorID: adjustment.ActorID, Action: audit.ActionLedgerAdjust, TargetType: "account", TargetID: adjustment.AccountID,
+			Reason: adjustment.Reason,
+			Detail: map[string]any{"amount": adjustment.Amount.String(), "transaction_id": posted.ID, "balance_after": userBalanceAfter(posted, adjustment.AccountID).String()},
+		})
+	})
+	return posted, err
+}
+
+func (s *Store) WriteOff(ctx context.Context, writeOff ledger.WriteOff) (ledger.Posted, error) {
+	var posted ledger.Posted
+	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		previous, found, err := existing(ctx, q, writeOff.IdempotencyKey, ledger.TypeBadDebtWriteOff, writeOff.AccountID)
+		if err != nil || found {
+			posted = previous
+			return err
+		}
+		locked, err := q.LockLedgerAccounts(ctx, LockLedgerAccountsParams{
+			UserIds: []string{writeOff.AccountID}, SystemCodes: []string{string(ledger.SystemBadDebt)},
+		})
+		if err != nil {
+			return err
+		}
+		var balance *money.Amount
+		for _, row := range locked {
+			if row.AccountID != nil {
+				balance = &row.BalanceNano
+			}
+		}
+		if balance == nil {
+			return ledger.ErrNotFound
+		}
+		if *balance >= 0 {
+			return ledger.ErrNothingToWriteOff
+		}
+		amount := -*balance
+		posted, err = Post(ctx, tx, ledger.Transaction{
+			Type: ledger.TypeBadDebtWriteOff, IdempotencyKey: writeOff.IdempotencyKey,
+			Related: &ledger.Related{Type: "account", ID: writeOff.AccountID},
+			ActorID: writeOff.ActorID, Reason: writeOff.Reason,
+			Entries: []ledger.Line{
+				{Account: ledger.User(writeOff.AccountID), Amount: amount},
+				{Account: ledger.System(ledger.SystemBadDebt), Amount: -amount},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		return auditpg.Record(ctx, tx, auditpg.Event{
+			ActorID: writeOff.ActorID, Action: audit.ActionLedgerWriteOff, TargetType: "account", TargetID: writeOff.AccountID,
+			Reason: writeOff.Reason, Detail: map[string]any{"amount": amount.String(), "transaction_id": posted.ID},
+		})
+	})
+	return posted, err
+}
+
+func userBalanceAfter(posted ledger.Posted, accountID string) money.Amount {
+	for _, entry := range posted.Entries {
+		if entry.Account.UserID == accountID {
+			return entry.BalanceAfter
 		}
 	}
-	return fmt.Errorf("ledger store: %w", err)
+	return 0
 }

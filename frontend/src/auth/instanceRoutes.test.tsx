@@ -8,8 +8,7 @@ describe('instance routes', () => {
     ['/', '/'],
     ['/initialize', '/initialize'],
     ['/welcome', '/welcome'],
-    ['/dashboard', '/dashboard'],
-    ['/admin/ops', '/admin/ops'],
+    ['/home', '/home'],
   ])('matches %s to route %s', (pathname, expectedRoute) => {
     expect(matchRoutes(appRoutes, pathname)?.at(-1)?.route.path).toBe(expectedRoute)
   })
@@ -19,9 +18,9 @@ describe('instance routes', () => {
   })
 
   it('初始化路由独立于会话门卫，控制台路由仍受会话门卫保护', () => {
-    const dashboardMatch = matchRoutes(appRoutes, '/dashboard') ?? []
-    const dashboardGuards = dashboardMatch.map((m) => (typeof m.route.element === 'object' && m.route.element !== null && 'type' in m.route.element ? String((m.route.element as { type?: { name?: string } }).type?.name) : ''))
-    expect(dashboardGuards).toContain('RequireSession')
+    const homeMatch = matchRoutes(appRoutes, '/home') ?? []
+    const homeGuards = homeMatch.map((m) => (typeof m.route.element === 'object' && m.route.element !== null && 'type' in m.route.element ? String((m.route.element as { type?: { name?: string } }).type?.name) : ''))
+    expect(homeGuards).toContain('RequireSession')
     const initializeMatch = matchRoutes(appRoutes, '/initialize') ?? []
     const initializeGuards = initializeMatch.map((m) => (typeof m.route.element === 'object' && m.route.element !== null && 'type' in m.route.element ? String((m.route.element as { type?: { name?: string } }).type?.name) : ''))
     expect(initializeGuards).not.toContain('RequireSession')

@@ -2,63 +2,81 @@ package ledger
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-func TestValidatePostRequestRejectsInvalidLedgerShapes(t *testing.T) {
-	valid := PostRequest{
-		IdempotencyKey: "posting-shape",
-		Kind:           TransactionTransfer,
-		Reason:         "settlement",
-		ReferenceType:  "api_call",
-		ReferenceID:    "call-1",
-		Entries: []Posting{
-			{Account: UserAccount("consumer"), BusinessRole: EntryRoleConsumer, Amount: money.FromNano(-1)},
-			{Account: UserAccount("provider"), BusinessRole: EntryRoleProvider, Amount: money.FromNano(1)},
+func validTransaction() Transaction {
+	return Transaction{
+		Type: TypeAPICall, IdempotencyKey: "call:1", Related: &Related{Type: "call", ID: "00000000-0000-4000-8000-000000000001"},
+		Entries: []Line{
+			{Account: User("consumer"), Amount: -30_030_000_000},
+			{Account: User("provider"), Amount: 30_000_000_000},
+			{Account: System(SystemPlatformRevenue), Amount: 30_000_000},
 		},
 	}
-	if err := ValidatePostRequest(valid); err != nil {
-		t.Fatalf("valid request: %v", err)
-	}
+}
 
-	tests := []struct {
-		name    string
-		mutate  func(*PostRequest)
-		wantErr error
-	}{
-		{
-			name: "fewer than two entries",
-			mutate: func(request *PostRequest) {
-				request.Entries = request.Entries[:1]
-			},
-			wantErr: ErrInvalidInput,
-		},
-		{
-			name: "zero amount entry",
-			mutate: func(request *PostRequest) {
-				request.Entries[0].Amount = 0
-			},
-			wantErr: ErrInvalidInput,
-		},
-		{
-			name: "unbalanced total",
-			mutate: func(request *PostRequest) {
-				request.Entries[1].Amount = money.FromNano(2)
-			},
-			wantErr: ErrUnbalanced,
-		},
+func TestTransactionValidateAcceptsBalancedEpicExample(t *testing.T) {
+	if err := validTransaction().Validate(); err != nil {
+		t.Fatalf("balanced transaction rejected: %v", err)
 	}
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			request := valid
-			request.Entries = append([]Posting(nil), valid.Entries...)
-			test.mutate(&request)
-			if err := ValidatePostRequest(request); !errors.Is(err, test.wantErr) {
-				t.Fatalf("ValidatePostRequest error = %v, want %v", err, test.wantErr)
-			}
-		})
+func TestTransactionValidateRejectsMalformedTransactions(t *testing.T) {
+	cases := map[string]func(*Transaction){
+		"unknown type":     func(tx *Transaction) { tx.Type = "transfer" },
+		"empty key":        func(tx *Transaction) { tx.IdempotencyKey = " " },
+		"single entry":     func(tx *Transaction) { tx.Entries = tx.Entries[:1] },
+		"zero amount":      func(tx *Transaction) { tx.Entries[2].Amount = 0 },
+		"duplicate":        func(tx *Transaction) { tx.Entries[1].Account = User("consumer") },
+		"both refs":        func(tx *Transaction) { tx.Entries[0].Account = AccountRef{UserID: "x", System: SystemBadDebt} },
+		"unknown system":   func(tx *Transaction) { tx.Entries[2].Account = System("platform_loss") },
+		"bad related type": func(tx *Transaction) { tx.Related.Type = "invoice" },
+	}
+	for name, mutate := range cases {
+		tx := validTransaction()
+		tx.Entries = append([]Line(nil), tx.Entries...)
+		related := *tx.Related
+		tx.Related = &related
+		mutate(&tx)
+		if err := tx.Validate(); !errors.Is(err, ErrInvalidInput) {
+			t.Errorf("%s: error = %v, want ErrInvalidInput", name, err)
+		}
+	}
+	unbalanced := validTransaction()
+	unbalanced.Entries[2].Amount = 1
+	if err := unbalanced.Validate(); !errors.Is(err, ErrUnbalanced) {
+		t.Fatalf("unbalanced error = %v", err)
+	}
+	overflow := Transaction{Type: TypeAdminAdjust, IdempotencyKey: "k", Entries: []Line{
+		{Account: User("a"), Amount: money.FromNano(math.MaxInt64)},
+		{Account: User("b"), Amount: 1},
+		{Account: System(SystemBadDebt), Amount: -1},
+	}}
+	if err := overflow.Validate(); !errors.Is(err, ErrAmountOverflow) {
+		t.Fatalf("overflow error = %v", err)
+	}
+}
+
+func TestPointsAvailableIsBalancePlusCreditLimit(t *testing.T) {
+	points := Points{Balance: -30_030_000_000, CreditLimit: 100_000_000_000}
+	if points.Available() != 69_970_000_000 {
+		t.Fatalf("available = %s", points.Available())
+	}
+	overdrawn := Points{Balance: -120_000_000_000, CreditLimit: 100_000_000_000}
+	if overdrawn.Available() != -20_000_000_000 {
+		t.Fatalf("overdrawn available = %s", overdrawn.Available())
+	}
+}
+
+func TestAddBalanceRejectsOverflow(t *testing.T) {
+	if _, err := AddBalance(money.FromNano(math.MaxInt64), 1); !errors.Is(err, ErrAmountOverflow) {
+		t.Fatalf("overflow error = %v", err)
+	}
+	if sum, err := AddBalance(5, -7); err != nil || sum != -2 {
+		t.Fatalf("sum = %v, %v", sum, err)
 	}
 }

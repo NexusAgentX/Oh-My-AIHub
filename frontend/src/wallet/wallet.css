@@ -1,8 +1,0 @@
-.ledger-time { color: var(--muted); font-size: var(--text-xs); }
-.ledger-kind { display: grid; gap: var(--space-1); }
-.ledger-kind small { color: var(--muted); font-size: var(--text-xs); }
-.ledger-reference { display: grid; gap: var(--space-1); }
-.ledger-reference small { color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
-.amount-positive { color: var(--positive) !important; }
-.amount-negative { color: var(--danger) !important; }
-.wallet-recovery { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }

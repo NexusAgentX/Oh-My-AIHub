@@ -12,17 +12,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-const administratorExists = `-- name: AdministratorExists :one
-SELECT EXISTS (SELECT 1 FROM accounts WHERE is_admin)
-`
-
-func (q *Queries) AdministratorExists(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, administratorExists)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const countActiveAdministrators = `-- name: CountActiveAdministrators :one
 SELECT count(*) FROM accounts WHERE is_admin AND status = 'active'
 `
@@ -32,6 +21,17 @@ func (q *Queries) CountActiveAdministrators(ctx context.Context) (int64, error) 
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const defaultCreditLimit = `-- name: DefaultCreditLimit :one
+SELECT default_credit_limit_nano FROM settings
+`
+
+func (q *Queries) DefaultCreditLimit(ctx context.Context) (money.Amount, error) {
+	row := q.db.QueryRow(ctx, defaultCreditLimit)
+	var default_credit_limit_nano money.Amount
+	err := row.Scan(&default_credit_limit_nano)
+	return default_credit_limit_nano, err
 }
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
@@ -62,61 +62,38 @@ func (q *Queries) DeleteSessionsByAccount(ctx context.Context, accountID string)
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.password_changed_at, a.disabled_at, a.created_by, a.created_at, a.updated_at, a.credit_frozen, la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at
-FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
-WHERE a.id = $1
+SELECT id, username, display_name, password_hash, password_version, must_change_password, is_admin, status, credit_limit_nano, default_key_created_at, password_changed_at, created_at, updated_at FROM accounts WHERE id = $1
 `
 
-type GetAccountByIDRow struct {
-	Account       Account
-	LedgerAccount LedgerAccount
-}
-
-// 账户与其账本余额投影总是成对读取：sqlc.embed 让所有查询共享同一映射函数。
-func (q *Queries) GetAccountByID(ctx context.Context, id string) (GetAccountByIDRow, error) {
+func (q *Queries) GetAccountByID(ctx context.Context, id string) (Account, error) {
 	row := q.db.QueryRow(ctx, getAccountByID, id)
-	var i GetAccountByIDRow
+	var i Account
 	err := row.Scan(
-		&i.Account.ID,
-		&i.Account.Username,
-		&i.Account.DisplayName,
-		&i.Account.PasswordHash,
-		&i.Account.PasswordVersion,
-		&i.Account.Version,
-		&i.Account.MustChangePassword,
-		&i.Account.IsAdmin,
-		&i.Account.Status,
-		&i.Account.CreditLimitNano,
-		&i.Account.PasswordChangedAt,
-		&i.Account.DisabledAt,
-		&i.Account.CreatedBy,
-		&i.Account.CreatedAt,
-		&i.Account.UpdatedAt,
-		&i.Account.CreditFrozen,
-		&i.LedgerAccount.ID,
-		&i.LedgerAccount.IdentityAccountID,
-		&i.LedgerAccount.Kind,
-		&i.LedgerAccount.SystemCode,
-		&i.LedgerAccount.PostedBalanceNano,
-		&i.LedgerAccount.AssetReservedNano,
-		&i.LedgerAccount.SpendAuthorizedNano,
-		&i.LedgerAccount.Version,
-		&i.LedgerAccount.CreatedAt,
-		&i.LedgerAccount.UpdatedAt,
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getAccountBySession = `-- name: GetAccountBySession :one
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.password_changed_at, a.disabled_at, a.created_by, a.created_at, a.updated_at, a.credit_frozen, la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at
-FROM accounts a
-JOIN sessions s ON s.account_id = a.id
-JOIN ledger_accounts la ON la.identity_account_id = a.id
+SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at
+FROM sessions s
+JOIN accounts a ON a.id = s.account_id
 WHERE s.token_hash = $1
-	AND s.expires_at > $2
-	AND s.password_version = a.password_version
-	AND a.status = 'active'
+  AND s.expires_at > $2::timestamptz
+  AND s.password_version = a.password_version
+  AND a.status = 'active'
 `
 
 type GetAccountBySessionParams struct {
@@ -124,156 +101,138 @@ type GetAccountBySessionParams struct {
 	Now       time.Time
 }
 
-type GetAccountBySessionRow struct {
-	Account       Account
-	LedgerAccount LedgerAccount
-}
-
-func (q *Queries) GetAccountBySession(ctx context.Context, arg GetAccountBySessionParams) (GetAccountBySessionRow, error) {
+func (q *Queries) GetAccountBySession(ctx context.Context, arg GetAccountBySessionParams) (Account, error) {
 	row := q.db.QueryRow(ctx, getAccountBySession, arg.TokenHash, arg.Now)
-	var i GetAccountBySessionRow
+	var i Account
 	err := row.Scan(
-		&i.Account.ID,
-		&i.Account.Username,
-		&i.Account.DisplayName,
-		&i.Account.PasswordHash,
-		&i.Account.PasswordVersion,
-		&i.Account.Version,
-		&i.Account.MustChangePassword,
-		&i.Account.IsAdmin,
-		&i.Account.Status,
-		&i.Account.CreditLimitNano,
-		&i.Account.PasswordChangedAt,
-		&i.Account.DisabledAt,
-		&i.Account.CreatedBy,
-		&i.Account.CreatedAt,
-		&i.Account.UpdatedAt,
-		&i.Account.CreditFrozen,
-		&i.LedgerAccount.ID,
-		&i.LedgerAccount.IdentityAccountID,
-		&i.LedgerAccount.Kind,
-		&i.LedgerAccount.SystemCode,
-		&i.LedgerAccount.PostedBalanceNano,
-		&i.LedgerAccount.AssetReservedNano,
-		&i.LedgerAccount.SpendAuthorizedNano,
-		&i.LedgerAccount.Version,
-		&i.LedgerAccount.CreatedAt,
-		&i.LedgerAccount.UpdatedAt,
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getAccountByUsername = `-- name: GetAccountByUsername :one
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.password_changed_at, a.disabled_at, a.created_by, a.created_at, a.updated_at, a.credit_frozen, la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at
-FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
-WHERE a.username = $1
+SELECT id, username, display_name, password_hash, password_version, must_change_password, is_admin, status, credit_limit_nano, default_key_created_at, password_changed_at, created_at, updated_at FROM accounts WHERE username = $1
 `
 
-type GetAccountByUsernameRow struct {
-	Account       Account
-	LedgerAccount LedgerAccount
+func (q *Queries) GetAccountByUsername(ctx context.Context, username string) (Account, error) {
+	row := q.db.QueryRow(ctx, getAccountByUsername, username)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-func (q *Queries) GetAccountByUsername(ctx context.Context, username string) (GetAccountByUsernameRow, error) {
-	row := q.db.QueryRow(ctx, getAccountByUsername, username)
-	var i GetAccountByUsernameRow
+const getAdminAccount = `-- name: GetAdminAccount :one
+SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano
+FROM accounts a
+LEFT JOIN ledger_accounts l ON l.account_id = a.id
+WHERE a.id = $1
+`
+
+type GetAdminAccountRow struct {
+	Account     Account
+	BalanceNano int64
+}
+
+func (q *Queries) GetAdminAccount(ctx context.Context, id string) (GetAdminAccountRow, error) {
+	row := q.db.QueryRow(ctx, getAdminAccount, id)
+	var i GetAdminAccountRow
 	err := row.Scan(
 		&i.Account.ID,
 		&i.Account.Username,
 		&i.Account.DisplayName,
 		&i.Account.PasswordHash,
 		&i.Account.PasswordVersion,
-		&i.Account.Version,
 		&i.Account.MustChangePassword,
 		&i.Account.IsAdmin,
 		&i.Account.Status,
 		&i.Account.CreditLimitNano,
+		&i.Account.DefaultKeyCreatedAt,
 		&i.Account.PasswordChangedAt,
-		&i.Account.DisabledAt,
-		&i.Account.CreatedBy,
 		&i.Account.CreatedAt,
 		&i.Account.UpdatedAt,
-		&i.Account.CreditFrozen,
-		&i.LedgerAccount.ID,
-		&i.LedgerAccount.IdentityAccountID,
-		&i.LedgerAccount.Kind,
-		&i.LedgerAccount.SystemCode,
-		&i.LedgerAccount.PostedBalanceNano,
-		&i.LedgerAccount.AssetReservedNano,
-		&i.LedgerAccount.SpendAuthorizedNano,
-		&i.LedgerAccount.Version,
-		&i.LedgerAccount.CreatedAt,
-		&i.LedgerAccount.UpdatedAt,
+		&i.BalanceNano,
 	)
 	return i, err
 }
 
+const hasAdministrator = `-- name: HasAdministrator :one
+SELECT EXISTS (SELECT 1 FROM accounts WHERE is_admin) AS has_administrator
+`
+
+func (q *Queries) HasAdministrator(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, hasAdministrator)
+	var has_administrator bool
+	err := row.Scan(&has_administrator)
+	return has_administrator, err
+}
+
 const insertAccount = `-- name: InsertAccount :one
-INSERT INTO accounts (
-	username, display_name, password_hash, must_change_password,
-	is_admin, status, disabled_at, credit_limit_nano, created_by
-) VALUES (
-	$1, $2, $3, $4,
-	$5, $6::text, CASE WHEN $6::text = 'disabled' THEN now() END,
-	$7, $8
-)
-RETURNING id
+INSERT INTO accounts (username, display_name, password_hash, is_admin, must_change_password, credit_limit_nano)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, username, display_name, password_hash, password_version, must_change_password, is_admin, status, credit_limit_nano, default_key_created_at, password_changed_at, created_at, updated_at
 `
 
 type InsertAccountParams struct {
 	Username           string
 	DisplayName        string
 	PasswordHash       string
-	MustChangePassword bool
 	IsAdmin            bool
-	Status             string
+	MustChangePassword bool
 	CreditLimitNano    money.Amount
-	CreatedBy          *string
 }
 
-func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (string, error) {
+func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (Account, error) {
 	row := q.db.QueryRow(ctx, insertAccount,
 		arg.Username,
 		arg.DisplayName,
 		arg.PasswordHash,
-		arg.MustChangePassword,
 		arg.IsAdmin,
-		arg.Status,
-		arg.CreditLimitNano,
-		arg.CreatedBy,
-	)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const insertBootstrapAdmin = `-- name: InsertBootstrapAdmin :one
-INSERT INTO accounts (
-	username, display_name, password_hash, must_change_password,
-	is_admin, status, credit_limit_nano
-) VALUES ($1, $2, $3, $4, true, $5, 0)
-RETURNING id
-`
-
-type InsertBootstrapAdminParams struct {
-	Username           string
-	DisplayName        string
-	PasswordHash       string
-	MustChangePassword bool
-	Status             string
-}
-
-func (q *Queries) InsertBootstrapAdmin(ctx context.Context, arg InsertBootstrapAdminParams) (string, error) {
-	row := q.db.QueryRow(ctx, insertBootstrapAdmin,
-		arg.Username,
-		arg.DisplayName,
-		arg.PasswordHash,
 		arg.MustChangePassword,
-		arg.Status,
+		arg.CreditLimitNano,
 	)
-	var id string
-	err := row.Scan(&id)
-	return id, err
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const insertSession = `-- name: InsertSession :exec
@@ -298,65 +257,58 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 	return err
 }
 
-const insertUserLedgerAccount = `-- name: InsertUserLedgerAccount :exec
-INSERT INTO ledger_accounts (identity_account_id, kind) VALUES ($1::uuid, 'user')
+const listAdminAccounts = `-- name: ListAdminAccounts :many
+SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.default_key_created_at, a.password_changed_at, a.created_at, a.updated_at, coalesce(l.balance_nano, 0)::bigint AS balance_nano
+FROM accounts a
+LEFT JOIN ledger_accounts l ON l.account_id = a.id
+WHERE ($1::text = '' OR a.username ILIKE '%' || $1 || '%' OR a.display_name ILIKE '%' || $1 || '%' OR a.id::text = $1)
+  AND ($2::text = '' OR a.status = $2)
+  AND a.username > $3::text
+ORDER BY a.username
+LIMIT $4
 `
 
-func (q *Queries) InsertUserLedgerAccount(ctx context.Context, identityAccountID string) error {
-	_, err := q.db.Exec(ctx, insertUserLedgerAccount, identityAccountID)
-	return err
+type ListAdminAccountsParams struct {
+	Query         string
+	Status        string
+	AfterUsername string
+	RowLimit      int32
 }
 
-const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.username, a.display_name, a.password_hash, a.password_version, a.version, a.must_change_password, a.is_admin, a.status, a.credit_limit_nano, a.password_changed_at, a.disabled_at, a.created_by, a.created_at, a.updated_at, a.credit_frozen, la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at
-FROM accounts a JOIN ledger_accounts la ON la.identity_account_id = a.id
-WHERE $1::text = '' OR a.id::text = $1::text
-	OR a.username ILIKE '%' || $1::text || '%'
-	OR a.display_name ILIKE '%' || $1::text || '%'
-ORDER BY a.created_at DESC
-`
-
-type ListAccountsRow struct {
-	Account       Account
-	LedgerAccount LedgerAccount
+type ListAdminAccountsRow struct {
+	Account     Account
+	BalanceNano int64
 }
 
-func (q *Queries) ListAccounts(ctx context.Context, query string) ([]ListAccountsRow, error) {
-	rows, err := q.db.Query(ctx, listAccounts, query)
+func (q *Queries) ListAdminAccounts(ctx context.Context, arg ListAdminAccountsParams) ([]ListAdminAccountsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminAccounts,
+		arg.Query,
+		arg.Status,
+		arg.AfterUsername,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListAccountsRow
+	var items []ListAdminAccountsRow
 	for rows.Next() {
-		var i ListAccountsRow
+		var i ListAdminAccountsRow
 		if err := rows.Scan(
 			&i.Account.ID,
 			&i.Account.Username,
 			&i.Account.DisplayName,
 			&i.Account.PasswordHash,
 			&i.Account.PasswordVersion,
-			&i.Account.Version,
 			&i.Account.MustChangePassword,
 			&i.Account.IsAdmin,
 			&i.Account.Status,
 			&i.Account.CreditLimitNano,
+			&i.Account.DefaultKeyCreatedAt,
 			&i.Account.PasswordChangedAt,
-			&i.Account.DisabledAt,
-			&i.Account.CreatedBy,
 			&i.Account.CreatedAt,
 			&i.Account.UpdatedAt,
-			&i.Account.CreditFrozen,
-			&i.LedgerAccount.ID,
-			&i.LedgerAccount.IdentityAccountID,
-			&i.LedgerAccount.Kind,
-			&i.LedgerAccount.SystemCode,
-			&i.LedgerAccount.PostedBalanceNano,
-			&i.LedgerAccount.AssetReservedNano,
-			&i.LedgerAccount.SpendAuthorizedNano,
-			&i.LedgerAccount.Version,
-			&i.LedgerAccount.CreatedAt,
-			&i.LedgerAccount.UpdatedAt,
+			&i.BalanceNano,
 		); err != nil {
 			return nil, err
 		}
@@ -368,84 +320,72 @@ func (q *Queries) ListAccounts(ctx context.Context, query string) ([]ListAccount
 	return items, nil
 }
 
-const lockAccount = `-- name: LockAccount :exec
-SELECT pg_advisory_xact_lock(hashtextextended('oh-my-aihub-account:' || $1::text, 0))
+const lockAccount = `-- name: LockAccount :one
+SELECT id, username, display_name, password_hash, password_version, must_change_password, is_admin, status, credit_limit_nano, default_key_created_at, password_changed_at, created_at, updated_at FROM accounts WHERE id = $1 FOR UPDATE
 `
 
-// Account policy changes and C2C commands share this stable per-account
-// serialization key before taking ledger, identity, order, or hold rows.
-func (q *Queries) LockAccount(ctx context.Context, accountID string) error {
-	_, err := q.db.Exec(ctx, lockAccount, accountID)
-	return err
-}
-
-const lockAccountForUpdate = `-- name: LockAccountForUpdate :one
-SELECT is_admin, status, version FROM accounts WHERE id = $1 FOR UPDATE
-`
-
-type LockAccountForUpdateRow struct {
-	IsAdmin bool
-	Status  string
-	Version int64
-}
-
-func (q *Queries) LockAccountForUpdate(ctx context.Context, id string) (LockAccountForUpdateRow, error) {
-	row := q.db.QueryRow(ctx, lockAccountForUpdate, id)
-	var i LockAccountForUpdateRow
-	err := row.Scan(&i.IsAdmin, &i.Status, &i.Version)
+func (q *Queries) LockAccount(ctx context.Context, id string) (Account, error) {
+	row := q.db.QueryRow(ctx, lockAccount, id)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
-const lockAdministratorMembership = `-- name: LockAdministratorMembership :exec
-SELECT pg_advisory_xact_lock(hashtext('oh-my-aihub-administrator-membership'))
+const lockActiveAdministrators = `-- name: LockActiveAdministrators :exec
+SELECT pg_advisory_xact_lock(hashtext('oh-my-aihub:active-administrators'))
 `
 
-func (q *Queries) LockAdministratorMembership(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, lockAdministratorMembership)
+func (q *Queries) LockActiveAdministrators(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockActiveAdministrators)
 	return err
 }
 
-const lockBootstrapAdmin = `-- name: LockBootstrapAdmin :exec
-SELECT pg_advisory_xact_lock(hashtext('oh-my-aihub-bootstrap-admin'))
+const lockBootstrap = `-- name: LockBootstrap :exec
+SELECT pg_advisory_xact_lock(hashtext('oh-my-aihub:bootstrap-admin'))
 `
 
-func (q *Queries) LockBootstrapAdmin(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, lockBootstrapAdmin)
+func (q *Queries) LockBootstrap(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockBootstrap)
 	return err
 }
 
-const lockLedgerAccountByIdentity = `-- name: LockLedgerAccountByIdentity :one
-SELECT 1::int FROM ledger_accounts WHERE identity_account_id = $1::uuid FOR UPDATE
-`
-
-// Ledger mutations lock this same row before consulting credit policy.
-func (q *Queries) LockLedgerAccountByIdentity(ctx context.Context, identityAccountID string) (int32, error) {
-	row := q.db.QueryRow(ctx, lockLedgerAccountByIdentity, identityAccountID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const replaceActivePassword = `-- name: ReplaceActivePassword :execrows
+const replacePassword = `-- name: ReplacePassword :execrows
 UPDATE accounts
 SET password_hash = $1,
-	must_change_password = false,
-	password_version = password_version + 1,
-	password_changed_at = $2::timestamptz,
-	updated_at = $2::timestamptz
-WHERE id = $3 AND status = 'active' AND password_version = $4
+    password_version = password_version + 1,
+    must_change_password = $2,
+    password_changed_at = $3,
+    updated_at = $3
+WHERE id = $4
+  AND password_version = $5
 `
 
-type ReplaceActivePasswordParams struct {
+type ReplacePasswordParams struct {
 	PasswordHash            string
-	ChangedAt               time.Time
+	MustChangePassword      bool
+	ChangedAt               *time.Time
 	ID                      string
 	ExpectedPasswordVersion int64
 }
 
-func (q *Queries) ReplaceActivePassword(ctx context.Context, arg ReplaceActivePasswordParams) (int64, error) {
-	result, err := q.db.Exec(ctx, replaceActivePassword,
+func (q *Queries) ReplacePassword(ctx context.Context, arg ReplacePasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, replacePassword,
 		arg.PasswordHash,
+		arg.MustChangePassword,
 		arg.ChangedAt,
 		arg.ID,
 		arg.ExpectedPasswordVersion,
@@ -456,72 +396,44 @@ func (q *Queries) ReplaceActivePassword(ctx context.Context, arg ReplaceActivePa
 	return result.RowsAffected(), nil
 }
 
-const resetPassword = `-- name: ResetPassword :execrows
+const updateAccount = `-- name: UpdateAccount :one
 UPDATE accounts
-SET password_hash = $1,
-	must_change_password = true,
-	password_version = password_version + 1,
-	password_changed_at = $2::timestamptz,
-	updated_at = $2::timestamptz
-WHERE id = $3 AND password_version = $4
+SET display_name = $2, status = $3, credit_limit_nano = $4, is_admin = $5, updated_at = now()
+WHERE id = $1
+RETURNING id, username, display_name, password_hash, password_version, must_change_password, is_admin, status, credit_limit_nano, default_key_created_at, password_changed_at, created_at, updated_at
 `
 
-type ResetPasswordParams struct {
-	PasswordHash            string
-	ChangedAt               time.Time
-	ID                      string
-	ExpectedPasswordVersion int64
-}
-
-func (q *Queries) ResetPassword(ctx context.Context, arg ResetPasswordParams) (int64, error) {
-	result, err := q.db.Exec(ctx, resetPassword,
-		arg.PasswordHash,
-		arg.ChangedAt,
-		arg.ID,
-		arg.ExpectedPasswordVersion,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const updateAccountPolicy = `-- name: UpdateAccountPolicy :execrows
-UPDATE accounts
-SET status = COALESCE($1::text, status),
-	credit_limit_nano = COALESCE($2::bigint, credit_limit_nano),
-	is_admin = COALESCE($3::boolean, is_admin),
-	credit_frozen = COALESCE($4::boolean, credit_frozen),
-	version = version + 1,
-	disabled_at = CASE
-		WHEN $1::text = 'disabled' AND status <> 'disabled' THEN now()
-		WHEN $1::text = 'active' THEN NULL
-		ELSE disabled_at
-	END,
-	updated_at = now()
-WHERE id = $5 AND version = $6
-`
-
-type UpdateAccountPolicyParams struct {
-	Status          *string
-	CreditLimitNano *int64
-	IsAdmin         *bool
-	CreditFrozen    *bool
+type UpdateAccountParams struct {
 	ID              string
-	ExpectedVersion int64
+	DisplayName     string
+	Status          string
+	CreditLimitNano money.Amount
+	IsAdmin         bool
 }
 
-func (q *Queries) UpdateAccountPolicy(ctx context.Context, arg UpdateAccountPolicyParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateAccountPolicy,
+func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error) {
+	row := q.db.QueryRow(ctx, updateAccount,
+		arg.ID,
+		arg.DisplayName,
 		arg.Status,
 		arg.CreditLimitNano,
 		arg.IsAdmin,
-		arg.CreditFrozen,
-		arg.ID,
-		arg.ExpectedVersion,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.PasswordVersion,
+		&i.MustChangePassword,
+		&i.IsAdmin,
+		&i.Status,
+		&i.CreditLimitNano,
+		&i.DefaultKeyCreatedAt,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

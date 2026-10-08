@@ -25,7 +25,7 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
+		writeInvalidJSON(w)
 		return
 	}
 	initialized, err := a.identity.HasAdministrator(r.Context())
@@ -53,10 +53,7 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.setSessionCookie(w, result.SessionToken)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"initialized": true,
-		"account":     accountResponse(result.Account),
-	})
+	writeJSON(w, http.StatusCreated, map[string]any{"account": accountResponse(result.Account)})
 }
 
 // registerInstanceRoutes 注册实例与健康检查路由。

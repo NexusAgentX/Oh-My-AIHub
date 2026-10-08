@@ -1,26 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEphemeralCredential } from '../accounts/EphemeralCredentialProvider'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { Drawer, Icon, IconButton } from '../ui'
-import { formatPointAmount } from '../wallet/presentation'
-import { useWallet } from '../wallet/queries'
+import { usePoints } from '../home/queries'
+import { formatPointAmount } from '../money/format'
 import { Brand } from './Brand'
 import { findNavItem, flattenNavigation, type NavGroup } from './navigation'
 
-type Variant = 'product' | 'admin'
-
 function useSignOut() {
   const { logout } = useAuth()
-  const { clearCredential } = useEphemeralCredential()
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const signOut = async () => {
     setError('')
     try {
       await logout()
-      clearCredential()
       navigate('/login', { replace: true })
     } catch (caught) {
       setError(errorMessage(caught, '退出失败，请重试'))
@@ -59,22 +54,6 @@ function NavGroups({
   )
 }
 
-/** 区域切换：普通界面 ↔ 管理后台。仅管理员可见。 */
-function AreaSwitch({ variant, onNavigate }: { variant: Variant; onNavigate?: () => void }) {
-  const { account } = useAuth()
-  if (!account?.is_admin) return null
-  return (
-    <NavLink
-      className="nav-item nav-item-switch"
-      onClick={onNavigate}
-      to={variant === 'admin' ? '/dashboard' : '/admin/accounts'}
-    >
-      <Icon name={variant === 'admin' ? 'back' : 'settings'} />
-      <span>{variant === 'admin' ? '返回产品' : '进入管理后台'}</span>
-    </NavLink>
-  )
-}
-
 function AccountFooter({
   onNavigate,
   onSignOut,
@@ -85,7 +64,7 @@ function AccountFooter({
   const { account } = useAuth()
   return (
     <div className="sidebar-account">
-      <Link className="sidebar-account-link" onClick={onNavigate} to="/account">
+      <Link className="sidebar-account-link" onClick={onNavigate} to="/home">
         <span aria-hidden="true" className="avatar">
           {account?.display_name.slice(0, 1) || '用'}
         </span>
@@ -93,45 +72,33 @@ function AccountFooter({
           <strong>{account?.display_name}</strong>
           <span>{account?.is_admin ? '管理员' : `@${account?.username}`}</span>
         </span>
-        <span className="visually-hidden">账户设置</span>
+        <span className="visually-hidden">首页</span>
       </Link>
       <IconButton icon={<Icon name="logout" />} label="退出登录" onClick={onSignOut} />
     </div>
   )
 }
 
-/** 顶栏常驻可用积分与钱包入口（用户界面）。 */
-function WalletChip() {
-  const { wallet } = useWallet()
-  const amount = wallet ? formatPointAmount(wallet.spendable_capacity) : '—'
+/** 顶栏常驻可透支额度。 */
+function PointsChip() {
+  const { data } = usePoints()
+  const amount = data ? formatPointAmount(data.available) : '—'
   return (
-    <Link
-      aria-label={`可用 ${amount} 积分，打开钱包`}
-      className="wallet-chip"
-      to="/wallet"
-    >
+    <Link aria-label={`可用 ${amount} 积分`} className="wallet-chip" to="/home">
       <span>可用</span>
       <strong className="num">{amount}</strong>
       <span>积分</span>
-      <span className="wallet-chip-link">钱包</span>
     </Link>
   )
 }
 
-export function AppFrame({
-  navigation,
-  variant,
-}: {
-  navigation: NavGroup[]
-  variant: Variant
-}) {
+export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   const { sessionError } = useAuth()
   const { signOut, error: signOutError } = useSignOut()
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
   const alertReference = useRef<HTMLDivElement>(null)
   const mainReference = useRef<HTMLElement>(null)
-  const admin = variant === 'admin'
   const items = flattenNavigation(navigation)
   const tabItems = items.filter((item) => item.tab)
   const current = findNavItem(navigation, location.pathname)
@@ -166,26 +133,18 @@ export function AppFrame({
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
-      <aside
-        aria-label={admin ? '管理侧边栏' : '产品侧边栏'}
-        className="sidebar"
-      >
-        <Brand subtitle={admin ? '管理后台' : undefined} />
-        <nav aria-label={admin ? '管理导航' : '产品导航'} className="sidebar-nav">
+      <aside aria-label="产品侧边栏" className="sidebar">
+        <Brand />
+        <nav aria-label="产品导航" className="sidebar-nav">
           <NavGroups groups={navigation} />
-          <AreaSwitch variant={variant} />
         </nav>
         <AccountFooter onSignOut={() => void signOut()} />
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span className="topbar-brand"><Brand /></span>
-          <span className="topbar-crumb">{admin ? `管理后台 · ${current?.label ?? ''}` : (current?.label ?? '')}</span>
-          {admin ? (
-            <Link className="topbar-switch" to="/dashboard">返回产品</Link>
-          ) : (
-            <WalletChip />
-          )}
+          <span className="topbar-crumb">{current?.label ?? ''}</span>
+          <PointsChip />
         </header>
         {(sessionError || signOutError) && (
           <div className="session-alert" ref={alertReference} role="alert" tabIndex={-1}>
@@ -222,11 +181,10 @@ export function AppFrame({
         onClose={() => setMoreOpen(false)}
         open={moreOpen}
         placement="bottom"
-        title={admin ? '管理导航' : '全部导航'}
+        title="全部导航"
       >
         <nav aria-label="全部导航" className="sidebar-nav drawer-nav">
           <NavGroups groups={navigation} onNavigate={() => setMoreOpen(false)} />
-          <AreaSwitch onNavigate={() => setMoreOpen(false)} variant={variant} />
         </nav>
         <AccountFooter
           onNavigate={() => setMoreOpen(false)}

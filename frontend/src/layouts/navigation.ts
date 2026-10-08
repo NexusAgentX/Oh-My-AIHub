@@ -15,47 +15,13 @@ export type NavGroup = {
 }
 
 /**
- * 用户导航：使用 API / 共享渠道 / 积分。
- * 「渠道收入」不单设入口：收入由「我的渠道」列表（累计）与渠道详情（按报价）呈现，现有接口没有跨渠道的收入明细。
+ * 用户导航。产品重写（Epic #170）期间只保留占位首页；
+ * 完整的侧栏分组由 Feature D（用户界面）与 Feature E（管理后台）重建。
  */
 export const productNavigation: NavGroup[] = [
   {
-    label: '使用 API',
-    items: [
-      { label: '工作台', to: '/dashboard', icon: 'home', tab: '工作台' },
-      { label: 'API Keys', to: '/keys', icon: 'key', tab: 'Keys' },
-      { label: '调用记录', to: '/calls', icon: 'list' },
-      { label: 'API 市场', to: '/market', icon: 'store', tab: '市场' },
-    ],
-  },
-  {
-    label: '共享渠道',
-    items: [{ label: '我的渠道', to: '/channels', icon: 'server', tab: '渠道' }],
-  },
-  {
-    label: '积分',
-    items: [
-      { label: '钱包', to: '/wallet', icon: 'wallet', tab: '钱包' },
-      { label: 'C2C 市场', to: '/c2c', icon: 'swap' },
-    ],
-  },
-]
-
-export const adminNavigation: NavGroup[] = [
-  {
-    label: '运营',
-    items: [
-      { label: '运营台', to: '/admin/ops', icon: 'gauge', tab: '运营台' },
-      { label: '账户与信用', to: '/admin/accounts', icon: 'users', tab: '账户' },
-      { label: '模型目录', to: '/admin/models', icon: 'layers', tab: '模型' },
-    ],
-  },
-  {
-    label: '治理',
-    items: [
-      { label: '渠道治理', to: '/admin/channels', icon: 'shield', tab: '渠道' },
-      { label: '争议处理', to: '/admin/c2c/disputes', icon: 'scale' },
-    ],
+    label: '概览',
+    items: [{ label: '首页', to: '/home', icon: 'home', tab: '首页' }],
   },
 ]
 

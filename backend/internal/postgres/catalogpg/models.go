@@ -11,26 +11,24 @@ import (
 )
 
 type Model struct {
-	InternalID                    string
 	ID                            string
-	Name                          string
+	DisplayName                   string
+	InputPriceNanoPerMillion      money.Amount
+	OutputPriceNanoPerMillion     money.Amount
+	CacheWritePriceNanoPerMillion money.Amount
+	CacheReadPriceNanoPerMillion  money.Amount
+	Enabled                       bool
+	SortOrder                     int32
 	Provider                      string
-	ContextWindow                 int64
-	ParameterInfo                 string
+	ContextWindow                 *int64
 	InputModalities               []string
 	OutputModalities              []string
 	SupportsTools                 bool
 	SupportsStructuredOutput      bool
 	SupportsVision                bool
-	InputPriceNanoPerMillion      money.Amount
-	OutputPriceNanoPerMillion     money.Amount
-	CacheWritePriceNanoPerMillion money.Amount
-	CacheReadPriceNanoPerMillion  money.Amount
-	Status                        string
-	Version                       int64
+	ParameterInfo                 string
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
-	PriceUpdatedAt                time.Time
 }
 
 type ModelPriceTier struct {

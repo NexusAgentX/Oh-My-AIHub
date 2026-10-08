@@ -9,8 +9,7 @@ import (
 
 func tieredModel(tiers []ledger.PriceTier) Model {
 	return Model{
-		ID: "provider/model", Name: "Test Model", Provider: "Provider", ContextWindow: 1,
-		InputModalities: []string{"text"}, OutputModalities: []string{"text"}, Status: StatusActive,
+		ID: "provider-model", DisplayName: "Test Model",
 		PriceTiers: tiers,
 	}
 }
@@ -26,7 +25,7 @@ func validTier() ledger.PriceTier {
 func TestValidateModelPriceTiersAcceptsRealisticSchedules(t *testing.T) {
 	tier := validTier()
 	model := tieredModel([]ledger.PriceTier{tier})
-	if err := validate(normalize(model)); err != nil {
+	if err := Validate(Normalize(model)); err != nil {
 		t.Fatalf("realistic tier rejected: %v", err)
 	}
 
@@ -38,7 +37,7 @@ func TestValidateModelPriceTiersAcceptsRealisticSchedules(t *testing.T) {
 	afternoon := morning
 	afternoon.StartMinute, afternoon.EndMinute = int16Pointer(840), int16Pointer(1080)
 	model = tieredModel([]ledger.PriceTier{morning, afternoon})
-	if err := validate(normalize(model)); err != nil {
+	if err := Validate(Normalize(model)); err != nil {
 		t.Fatalf("DeepSeek-style peak schedule rejected: %v", err)
 	}
 }
@@ -63,14 +62,14 @@ func TestValidateModelPriceTiersRejectsInvalidShapes(t *testing.T) {
 	for note, mutate := range cases {
 		tier := validTier()
 		mutate(&tier)
-		if err := validate(tieredModel([]ledger.PriceTier{tier})); err == nil {
+		if err := Validate(tieredModel([]ledger.PriceTier{tier})); err == nil {
 			t.Fatalf("%s: tier accepted", note)
 		}
 	}
 
 	tier := validTier()
 	tier.InputPrice = money.FromNano(MaxPriceNanoPerMillion.Nano() + 1)
-	if err := validate(tieredModel([]ledger.PriceTier{tier})); err == nil {
+	if err := Validate(tieredModel([]ledger.PriceTier{tier})); err == nil {
 		t.Fatal("tier price above the catalog ceiling accepted")
 	}
 
@@ -78,7 +77,7 @@ func TestValidateModelPriceTiersRejectsInvalidShapes(t *testing.T) {
 	for index := range tiers {
 		tiers[index] = validTier()
 	}
-	if err := validate(tieredModel(tiers)); err == nil {
+	if err := Validate(tieredModel(tiers)); err == nil {
 		t.Fatal("more tiers than the storage bound accepted")
 	}
 }
@@ -87,7 +86,7 @@ func TestNormalizePriceTiersDefaultsTimezoneAndDeduplicatesWeekdays(t *testing.T
 	tier := validTier()
 	tier.Timezone = ""
 	tier.Weekdays = []int{3, 3, 1, 7, 7}
-	model := normalize(tieredModel([]ledger.PriceTier{tier}))
+	model := Normalize(tieredModel([]ledger.PriceTier{tier}))
 	normalized := model.PriceTiers[0]
 	if normalized.Timezone != "UTC" {
 		t.Fatalf("timezone default = %q, want UTC", normalized.Timezone)
@@ -95,7 +94,7 @@ func TestNormalizePriceTiersDefaultsTimezoneAndDeduplicatesWeekdays(t *testing.T
 	if len(normalized.Weekdays) != 3 || normalized.Weekdays[0] != 1 || normalized.Weekdays[1] != 3 || normalized.Weekdays[2] != 7 {
 		t.Fatalf("weekdays not deduplicated and sorted: %v", normalized.Weekdays)
 	}
-	if err := validate(model); err != nil {
+	if err := Validate(model); err != nil {
 		t.Fatalf("normalized tier rejected: %v", err)
 	}
 }
