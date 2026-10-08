@@ -92,3 +92,38 @@ COMMIT;
 ```
 
 核对列存在后再批准部署。若事务失败则停止发布并检查原因；镜像回滚时可以保留这些附加列。
+
+## v0.8.0 → v0.9.0 数据库前置步骤
+
+先确认生产缺少 `model_sources`、`catalog_sync` 两表，运行
+`sudo systemctl start oh-my-aihub-backup.service` 并核对 Result=success、ExecMainStatus=0。
+在现有库执行下列事务，只新增同步表，不重建数据库或改动既有模型及账本。
+
+```sql
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+CREATE TABLE model_sources (
+ source_key text PRIMARY KEY,
+ model_id text NOT NULL UNIQUE,
+ ignored boolean NOT NULL DEFAULT false,
+ sync_enabled boolean NOT NULL DEFAULT true,
+ raw_record jsonb NOT NULL,
+ info jsonb NOT NULL,
+ seen_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE catalog_sync (
+ id boolean PRIMARY KEY DEFAULT true CHECK(id),
+ exchange_rate text NOT NULL DEFAULT '',
+ started_at timestamptz,
+ finished_at timestamptz,
+ status text NOT NULL DEFAULT 'idle',
+ error text NOT NULL DEFAULT '',
+ result jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+INSERT INTO catalog_sync(id) VALUES(true);
+COMMIT;
+```
+
+核对两表及唯一初始配置行后再批准部署。汇率保持空值，首次启动自动同步资料，
+新模型停用，既有同名手工模型不接管。管理员之后在模型页自行设置汇率。
+升级失败可保留新增表并回滚到 v0.8.0 镜像；不得执行基线 Down。
