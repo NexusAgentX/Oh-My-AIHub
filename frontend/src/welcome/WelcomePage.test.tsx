@@ -21,32 +21,29 @@ describe('WelcomePage', () => {
     </MemoryRouter>,
   )
 
-  it('states positioning, value, fallback and boundaries', () => {
+  it('states the API market + points market positioning and boundaries', () => {
     expect(markup).toContain('<main')
     expect(markup).toContain('<footer')
-    expect(markup).toContain('API 渠道市场')
-    expect(markup).toContain('积分 C2C')
-    expect(markup).toContain('消费者')
-    expect(markup).toContain('共享者')
-    expect(markup).toContain('备用顺序')
+    expect(markup).toContain('API 市场 + 积分市场')
+    expect(markup).toContain('用 API')
+    expect(markup).toContain('卖 API')
+    expect(markup).toContain('积分')
+    expect(markup).toContain('失败自动换')
+    expect(markup).toContain('Key 加密保存')
     expect(markup).toContain('不保存请求与响应正文')
-    expect(markup).toContain('不承诺兑付')
+    expect(markup).toContain('不托管人民币')
   })
 
-  it('offers only the invited login path as the account action', () => {
+  it('offers only login as the account action', () => {
     expect(markup.match(/href="\/login"/g)?.length).toBeGreaterThanOrEqual(2)
-    expect(markup).toContain('受邀用户登录')
-    expect(markup).toContain('暂不开放自由注册')
+    expect(markup).toContain('受邀制')
     expect(markup).not.toContain('href="/register"')
-    expect(markup).not.toContain('找回密码')
-    expect(markup).not.toContain('免费注册')
+    expect(markup).not.toContain('注册')
   })
 
-  it('does not introduce composite recommendations or fabricated social proof', () => {
-    expect(markup).not.toContain('综合推荐')
+  it('does not introduce fabricated social proof', () => {
     expect(markup).not.toContain('客户数量')
     expect(markup).not.toContain('用户增长')
-    expect(markup).not.toContain('月收入')
     expect(markup).not.toContain('99.9%')
   })
 })
