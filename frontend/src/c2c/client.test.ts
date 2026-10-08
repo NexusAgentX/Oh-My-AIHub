@@ -12,7 +12,7 @@ describe('C2C client contracts', () => {
     const image = new File([new Uint8Array([1, 2, 3])], 'qr.png', { type: 'image/png' })
 
     await api.createC2COrder({
-      side: 'sell', unit_price_fen: 100, total: '10', minimum: '1', maximum: '10',
+      unit_price_fen: 100, total: '10', minimum: '1', maximum: '10',
       payment_methods: [{ type: 'wechat', contact: '', instructions: '', qr: image }],
     })
 

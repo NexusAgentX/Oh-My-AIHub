@@ -71,9 +71,8 @@ type ConsumptionMetrics struct {
 	PlatformFeeNano     int64  `json:"-"`
 }
 
-// C2COrderStatusCount groups parent orders by side and status.
+// C2COrderStatusCount groups parent orders by status.
 type C2COrderStatusCount struct {
-	Side   string `json:"side"`
 	Status string `json:"status"`
 	Count  int64  `json:"count"`
 }
@@ -84,13 +83,11 @@ type C2CTradeStatusCount struct {
 	Count  int64  `json:"count"`
 }
 
-// C2CMarketQuote is the non-windowed order-book snapshot; any missing side
-// keeps the whole spread null rather than fabricating a price.
+// C2CMarketQuote is the non-windowed sell-order snapshot; a missing price stays
+// null rather than being fabricated.
 type C2CMarketQuote struct {
 	LastTradedPriceFen *int64 `json:"last_traded_price_fen"`
-	BestBidPriceFen    *int64 `json:"best_bid_price_fen"`
 	BestAskPriceFen    *int64 `json:"best_ask_price_fen"`
-	SpreadFen          *int64 `json:"spread_fen"`
 }
 
 // C2CMetrics combines windowed order/trade counts with the quote snapshot.

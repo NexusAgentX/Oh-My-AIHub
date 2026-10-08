@@ -47,7 +47,6 @@ export function WalletSummary({ wallet }: { wallet: Wallet }) {
 
 const recoveryLabels: Record<WalletRecoveryAction['kind'], string> = {
   market: 'C2C 市场',
-  create_buy_order: '发布买单',
   my_orders: '我的挂单',
 }
 

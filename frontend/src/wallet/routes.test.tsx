@@ -22,7 +22,7 @@ describe('ledger routes', () => {
 
   it.each([
     ['/c2c', '/c2c'],
-    ['/c2c/orders/new?side=buy', '/c2c/orders/new'],
+    ['/c2c/orders/new', '/c2c/orders/new'],
     ['/c2c/me', '/c2c/me'],
   ])('keeps the recovery entry %s out of the wildcard redirect', (pathname, expectedRoute) => {
     expect(matchRoutes(appRoutes, pathname)?.at(-1)?.route.path).toBe(expectedRoute)

@@ -21,7 +21,7 @@ func TestC2CDTOsNeverSerializeEncryptionEnvelopesOrHoldIdentifiers(t *testing.T)
 	now := time.Date(2026, time.September, 2, 12, 0, 0, 0, time.UTC)
 	encrypted := c2c.EncryptedValue{KeyID: "private-key-id", Nonce: []byte("private-nonce"), Ciphertext: []byte("private-ciphertext")}
 	order := c2c.Order{
-		ID: "order-id", OwnerAccountID: "owner-id", OwnerDisplayName: "共享者", Side: c2c.SideSell,
+		ID: "order-id", OwnerAccountID: "owner-id", OwnerDisplayName: "共享者",
 		UnitPriceFen: 100, Total: money.FromNano(100 * money.Scale), Available: money.FromNano(50 * money.Scale),
 		Allocated: money.FromNano(25 * money.Scale), Settled: money.FromNano(25 * money.Scale), Minimum: money.FromNano(money.Scale),
 		Maximum: money.FromNano(100 * money.Scale), Status: c2c.OrderOpen, ParentHoldID: "private-parent-hold",
@@ -31,7 +31,7 @@ func TestC2CDTOsNeverSerializeEncryptionEnvelopesOrHoldIdentifiers(t *testing.T)
 		}}, CreatedAt: now, UpdatedAt: now,
 	}
 	trade := c2c.Trade{
-		ID: "trade-id", OrderID: order.ID, OrderSide: order.Side,
+		ID: "trade-id", OrderID: order.ID,
 		BuyerAccountID: "buyer-id", BuyerDisplayName: "买家", SellerAccountID: "seller-id", SellerDisplayName: "卖家",
 		Quantity: money.FromNano(25 * money.Scale), UnitPriceFen: 100, FiatAmountFen: 2500,
 		Status: c2c.TradePaid, HoldID: "private-child-hold", SelectedPaymentMethod: &order.PaymentMethods[0],

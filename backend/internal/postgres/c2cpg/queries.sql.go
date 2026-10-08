@@ -215,8 +215,8 @@ SELECT unit_price_fen FROM c2c_trades
 WHERE status = 'released_to_buyer' ORDER BY resolved_at DESC, id DESC LIMIT 1
 `
 
-// 最优买价/卖价取自 ListMarketBuyOrders/ListMarketSellOrders 的首行（两者均按价格排序、
-// 且过滤条件与盘口一致），这里只需要最新成交价；没有成交时无行。
+// 最优卖价取自 ListMarketSellOrders 的首行（按价格排序、过滤条件与盘口一致），
+// 这里只需要最新成交价；没有成交时无行。
 func (q *Queries) GetLatestTradePrice(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, getLatestTradePrice)
 	var unit_price_fen int64
@@ -227,7 +227,7 @@ func (q *Queries) GetLatestTradePrice(ctx context.Context) (int64, error) {
 const getOrder = `-- name: GetOrder :one
 
 
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -243,7 +243,6 @@ type GetOrderRow struct {
 	ID               string
 	OwnerAccountID   string
 	OwnerDisplayName string
-	Side             string
 	UnitPriceFen     int64
 	TotalNano        money.Amount
 	AvailableNano    money.Amount
@@ -262,7 +261,7 @@ type GetOrderRow struct {
 
 // C2C 领域全部 SQL。
 // 订单与成交的列表必须逐列相同：sqlc 没有片段复用，store.go 靠结构体转换共用一个映射函数
-// （GetOrder / GetOrderForUpdate / ListMarketSellOrders / ListMarketBuyOrders / ListOwnerOrders，
+// （GetOrder / GetOrderForUpdate / ListMarketSellOrders / ListOwnerOrders，
 // GetTrade / GetTradeForUpdate / ListAccountTrades / ListDisputedTrades）。
 // takeable 的判定必须与 GetAccountGate 加 store.go 中 ensureOwnerReady 的口径一致。
 // ---------------------------------------------------------------------------
@@ -275,7 +274,6 @@ func (q *Queries) GetOrder(ctx context.Context, id string) (GetOrderRow, error) 
 		&i.ID,
 		&i.OwnerAccountID,
 		&i.OwnerDisplayName,
-		&i.Side,
 		&i.UnitPriceFen,
 		&i.TotalNano,
 		&i.AvailableNano,
@@ -295,7 +293,7 @@ func (q *Queries) GetOrder(ctx context.Context, id string) (GetOrderRow, error) 
 }
 
 const getOrderForUpdate = `-- name: GetOrderForUpdate :one
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -312,7 +310,6 @@ type GetOrderForUpdateRow struct {
 	ID               string
 	OwnerAccountID   string
 	OwnerDisplayName string
-	Side             string
 	UnitPriceFen     int64
 	TotalNano        money.Amount
 	AvailableNano    money.Amount
@@ -336,7 +333,6 @@ func (q *Queries) GetOrderForUpdate(ctx context.Context, id string) (GetOrderFor
 		&i.ID,
 		&i.OwnerAccountID,
 		&i.OwnerDisplayName,
-		&i.Side,
 		&i.UnitPriceFen,
 		&i.TotalNano,
 		&i.AvailableNano,
@@ -393,7 +389,7 @@ func (q *Queries) GetSelectedPaymentMethod(ctx context.Context, tradeID string) 
 
 const getTrade = `-- name: GetTrade :one
 
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -407,7 +403,6 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.id = $1
@@ -416,7 +411,6 @@ WHERE t.id = $1
 type GetTradeRow struct {
 	ID                         string
 	OrderID                    string
-	OrderSide                  string
 	BuyerAccountID             string
 	BuyerDisplayName           string
 	SellerAccountID            string
@@ -451,7 +445,6 @@ func (q *Queries) GetTrade(ctx context.Context, id string) (GetTradeRow, error) 
 	err := row.Scan(
 		&i.ID,
 		&i.OrderID,
-		&i.OrderSide,
 		&i.BuyerAccountID,
 		&i.BuyerDisplayName,
 		&i.SellerAccountID,
@@ -480,7 +473,7 @@ func (q *Queries) GetTrade(ctx context.Context, id string) (GetTradeRow, error) 
 }
 
 const getTradeForUpdate = `-- name: GetTradeForUpdate :one
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -494,7 +487,6 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.id = $1
@@ -504,7 +496,6 @@ FOR UPDATE OF t
 type GetTradeForUpdateRow struct {
 	ID                         string
 	OrderID                    string
-	OrderSide                  string
 	BuyerAccountID             string
 	BuyerDisplayName           string
 	SellerAccountID            string
@@ -536,7 +527,6 @@ func (q *Queries) GetTradeForUpdate(ctx context.Context, id string) (GetTradeFor
 	err := row.Scan(
 		&i.ID,
 		&i.OrderID,
-		&i.OrderSide,
 		&i.BuyerAccountID,
 		&i.BuyerDisplayName,
 		&i.SellerAccountID,
@@ -662,20 +652,19 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 const insertOrder = `-- name: InsertOrder :exec
 
 INSERT INTO c2c_orders (
-	id, owner_account_id, side, unit_price_fen, total_nano,
+	id, owner_account_id, unit_price_fen, total_nano,
 	available_nano, allocated_nano, settled_nano, closed_nano,
 	minimum_nano, maximum_nano, status, parent_hold_id, created_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5,
-	$5, 0, 0, 0,
-	$6, $7, 'open', $8, $9, $9
+	$1, $2, $3, $4,
+	$4, 0, 0, 0,
+	$5, $6, 'open', $7, $8, $8
 )
 `
 
 type InsertOrderParams struct {
 	ID             string
 	OwnerAccountID string
-	Side           string
 	UnitPriceFen   int64
 	TotalNano      money.Amount
 	MinimumNano    money.Amount
@@ -691,7 +680,6 @@ func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) error 
 	_, err := q.db.Exec(ctx, insertOrder,
 		arg.ID,
 		arg.OwnerAccountID,
-		arg.Side,
 		arg.UnitPriceFen,
 		arg.TotalNano,
 		arg.MinimumNano,
@@ -804,7 +792,7 @@ func (q *Queries) IsOrderParticipant(ctx context.Context, arg IsOrderParticipant
 }
 
 const listAccountTrades = `-- name: ListAccountTrades :many
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -818,7 +806,6 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.buyer_account_id = $1 OR t.seller_account_id = $1
@@ -828,7 +815,6 @@ ORDER BY t.updated_at DESC, t.id DESC LIMIT 200
 type ListAccountTradesRow struct {
 	ID                         string
 	OrderID                    string
-	OrderSide                  string
 	BuyerAccountID             string
 	BuyerDisplayName           string
 	SellerAccountID            string
@@ -866,7 +852,6 @@ func (q *Queries) ListAccountTrades(ctx context.Context, accountID string) ([]Li
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrderID,
-			&i.OrderSide,
 			&i.BuyerAccountID,
 			&i.BuyerDisplayName,
 			&i.SellerAccountID,
@@ -902,7 +887,7 @@ func (q *Queries) ListAccountTrades(ctx context.Context, accountID string) ([]Li
 }
 
 const listDisputedTrades = `-- name: ListDisputedTrades :many
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -916,7 +901,6 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.status = 'disputed'
@@ -926,7 +910,6 @@ ORDER BY t.updated_at, t.id LIMIT 200
 type ListDisputedTradesRow struct {
 	ID                         string
 	OrderID                    string
-	OrderSide                  string
 	BuyerAccountID             string
 	BuyerDisplayName           string
 	SellerAccountID            string
@@ -964,7 +947,6 @@ func (q *Queries) ListDisputedTrades(ctx context.Context) ([]ListDisputedTradesR
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrderID,
-			&i.OrderSide,
 			&i.BuyerAccountID,
 			&i.BuyerDisplayName,
 			&i.SellerAccountID,
@@ -1138,82 +1120,8 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 	return items, nil
 }
 
-const listMarketBuyOrders = `-- name: ListMarketBuyOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
-	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
-	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
-	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
-	o.cancelled_at,
-	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
-		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
-FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.side = 'buy' AND o.status = 'open' AND o.available_nano > 0
-	AND (owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
-ORDER BY o.unit_price_fen DESC, o.created_at, o.id LIMIT 200
-`
-
-type ListMarketBuyOrdersRow struct {
-	ID               string
-	OwnerAccountID   string
-	OwnerDisplayName string
-	Side             string
-	UnitPriceFen     int64
-	TotalNano        money.Amount
-	AvailableNano    money.Amount
-	AllocatedNano    money.Amount
-	SettledNano      money.Amount
-	ClosedNano       money.Amount
-	MinimumNano      money.Amount
-	MaximumNano      money.Amount
-	Status           string
-	ParentHoldID     string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	CancelledAt      *time.Time
-	Takeable         bool
-}
-
-func (q *Queries) ListMarketBuyOrders(ctx context.Context) ([]ListMarketBuyOrdersRow, error) {
-	rows, err := q.db.Query(ctx, listMarketBuyOrders)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListMarketBuyOrdersRow
-	for rows.Next() {
-		var i ListMarketBuyOrdersRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OwnerAccountID,
-			&i.OwnerDisplayName,
-			&i.Side,
-			&i.UnitPriceFen,
-			&i.TotalNano,
-			&i.AvailableNano,
-			&i.AllocatedNano,
-			&i.SettledNano,
-			&i.ClosedNano,
-			&i.MinimumNano,
-			&i.MaximumNano,
-			&i.Status,
-			&i.ParentHoldID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.CancelledAt,
-			&i.Takeable,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listMarketSellOrders = `-- name: ListMarketSellOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -1221,7 +1129,7 @@ SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.sid
 	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
 FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.side = 'sell' AND o.status = 'open' AND o.available_nano > 0
+WHERE o.status = 'open' AND o.available_nano > 0
 	AND (owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 ORDER BY o.unit_price_fen ASC, o.created_at, o.id LIMIT 200
 `
@@ -1230,7 +1138,6 @@ type ListMarketSellOrdersRow struct {
 	ID               string
 	OwnerAccountID   string
 	OwnerDisplayName string
-	Side             string
 	UnitPriceFen     int64
 	TotalNano        money.Amount
 	AvailableNano    money.Amount
@@ -1260,7 +1167,6 @@ func (q *Queries) ListMarketSellOrders(ctx context.Context) ([]ListMarketSellOrd
 			&i.ID,
 			&i.OwnerAccountID,
 			&i.OwnerDisplayName,
-			&i.Side,
 			&i.UnitPriceFen,
 			&i.TotalNano,
 			&i.AvailableNano,
@@ -1287,7 +1193,7 @@ func (q *Queries) ListMarketSellOrders(ctx context.Context) ([]ListMarketSellOrd
 }
 
 const listOwnerOrders = `-- name: ListOwnerOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -1295,7 +1201,7 @@ SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.sid
 	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
 FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.owner_account_id = $1
+WHERE o.owner_account_id = $1 AND o.side = 'sell'
 ORDER BY o.updated_at DESC, o.id DESC LIMIT 200
 `
 
@@ -1303,7 +1209,6 @@ type ListOwnerOrdersRow struct {
 	ID               string
 	OwnerAccountID   string
 	OwnerDisplayName string
-	Side             string
 	UnitPriceFen     int64
 	TotalNano        money.Amount
 	AvailableNano    money.Amount
@@ -1320,6 +1225,7 @@ type ListOwnerOrdersRow struct {
 	Takeable         bool
 }
 
+// 迁移 0009 之前遗留的已终结买单只保留为历史，不进入用户的订单列表。
 func (q *Queries) ListOwnerOrders(ctx context.Context, ownerAccountID string) ([]ListOwnerOrdersRow, error) {
 	rows, err := q.db.Query(ctx, listOwnerOrders, ownerAccountID)
 	if err != nil {
@@ -1333,7 +1239,6 @@ func (q *Queries) ListOwnerOrders(ctx context.Context, ownerAccountID string) ([
 			&i.ID,
 			&i.OwnerAccountID,
 			&i.OwnerDisplayName,
-			&i.Side,
 			&i.UnitPriceFen,
 			&i.TotalNano,
 			&i.AvailableNano,

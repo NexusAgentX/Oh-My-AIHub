@@ -8,8 +8,6 @@
 .c2c-editor { display: grid; gap: var(--space-4); max-width: 880px; }
 .c2c-editor .notice { margin-bottom: 0; }
 .c2c-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.c2c-editor-side { display: grid; grid-column: 1 / -1; gap: var(--space-2); }
-.c2c-editor-side .segmented { width: fit-content; }
 .c2c-methods { display: grid; gap: var(--space-3); }
 .c2c-method { display: grid; gap: var(--space-4); min-width: 0; margin: 0; padding: var(--space-4); border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--soft); }
 .c2c-method legend { padding: 0 var(--space-2); color: var(--muted); font-size: var(--text-sm); font-weight: 600; }

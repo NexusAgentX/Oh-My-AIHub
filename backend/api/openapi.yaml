@@ -2556,7 +2556,7 @@ components:
           items:
             type: object
             properties:
-              kind: {type: string, enum: [market, create_buy_order, my_orders]}
+              kind: {type: string, enum: [market, my_orders]}
               href: {type: string}
             required: [kind, href]
             additionalProperties: false
@@ -3314,7 +3314,6 @@ components:
         id: {type: string}
         owner_account_id: {type: string}
         owner_display_name: {type: string}
-        side: {type: string, enum: [sell, buy]}
         unit_price_fen: {type: integer}
         total: {$ref: "#/components/schemas/Amount"}
         available: {$ref: "#/components/schemas/Amount"}
@@ -3337,7 +3336,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
-      required: [id, owner_account_id, owner_display_name, side, unit_price_fen, total, available, allocated, settled, closed, minimum, maximum, status, takeable, payment_types, payment_methods, created_at, updated_at, cancelled_at]
+      required: [id, owner_account_id, owner_display_name, unit_price_fen, total, available, allocated, settled, closed, minimum, maximum, status, takeable, payment_types, payment_methods, created_at, updated_at, cancelled_at]
       additionalProperties: false
     C2COrderEnvelope:
       type: object
@@ -3351,7 +3350,6 @@ components:
       properties:
         id: {type: string}
         order_id: {type: string}
-        order_side: {type: string, enum: [sell, buy]}
         buyer_account_id: {type: string}
         buyer_display_name: {type: string}
         seller_account_id: {type: string}
@@ -3415,7 +3413,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
-      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at]
+      required: [id, order_id, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at]
       additionalProperties: false
     C2CAdminTrade:
       type: object
@@ -3423,7 +3421,6 @@ components:
       properties:
         id: {type: string}
         order_id: {type: string}
-        order_side: {type: string, enum: [sell, buy]}
         buyer_account_id: {type: string}
         buyer_display_name: {type: string}
         seller_account_id: {type: string}
@@ -3489,7 +3486,7 @@ components:
             - type: "null"
         buyer_credit_frozen: {type: boolean}
         seller_credit_frozen: {type: boolean}
-      required: [id, order_id, order_side, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at, buyer_credit_frozen, seller_credit_frozen]
+      required: [id, order_id, buyer_account_id, buyer_display_name, seller_account_id, seller_display_name, quantity, unit_price_fen, fiat_amount_fen, status, payment_method, payment_reference, payment_reference_deleted_at, payment_deadline, review_due_at, ledger_transaction_id, statements, events, created_at, updated_at, paid_at, resolved_at, buyer_credit_frozen, seller_credit_frozen]
       additionalProperties: false
     C2CTradeEnvelope:
       type: object
@@ -3529,18 +3526,13 @@ components:
           properties:
             guidance_price_fen: {type: integer}
             latest_price_fen: {type: [integer, "null"]}
-            best_bid_fen: {type: [integer, "null"]}
             best_ask_fen: {type: [integer, "null"]}
-            spread_fen: {type: [integer, "null"]}
-          required: [guidance_price_fen, latest_price_fen, best_bid_fen, best_ask_fen, spread_fen]
+          required: [guidance_price_fen, latest_price_fen, best_ask_fen]
           additionalProperties: false
         sell_orders:
           type: array
           items: {$ref: "#/components/schemas/C2COrder"}
-        buy_orders:
-          type: array
-          items: {$ref: "#/components/schemas/C2COrder"}
-      required: [metrics, sell_orders, buy_orders]
+      required: [metrics, sell_orders]
       additionalProperties: false
     C2CMyActivity:
       type: object
@@ -3565,7 +3557,6 @@ components:
     C2CCreateOrderRequest:
       type: object
       properties:
-        side: {type: string, enum: [sell, buy]}
         unit_price_fen: {type: integer}
         total: {$ref: "#/components/schemas/Amount"}
         minimum: {$ref: "#/components/schemas/Amount"}
@@ -3573,7 +3564,7 @@ components:
         payment_methods:
           type: array
           items: {$ref: "#/components/schemas/C2CPaymentMethodRequest"}
-      required: [side, unit_price_fen, total, minimum, maximum, payment_methods]
+      required: [unit_price_fen, total, minimum, maximum, payment_methods]
       additionalProperties: false
     C2CTakeOrderRequest:
       type: object
@@ -3704,10 +3695,9 @@ components:
               items:
                 type: object
                 properties:
-                  side: {type: string}
                   status: {type: string}
                   count: {type: integer}
-                required: [side, status, count]
+                required: [status, count]
                 additionalProperties: false
             trades:
               type: array
@@ -3722,10 +3712,8 @@ components:
               type: object
               properties:
                 last_traded_price_fen: {type: [integer, "null"]}
-                best_bid_price_fen: {type: [integer, "null"]}
                 best_ask_price_fen: {type: [integer, "null"]}
-                spread_fen: {type: [integer, "null"]}
-              required: [last_traded_price_fen, best_bid_price_fen, best_ask_price_fen, spread_fen]
+              required: [last_traded_price_fen, best_ask_price_fen]
               additionalProperties: false
           required: [orders, trades, quote]
           additionalProperties: false

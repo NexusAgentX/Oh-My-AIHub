@@ -1,6 +1,6 @@
 -- C2C 领域全部 SQL。
 -- 订单与成交的列表必须逐列相同：sqlc 没有片段复用，store.go 靠结构体转换共用一个映射函数
--- （GetOrder / GetOrderForUpdate / ListMarketSellOrders / ListMarketBuyOrders / ListOwnerOrders，
+-- （GetOrder / GetOrderForUpdate / ListMarketSellOrders / ListOwnerOrders，
 -- GetTrade / GetTradeForUpdate / ListAccountTrades / ListDisputedTrades）。
 -- takeable 的判定必须与 GetAccountGate 加 store.go 中 ensureOwnerReady 的口径一致。
 
@@ -9,7 +9,7 @@
 -- ---------------------------------------------------------------------------
 
 -- name: GetOrder :one
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -21,7 +21,7 @@ JOIN accounts owner ON owner.id = o.owner_account_id
 WHERE o.id = @id;
 
 -- name: GetOrderForUpdate :one
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -34,7 +34,7 @@ WHERE o.id = @id
 FOR UPDATE OF o;
 
 -- name: ListMarketSellOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -42,25 +42,12 @@ SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.sid
 	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
 FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.side = 'sell' AND o.status = 'open' AND o.available_nano > 0
+WHERE o.status = 'open' AND o.available_nano > 0
 	AND (owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 ORDER BY o.unit_price_fen ASC, o.created_at, o.id LIMIT 200;
 
--- name: ListMarketBuyOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
-	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
-	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
-	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
-	o.cancelled_at,
-	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
-		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
-FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.side = 'buy' AND o.status = 'open' AND o.available_nano > 0
-	AND (owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
-ORDER BY o.unit_price_fen DESC, o.created_at, o.id LIMIT 200;
-
 -- name: ListOwnerOrders :many
-SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.side,
+SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	o.unit_price_fen, o.total_nano, o.available_nano, o.allocated_nano,
 	o.settled_nano, o.closed_nano, o.minimum_nano, o.maximum_nano,
 	o.status, COALESCE(o.parent_hold_id::text, '')::text AS parent_hold_id, o.created_at, o.updated_at,
@@ -68,14 +55,15 @@ SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name, o.sid
 	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
 FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
-WHERE o.owner_account_id = @owner_account_id
+-- 迁移 0009 之前遗留的已终结买单只保留为历史，不进入用户的订单列表。
+WHERE o.owner_account_id = @owner_account_id AND o.side = 'sell'
 ORDER BY o.updated_at DESC, o.id DESC LIMIT 200;
 
 -- name: GetOrderOwnerID :one
 SELECT owner_account_id FROM c2c_orders WHERE id = @id;
 
--- 最优买价/卖价取自 ListMarketBuyOrders/ListMarketSellOrders 的首行（两者均按价格排序、
--- 且过滤条件与盘口一致），这里只需要最新成交价；没有成交时无行。
+-- 最优卖价取自 ListMarketSellOrders 的首行（按价格排序、过滤条件与盘口一致），
+-- 这里只需要最新成交价；没有成交时无行。
 -- name: GetLatestTradePrice :one
 SELECT unit_price_fen FROM c2c_trades
 WHERE status = 'released_to_buyer' ORDER BY resolved_at DESC, id DESC LIMIT 1;
@@ -113,7 +101,7 @@ INSERT INTO c2c_payment_methods (
 -- ---------------------------------------------------------------------------
 
 -- name: GetTrade :one
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -127,13 +115,12 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.id = @id;
 
 -- name: GetTradeForUpdate :one
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -147,14 +134,13 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.id = @id
 FOR UPDATE OF t;
 
 -- name: ListAccountTrades :many
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -168,14 +154,13 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.buyer_account_id = @account_id OR t.seller_account_id = @account_id
 ORDER BY t.updated_at DESC, t.id DESC LIMIT 200;
 
 -- name: ListDisputedTrades :many
-SELECT t.id, t.order_id, o.side AS order_side,
+SELECT t.id, t.order_id,
 	t.buyer_account_id, buyer.display_name AS buyer_display_name,
 	t.seller_account_id, seller.display_name AS seller_display_name,
 	buyer.credit_frozen AS buyer_credit_frozen, seller.credit_frozen AS seller_credit_frozen,
@@ -189,7 +174,6 @@ SELECT t.id, t.order_id, o.side AS order_side,
 	COALESCE(t.ledger_transaction_id::text, '')::text AS ledger_transaction_id,
 	t.created_at, t.updated_at, t.paid_at, t.resolved_at
 FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
 JOIN accounts buyer ON buyer.id = t.buyer_account_id
 JOIN accounts seller ON seller.id = t.seller_account_id
 WHERE t.status = 'disputed'
@@ -283,13 +267,13 @@ RETURNING version;
 
 -- name: InsertOrder :exec
 INSERT INTO c2c_orders (
-	id, owner_account_id, side, unit_price_fen, total_nano,
+	id, owner_account_id, unit_price_fen, total_nano,
 	available_nano, allocated_nano, settled_nano, closed_nano,
 	minimum_nano, maximum_nano, status, parent_hold_id, created_at, updated_at
 ) VALUES (
-	@id, @owner_account_id, @side, @unit_price_fen, @total_nano,
+	@id, @owner_account_id, @unit_price_fen, @total_nano,
 	@total_nano, 0, 0, 0,
-	@minimum_nano, @maximum_nano, 'open', sqlc.narg('parent_hold_id'), @created_at, @created_at
+	@minimum_nano, @maximum_nano, 'open', @parent_hold_id, @created_at, @created_at
 );
 
 -- name: UpdateOrderAmounts :execrows

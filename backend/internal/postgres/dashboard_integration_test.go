@@ -192,7 +192,7 @@ func TestDashboardPendingItemsIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	method := []c2c.PaymentMethodInput{{Type: c2c.PaymentWeChat, Contact: "wx-private", Instructions: "pay exact amount"}}
-	order, err := c2cService.CreateOrder(ctx, seller, "dash-sell", c2c.SideSell, 100, money.FromNano(5*money.Scale), money.FromNano(2*money.Scale), money.FromNano(5*money.Scale), method)
+	order, err := c2cService.CreateOrder(ctx, seller, "dash-sell", 100, money.FromNano(5*money.Scale), money.FromNano(2*money.Scale), money.FromNano(5*money.Scale), method)
 	if err != nil {
 		t.Fatal(err)
 	}

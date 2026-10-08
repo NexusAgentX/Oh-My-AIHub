@@ -4,7 +4,6 @@ import {
   c2cDisputeParties,
   c2cEventLabel,
   c2cFiatFen,
-  c2cTakeLabel,
   c2cTakeQuantityError,
   c2cTradeActionHint,
   c2cTradeRole,
@@ -65,11 +64,6 @@ const order = { minimum: '10', maximum: '50', available: '30' } as C2COrder
 const trade = { buyer_account_id: 'buyer', seller_account_id: 'seller', status: 'awaiting_payment' } as C2CTrade
 
 describe('C2C taking and trade roles', () => {
-  it('labels the taker action by the order side', () => {
-    expect(c2cTakeLabel('sell')).toBe('购买')
-    expect(c2cTakeLabel('buy')).toBe('出售')
-  })
-
   it('validates a taken quantity against limits and the available amount', () => {
     expect(c2cTakeQuantityError(order, '10')).toBe('')
     expect(c2cTakeQuantityError(order, '30')).toBe('')
@@ -107,21 +101,21 @@ describe('C2C order draft validation', () => {
   const base = { price: '1.00', total: '100', minimum: '10', maximum: '100' }
   const contact = { contact: 'wx-id', instructions: '', qr: null }
 
-  it('accepts sell orders with a QR code only and buy orders with contact', () => {
+  it('accepts a QR code only or a contact as payment info', () => {
     const qr = new File([new Uint8Array([1])], 'qr.png', { type: 'image/png' })
-    expect(validateOrderDraft({ ...base, side: 'sell', methods: [{ contact: '', instructions: '', qr }] })).toBe('')
-    expect(validateOrderDraft({ ...base, side: 'buy', methods: [contact] })).toBe('')
+    expect(validateOrderDraft({ ...base, methods: [{ contact: '', instructions: '', qr }] })).toBe('')
+    expect(validateOrderDraft({ ...base, methods: [contact] })).toBe('')
   })
 
-  it('requires buy orders to carry a contact and sell orders some payment info', () => {
-    expect(validateOrderDraft({ ...base, side: 'buy', methods: [{ contact: '', instructions: 'x', qr: null }] })).toBe('请填写联系方式')
-    expect(validateOrderDraft({ ...base, side: 'sell', methods: [{ contact: '', instructions: '', qr: null }] })).toContain('收款')
+  it('requires some payment info for every method', () => {
+    expect(validateOrderDraft({ ...base, methods: [{ contact: '', instructions: 'x', qr: null }] })).toBe('')
+    expect(validateOrderDraft({ ...base, methods: [{ contact: '', instructions: '', qr: null }] })).toContain('收款')
   })
 
   it('rejects inverted ranges and malformed prices', () => {
-    expect(validateOrderDraft({ ...base, side: 'sell', maximum: '5', methods: [contact] })).toContain('数量范围')
-    expect(validateOrderDraft({ ...base, side: 'sell', total: '50', methods: [contact] })).toContain('数量范围')
-    expect(validateOrderDraft({ ...base, side: 'sell', price: '1.234', methods: [contact] })).toContain('格式')
+    expect(validateOrderDraft({ ...base, maximum: '5', methods: [contact] })).toContain('数量范围')
+    expect(validateOrderDraft({ ...base, total: '50', methods: [contact] })).toContain('数量范围')
+    expect(validateOrderDraft({ ...base, price: '1.234', methods: [contact] })).toContain('格式')
   })
 })
 

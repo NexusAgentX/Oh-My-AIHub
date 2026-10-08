@@ -5,15 +5,9 @@ import type {
   C2CTrade,
   C2CTradeView,
   C2CPaymentMethodType,
-  C2CSide,
   C2CTradeStatus,
 } from '../api/types'
 import { parseNanoPoints } from '../money/amount'
-
-export const c2cSideLabels: Record<C2CSide, string> = {
-  sell: '卖单',
-  buy: '买单',
-}
 
 export const c2cPaymentLabels: Record<C2CPaymentMethodType, string> = {
   wechat: '微信',
@@ -120,11 +114,6 @@ export function c2cAdminDisputeActions(status: C2CTradeStatus): C2CAdminDisputeA
   }
 }
 
-/** 挂单发布方向对应的承接动作：卖单由买家承接（购买），买单由卖家承接（出售）。 */
-export function c2cTakeLabel(side: C2CSide) {
-  return side === 'sell' ? '购买' : '出售'
-}
-
 export function isC2COrderCancellable(order: Pick<C2COrder, 'status'>) {
   return order.status === 'open' || order.status === 'allocated'
 }
@@ -161,9 +150,8 @@ export function c2cTakeQuantityError(order: C2COrder, quantity: string) {
   return ''
 }
 
-/** 返回表单校验错误文案；合法时返回空串。买单必须填写联系方式，卖单至少填写账号、备注或收款码之一。 */
+/** 返回表单校验错误文案；合法时返回空串。至少填写收款账号、备注或收款码之一。 */
 export function validateOrderDraft(input: {
-  side: C2CSide
   price: string
   total: string
   minimum: string
@@ -181,15 +169,10 @@ export function validateOrderDraft(input: {
   } catch {
     return '请检查单价与数量格式'
   }
-  const incomplete = input.methods.some((method) =>
-    input.side === 'buy'
-      ? !method.contact.trim()
-      : !method.contact.trim() && !method.instructions.trim() && !method.qr,
+  const incomplete = input.methods.some(
+    (method) => !method.contact.trim() && !method.instructions.trim() && !method.qr,
   )
-  if (incomplete) {
-    return input.side === 'buy' ? '请填写联系方式' : '请至少填写收款账号、备注或上传收款码'
-  }
-  return ''
+  return incomplete ? '请至少填写收款账号、备注或上传收款码' : ''
 }
 
 const c2cEventLabels: Record<string, string> = {
