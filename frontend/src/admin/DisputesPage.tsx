@@ -15,7 +15,7 @@ import {
 import { ConfirmActionDialog, DetailList, LoadMore } from './components'
 import { formatDateTime, formatFen, formatPoints, shortID } from './format'
 import { useAdminDisputes, useAdminTrade, useAdminTransactions, useResolveTrade } from './queries'
-import { TransactionTypeLabel } from './transactions'
+import { TransactionTypeLabel, transactionVolume } from './transactions'
 import type { C2CTrade, TradeStatus } from './types'
 
 export const tradeStatusLabels: Record<TradeStatus, [string, BadgeTone]> = {
@@ -125,20 +125,35 @@ export function tradeTimeline(trade: C2CTrade): Array<{ label: string; at: strin
     .sort((left, right) => left.at.localeCompare(right.at))
 }
 
+/** 相关账本记录：按关联对象查询本交易的记账与所属卖单的挂单记账。 */
 function RelatedLedger({ trade }: { trade: C2CTrade }) {
-  const transactions = useAdminTransactions({ account_id: trade.seller.id, limit: 100 })
-  const related = new Set([trade.id, trade.order_id])
+  const byTrade = useAdminTransactions({ related_type: 'c2c_trade', related_id: trade.id, limit: 50 })
+  const byOrder = useAdminTransactions({ related_type: 'c2c_order', related_id: trade.order_id, limit: 50 })
+  const merged =
+    byTrade.data && byOrder.data
+      ? [...byTrade.data, ...byOrder.data].sort((left, right) => left.created_at.localeCompare(right.created_at))
+      : undefined
   return (
-    <QueryBoundary query={transactions}>
+    <QueryBoundary
+      query={{
+        data: merged,
+        isPending: byTrade.isPending || byOrder.isPending,
+        isError: byTrade.isError || byOrder.isError,
+        error: byTrade.error ?? byOrder.error,
+        refetch: () => Promise.all([byTrade.refetch(), byOrder.refetch()]),
+      }}
+    >
       {(rows) => {
-        const matched = rows.filter((row) => row.related && related.has(row.related.id))
-        if (matched.length === 0) return <p className="muted-copy">暂无相关记账</p>
+        if (rows.length === 0) return <p className="muted-copy">暂无相关记账</p>
         return (
           <ul className="plain-list">
-            {matched.map((transaction) => (
+            {rows.map((transaction) => (
               <li key={transaction.id}>
                 <TransactionTypeLabel type={transaction.type} />
-                <span className="muted-copy">{formatDateTime(transaction.created_at)}</span>
+                <span className="muted-copy">
+                  {formatDateTime(transaction.created_at)} · {formatPoints(transactionVolume(transaction))} 积分
+                  {transaction.related?.type === 'c2c_order' ? ' · 卖单' : ''}
+                </span>
                 <Link to={`/admin/points?tab=transactions&transaction=${transaction.id}`}>查看分录</Link>
               </li>
             ))}

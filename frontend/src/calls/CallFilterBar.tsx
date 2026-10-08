@@ -11,6 +11,8 @@ export type CallFilterState = {
   format: string
   outcome: string
   tag: string
+  /** 请求 ID 精确匹配；设置后忽略时间范围 */
+  requestId: string
 }
 
 export const emptyCallFilters: CallFilterState = {
@@ -20,11 +22,19 @@ export const emptyCallFilters: CallFilterState = {
   format: '',
   outcome: '',
   tag: '',
+  requestId: '',
+}
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isRequestId(value: string) {
+  return uuidPattern.test(value)
 }
 
 export function filtersToParams(filters: CallFilterState, now = new Date()): CallListParams {
   return {
-    from: rangeFrom(filters.range, now),
+    from: filters.requestId ? undefined : rangeFrom(filters.range, now),
+    request_id: filters.requestId || undefined,
     model: filters.model || undefined,
     api_key_id: filters.apiKeyId || undefined,
     format: filters.format || undefined,
@@ -67,7 +77,7 @@ function FilterSelect({
 }
 
 /**
- * 调用筛选：时间范围、模型、Key、格式、结果、标签与按请求 ID 打开详情。
+ * 调用筛选：时间范围、模型、Key、格式、结果、标签与请求 ID 精确查找。
  * models / keys 不传时隐藏对应筛选。
  */
 export function CallFilterBar({
@@ -75,21 +85,30 @@ export function CallFilterBar({
   onChange,
   models,
   keys,
-  onSearchId,
 }: {
   value: CallFilterState
   onChange: (value: CallFilterState) => void
   models?: string[]
   keys?: Array<{ id: string; name: string }>
-  onSearchId?: (id: string) => void
 }) {
-  const [requestId, setRequestId] = useState('')
+  const [requestId, setRequestId] = useState(value.requestId)
+  const [idError, setIdError] = useState('')
   const [tag, setTag] = useState(value.tag)
   const set = (patch: Partial<CallFilterState>) => onChange({ ...value, ...patch })
   const submitId = (event: FormEvent) => {
     event.preventDefault()
     const id = requestId.trim()
-    if (id) onSearchId?.(id)
+    if (id && !isRequestId(id)) {
+      setIdError('请输入完整的请求 ID')
+      return
+    }
+    setIdError('')
+    set({ requestId: id })
+  }
+  const clearId = () => {
+    setRequestId('')
+    setIdError('')
+    set({ requestId: '' })
   }
   return (
     <div className="call-filters">
@@ -138,20 +157,30 @@ export function CallFilterBar({
           value={tag}
         />
       </form>
-      {onSearchId && (
-        <form className="filter-inline-form filter-id-form" onSubmit={submitId}>
-          <input
-            aria-label="请求 ID"
-            className="input mono"
-            onChange={(event) => setRequestId(event.target.value)}
-            placeholder="请求 ID"
-            value={requestId}
-          />
-          <Button icon={<Icon name="search" />} size="sm" type="submit" variant="secondary">
-            查找
+      <form className="filter-inline-form filter-id-form" onSubmit={submitId}>
+        <input
+          aria-describedby={idError ? 'call-request-id-error' : undefined}
+          aria-invalid={idError ? true : undefined}
+          aria-label="请求 ID"
+          className="input mono"
+          onChange={(event) => setRequestId(event.target.value)}
+          placeholder="请求 ID"
+          value={requestId}
+        />
+        <Button icon={<Icon name="search" />} size="sm" type="submit" variant="secondary">
+          查找
+        </Button>
+        {value.requestId && (
+          <Button onClick={clearId} size="sm" type="button" variant="quiet">
+            清除
           </Button>
-        </form>
-      )}
+        )}
+        {idError && (
+          <span className="field-error" id="call-request-id-error" role="alert">
+            {idError}
+          </span>
+        )}
+      </form>
     </div>
   )
 }

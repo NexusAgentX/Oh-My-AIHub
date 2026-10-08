@@ -1,24 +1,26 @@
 import { Badge, ButtonLink, Card, Metric, PageHeader, QueryBoundary, type BadgeTone } from '../ui'
-import { formatCount, formatPoints, formatRatio, pointsRatio } from './format'
-import { absolute } from './pointsView'
-import { useAdminOverview, useAdminPoints } from './queries'
+import { formatCount, formatFen, formatPoints, formatRatio, pointsRatio } from './format'
+import { useAdminOverview } from './queries'
 import type { AdminOverview, AttentionItem } from './types'
 
-const attentionKinds: Record<AttentionItem['kind'], { label: string; action: string }> = {
+const attentionKinds: Record<AttentionItem['kind'], { label: string; action: string; anchor?: string }> = {
   dispute: { label: '申诉', action: '去仲裁' },
   over_limit: { label: '透支', action: '查看用户' },
-  negative_balance: { label: '负余额过久', action: '查看用户' },
+  negative_balance: { label: '负余额过久', action: '查看风险' },
+  credit_concentration: { label: '积分集中', action: '查看集中度', anchor: 'risks' },
   channel_suspended: { label: '渠道下架', action: '查看渠道' },
   channel_failing: { label: '渠道异常', action: '查看渠道' },
-  ledger_unbalanced: { label: '核对不通过', action: '去核对' },
-  stuck_call: { label: '调用未结束', action: '查看调用' },
-  credit_concentration: { label: '积分集中', action: '查看用户' },
   unbilled_usage: { label: '用量未读到', action: '查看调用' },
-  reconciliation_failed: { label: '记账或核对异常', action: '去核对' },
+  ledger_unbalanced: { label: '账本不平衡', action: '去核对', anchor: 'checks' },
+  reconciliation_failed: { label: '记账或核对异常', action: '去核对', anchor: 'checks' },
+  stuck_call: { label: '调用未结束', action: '查看调用' },
 }
 
-function attentionMeta(item: AttentionItem) {
-  return attentionKinds[item.kind] ?? { label: item.kind, action: '查看' }
+/** 类型文案与跳转：后端给出目标页面，核对与集中度类定位到积分页对应区块。 */
+export function attentionMeta(item: AttentionItem) {
+  const meta = attentionKinds[item.kind] ?? { label: item.kind, action: '查看' }
+  const link = item.kind === 'negative_balance' ? '/admin/points#risks' : meta.anchor && !item.link.includes('#') ? `${item.link}#${meta.anchor}` : item.link
+  return { ...meta, link }
 }
 
 /** 「需要处理」列表：每项一个类型徽标 + 一句话 + 操作。 */
@@ -43,7 +45,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
               {item.title}
               {item.count > 1 && <span className="muted"> · {item.count} 项</span>}
             </span>
-            <ButtonLink size="sm" to={item.link}>
+            <ButtonLink size="sm" to={meta.link}>
               {meta.action}
             </ButtonLink>
           </li>
@@ -53,25 +55,9 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
   )
 }
 
-function CreditMetric() {
-  const points = useAdminPoints()
-  if (!points.data) {
-    return <Metric hint={points.isError ? '暂不可用' : '加载中'} label="信用占用" value="—" />
-  }
-  const { balances } = points.data
-  const used = absolute(balances.user_negative)
-  return (
-    <Metric
-      hint={`已用 ${formatPoints(used)} / 总额度 ${formatPoints(balances.credit_issued)}`}
-      label="信用占用"
-      progress={pointsRatio(used, balances.credit_issued)}
-      value={`${Math.round(pointsRatio(used, balances.credit_issued))}%`}
-    />
-  )
-}
-
-function Indicators({ overview }: { overview: AdminOverview }) {
-  const { ledger, today, c2c } = overview
+export function Indicators({ overview }: { overview: AdminOverview }) {
+  const { ledger, credit, last_24h: calls, c2c } = overview
+  const creditPercent = pointsRatio(credit.issued, credit.limit)
   return (
     <section aria-label="指标" className="metric-grid">
       <Metric
@@ -80,12 +66,17 @@ function Indicators({ overview }: { overview: AdminOverview }) {
         tone={ledger.balanced ? 'accent' : 'warm'}
         value={ledger.balanced ? '平衡' : '不平衡'}
       />
-      <CreditMetric />
-      <Metric hint={`成功率 ${formatRatio(today.success_rate)}`} label="今日调用" value={formatCount(today.calls)} />
       <Metric
-        hint={`卖单 ${c2c.open_orders} · 待付款 ${c2c.awaiting_payment}`}
-        label="C2C 申诉中"
-        value={formatCount(c2c.open_disputes)}
+        hint={`已用 ${formatPoints(credit.issued)} / 总额度 ${formatPoints(credit.limit)}`}
+        label="信用占用"
+        progress={creditPercent}
+        value={`${Math.round(creditPercent)}%`}
+      />
+      <Metric hint={`成功率 ${formatRatio(calls.success_rate)}`} label="24 小时调用" value={formatCount(calls.calls)} />
+      <Metric
+        hint={`${formatPoints(c2c.volume_24h)} 积分 · 均价 ${c2c.avg_price_fen_24h === null ? '—' : formatFen(c2c.avg_price_fen_24h)}`}
+        label="24 小时 C2C 成交"
+        value={`${formatCount(c2c.trades_24h)} 笔`}
       />
     </section>
   )

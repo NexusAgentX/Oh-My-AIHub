@@ -94,7 +94,6 @@ export function UsagePage() {
               keys={keys.data?.items.map((key) => ({ id: key.id, name: key.name }))}
               models={models.data?.items.map((model) => model.id)}
               onChange={setFilters}
-              onSearchId={setOpenCall}
               value={filters}
             />
           }

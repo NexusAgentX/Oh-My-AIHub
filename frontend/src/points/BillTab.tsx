@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { PointsEntry, TransactionType } from '../api/types'
+import type { PointsEntry, PointsPeriod, TransactionType } from '../api/types'
 import { useKeys } from '../keys/queries'
 import { amountSign, formatPoints } from '../money/format'
 import { currentMonth, formatTime, monthRange } from '../money/time'
 import { BarChart, Button, DataTable, EmptyState, Icon, InlineError, QueryBoundary, Segmented, type Column } from '../ui'
 import { transactionTypeLabels } from './c2c'
-import { downloadEntriesCsv, usePoints, usePointsEntries, type EntryParams } from './queries'
+import { downloadEntriesCsv, usePointsEntries, usePointsPeriod, type EntryParams } from './queries'
+import { reconcileItems } from './reconcile'
 
 type SummaryMode = 'entries' | 'day' | 'key'
 
@@ -42,11 +43,8 @@ const columns: Column<PointsEntry>[] = [
   { key: 'after', header: '变动后余额', numeric: true, hideOnMobile: true, cell: (entry) => formatPoints(entry.balance_after) },
 ]
 
-/** 期间对账条（G）：期初 → 收入 / 支出 → 期末。 */
-function Reconciliation() {
-  const points = usePoints()
-  const period = points.data?.period
-  if (!period) return null
+/** 期间对账条：期初 → 调用支出 / 渠道收入 / C2C 买入 / C2C 卖出 / 调账与核销 → 期末。 */
+export function ReconcileBar({ period }: { period: PointsPeriod }) {
   return (
     <div className="recon-bar" aria-label="本期对账">
       <div>
@@ -54,22 +52,26 @@ function Reconciliation() {
         <strong className="num">{formatPoints(period.opening_balance)}</strong>
       </div>
       <Icon name="chevron-right" />
-      <div>
-        <span>收入</span>
-        <strong className="num amount-positive">{formatPoints(period.income, { signed: true })}</strong>
-      </div>
-      <div>
-        <span>支出</span>
-        <strong className="num amount-negative">{formatPoints(`-${period.spend.replace(/^-/, '')}`)}</strong>
-      </div>
+      {reconcileItems(period).map((item) => (
+        <div key={item.key}>
+          <span>{item.label}</span>
+          <Signed value={item.value} />
+        </div>
+      ))}
       <Icon name="chevron-right" />
       <div>
         <span>期末</span>
         <strong className="num">{formatPoints(period.closing_balance)}</strong>
       </div>
-      {period.difference !== '0' && <span className="badge badge-danger">差额 {formatPoints(period.difference)}</span>}
+      {amountSign(period.difference) !== 0 && <span className="badge badge-danger">差额 {formatPoints(period.difference)}</span>}
     </div>
   )
+}
+
+function Reconciliation({ from, to }: { from?: string; to?: string }) {
+  const period = usePointsPeriod(from, to)
+  if (!period.data) return null
+  return <ReconcileBar period={period.data} />
 }
 
 export function BillTab() {
@@ -82,7 +84,7 @@ export function BillTab() {
   const keys = useKeys()
   const range = monthRange(month)
   const params: EntryParams = { ...range, type: type || undefined, api_key_id: keyId || undefined }
-  const entries = usePointsEntries(params)
+  const entries = usePointsEntries({ ...params, group: mode === 'entries' ? undefined : mode })
   const rows = entries.data?.pages.flatMap((page) => page.items) ?? []
   const summary = entries.data?.pages[0]?.summary
 
@@ -100,7 +102,7 @@ export function BillTab() {
 
   return (
     <div className="bill-tab">
-      <Reconciliation />
+      <Reconciliation from={range.from} to={range.to} />
       <div className="call-filters">
         <label className="filter-select">
           <span className="visually-hidden">月份</span>
@@ -146,7 +148,7 @@ export function BillTab() {
       <QueryBoundary errorFallback="账单加载失败" query={{ ...entries, data: entries.data ? rows : undefined }}>
         {(data) => {
           if (mode === 'day') {
-            return summary ? (
+            return summary && summary.by_day.length > 0 ? (
               <BarChart
                 data={summary.by_day.map((day) => ({
                   key: day.date,
@@ -157,11 +159,11 @@ export function BillTab() {
                 label="按天汇总"
               />
             ) : (
-              <EmptyState title="按天汇总暂不可用" />
+              <EmptyState title="本月没有账单" />
             )
           }
           if (mode === 'key') {
-            return summary ? (
+            return summary && summary.by_key.length > 0 ? (
               <BarChart
                 data={summary.by_key.map((row) => ({
                   key: row.api_key?.id ?? 'none',
@@ -173,7 +175,7 @@ export function BillTab() {
                 orientation="horizontal"
               />
             ) : (
-              <EmptyState title="按 Key 汇总暂不可用" />
+              <EmptyState title="本月没有调用支出" />
             )
           }
           return (

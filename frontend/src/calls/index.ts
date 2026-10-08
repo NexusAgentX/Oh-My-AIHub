@@ -5,7 +5,7 @@
 export { AttemptTimeline } from './AttemptTimeline'
 export { CallDetailDrawer, CallDetailView } from './CallDetail'
 export { CallExplorer, matchesFilters } from './CallExplorer'
-export { CallFilterBar, emptyCallFilters, filtersToParams, type CallFilterState } from './CallFilterBar'
+export { CallFilterBar, emptyCallFilters, filtersToParams, isRequestId, type CallFilterState } from './CallFilterBar'
 export { CallStatsBar } from './CallStatsBar'
 export {
   CallTable,

@@ -11,7 +11,7 @@ import { adminApi, type AdminQuery } from './api'
 export const adminKeys = {
   all: ['admin'] as const,
   overview: ['admin', 'overview'] as const,
-  points: ['admin', 'points'] as const,
+  points: (days: number) => ['admin', 'points', days] as const,
   accounts: (query: object) => ['admin', 'accounts', query] as const,
   models: ['admin', 'models'] as const,
   settings: ['admin', 'settings'] as const,
@@ -51,8 +51,13 @@ export function useAdminOverview() {
   return useQuery({ queryKey: adminKeys.overview, queryFn: adminApi.overview })
 }
 
-export function useAdminPoints() {
-  return useQuery({ queryKey: adminKeys.points, queryFn: adminApi.points })
+/** 积分全局；days 为走势时间窗（7 / 30 / 90），切换时保留上一份数据避免整页闪烁。 */
+export function useAdminPoints(days: 7 | 30 | 90 = 30) {
+  return useQuery({
+    queryKey: adminKeys.points(days),
+    queryFn: () => adminApi.points(days),
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useAdminAccounts(query: Omit<AdminQuery<'listAdminAccounts'>, 'cursor'>) {

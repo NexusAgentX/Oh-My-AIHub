@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -17,21 +17,12 @@ import {
   type Column,
 } from '../ui'
 import { ConfirmActionDialog, LoadMore } from './components'
-import { daysSince, formatDateTime, formatPoints } from './format'
+import { daysSince, formatDateTime, formatPoints, formatRatio } from './format'
 import { LineChart } from './LineChart'
-import {
-  absolute,
-  holdingConcentration,
-  ledgerChecks,
-  ledgerEquation,
-  toNumber,
-  trendWindow,
-  type TrendWindow,
-} from './pointsView'
+import { ledgerChecks, ledgerEquation, sortedTrend, type TrendWindow } from './pointsView'
 import {
   useAdminAccounts,
   useAdminAudit,
-  useAdminOverview,
   useAdminPoints,
   useAdminTransactions,
   useRepairCall,
@@ -45,7 +36,9 @@ import {
   transactionTypeLabels,
   transactionVolume,
 } from './transactions'
-import type { AdminPoints, AdminPointsRisk, AuditEntry, LedgerTransaction, TransactionType } from './types'
+import type { AdminPoints, AdminPointsRisk, AuditEntry, LedgerRelated, LedgerTransaction, TransactionType } from './types'
+
+type RelatedType = LedgerRelated['type']
 
 /** 等式行：用户 + C2C 托管 + 平台收入 + 坏账 = 合计。 */
 export function LedgerEquation({ balances }: { balances: AdminPoints['balances'] }) {
@@ -72,8 +65,6 @@ export function LedgerEquation({ balances }: { balances: AdminPoints['balances']
 }
 
 function Figures({ points }: { points: AdminPoints }) {
-  const overview = useAdminOverview()
-  const c2c = overview.data?.c2c
   const { balances } = points
   return (
     <>
@@ -81,54 +72,96 @@ function Figures({ points }: { points: AdminPoints }) {
         <Metric label="流通积分" tone="accent" value={formatPoints(balances.user_positive)} hint="用户正余额合计" />
         <Metric
           label="信用发行"
-          value={formatPoints(absolute(balances.user_negative))}
-          hint={`负余额合计 · 总额度 ${formatPoints(balances.credit_issued)}`}
+          value={formatPoints(balances.credit_issued)}
+          hint={`总额度 ${formatPoints(balances.total_credit_limit)}`}
         />
         <Metric
           label="C2C 托管"
           value={formatPoints(balances.c2c_escrow)}
-          hint={c2c ? `卖单 ${c2c.open_orders} · 待付款 ${c2c.awaiting_payment}` : undefined}
+          hint={`卖单 ${balances.escrow_orders} · 交易中 ${balances.escrow_trades_in_progress}`}
         />
         <Metric label="平台收入" value={formatPoints(balances.platform_revenue)} />
-        <Metric label="坏账" value={formatPoints(balances.bad_debt)} hint="已核销转入" />
+        <Metric label="坏账" value={formatPoints(balances.bad_debt)} hint={`已核销 ${balances.bad_debt_writeoffs} 笔`} />
       </section>
       <LedgerEquation balances={balances} />
     </>
   )
 }
 
-const trendGroups = {
-  balances: [
-    { key: 'circulation', label: '流通', color: 'var(--ink)' },
-    { key: 'c2c_escrow', label: 'C2C 托管', color: 'var(--mustard)' },
-  ],
-  income: [
-    { key: 'platform_revenue', label: '平台收入', color: 'var(--positive)' },
-    { key: 'bad_debt', label: '坏账', color: 'var(--danger)' },
-  ],
-} as const
+type TrendPoint = AdminPoints['trend'][number]
+type TrendSeries = { key: string; label: string; color: string; value: (point: TrendPoint) => number | null }
 
-function Trend({ trend }: { trend: AdminPoints['trend'] }) {
-  const [days, setDays] = useState<TrendWindow>(30)
+const amount = (key: 'circulation' | 'credit_issued' | 'c2c_escrow' | 'platform_revenue' | 'bad_debt' | 'api_volume' | 'api_fee' | 'c2c_volume') =>
+  (point: TrendPoint) => Number(point[key])
+
+export const trendGroups: Record<'balances' | 'income' | 'api' | 'c2c' | 'price', { label: string; series: TrendSeries[] }> = {
+  balances: {
+    label: '流通与信用',
+    series: [
+      { key: 'circulation', label: '流通', color: 'var(--ink)', value: amount('circulation') },
+      { key: 'credit_issued', label: '信用发行', color: 'var(--danger)', value: amount('credit_issued') },
+      { key: 'c2c_escrow', label: 'C2C 托管', color: 'var(--mustard)', value: amount('c2c_escrow') },
+    ],
+  },
+  income: {
+    label: '收入与坏账',
+    series: [
+      { key: 'platform_revenue', label: '平台收入', color: 'var(--positive)', value: amount('platform_revenue') },
+      { key: 'bad_debt', label: '坏账', color: 'var(--danger)', value: amount('bad_debt') },
+    ],
+  },
+  api: {
+    label: 'API 结算',
+    series: [
+      { key: 'api_volume', label: 'API 结算量', color: 'var(--ink)', value: amount('api_volume') },
+      { key: 'api_fee', label: '手续费', color: 'var(--positive)', value: amount('api_fee') },
+    ],
+  },
+  c2c: {
+    label: 'C2C 成交量',
+    series: [{ key: 'c2c_volume', label: 'C2C 成交量', color: 'var(--mustard)', value: amount('c2c_volume') }],
+  },
+  price: {
+    label: 'C2C 均价',
+    series: [
+      {
+        key: 'c2c_avg_price',
+        label: 'C2C 均价（元/积分）',
+        color: 'var(--ink)',
+        value: (point) => (point.c2c_avg_price_fen === null ? null : point.c2c_avg_price_fen / 100),
+      },
+    ],
+  },
+}
+
+function Trend({
+  trend,
+  days,
+  onDays,
+  loading,
+}: {
+  trend: AdminPoints['trend']
+  days: TrendWindow
+  onDays: (days: TrendWindow) => void
+  loading: boolean
+}) {
   const [group, setGroup] = useState<keyof typeof trendGroups>('balances')
-  const points = trendWindow(trend, days)
+  const points = sortedTrend(trend)
   return (
     <Card
       className="chart-card"
       actions={
         <div className="chart-controls">
-          <Segmented
-            label="指标"
-            onChange={setGroup}
-            options={[
-              { key: 'balances', label: '流通与托管' },
-              { key: 'income', label: '收入与坏账' },
-            ]}
-            value={group}
-          />
+          <SelectField label="指标" onChange={(event) => setGroup(event.target.value as keyof typeof trendGroups)} value={group}>
+            {(Object.keys(trendGroups) as Array<keyof typeof trendGroups>).map((key) => (
+              <option key={key} value={key}>
+                {trendGroups[key].label}
+              </option>
+            ))}
+          </SelectField>
           <Segmented
             label="时间窗"
-            onChange={(key) => setDays(Number(key) as TrendWindow)}
+            onChange={(key) => onDays(Number(key) as TrendWindow)}
             options={[
               { key: '7', label: '7 天' },
               { key: '30', label: '30 天' },
@@ -140,29 +173,128 @@ function Trend({ trend }: { trend: AdminPoints['trend'] }) {
       }
       title="走势"
     >
-      <LineChart
-        labels={points.map((point) => point.date)}
-        series={trendGroups[group].map((item) => ({
-          ...item,
-          values: points.map((point) => toNumber(point[item.key])),
-        }))}
-        title={`最近 ${days} 天走势`}
-      />
+      <div aria-busy={loading || undefined}>
+        <LineChart
+          labels={points.map((point) => point.date)}
+          series={trendGroups[group].series.map((item) => ({
+            key: item.key,
+            label: item.label,
+            color: item.color,
+            values: points.map(item.value),
+          }))}
+          title={`最近 ${days} 天走势`}
+        />
+      </div>
     </Card>
   )
 }
 
+type Repair = { id: string; action: 'charge' | 'void' }
+
+function MissingCalls({ points, onRepair }: { points: AdminPoints; onRepair: (repair: Repair) => void }) {
+  const billing = points.checks.billing_calls
+  if (billing.passed) return null
+  return (
+    <div className="check-detail">
+      <h3 className="section-title">
+        漏记调用 {billing.missing_count > billing.missing.length && <small className="muted">（显示前 {billing.missing.length} 条，共 {billing.missing_count} 条）</small>}
+      </h3>
+      <ul className="plain-list missing-calls">
+        {billing.missing.map((call) => (
+          <li key={call.call_id}>
+            <span>
+              <Link className="mono" to={`/admin/calls?call=${call.call_id}`}>
+                {call.call_id.slice(0, 8)}
+              </Link>{' '}
+              <span className="muted-copy">
+                {formatDateTime(call.created_at)} · {call.account.display_name} · {call.channel.name} · {formatPoints(call.charged)}
+              </span>
+            </span>
+            <span className="missing-call-actions">
+              <Button onClick={() => onRepair({ id: call.call_id, action: 'charge' })} size="sm" type="button">
+                补记
+              </Button>
+              <Button onClick={() => onRepair({ id: call.call_id, action: 'void' })} size="sm" type="button" variant="quiet">
+                作废
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function CheckDetails({ points }: { points: AdminPoints }) {
+  const { account_balances: accounts, escrow, released_trades: trades } = points.checks
+  return (
+    <>
+      {!accounts.passed && (
+        <div className="check-detail">
+          <h3 className="section-title">余额与分录不一致的账户</h3>
+          <ul className="plain-list">
+            {accounts.mismatches.map((row, index) => (
+              <li key={index}>
+                <strong>{ledgerAccountLabel(row.ledger_account)}</strong>
+                <span className="muted-copy num">
+                  余额 {formatPoints(row.balance)} · 分录合计 {formatPoints(row.entries_total)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!escrow.passed && (
+        <p className="check-detail muted-copy num">
+          托管余额 {formatPoints(escrow.escrow_balance)} · 卖单合计 {formatPoints(escrow.orders_total)} · 差额{' '}
+          {formatPoints(escrow.difference)}
+        </p>
+      )}
+      {!trades.passed && (
+        <div className="check-detail">
+          <h3 className="section-title">漏记的 C2C 交易</h3>
+          <ul className="plain-list">
+            {trades.missing.map((trade) => (
+              <li key={trade.trade_id}>
+                <Link className="mono" to={`/admin/disputes/${trade.trade_id}`}>
+                  {trade.trade_id.slice(0, 8)}
+                </Link>
+                <span className="muted-copy">
+                  {formatPoints(trade.amount)} 积分 · {formatDateTime(trade.resolved_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function Checks({ points }: { points: AdminPoints }) {
-  const [repairOpen, setRepairOpen] = useState(false)
-  const [callID, setCallID] = useState('')
-  const [action, setAction] = useState<'charge' | 'void'>('charge')
-  const repair = useRepairCall()
-  const rows = ledgerChecks(points.check)
+  const [repair, setRepair] = useState<Repair | null>(null)
+  const [manual, setManual] = useState(false)
+  const repairCall = useRepairCall()
+  const rows = ledgerChecks(points.check, points.checks)
+  const close = () => {
+    setRepair(null)
+    setManual(false)
+  }
   return (
     <Card
       actions={
-        <Button onClick={() => setRepairOpen(true)} size="sm" type="button" variant="secondary">
-          补记调用
+        <Button
+          onClick={() => {
+            setManual(true)
+            setRepair({ id: '', action: 'charge' })
+          }}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          按请求 ID 补记
         </Button>
       }
       title="实时核对"
@@ -174,40 +306,51 @@ function Checks({ points }: { points: AdminPoints }) {
               {row.ok ? '✓' : '✗'}
             </span>
             <span className="check-label">{row.label}</span>
-            <strong className="num">{row.ok ? formatPoints(row.value) : `差额 ${formatPoints(row.value)}`}</strong>
+            <strong className="num">{row.detail}</strong>
             <span className="visually-hidden">{row.ok ? '通过' : '不通过'}</span>
-            {!row.ok && row.link && <Link to={row.link}>明细</Link>}
+            {!row.ok && row.key === 'zero_sum' && <Link to="/admin/points?tab=transactions">明细</Link>}
           </li>
         ))}
       </ul>
-      <p className="muted-copy">核对时间 {formatDateTime(points.check.checked_at)}</p>
+      <MissingCalls onRepair={setRepair} points={points} />
+      <CheckDetails points={points} />
+      <p className="muted-copy">核对时间 {formatDateTime(points.checks.checked_at)}</p>
       <ConfirmActionDialog
-        confirmLabel={action === 'charge' ? '确认补记' : '确认作废'}
-        onClose={() => setRepairOpen(false)}
-        onConfirm={(reason) => repair.mutateAsync({ id: callID.trim(), body: { action, reason } })}
-        open={repairOpen}
+        confirmLabel={repair?.action === 'void' ? '确认作废' : '确认补记'}
+        onClose={close}
+        onConfirm={async (reason) => {
+          if (!repair) return
+          await repairCall.mutateAsync({ id: repair.id.trim(), body: { action: repair.action, reason } })
+        }}
+        open={repair !== null}
         summary={
           <p>
-            {action === 'charge' ? '按调用记录的用量与价格快照补记账' : '标记为不收费的中断'}：调用{' '}
-            <span className="mono">{callID.trim()}</span>
+            {repair?.action === 'void' ? '标记为不收费的中断' : '按调用记录的用量与价格快照补记账'}：调用{' '}
+            <span className="mono">{repair?.id.trim()}</span>
           </p>
         }
-        title="补记调用"
-        validate={() =>
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(callID.trim()) ? '' : '请输入完整的请求 ID'
-        }
+        title={repair?.action === 'void' ? '作废调用' : '补记调用'}
+        validate={() => (uuidPattern.test(repair?.id.trim() ?? '') ? '' : '请输入完整的请求 ID')}
       >
-        <TextField label="请求 ID" onChange={(event) => setCallID(event.target.value)} value={callID} />
-        <SelectField label="处理方式" onChange={(event) => setAction(event.target.value as 'charge' | 'void')} value={action}>
-          <option value="charge">补记账</option>
-          <option value="void">作废（不收费）</option>
-        </SelectField>
+        {manual && repair && (
+          <>
+            <TextField label="请求 ID" onChange={(event) => setRepair({ ...repair, id: event.target.value })} value={repair.id} />
+            <SelectField
+              label="处理方式"
+              onChange={(event) => setRepair({ ...repair, action: event.target.value as 'charge' | 'void' })}
+              value={repair.action}
+            >
+              <option value="charge">补记账</option>
+              <option value="void">作废（不收费）</option>
+            </SelectField>
+          </>
+        )}
       </ConfirmActionDialog>
     </Card>
   )
 }
 
-const riskColumns: Column<AdminPointsRisk>[] = [
+export const riskColumns: Column<AdminPointsRisk>[] = [
   {
     key: 'account',
     header: '用户',
@@ -223,38 +366,56 @@ const riskColumns: Column<AdminPointsRisk>[] = [
     key: 'kind',
     header: '风险',
     cell: (risk) =>
-      risk.kind === 'over_limit' ? <Badge tone="danger">超出信用额度</Badge> : <Badge tone="warning">负余额且不活跃</Badge>,
+      risk.kind === 'over_limit' ? <Badge tone="danger">超出信用额度</Badge> : <Badge tone="warning">长期负余额</Badge>,
   },
   { key: 'balance', header: '余额', numeric: true, cell: (risk) => <span className="amount-negative">{formatPoints(risk.balance)}</span> },
   { key: 'limit', header: '信用额度', numeric: true, cell: (risk) => formatPoints(risk.credit_limit) },
   {
+    key: 'negative_days',
+    header: '负余额天数',
+    numeric: true,
+    cell: (risk) => (risk.negative_days === null ? '—' : `${risk.negative_days} 天`),
+  },
+  {
     key: 'activity',
     header: '最近活跃',
     numeric: true,
+    hideOnMobile: true,
     cell: (risk) => {
       const days = daysSince(risk.last_activity_at)
-      return days === null ? '—' : `${days} 天前`
+      return days === null ? '—' : days === 0 ? '今天' : `${days} 天前`
     },
   },
 ]
 
 function Risks({ points }: { points: AdminPoints }) {
-  const accounts = useAdminAccounts({})
-  const concentration = accounts.data ? holdingConcentration(accounts.data, points.balances.user_positive) : null
+  const { concentration } = points
+  const largest = concentration.top[0]
   return (
     <Card flush title="风险">
-      {concentration && (
-        <p className="risk-concentration">
-          持有集中度：前 5 名占流通 <strong className="num">{concentration.topShare}%</strong>
-          {concentration.largest && (
+      <div className="risk-concentration" id="risks">
+        <p>
+          持有集中度：前 5 名占流通 <strong className="num">{formatRatio(concentration.top5_share)}</strong>
+          {largest && (
             <>
-              ，最大持有 {concentration.largest.name}{' '}
-              <Badge tone={concentration.largest.share > 50 ? 'danger' : 'neutral'}>{concentration.largest.share}%</Badge>
+              ，最大持有 {largest.account.display_name}{' '}
+              <Badge tone={Number(largest.share) > 0.5 ? 'danger' : 'neutral'}>{formatRatio(largest.share)}</Badge>
             </>
           )}
-          {accounts.hasNextPage && <span className="muted-copy">（按已加载的账户计算）</span>}
         </p>
-      )}
+        {concentration.top.length > 1 && (
+          <ol className="concentration-list">
+            {concentration.top.map((holder) => (
+              <li key={holder.account.id}>
+                <span>{holder.account.display_name}</span>
+                <span className="num muted-copy">
+                  {formatPoints(holder.balance)} · {formatRatio(holder.share)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
       <DataTable
         caption="风险账户"
         columns={riskColumns}
@@ -266,14 +427,25 @@ function Risks({ points }: { points: AdminPoints }) {
   )
 }
 
+/** 概览「需要处理」跳转带锚点（#checks / #risks）时，数据就绪后滚动到对应区块。 */
+function useScrollToHash(ready: boolean) {
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!ready || !hash) return
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+  }, [ready, hash])
+}
+
 function Overview() {
-  const points = useAdminPoints()
+  const [days, setDays] = useState<TrendWindow>(30)
+  const points = useAdminPoints(days)
+  useScrollToHash(Boolean(points.data))
   return (
     <QueryBoundary query={points}>
       {(data) => (
         <div className="admin-stack">
           <Figures points={data} />
-          <Trend trend={data.trend} />
+          <Trend days={days} loading={points.isPlaceholderData} onDays={setDays} trend={data.trend} />
           <Checks points={data} />
           <Risks points={data} />
         </div>
@@ -310,20 +482,34 @@ function dateParam(value: string, endOfDay = false) {
   return date.toISOString()
 }
 
+const relatedTypeLabels: Record<RelatedType, string> = {
+  call: '调用',
+  c2c_order: '卖单',
+  c2c_trade: 'C2C 交易',
+  account: '账户',
+}
+
 function Transactions() {
   const [params, setParams] = useSearchParams()
   const accountID = params.get('account_id') ?? ''
   const selected = params.get('transaction')
+  const relatedType = (params.get('related_type') ?? '') as RelatedType | ''
+  const relatedID = params.get('related_id') ?? ''
+  const [relatedInput, setRelatedInput] = useState(relatedID)
   const [type, setType] = useState<TransactionType | ''>('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const accounts = useAdminAccounts({})
+  const relatedReady = Boolean(relatedType) && uuidPattern.test(relatedID)
   const transactions = useAdminTransactions({
     account_id: accountID || undefined,
     type: type || undefined,
+    related_type: relatedReady ? relatedType || undefined : undefined,
+    related_id: relatedReady ? relatedID : undefined,
     from: dateParam(from),
     to: dateParam(to, true),
   })
+  const relatedError = relatedType && relatedInput.trim() && !uuidPattern.test(relatedInput.trim()) ? '请输入完整的 ID' : ''
   const update = (key: string, value: string | null) =>
     setParams(
       (current) => {
@@ -357,6 +543,36 @@ function Transactions() {
             </option>
           ))}
         </SelectField>
+        <SelectField
+          label="关联对象"
+          onChange={(event) => {
+            update('related_type', event.target.value || null)
+            if (!event.target.value) {
+              setRelatedInput('')
+              update('related_id', null)
+            }
+          }}
+          value={relatedType}
+        >
+          <option value="">不限</option>
+          {(Object.keys(relatedTypeLabels) as RelatedType[]).map((key) => (
+            <option key={key} value={key}>
+              {relatedTypeLabels[key]}
+            </option>
+          ))}
+        </SelectField>
+        {relatedType && (
+          <TextField
+            error={relatedError}
+            label={`${relatedTypeLabels[relatedType]} ID`}
+            onBlur={() => update('related_id', relatedInput.trim() || null)}
+            onChange={(event) => setRelatedInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') update('related_id', relatedInput.trim() || null)
+            }}
+            value={relatedInput}
+          />
+        )}
         <TextField label="开始日期" onChange={(event) => setFrom(event.target.value)} type="date" value={from} />
         <TextField label="结束日期" onChange={(event) => setTo(event.target.value)} type="date" value={to} />
       </Toolbar>

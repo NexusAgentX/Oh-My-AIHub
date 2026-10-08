@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
+import { formatMultiplier } from '../money/format'
 import { Badge, QueryBoundary, type BadgeTone } from '../ui'
 import { DetailList } from './components'
-import { formatDateTime, formatPoints, isNegative, shortID } from './format'
-import { useAdminAudit, useAdminTransaction } from './queries'
-import type { AuditEntry, LedgerAccountRef, LedgerRelated, LedgerTransaction, TransactionType } from './types'
+import { feeRateToPercent, formatDateTime, formatPoints, isNegative, shortID } from './format'
+import { useAdminTransaction } from './queries'
+import type { AuditEntry, LedgerAccountRef, LedgerRelated, LedgerTransaction, PriceSnapshot, TransactionType } from './types'
 
 export const transactionTypeLabels: Record<TransactionType, [string, BadgeTone]> = {
   api_call: ['API 调用', 'info'],
@@ -79,28 +80,44 @@ export function auditActionLabel(entry: Pick<AuditEntry, 'action'>) {
   return auditActionLabels[entry.action] ?? entry.action
 }
 
-function RecentManualOps({ accountID }: { accountID: string }) {
-  const audit = useAdminAudit({ target_type: 'account', target_id: accountID, limit: 5 })
+function RecentManualOps({ actions }: { actions: AuditEntry[] }) {
+  if (actions.length === 0) return <p className="muted-copy">没有人工操作</p>
   return (
-    <QueryBoundary query={audit}>
-      {(rows) =>
-        rows.length === 0 ? (
-          <p className="muted-copy">没有人工操作</p>
-        ) : (
-          <ul className="plain-list">
-            {rows.slice(0, 5).map((entry) => (
-              <li key={entry.id}>
-                <strong>{auditActionLabel(entry)}</strong>
-                <span className="muted-copy">
-                  {formatDateTime(entry.created_at)} · {entry.actor?.display_name ?? '系统'}
-                  {entry.reason ? ` · ${entry.reason}` : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </QueryBoundary>
+    <ul className="plain-list">
+      {actions.map((entry) => (
+        <li key={entry.id}>
+          <strong>{auditActionLabel(entry)}</strong>
+          <span className="muted-copy">
+            {formatDateTime(entry.created_at)} · {entry.actor?.display_name ?? '系统'}
+            {entry.reason ? ` · ${entry.reason}` : ''}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+const priceLabels: Array<[keyof PriceSnapshot['prices'], string]> = [
+  ['input', '输入'],
+  ['output', '输出'],
+  ['cache_read', '缓存读'],
+  ['cache_write', '缓存写'],
+]
+
+/** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。 */
+export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
+  return (
+    <DetailList
+      items={[
+        ['价格档', snapshot.tier?.name ?? '基准价'],
+        ['倍率', formatMultiplier(snapshot.multiplier)],
+        ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`],
+        ...priceLabels.map(([key, label]): [string, string] => [
+          `${label}现价`,
+          `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
+        ]),
+      ]}
+    />
   )
 }
 
@@ -114,7 +131,13 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
         items={[
           ['类型', <TransactionTypeLabel type={transaction.type} />],
           ['时间', formatDateTime(transaction.created_at)],
-          ['关联对象', <RelatedLink related={transaction.related} />],
+          [
+            '关联对象',
+            <>
+              <RelatedLink related={transaction.related} />
+              {transaction.related_summary && <small className="muted-copy"> {transaction.related_summary}</small>}
+            </>,
+          ],
           ['经办人', transaction.actor?.display_name ?? '系统'],
           ['原因', transaction.reason || '—'],
           ['交易号', <span className="mono">{shortID(transaction.id)}</span>],
@@ -128,6 +151,9 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
             <tr>
               <th scope="col">账户</th>
               <th className="cell-numeric" scope="col">
+                变动前
+              </th>
+              <th className="cell-numeric" scope="col">
                 变动
               </th>
               <th className="cell-numeric" scope="col">
@@ -139,6 +165,7 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
             {transaction.entries.map((entry, index) => (
               <tr key={index}>
                 <td>{ledgerAccountLabel(entry.ledger_account)}</td>
+                <td className="cell-numeric">{formatPoints(entry.balance_before)}</td>
                 <td className={`cell-numeric ${isNegative(entry.amount) ? 'amount-negative' : 'amount-positive'}`}>
                   {formatPoints(entry.amount, true)}
                 </td>
@@ -148,7 +175,9 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
           </tbody>
           <tfoot>
             <tr>
-              <th scope="row">借贷合计</th>
+              <th colSpan={2} scope="row">
+                借贷合计
+              </th>
               <td className="cell-numeric">
                 <Badge tone={balanced ? 'success' : 'danger'}>
                   {balanced ? '✓ ' : ''}
@@ -160,15 +189,16 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
           </tfoot>
         </table>
       </div>
-      {transaction.related?.type === 'call' && (
-        <p className="muted-copy">
-          价格快照见 <Link to={`/admin/calls?call=${transaction.related.id}`}>调用详情</Link>
-        </p>
-      )}
-      {user && (
+      {transaction.price_snapshot && (
         <div>
-          <h3 className="section-title">{user.display_name} 最近的人工操作</h3>
-          <RecentManualOps accountID={user.id} />
+          <h3 className="section-title">价格快照</h3>
+          <PriceSnapshotView snapshot={transaction.price_snapshot} />
+        </div>
+      )}
+      {transaction.recent_actions && (
+        <div>
+          <h3 className="section-title">{user ? `${user.display_name} 最近的人工操作` : '最近的人工操作'}</h3>
+          <RecentManualOps actions={transaction.recent_actions} />
         </div>
       )}
     </div>

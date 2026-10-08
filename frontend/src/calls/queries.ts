@@ -7,6 +7,8 @@ import type { CallDetail, UsageReport } from '../api/types'
  * 用户（/api/calls）、渠道（/api/channels/{id}/calls）与管理员（/api/admin/calls）共用。
  */
 export type CallListParams = {
+  /** 请求 ID 精确匹配 */
+  request_id?: string
   model?: string
   outcome?: string
   api_key_id?: string

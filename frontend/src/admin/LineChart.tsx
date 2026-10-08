@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 export type ChartSeries = {
   key: string
   label: string
-  values: number[]
+  /** null 表示当天无数据（例如没有成交时的均价），折线在此断开 */
+  values: Array<number | null>
   /** CSS 颜色（使用 token 变量） */
   color: string
 }
@@ -43,6 +44,22 @@ function compact(value: number) {
   return value.toFixed(2)
 }
 
+/** 按 null 把序列切成连续段。 */
+export function segments(values: Array<number | null>) {
+  const result: Array<Array<{ index: number; value: number }>> = []
+  let current: Array<{ index: number; value: number }> = []
+  values.forEach((value, index) => {
+    if (value === null) {
+      if (current.length) result.push(current)
+      current = []
+    } else {
+      current.push({ index, value })
+    }
+  })
+  if (current.length) result.push(current)
+  return result
+}
+
 /** 极简 SVG 折线图：多条序列共享 Y 轴；附带视觉隐藏的数据表供读屏。 */
 export function LineChart({
   title,
@@ -55,7 +72,7 @@ export function LineChart({
   series: ChartSeries[]
 }) {
   const { reference, width } = useWidth()
-  const all = series.flatMap((item) => item.values)
+  const all = series.flatMap((item) => item.values).filter((value): value is number => value !== null)
   if (labels.length === 0 || all.length === 0) {
     return <p className="muted-copy">暂无走势数据</p>
   }
@@ -91,16 +108,28 @@ export function LineChart({
             {labels[index].slice(5)}
           </text>
         ))}
-        {series.map((item) => (
-          <polyline
-            fill="none"
-            key={item.key}
-            points={item.values.map((value, index) => `${x(index)},${y(value)}`).join(' ')}
-            stroke={item.color}
-            strokeLinejoin="round"
-            strokeWidth="2"
-          />
-        ))}
+        {series.flatMap((item) =>
+          segments(item.values).map((segment) =>
+            segment.length === 1 ? (
+              <circle
+                cx={x(segment[0].index)}
+                cy={y(segment[0].value)}
+                fill={item.color}
+                key={`${item.key}-${segment[0].index}`}
+                r="2.5"
+              />
+            ) : (
+              <polyline
+                fill="none"
+                key={`${item.key}-${segment[0].index}`}
+                points={segment.map(({ index, value }) => `${x(index)},${y(value)}`).join(' ')}
+                stroke={item.color}
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            ),
+          ),
+        )}
       </svg>
       <figcaption className="chart-legend">
         {series.map((item) => (
@@ -127,7 +156,7 @@ export function LineChart({
             <tr key={label}>
               <th scope="row">{label}</th>
               {series.map((item) => (
-                <td key={item.key}>{item.values[index]}</td>
+                <td key={item.key}>{item.values[index] ?? '—'}</td>
               ))}
             </tr>
           ))}

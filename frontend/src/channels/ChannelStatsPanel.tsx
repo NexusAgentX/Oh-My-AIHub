@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { ChannelEvent } from '../api/types'
+import type { ChannelEvent, ChannelFailure, ChannelStats } from '../api/types'
 import { formatMs, formatPoints, formatRatio } from '../money/format'
-import { formatDateTime, rangeFrom } from '../money/time'
+import { formatDateTime } from '../money/time'
 import { BarChart, Badge, Card, EmptyState, MetricGrid, Metric, QueryBoundary, Segmented, type BadgeTone } from '../ui'
 import { useChannelStats } from './queries'
 
@@ -34,19 +34,72 @@ export function ChannelEvents({ events }: { events: ChannelEvent[] }) {
   )
 }
 
-/** 渠道统计（G 提供）：成功率、调用量、收入、首字与速度、按天趋势与按模型。 */
+function speed(value: number | null) {
+  return value === null ? '—' : `${value.toFixed(1)} t/s`
+}
+
+const hourFormat = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
+
+/** 失败按上游状态码分布；null 表示没有拿到响应（连接失败或超时）。 */
+export function StatusCodes({ codes }: { codes: ChannelStats['status_codes'] }) {
+  if (codes.length === 0) return <EmptyState title="没有失败" />
+  return (
+    <BarChart
+      data={codes.map((row) => ({
+        key: String(row.status_code ?? 'none'),
+        label: row.status_code === null ? '无响应' : String(row.status_code),
+        value: row.count,
+        display: `${row.count} 次`,
+      }))}
+      label="失败按状态码"
+      orientation="horizontal"
+    />
+  )
+}
+
+/** 最近失败：时间、模型、状态码与错误码、上游原始错误。 */
+export function RecentFailures({ failures }: { failures: ChannelFailure[] }) {
+  if (failures.length === 0) return <EmptyState title="没有失败" />
+  return (
+    <ol className="channel-failures">
+      {failures.map((failure, index) => (
+        <li key={`${failure.call_id}-${index}`}>
+          <div className="channel-failure-head">
+            <strong className="num">
+              {[failure.status_code ?? '无响应', failure.error_code].filter(Boolean).join(' · ')}
+            </strong>
+            <span className="muted">{failure.model_id ?? '—'}</span>
+            <time className="muted num" dateTime={failure.created_at}>
+              {formatDateTime(failure.created_at)}
+            </time>
+          </div>
+          {failure.error_message ? (
+            <pre className="channel-failure-message">{failure.error_message}</pre>
+          ) : (
+            <span className="muted-copy">{endReasonLabel(failure.end_reason)}</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function endReasonLabel(reason: string) {
+  return reason ? `结束原因：${reason}` : '无原始错误'
+}
+
+/** 渠道统计：24h/7d 成功率、收入与今日上限进度、首字与速度 p50/p95、调用趋势、按模型收入、失败分布与最近失败。 */
 export function ChannelStatsPanel({ channelId }: { channelId: string }) {
-  const [range, setRange] = useState<'today' | '7d'>('7d')
-  const from = rangeFrom(range)
-  const stats = useChannelStats(channelId, from)
+  const [range, setRange] = useState<'24h' | '7d'>('7d')
+  const stats = useChannelStats(channelId)
   return (
     <Card
       actions={
         <Segmented
-          label="统计范围"
+          label="趋势范围"
           onChange={setRange}
           options={[
-            { key: 'today', label: '今天' },
+            { key: '24h', label: '24 小时' },
             { key: '7d', label: '7 天' },
           ]}
           value={range}
@@ -58,24 +111,46 @@ export function ChannelStatsPanel({ channelId }: { channelId: string }) {
         {(data) => (
           <div className="channel-stats">
             <MetricGrid label="渠道统计">
-              <Metric hint={`${data.succeeded} / ${data.calls} 次`} label="成功率" value={formatRatio(data.success_rate)} />
-              <Metric label="收入" value={formatPoints(data.revenue)} />
-              <Metric label="首字 p50" value={formatMs(data.ttft_p50_ms)} />
               <Metric
+                hint={`${data.last_24h.succeeded} / ${data.last_24h.calls} 次 · 7 天 ${formatRatio(data.last_7d.success_rate)}`}
+                label="24 小时成功率"
+                value={formatRatio(data.last_24h.success_rate)}
+              />
+              <Metric
+                hint={data.today.daily_cap ? `上限 ${formatPoints(data.today.daily_cap)}` : '未设上限'}
+                label="今日收入"
+                progress={data.today.progress === null ? undefined : Number(data.today.progress) * 100}
+                value={formatPoints(data.today.revenue)}
+              />
+              <Metric hint={`p95 ${formatMs(data.ttft_p95_ms)}`} label="首字 p50" value={formatMs(data.ttft_p50_ms)} />
+              <Metric
+                hint={`p95 ${speed(data.output_tokens_per_second_p95)}`}
                 label="速度 p50"
-                value={data.output_tokens_per_second_p50 === null ? '—' : `${data.output_tokens_per_second_p50.toFixed(1)} t/s`}
+                value={speed(data.output_tokens_per_second_p50)}
               />
             </MetricGrid>
-            {data.daily.length > 0 && (
+            {range === '24h' ? (
               <BarChart
-                data={data.daily.map((day) => ({
-                  key: day.date,
-                  label: day.date.slice(5),
-                  value: day.calls,
-                  display: `${day.calls} 次 · 成功 ${day.succeeded}`,
+                data={data.hourly.map((hour) => ({
+                  key: hour.hour,
+                  label: hourFormat.format(new Date(hour.hour)),
+                  value: hour.calls,
+                  display: `${hour.calls} 次 · 成功 ${hour.succeeded}`,
                 }))}
-                label="每日调用量"
+                label="每小时调用量"
               />
+            ) : (
+              data.daily.length > 0 && (
+                <BarChart
+                  data={data.daily.map((day) => ({
+                    key: day.date,
+                    label: day.date.slice(5),
+                    value: day.calls,
+                    display: `${day.calls} 次 · 成功 ${day.succeeded}`,
+                  }))}
+                  label="每日调用量"
+                />
+              )
             )}
             {data.by_model.length > 0 && (
               <BarChart
@@ -85,10 +160,18 @@ export function ChannelStatsPanel({ channelId }: { channelId: string }) {
                   value: Number(model.revenue),
                   display: `${formatPoints(model.revenue)} · ${model.calls} 次`,
                 }))}
-                label="按模型收入"
+                label="按模型收入（7 天）"
                 orientation="horizontal"
               />
             )}
+            <section className="channel-stats-section" aria-label="失败按状态码">
+              <h3 className="section-title">失败按状态码（7 天）</h3>
+              <StatusCodes codes={data.status_codes} />
+            </section>
+            <section className="channel-stats-section" aria-label="最近失败">
+              <h3 className="section-title">最近失败</h3>
+              <RecentFailures failures={data.recent_failures} />
+            </section>
           </div>
         )}
       </QueryBoundary>
