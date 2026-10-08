@@ -55,8 +55,7 @@ SELECT o.id, o.owner_account_id, owner.display_name AS owner_display_name,
 	((owner.status = 'active' AND NOT owner.must_change_password AND NOT owner.credit_frozen)
 		AND o.status = 'open' AND o.available_nano > 0)::boolean AS takeable
 FROM c2c_orders o JOIN accounts owner ON owner.id = o.owner_account_id
--- 迁移 0009 之前遗留的已终结买单只保留为历史，不进入用户的订单列表。
-WHERE o.owner_account_id = @owner_account_id AND o.side = 'sell'
+WHERE o.owner_account_id = @owner_account_id
 ORDER BY o.updated_at DESC, o.id DESC LIMIT 200;
 
 -- name: GetOrderOwnerID :one

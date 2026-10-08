@@ -35,7 +35,7 @@
 | API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是 `/api/**` JSON 契约的唯一来源（`/v1`、`/v1beta` 只登记路径与认证），`x-access` 声明各路由门禁；`internal/api` 按领域文件注册路由，`router` 依 access 包裹会话、首次改密与管理员门禁，全局中间件链为“写超时 → 安全头 → 同源校验 → mux”，限流状态集中在 `rateLimits`；契约测试对照路由表并用规范 schema 校验响应（见 [ADR-0021](docs/adr/0021-openapi-as-single-api-contract.md)）；前端 API 类型由它经 `openapi-typescript` 生成为已提交的 `frontend/src/api/schema.gen.ts`（生成器隔离在 `frontend/tools/openapi-types/`，因其需要 TypeScript 5 编译器 API；`npm --prefix frontend run generate:api` 或 `mise run generate`），`frontend/src/api/types.ts` 提供简洁别名与 `RequestBody` / `ResponseBody`，`client.ts` 据此对请求体与响应做类型校验，CI 以 `git diff --exit-code` 校验生成物与规范一致 |
 | 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
 | 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 组合根 `postgres.Store` 嵌入各领域持久化包；已迁移领域（身份、模型目录、API 手续费率、账本、渠道、C2C、网关、运营指标，加共享的审计与事务辅助）在 `<domain>pg/` 中以 `queries.sql` 加 sqlc 生成代码实现领域服务定义的 Store 接口；全部领域均已迁移（见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)）；账本与业务行需原子提交时，业务领域自己开启 `pgx.Tx` 并用 `ledgerpg.NewTx(tx)` 得到绑定该事务的账本 Store，事务与提交始终由调用方持有（见 [ADR-0020](docs/adr/0020-adopt-caller-owned-transactions-across-persistence-domains.md)） |
-| 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 以嵌入式 SQL-only Goose 迁移建立并演进数据库结构 |
+| 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 以嵌入式 SQL-only Goose 迁移建立并演进数据库结构；当前只有基线 `0001_baseline.sql`，此后的结构变化从 `0002` 起追加（ADR-0024） |
 | 开发任务 | `mise.toml` | 固定工具版本并提供安装、开发、测试、构建和运行命令 |
 | 容器编排 | `compose.yaml` | 运行 PostgreSQL、一次性迁移、后端和前端，并按健康与完成状态排序启动 |
 | Web 入口 | `frontend/nginx.conf` | 提供前端静态资源，将 `/api/` 与四类外部协议路径代理至后端；协议路径关闭请求和响应落盘缓冲 |
@@ -60,7 +60,7 @@
 - 只保存 SHA-256 摘要的 24 小时服务器端会话；密码版本变化会使旧会话失效。
 - 模型公开 ID、显示元数据、输入输出模态、能力、状态和四类基准价。
 - 管理员创建/调整账户与维护模型的审计事件。
-- 全局 API 手续费率的追加式不可变版本（`api_fee_rates`，迁移默认 0.1%）及其调整审计事件。
+- 全局 API 手续费率的追加式不可变版本（`api_fee_rates`，基线默认 0.1%）及其调整审计事件。
 - 每个身份唯一的用户账本账户，以及固定的平台激励账户和平台损失账户。
 - 幂等命令、封存交易、有序不可变分录、资产冻结/消费授权持有及其不可变 capture/release 事件。
 - 渠道生命周期与管理版本、每个模型的共享倍率、各原生协议报价及其版本和逻辑删除快照。
@@ -69,7 +69,7 @@
 - 平台 API Key 的不可逆 SHA-256 摘要、公开前缀、代次、active/disabled/deleted 状态和配置版本；完整 Key 不持久化。
 - 每把 Key 的唯一模型协议池、稳定报价成员和连续优先级，以及调用时的不可变候选、价格、凭据版本、费率和预授权快照。
 - 调用、上游尝试、心跳租约、语义提交标记、四类归一用量、结算结果、终结载荷摘要、恢复状态和真实 TTFT/TPS/成功率/调用量聚合。
-- C2C 卖单（迁移 `0009` 之前遗留的已终结买单仅作为历史行保留）、部分成交交易、父单数量投影、幂等命令与不可变状态事件。
+- C2C 卖单、部分成交交易、父单数量投影、幂等命令与不可变状态事件。
 - 使用独立版本化密钥环保存的支付方式详情、付款说明、争议陈述和净化后的收款码图片；终态满 180 天后销毁付款参考与争议陈述正文，保留非敏感审计元数据。
 
 所有积分金额和模型基准价在数据库中使用 `BIGINT` 纳积分，即 1 积分等于 1,000,000,000 纳积分；JSON 边界使用十进制字符串，最终结算不依赖浮点数。账户同步保存 `posted_balance`、`asset_reserved` 与 `spend_authorized` 投影，并由不可变事实在事务提交时复算验证。有效信用冻结时为零；信用冻结账户的可操作额度固定为零，其他账户的 `spendable = max(posted + effective_credit - asset_reserved - spend_authorized, 0)`；`credit_used = max(-posted, 0)`，只有已入账负余额超过有效信用才标记超限。
@@ -114,7 +114,7 @@ PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可
 - 用户总览、Key/池、调用记录和渠道页面使用真实调用事实展示消费、收入、渠道健康、成功率、TTFT、TPS 和调用量；工作台额外提供 UTC 当日消费、成功调用和外部渠道收入。API 市场支持按成功率、TTFT 与 TPS 确定性游标排序，无样本保持空值。
 - 管理员共享者收入页按 UTC 窗口列出每个共享者的总收入、外部消费收入、自有调用收入和尝试成功率；投影只含显示名与金额，空样本成功率保持空值。公开渠道详情通过独立页把当前合格报价加入指定 Key 的模型协议池。
 - 人民币在 C2C 双方之间直接流转，平台只冻结和划转积分。
-- C2C 只有卖单（ADR-0023）：发布时创建覆盖总量的 `asset_reservation` 父持有，部分成交只分配父持有数量，取消只释放尚未分配部分；迁移 `0009` 要求不存在未终结的买单状态，保留终态历史买单行（`side` 列带 `CHECK (side = 'sell') NOT VALID` 约束，校验触发器跳过非卖单行）。订单始终满足 `total = available + allocated + settled + closed`，capture/release 以交易 UUID 作为业务标识并与业务状态在同一事务提交。
+- C2C 只有卖单（ADR-0023）：发布时创建覆盖总量的 `asset_reservation` 父持有，部分成交只分配父持有数量，取消只释放尚未分配部分；数据库不存在 `side` 列，`parent_hold_id` 为 `NOT NULL`，校验触发器只描述卖单语义（ADR-0024）。订单始终满足 `total = available + allocated + settled + closed`，capture/release 以交易 UUID 作为业务标识并与业务状态在同一事务提交。
 - C2C 写命令以操作、操作者、幂等键和实际净化后的载荷摘要识别；涉及账户先按稳定顺序取得共享 advisory lock，再读取身份、订单、交易和账本持有。付款、取消、精确到期、争议和管理员裁决在锁内竞争，只允许一个合法终态。
 - C2C 公开市场只展示支付方式类型；订单所有者、开放交易对手、交易双方和管理员按各自授权读取最小私密投影。管理员可带必填原因取消挂单可用量，并直接终结 `paid` 或 `disputed` 交易，避免账户停用或信用冻结让既有持有永久滞留。处理 `paid` 或 `disputed` 交易时，管理员还可经同一裁决入口以 `restrict_buyer` / `restrict_seller` 并带必填原因冻结一方信用：在同一事务内按账户 advisory lock、交易行、账本账户行、身份行的顺序将 `credit_frozen` 置真并递增账户版本，写入交易事件 `dispute.<party>_restricted` 与审计 `c2c.dispute.party_restricted`；交易状态、复核期限与持有保持不变，可与延长核实并用，对已冻结账户只记录事件与审计、不再修改账户。被冻结方不能发布或接取 C2C 订单，其已挂出的订单也不能再被他人接取（接取在同一事务内于账户锁之后复核所有者状态；不自动取消挂单、不释放父持有，已有交易不受影响，管理员仍可取消剩余挂单），且与停用或未改密所有者的挂单一样不出现在公开市场与最优卖价中，订单详情以 `takeable` 标明是否可接取；被冻结方仍可处理已有交易；解除冻结走账户管理。当事方信用状态与限制事件只出现在管理员交易响应中。支付资料与陈述的加密、收款码图片净化和清理边界见 [ADR-0011](docs/adr/0011-adopt-c2c-order-trade-hold-state-machine.md)。
 

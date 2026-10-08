@@ -147,9 +147,9 @@ SELECT
 		WHERE (s.kind = 'captured' AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.id = s.capture_transaction_id))
 			OR (s.kind = 'self_usage' AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.id = s.self_transaction_id)))::bigint AS without_ledger_tx,
 	(SELECT count(*) FROM c2c_orders WHERE total_nano <> available_nano + allocated_nano + settled_nano + closed_nano)::bigint AS quantity_violations,
-	(SELECT count(*) FROM c2c_orders o LEFT JOIN ledger_holds h ON h.id = o.parent_hold_id
-		WHERE o.side = 'sell' AND o.status IN ('open', 'allocated')
-			AND (o.parent_hold_id IS NULL OR h.remaining_nano <> o.available_nano + o.allocated_nano))::bigint AS hold_violations;
+	(SELECT count(*) FROM c2c_orders o JOIN ledger_holds h ON h.id = o.parent_hold_id
+		WHERE o.status IN ('open', 'allocated')
+			AND h.remaining_nano <> o.available_nano + o.allocated_nano)::bigint AS hold_violations;
 
 -- name: CountDisputedTrades :one
 SELECT count(*)::bigint FROM c2c_trades WHERE status = 'disputed';

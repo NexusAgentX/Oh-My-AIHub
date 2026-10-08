@@ -45,7 +45,7 @@ func (s *Store) CreateOrder(ctx context.Context, command c2c.Command, input c2c.
 			ID: input.ID, OwnerAccountID: command.Actor.ID,
 			UnitPriceFen: input.UnitPriceFen, TotalNano: input.Total,
 			MinimumNano: input.Minimum, MaximumNano: input.Maximum,
-			ParentHoldID: &hold.ID, CreatedAt: command.Now,
+			ParentHoldID: hold.ID, CreatedAt: command.Now,
 		}); err != nil {
 			return mapError(err)
 		}
