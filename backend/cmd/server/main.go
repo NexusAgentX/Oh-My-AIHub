@@ -64,11 +64,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// C2C 私密数据密钥环在 Feature C 使用；启动时先校验配置，避免带着错误配置上线。
-	if _, err := c2c.ParseKeyring(
+	c2cKeyring, err := c2c.ParseKeyring(
 		os.Getenv("C2C_PRIVATE_DATA_KEYRING"),
 		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
-	); err != nil {
+	)
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -118,6 +118,11 @@ func main() {
 	defer stopReaper()
 	go engine.RunReaper(reaperContext, time.Minute)
 
+	c2cService := c2c.NewService(store.C2C, c2cKeyring)
+	backgroundContext, stopBackground := context.WithCancel(context.Background())
+	defer stopBackground()
+	go runC2CExpiry(backgroundContext, c2cService)
+
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
@@ -137,6 +142,7 @@ func main() {
 			Routing:           store.Routes,
 			Gateway:           engine,
 			Browse:            store.Gateway,
+			C2C:               c2cService,
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
@@ -178,6 +184,33 @@ func channelEventKind(kind string) gateway.EventKind {
 		return gateway.EventChannelRecover
 	}
 	return gateway.EventChannelLimit
+}
+
+// runC2CExpiry cancels C2C trades whose payment deadline has passed, once a
+// minute, and returns their points to the order (or the seller).
+func runC2CExpiry(ctx context.Context, service *c2c.Service) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		expireOnce(ctx, service)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func expireOnce(ctx context.Context, service *c2c.Service) {
+	runContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cancelled, err := service.ExpireDue(runContext, 100)
+	if err != nil && ctx.Err() == nil {
+		log.Printf("c2c payment expiry failed: %v", err)
+	}
+	if cancelled > 0 {
+		log.Printf("c2c payment expiry cancelled %d trades", cancelled)
+	}
 }
 
 func parseCommaSeparated(value string) []string {

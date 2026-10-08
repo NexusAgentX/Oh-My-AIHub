@@ -17,6 +17,7 @@ describe('shouldRetry', () => {
   it('never retries deterministic 4xx failures', () => {
     expect(shouldRetry(0, new ApiError(404, 'not_found', 'x'))).toBe(false)
     expect(shouldRetry(0, new ApiError(401, 'authentication_required', 'x'))).toBe(false)
+    expect(shouldRetry(0, new ApiError(501, 'not_implemented', 'x'))).toBe(false)
   })
 
   it('retries network and 5xx failures at most twice', () => {

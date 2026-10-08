@@ -46,7 +46,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
 
-产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；C2C 与观测接口当前返回 `501 not_implemented`，网关、渠道、API Key、路由、模型浏览与首页已由 Feature B 实现，前端只保留公开落地页、`/initialize` 实例初始化、登录、首次改密与占位首页。进度见 `PRODUCT.md`。
+产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、路由、模型浏览与首页（Feature B）和 C2C（Feature C）已实现，观测接口当前返回 `501 not_implemented`；前端用户界面、管理后台与落地页已按新信息架构重写，依赖观测接口的区块显示可重试的错误态。进度见 `PRODUCT.md`。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 

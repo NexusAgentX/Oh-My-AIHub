@@ -40,7 +40,7 @@ function jsonBody<Op extends keyof operations>(body: RequestBody<Op>) {
   return JSON.stringify(body)
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   if (init?.body) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, {
@@ -67,6 +67,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+/** 查询参数：跳过 undefined、null 与空字符串。 */
+export type QueryParams = Record<string, string | number | boolean | null | undefined>
+
+export function withQuery(path: string, params?: QueryParams) {
+  if (!params) return path
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `${path}?${text}` : path
+}
+
+/** 路径参数统一编码，模型名等不会改变路径结构。 */
+export function pathSegment(value: string) {
+  return encodeURIComponent(value)
+}
+
+/** GET 某个 operationId，响应类型来自契约。 */
+export function apiGet<Op extends keyof operations>(path: string, params?: QueryParams) {
+  return request<ResponseBody<Op>>(withQuery(path, params))
+}
+
+/** 带 JSON 请求体的写操作；idempotencyKey 用于记账类请求防止重复提交。 */
+export function apiSend<Op extends keyof operations>(
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body?: RequestBody<Op>,
+  options?: { idempotencyKey?: string },
+) {
+  const headers: Record<string, string> = {}
+  if (options?.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
+  return request<ResponseBody<Op>>(path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : jsonBody<Op>(body),
+  })
 }
 
 export const api = {
@@ -103,8 +143,5 @@ export const api = {
         }),
       })
     ).account
-  },
-  points() {
-    return request<ResponseBody<'getPoints'>>('/api/points')
   },
 }

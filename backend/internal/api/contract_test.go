@@ -196,9 +196,6 @@ func TestOpenAPIPathsMatchRouteTable(t *testing.T) {
 		if !entry.implemented && entry.access != accessGatewayKey && responses["501"] == nil {
 			t.Errorf("%s: 未实现的路由须登记 501", key)
 		}
-		if entry.implemented && entry.feature != "A" && entry.feature != "B" {
-			t.Errorf("%s: 只有 Feature A、B 的路由已实现", key)
-		}
 	}
 	for key := range operations {
 		if !seen[key] {

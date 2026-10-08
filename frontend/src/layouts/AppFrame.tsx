@@ -2,13 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
-import { Drawer, Icon, IconButton } from '../ui'
-import { usePoints } from '../home/queries'
-import { formatPointAmount } from '../money/format'
+import { usePoints } from '../points/queries'
+import { amountSign, formatPoints } from '../money/format'
+import { Icon } from '../ui'
 import { Brand } from './Brand'
-import { findNavItem, flattenNavigation, type NavGroup } from './navigation'
+import {
+  findMobileTab,
+  mobileTabs,
+  pageTitle,
+  type MobileTab,
+  type NavGroup,
+} from './navigation'
 
-function useSignOut() {
+export function useSignOut() {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState('')
@@ -24,24 +30,16 @@ function useSignOut() {
   return { signOut, error }
 }
 
-/** 分组导航列表，侧边栏与移动端「更多」抽屉共用。 */
-function NavGroups({
-  groups,
-  onNavigate,
-}: {
-  groups: NavGroup[]
-  onNavigate?: () => void
-}) {
+function NavGroups({ groups }: { groups: NavGroup[] }) {
   return (
     <>
       {groups.map((group) => (
-        <div className="nav-group" key={group.label} role="group" aria-label={group.label}>
+        <div aria-label={group.label} className="nav-group" key={group.label} role="group">
           <h6 aria-hidden="true">{group.label}</h6>
           {group.items.map((item) => (
             <NavLink
               className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
               key={item.to}
-              onClick={onNavigate}
               to={item.to}
             >
               <Icon name={item.icon} />
@@ -54,41 +52,115 @@ function NavGroups({
   )
 }
 
-function AccountFooter({
-  onNavigate,
-  onSignOut,
-}: {
-  onNavigate?: () => void
-  onSignOut: () => void
-}) {
-  const { account } = useAuth()
+/** 余额：负数红色；未加载时显示 —。 */
+function BalanceText() {
+  const { data } = usePoints()
+  if (!data) return <span className="num">—</span>
   return (
-    <div className="sidebar-account">
-      <Link className="sidebar-account-link" onClick={onNavigate} to="/home">
+    <span className={`num ${amountSign(data.balance) < 0 ? 'amount-negative' : ''}`}>
+      {formatPoints(data.balance, { digits: 2 })}
+    </span>
+  )
+}
+
+/** 侧栏底部账户按钮与菜单：账户设置、管理后台（管理员）、退出。 */
+function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
+  const { account } = useAuth()
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const location = useLocation()
+
+  useEffect(() => setOpen(false), [location.pathname])
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        button.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="sidebar-account" ref={root}>
+      {open && (
+        <div aria-label="账户菜单" className="account-menu" role="menu">
+          <Link className="account-menu-item" role="menuitem" to="/account">
+            <Icon name="settings" />
+            账户设置
+          </Link>
+          {account?.is_admin && (
+            <Link className="account-menu-item" role="menuitem" to="/admin">
+              <Icon name="shield" />
+              管理后台
+            </Link>
+          )}
+          <button
+            className="account-menu-item"
+            onClick={() => {
+              setOpen(false)
+              onSignOut()
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <Icon name="logout" />
+            退出
+          </button>
+        </div>
+      )}
+      <button
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="sidebar-account-button"
+        onClick={() => setOpen((value) => !value)}
+        ref={button}
+        type="button"
+      >
         <span aria-hidden="true" className="avatar">
           {account?.display_name.slice(0, 1) || '用'}
         </span>
         <span className="sidebar-account-copy">
           <strong>{account?.display_name}</strong>
-          <span>{account?.is_admin ? '管理员' : `@${account?.username}`}</span>
+          <span>
+            余额 <BalanceText />
+          </span>
         </span>
-        <span className="visually-hidden">首页</span>
-      </Link>
-      <IconButton icon={<Icon name="logout" />} label="退出登录" onClick={onSignOut} />
+        <Icon name="more" />
+      </button>
     </div>
   )
 }
 
-/** 顶栏常驻可透支额度。 */
-function PointsChip() {
-  const { data } = usePoints()
-  const amount = data ? formatPointAmount(data.available) : '—'
+function BottomTabs({ tabs, pathname }: { tabs: MobileTab[]; pathname: string }) {
+  const current = findMobileTab(tabs, pathname)
   return (
-    <Link aria-label={`可用 ${amount} 积分`} className="wallet-chip" to="/home">
-      <span>可用</span>
-      <strong className="num">{amount}</strong>
-      <span>积分</span>
-    </Link>
+    <nav aria-label="底部导航" className="bottom-bar">
+      {tabs.map((tab) => {
+        const active = current?.to === tab.to
+        return (
+          <Link
+            aria-current={active ? 'page' : undefined}
+            className={`bottom-tab ${active ? 'bottom-tab-active' : ''}`}
+            key={tab.to}
+            to={tab.to}
+          >
+            <Icon name={tab.icon} size={20} />
+            <span>{tab.label}</span>
+          </Link>
+        )
+      })}
+    </nav>
   )
 }
 
@@ -96,19 +168,11 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   const { sessionError } = useAuth()
   const { signOut, error: signOutError } = useSignOut()
   const location = useLocation()
-  const [moreOpen, setMoreOpen] = useState(false)
   const alertReference = useRef<HTMLDivElement>(null)
   const mainReference = useRef<HTMLElement>(null)
-  const items = flattenNavigation(navigation)
-  const tabItems = items.filter((item) => item.tab)
-  const current = findNavItem(navigation, location.pathname)
-  const moreActive = Boolean(current && !current.tab)
 
   useEffect(() => {
-    if (signOutError) {
-      setMoreOpen(false)
-      alertReference.current?.focus()
-    }
+    if (signOutError) alertReference.current?.focus()
   }, [signOutError])
 
   // 路由切换后把焦点移到主内容，键盘与读屏用户不必重新穿过导航
@@ -120,31 +184,32 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
     }
   }, [location.pathname])
 
-  // 抽屉打开时跨过 760px 进入桌面布局，主动关闭
-  useEffect(() => {
-    const desktop = window.matchMedia('(min-width: 761px)')
-    const close = (event: MediaQueryListEvent) => {
-      if (event.matches) setMoreOpen(false)
-    }
-    desktop.addEventListener('change', close)
-    return () => desktop.removeEventListener('change', close)
-  }, [])
-
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">跳到主要内容</a>
+      <a className="skip-link" href="#main-content">
+        跳到主要内容
+      </a>
       <aside aria-label="产品侧边栏" className="sidebar">
-        <Brand />
+        <Link aria-label="首页" className="sidebar-brand" to="/home">
+          <Brand />
+        </Link>
         <nav aria-label="产品导航" className="sidebar-nav">
           <NavGroups groups={navigation} />
         </nav>
-        <AccountFooter onSignOut={() => void signOut()} />
+        <AccountMenu onSignOut={() => void signOut()} />
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <span className="topbar-brand"><Brand /></span>
-          <span className="topbar-crumb">{current?.label ?? ''}</span>
-          <PointsChip />
+          <Link aria-label="首页" className="topbar-brand" to="/home">
+            <Brand />
+          </Link>
+          <span className="topbar-crumb">{pageTitle(location.pathname)}</span>
+          <Link className="wallet-chip" to="/points">
+            <span>余额</span>
+            <strong>
+              <BalanceText />
+            </strong>
+          </Link>
         </header>
         {(sessionError || signOutError) && (
           <div className="session-alert" ref={alertReference} role="alert" tabIndex={-1}>
@@ -155,45 +220,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
           <Outlet />
         </main>
       </div>
-      <nav aria-label="高频导航" className="bottom-bar">
-        {tabItems.map((item) => (
-          <NavLink
-            className={({ isActive }) => `bottom-tab ${isActive ? 'bottom-tab-active' : ''}`}
-            key={item.to}
-            to={item.to}
-          >
-            <Icon name={item.icon} size={20} />
-            <span>{item.tab}</span>
-          </NavLink>
-        ))}
-        <button
-          aria-expanded={moreOpen}
-          aria-haspopup="dialog"
-          className={`bottom-tab ${moreActive ? 'bottom-tab-active' : ''}`}
-          onClick={() => setMoreOpen(true)}
-          type="button"
-        >
-          <Icon name="more" size={20} />
-          <span>更多</span>
-        </button>
-      </nav>
-      <Drawer
-        onClose={() => setMoreOpen(false)}
-        open={moreOpen}
-        placement="bottom"
-        title="全部导航"
-      >
-        <nav aria-label="全部导航" className="sidebar-nav drawer-nav">
-          <NavGroups groups={navigation} onNavigate={() => setMoreOpen(false)} />
-        </nav>
-        <AccountFooter
-          onNavigate={() => setMoreOpen(false)}
-          onSignOut={() => {
-            setMoreOpen(false)
-            void signOut()
-          }}
-        />
-      </Drawer>
+      <BottomTabs pathname={location.pathname} tabs={mobileTabs} />
     </div>
   )
 }

@@ -18,6 +18,7 @@ const (
 	ActionAccountPasswordChange = "account.password_changed"
 	ActionLedgerAdjust          = "ledger.adjust"
 	ActionLedgerWriteOff        = "ledger.write_off"
+	ActionC2CResolve            = "c2c.resolve"
 	ActionModelCreated          = "model.created"
 	ActionModelUpdated          = "model.updated"
 	ActionSettingsUpdated       = "settings.updated"

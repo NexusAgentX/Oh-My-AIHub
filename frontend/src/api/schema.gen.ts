@@ -559,10 +559,7 @@ export interface paths {
          */
         get: operations["listC2COrders"];
         put?: never;
-        /**
-         * 挂卖单
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 挂卖单 */
         post: operations["createC2COrder"];
         delete?: never;
         options?: never;
@@ -577,10 +574,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 我的卖单
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 我的卖单（可按状态筛选） */
         get: operations["listMyC2COrders"];
         put?: never;
         post?: never;
@@ -599,10 +593,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 关闭卖单（剩余积分退回）
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 关闭卖单（剩余积分退回） */
         post: operations["closeC2COrder"];
         delete?: never;
         options?: never;
@@ -619,10 +610,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 买入（下单）
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 买入（下单） */
         post: operations["createC2CTrade"];
         delete?: never;
         options?: never;
@@ -637,10 +625,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 我的交易
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 我的交易 */
         get: operations["listMyC2CTrades"];
         put?: never;
         post?: never;
@@ -657,10 +642,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 交易详情
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 交易详情 */
         get: operations["getC2CTrade"];
         put?: never;
         post?: never;
@@ -679,10 +661,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 我已付款
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 我已付款 */
         post: operations["markC2CTradePaid"];
         delete?: never;
         options?: never;
@@ -699,10 +678,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 确认收款放行
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 确认收款放行 */
         post: operations["releaseC2CTrade"];
         delete?: never;
         options?: never;
@@ -719,10 +695,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 取消交易
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 取消交易 */
         post: operations["cancelC2CTrade"];
         delete?: never;
         options?: never;
@@ -739,10 +712,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 申诉
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 申诉 */
         post: operations["disputeC2CTrade"];
         delete?: never;
         options?: never;
@@ -996,10 +966,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * 申诉列表
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 申诉列表 */
         get: operations["listAdminDisputes"];
         put?: never;
         post?: never;
@@ -1018,10 +985,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * 仲裁
-         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
-         */
+        /** 仲裁 */
         post: operations["resolveAdminC2CTrade"];
         delete?: never;
         options?: never;
@@ -1342,6 +1306,8 @@ export interface components {
         ChannelStatus: "listed" | "unlisted" | "suspended";
         /** @enum {string} */
         TransactionType: "api_call" | "c2c_list" | "c2c_release" | "c2c_return" | "admin_adjust" | "bad_debt_writeoff";
+        /** @enum {string} */
+        OrderStatus: "open" | "closed" | "filled";
         /** @enum {string} */
         TradeStatus: "awaiting_payment" | "paid" | "released" | "cancelled" | "disputed" | "resolved_to_buyer" | "resolved_to_seller";
         /** @description 所有 /api 错误的统一结构。 */
@@ -2165,11 +2131,11 @@ export interface components {
         C2CMyOrderEnvelope: {
             order: components["schemas"]["C2CMyOrder"];
         };
-        /** @description 只能卖正余额；挂单时积分转入 C2C 托管账户。 */
+        /** @description 只能卖正余额，不能卖信用额度；挂单时积分转入 C2C 托管账户。min_per_trade、max_per_trade 省略或为 null 表示不限（最少按最小单位 0.000000001 存储）。 */
         C2COrderCreateRequest: {
             amount: components["schemas"]["Amount"];
             unit_price_fen: number;
-            min_per_trade: components["schemas"]["Amount"];
+            min_per_trade?: components["schemas"]["NullableAmount"];
             max_per_trade?: components["schemas"]["NullableAmount"];
             payment_methods: components["schemas"]["PaymentMethod"][];
         };
@@ -2619,6 +2585,10 @@ export interface components {
         tradeRole: "buyer" | "seller";
         /** @description 交易状态。 */
         tradeStatus: components["schemas"]["TradeStatus"];
+        /** @description 卖单状态。 */
+        orderStatus: components["schemas"]["OrderStatus"];
+        /** @description 为 true 时只返回待我处理的交易：我是买家且待付款，或我是卖家且已付款待放行。 */
+        tradePending: boolean;
         /** @description 操作类型，例如 account.created。 */
         auditAction: string;
         /** @description 对象类型，例如 account、model。 */
@@ -3639,7 +3609,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     createC2COrder: {
@@ -3670,13 +3639,15 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listMyC2COrders: {
         parameters: {
             query?: {
+                /** @description 卖单状态。 */
+                status?: components["parameters"]["orderStatus"];
                 /** @description 上一页返回的 next_cursor。 */
                 cursor?: components["parameters"]["cursor"];
                 /** @description 每页条数，1～100，默认 20。 */
@@ -3700,7 +3671,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     closeC2COrder: {
@@ -3729,7 +3699,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     createC2CTrade: {
@@ -3766,7 +3735,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listMyC2CTrades: {
@@ -3776,6 +3744,8 @@ export interface operations {
                 role?: components["parameters"]["tradeRole"];
                 /** @description 交易状态。 */
                 status?: components["parameters"]["tradeStatus"];
+                /** @description 为 true 时只返回待我处理的交易：我是买家且待付款，或我是卖家且已付款待放行。 */
+                pending?: components["parameters"]["tradePending"];
                 /** @description 上一页返回的 next_cursor。 */
                 cursor?: components["parameters"]["cursor"];
                 /** @description 每页条数，1～100，默认 20。 */
@@ -3799,7 +3769,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getC2CTrade: {
@@ -3826,7 +3795,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     markC2CTradePaid: {
@@ -3859,7 +3827,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     releaseC2CTrade: {
@@ -3888,7 +3855,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     cancelC2CTrade: {
@@ -3917,7 +3883,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     disputeC2CTrade: {
@@ -3951,7 +3916,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     listAdminAccounts: {
@@ -4473,7 +4437,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     resolveAdminC2CTrade: {
@@ -4507,7 +4470,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-            501: components["responses"]["NotImplemented"];
         };
     };
     getAdminOverview: {

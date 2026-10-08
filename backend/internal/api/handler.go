@@ -8,6 +8,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -33,6 +34,7 @@ type Dependencies struct {
 	Routing           routing.Store
 	Gateway           *gateway.Engine
 	Browse            gateway.Browse
+	C2C               *c2c.Service
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -49,6 +51,7 @@ type app struct {
 	routing           routing.Store
 	gateway           *gateway.Engine
 	browse            gateway.Browse
+	c2c               *c2c.Service
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
 	cookieName        string
@@ -75,6 +78,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		routing:           dependencies.Routing,
 		gateway:           dependencies.Gateway,
 		browse:            dependencies.Browse,
+		c2c:               dependencies.C2C,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
 		cookieName:        defaultSessionCookie,
@@ -93,6 +97,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerBrowseRoutes(routes)
 	application.registerChannelRoutes(routes)
 	application.registerGatewayRoutes(routes)
+	application.registerC2CRoutes(routes)
 	registerPlannedRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table

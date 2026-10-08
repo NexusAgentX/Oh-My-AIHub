@@ -1,6 +1,6 @@
 # 架构说明
 
-> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature B（#172）已交付透明网关、渠道、API Key、路由、模型浏览与首页；C2C 与观测接口已在契约中定义并返回 501，由后续 Feature 实现。
+> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature B（#172）已交付透明网关、渠道、API Key、路由、模型浏览与首页；Feature C（#173）已交付 C2C 卖单市场；Feature D（#174）、E（#175）已交付用户界面、管理后台与落地页；观测接口已在契约中定义并返回 501，由 Feature G 实现。
 
 本文档描述仓库当前真实存在的系统结构，再单独列出已确认但尚未实现的目标约束。不得把目标约束当作当前代码能力。
 
@@ -30,7 +30,7 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。重写期间只保留公开落地页、实例初始化、登录、首次改密与占位首页（`/home`，读取 `GET /api/points`），外壳为 `src/layouts/` 的侧栏与移动端底部 Tab 栏；用户界面与管理后台由 Feature D、E 重建 |
+| 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。外壳为 `src/layouts/`：桌面左侧分组侧栏（使用 API / 共享 / 积分，底部账户菜单与余额），<768px 为顶部条 + 底部 5 个 Tab（首页、模型、渠道、积分、我的）。用户页面按领域分目录，查询在各自 `queries.ts`，类型来自 `schema.gen.ts`：`home/`（`/home`）、`models/`（`/models`、`/models/:model`，含账号级与 Key 级共用的路由编辑器）、`keys/`（`/keys` 与抽屉）、`usage/`（`/usage`）、`channels/`（`/channels`、`/channels/new` 三步向导、`/channels/:id`）、`points/`（`/points` 各 Tab、`/points/trades/:id`、买卖抽屉）、`account/`（`/account`、移动端 `/me`）。`src/calls/` 是调用观测的共享组件（列表、筛选、汇总、SSE 实时 hook、调用详情抽屉与尝试时间线），按接口路径参数化，供用户用量、渠道编辑页与管理后台复用。依赖尚未实现（501）接口的区块显示可重试的错误态。实例初始化、登录与首次改密沿用原流程。公开落地页在 `src/welcome/`（已登录访问 `/` 跳到 `/home`）。管理后台在 `src/admin/`（Feature E）：自带外壳 `AdminFrame`（复用 `layout.css` 的侧栏与底部 Tab 样式，移动端前 4 项进 Tab、其余进「更多」）与 `RequireAdmin` 门禁，`/admin` 下有概览、调用、积分、用户、模型、渠道、申诉、设置 8 页；查询与写操作集中在 `admin/api.ts` 与 `admin/queries.ts`（写成功后失效 `['admin']` 前缀），调用页复用 `src/calls/`，需要原因的操作统一用两步确认对话框，一次性密码关闭即丢弃 |
 | 后端 | `backend/` | Go `net/http` 服务。`cmd/server` 组装服务并在启动时校验 `UPSTREAM_CREDENTIAL_*`、`UPSTREAM_*` 出站配置与 `C2C_PRIVATE_DATA_*` 密钥环；`cmd/migrate` 执行迁移 |
 | API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是唯一契约（ADR-0021），定义约 70 个 JSON 接口与 6 个外部模型 API 入口；`x-access` 声明门禁，`x-feature` 标明负责实现的 Feature。`internal/api` 的 `router` 按 access 包裹会话、首次改密与管理员门禁；已实现的路由经 `handle`（A）或 `feature`（B 起）注册，未实现的路由经 `planned` 注册，保留门禁并返回 `501 {"error":"not_implemented"}`。契约测试逐项对照路由表、门禁、Feature 与实现状态，并用规范 schema 校验每个真实响应。前端类型由它生成为已提交的 `frontend/src/api/schema.gen.ts` |
 | 数据库 | PostgreSQL 18 | 18 张表，见下文“数据与状态” |
@@ -55,12 +55,12 @@
 | `internal/routing` | 每个用户每个模型的路由偏好（便宜/稳定/快速/手动、取消勾选、最大尝试次数、首字超时），账号级与 Key 级覆盖 |
 | `internal/gateway` | 透明网关（ADR-0027）：`bodyscan` 对顶层 JSON 做词法扫描与字节拼接（替换 `model`、补 `include_usage`）；`usage` 旁路读取四种格式的用量与流式指标；`rank` 按四种模式排序候选并处理粘性；`runtime` 保存进程内并发/RPM/冷却/连续失败/当日收入与 Key 花费缓存；`engine` 实现认证、模型解析、余额与预算检查、回退、原样回写、事后记账与 `slog` 日志；`events` 为非阻塞进程内事件总线；`models` 回答 `GET /v1/models` 与 `/v1beta/models` 并运行超时调用清理 |
 | `internal/localtime` | 记账日历：Asia/Shanghai 的自然日与自然月（预算窗口与“今日”统计） |
-| `internal/c2c` | 目前只保留 C2C 私密数据密钥环；卖单与交易由 Feature C 重建 |
+| `internal/c2c` | C2C 卖单市场领域：词汇与错误（`types.go`）、纯状态机（`machine.go`：数量恒等式、各转换的前置检查与幂等判断、应付金额向上取整）、`Service`（输入校验、收款方式加解密与可见性、游标分页、超时任务入口）、C2C 私密数据密钥环 |
 | `internal/secretguard` | 凭据泄露检测辅助 |
 
 ## 当前请求链路
 
-1. 浏览器加载 React 应用；`/`、`/welcome` 与未知路径显示公开落地页；实例尚无管理员时前端引导到 `/initialize`。
+1. 浏览器加载 React 应用；`/`、`/welcome` 与未知路径显示公开落地页（`/` 与未知路径在已登录时跳到 `/home`）；实例尚无管理员时前端引导到 `/initialize`；`/admin/**` 只对管理员开放，其他用户回到 `/home`。
 2. 开发环境由 Vite、Compose 环境由 Nginx 把 `/api`、`/v1`、`/v1beta` 代理到后端。
 3. 后端中间件链为“写超时 → 安全头 → 同源校验 → mux”；只对可信内部代理采信转发头，对非安全方法校验同源 `Origin`（`/v1`、`/v1beta` 外部入口除外）；路由层执行会话、首次改密与管理员门禁。
 4. 错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`。
@@ -104,16 +104,35 @@
 - 停用账户在同一事务内删除其全部会话；重置密码提升密码版本并删除全部会话（ADR-0013）。移除管理员身份的修改在事务级 advisory lock 下检查剩余启用管理员数。
 - 模型目录写入在 `FOR UPDATE` 锁内合并部分更新并整组替换价格档；创建、修改模型与平台设置均写审计（含修改前后值）。
 - 用户只能读取本人积分与账单；账单按分录 id 倒序游标分页，可按交易类型、Key、时间筛选，`format=csv` 由 Feature G 实现（当前 501）。
-- 上游凭据密钥环与出站策略在启动时校验配置，供渠道与网关使用；C2C 私密数据密钥环同样在启动时校验。
+- 上游凭据密钥环与出站策略在启动时校验配置，供渠道与网关使用；C2C 私密数据密钥环在启动时校验并用于加密卖单收款方式。
 - 渠道公开信息（模型详情里的渠道列表）只含渠道名、所有者显示名、格式、倍率、现价、成功率、首字与状态，不含 Base URL、Key 与请求头规则；上游 Key 在任何读取接口都不回显。
 - 渠道的并发、每分钟请求数、冷却、连续失败计数保存在进程内（单实例）；每日收入与 Key 预算已用额从数据库汇总并缓存。
 - 自己的渠道调用手续费为 0，消费者与共享者是同一个账本账户，账本不允许一笔交易中同一账户出现两次，因此这类调用不产生账本交易（`calls.ledger_tx_id` 为空，费用仍记录）；Feature G 的记账核对须排除它们。
+
+## C2C 卖单市场（Feature C）
+
+积分的托管全部落在系统账户 `c2c_escrow`（ADR-0025）。`internal/postgres/c2cpg` 实现 `c2c.Store`：每个状态转换在一个数据库事务内完成加锁、状态检查、数量更新和 `ledgerpg.Post` 过账；纯规则在 `internal/c2c/machine.go`，持久化只负责加锁、读取、写入。
+
+| 动作 | 过账（幂等键） | 数量变化 |
+| --- | --- | --- |
+| 挂单 | `c2c_list`：卖家 −总量，托管 +总量（`c2c:order:<id>:list`） | available = total |
+| 买入 | 无 | available −= 数量，in_trade += 数量 |
+| 放行 / 判给买家 | `c2c_release`：托管 −数量，买家 +数量（`c2c:trade:<id>:release`） | in_trade −= 数量，sold += 数量；开放且 available、in_trade 均为 0 时订单为 filled |
+| 取消 / 超时 / 退回卖家（订单开放） | 无 | in_trade −= 数量，available += 数量 |
+| 取消 / 超时 / 退回卖家（订单已关闭） | `c2c_return`：托管 −数量，卖家 +数量（`c2c:trade:<id>:return`） | in_trade −= 数量，closed += 数量 |
+| 关闭卖单 | `c2c_return`：托管 −可买量，卖家 +可买量（`c2c:order:<id>:close`） | closed += available，available = 0，状态 closed |
+
+- **恒等式**：`total = available + in_trade + sold + closed` 由数据库 CHECK 保证；`c2c_escrow` 余额始终等于所有订单 `available + in_trade` 之和（Feature G 做实时核对，集成测试在每条路径后断言）。
+- **加锁顺序**：订单行 → 交易行 → 账本账户行（`Post` 内按 id 升序）。挂单先锁卖家账本账户再检查「余额 ≥ 总量」，并发挂单不会重复花同一笔余额；并发买入在订单行锁上串行，不会超卖，同一买家同一卖单的未完成交易唯一性在同一锁内检查。
+- **幂等**：状态转换重复请求返回当前状态、不重复记账（放行已放行的交易、取消已取消的交易等）；挂单与买入带 `Idempotency-Key` 时，订单、交易 ID 由卖家/买家与该键派生，重复请求返回同一对象。
+- **收款方式**：JSON 经 `C2C_PRIVATE_DATA_KEYRING` 以订单 ID 为附加数据加密保存；列表只解密出渠道名称，账号只在交易详情中按可见性规则返回（买家仅在交易未结束时）。
+- **超时任务**：`cmd/server` 启动后每分钟调用 `Service.ExpireDue`，取消 `awaiting_payment` 且已过 `payment_deadline` 的交易（每批 100 笔，逐笔独立事务，锁内复查状态）；`paid`、`disputed` 不受影响。进程重启后下一轮继续处理。
+- **仲裁**：管理员判给买家复用放行路径（`resolved_to_buyer`），退回卖家复用取消路径（`resolved_to_seller`）；原因必填并写入审计 `c2c.resolve`。
 
 ## 已确认但未实现的目标边界
 
 以下由后续 Feature 实现，契约已在 `openapi.yaml` 中定义：
 
-- Feature C：C2C 卖单、托管账户过账、部分成交、付款超时、申诉与仲裁。
 - Feature G：调用与用量查询、SSE 实时流、渠道统计、Prometheus 指标、管理员概览与积分全局、账本交易浏览与调用修复、积分走势与 CSV 导出。
 
 ## 架构原则

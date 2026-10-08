@@ -484,15 +484,15 @@ func (a *app) moderateChannel(suspend bool) http.HandlerFunc {
 
 // registerChannelRoutes 注册渠道与管理员渠道路由（Feature B）。
 func (a *app) registerChannelRoutes(r *router) {
-	r.feature("B", "GET /api/channels", accessReady, a.listChannels)
-	r.feature("B", "POST /api/channels", accessReady, a.createChannel)
-	r.feature("B", "POST /api/channels/discover", accessReady, a.discoverChannel)
-	r.feature("B", "GET /api/channels/{channelID}", accessReady, a.getChannel)
-	r.feature("B", "PATCH /api/channels/{channelID}", accessReady, a.updateChannel)
-	r.feature("B", "DELETE /api/channels/{channelID}", accessReady, a.deleteChannel)
-	r.feature("B", "POST /api/channels/{channelID}/test", accessReady, a.testChannel)
-	r.feature("B", "GET /api/admin/channels", accessAdmin, a.listAdminChannels)
-	r.feature("B", "GET /api/admin/channels/{channelID}", accessAdmin, a.getAdminChannel)
-	r.feature("B", "POST /api/admin/channels/{channelID}/suspend", accessAdmin, a.moderateChannel(true))
-	r.feature("B", "POST /api/admin/channels/{channelID}/unsuspend", accessAdmin, a.moderateChannel(false))
+	r.implement("B", "GET /api/channels", accessReady, a.listChannels)
+	r.implement("B", "POST /api/channels", accessReady, a.createChannel)
+	r.implement("B", "POST /api/channels/discover", accessReady, a.discoverChannel)
+	r.implement("B", "GET /api/channels/{channelID}", accessReady, a.getChannel)
+	r.implement("B", "PATCH /api/channels/{channelID}", accessReady, a.updateChannel)
+	r.implement("B", "DELETE /api/channels/{channelID}", accessReady, a.deleteChannel)
+	r.implement("B", "POST /api/channels/{channelID}/test", accessReady, a.testChannel)
+	r.implement("B", "GET /api/admin/channels", accessAdmin, a.listAdminChannels)
+	r.implement("B", "GET /api/admin/channels/{channelID}", accessAdmin, a.getAdminChannel)
+	r.implement("B", "POST /api/admin/channels/{channelID}/suspend", accessAdmin, a.moderateChannel(true))
+	r.implement("B", "POST /api/admin/channels/{channelID}/unsuspend", accessAdmin, a.moderateChannel(false))
 }

@@ -242,7 +242,7 @@ func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 
 // registerBrowseRoutes 注册首页与模型浏览路由（Feature B）。
 func (a *app) registerBrowseRoutes(r *router) {
-	r.feature("B", "GET /api/home", accessReady, a.getHome)
-	r.feature("B", "GET /api/models", accessReady, a.listModels)
-	r.feature("B", "GET /api/models/{modelID}", accessReady, a.getModel)
+	r.implement("B", "GET /api/home", accessReady, a.getHome)
+	r.implement("B", "GET /api/models", accessReady, a.listModels)
+	r.implement("B", "GET /api/models/{modelID}", accessReady, a.getModel)
 }

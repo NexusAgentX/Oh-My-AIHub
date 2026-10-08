@@ -298,13 +298,13 @@ func (a *app) deleteKeyRouting(w http.ResponseWriter, r *http.Request) {
 
 // registerKeyRoutes 注册 API Key 与路由偏好路由（Feature B）。
 func (a *app) registerKeyRoutes(r *router) {
-	r.feature("B", "GET /api/keys", accessReady, a.listKeys)
-	r.feature("B", "POST /api/keys", accessReady, a.createKey)
-	r.feature("B", "GET /api/keys/{keyID}", accessReady, a.getKey)
-	r.feature("B", "PATCH /api/keys/{keyID}", accessReady, a.updateKey)
-	r.feature("B", "DELETE /api/keys/{keyID}", accessReady, a.deleteKey)
-	r.feature("B", "GET /api/keys/{keyID}/secret", accessReady, a.getKeySecret)
-	r.feature("B", "PUT /api/routing/{modelID}", accessReady, a.setRouting)
-	r.feature("B", "PUT /api/keys/{keyID}/routing/{modelID}", accessReady, a.setKeyRouting)
-	r.feature("B", "DELETE /api/keys/{keyID}/routing/{modelID}", accessReady, a.deleteKeyRouting)
+	r.implement("B", "GET /api/keys", accessReady, a.listKeys)
+	r.implement("B", "POST /api/keys", accessReady, a.createKey)
+	r.implement("B", "GET /api/keys/{keyID}", accessReady, a.getKey)
+	r.implement("B", "PATCH /api/keys/{keyID}", accessReady, a.updateKey)
+	r.implement("B", "DELETE /api/keys/{keyID}", accessReady, a.deleteKey)
+	r.implement("B", "GET /api/keys/{keyID}/secret", accessReady, a.getKeySecret)
+	r.implement("B", "PUT /api/routing/{modelID}", accessReady, a.setRouting)
+	r.implement("B", "PUT /api/keys/{keyID}/routing/{modelID}", accessReady, a.setKeyRouting)
+	r.implement("B", "DELETE /api/keys/{keyID}/routing/{modelID}", accessReady, a.deleteKeyRouting)
 }

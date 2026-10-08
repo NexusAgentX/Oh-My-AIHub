@@ -32,12 +32,12 @@ func (a *app) registerGatewayRoutes(r *router) {
 	serve := func(format channel.Format) http.HandlerFunc {
 		return func(w http.ResponseWriter, req *http.Request) { a.gateway.Serve(w, req, format, "", false) }
 	}
-	r.feature("B", "POST /v1/chat/completions", accessGatewayKey, serve(channel.FormatOpenAIChat))
-	r.feature("B", "POST /v1/responses", accessGatewayKey, serve(channel.FormatOpenAIResponses))
-	r.feature("B", "POST /v1/messages", accessGatewayKey, serve(channel.FormatAnthropic))
-	r.feature("B", "POST /v1beta/models/{model}", accessGatewayKey, a.serveGemini)
-	r.feature("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
-	r.feature("B", "GET /v1beta/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, true) })
+	r.implement("B", "POST /v1/chat/completions", accessGatewayKey, serve(channel.FormatOpenAIChat))
+	r.implement("B", "POST /v1/responses", accessGatewayKey, serve(channel.FormatOpenAIResponses))
+	r.implement("B", "POST /v1/messages", accessGatewayKey, serve(channel.FormatAnthropic))
+	r.implement("B", "POST /v1beta/models/{model}", accessGatewayKey, a.serveGemini)
+	r.implement("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
+	r.implement("B", "GET /v1beta/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, true) })
 	r.mux.HandleFunc("/v1/", unsupportedEndpoint)
 	r.mux.HandleFunc("/v1beta/", unsupportedEndpoint)
 }

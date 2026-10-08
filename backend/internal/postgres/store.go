@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/c2cpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/gatewaypg"
@@ -26,6 +27,7 @@ type Store struct {
 	Keys     *keypg.Store
 	Routes   *keypg.Routes
 	Gateway  *gatewaypg.Store
+	C2C      *c2cpg.Store
 }
 
 func New(pool *pgxpool.Pool) *Store {
@@ -39,5 +41,6 @@ func New(pool *pgxpool.Pool) *Store {
 		Keys:     keypg.NewStore(pool),
 		Routes:   keypg.NewRoutes(pool),
 		Gateway:  gatewaypg.NewStore(pool),
+		C2C:      c2cpg.NewStore(pool),
 	}
 }
