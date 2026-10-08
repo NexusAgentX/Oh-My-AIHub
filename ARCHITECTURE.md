@@ -1,8 +1,8 @@
 # 架构说明
 
-> 状态：公开落地页、受邀账户、模型目录、零和账本、渠道托管、API 市场、平台 API Key、四协议代理调用结算与 C2C 卖单市场已实现
+> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；网关、渠道、Key、C2C 与观测接口已在契约中定义并返回 501，由后续 Feature 实现。
 
-本文档首先描述仓库当前真实存在的系统结构，再单独列出尚未实现的目标约束。不得把规划约束当作当前代码能力。
+本文档描述仓库当前真实存在的系统结构，再单独列出已确认但尚未实现的目标约束。不得把目标约束当作当前代码能力。
 
 ## 当前结构
 
@@ -30,108 +30,82 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包（含余额不足提示）、模型目录、渠道配置、API 市场（筛选条件存于 URL，查询在 `channels/marketQueries.ts`）、公开渠道详情与加入路由抽屉、平台 Key 与路由（模型协议池）设置抽屉、含快速开始与待处理事项的工作台（待处理事项由后端 `GET /api/dashboard/pending-items` 聚合，前端只渲染）、调用记录、C2C 市场（承接抽屉、交易详情与确认对话框）与管理员后台界面（运营台 `/admin/ops` 仅「总览」（含共享者收入）与「账本与费率」（含巡检历史与手动巡检）两个分区，`tab` 参数只接受这两个值；账户、模型目录含条件价格档抽屉编辑器、渠道治理与争议处理） |
-| 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、工作台待处理事项聚合、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
-| API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是 `/api/**` JSON 契约的唯一来源（`/v1`、`/v1beta` 只登记路径与认证），`x-access` 声明各路由门禁；`internal/api` 按领域文件注册路由，`router` 依 access 包裹会话、首次改密与管理员门禁，全局中间件链为“写超时 → 安全头 → 同源校验 → mux”，限流状态集中在 `rateLimits`；契约测试对照路由表并用规范 schema 校验响应（见 [ADR-0021](docs/adr/0021-openapi-as-single-api-contract.md)）；前端 API 类型由它经 `openapi-typescript` 生成为已提交的 `frontend/src/api/schema.gen.ts`（生成器隔离在 `frontend/tools/openapi-types/`，因其需要 TypeScript 5 编译器 API；`npm --prefix frontend run generate:api` 或 `mise run generate`），`frontend/src/api/types.ts` 提供简洁别名与 `RequestBody` / `ResponseBody`，`client.ts` 据此对请求体与响应做类型校验，CI 以 `git diff --exit-code` 校验生成物与规范一致 |
-| 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
-| 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 组合根 `postgres.Store` 嵌入各领域持久化包；已迁移领域（身份、模型目录、API 手续费率、账本、渠道、C2C、网关、运营指标，加共享的审计与事务辅助）在 `<domain>pg/` 中以 `queries.sql` 加 sqlc 生成代码实现领域服务定义的 Store 接口；全部领域均已迁移（见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)）；账本与业务行需原子提交时，业务领域自己开启 `pgx.Tx` 并用 `ledgerpg.NewTx(tx)` 得到绑定该事务的账本 Store，事务与提交始终由调用方持有（见 [ADR-0020](docs/adr/0020-adopt-caller-owned-transactions-across-persistence-domains.md)） |
-| 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 以嵌入式 SQL-only Goose 迁移建立并演进数据库结构；当前只有基线 `0001_baseline.sql`，此后的结构变化从 `0002` 起追加（ADR-0024） |
-| 开发任务 | `mise.toml` | 固定工具版本并提供安装、开发、测试、构建和运行命令 |
-| 容器编排 | `compose.yaml` | 运行 PostgreSQL、一次性迁移、后端和前端，并按健康与完成状态排序启动 |
-| Web 入口 | `frontend/nginx.conf` | 提供前端静态资源，将 `/api/` 与四类外部协议路径代理至后端；协议路径关闭请求和响应落盘缓冲 |
+| 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。重写期间只保留公开落地页、实例初始化、登录、首次改密与占位首页（`/home`，读取 `GET /api/points`），外壳为 `src/layouts/` 的侧栏与移动端底部 Tab 栏；用户界面与管理后台由 Feature D、E 重建 |
+| 后端 | `backend/` | Go `net/http` 服务。`cmd/server` 组装服务并在启动时校验 `UPSTREAM_CREDENTIAL_*`、`UPSTREAM_*` 出站配置与 `C2C_PRIVATE_DATA_*` 密钥环；`cmd/migrate` 执行迁移 |
+| API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是唯一契约（ADR-0021），定义约 70 个 JSON 接口与 6 个外部模型 API 入口；`x-access` 声明门禁，`x-feature` 标明负责实现的 Feature。`internal/api` 的 `router` 按 access 包裹会话、首次改密与管理员门禁；未实现的路由经 `planned` 注册，保留门禁并返回 `501 {"error":"not_implemented"}`。契约测试逐项对照路由表、门禁、Feature 与实现状态，并用规范 schema 校验每个真实响应。前端类型由它生成为已提交的 `frontend/src/api/schema.gen.ts` |
+| 数据库 | PostgreSQL 18 | 18 张表，见下文“数据与状态” |
+| 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 每个领域一个 `<domain>pg/`（`queries.sql` + sqlc 生成代码 + 领域 Store，ADR-0017）：`identitypg`、`catalogpg`、`settingspg`、`auditpg`、`ledgerpg`；共享事务辅助在 `pgkit`。组合根 `postgres.Store` 以字段持有各领域 Store。跨领域原子提交由调用方持有 `pgx.Tx`（ADR-0020）：创建账户在同一事务内写身份行、用户账本账户与审计；账本过账 `ledgerpg.Post(ctx, tx, …)` 总在调用方事务内执行 |
+| 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 只有一份原地重写的基线 `0001_baseline.sql`（ADR-0024、ADR-0026） |
+| 开发任务 | `mise.toml` | 固定工具版本并提供安装、开发、测试、生成与构建命令 |
+| 容器编排 | `compose.yaml` | 运行 PostgreSQL、一次性迁移、后端与前端 |
+| Web 入口 | `frontend/nginx.conf` | 提供前端静态资源，将 `/api/` 与外部模型 API 路径代理至后端 |
+
+## 后端领域包
+
+| 包 | 职责 |
+| --- | --- |
+| `internal/identity` | 受邀账户、Argon2id 密码、服务器端会话、首次改密、管理员创建/修改/重置账户；不能停用、降级或重置自己，不能移除最后一个启用管理员 |
+| `internal/ledger` | 账本领域：交易类型、系统账户、交易校验（至少两条、非零、账户不重复、合计为 0）、积分概况与账单读取、管理员调账与坏账核销；计价公式 v2（`CalculatePriceV2` 与条件价格档选择） |
+| `internal/catalog` | 模型目录与条件价格档的规范化、校验与部分更新（`ModelPatch`，价格档整组替换） |
+| `internal/settings` | 单行平台设置的校验与更新 |
+| `internal/audit` | 审计日志读取；写入由各领域在自己的事务内调用 `auditpg.Record` |
+| `internal/money` | 九位定点纳积分 `Amount` 与十进制字符串解析/格式化 |
+| `internal/channel` | 目前只保留上游凭据版本化密钥环（ADR-0009）与固定出站策略（HTTPS、DNS/IP 校验、端口白名单、禁用主机、禁止重定向）；渠道领域由 Feature B 在其上重建 |
+| `internal/c2c` | 目前只保留 C2C 私密数据密钥环；卖单与交易由 Feature C 重建 |
+| `internal/secretguard` | 凭据泄露检测辅助 |
 
 ## 当前请求链路
 
-1. 浏览器加载 React 应用；实例初始化后，`/`、`/welcome` 与未知路径都显示不经过登录门禁的公共落地页，页面中的账户 CTA 统一进入 `/login`。
-2. 开发环境由 Vite 将 `/api`、`/v1` 和 `/v1beta` 对应入口代理到本机 Go 服务；Compose 环境由 Nginx 代理到 `backend` 服务。管理链路传递可信代理信息，外部协议链路同时关闭代理缓冲并允许最长 30 分钟的受控流。
-3. 后端只对配置为可信内部代理的来源采信转发头，对非安全方法校验同源 `Origin`，从 Host-only Cookie 验证服务器端会话，并在路由层执行首次改密与管理员权限门禁。
-4. 身份、模型目录、账本、渠道和 C2C 服务通过 PostgreSQL Store 读写状态；业务调用方可以在同一数据库事务中原子提交账本与业务记录，健康检查也验证数据库可用性。
-5. 后端返回 `Cache-Control: no-store` 的 JSON；前端根据会话、首次改密和管理员状态执行对应路由跳转。
-6. 渠道保存、校验和每次平台代理尝试都经过统一出站策略；请求重新解析域名、拒绝受保护地址、固定实际连接地址并保留原始 TLS 主机名，不使用环境代理、连接复用或重定向。
-7. 外部协议入口按自身规定的认证头校验平台 Key，从请求 body 或 Gemini path 取得 canonical 模型；随后在一个 `REPEATABLE READ` 事务中建立 Key、池、候选、费率、凭据版本、价格和可空 hold 快照，提交成功后才访问上游。
-8. 每个候选最多尝试一次。提交点前失败按池优先级回退；首个语义内容或工具事件提交后锁定候选。非流式成功响应与流式成功终止事件都在合法用量和幂等结算完成后才返回。响应形状不参与拒绝：无法计价的成功响应先交付客户端，再以零收费的不完整结算终结。
-9. C2C 市场公开读取只返回订单行情和支付方式类型；交易双方在授权详情中取得支付资料，写命令以幂等键串行改变订单、交易和账本持有，管理员通过独立入口处理争议或受限账户遗留交易。
+1. 浏览器加载 React 应用；`/`、`/welcome` 与未知路径显示公开落地页；实例尚无管理员时前端引导到 `/initialize`。
+2. 开发环境由 Vite、Compose 环境由 Nginx 把 `/api`、`/v1`、`/v1beta` 代理到后端。
+3. 后端中间件链为“写超时 → 安全头 → 同源校验 → mux”；只对可信内部代理采信转发头，对非安全方法校验同源 `Origin`（`/v1`、`/v1beta` 外部入口除外）；路由层执行会话、首次改密与管理员门禁。
+4. 错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`。
+5. 外部模型 API 入口（`POST /v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/{model}`，`GET /v1/models`、`/v1beta/models`）已登记路由，当前返回 501。
 
 ## 数据与状态
 
-当前使用 PostgreSQL 保存以下状态：
+金额一律为 `bigint` 纳积分（1 积分 = 1e9）；人民币为整数分；费率为纳比率（1e9 = 100%）；时间为 `timestamptz`。
 
-- 受邀账户、独立管理员标记、启停状态、首次改密状态、信用额度和管理版本。
-- 只保存 SHA-256 摘要的 24 小时服务器端会话；密码版本变化会使旧会话失效。
-- 模型公开 ID、显示元数据、输入输出模态、能力、状态和四类基准价。
-- 管理员创建/调整账户与维护模型的审计事件。
-- 全局 API 手续费率的追加式不可变版本（`api_fee_rates`，基线默认 0.1%）及其调整审计事件。
-- 每个身份唯一的用户账本账户，以及固定的平台激励账户和平台损失账户。
-- 幂等命令、封存交易、有序不可变分录、资产冻结/消费授权持有及其不可变 capture/release 事件。
-- 渠道生命周期与管理版本、每个模型的共享倍率、各原生协议报价及其版本和逻辑删除快照。
-- 使用版本化密钥标识、随机 nonce、AEAD 密文和渠道/凭据版本绑定信息保存的上游凭据；接口只返回是否配置与更新时间。
-- 每次渠道校验的不可变尝试、分类、HTTP 状态、时延和授权范围内的原始错误。
-- 平台 API Key 的不可逆 SHA-256 摘要、公开前缀、代次、active/disabled/deleted 状态和配置版本；完整 Key 不持久化。
-- 每把 Key 的唯一模型协议池、稳定报价成员和连续优先级，以及调用时的不可变候选、价格、凭据版本、费率和预授权快照。
-- 调用、上游尝试、心跳租约、语义提交标记、四类归一用量、结算结果、终结载荷摘要、恢复状态和真实 TTFT/TPS/成功率/调用量聚合。
-- C2C 卖单、部分成交交易、父单数量投影、幂等命令与不可变状态事件。
-- 使用独立版本化密钥环保存的支付方式详情、付款说明、争议陈述和净化后的收款码图片；终态满 180 天后销毁付款参考与争议陈述正文，保留非敏感审计元数据。
+| 领域 | 表 | 说明 |
+| --- | --- | --- |
+| 身份 | `accounts`、`sessions` | 账户（用户名、显示名、Argon2id 哈希、密码版本、管理员标记、状态、首次改密、信用额度 ≥ 0、默认 Key 创建标记）；会话只存令牌 SHA-256 摘要，密码版本变化、账户停用或删除行即失效 |
+| 审计 | `audit_log` | 操作者、动作、对象、原因、`detail jsonb`、时间；追加写入 |
+| 设置与目录 | `settings`、`models`、`model_price_tiers` | 单行平台设置（seed 默认值）；模型名即主键，四个基准价与可选展示信息；条件价格档最多 16 档 |
+| 渠道（B） | `channels`、`channel_models`、`channel_events` | 上游 Key 密文与 key id、状态（listed/unlisted/suspended）、请求头规则与可空高级项；每个模型的上游名称、倍率、格式与格式测试结果；健康事件 |
+| Key 与路由（B） | `api_keys`、`route_prefs`、`route_pref_channels` | Key 摘要（网关查找）与可逆密文、预算、可用模型、别名；账号级或 Key 级路由（`UNIQUE NULLS NOT DISTINCT`）与手动顺序、取消勾选 |
+| 调用（B/G） | `calls` | 一次调用一行，`id` 即请求 ID；尝试时间线 `jsonb`、四类 token、价格快照、费用与手续费、流式指标、结果分类；不保存正文 |
+| 账本 | `ledger_accounts`、`ledger_transactions`、`ledger_entries` | 用户账本账户（每人一个）与三个系统账户 `platform_revenue`、`c2c_escrow`、`bad_debt`；交易幂等键唯一；分录非零并记录变动后余额 |
+| C2C（C） | `c2c_orders`、`c2c_trades` | 卖单数量恒等式 `total = available + in_trade + sold + closed`、加密收款方式；交易状态与各状态时间 |
 
-所有积分金额和模型基准价在数据库中使用 `BIGINT` 纳积分，即 1 积分等于 1,000,000,000 纳积分；JSON 边界使用十进制字符串，最终结算不依赖浮点数。账户同步保存 `posted_balance`、`asset_reserved` 与 `spend_authorized` 投影，并由不可变事实在事务提交时复算验证。有效信用冻结时为零；信用冻结账户的可操作额度固定为零，其他账户的 `spendable = max(posted + effective_credit - asset_reserved - spend_authorized, 0)`；`credit_used = max(-posted, 0)`，只有已入账负余额超过有效信用才标记超限。
+账本不变量（ADR-0025）：
 
-## 外部依赖
-
-实例生命周期：不存在任何管理员时前端将一切路由重定向到 `/initialize`，由 `POST /api/instance/initialize` 复用既有 bootstrap 事务（advisory lock + 冲突拒绝）创建首个管理员；已初始化实例该端点返回 409。初始化窗口期不做防陌生人抢注的技术屏障（站长负责）。
-
-后端维护循环在启动、每小时和手动触发时执行跨模块巡检并持久化历史：零和与三类投影、成功调用结算链路、C2C 数量与父持有一致性。管理员运营总览按显式 UTC 时间窗口提供统一指标（账本、信用、API 漏斗、消费与收入、C2C、负余额风险与集中度），硬异常带固定下钻。空样本保持空值，不伪造为零或成功。
-
-PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可能产生费用后才访问第三方中转站；消费者使用平台 Key 发起真实调用时，网关会按其模型协议池访问共享者配置的第三方上游。公开市场和普通管理读取不会调用上游。C2C 人民币付款发生在用户选择的外部支付工具中，平台不接入支付机构、不托管人民币，也不根据付款声明自动确认到账。
+- 唯一的 `DEFERRABLE INITIALLY DEFERRED` 约束触发器在提交时要求每笔有分录的交易至少两条分录且合计为 0；`ledger_entries` 与 `ledger_transactions` 由触发器拒绝 UPDATE/DELETE。
+- `ledgerpg.Post` 是唯一过账路径：插入交易（幂等键重复返回已有交易，不重复记账；同键不同类型或关联对象返回冲突）→ 按账本账户 id 升序 `FOR UPDATE` 锁定 → 更新余额 → 写分录与 `balance_after`。余额规则（API 调用“余额 > −信用额度”、C2C“只能卖正余额”）由调用方在同一事务内用 `ledgerpg.Balance`、`ledgerpg.CreditLimit` 检查。
+- 管理员调账以 `platform_revenue` 为对手方；坏账核销把用户全部负余额转入 `bad_debt`。两者均写审计，接受 `Idempotency-Key`。
 
 ## 已实现边界
 
-- 产品以单个中心化实例运行；账户只能由管理员创建（实例尚无管理员时，首个管理员经 `/initialize` 网页 `POST /api/instance/initialize` 创建，初始化后接口返回 409），以规范化后的唯一用户名登录，普通账户与管理员权限独立。
-- 初始凭据只在创建响应中出现一次；首次登录只能访问会话、退出与改密入口，成功改密后所有既有会话被原子撤销并签发新会话。
-- 密码使用 Argon2id 不可逆哈希；会话使用 CSPRNG 不透明令牌，数据库只保存令牌摘要。具体见 [ADR-0007](docs/adr/0007-adopt-invited-identity-and-server-sessions.md)。
-- 管理员可以创建、搜索、停用账户，授予或撤销独立管理员权限并调整信用额度，还可以为其他账户重置密码（生成只展示一次的新初始密码，目标会话全部撤销，具体见 [ADR-0013](docs/adr/0013-adopt-admin-initiated-password-reset.md)）；不能停用或撤销自己，不能移除最后一个启用管理员，也不能重置自己的密码。账户管理写入携带服务端 `version` 并使用乐观并发控制，陈旧弹窗不能重新启用账户或恢复已撤销权限。初始管理员只能在系统尚无任何管理员时创建：网页 `/initialize` 引导（`POST /api/instance/initialize`），在 advisory lock 保护的 bootstrap 事务中创建。
-- 管理员还能通过同一版本比较冻结或恢复账户信用；冻结使有效信用立即为零并阻止新的借记与持有，但已存在的授权或冻结仍可完成或释放。
-- 管理员可以创建、查询、更新、启停模型；普通已改密账户只能读取启用模型。模型公开 ID 支持 `provider/model` 形式，并与内部 UUID 分离。模型写入携带服务端 `version` 并使用乐观并发控制，过期编辑不会覆盖较新的管理员修改。
-- PostgreSQL、Goose 迁移与九位定点纳积分是当前持久化基础，具体见 [ADR-0006](docs/adr/0006-adopt-postgresql-goose-and-fixed-point-amounts.md)。
-- 持久化按领域分包并以 sqlc 生成查询代码：每个领域目录 `internal/postgres/<domain>pg/` 含手写 `queries.sql`、已提交的生成文件与领域 `Store`（事务边界、领域映射、错误映射）；共享的事务辅助在 `pgkit`、审计写入在 `auditpg`。sqlc 以 Goose 迁移目录为 schema，CI 通过 `sqlc diff` 校验生成物与 SQL 一致，并以 `gofmt -l backend` 校验后端格式。当前全部领域（身份、模型目录、费率、账本、渠道、C2C、网关与运营指标）均已迁移（`channelpg` 另导出 `ResolveRoutingTargets` 与 `RoutingEligibility` 供网关持久化在自己的事务内解析报价）；`opspg` 的只读聚合与巡检写入直接 JOIN 账本、调用、渠道与 C2C 表，经注入的 `ledgerpg.Store` 取账本指标快照，窗口为显式 UTC、闲置天数用数据库时钟；sqlc 不推断聚合与子查询的可空性，故可空聚合在 SQL 中以哨兵值加 `has_*` 标志返回、由 Go 还原为空值语义；`internal/postgres` 现仅含组合根（`Store`）与各领域包，`LedgerTransaction` 过渡类型已删除，账本集成测试直接使用 `pgx.Tx` 与 `ledgerpg.NewTx`。网关持久化 `gatewaypg` 自己持有事务：`BeginCall` 使用 `REPEATABLE READ` 快照事务并以保存点创建预授权持有，终结、送达补偿使用 `SERIALIZABLE` 事务，并经 `ledgerpg.NewTx(tx)` 与结算行原子提交；提交确认丢失的测试缝为 `gatewaypg.Store.SetCommitHook`。`c2cpg` 的每条写命令自己开启 `pgx.Tx`（连接池默认隔离级别），以 `ledgerpg.NewTx(tx)` 创建账本服务，C2C 行与账本持有/划转同事务提交，提交错误先经账本错误映射再映射为 C2C 错误；行情最优卖价取自按价格排序的卖单首行，最新成交价单独查询。账本的 `Store` 每个操作自带事务，`Tx` 绑定调用方事务或保存点，锁顺序（按账户 id 升序）与延迟约束语义在两种入口下一致。目录约定见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)。
-- 零和账本已实现：交易必须以至少两条有序非零分录平衡封存，封存后只能用精确冲正纠错；普通用户只能读取本人钱包与分录，管理员可以读取任意用户、激励/损失账户及全局一致性指标，并可执行有明确对手方与原因的调整和坏账转移。浏览器没有通用记账入口。
-- API 消费授权使用可由信用支持的 `spend_authorization`，C2C 卖单冻结使用只由正余额支持的 `asset_reservation`；两者支持部分 capture/release。capture 交易、持有事件、源借记、幂等命令与业务记录共享原子事务。数据库延迟约束复核零和、完整余额链、精确冲正、投影来源、持有状态、capture 关联和幂等命令完成状态。
-- 幂等操作以“操作命名空间 + 键 + 载荷摘要”识别；同载荷永久重放首次结果快照，异载荷冲突。计价公式 v1 使用任意精度整数中间值，四类用量合计后的提供者费用与平台手续费分别向上取整；具体见 [ADR-0008](docs/adr/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)。模型可再配置最多 16 条条件价格档（prompt token 区间与带时区时间窗两类谓词 AND 组合，首个命中生效、整单按档、默认档兜底）：计价公式 v2 在同一取整内核前先按“prompt 侧 token 总量 + 请求开始时刻”选档，无档位模型结果与 v1 逐 nano 一致，`api_calls.formula_version` 区分版本且不改写历史；具体见 [ADR-0012](docs/adr/0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)。
-- 上游凭据使用环境注入的版本化 AES-256-GCM 密钥环加密，密文绑定渠道、凭据版本和密钥 ID；服务启动时验证全部存活凭据可解密，密钥轮换通过管理员批量重加密完成。明文只存在于一次请求所需的进程内对象，不进入 API 投影、日志或历史。具体见 [ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)。
-- 渠道 Base URL 只允许 HTTPS 域名和根前缀，默认只允许 443；保存及每次访问都解析 DNS 并拒绝本机、私有、链路本地、保留、文档、转换和隧道地址。实际连接固定到本次校验通过的地址，禁止环境代理、重定向和连接复用；`api.openai.com` 及其子域永久禁用。
-- 渠道采用草稿、已发布、暂停、已删除状态，报价采用启用、停用、已删除状态。发布要求至少一个当前版本校验通过的启用报价；Base URL 或凭据变化会使全部存活报价校验失效，单个 `upstream_model_id` 变化只使对应报价失效，名称、倍率及渠道或报价启停不会触发安全重验。删除为不可逆逻辑删除，历史报价倍率与校验保留。
-- 报价校验在共享者确认可能产生费用后，向当前 Base URL 发出非流式 `ping` 探测，四种协议的输出上限均为 64 token，总超时 15 秒。该上限用于覆盖推理模型内部 thinking 所需的少量 token，而不是按模型分支探测或接近上下文窗口的用量。
-- 已发布渠道只有在账户启用、无需首次改密、凭据存在且报价当前校验通过时进入市场和路由资格投影。市场以稳定报价为行，支持模型、协议、共享者筛选以及价格排序；游标即使对应报价随后失去资格仍保持确定分页位置。
-- 共享者管理接口可读取自己的 Base URL、上游模型 ID 和授权校验历史；公开市场和管理员通用治理 DTO 不包含完整 Base URL、凭据、上游模型 ID、原始错误或共享者收入。管理员可以通过独立校验历史接口读取原始错误，并能查看、重验及带原因暂停或删除，但不能代替共享者修改商业配置。
-- 模型目录四类基准价与每条条件档四价单项上限均为 100,000 积分/百万 token；配合九位定点 `0～1000` 倍报价倍率，公开价格和后续结算费用保持在金额类型的可表示范围内，Go 领域校验与数据库约束共同拒绝越界写入。
-- 平台 API Key 由服务端生成，只保存摘要、前缀、代次、状态和版本；创建及轮换响应只展示一次完整 Key，旧代次在轮换提交时立即失效。Key 配置、状态、轮换和删除使用 CAS，删除保留历史墓碑。具体见 [ADR-0010](docs/adr/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)。
-- 每个 Key 以 `(canonical model, native protocol)` 唯一标识池，池成员引用稳定报价 ID并使用连续固定优先级。市场详情可以把当前合格报价直接加入兼容池；调用前会再次校验当前资格和加入时的验证版本。
-- 四个外部 POST 入口分别支持 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 的非流式与流式原生格式。网关按原生协议透传请求与响应：只重写同协议模型别名、还原成功元数据、擦除凭据，不做跨协议转换，也不按字段白名单拦截原生形状（`previous_response_id`、`store`、`n`、服务端工具等由上游决定）；Chat 流式额外注入 `include_usage=true` 以取得用量帧。请求头默认全量透传，只剥离凭据、账户作用域、客户端身份与链路、hop-by-hop 和 `Accept-Encoding`；查询串原样合并进供应商 endpoint，只拒绝畸形串与 `key` 参数；压缩由 transport 协商并解压，只有网关解不了的残留编码才拒绝；未知 SSE 字段、重复或空 `event:` 字段、事件名不匹配、非 JSON 的 data 与非 Chat 协议的 `[DONE]` 全部下行，所有协议在终止事件后继续读取至 EOF，尾帧进入受限终端缓冲并执行原有超时与安全检查后交付，上游直接关闭连接（无终止帧、无 `[DONE]`）时已到达的帧（包括仅未知事件或非 JSON data 的流）同样先交付再结算（非 JSON 与无 data 的帧逐字原样转发；JSON 帧会重新序列化为紧凑 JSON，未知 JSON 字段保留，`id:`/`retry:` 与注释行在重新序列化时丢弃）。计费约束只在结算层执行：成功调用必须有可映射到四类 token 的完整用量，未知用量字段被忽略，用量抽取三态区分缺席与非法（键存在但类型或数值非法、数值矛盾、公式无法计价的额外计费维如非零 `server_tool_use`、音频/图片 token、1h 缓存写入、Gemini 非 TEXT 模态），非法状态污染整次调用；无法计价时先交付响应再以不完整结算零收费；Chat 在 `total_tokens` 把 reasoning 单独加总时才把 `reasoning_tokens` 计入输出。具体见 [ADR-0016](docs/adr/0016-decouple-gateway-delivery-from-settlement.md)。
-- 网关代码按协议拆分（Feature #112）：`backend/internal/gateway` 的 `protocolAdapter` 接口（`adapter.go`）封装四种原生协议的差异，Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 各有一个 `adapter_*.go`，实现凭据头、请求改写、模型元数据还原、用量三态抽取、SSE 事件分类与原生错误信封；`proxy.go` 与 `stream.go` 只做候选遍历、提交点、回退、心跳与结算编排，不再按协议分支；SSE 帧与凭据守卫、用量类型、请求/响应头处理和错误处理分别位于 `sse.go`、`usage.go`、`headers.go`、`errors.go`。
-- 调用快照、预授权和业务拒绝在同一个 `REPEATABLE READ` 账本事务内建立；条件档位作为调用级不可变快照（`api_call_price_tiers`）一并固化，预授权上界覆盖默认档与全部条件档的最坏组合，成功调用记录命中的档位序号。非自有成功调用精确捕获最终渠道费用与手续费并释放余量；自有渠道免手续费，名义费用非零时写同账户消费/收入双分录，余额净变化为零。
-- 全局 API 手续费率由管理员通过 `GET/PUT /api/admin/fee-rate` 维护，在运营台「账本与费率」分区查看当前值与历史并设置新值：比率以九位小数十进制字符串传递，范围 0～1（0%～100%）；每次修改在表锁串行化的事务内按期望当前版本 CAS 追加新版本（不更新旧行）并写入统一审计。调用快照读取建立快照时最新的版本，因此修改只影响之后的新调用，历史调用保留各自 `fee_rate_version`/`fee_rate_nano`。
-- 流式提交点按协议语义事件判断，角色、心跳、空增量和 usage 元数据不锁定候选；成功终止事件在结算后才发送，缺少可结算用量的流先交付终止帧再零收费终结。调用、尝试、finalizer 和 orphan 恢复使用行锁、唯一约束、载荷摘要和调用 ID 幂等，禁止重复扣款、收入或释放。
-- 请求和响应正文只在受限进程内内存中处理，不进入数据库、缓存、审计或日志。调用长期保存统计、价格/用量快照、HTTP 状态、错误码和最多 4096 字节的原始错误消息；消费者、相关共享者和管理员使用不同投影读取。
-- 工作台待处理事项（`internal/dashboard`）：`GET /api/dashboard/pending-items` 由独立只读聚合服务按当前账户复用 API Key、渠道与 C2C 三个领域服务计算，不拥有持久化状态；种类为待放行、待付款（只看交易买卖双方身份与状态，与订单方向无关）、校验失败、已暂停、含不可用渠道的路由与单渠道路由，按种类固定排序、不分页，任一来源失败则整体失败。C2C 一项取自 `MyActivity` 的最近 200 笔交易。条目文案、徽标强度与跳转路由由服务端给出，前端只渲染。
-- 用户总览、Key/池、调用记录和渠道页面使用真实调用事实展示消费、收入、渠道健康、成功率、TTFT、TPS 和调用量；工作台额外提供 UTC 当日消费、成功调用和外部渠道收入。API 市场支持按成功率、TTFT 与 TPS 确定性游标排序，无样本保持空值。
-- 管理员共享者收入页按 UTC 窗口列出每个共享者的总收入、外部消费收入、自有调用收入和尝试成功率；投影只含显示名与金额，空样本成功率保持空值。公开渠道详情通过独立页把当前合格报价加入指定 Key 的模型协议池。
-- 人民币在 C2C 双方之间直接流转，平台只冻结和划转积分。
-- C2C 只有卖单（ADR-0023）：发布时创建覆盖总量的 `asset_reservation` 父持有，部分成交只分配父持有数量，取消只释放尚未分配部分；数据库不存在 `side` 列，`parent_hold_id` 为 `NOT NULL`，校验触发器只描述卖单语义（ADR-0024）。订单始终满足 `total = available + allocated + settled + closed`，capture/release 以交易 UUID 作为业务标识并与业务状态在同一事务提交。
-- C2C 写命令以操作、操作者、幂等键和实际净化后的载荷摘要识别；涉及账户先按稳定顺序取得共享 advisory lock，再读取身份、订单、交易和账本持有。付款、取消、精确到期、争议和管理员裁决在锁内竞争，只允许一个合法终态。
-- C2C 公开市场只展示支付方式类型；订单所有者、开放交易对手、交易双方和管理员按各自授权读取最小私密投影。管理员可带必填原因取消挂单可用量，并直接终结 `paid` 或 `disputed` 交易，避免账户停用或信用冻结让既有持有永久滞留。处理 `paid` 或 `disputed` 交易时，管理员还可经同一裁决入口以 `restrict_buyer` / `restrict_seller` 并带必填原因冻结一方信用：在同一事务内按账户 advisory lock、交易行、账本账户行、身份行的顺序将 `credit_frozen` 置真并递增账户版本，写入交易事件 `dispute.<party>_restricted` 与审计 `c2c.dispute.party_restricted`；交易状态、复核期限与持有保持不变，可与延长核实并用，对已冻结账户只记录事件与审计、不再修改账户。被冻结方不能发布或接取 C2C 订单，其已挂出的订单也不能再被他人接取（接取在同一事务内于账户锁之后复核所有者状态；不自动取消挂单、不释放父持有，已有交易不受影响，管理员仍可取消剩余挂单），且与停用或未改密所有者的挂单一样不出现在公开市场与最优卖价中，订单详情以 `takeable` 标明是否可接取；被冻结方仍可处理已有交易；解除冻结走账户管理。当事方信用状态与限制事件只出现在管理员交易响应中。支付资料与陈述的加密、收款码图片净化和清理边界见 [ADR-0011](docs/adr/0011-adopt-c2c-order-trade-hold-state-machine.md)。
+- 账户只能由管理员创建（首个管理员经 `POST /api/instance/initialize`，advisory lock 防并发，已初始化返回 409）；初始密码与重置密码只返回一次；首次登录只能访问 `/api/me`、`/api/me/password` 与退出。
+- 停用账户在同一事务内删除其全部会话；重置密码提升密码版本并删除全部会话（ADR-0013）。移除管理员身份的修改在事务级 advisory lock 下检查剩余启用管理员数。
+- 模型目录写入在 `FOR UPDATE` 锁内合并部分更新并整组替换价格档；创建、修改模型与平台设置均写审计（含修改前后值）。
+- 用户只能读取本人积分与账单；账单按分录 id 倒序游标分页，可按交易类型、Key、时间筛选，`format=csv` 由 Feature G 实现（当前 501）。
+- 上游凭据密钥环与出站策略在启动时校验配置，供 Feature B 使用；C2C 私密数据密钥环同样在启动时校验。
 
 ## 已确认但未实现的目标边界
 
-暂无。新确认的目标约束在实现合并并通过验收前列于此处，不得写入上方“已实现边界”。
+以下由后续 Feature 实现，契约已在 `openapi.yaml` 中定义：
+
+- Feature B：透明网关（换鉴权、可选换 UA 与请求头规则、字节级替换顶层 `model`、OpenAI Chat 流式补 `include_usage`）、按格式选渠道、按用户按模型路由、无预扣的事后一次记账、渠道发现与格式测试、API Key 可逆加密与预算、首页、管理员渠道治理。
+- Feature C：C2C 卖单、托管账户过账、部分成交、付款超时、申诉与仲裁。
+- Feature G：调用与用量查询、SSE 实时流、渠道统计、Prometheus 指标、管理员概览与积分全局、账本交易浏览与调用修复、积分走势与 CSV 导出。
 
 ## 架构原则
 
 - 以当前源码和有效配置为事实依据，文档不得超前描述尚未实现的能力。
-- 在产品边界明确前保持结构简单，避免提前引入无法证明必要性的组件。
-- 影响系统边界、数据模型、部署方式、安全模型或长期维护成本的重要决定，应写入 `docs/adr/`。
-- 架构变化必须同步更新本文档；只记录历史背景但不再代表现状的内容保留在 ADR 中。
+- 影响系统边界、数据模型、部署方式、安全模型或长期维护成本的重要决定，写入 `docs/adr/`。
+- 架构变化必须同步更新本文档；只记录历史背景的内容保留在 ADR 中。
 
 ## 尚待确定
 
-- 最后一名（或唯一）启用管理员遗忘密码时的凭据恢复流程；管理员可以为其他账户重置密码，但不能重置自己（见 [ADR-0013](docs/adr/0013-adopt-admin-initiated-password-reset.md)）。
-- 生产数据库连接池容量与高可用策略；加密备份与隔离恢复演练已实现，见 [备份与恢复 Runbook](docs/runbooks/backup-restore.md)。
-- 备份、恢复、容量、延迟、可用性和告警的数值目标。
-- 首批真实渠道、模型、客户端、并发和调用量基线。
+- 最后一名启用管理员遗忘密码时的凭据恢复流程（ADR-0013）。
+- 生产数据库连接池容量与高可用策略；备份、恢复、容量、延迟、可用性和告警的数值目标。

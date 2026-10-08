@@ -41,12 +41,12 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 ## 当前工程组成
 
 - 前端：React 19、TypeScript、Vite、React Router 与 TanStack Query。
-- 后端：Go HTTP 服务、受邀账户、模型目录、零和账本、渠道安全托管、API 市场、平台 API 网关、调用结算、C2C 状态机与管理员治理 API。
+- 后端：Go HTTP 服务；当前实现受邀账户与会话、零和账本核心、模型目录与条件价格档、平台设置、审计与用户积分接口。
 - 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
 - 本地工具链：mise。
-- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与四类外部协议请求，迁移完成后再启动后端。
+- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
 
-管理员运营总览提供 UTC 时间窗口的统一指标、硬异常下钻、跨模块巡检历史；发布准备包含 `mise run check-release` 门禁、CI、加密备份与隔离恢复演练，操作手册见 `docs/runbooks/`。当前可运行能力包括作为首页的公开 SaaS 落地页（`/`，`/welcome` 与未知路径同样显示）、未初始化实例的 `/initialize` 网页引导、受邀登录与改密、账户和模型目录管理、真实钱包与管理员账本运营。已改密用户可以托管和校验自己的渠道，在公开市场按价格、成功率、TTFT 或 TPS 选择报价；也可以创建或轮换只显示一次的多把平台 API Key，为每把 Key 配置模型协议池与固定优先级，通过 Chat Completions、Responses、Anthropic Messages 或 Gemini GenerateContent 原生入口调用。平台在调用前建立快照和预授权，提交点前顺序回退，成功后精确结算；总览、调用记录和渠道页使用真实调用指标。C2C 市场支持固定价格卖单、部分成交、多种支付方式、文字付款声明、争议和管理员裁决；卖单积分由账本父持有担保。
+产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、C2C 与观测接口当前返回 `501 not_implemented`，前端只保留公开落地页、`/initialize` 实例初始化、登录、首次改密与占位首页。进度见 `PRODUCT.md`。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 
@@ -70,7 +70,7 @@ mise run install
 mise run dev-database
 ```
 
-迁移已压缩为单一基线 `0001_baseline.sql`（ADR-0024）。更早创建的开发数据库与它不兼容，须先用 `docker compose down -v` 删除数据卷再重新启动。
+迁移只有一份基线 `0001_baseline.sql`，产品重写时已原地重写（ADR-0024、ADR-0026）。更早创建的开发数据库与它不兼容，须先用 `docker compose down -v` 删除数据卷再重新启动。
 
 首次运行时，启动后端与前端后访问 `/initialize`，在网页上创建唯一的初始管理员。
 
@@ -84,9 +84,9 @@ export C2C_PRIVATE_DATA_ACTIVE_KEY_ID='v1'
 mise run dev-backend
 ```
 
-`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须在完成重加密前继续保留；密钥环和数据库备份必须配套保存，不能每次启动临时生成。多副本轮换时，先让全部副本同时持有完整的新旧密钥环并统一使用新的活动密钥 ID，确认没有仍以旧密钥写入的副本后，才能调用管理员重加密。管理员从同源已认证会话调用 `POST /api/admin/channel-credentials/reencrypt`，请求体为 `{"limit": 100}`；`limit` 必须为 1～1000。按批次重复调用，直到响应 `{"reencrypted": 0}`，再确认数据库库存不再引用旧 key ID 且全部副本都使用新配置，最后才移除旧密钥。无法保证这个顺序时应暂停凭据写入和重加密，而不是混合运行。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，额外禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 追加。`api.openai.com` 及其子域永久禁用，不能通过配置解除。
+`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留；密钥环和数据库备份必须配套保存，不能每次启动临时生成。服务启动时校验密钥环格式；重写后的渠道与平台 API Key 使用它加密（Feature B）。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，额外禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 追加。`api.openai.com` 及其子域永久禁用，不能通过配置解除。
 
-`C2C_PRIVATE_DATA_KEYRING` 采用相同的 `key-id=base64-key` 语法，但必须使用与上游凭据不同的密钥，保护收款方式详情、联系方式、付款说明、争议陈述和净化后的收款码图片。服务启动会验证全部存活私密数据可由当前密钥环解密；新的活动密钥只影响后续写入，当前尚无批量重加密入口，因此任何仍被库存引用的旧密钥都必须保留。终态满 180 天后会清理付款参考与争议陈述。该密钥环同样必须与数据库备份配套保存，不得每次启动临时生成。
+`C2C_PRIVATE_DATA_KEYRING` 采用相同的 `key-id=base64-key` 语法，但必须使用与上游凭据不同的密钥，用于加密 C2C 收款方式文字（Feature C）。服务启动时校验密钥环格式；任何仍被库存引用的旧密钥都必须保留。该密钥环同样必须与数据库备份配套保存，不得每次启动临时生成。
 
 在另一个终端启动前端：
 
@@ -96,7 +96,7 @@ mise run dev-frontend
 
 前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。后端改用其他端口（`PORT`）时，可用 `AIHUB_BACKEND_ORIGIN=http://127.0.0.1:<端口>` 覆盖 Vite 的代理目标。
 
-平台代理入口只接受各协议规定的认证头：OpenAI 风格使用 `Authorization: Bearer <平台 Key>`，Anthropic 使用 `x-api-key`，Gemini 使用 `x-goog-api-key`。客户端必须提交模型目录中的 canonical model ID；平台不做跨协议转换。请求上限为 32 MiB，非流式调用最长 10 分钟，流式调用最长 30 分钟。
+外部模型 API 入口（OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini）由 Feature B 重新实现，当前返回 `501 not_implemented`。
 
 本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
 

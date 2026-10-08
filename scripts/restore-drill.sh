@@ -11,7 +11,7 @@
 #   3. 清除恢复出来的旧会话（备份中的会话不得复活）
 #   4. 运行迁移到最新版本
 #   5. 用生产同款后端二进制对隔离库做启动自检：上游凭据与 C2C 私密数据可解密、
-#      跨模块巡检（零和/投影/调用结算/C2C 一致性）全部通过
+#      账本核对（余额合计为 0、余额与分录一致）通过
 #   6. 输出演练结论并清理容器
 set -euo pipefail
 
@@ -71,12 +71,12 @@ for _ in $(seq 1 20); do
 done
 if [ -z "$health" ]; then echo "恢复后的后端未能在隔离环境启动（很可能是密钥环缺失或密文损坏）" >&2; exit 1; fi
 
-inspection="$(docker exec "$container" psql -U drill -d drill -tAc \
-  "SELECT zero_sum_ok AND projection_ok AND call_settlement_ok AND c2c_consistency_ok FROM ops_inspections ORDER BY checked_at DESC LIMIT 1")"
-if [ "$inspection" != "t" ]; then
-  echo "恢复后的跨模块巡检未通过（零和/投影/调用结算/C2C 一致性存在差异）" >&2
+ledger_check="$(docker exec "$container" psql -U drill -d drill -tAc \
+  "SELECT coalesce(sum(a.balance_nano), 0) = 0 AND bool_and(a.balance_nano = coalesce(e.total, 0)) FROM ledger_accounts a LEFT JOIN (SELECT ledger_account_id, sum(amount_nano) AS total FROM ledger_entries GROUP BY ledger_account_id) e ON e.ledger_account_id = a.id")"
+if [ "$ledger_check" != "t" ]; then
+  echo "恢复后的账本核对未通过（余额合计不为 0 或余额与分录不一致）" >&2
   exit 1
 fi
 
 lsof -ti ":$backend_port" | xargs kill 2>/dev/null || true
-echo "恢复演练通过：清单哈希校验、数据恢复、旧会话清除、迁移、凭据可解密与跨模块巡检全部成功。"
+echo "恢复演练通过：清单哈希校验、数据恢复、旧会话清除、迁移、后端启动与账本核对全部成功。"

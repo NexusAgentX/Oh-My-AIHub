@@ -39,10 +39,10 @@
 - [ADR-0005：采用中心化零和复式账本作为积分清算核心](0005-adopt-centralized-zero-sum-ledger.md) — 已通过
 - [ADR-0006：采用 PostgreSQL、Goose 与九位定点金额](0006-adopt-postgresql-goose-and-fixed-point-amounts.md) — 已通过
 - [ADR-0007：采用受邀身份与服务器端 Cookie 会话](0007-adopt-invited-identity-and-server-sessions.md) — 已通过
-- [ADR-0008：采用不可变账本、双持有投影与计价公式 v1](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) — 已通过
+- [ADR-0008：采用不可变账本、双持有投影与计价公式 v1](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) — 已通过（持有部分由 ADR-0025 取代）
 - [ADR-0009：采用版本化凭据加密与固定出站网络边界](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) — 已通过
 - [ADR-0010：采用快照化 API 网关与幂等终结状态机](0010-adopt-snapshot-gateway-and-idempotent-settlement.md) — 已通过
-- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过（证据图片部分被 ADR-0018 取代，买单部分被 ADR-0023 取代）
+- [ADR-0011：采用 C2C 父子持有与订单交易状态机](0011-adopt-c2c-order-trade-hold-state-machine.md) — 已通过（证据图片部分被 ADR-0018 取代，买单部分被 ADR-0023 取代，持有部分被 ADR-0025 取代）
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md) — 已通过
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md) — 已通过
 - [ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行](0014-adopt-native-passthrough-gateway.md) — 已通过
@@ -55,4 +55,6 @@
 - [ADR-0021：以 OpenAPI 作为前后端唯一契约来源](0021-openapi-as-single-api-contract.md) — 已通过
 - [ADR-0022：取消用户验证环节](0022-drop-user-validation-stage.md) — 已通过
 - [ADR-0023：删除 C2C 买单，只保留卖单](0023-remove-c2c-buy-orders.md) — 已通过
-- [ADR-0024：数据库迁移压缩为单一基线](0024-squash-migrations-to-single-baseline.md) — 已通过
+- [ADR-0024：数据库迁移压缩为单一基线](0024-squash-migrations-to-single-baseline.md) — 已通过（由 ADR-0026 补充）
+- [ADR-0025：账本去冻结与 C2C 托管账户](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md) — 已通过
+- [ADR-0026：产品重写时原地重写基线迁移](0026-rewrite-baseline-migration-in-place.md) — 已通过

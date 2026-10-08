@@ -2,6 +2,8 @@
 
 适用范围：首版受邀小圈子实例的单机部署。内容由 Feature #22 交付并随实现演进。
 
+> 重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）：Feature #171 已删除 `/admin/ops` 运营台与巡检历史；管理员概览与实时账本核对由 Feature G 重建，本手册中相关步骤在此之前不可用，由 Feature F 统一改写。
+
 ## 前置条件
 
 - Docker 与 Docker Compose。
