@@ -19,6 +19,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalogsync"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -123,6 +124,8 @@ func main() {
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)
 	backgroundContext, stopBackground := context.WithCancel(context.Background())
 	defer stopBackground()
+	catalogSyncService := catalogsync.NewService(store.Catalog, backgroundContext)
+	go catalogSyncService.Run(backgroundContext)
 	go runC2CExpiry(backgroundContext, c2cService)
 
 	observeService := observe.NewService(store.Observe)
@@ -143,12 +146,13 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			Identity: identityService,
-			Catalog:  catalogService,
-			Ledger:   ledger.NewService(store.Ledger),
-			Settings: settingsService,
-			Audit:    audit.NewService(store.Audit),
-			Keys:     apikey.NewService(store.Keys, credentialKeyring, modelIDs),
+			Identity:    identityService,
+			Catalog:     catalogService,
+			CatalogSync: catalogSyncService,
+			Ledger:      ledger.NewService(store.Ledger),
+			Settings:    settingsService,
+			Audit:       audit.NewService(store.Audit),
+			Keys:        apikey.NewService(store.Keys, credentialKeyring, modelIDs),
 			Channels: channel.NewService(channel.Dependencies{
 				Store: store.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
 				BlockedHosts: func(ctx context.Context) ([]string, error) {

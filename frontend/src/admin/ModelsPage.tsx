@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { CatalogSync, SourceDetails } from './CatalogSync'
 import { errorMessage } from '../api/query'
 import {
   Badge,
@@ -67,6 +68,7 @@ function ModelEditor({
   onDone: () => void
 }) {
   const creating = model === null
+ const [syncing, setSyncing] = useState(model?.source?.sync_enabled ?? false)
   const [form, setForm] = useState<ModelForm>(() => (model ? modelToForm(model) : emptyModelForm()))
   const [errors, setErrors] = useState<ModelErrors>({})
   const save = useSaveModel()
@@ -80,13 +82,14 @@ function ModelEditor({
     save.mutate(
       creating
         ? { mode: 'create', body: formToCreateRequest(form) }
-        : { mode: 'update', id: model.id, body: formToUpdateRequest(form) },
+        : { mode: 'update', id: model.id, body: model.source && syncing ? { enabled: form.enabled, sort_order: Number(form.sortOrder), parameter_info: form.parameterInfo, sync_enabled: true } : { ...formToUpdateRequest(form), ...(model.source ? { sync_enabled: false } : {}) } },
       { onSuccess: onDone },
     )
   }
 
   return (
     <form className="stack-form" id="model-form" noValidate onSubmit={submit}>
+      {model?.source && <SourceDetails model={model} syncing={syncing} onChange={setSyncing} />}
       <TextField
         disabled={!creating}
         error={errors.id}
@@ -95,6 +98,7 @@ function ModelEditor({
         onChange={(event) => set({ id: event.target.value })}
         value={form.id}
       />
+      <fieldset disabled={syncing} className="stack-form" style={{ border: 0, padding: 0, margin: 0 }}>
       <TextField
         error={errors.displayName}
         label="显示名"
@@ -107,6 +111,7 @@ function ModelEditor({
         onChange={(prices) => set({ prices })}
         prices={form.prices}
       />
+      </fieldset>
       <div className="field-row">
         <TextField
           error={errors.sortOrder}
@@ -118,6 +123,7 @@ function ModelEditor({
         />
         <Checkbox
           checked={form.enabled}
+          disabled={syncing && model?.source?.price_ready === false}
           className="field-checkbox"
           label="启用"
           onChange={(event) => set({ enabled: event.target.checked })}
@@ -125,6 +131,7 @@ function ModelEditor({
       </div>
       <Collapsible changed={changedModelAdvanced(form)} title="高级设置">
         <div className="stack-form">
+          <fieldset disabled={syncing} className="stack-form" style={{ border: 0, padding: 0, margin: 0 }}>
           <div className="field-row">
             <TextField label="提供方" onChange={(event) => set({ provider: event.target.value })} value={form.provider} />
             <TextField
@@ -155,6 +162,7 @@ function ModelEditor({
             />
             <Checkbox checked={form.supportsVision} label="视觉" onChange={(event) => set({ supportsVision: event.target.checked })} />
           </fieldset>
+          </fieldset>
           <TextareaField
             error={errors.parameterInfo}
             label="模型备注"
@@ -166,7 +174,7 @@ function ModelEditor({
         </div>
       </Collapsible>
       <Collapsible badge={form.tiers.length > 0 ? `${form.tiers.length} 档` : undefined} defaultOpen={form.tiers.length > 0} title="条件价格档">
-        <TierEditor basePrices={form.prices} onChange={(tiers) => set({ tiers })} tiers={form.tiers} />
+        <fieldset disabled={syncing} style={{ border: 0, padding: 0, margin: 0 }}><TierEditor basePrices={form.prices} onChange={(tiers) => set({ tiers })} tiers={form.tiers} /></fieldset>
         <InlineError>{errors.tiers}</InlineError>
       </Collapsible>
       <InlineError>{save.isError ? errorMessage(save.error, '保存失败，请重试') : ''}</InlineError>
@@ -192,15 +200,16 @@ const columns: Column<AdminModel>[] = [
       </>
     ),
   },
+  { key: 'source', header: '来源', cell: (model) => !model.source ? '手工' : !model.source.sync_enabled ? '已退出同步' : model.source.status === 'waiting_rate' ? '待汇率' : model.source.status === 'needs_review' ? '需人工处理' : model.source.status === 'missing' ? '来源缺失' : '自动同步' },
   {
     key: 'enabled',
     header: '状态',
     cell: (model) => <Badge tone={model.enabled ? 'success' : 'neutral'}>{model.enabled ? '启用' : '停用'}</Badge>,
   },
-  { key: 'input', header: '输入', numeric: true, cell: (model) => model.base_prices.input },
-  { key: 'output', header: '输出', numeric: true, cell: (model) => model.base_prices.output },
-  { key: 'cache_read', header: '缓存读', numeric: true, cell: (model) => model.base_prices.cache_read },
-  { key: 'cache_write', header: '缓存写', numeric: true, cell: (model) => model.base_prices.cache_write },
+  { key: 'input', header: '输入', numeric: true, cell: (model) => model.source?.price_ready === false ? '待配置' : model.base_prices.input },
+  { key: 'output', header: '输出', numeric: true, cell: (model) => model.source?.price_ready === false ? '待配置' : model.base_prices.output },
+  { key: 'cache_read', header: '缓存读', numeric: true, cell: (model) => model.source?.price_ready === false ? '待配置' : model.base_prices.cache_read },
+  { key: 'cache_write', header: '缓存写', numeric: true, cell: (model) => model.source?.price_ready === false ? '待配置' : model.base_prices.cache_write },
   {
     key: 'tiers',
     header: '价格档',
@@ -211,7 +220,11 @@ const columns: Column<AdminModel>[] = [
 
 export function ModelsPage() {
   const models = useAdminModels()
+ const [search, setSearch] = useState('')
+ const [page, setPage] = useState(0)
+ const filtered = (models.data?.items ?? []).filter(m => [m.id,m.display_name,m.provider,m.source?.key ?? ''].join(' ').toLowerCase().includes(search.toLowerCase())).sort((a,b) => a.sort_order-b.sort_order || a.id.localeCompare(b.id))
   const remove = useDeleteModel()
+  useEffect(() => { setPage(current => Math.min(current, Math.max(0, Math.ceil(filtered.length / 50) - 1))) }, [filtered.length])
   const [deleting, setDeleting] = useState<AdminModel | null>(null)
   const [editing, setEditing] = useState<AdminModel | 'new' | null>(null)
   const close = () => setEditing(null)
@@ -225,9 +238,12 @@ export function ModelsPage() {
         }
         title="模型"
       />
+      <CatalogSync />
+      <TextField label="查找模型" value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} />
+      <p className="muted-copy">{filtered.length} 个模型 · 第 {page + 1} 页</p>
       <Card flush>
         <QueryBoundary query={models}>
-          {(data) => (
+          {() => (
             <DataTable
               caption="模型目录"
               columns={[
@@ -245,16 +261,17 @@ export function ModelsPage() {
               ]}
               empty={<p className="muted-copy empty-pad">还没有模型</p>}
               rowKey={(model) => model.id}
-              rows={[...data.items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))}
+              rows={filtered.slice(page * 50, (page + 1) * 50)}
             />
           )}
         </QueryBoundary>
       </Card>
+      <div className="form-actions"><Button type="button" variant="secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</Button><Button type="button" variant="secondary" disabled={(page + 1) * 50 >= filtered.length} onClick={() => setPage(page + 1)}>下一页</Button></div>
       <ConfirmDialog
         busy={remove.isPending}
         confirmLabel="删除"
         danger
-        description="将删除模型、条件价格档及路由偏好，历史调用和账单保留。此操作不可撤销。"
+        description="将删除模型、条件价格档及路由偏好，历史调用和账单保留。同步模型会保留忽略记录，后续同步不会重新创建。此操作不可撤销。"
         error={remove.isError ? errorMessage(remove.error, '删除失败，请重试') : ''}
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}

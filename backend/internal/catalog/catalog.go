@@ -40,6 +40,7 @@ var serviceTierPattern = regexp.MustCompile(`^(openai|anthropic|gemini):[A-Za-z0
 var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type Model struct {
+	Source                   *SourceInfo
 	ID                       string
 	DisplayName              string
 	InputPrice               money.Amount
@@ -73,6 +74,7 @@ func (m Model) BasePrices() ledger.Prices {
 
 // ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
 type ModelPatch struct {
+	SyncEnabled              *bool
 	DisplayName              *string
 	InputPrice               *money.Amount
 	OutputPrice              *money.Amount
@@ -98,6 +100,13 @@ func (p ModelPatch) empty() bool {
 
 // Apply returns the model with the patch applied.
 func (p ModelPatch) Apply(model Model) Model {
+	if model.Source != nil {
+		copy := *model.Source
+		model.Source = &copy
+		if p.SyncEnabled != nil {
+			model.Source.SyncEnabled = *p.SyncEnabled
+		}
+	}
 	set := func(target *string, value *string) {
 		if value != nil {
 			*target = *value
@@ -114,6 +123,9 @@ func (p ModelPatch) Apply(model Model) Model {
 		}
 	}
 	set(&model.DisplayName, p.DisplayName)
+	if model.Source != nil && !model.Source.SyncEnabled && p.InputPrice != nil {
+		model.Source.PriceReady = true
+	}
 	setAmount(&model.InputPrice, p.InputPrice)
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)

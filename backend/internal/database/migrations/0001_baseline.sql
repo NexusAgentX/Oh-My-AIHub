@@ -106,6 +106,27 @@ CREATE TABLE models (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Source records deliberately survive model deletion (ignored tombstones).
+CREATE TABLE model_sources (
+ source_key text PRIMARY KEY,
+ model_id text NOT NULL UNIQUE,
+ ignored boolean NOT NULL DEFAULT false,
+ sync_enabled boolean NOT NULL DEFAULT true,
+ raw_record jsonb NOT NULL,
+ info jsonb NOT NULL,
+ seen_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE catalog_sync (
+ id boolean PRIMARY KEY DEFAULT true CHECK(id),
+ exchange_rate text NOT NULL DEFAULT '',
+ started_at timestamptz,
+ finished_at timestamptz,
+ status text NOT NULL DEFAULT 'idle',
+ error text NOT NULL DEFAULT '',
+ result jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+INSERT INTO catalog_sync(id) VALUES(true);
+
 CREATE INDEX models_enabled_order_idx ON models(enabled, sort_order, id);
 
 -- 条件价格档（ADR-0012）：输入侧 token 区间 × 带时区每周时间窗，按 seq 首个命中整单生效。
@@ -486,6 +507,8 @@ DROP TABLE api_keys;
 DROP TABLE channel_events;
 DROP TABLE channel_models;
 DROP TABLE channels;
+DROP TABLE model_sources;
+DROP TABLE catalog_sync;
 DROP TABLE model_price_tiers;
 DROP TABLE models;
 DROP TABLE settings;

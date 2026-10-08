@@ -818,6 +818,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/catalog-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bifrost 模型同步 */
+        get: operations["getCatalogSync"];
+        /** Bifrost 模型同步 */
+        put: operations["setCatalogSyncRate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/catalog-sync/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bifrost 模型同步 */
+        post: operations["runCatalogSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/models/{modelID}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bifrost 模型同步 */
+        get: operations["getModelSource"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/models": {
         parameters: {
             query?: never;
@@ -1553,7 +1605,43 @@ export interface components {
             end_minute_of_day?: number | null;
             prices: components["schemas"]["ModelPrices"];
         };
+        ModelSource: {
+            key: string;
+            sync_enabled: boolean;
+            status: string;
+            problems: string[];
+            warnings: string[];
+            metadata: {
+                [key: string]: unknown;
+            };
+            last_seen_at: string;
+            last_applied_at: string | null;
+            applied_rate: string;
+            price_ready: boolean;
+        } | null;
+        CatalogSyncRate: {
+            exchange_rate: string;
+        };
+        CatalogSyncStatus: {
+            exchange_rate: string;
+            started_at: string | null;
+            finished_at: string | null;
+            status: string;
+            error: string;
+            result: {
+                [key: string]: number;
+            };
+        };
+        CatalogSyncAccepted: {
+            accepted: boolean;
+        };
+        ModelSourceRecord: {
+            record: {
+                [key: string]: unknown;
+            };
+        };
         AdminModel: {
+            source?: components["schemas"]["ModelSource"];
             id: string;
             display_name: string;
             base_prices: components["schemas"]["ModelPrices"];
@@ -1595,6 +1683,7 @@ export interface components {
             parameter_info?: string;
         };
         ModelUpdateRequest: {
+            sync_enabled?: boolean;
             display_name?: string;
             base_prices?: components["schemas"]["ModelPrices"];
             /** @description 提供时整组替换价格档；空数组表示删除全部档位。 */
@@ -4407,6 +4496,100 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getCatalogSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSyncStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setCatalogSyncRate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogSyncRate"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSyncStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    runCatalogSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSyncAccepted"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getModelSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelSourceRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listAdminModels: {

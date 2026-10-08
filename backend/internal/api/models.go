@@ -53,6 +53,7 @@ type priceTierRequest struct {
 }
 
 type modelRequest struct {
+	SyncEnabled              *bool               `json:"sync_enabled"`
 	ID                       *string             `json:"id"`
 	DisplayName              *string             `json:"display_name"`
 	BasePrices               *pricesRequest      `json:"base_prices"`
@@ -121,6 +122,7 @@ func parsePriceTiers(requests []priceTierRequest) ([]ledger.PriceTier, error) {
 // patch converts the request into a catalog patch; base prices are replaced as a set.
 func (request modelRequest) patch() (catalog.ModelPatch, error) {
 	patch := catalog.ModelPatch{
+		SyncEnabled: request.SyncEnabled,
 		DisplayName: request.DisplayName, Enabled: request.Enabled, SortOrder: request.SortOrder,
 		Provider: request.Provider, InputModalities: request.InputModalities, OutputModalities: request.OutputModalities,
 		SupportsTools: request.SupportsTools, SupportsStructuredOutput: request.SupportsStructuredOutput,
@@ -185,7 +187,7 @@ func adminModelResponse(model catalog.Model) map[string]any {
 		tiers = append(tiers, priceTierResponse(index+1, tier))
 	}
 	return map[string]any{
-		"id": model.ID, "display_name": model.DisplayName,
+		"id": model.ID, "display_name": model.DisplayName, "source": model.Source,
 		"base_prices": pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
 		"price_tiers": tiers, "enabled": model.Enabled, "sort_order": model.SortOrder,
 		"provider": model.Provider, "context_window": model.ContextWindow,
@@ -266,6 +268,10 @@ func (a *app) deleteAdminModel(w http.ResponseWriter, r *http.Request) {
 
 // registerAdminModelRoutes 注册管理员模型目录路由。
 func (a *app) registerAdminModelRoutes(r *router) {
+	r.admin("GET /api/admin/catalog-sync", a.catalogSyncStatus)
+	r.admin("PUT /api/admin/catalog-sync", a.catalogSyncRate)
+	r.admin("POST /api/admin/catalog-sync/run", a.triggerCatalogSync)
+	r.admin("GET /api/admin/models/{modelID}/source", a.catalogSourceRaw)
 	r.admin("GET /api/admin/models", a.listAdminModels)
 	r.admin("POST /api/admin/models", a.createAdminModel)
 	r.admin("PATCH /api/admin/models/{modelID}", a.updateAdminModel)
