@@ -7,30 +7,105 @@ package auditpg
 
 import (
 	"context"
+	"time"
 )
 
-const insertAuditEvent = `-- name: InsertAuditEvent :exec
-INSERT INTO audit_events (actor_account_id, action, target_type, target_id, reason, details)
+const insertAudit = `-- name: InsertAudit :exec
+INSERT INTO audit_log (actor_id, action, target_type, target_id, reason, detail)
 VALUES ($1, $2, $3, $4, $5, $6)
 `
 
-type InsertAuditEventParams struct {
-	ActorAccountID *string
-	Action         string
-	TargetType     string
-	TargetID       string
-	Reason         string
-	Details        []byte
+type InsertAuditParams struct {
+	ActorID    *string
+	Action     string
+	TargetType string
+	TargetID   string
+	Reason     string
+	Detail     []byte
 }
 
-func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) error {
-	_, err := q.db.Exec(ctx, insertAuditEvent,
-		arg.ActorAccountID,
+func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error {
+	_, err := q.db.Exec(ctx, insertAudit,
+		arg.ActorID,
 		arg.Action,
 		arg.TargetType,
 		arg.TargetID,
 		arg.Reason,
-		arg.Details,
+		arg.Detail,
 	)
 	return err
+}
+
+const listAudit = `-- name: ListAudit :many
+SELECT l.id, l.actor_id, a.username AS actor_username, a.display_name AS actor_display_name,
+       l.action, l.target_type, l.target_id, l.reason, l.detail, l.created_at
+FROM audit_log l
+LEFT JOIN accounts a ON a.id = l.actor_id
+WHERE ($1::text = '' OR l.action = $1)
+  AND ($2::text = '' OR l.target_type = $2)
+  AND ($3::text = '' OR l.target_id = $3)
+  AND ($4::text = '' OR l.actor_id::text = $4)
+  AND ($5::bigint = 0 OR l.id < $5)
+ORDER BY l.id DESC
+LIMIT $6
+`
+
+type ListAuditParams struct {
+	Action     string
+	TargetType string
+	TargetID   string
+	ActorID    string
+	BeforeID   int64
+	RowLimit   int32
+}
+
+type ListAuditRow struct {
+	ID               int64
+	ActorID          *string
+	ActorUsername    *string
+	ActorDisplayName *string
+	Action           string
+	TargetType       string
+	TargetID         string
+	Reason           string
+	Detail           []byte
+	CreatedAt        time.Time
+}
+
+func (q *Queries) ListAudit(ctx context.Context, arg ListAuditParams) ([]ListAuditRow, error) {
+	rows, err := q.db.Query(ctx, listAudit,
+		arg.Action,
+		arg.TargetType,
+		arg.TargetID,
+		arg.ActorID,
+		arg.BeforeID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAuditRow
+	for rows.Next() {
+		var i ListAuditRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ActorID,
+			&i.ActorUsername,
+			&i.ActorDisplayName,
+			&i.Action,
+			&i.TargetType,
+			&i.TargetID,
+			&i.Reason,
+			&i.Detail,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

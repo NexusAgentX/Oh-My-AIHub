@@ -47,7 +47,7 @@ func NewOutboundPolicy(allowedPorts, additionalBlockedHosts []string) (*Outbound
 
 func NewOutboundPolicyWithResolver(allowedPorts, additionalBlockedHosts []string, resolver Resolver) (*OutboundPolicy, error) {
 	if resolver == nil {
-		return nil, errorsNewConfiguration()
+		return nil, errors.New("outbound resolver is required")
 	}
 	ports := map[string]struct{}{"443": {}}
 	for _, value := range allowedPorts {
@@ -294,20 +294,20 @@ func unsafeAddress(address netip.Addr) bool {
 	return false
 }
 
-func (p *OutboundPolicy) Endpoint(baseURL string, protocol Protocol, upstreamModelID string, stream bool) (*url.URL, error) {
+func (p *OutboundPolicy) Endpoint(baseURL string, format Format, upstreamModelID string, stream bool) (*url.URL, error) {
 	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, ErrInvalidInput
 	}
 	var suffix string
-	switch protocol {
-	case ProtocolOpenAIChat:
+	switch format {
+	case FormatOpenAIChat:
 		suffix = "/v1/chat/completions"
-	case ProtocolOpenAIResponse:
+	case FormatOpenAIResponses:
 		suffix = "/v1/responses"
-	case ProtocolAnthropic:
+	case FormatAnthropic:
 		suffix = "/v1/messages"
-	case ProtocolGemini:
+	case FormatGemini:
 		operation := ":generateContent"
 		if stream {
 			operation = ":streamGenerateContent"
@@ -383,12 +383,12 @@ func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string
 	}, nil
 }
 
-func ApplyAuthentication(request *http.Request, protocol Protocol, credential string) {
-	switch protocol {
-	case ProtocolAnthropic:
+func ApplyAuthentication(request *http.Request, format Format, credential string) {
+	switch format {
+	case FormatAnthropic:
 		request.Header.Set("x-api-key", credential)
 		request.Header.Set("anthropic-version", "2023-06-01")
-	case ProtocolGemini:
+	case FormatGemini:
 		request.Header.Set("x-goog-api-key", credential)
 	default:
 		request.Header.Set("Authorization", "Bearer "+credential)

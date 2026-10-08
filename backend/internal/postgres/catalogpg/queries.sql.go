@@ -11,149 +11,128 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-const createModel = `-- name: CreateModel :one
-INSERT INTO models (
-	id, name, provider, context_window, parameter_info,
-	input_modalities, output_modalities, supports_tools,
-	supports_structured_output, supports_vision,
-	input_price_nano_per_million, output_price_nano_per_million,
-	cache_write_price_nano_per_million, cache_read_price_nano_per_million,
-	status
-) VALUES (
-	$1, $2, $3, $4, $5,
-	$6, $7, $8,
-	$9, $10,
-	$11, $12,
-	$13, $14,
-	$15
-)
-RETURNING internal_id, id, name, provider, context_window, parameter_info, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, status, version, created_at, updated_at, price_updated_at
+const deleteTiers = `-- name: DeleteTiers :exec
+DELETE FROM model_price_tiers WHERE model_id = $1
 `
 
-type CreateModelParams struct {
+func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, deleteTiers, modelID)
+	return err
+}
+
+const getModel = `-- name: GetModel :one
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1
+`
+
+func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
+	row := q.db.QueryRow(ctx, getModel, id)
+	var i Model
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.InputPriceNanoPerMillion,
+		&i.OutputPriceNanoPerMillion,
+		&i.CacheWritePriceNanoPerMillion,
+		&i.CacheReadPriceNanoPerMillion,
+		&i.Enabled,
+		&i.SortOrder,
+		&i.Provider,
+		&i.ContextWindow,
+		&i.InputModalities,
+		&i.OutputModalities,
+		&i.SupportsTools,
+		&i.SupportsStructuredOutput,
+		&i.SupportsVision,
+		&i.ParameterInfo,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertModel = `-- name: InsertModel :one
+INSERT INTO models (
+    id, display_name,
+    input_price_nano_per_million, output_price_nano_per_million,
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million,
+    enabled, sort_order, provider, context_window, input_modalities, output_modalities,
+    supports_tools, supports_structured_output, supports_vision, parameter_info
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+`
+
+type InsertModelParams struct {
 	ID                            string
-	Name                          string
+	DisplayName                   string
+	InputPriceNanoPerMillion      money.Amount
+	OutputPriceNanoPerMillion     money.Amount
+	CacheWritePriceNanoPerMillion money.Amount
+	CacheReadPriceNanoPerMillion  money.Amount
+	Enabled                       bool
+	SortOrder                     int32
 	Provider                      string
-	ContextWindow                 int64
-	ParameterInfo                 string
+	ContextWindow                 *int64
 	InputModalities               []string
 	OutputModalities              []string
 	SupportsTools                 bool
 	SupportsStructuredOutput      bool
 	SupportsVision                bool
-	InputPriceNanoPerMillion      money.Amount
-	OutputPriceNanoPerMillion     money.Amount
-	CacheWritePriceNanoPerMillion money.Amount
-	CacheReadPriceNanoPerMillion  money.Amount
-	Status                        string
+	ParameterInfo                 string
 }
 
-func (q *Queries) CreateModel(ctx context.Context, arg CreateModelParams) (Model, error) {
-	row := q.db.QueryRow(ctx, createModel,
+func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model, error) {
+	row := q.db.QueryRow(ctx, insertModel,
 		arg.ID,
-		arg.Name,
+		arg.DisplayName,
+		arg.InputPriceNanoPerMillion,
+		arg.OutputPriceNanoPerMillion,
+		arg.CacheWritePriceNanoPerMillion,
+		arg.CacheReadPriceNanoPerMillion,
+		arg.Enabled,
+		arg.SortOrder,
 		arg.Provider,
 		arg.ContextWindow,
-		arg.ParameterInfo,
 		arg.InputModalities,
 		arg.OutputModalities,
 		arg.SupportsTools,
 		arg.SupportsStructuredOutput,
 		arg.SupportsVision,
-		arg.InputPriceNanoPerMillion,
-		arg.OutputPriceNanoPerMillion,
-		arg.CacheWritePriceNanoPerMillion,
-		arg.CacheReadPriceNanoPerMillion,
-		arg.Status,
+		arg.ParameterInfo,
 	)
 	var i Model
 	err := row.Scan(
-		&i.InternalID,
 		&i.ID,
-		&i.Name,
+		&i.DisplayName,
+		&i.InputPriceNanoPerMillion,
+		&i.OutputPriceNanoPerMillion,
+		&i.CacheWritePriceNanoPerMillion,
+		&i.CacheReadPriceNanoPerMillion,
+		&i.Enabled,
+		&i.SortOrder,
 		&i.Provider,
 		&i.ContextWindow,
-		&i.ParameterInfo,
 		&i.InputModalities,
 		&i.OutputModalities,
 		&i.SupportsTools,
 		&i.SupportsStructuredOutput,
 		&i.SupportsVision,
-		&i.InputPriceNanoPerMillion,
-		&i.OutputPriceNanoPerMillion,
-		&i.CacheWritePriceNanoPerMillion,
-		&i.CacheReadPriceNanoPerMillion,
-		&i.Status,
-		&i.Version,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.PriceUpdatedAt,
-	)
-	return i, err
-}
-
-const deleteModelPriceTiers = `-- name: DeleteModelPriceTiers :exec
-DELETE FROM model_price_tiers WHERE model_id = $1
-`
-
-func (q *Queries) DeleteModelPriceTiers(ctx context.Context, modelID string) error {
-	_, err := q.db.Exec(ctx, deleteModelPriceTiers, modelID)
-	return err
-}
-
-const getModel = `-- name: GetModel :one
-SELECT internal_id, id, name, provider, context_window, parameter_info, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, status, version, created_at, updated_at, price_updated_at FROM models
-WHERE id = $1 AND ($2::boolean OR status = 'active')
-`
-
-type GetModelParams struct {
-	ID              string
-	IncludeDisabled bool
-}
-
-func (q *Queries) GetModel(ctx context.Context, arg GetModelParams) (Model, error) {
-	row := q.db.QueryRow(ctx, getModel, arg.ID, arg.IncludeDisabled)
-	var i Model
-	err := row.Scan(
-		&i.InternalID,
-		&i.ID,
-		&i.Name,
-		&i.Provider,
-		&i.ContextWindow,
 		&i.ParameterInfo,
-		&i.InputModalities,
-		&i.OutputModalities,
-		&i.SupportsTools,
-		&i.SupportsStructuredOutput,
-		&i.SupportsVision,
-		&i.InputPriceNanoPerMillion,
-		&i.OutputPriceNanoPerMillion,
-		&i.CacheWritePriceNanoPerMillion,
-		&i.CacheReadPriceNanoPerMillion,
-		&i.Status,
-		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceUpdatedAt,
 	)
 	return i, err
 }
 
-const insertModelPriceTier = `-- name: InsertModelPriceTier :exec
+const insertTier = `-- name: InsertTier :exec
 INSERT INTO model_price_tiers (
-	model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
-	start_minute_of_day, end_minute_of_day,
-	input_price_nano_per_million, output_price_nano_per_million,
-	cache_write_price_nano_per_million, cache_read_price_nano_per_million
-) VALUES (
-	$1, $2, $3, $4, $5, $6, $7,
-	$8, $9,
-	$10, $11,
-	$12, $13
-)
+    model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+    start_minute_of_day, end_minute_of_day,
+    input_price_nano_per_million, output_price_nano_per_million,
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 `
 
-type InsertModelPriceTierParams struct {
+type InsertTierParams struct {
 	ModelID                       string
 	Seq                           int32
 	Name                          string
@@ -169,8 +148,8 @@ type InsertModelPriceTierParams struct {
 	CacheReadPriceNanoPerMillion  money.Amount
 }
 
-func (q *Queries) InsertModelPriceTier(ctx context.Context, arg InsertModelPriceTierParams) error {
-	_, err := q.db.Exec(ctx, insertModelPriceTier,
+func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
+	_, err := q.db.Exec(ctx, insertTier,
 		arg.ModelID,
 		arg.Seq,
 		arg.Name,
@@ -188,14 +167,59 @@ func (q *Queries) InsertModelPriceTier(ctx context.Context, arg InsertModelPrice
 	return err
 }
 
-const listModelPriceTiers = `-- name: ListModelPriceTiers :many
+const listModels = `-- name: ListModels :many
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models
+WHERE enabled OR $1::boolean
+ORDER BY sort_order, id
+`
+
+func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model, error) {
+	rows, err := q.db.Query(ctx, listModels, includeDisabled)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Model
+	for rows.Next() {
+		var i Model
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisplayName,
+			&i.InputPriceNanoPerMillion,
+			&i.OutputPriceNanoPerMillion,
+			&i.CacheWritePriceNanoPerMillion,
+			&i.CacheReadPriceNanoPerMillion,
+			&i.Enabled,
+			&i.SortOrder,
+			&i.Provider,
+			&i.ContextWindow,
+			&i.InputModalities,
+			&i.OutputModalities,
+			&i.SupportsTools,
+			&i.SupportsStructuredOutput,
+			&i.SupportsVision,
+			&i.ParameterInfo,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTiers = `-- name: ListTiers :many
 SELECT model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million FROM model_price_tiers
 WHERE model_id = ANY($1::text[])
 ORDER BY model_id, seq
 `
 
-func (q *Queries) ListModelPriceTiers(ctx context.Context, modelIds []string) ([]ModelPriceTier, error) {
-	rows, err := q.db.Query(ctx, listModelPriceTiers, modelIds)
+func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPriceTier, error) {
+	rows, err := q.db.Query(ctx, listTiers, modelIds)
 	if err != nil {
 		return nil, err
 	}
@@ -228,165 +252,116 @@ func (q *Queries) ListModelPriceTiers(ctx context.Context, modelIds []string) ([
 	return items, nil
 }
 
-const listModels = `-- name: ListModels :many
-SELECT internal_id, id, name, provider, context_window, parameter_info, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, status, version, created_at, updated_at, price_updated_at FROM models
-WHERE ($1::boolean OR status = 'active')
-	AND ($2::text = '' OR id ILIKE '%' || $2::text || '%'
-		OR name ILIKE '%' || $2::text || '%'
-		OR provider ILIKE '%' || $2::text || '%')
-ORDER BY provider, name, id
+const lockModel = `-- name: LockModel :one
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1 FOR UPDATE
 `
 
-type ListModelsParams struct {
-	IncludeDisabled bool
-	Query           string
-}
-
-func (q *Queries) ListModels(ctx context.Context, arg ListModelsParams) ([]Model, error) {
-	rows, err := q.db.Query(ctx, listModels, arg.IncludeDisabled, arg.Query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Model
-	for rows.Next() {
-		var i Model
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.ID,
-			&i.Name,
-			&i.Provider,
-			&i.ContextWindow,
-			&i.ParameterInfo,
-			&i.InputModalities,
-			&i.OutputModalities,
-			&i.SupportsTools,
-			&i.SupportsStructuredOutput,
-			&i.SupportsVision,
-			&i.InputPriceNanoPerMillion,
-			&i.OutputPriceNanoPerMillion,
-			&i.CacheWritePriceNanoPerMillion,
-			&i.CacheReadPriceNanoPerMillion,
-			&i.Status,
-			&i.Version,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PriceUpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const modelExists = `-- name: ModelExists :one
-SELECT EXISTS (SELECT 1 FROM models WHERE id = $1)
-`
-
-func (q *Queries) ModelExists(ctx context.Context, id string) (bool, error) {
-	row := q.db.QueryRow(ctx, modelExists, id)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
-const updateModel = `-- name: UpdateModel :one
-UPDATE models SET
-	name = $1,
-	provider = $2,
-	context_window = $3,
-	parameter_info = $4,
-	input_modalities = $5,
-	output_modalities = $6,
-	supports_tools = $7,
-	supports_structured_output = $8,
-	supports_vision = $9,
-	input_price_nano_per_million = $10,
-	output_price_nano_per_million = $11,
-	cache_write_price_nano_per_million = $12,
-	cache_read_price_nano_per_million = $13,
-	status = $14,
-	version = version + 1,
-	updated_at = now(),
-	price_updated_at = CASE
-		WHEN input_price_nano_per_million <> $10
-			OR output_price_nano_per_million <> $11
-			OR cache_write_price_nano_per_million <> $12
-			OR cache_read_price_nano_per_million <> $13
-			OR $15::boolean
-		THEN now()
-		ELSE price_updated_at
-	END
-WHERE id = $16 AND version = $17
-RETURNING internal_id, id, name, provider, context_window, parameter_info, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, status, version, created_at, updated_at, price_updated_at
-`
-
-type UpdateModelParams struct {
-	Name                          string
-	Provider                      string
-	ContextWindow                 int64
-	ParameterInfo                 string
-	InputModalities               []string
-	OutputModalities              []string
-	SupportsTools                 bool
-	SupportsStructuredOutput      bool
-	SupportsVision                bool
-	InputPriceNanoPerMillion      money.Amount
-	OutputPriceNanoPerMillion     money.Amount
-	CacheWritePriceNanoPerMillion money.Amount
-	CacheReadPriceNanoPerMillion  money.Amount
-	Status                        string
-	PriceTiersChanged             bool
-	ID                            string
-	ExpectedVersion               int64
-}
-
-func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model, error) {
-	row := q.db.QueryRow(ctx, updateModel,
-		arg.Name,
-		arg.Provider,
-		arg.ContextWindow,
-		arg.ParameterInfo,
-		arg.InputModalities,
-		arg.OutputModalities,
-		arg.SupportsTools,
-		arg.SupportsStructuredOutput,
-		arg.SupportsVision,
-		arg.InputPriceNanoPerMillion,
-		arg.OutputPriceNanoPerMillion,
-		arg.CacheWritePriceNanoPerMillion,
-		arg.CacheReadPriceNanoPerMillion,
-		arg.Status,
-		arg.PriceTiersChanged,
-		arg.ID,
-		arg.ExpectedVersion,
-	)
+func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
+	row := q.db.QueryRow(ctx, lockModel, id)
 	var i Model
 	err := row.Scan(
-		&i.InternalID,
 		&i.ID,
-		&i.Name,
+		&i.DisplayName,
+		&i.InputPriceNanoPerMillion,
+		&i.OutputPriceNanoPerMillion,
+		&i.CacheWritePriceNanoPerMillion,
+		&i.CacheReadPriceNanoPerMillion,
+		&i.Enabled,
+		&i.SortOrder,
 		&i.Provider,
 		&i.ContextWindow,
-		&i.ParameterInfo,
 		&i.InputModalities,
 		&i.OutputModalities,
 		&i.SupportsTools,
 		&i.SupportsStructuredOutput,
 		&i.SupportsVision,
+		&i.ParameterInfo,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateModel = `-- name: UpdateModel :one
+UPDATE models SET
+    display_name = $2,
+    input_price_nano_per_million = $3,
+    output_price_nano_per_million = $4,
+    cache_write_price_nano_per_million = $5,
+    cache_read_price_nano_per_million = $6,
+    enabled = $7,
+    sort_order = $8,
+    provider = $9,
+    context_window = $10,
+    input_modalities = $11,
+    output_modalities = $12,
+    supports_tools = $13,
+    supports_structured_output = $14,
+    supports_vision = $15,
+    parameter_info = $16,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+`
+
+type UpdateModelParams struct {
+	ID                            string
+	DisplayName                   string
+	InputPriceNanoPerMillion      money.Amount
+	OutputPriceNanoPerMillion     money.Amount
+	CacheWritePriceNanoPerMillion money.Amount
+	CacheReadPriceNanoPerMillion  money.Amount
+	Enabled                       bool
+	SortOrder                     int32
+	Provider                      string
+	ContextWindow                 *int64
+	InputModalities               []string
+	OutputModalities              []string
+	SupportsTools                 bool
+	SupportsStructuredOutput      bool
+	SupportsVision                bool
+	ParameterInfo                 string
+}
+
+func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model, error) {
+	row := q.db.QueryRow(ctx, updateModel,
+		arg.ID,
+		arg.DisplayName,
+		arg.InputPriceNanoPerMillion,
+		arg.OutputPriceNanoPerMillion,
+		arg.CacheWritePriceNanoPerMillion,
+		arg.CacheReadPriceNanoPerMillion,
+		arg.Enabled,
+		arg.SortOrder,
+		arg.Provider,
+		arg.ContextWindow,
+		arg.InputModalities,
+		arg.OutputModalities,
+		arg.SupportsTools,
+		arg.SupportsStructuredOutput,
+		arg.SupportsVision,
+		arg.ParameterInfo,
+	)
+	var i Model
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
 		&i.InputPriceNanoPerMillion,
 		&i.OutputPriceNanoPerMillion,
 		&i.CacheWritePriceNanoPerMillion,
 		&i.CacheReadPriceNanoPerMillion,
-		&i.Status,
-		&i.Version,
+		&i.Enabled,
+		&i.SortOrder,
+		&i.Provider,
+		&i.ContextWindow,
+		&i.InputModalities,
+		&i.OutputModalities,
+		&i.SupportsTools,
+		&i.SupportsStructuredOutput,
+		&i.SupportsVision,
+		&i.ParameterInfo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceUpdatedAt,
 	)
 	return i, err
 }

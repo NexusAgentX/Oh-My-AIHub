@@ -118,18 +118,17 @@ func (s *Service) ChangePassword(ctx context.Context, accountID, currentPassword
 	return LoginResult{Account: account.Account, SessionToken: token}, nil
 }
 
-// AdminResetPassword 生成管理员代发的新初始密码：目标账户被标记必须改密，
+// AdminResetPassword 生成管理员代发的新初始密码（ADR-0013）：目标账户被标记必须改密，
 // 既有会话全部撤销；不为目标创建新会话，因为发起者是管理员而非账户本人。
 func (s *Service) AdminResetPassword(ctx context.Context, actor Account, accountID string) (CreatedAccount, error) {
 	if !actor.IsAdmin {
 		return CreatedAccount{}, ErrForbidden
 	}
-	if accountID == "" || accountID == actor.ID {
+	if accountID == "" {
 		return CreatedAccount{}, ErrInvalidInput
 	}
-	account, err := s.store.FindAccountByID(ctx, accountID)
-	if err != nil {
-		return CreatedAccount{}, err
+	if accountID == actor.ID {
+		return CreatedAccount{}, ErrSelfModification
 	}
 	password, err := GenerateInitialPassword()
 	if err != nil {
@@ -139,59 +138,22 @@ func (s *Service) AdminResetPassword(ctx context.Context, actor Account, account
 	if err != nil {
 		return CreatedAccount{}, err
 	}
-	changedAt := s.now().UTC()
-	if err := s.store.ResetPassword(ctx, actor.ID, accountID, account.PasswordVersion, hash, changedAt); err != nil {
+	account, err := s.store.ResetPassword(ctx, actor.ID, accountID, hash, s.now().UTC())
+	if err != nil {
 		return CreatedAccount{}, err
 	}
-	account.PasswordHash = ""
-	account.MustChangePassword = true
-	account.PasswordVersion++
-	account.PasswordChangedAt = &changedAt
-	account.UpdatedAt = changedAt
-	return CreatedAccount{Account: account.Account, InitialPassword: password}, nil
+	return CreatedAccount{Account: account, InitialPassword: password}, nil
 }
 
-func (s *Service) CreateInvitedAccount(ctx context.Context, actor Account, username, displayName string, creditLimit money.Amount, isAdmin bool, status Status) (CreatedAccount, error) {
+// CreateInvitedAccount creates an account with a one-time initial password.
+// A nil credit limit uses the platform default.
+func (s *Service) CreateInvitedAccount(ctx context.Context, actor Account, username, displayName string, creditLimit *money.Amount, isAdmin bool) (CreatedAccount, error) {
 	if !actor.IsAdmin {
 		return CreatedAccount{}, ErrForbidden
 	}
-	return s.createAccount(ctx, actor.ID, username, displayName, creditLimit, isAdmin, status)
-}
-
-func (s *Service) HasAdministrator(ctx context.Context) (bool, error) {
-	return s.store.HasAdministrator(ctx)
-}
-
-func (s *Service) CreateBootstrapAdmin(ctx context.Context, username, displayName string, password string) (Account, error) {
 	username = NormalizeUsername(username)
 	displayName = strings.TrimSpace(displayName)
-	if !usernamePattern.MatchString(username) || displayName == "" {
-		return Account{}, ErrInvalidInput
-	}
-	if err := ValidatePassword(password); err != nil {
-		return Account{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
-	}
-	hash, err := HashPassword(password)
-	if err != nil {
-		return Account{}, err
-	}
-	return s.store.CreateBootstrapAdmin(ctx, NewAccount{
-		Username:     username,
-		DisplayName:  displayName,
-		PasswordHash: hash,
-		IsAdmin:      true,
-		Status:       StatusActive,
-		// 密码由创始人自设（网页初始化），无第三方经手，
-		// 不适用受邀账户的首登强制改密规则。
-		MustChangePassword: false,
-		CreditLimit:        0,
-	})
-}
-
-func (s *Service) createAccount(ctx context.Context, actorID, username, displayName string, creditLimit money.Amount, isAdmin bool, status Status) (CreatedAccount, error) {
-	username = NormalizeUsername(username)
-	displayName = strings.TrimSpace(displayName)
-	if !usernamePattern.MatchString(username) || displayName == "" || creditLimit < 0 || (status != StatusActive && status != StatusDisabled) {
+	if !usernamePattern.MatchString(username) || !validDisplayName(displayName) || (creditLimit != nil && *creditLimit < 0) {
 		return CreatedAccount{}, ErrInvalidInput
 	}
 	password, err := GenerateInitialPassword()
@@ -203,12 +165,11 @@ func (s *Service) createAccount(ctx context.Context, actorID, username, displayN
 		return CreatedAccount{}, err
 	}
 	account, err := s.store.CreateAccount(ctx, NewAccount{
-		ActorID:            actorID,
+		ActorID:            actor.ID,
 		Username:           username,
 		DisplayName:        displayName,
 		PasswordHash:       hash,
 		IsAdmin:            isAdmin,
-		Status:             status,
 		MustChangePassword: true,
 		CreditLimit:        creditLimit,
 	})
@@ -218,30 +179,83 @@ func (s *Service) createAccount(ctx context.Context, actorID, username, displayN
 	return CreatedAccount{Account: account, InitialPassword: password}, nil
 }
 
-func (s *Service) ListAccounts(ctx context.Context, actor Account, query string) ([]Account, error) {
+func (s *Service) HasAdministrator(ctx context.Context) (bool, error) {
+	return s.store.HasAdministrator(ctx)
+}
+
+func (s *Service) CreateBootstrapAdmin(ctx context.Context, username, displayName string, password string) (Account, error) {
+	username = NormalizeUsername(username)
+	displayName = strings.TrimSpace(displayName)
+	if !usernamePattern.MatchString(username) || !validDisplayName(displayName) {
+		return Account{}, ErrInvalidInput
+	}
+	if err := ValidatePassword(password); err != nil {
+		return Account{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return Account{}, err
+	}
+	zero := money.Amount(0)
+	return s.store.CreateBootstrapAdmin(ctx, NewAccount{
+		Username:     username,
+		DisplayName:  displayName,
+		PasswordHash: hash,
+		IsAdmin:      true,
+		// 密码由创始人自设（网页初始化），无第三方经手，
+		// 不适用受邀账户的首登强制改密规则。
+		MustChangePassword: false,
+		CreditLimit:        &zero,
+	})
+}
+
+func (s *Service) ListAccounts(ctx context.Context, actor Account, filter AccountFilter) ([]AdminAccount, error) {
 	if !actor.IsAdmin {
 		return nil, ErrForbidden
 	}
-	return s.store.ListAccounts(ctx, strings.TrimSpace(query))
+	filter.Query = strings.TrimSpace(filter.Query)
+	if filter.Limit < 1 || filter.Limit > 100 || (filter.Status != "" && filter.Status != StatusActive && filter.Status != StatusDisabled) {
+		return nil, ErrInvalidInput
+	}
+	return s.store.ListAccounts(ctx, filter)
 }
 
-func (s *Service) UpdateAccount(ctx context.Context, actor Account, accountID string, update AccountUpdate) (Account, error) {
+func (s *Service) GetAccount(ctx context.Context, actor Account, accountID string) (AdminAccount, error) {
 	if !actor.IsAdmin {
-		return Account{}, ErrForbidden
+		return AdminAccount{}, ErrForbidden
 	}
-	if update.ExpectedVersion <= 0 {
-		return Account{}, ErrInvalidInput
+	return s.store.GetAccount(ctx, accountID)
+}
+
+func (s *Service) UpdateAccount(ctx context.Context, actor Account, accountID string, update AccountUpdate) (AdminAccount, error) {
+	if !actor.IsAdmin {
+		return AdminAccount{}, ErrForbidden
+	}
+	if update.DisplayName == nil && update.Status == nil && update.CreditLimit == nil && update.IsAdmin == nil {
+		return AdminAccount{}, ErrInvalidInput
+	}
+	if update.DisplayName != nil {
+		trimmed := strings.TrimSpace(*update.DisplayName)
+		if !validDisplayName(trimmed) {
+			return AdminAccount{}, ErrInvalidInput
+		}
+		update.DisplayName = &trimmed
 	}
 	if update.Status != nil && *update.Status != StatusActive && *update.Status != StatusDisabled {
-		return Account{}, ErrInvalidInput
+		return AdminAccount{}, ErrInvalidInput
 	}
 	if update.CreditLimit != nil && *update.CreditLimit < 0 {
-		return Account{}, ErrInvalidInput
+		return AdminAccount{}, ErrInvalidInput
 	}
-	if update.Status == nil && update.CreditLimit == nil && update.CreditFrozen == nil && update.IsAdmin == nil {
-		return Account{}, ErrInvalidInput
+	if accountID == actor.ID && ((update.Status != nil && *update.Status == StatusDisabled) || (update.IsAdmin != nil && !*update.IsAdmin)) {
+		return AdminAccount{}, ErrSelfModification
 	}
 	return s.store.UpdateAccount(ctx, actor.ID, accountID, update)
+}
+
+func validDisplayName(value string) bool {
+	length := len([]rune(value))
+	return length >= 1 && length <= 64
 }
 
 func (s *Service) newSession(accountID string, passwordVersion int64) (string, Session, error) {

@@ -14,15 +14,15 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
 func main() {
@@ -61,6 +61,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// C2C 私密数据密钥环在 Feature C 使用；启动时先校验配置，避免带着错误配置上线。
+	if _, err := c2c.ParseKeyring(
+		os.Getenv("C2C_PRIVATE_DATA_KEYRING"),
+		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
+	); err != nil {
+		log.Fatal(err)
+	}
+
 	startupContext, cancelStartup := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelStartup()
 	pool, err := database.Open(startupContext, databaseURL)
@@ -69,130 +77,21 @@ func main() {
 	}
 	defer pool.Close()
 	store := postgres.New(pool)
-	identityService, err := identity.NewService(store, 24*time.Hour)
+	identityService, err := identity.NewService(store.Identity, 24*time.Hour)
 	if err != nil {
 		log.Fatal(err)
 	}
-	channelService, err := channel.NewService(store, credentialKeyring, outboundPolicy)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := channelService.ValidateCredentialInventory(startupContext); err != nil {
-		log.Fatal(err)
-	}
-	if _, err := channelService.RecoverAbandonedValidations(startupContext); err != nil {
-		log.Fatal(err)
-	}
-	gatewayService, err := gateway.NewService(store, channelService)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if _, err := gatewayService.RecoverOrphans(startupContext, time.Now().Add(-2*time.Minute), 100); err != nil {
-		log.Fatal(err)
-	}
-	c2cKeyring, err := c2c.ParseKeyring(
-		os.Getenv("C2C_PRIVATE_DATA_KEYRING"),
-		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	c2cService, err := c2c.NewService(store, c2cKeyring)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := c2cService.ValidateEncryptedInventory(startupContext); err != nil {
-		log.Fatal(err)
-	}
-	maintenanceContext, cancelMaintenance := context.WithCancel(context.Background())
-	defer cancelMaintenance()
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-maintenanceContext.Done():
-				return
-			case <-ticker.C:
-				result := runRecoveryCycle(
-					maintenanceContext, 5*time.Second,
-					channelService.RecoverAbandonedValidations,
-					func(ctx context.Context) (int64, error) {
-						recovered, err := gatewayService.RecoverOrphans(ctx, time.Now().Add(-2*time.Minute), 100)
-						return int64(recovered), err
-					},
-				)
-				if result.channelErr != nil {
-					log.Printf("recover abandoned channel validations: %v", result.channelErr)
-				} else if result.channels > 0 {
-					log.Printf("recovered %d abandoned channel validation attempts", result.channels)
-				}
-				if result.gatewayErr != nil {
-					log.Printf("recover orphan gateway calls: %v", result.gatewayErr)
-				} else if result.gateways > 0 {
-					log.Printf("recovered %d orphan gateway calls", result.gateways)
-				}
-			}
-		}
-	}()
-	go func() {
-		expiryTicker := time.NewTicker(30 * time.Second)
-		cleanupTicker := time.NewTicker(time.Hour)
-		defer expiryTicker.Stop()
-		defer cleanupTicker.Stop()
-		for {
-			select {
-			case <-maintenanceContext.Done():
-				return
-			case <-expiryTicker.C:
-				jobContext, cancelJob := context.WithTimeout(maintenanceContext, 20*time.Second)
-				if expired, expiryErr := c2cService.ExpireDue(jobContext, 200); expiryErr != nil {
-					log.Printf("expire C2C payment windows: %v", expiryErr)
-				} else if expired > 0 {
-					log.Printf("expired %d C2C trades", expired)
-				}
-				cancelJob()
-			case <-cleanupTicker.C:
-				jobContext, cancelJob := context.WithTimeout(maintenanceContext, 20*time.Second)
-				if _, cleanupErr := c2cService.CleanupPrivateData(jobContext, 500); cleanupErr != nil {
-					log.Printf("clean C2C private data: %v", cleanupErr)
-				}
-				cancelJob()
-			}
-		}
-	}()
-
-	if _, inspectErr := store.OpsRunInspection(startupContext, "startup"); inspectErr != nil {
-		log.Printf("startup ops inspection: %v", inspectErr)
-	}
-	go func() {
-		inspectionTicker := time.NewTicker(time.Hour)
-		defer inspectionTicker.Stop()
-		for {
-			select {
-			case <-maintenanceContext.Done():
-				return
-			case <-inspectionTicker.C:
-				inspectionContext, cancelInspection := context.WithTimeout(maintenanceContext, 30*time.Second)
-				if _, inspectErr := store.OpsRunInspection(inspectionContext, "periodic"); inspectErr != nil {
-					log.Printf("periodic ops inspection: %v", inspectErr)
-				}
-				cancelInspection()
-			}
-		}
-	}()
+	// 上游凭据密钥环与出站策略由 Feature B 的渠道与网关使用。
+	_, _ = credentialKeyring, outboundPolicy
 
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
 			Identity:          identityService,
-			Catalog:           catalog.NewService(store),
-			Channels:          channelService,
-			Gateway:           gatewayService,
-			Ledger:            ledger.NewService(store),
-			C2C:               c2cService,
-			Ops:               store,
-			FeeRates:          feerate.NewService(store),
+			Catalog:           catalog.NewService(store.Catalog),
+			Ledger:            ledger.NewService(store.Ledger),
+			Settings:          settings.NewService(store.Settings),
+			Audit:             audit.NewService(store.Audit),
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
@@ -224,24 +123,6 @@ func main() {
 			log.Printf("graceful shutdown failed: %v", err)
 		}
 	}
-}
-
-type recoveryCycleResult struct {
-	channels   int64
-	channelErr error
-	gateways   int64
-	gatewayErr error
-}
-
-func runRecoveryCycle(parent context.Context, timeout time.Duration, recoverChannels, recoverGateways func(context.Context) (int64, error)) recoveryCycleResult {
-	channelContext, cancelChannels := context.WithTimeout(parent, timeout)
-	channels, channelErr := recoverChannels(channelContext)
-	cancelChannels()
-
-	gatewayContext, cancelGateways := context.WithTimeout(parent, timeout)
-	gateways, gatewayErr := recoverGateways(gatewayContext)
-	cancelGateways()
-	return recoveryCycleResult{channels: channels, channelErr: channelErr, gateways: gateways, gatewayErr: gatewayErr}
 }
 
 func parseCommaSeparated(value string) []string {

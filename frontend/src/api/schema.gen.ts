@@ -69,7 +69,7 @@ export interface paths {
         put?: never;
         /**
          * 登录
-         * @description 成功时设置会话 Cookie。
+         * @description 成功时设置会话 Cookie。用户名或密码错误、账户停用均返回 401 invalid_credentials。
          */
         post: operations["login"];
         delete?: never;
@@ -95,7 +95,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/session": {
+    "/api/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -103,10 +103,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 当前会话账户
+         * 当前账户
          * @description 允许仍须首次改密的账户访问。
          */
-        get: operations["getSession"];
+        get: operations["getMe"];
         put?: never;
         post?: never;
         delete?: never;
@@ -115,7 +115,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/account/password": {
+    "/api/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 修改密码
+         * @description 成功后撤销全部旧会话并签发新会话 Cookie；首次登录改密也使用本接口。
+         */
+        post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 首页
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getHome"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 可用模型列表
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{modelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 模型详情、渠道与我的路由
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routing/{modelID}": {
         parameters: {
             query?: never;
             header?: never;
@@ -124,10 +204,12 @@ export interface paths {
         };
         get?: never;
         /**
-         * 修改自己的密码
-         * @description 成功后轮换会话 Cookie。
+         * 设置账号级路由
+         * @description 对该用户所有未单独设置路由的 Key 生效。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
-        put: operations["changePassword"];
+        put: operations["setRouting"];
         post?: never;
         delete?: never;
         options?: never;
@@ -135,17 +217,584 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/account": {
+    "/api/keys": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 当前账户与额度 */
-        get: operations["getAccount"];
+        /**
+         * 我的 API Key
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listKeys"];
+        put?: never;
+        /**
+         * 创建 API Key
+         * @description 每个用户最多 20 把未删除的 Key（超过返回 409 key_limit_reached）。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["createKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{keyID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * API Key 详情
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getKey"];
         put?: never;
         post?: never;
+        /**
+         * 删除 API Key
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        delete: operations["deleteKey"];
+        options?: never;
+        head?: never;
+        /**
+         * 修改 API Key
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        patch: operations["updateKey"];
+        trace?: never;
+    };
+    "/api/keys/{keyID}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 复制完整 Key
+         * @description 每次读取写入审计（查看 API Key 明文）。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getKeySecret"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{keyID}/routing/{modelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 设置该 Key 的单独路由
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        put: operations["setKeyRouting"];
+        post?: never;
+        /**
+         * 删除该 Key 的单独路由
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        delete: operations["deleteKeyRouting"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的渠道
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listChannels"];
+        put?: never;
+        /**
+         * 添加渠道
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["createChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 读取上游模型列表并匹配目录
+         * @description Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["discoverChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 渠道详情
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getChannel"];
+        put?: never;
+        post?: never;
+        /**
+         * 删除渠道
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        delete: operations["deleteChannel"];
+        options?: never;
+        head?: never;
+        /**
+         * 修改渠道
+         * @description 被管理员强制下架的渠道不能由所有者重新上架（409）。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        patch: operations["updateChannel"];
+        trace?: never;
+    };
+    "/api/channels/{channelID}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 按模型逐个格式测试
+         * @description 会向上游发出真实请求，可能产生少量费用。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["testChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的调用记录
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calls/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的调用实时流
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["streamCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calls/{callID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 调用详情
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getCall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 用量聚合
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channelID}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 渠道统计
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getChannelStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channelID}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 渠道上的调用
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listChannelCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channelID}/calls/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 渠道调用实时流
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["streamChannelCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的积分
+         * @description Feature A 返回余额、信用额度与可透支额度；Feature G 补充 30 天走势（trend）与期间对账（period）。
+         */
+        get: operations["getPoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/points/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的积分账单
+         * @description 按时间倒序。Feature G 补充 summary（按天/按 Key 汇总）与 format=csv 导出；在此之前 format=csv 返回 501。
+         */
+        get: operations["listPointsEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 卖单市场
+         * @description 开放卖单按单价从低到高。
+         *
+         *     由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listC2COrders"];
+        put?: never;
+        /**
+         * 挂卖单
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["createC2COrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/my/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的卖单
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listMyC2COrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/orders/{orderID}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 关闭卖单（剩余积分退回）
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["closeC2COrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/orders/{orderID}/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 买入（下单）
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["createC2CTrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/my/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的交易
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listMyC2CTrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/trades/{tradeID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 交易详情
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getC2CTrade"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/trades/{tradeID}/paid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 我已付款
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["markC2CTradePaid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/trades/{tradeID}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 确认收款放行
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["releaseC2CTrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/trades/{tradeID}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 取消交易
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["cancelC2CTrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/trades/{tradeID}/dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 申诉
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["disputeC2CTrade"];
         delete?: never;
         options?: never;
         head?: never;
@@ -159,11 +808,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 账户列表 */
-        get: operations["listAccounts"];
+        /**
+         * 账户列表
+         * @description 按用户名排序；q 匹配用户名、显示名或账户 ID。
+         */
+        get: operations["listAdminAccounts"];
         put?: never;
-        /** 邀请创建账户 */
-        post: operations["createAccount"];
+        /**
+         * 创建账户
+         * @description 同时创建用户账本账户；返回只展示一次的初始密码，首次登录必须改密。
+         */
+        post: operations["createAdminAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -183,11 +838,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** 更新账户 */
-        patch: operations["updateAccount"];
+        /** 修改账户 */
+        patch: operations["updateAdminAccount"];
         trace?: never;
     };
-    "/api/admin/accounts/{accountID}/password-reset": {
+    "/api/admin/accounts/{accountID}/reset-password": {
         parameters: {
             query?: never;
             header?: never;
@@ -197,44 +852,47 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 重置账户密码
-         * @description 不能重置自己的密码。
+         * 重置密码
+         * @description 生成只展示一次的新初始密码，目标账户全部会话失效（ADR-0013）。不能重置自己。
          */
-        post: operations["resetAccountPassword"];
+        post: operations["resetAdminAccountPassword"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models": {
+    "/api/admin/accounts/{accountID}/adjust": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 模型列表 */
-        get: operations["listModels"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** 调账 */
+        post: operations["adjustAdminAccount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{modelID}": {
+    "/api/admin/accounts/{accountID}/write-off": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 模型详情 */
-        get: operations["getModel"];
+        get?: never;
         put?: never;
-        post?: never;
+        /**
+         * 坏账核销
+         * @description 把账户全部负余额转入坏账系统账户，余额归零；余额不为负时返回 422 nothing_to_write_off。
+         */
+        post: operations["writeOffAdminAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -248,11 +906,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员：模型列表 */
+        /** 模型目录（含停用） */
         get: operations["listAdminModels"];
         put?: never;
-        /** 管理员：创建模型 */
-        post: operations["createModel"];
+        /** 上架模型 */
+        post: operations["createAdminModel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -266,364 +924,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员：模型详情 */
-        get: operations["getAdminModel"];
-        /** 管理员：更新模型 */
-        put: operations["updateModel"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/wallet": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的钱包 */
-        get: operations["getWallet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/wallet/entries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的账本分录 */
-        get: operations["listWalletEntries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/metrics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 账本一致性指标 */
-        get: operations["getLedgerMetrics"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/accounts/{accountID}/wallet": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 用户账户钱包 */
-        get: operations["getAdminLedgerAccountWallet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/accounts/{accountID}/entries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 用户账户账本分录 */
-        get: operations["listAdminLedgerAccountEntries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/system-accounts/{systemKind}/wallet": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 系统账户钱包 */
-        get: operations["getAdminLedgerSystemWallet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/system-accounts/{systemKind}/entries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 系统账户账本分录 */
-        get: operations["listAdminLedgerSystemEntries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/adjustments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
         get?: never;
         put?: never;
-        /** 管理员账本调整 */
-        post: operations["createLedgerAdjustment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ledger/bad-debts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 坏账划转 */
-        post: operations["createBadDebtTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的渠道 */
-        get: operations["listChannels"];
-        put?: never;
-        /** 创建渠道 */
-        post: operations["createChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/{channelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的渠道详情 */
-        get: operations["getChannel"];
-        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
         /**
-         * 删除渠道
-         * @description DELETE 请求携带 JSON 请求体（expected_version）。
+         * 修改模型与价格档
+         * @description 只修改提供的字段；price_tiers 提供时整组替换。
          */
-        delete: operations["deleteChannel"];
-        options?: never;
-        head?: never;
-        /** 更新渠道 */
-        patch: operations["updateChannel"];
+        patch: operations["updateAdminModel"];
         trace?: never;
     };
-    "/api/channels/{channelID}/publish": {
+    "/api/admin/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** 发布渠道 */
-        post: operations["publishChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/{channelID}/pause": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 暂停渠道 */
-        post: operations["pauseChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/{channelID}/credential-revoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 撤销渠道凭据 */
-        post: operations["revokeChannelCredential"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/{channelID}/offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 新增报价 */
-        post: operations["addChannelOffer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channel-offers/{offerID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * 删除报价
-         * @description DELETE 请求携带 JSON 请求体（expected_version）。
-         */
-        delete: operations["deleteChannelOffer"];
-        options?: never;
-        head?: never;
-        /** 更新报价 */
-        patch: operations["updateChannelOffer"];
-        trace?: never;
-    };
-    "/api/channel-offers/{offerID}/disable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 停用报价 */
-        post: operations["disableChannelOffer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channel-offers/{offerID}/resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 恢复报价 */
-        post: operations["resumeChannelOffer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channel-offers/{offerID}/validation-attempts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 报价验证记录 */
-        get: operations["listOfferValidationAttempts"];
-        put?: never;
-        /**
-         * 发起报价验证
-         * @description 会向上游发起真实调用，需通过 confirmed_upstream_cost 确认费用。
-         */
-        post: operations["validateChannelOffer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/market/offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 市场报价列表 */
-        get: operations["listMarketOffers"];
-        put?: never;
+        /** 平台设置 */
+        get: operations["getAdminSettings"];
+        /** 修改平台设置 */
+        put: operations["updateAdminSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -631,15 +955,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/market/channels/{channelID}": {
+    "/api/admin/audit": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 市场渠道详情 */
-        get: operations["getMarketChannel"];
+        /** 操作记录 */
+        get: operations["listAdminAudit"];
         put?: never;
         post?: never;
         delete?: never;
@@ -655,7 +979,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员：渠道列表 */
+        /**
+         * 全部渠道
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
         get: operations["listAdminChannels"];
         put?: never;
         post?: never;
@@ -672,21 +999,40 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员：渠道详情 */
+        /**
+         * 渠道详情
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
         get: operations["getAdminChannel"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/channels/{channelID}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * 管理员：删除渠道
-         * @description DELETE 请求携带 JSON 请求体（expected_version、reason）。
+         * 强制下架
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
-        delete: operations["adminDeleteChannel"];
+        post: operations["suspendAdminChannel"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/channels/{channelID}/pause": {
+    "/api/admin/channels/{channelID}/unsuspend": {
         parameters: {
             query?: never;
             header?: never;
@@ -695,209 +1041,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 管理员：暂停渠道 */
-        post: operations["adminPauseChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channel-offers/{offerID}/validation-attempts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 管理员：报价验证记录 */
-        get: operations["adminListOfferValidationAttempts"];
-        put?: never;
-        /** 管理员：发起报价验证 */
-        post: operations["adminValidateChannelOffer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channel-credentials/reencrypt": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 管理员：重加密渠道凭据 */
-        post: operations["reencryptChannelCredentials"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的 API Key */
-        get: operations["listAPIKeys"];
-        put?: never;
-        /** 创建 API Key */
-        post: operations["createAPIKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/keys/{keyID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** API Key 详情 */
-        get: operations["getAPIKey"];
-        put?: never;
-        post?: never;
         /**
-         * 删除 API Key
-         * @description DELETE 请求携带 JSON 请求体（expected_version）。
+         * 恢复
+         * @description 由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
-        delete: operations["deleteAPIKey"];
-        options?: never;
-        head?: never;
-        /** 更新 API Key */
-        patch: operations["updateAPIKey"];
-        trace?: never;
-    };
-    "/api/keys/{keyID}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 轮换 API Key */
-        post: operations["rotateAPIKey"];
+        post: operations["unsuspendAdminChannel"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/keys/{keyID}/disable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 停用 API Key */
-        post: operations["disableAPIKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/keys/{keyID}/enable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 启用 API Key */
-        post: operations["enableAPIKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/keys/{keyID}/pool-members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 向模型池追加报价 */
-        post: operations["addAPIKeyPoolMember"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/calls": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 调用记录 */
-        get: operations["listGatewayCalls"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/calls/{callID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 调用详情 */
-        get: operations["getGatewayCall"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 使用看板 */
-        get: operations["getDashboard"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dashboard/pending-items": {
+    "/api/admin/disputes": {
         parameters: {
             query?: never;
             header?: never;
@@ -905,267 +1060,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 工作台待处理事项
-         * @description 服务端聚合当前用户的待处理事项：待放行 / 待付款的 C2C 交易、校验失败或已暂停的渠道、含不可用渠道的路由、只有一个渠道的路由。按种类固定排序，不分页。
+         * 申诉列表
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
          */
-        get: operations["listPendingItems"];
+        get: operations["listAdminDisputes"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/market": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** C2C 市场 */
-        get: operations["getC2CMarket"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 创建 C2C 订单 */
-        post: operations["createC2COrder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders/{orderID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 订单详情 */
-        get: operations["getC2COrder"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders/{orderID}/payment-methods/{methodID}/qr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 收款码图片 */
-        get: operations["getC2CPaymentQR"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders/{orderID}/take": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 吃单 */
-        post: operations["takeC2COrder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders/{orderID}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 撤销订单 */
-        post: operations["cancelC2COrder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的订单与交易 */
-        get: operations["getC2CMyActivity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 交易详情 */
-        get: operations["getC2CTrade"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}/paid": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 标记已付款 */
-        post: operations["markC2CTradePaid"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 取消交易 */
-        post: operations["cancelC2CTrade"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}/release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 确认收款并放行 */
-        post: operations["confirmC2CReceipt"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}/dispute": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 发起争议 */
-        post: operations["openC2CDispute"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/trades/{tradeID}/statements": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 补充争议陈述 */
-        post: operations["addC2CStatement"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/c2c/disputes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 管理员：争议列表 */
-        get: operations["listC2CDisputes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/c2c/orders/{orderID}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 管理员：撤销订单 */
-        post: operations["adminCancelC2COrder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1181,15 +1081,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 管理员：裁决争议 */
-        post: operations["resolveC2CDispute"];
+        /**
+         * 仲裁
+         * @description 由 Feature C 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["resolveAdminC2CTrade"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/fee-rate": {
+    "/api/admin/overview": {
         parameters: {
             query?: never;
             header?: never;
@@ -1197,28 +1100,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 手续费率与历史
-         * @description limit 缺省时返回服务端默认条数。
+         * 概览：需要处理与账本核对
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
          */
-        get: operations["getFeeRates"];
-        /** 调整手续费率 */
-        put: operations["setFeeRate"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ops/metrics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 运营指标 */
-        get: operations["getOpsMetrics"];
+        get: operations["getAdminOverview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1227,15 +1112,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/ops/providers": {
+    "/api/admin/calls": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 分享方收入 */
-        get: operations["getOpsProviderIncome"];
+        /**
+         * 全部调用
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listAdminCalls"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1244,15 +1132,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/ops/anomalies": {
+    "/api/admin/calls/stream": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 异常与关注项 */
-        get: operations["getOpsAnomalies"];
+        /**
+         * 全部调用实时流
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["streamAdminCalls"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1261,18 +1152,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/ops/inspections": {
+    "/api/admin/points": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 巡检记录 */
-        get: operations["listOpsInspections"];
+        /**
+         * 积分全局
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getAdminPoints"];
         put?: never;
-        /** 手动执行巡检 */
-        post: operations["runOpsInspection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/ledger/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 账本交易浏览
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listAdminLedgerTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/ledger/transactions/{transactionID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 账本交易详情
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["getAdminLedgerTransaction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/ledger/repair-call/{callID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 修复未记账调用
+         * @description 由 Feature G 实现；当前处理器返回 501 not_implemented。
+         */
+        post: operations["repairAdminLedgerCall"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1290,7 +1243,9 @@ export interface paths {
         put?: never;
         /**
          * OpenAI Chat Completions
-         * @description 外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyOpenAIChat"];
         delete?: never;
@@ -1310,7 +1265,9 @@ export interface paths {
         put?: never;
         /**
          * OpenAI Responses
-         * @description 外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyOpenAIResponses"];
         delete?: never;
@@ -1330,7 +1287,9 @@ export interface paths {
         put?: never;
         /**
          * Anthropic Messages
-         * @description 外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyAnthropicMessages"];
         delete?: never;
@@ -1349,10 +1308,56 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Google Gemini generateContent / streamGenerateContent
-         * @description 外部模型协议入口：请求与响应正文按上游协议原样透传，本规范只登记路径与认证，不描述正文。不走会话 Cookie，也不做同源校验。
+         * Gemini generateContent / streamGenerateContent
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
          */
         post: operations["proxyGemini"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * OpenAI / Anthropic 风格模型列表
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listGatewayModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1beta/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gemini 风格模型列表
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     由 Feature B 实现；当前处理器返回 501 not_implemented。
+         */
+        get: operations["listGeminiModels"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1363,22 +1368,65 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description 积分金额的十进制字符串，最多 9 位小数，不使用浮点数。 */
+        /** @description 积分金额的十进制字符串，最多 9 位小数，不使用浮点数，例如 "12.5"。 */
         Amount: string;
+        /** @description 可空的积分金额十进制字符串。 */
+        NullableAmount: string | null;
+        /** @description 单价（积分/百万 token）的十进制字符串，0～100000，最多 9 位小数。 */
+        Price: string;
+        /** @description 渠道倍率的十进制字符串，0～1000，最多 9 位小数，默认 "1"。 */
+        Multiplier: string;
+        /** @description 0～1 之间的比率十进制字符串（如成功率）。 */
+        Ratio: string;
         /**
          * Format: date-time
          * @description RFC 3339 时间。
          */
         Timestamp: string;
-        /** @description 模型单价（积分/百万 Token）的十进制字符串。 */
-        PriceString: string;
-        Error: {
-            code: string;
-            message: string;
-        };
-        /** @description 所有 /api 错误的统一信封；code 为稳定的机器可读标识，message 为中文提示。 */
+        /**
+         * Format: date-time
+         * @description 可空的 RFC 3339 时间。
+         */
+        NullableTimestamp: string | null;
+        /**
+         * Format: date
+         * @description 日期（YYYY-MM-DD，Asia/Shanghai）。
+         */
+        Date: string;
+        /**
+         * @description 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini。网关不做格式转换。
+         * @enum {string}
+         */
+        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini";
+        /**
+         * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
+         * @enum {string}
+         */
+        RoutingMode: "cheapest" | "reliable" | "fastest" | "manual";
+        /**
+         * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
+         * @enum {string}
+         */
+        CallOutcome: "rejected_balance" | "rejected_budget" | "rejected_key" | "rejected_model" | "rejected_format" | "rejected_no_channel" | "upstream_failed" | "interrupted" | "client_disconnected" | "succeeded" | "succeeded_unbilled" | "in_progress";
+        /** @enum {string} */
+        AccountStatus: "active" | "disabled";
+        /**
+         * @description 上架、下架（所有者）、强制下架（管理员）。
+         * @enum {string}
+         */
+        ChannelStatus: "listed" | "unlisted" | "suspended";
+        /** @enum {string} */
+        TransactionType: "api_call" | "c2c_list" | "c2c_release" | "c2c_return" | "admin_adjust" | "bad_debt_writeoff";
+        /** @enum {string} */
+        TradeStatus: "awaiting_payment" | "paid" | "released" | "cancelled" | "disputed" | "resolved_to_buyer" | "resolved_to_seller";
+        /** @description 所有 /api 错误的统一结构。 */
         ErrorResponse: {
-            error: components["schemas"]["Error"];
+            /** @description 稳定的机器可读错误码，例如 not_found、not_implemented。 */
+            error: string;
+            /** @description 可读中文提示。 */
+            message: string;
+            /** @description 相关调用的请求 ID（仅网关与调用相关错误）。 */
+            request_id?: string;
         };
         Health: {
             /** @constant */
@@ -1394,39 +1442,6 @@ export interface components {
             display_name: string;
             password: string;
         };
-        InstanceInitializeResponse: {
-            /** @constant */
-            initialized: true;
-            account: components["schemas"]["Account"];
-        };
-        Account: {
-            id: string;
-            username: string;
-            display_name: string;
-            is_admin: boolean;
-            /** @enum {string} */
-            status: "active" | "disabled";
-            must_change_password: boolean;
-            version: number;
-            credit_limit: components["schemas"]["Amount"];
-            credit_frozen: boolean;
-            posted_balance: components["schemas"]["Amount"];
-            asset_reserved: components["schemas"]["Amount"];
-            spend_authorized: components["schemas"]["Amount"];
-            effective_credit_limit: components["schemas"]["Amount"];
-            credit_used: components["schemas"]["Amount"];
-            spendable_capacity: components["schemas"]["Amount"];
-            over_limit: boolean;
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-            password_changed_at: components["schemas"]["Timestamp"] | null;
-        };
-        AccountEnvelope: {
-            account: components["schemas"]["Account"];
-        };
-        AccountList: {
-            accounts: components["schemas"]["Account"][];
-        };
         LoginRequest: {
             username: string;
             password: string;
@@ -1435,462 +1450,55 @@ export interface components {
             current_password: string;
             new_password: string;
         };
-        CreateAccountRequest: {
+        /** @description 当前登录账户。余额与额度见 GET /api/points。 */
+        Account: {
+            /** Format: uuid */
+            id: string;
             username: string;
             display_name: string;
-            credit_limit: components["schemas"]["Amount"];
-            is_admin?: boolean;
-            /** @enum {string} */
-            status?: "active" | "disabled";
+            is_admin: boolean;
+            status: components["schemas"]["AccountStatus"];
+            must_change_password: boolean;
+            created_at: components["schemas"]["Timestamp"];
         };
-        /** @description initial_password 仅在创建或重置时返回一次。 */
-        AccountWithInitialPassword: {
+        AccountEnvelope: {
             account: components["schemas"]["Account"];
-            initial_password: string;
         };
-        UpdateAccountRequest: {
-            expected_version: number;
-            /** @enum {string} */
-            status?: "active" | "disabled";
-            credit_limit?: components["schemas"]["Amount"];
-            credit_frozen?: boolean;
-            is_admin?: boolean;
-        };
-        EmptyRequest: Record<string, never>;
-        PriceTier: {
-            name: string;
-            timezone: string;
-            min_prompt_tokens: number | null;
-            max_prompt_tokens: number | null;
-            weekdays: number[] | null;
-            start_minute_of_day: number | null;
-            end_minute_of_day: number | null;
-            input_price: components["schemas"]["Amount"];
-            output_price: components["schemas"]["Amount"];
-            cache_write_price: components["schemas"]["Amount"];
-            cache_read_price: components["schemas"]["Amount"];
-            /** @constant */
-            price_unit: "points_per_million_tokens";
-        };
-        PriceTierRequest: {
-            name: string;
-            min_prompt_tokens?: number | null;
-            max_prompt_tokens?: number | null;
-            timezone?: string;
-            weekdays?: number[] | null;
-            start_minute_of_day?: number | null;
-            end_minute_of_day?: number | null;
-            input_price: components["schemas"]["PriceString"];
-            output_price: components["schemas"]["PriceString"];
-            cache_write_price: components["schemas"]["PriceString"];
-            cache_read_price: components["schemas"]["PriceString"];
-        };
-        Model: {
-            id: string;
-            name: string;
-            provider: string;
-            context_window: number;
-            parameter_info: string;
-            input_modalities: string[];
-            output_modalities: string[];
-            supports_tools: boolean;
-            supports_structured_output: boolean;
-            supports_vision: boolean;
-            input_price: components["schemas"]["Amount"];
-            output_price: components["schemas"]["Amount"];
-            cache_write_price: components["schemas"]["Amount"];
-            cache_read_price: components["schemas"]["Amount"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            /** @constant */
-            price_unit: "points_per_million_tokens";
-            /** @enum {string} */
-            status: "active" | "disabled";
-            version: number;
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-            price_updated_at: components["schemas"]["Timestamp"];
-        };
-        ModelEnvelope: {
-            model: components["schemas"]["Model"];
-        };
-        ModelList: {
-            models: components["schemas"]["Model"][];
-        };
-        ModelRequest: {
-            /** @description 创建时必填；更新时以路径为准。 */
-            id?: string;
-            name: string;
-            provider: string;
-            context_window?: number;
-            parameter_info?: string;
-            input_modalities?: string[];
-            output_modalities?: string[];
-            supports_tools?: boolean;
-            supports_structured_output?: boolean;
-            supports_vision?: boolean;
-            input_price: components["schemas"]["PriceString"];
-            output_price: components["schemas"]["PriceString"];
-            cache_write_price: components["schemas"]["PriceString"];
-            cache_read_price: components["schemas"]["PriceString"];
-            price_tiers?: components["schemas"]["PriceTierRequest"][];
-            /** @enum {string} */
-            status: "active" | "disabled";
-            /** @description 仅更新时使用。 */
-            expected_version?: number;
-        };
-        Wallet: {
-            posted_balance: components["schemas"]["Amount"];
-            asset_reserved: components["schemas"]["Amount"];
-            spend_authorized: components["schemas"]["Amount"];
-            credit_limit: components["schemas"]["Amount"];
-            effective_credit_limit: components["schemas"]["Amount"];
-            credit_used: components["schemas"]["Amount"];
-            credit_frozen: boolean;
-            spendable_capacity: components["schemas"]["Amount"];
-            over_limit: boolean;
-            /** @enum {string} */
-            risk_status: "credit_frozen" | "over_limit" | "insufficient" | "normal";
-            updated_at: components["schemas"]["Timestamp"];
-        };
-        WalletEnvelope: {
-            wallet: components["schemas"]["Wallet"];
-        };
-        WalletResponse: {
-            wallet: components["schemas"]["Wallet"];
-            recovery_actions: {
-                /** @enum {string} */
-                kind: "market" | "my_orders";
-                href: string;
-            }[];
-        };
-        LedgerCounterparty: {
-            /** @enum {string} */
-            account_kind: "user" | "platform_incentive" | "platform_loss";
-            account_id: string;
-            business_role: string;
-            amount: components["schemas"]["Amount"];
-        };
-        LedgerEntry: {
-            /** @description 账本分录 ID 的十进制字符串，可作为 before 游标。 */
-            id: string;
-            transaction_id: string;
-            entry_ordinal: number;
-            business_role: string;
-            amount: components["schemas"]["Amount"];
-            posted_balance_before: components["schemas"]["Amount"];
-            posted_balance_after: components["schemas"]["Amount"];
-            created_at: components["schemas"]["Timestamp"];
-            /** @enum {string} */
-            transaction_kind: "transfer" | "admin_adjustment" | "bad_debt_transfer" | "hold_capture" | "self_channel_usage" | "reversal";
-            reason: string;
-            reference_type: string;
-            reference_id: string;
-            actor_account_id: string;
-            reversal_of_transaction_id: string;
-            hold_id: string;
-            counterparties: components["schemas"]["LedgerCounterparty"][];
-        };
-        LedgerTransactionEntry: {
-            /** @description 账本分录 ID 的十进制字符串，可作为 before 游标。 */
-            id: string;
-            transaction_id: string;
-            entry_ordinal: number;
-            business_role: string;
-            amount: components["schemas"]["Amount"];
-            posted_balance_before: components["schemas"]["Amount"];
-            posted_balance_after: components["schemas"]["Amount"];
-            created_at: components["schemas"]["Timestamp"];
-            /** @enum {string} */
-            transaction_kind: "transfer" | "admin_adjustment" | "bad_debt_transfer" | "hold_capture" | "self_channel_usage" | "reversal";
-            reason: string;
-            reference_type: string;
-            reference_id: string;
-            actor_account_id: string;
-            reversal_of_transaction_id: string;
-            hold_id: string;
-            counterparties: components["schemas"]["LedgerCounterparty"][];
-            account_id: string;
-            /** @enum {string} */
-            account_kind: "user" | "platform_incentive" | "platform_loss";
-        };
-        LedgerEntryPage: {
-            entries: components["schemas"]["LedgerEntry"][];
-            /** @description 下一页游标；已无更多时为空字符串。 */
-            next_before: string;
-        };
-        LedgerTransaction: {
-            id: string;
-            idempotency_key: string;
-            kind: string;
-            reason: string;
-            reference_type: string;
-            reference_id: string;
-            actor_account_id: string;
-            reversal_of_transaction_id: string;
-            hold_id: string;
-            entries: components["schemas"]["LedgerTransactionEntry"][];
-            created_at: components["schemas"]["Timestamp"];
-        };
-        LedgerTransactionEnvelope: {
-            transaction: components["schemas"]["LedgerTransaction"];
-        };
-        /** @description account_id 与 system_kind 二选一。 */
-        LedgerAccountRef: {
+        /** @description 对其他用户可见的最小账户信息。 */
+        Party: {
             /** Format: uuid */
-            account_id?: string;
-            /** @enum {string} */
-            system_kind?: "platform_incentive" | "platform_loss";
+            id: string;
+            display_name: string;
         };
-        LedgerAdjustmentRequest: {
-            from: components["schemas"]["LedgerAccountRef"];
-            to: components["schemas"]["LedgerAccountRef"];
-            amount: components["schemas"]["Amount"];
-            reason: string;
-            reference_type?: string;
-            reference_id?: string;
-        };
-        BadDebtRequest: {
+        /** @description 管理员视图中的账户引用。 */
+        AccountRef: {
             /** Format: uuid */
-            account_id: string;
-            amount: components["schemas"]["Amount"];
-            reason: string;
-            reference_id?: string;
-        };
-        LedgerMetrics: {
-            total_posted_balance: components["schemas"]["Amount"];
-            positive_posted_balance: components["schemas"]["Amount"];
-            negative_posted_balance: components["schemas"]["Amount"];
-            posted_projection_difference: components["schemas"]["Amount"];
-            posted_projection_mismatch_accounts: number;
-            asset_reservation_difference: components["schemas"]["Amount"];
-            spend_authorization_difference: components["schemas"]["Amount"];
-            hold_projection_mismatch_accounts: number;
-            zero_sum: boolean;
-            ledger_consistent: boolean;
-            total_credit_limit: components["schemas"]["Amount"];
-            credit_capacity_used: components["schemas"]["Amount"];
-            asset_reserved: components["schemas"]["Amount"];
-            spend_authorized: components["schemas"]["Amount"];
-            incentive_posted_balance: components["schemas"]["Amount"];
-            loss_posted_balance: components["schemas"]["Amount"];
-            over_limit_accounts: number;
-            credit_frozen_accounts: number;
-            ledger_account_count: number;
-        };
-        LedgerMetricsEnvelope: {
-            metrics: components["schemas"]["LedgerMetrics"];
-        };
-        ValidationSummary: {
             id: string;
-            validation_version: number;
-            attempt_seq: number;
-            /** @enum {string} */
-            status: "in_progress" | "passed" | "failed";
-            /** @description auth_failure、upstream_error、transport_error、timeout、response_too_large、invalid_response、configuration_error 或空串。 */
-            error_category: string;
-            http_status: number | null;
-            duration_milliseconds: number;
-            started_at: components["schemas"]["Timestamp"];
-            completed_at: components["schemas"]["Timestamp"] | null;
-        };
-        /** @description 含上游原始错误，仅渠道所有者与管理员可见。 */
-        ValidationAttempt: {
-            id: string;
-            validation_version: number;
-            attempt_seq: number;
-            /** @enum {string} */
-            status: "in_progress" | "passed" | "failed";
-            /** @description auth_failure、upstream_error、transport_error、timeout、response_too_large、invalid_response、configuration_error 或空串。 */
-            error_category: string;
-            http_status: number | null;
-            duration_milliseconds: number;
-            started_at: components["schemas"]["Timestamp"];
-            completed_at: components["schemas"]["Timestamp"] | null;
-            actor_account_id: string;
-            raw_error: string;
-            raw_error_truncated: boolean;
-        };
-        ValidationAttemptEnvelope: {
-            validation: components["schemas"]["ValidationAttempt"];
-        };
-        ValidationAttemptList: {
-            validation_attempts: components["schemas"]["ValidationAttempt"][];
-        };
-        OwnerOffer: {
-            id: string;
-            model_id: string;
-            model_name: string;
-            model_provider: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            upstream_model_id: string;
-            multiplier: components["schemas"]["Amount"];
-            /** @enum {string} */
-            status: "active" | "disabled" | "deleted";
-            validation_version: number;
-            version: number;
-            eligible: boolean;
-            ineligible_reason: string;
-            input_price: components["schemas"]["Amount"] | null;
-            output_price: components["schemas"]["Amount"] | null;
-            cache_write_price: components["schemas"]["Amount"] | null;
-            cache_read_price: components["schemas"]["Amount"] | null;
-            price_tiers: components["schemas"]["PriceTier"][];
-            call_success_rate: string | null;
-            ttft_milliseconds: number | null;
-            tokens_per_second: string | null;
-            call_count: number | null;
-            provider_income: components["schemas"]["Amount"] | null;
-            latest_validation: components["schemas"]["ValidationSummary"] | null;
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-        };
-        OwnerOfferEnvelope: {
-            offer: components["schemas"]["OwnerOffer"];
-        };
-        OwnerChannel: {
-            id: string;
-            owner_account_id: string;
-            owner_display_name: string;
+            username: string;
             display_name: string;
-            base_url: string;
-            credential_configured: boolean;
-            credential_version: number;
-            credential_updated_at: components["schemas"]["Timestamp"] | null;
-            /** @enum {string} */
-            status: "draft" | "published" | "paused" | "deleted";
-            version: number;
-            offers: components["schemas"]["OwnerOffer"][];
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
         };
-        OwnerChannelEnvelope: {
-            channel: components["schemas"]["OwnerChannel"];
-        };
-        OwnerChannelList: {
-            channels: components["schemas"]["OwnerChannel"][];
-        };
-        AdminChannelOffer: {
+        KeyRef: {
+            /** Format: uuid */
             id: string;
-            model_id: string;
-            model_name: string;
-            model_provider: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            multiplier: components["schemas"]["Amount"];
-            /** @enum {string} */
-            status: "active" | "disabled" | "deleted";
-            validation_version: number;
-            latest_validation: components["schemas"]["ValidationSummary"] | null;
+            name: string;
         };
-        AdminChannel: {
-            id: string;
-            owner_account_id: string;
-            owner_display_name: string;
-            display_name: string;
-            credential_configured: boolean;
-            credential_version: number;
-            credential_updated_at: components["schemas"]["Timestamp"] | null;
-            /** @enum {string} */
-            status: "draft" | "published" | "paused" | "deleted";
-            version: number;
-            offers: components["schemas"]["AdminChannelOffer"][];
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
+        TierRef: {
+            seq: number;
+            name: string;
         };
-        AdminChannelEnvelope: {
-            channel: components["schemas"]["AdminChannel"];
+        /** @description 四个单价，积分/百万 token。 */
+        ModelPrices: {
+            input: components["schemas"]["Price"];
+            output: components["schemas"]["Price"];
+            cache_write: components["schemas"]["Price"];
+            cache_read: components["schemas"]["Price"];
         };
-        AdminChannelList: {
-            channels: components["schemas"]["AdminChannel"][];
-        };
-        MarketOffer: {
-            offer_id: string;
-            channel_id: string;
-            channel_display_name: string;
-            owner_account_id: string;
-            owner_display_name: string;
-            model_id: string;
-            model_name: string;
-            model_provider: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            multiplier: components["schemas"]["Amount"];
-            input_price: components["schemas"]["Amount"];
-            output_price: components["schemas"]["Amount"];
-            cache_write_price: components["schemas"]["Amount"];
-            cache_read_price: components["schemas"]["Amount"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            /** @enum {string} */
-            validation_status: "in_progress" | "passed" | "failed";
-            last_tested_at: components["schemas"]["Timestamp"] | null;
-            call_success_rate: string | null;
-            ttft_milliseconds: number | null;
-            tokens_per_second: string | null;
-            call_count: number | null;
-        };
-        MarketOfferPage: {
-            offers: components["schemas"]["MarketOffer"][];
-            /** @description 下一页游标；已无更多时为空字符串。 */
-            next_after: string;
-        };
-        MarketChannel: {
-            id: string;
-            display_name: string;
-            owner_account_id: string;
-            owner_display_name: string;
-            /** @enum {string} */
-            status: "draft" | "published" | "paused" | "deleted";
-            offers: components["schemas"]["MarketOffer"][];
-        };
-        MarketChannelEnvelope: {
-            channel: components["schemas"]["MarketChannel"];
-        };
-        OfferInput: {
-            model_id: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            upstream_model_id: string;
-            multiplier: components["schemas"]["Amount"];
-        };
-        CreateChannelRequest: {
-            display_name: string;
-            base_url: string;
-            credential: string;
-            offers?: components["schemas"]["OfferInput"][];
-        };
-        UpdateChannelRequest: {
-            display_name: string;
-            base_url: string;
-            credential?: string | null;
-            expected_version: number;
-        };
-        AddOfferRequest: {
-            model_id: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            upstream_model_id: string;
-            multiplier: components["schemas"]["Amount"];
-            /** @description 所属渠道当前版本。 */
-            expected_version: number;
-        };
-        UpdateOfferRequest: {
-            upstream_model_id: string;
-            multiplier: components["schemas"]["Amount"];
-            expected_version: number;
-        };
-        VersionedRequest: {
-            expected_version: number;
-            reason?: string;
-        };
-        ValidateOfferRequest: {
-            confirmed_upstream_cost?: boolean;
-        };
-        ReencryptRequest: {
-            limit?: number;
-        };
-        ReencryptResponse: {
-            reencrypted: number;
+        /** @description 乘以渠道倍率后的四个现价，积分/百万 token。 */
+        EffectivePrices: {
+            input: components["schemas"]["Amount"];
+            output: components["schemas"]["Amount"];
+            cache_write: components["schemas"]["Amount"];
+            cache_read: components["schemas"]["Amount"];
         };
         Usage: {
             input_tokens: number;
@@ -1898,506 +1506,1044 @@ export interface components {
             cache_write_tokens: number;
             cache_read_tokens: number;
         };
-        ApiKeyPoolMember: {
-            priority: number;
-            offer_id: string;
-            channel_id: string;
-            channel_name: string;
-            provider_name: string;
-            added_validation_version: number;
-            current_validation_version: number;
-            eligible: boolean;
-            ineligible_reason: string;
-            input_price: components["schemas"]["Amount"];
-            output_price: components["schemas"]["Amount"];
-            cache_write_price: components["schemas"]["Amount"];
-            cache_read_price: components["schemas"]["Amount"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            success_rate: string | null;
-            ttft_milliseconds: number | null;
-            tokens_per_second: string | null;
+        /** @description available = balance + credit_limit，即还能透支消费的额度，超限后为负。 */
+        PointsSummary: {
+            balance: components["schemas"]["Amount"];
+            credit_limit: components["schemas"]["Amount"];
+            available: components["schemas"]["Amount"];
         };
-        ApiKeyPool: {
-            id: string;
-            model_id: string;
-            model_name: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            version: number;
-            members: components["schemas"]["ApiKeyPoolMember"][];
-            created_at: components["schemas"]["Timestamp"];
+        PointsTrendPoint: {
+            date: components["schemas"]["Date"];
+            balance: components["schemas"]["Amount"];
+            income: components["schemas"]["Amount"];
+            spend: components["schemas"]["Amount"];
+        };
+        /** @description 期间对账：期初 + 收入 - 支出 = 期末，difference 正常为 "0"。 */
+        PointsPeriod: {
+            from: components["schemas"]["Timestamp"];
+            to: components["schemas"]["Timestamp"];
+            opening_balance: components["schemas"]["Amount"];
+            closing_balance: components["schemas"]["Amount"];
+            income: components["schemas"]["Amount"];
+            spend: components["schemas"]["Amount"];
+            difference: components["schemas"]["Amount"];
+        };
+        /** @description 积分概况。trend 与 period 由 Feature G 补充，Feature A 不返回。 */
+        Points: {
+            balance: components["schemas"]["Amount"];
+            credit_limit: components["schemas"]["Amount"];
+            available: components["schemas"]["Amount"];
             updated_at: components["schemas"]["Timestamp"];
+            /** @description [G] 最近 30 天每日走势，由 Feature G 提供。 */
+            trend?: components["schemas"]["PointsTrendPoint"][];
+            period?: components["schemas"]["PointsPeriod"];
         };
-        ApiKey: {
+        LedgerRelated: {
+            /** @enum {string} */
+            type: "call" | "c2c_order" | "c2c_trade" | "account";
+            /** Format: uuid */
+            id: string;
+        };
+        PointsEntry: {
+            /** @description 分录 ID，亦为分页游标。 */
+            id: string;
+            /** Format: uuid */
+            transaction_id: string;
+            created_at: components["schemas"]["Timestamp"];
+            type: components["schemas"]["TransactionType"];
+            reason: string;
+            related: components["schemas"]["LedgerRelated"] | null;
+            amount: components["schemas"]["Amount"];
+            balance_after: components["schemas"]["Amount"];
+            api_key: components["schemas"]["KeyRef"] | null;
+        };
+        /** @description [G] 按天与按 Key 汇总。 */
+        PointsEntrySummary: {
+            by_day: {
+                date: components["schemas"]["Date"];
+                income: components["schemas"]["Amount"];
+                spend: components["schemas"]["Amount"];
+                net: components["schemas"]["Amount"];
+            }[];
+            by_key: {
+                api_key: components["schemas"]["KeyRef"] | null;
+                spend: components["schemas"]["Amount"];
+                entries: number;
+            }[];
+        };
+        PointsEntryPage: {
+            items: components["schemas"]["PointsEntry"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+            summary?: components["schemas"]["PointsEntrySummary"];
+        };
+        DefaultKey: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            prefix: string;
+        };
+        HomeResponse: {
+            points: components["schemas"]["PointsSummary"];
+            today: {
+                spend: components["schemas"]["Amount"];
+                calls: number;
+                succeeded_calls: number;
+            };
+            channels: {
+                today_revenue: components["schemas"]["Amount"];
+                online: number;
+                total: number;
+            };
+            default_key: components["schemas"]["DefaultKey"] | null;
+            /** @description 待我处理（付款或放行）的 C2C 交易数。 */
+            pending_c2c_trades: number;
+            recent_calls: components["schemas"]["CallSummary"][];
+        };
+        /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
+        PriceTier: {
+            seq: number;
+            name: string;
+            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
+            min_prompt_tokens: number | null;
+            /** @description 输入侧 token 上限，不含。 */
+            max_prompt_tokens: number | null;
+            /** @description IANA 时区，默认 UTC。 */
+            timezone: string;
+            /** @description ISO 星期（1=周一）；null 表示每天。 */
+            weekdays: number[] | null;
+            start_minute_of_day: number | null;
+            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
+            end_minute_of_day: number | null;
+            prices: components["schemas"]["ModelPrices"];
+        };
+        PriceTierInput: {
+            name?: string;
+            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
+            min_prompt_tokens?: number | null;
+            /** @description 输入侧 token 上限，不含。 */
+            max_prompt_tokens?: number | null;
+            /** @description IANA 时区，默认 UTC。 */
+            timezone?: string;
+            /** @description ISO 星期（1=周一）；null 表示每天。 */
+            weekdays?: number[] | null;
+            start_minute_of_day?: number | null;
+            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
+            end_minute_of_day?: number | null;
+            prices: components["schemas"]["ModelPrices"];
+        };
+        AdminModel: {
             id: string;
             display_name: string;
-            prefix: string;
-            generation: number;
-            /** @enum {string} */
-            status: "active" | "disabled" | "deleted";
-            version: number;
-            pools: components["schemas"]["ApiKeyPool"][];
-            last_used_at: components["schemas"]["Timestamp"] | null;
+            base_prices: components["schemas"]["ModelPrices"];
+            price_tiers: components["schemas"]["PriceTier"][];
+            enabled: boolean;
+            sort_order: number;
+            provider: string;
+            context_window: number | null;
+            input_modalities: string[];
+            output_modalities: string[];
+            supports_tools: boolean;
+            supports_structured_output: boolean;
+            supports_vision: boolean;
+            parameter_info: string;
             created_at: components["schemas"]["Timestamp"];
             updated_at: components["schemas"]["Timestamp"];
+        };
+        AdminModelList: {
+            items: components["schemas"]["AdminModel"][];
+        };
+        AdminModelEnvelope: {
+            model: components["schemas"]["AdminModel"];
+        };
+        ModelCreateRequest: {
+            /** @description 模型名，即客户端请求中的 model；不含 / 与 :。 */
+            id: string;
+            display_name: string;
+            base_prices: components["schemas"]["ModelPrices"];
+            price_tiers?: components["schemas"]["PriceTierInput"][];
+            enabled?: boolean;
+            sort_order?: number;
+            provider?: string;
+            context_window?: number | null;
+            input_modalities?: string[];
+            output_modalities?: string[];
+            supports_tools?: boolean;
+            supports_structured_output?: boolean;
+            supports_vision?: boolean;
+            parameter_info?: string;
+        };
+        ModelUpdateRequest: {
+            display_name?: string;
+            base_prices?: components["schemas"]["ModelPrices"];
+            /** @description 提供时整组替换价格档；空数组表示删除全部档位。 */
+            price_tiers?: components["schemas"]["PriceTierInput"][];
+            enabled?: boolean;
+            sort_order?: number;
+            provider?: string;
+            context_window?: number | null;
+            input_modalities?: string[];
+            output_modalities?: string[];
+            supports_tools?: boolean;
+            supports_structured_output?: boolean;
+            supports_vision?: boolean;
+            parameter_info?: string;
+        };
+        /** @description 启用模型的列表项。 */
+        CatalogModel: {
+            id: string;
+            display_name: string;
+            provider: string;
+            context_window: number | null;
+            input_modalities: string[];
+            output_modalities: string[];
+            supports_tools: boolean;
+            supports_structured_output: boolean;
+            supports_vision: boolean;
+            parameter_info: string;
+            base_prices: components["schemas"]["ModelPrices"];
+            current_tier: components["schemas"]["TierRef"] | null;
+            lowest_prices: components["schemas"]["EffectivePrices"] | null;
+            formats: components["schemas"]["Format"][];
+            online_channels: number;
+        };
+        CatalogModelList: {
+            items: components["schemas"]["CatalogModel"][];
+        };
+        ModelChannel: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            owner: components["schemas"]["Party"];
+            is_mine: boolean;
+            formats: components["schemas"]["Format"][];
+            multiplier: components["schemas"]["Multiplier"];
+            current_prices: components["schemas"]["EffectivePrices"];
+            success_rate_24h: components["schemas"]["Ratio"] | null;
+            ttft_p50_ms: number | null;
+            /**
+             * @description available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM/每日收入上限。
+             * @enum {string}
+             */
+            state: "available" | "cooldown" | "limited";
+            cooldown_remaining_seconds: number | null;
+        };
+        RoutingPreference: {
+            model_id: string;
+            /**
+             * @description default 表示没有设置（便宜优先 + 全部渠道）。
+             * @enum {string}
+             */
+            source: "default" | "account" | "key";
+            mode: components["schemas"]["RoutingMode"];
+            /** @description manual 模式的渠道顺序；新上架渠道排在最后且默认不勾选。 */
+            order: string[];
+            /** @description 取消勾选的渠道。 */
+            excluded: string[];
+            /** @description null 使用平台默认。 */
+            max_attempts: number | null;
+            ttft_timeout_ms: number | null;
+            updated_at: components["schemas"]["NullableTimestamp"];
+        };
+        RoutingPreferenceInput: {
+            mode: components["schemas"]["RoutingMode"];
+            order?: string[];
+            excluded?: string[];
+            max_attempts?: number | null;
+            ttft_timeout_ms?: number | null;
+        };
+        ModelDetail: {
+            model: components["schemas"]["CatalogModel"];
+            price_tiers: components["schemas"]["PriceTier"][];
+            channels: components["schemas"]["ModelChannel"][];
+            routing: components["schemas"]["RoutingPreference"];
+        };
+        ApiKeySpend: {
+            today: components["schemas"]["Amount"];
+            month: components["schemas"]["Amount"];
+            total: components["schemas"]["Amount"];
+        };
+        ApiKey: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            prefix: string;
+            /** @enum {string} */
+            status: "enabled" | "disabled";
+            is_default: boolean;
+            expires_at: components["schemas"]["NullableTimestamp"];
+            /** @description 空数组表示全部模型。 */
+            allowed_models: string[];
+            budget_daily: components["schemas"]["NullableAmount"];
+            budget_monthly: components["schemas"]["NullableAmount"];
+            budget_total: components["schemas"]["NullableAmount"];
+            /** @description 客户端模型名 → 平台模型名。 */
+            model_aliases: {
+                [key: string]: string;
+            };
+            /** @description 设置了单独路由的模型。 */
+            routed_models: string[];
+            spend: components["schemas"]["ApiKeySpend"];
+            last_used_at: components["schemas"]["NullableTimestamp"];
+            created_at: components["schemas"]["Timestamp"];
+            updated_at: components["schemas"]["Timestamp"];
+        };
+        ApiKeyList: {
+            items: components["schemas"]["ApiKey"][];
         };
         ApiKeyEnvelope: {
             key: components["schemas"]["ApiKey"];
         };
-        ApiKeyList: {
-            keys: components["schemas"]["ApiKey"][];
+        ApiKeyCreateRequest: {
+            name: string;
+            /** @enum {string} */
+            status?: "enabled" | "disabled";
+            expires_at?: components["schemas"]["NullableTimestamp"];
+            /** @description 空数组表示全部模型。 */
+            allowed_models?: string[];
+            budget_daily?: components["schemas"]["NullableAmount"];
+            budget_monthly?: components["schemas"]["NullableAmount"];
+            budget_total?: components["schemas"]["NullableAmount"];
+            /** @description 客户端模型名 → 平台模型名。 */
+            model_aliases?: {
+                [key: string]: string;
+            };
         };
-        ApiKeyWithSecret: {
+        ApiKeyUpdateRequest: {
+            name?: string;
+            /** @enum {string} */
+            status?: "enabled" | "disabled";
+            expires_at?: components["schemas"]["NullableTimestamp"];
+            /** @description 空数组表示全部模型。 */
+            allowed_models?: string[];
+            budget_daily?: components["schemas"]["NullableAmount"];
+            budget_monthly?: components["schemas"]["NullableAmount"];
+            budget_total?: components["schemas"]["NullableAmount"];
+            /** @description 客户端模型名 → 平台模型名。 */
+            model_aliases?: {
+                [key: string]: string;
+            };
+        };
+        ApiKeyCreated: {
             key: components["schemas"]["ApiKey"];
-            /** @description 平台 API Key 明文，仅在创建或轮换时返回一次。 */
             secret: string;
         };
-        ApiPoolRequest: {
-            model_id: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            offer_ids: string[];
+        ApiKeyDetail: {
+            key: components["schemas"]["ApiKey"];
+            routing: components["schemas"]["RoutingPreference"][];
         };
-        ApiKeyConfigRequest: {
+        /** @description 完整 Key；每次读取写入审计。 */
+        ApiKeySecret: {
+            secret: string;
+        };
+        /** @description 请求头规则：设置/覆写与删除。 */
+        HeaderRules: {
+            set: {
+                name: string;
+                value: string;
+            }[];
+            remove: string[];
+        };
+        /** @description 高级设置；null 表示使用平台默认。 */
+        ChannelAdvanced: {
+            user_agent: string | null;
+            header_rules: components["schemas"]["HeaderRules"];
+            concurrency_limit: number | null;
+            rpm_limit: number | null;
+            daily_revenue_cap: components["schemas"]["NullableAmount"];
+            ttft_timeout_ms: number | null;
+            total_timeout_ms: number | null;
+            cooldown_failures: number | null;
+            cooldown_seconds: number | null;
+        };
+        ChannelAdvancedInput: {
+            user_agent?: string | null;
+            header_rules?: components["schemas"]["HeaderRules"];
+            concurrency_limit?: number | null;
+            rpm_limit?: number | null;
+            daily_revenue_cap?: components["schemas"]["NullableAmount"];
+            ttft_timeout_ms?: number | null;
+            total_timeout_ms?: number | null;
+            cooldown_failures?: number | null;
+            cooldown_seconds?: number | null;
+        };
+        FormatTest: {
+            ok: boolean;
+            status_code: number | null;
+            error: string | null;
+            duration_ms: number | null;
+            tested_at: components["schemas"]["Timestamp"];
+        };
+        ChannelModel: {
+            model_id: string;
             display_name: string;
-            /** @description 仅更新时使用。 */
-            expected_version?: number;
-            pools: components["schemas"]["ApiPoolRequest"][];
+            upstream_model: string;
+            multiplier: components["schemas"]["Multiplier"];
+            formats: components["schemas"]["Format"][];
+            /** @description 键为格式。 */
+            format_tests: {
+                [key: string]: components["schemas"]["FormatTest"];
+            };
+            enabled: boolean;
+            current_prices: components["schemas"]["EffectivePrices"];
         };
-        ApiKeyVersionRequest: {
-            expected_version: number;
-        };
-        ApiKeyPoolMemberRequest: {
-            expected_version: number;
+        ChannelModelInput: {
             model_id: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            offer_id: string;
-            priority?: number;
+            /** @description 默认与 model_id 相同（模型重定向）。 */
+            upstream_model?: string;
+            multiplier?: components["schemas"]["Multiplier"];
+            formats: components["schemas"]["Format"][];
+            enabled?: boolean;
         };
-        GatewayAttempt: {
-            id: string;
-            sequence: number;
-            offer_id: string;
-            channel_name: string;
-            provider_account_id: string;
-            /** @enum {string} */
-            status: "in_progress" | "pending_delivery" | "succeeded" | "failed" | "cancelled" | "incomplete";
-            http_status: number;
-            error_code: string;
-            raw_error: string;
-            raw_error_truncated: boolean;
-            semantic_committed: boolean;
-            ttft_milliseconds: number | null;
-            duration_milliseconds: number | null;
-            usage: components["schemas"]["Usage"] | null;
-            tokens_per_second: string | null;
-            started_at: components["schemas"]["Timestamp"];
-            completed_at: components["schemas"]["Timestamp"] | null;
+        ChannelToday: {
+            revenue: components["schemas"]["Amount"];
+            calls: number;
+            success_rate: components["schemas"]["Ratio"] | null;
         };
-        GatewayCall: {
+        /** @description 我的渠道；上游 Key 不回显。 */
+        Channel: {
+            /** Format: uuid */
             id: string;
-            consumer_account_id: string;
-            api_key_id: string;
-            key_prefix: string;
-            key_generation: number;
-            pool_id: string;
-            pool_version: number;
-            model_id: string;
-            /** @enum {string} */
-            protocol: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-            /** @enum {string} */
-            status: "rejected" | "in_progress" | "pending_delivery" | "succeeded" | "failed" | "incomplete" | "cancelled";
-            decision_code: string;
-            candidate_count: number;
-            attempt_count: number;
-            hold_id: string;
-            preauthorized: components["schemas"]["Amount"];
-            zero_hold_reason: string;
-            fee_rate_version: number;
-            fee_rate_nano: number;
-            final_offer_id: string;
-            final_channel_name: string;
-            completion_reason: string;
-            usage: components["schemas"]["Usage"] | null;
-            provider_charge: components["schemas"]["Amount"];
-            platform_fee: components["schemas"]["Amount"];
-            settled_price_tier_seq: number;
-            final_http_status: number;
-            attempts: components["schemas"]["GatewayAttempt"][];
+            name: string;
+            base_url: string;
+            status: components["schemas"]["ChannelStatus"];
+            suspended_reason: string | null;
+            cooldown_until: components["schemas"]["NullableTimestamp"];
+            models: components["schemas"]["ChannelModel"][];
+            advanced: components["schemas"]["ChannelAdvanced"];
+            today: components["schemas"]["ChannelToday"];
             created_at: components["schemas"]["Timestamp"];
-            completed_at: components["schemas"]["Timestamp"] | null;
+            updated_at: components["schemas"]["Timestamp"];
         };
-        GatewayCallEnvelope: {
-            call: components["schemas"]["GatewayCall"];
+        ChannelList: {
+            items: components["schemas"]["Channel"][];
         };
-        GatewayCallList: {
-            calls: components["schemas"]["GatewayCall"][];
+        ChannelEnvelope: {
+            channel: components["schemas"]["Channel"];
         };
-        PendingItem: {
+        ChannelEvent: {
             id: string;
             /** @enum {string} */
-            kind: "c2c_release" | "c2c_payment" | "channel_failed" | "channel_paused" | "route_ineligible" | "route_single";
-            /** @description 事项类别徽标文字。 */
+            kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed";
+            reason: string;
+            created_at: components["schemas"]["Timestamp"];
+        };
+        ChannelDetail: {
+            channel: components["schemas"]["Channel"];
+            events: components["schemas"]["ChannelEvent"][];
+        };
+        ChannelDiscoverRequest: {
+            base_url: string;
+            api_key: string;
+        };
+        DiscoveredModel: {
+            /** @description 上游模型名。 */
+            id: string;
+            matched_model_id: string | null;
+            suggested_formats: components["schemas"]["Format"][];
+        };
+        ChannelDiscoverResponse: {
+            /** @description 规范化后的 Base URL。 */
+            base_url: string;
+            upstream_models: components["schemas"]["DiscoveredModel"][];
+        };
+        ChannelCreateRequest: {
+            name: string;
+            base_url: string;
+            api_key: string;
+            /** @enum {string} */
+            status?: "listed" | "unlisted";
+            models: components["schemas"]["ChannelModelInput"][];
+            advanced?: components["schemas"]["ChannelAdvancedInput"];
+        };
+        ChannelUpdateRequest: {
+            name?: string;
+            base_url?: string;
+            /** @description 提供时替换上游 Key。 */
+            api_key?: string;
+            /** @enum {string} */
+            status?: "listed" | "unlisted";
+            /** @description 提供时整组替换。 */
+            models?: components["schemas"]["ChannelModelInput"][];
+            advanced?: components["schemas"]["ChannelAdvancedInput"];
+        };
+        ChannelTestRequest: {
+            /** @description 省略时测试全部模型。 */
+            model_ids?: string[];
+            /** @description 省略时测试四种格式。 */
+            formats?: components["schemas"]["Format"][];
+            /** @description 为 true 时把通过的格式写回 formats。 */
+            apply?: boolean;
+        };
+        ChannelTestResult: {
+            model_id: string;
+            format: components["schemas"]["Format"];
+            ok: boolean;
+            status_code: number | null;
+            error: string | null;
+            duration_ms: number;
+        };
+        ChannelTestResponse: {
+            results: components["schemas"]["ChannelTestResult"][];
+            channel: components["schemas"]["Channel"];
+        };
+        ChannelRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        CallAttempt: {
+            channel: components["schemas"]["ChannelRef"] | null;
+            status_code: number | null;
+            error_code: string | null;
+            /** @description 上游原始错误，最多 4KB，30 天后清理。 */
+            error_message: string | null;
+            connect_ms: number | null;
+            ttft_ms: number | null;
+            duration_ms: number | null;
+            response_bytes: number | null;
+            /** @description 例如 completed、upstream_error、timeout_ttft、timeout_total、client_disconnected。 */
+            end_reason: string;
+        };
+        /** @description 调用列表项。charged = cost + fee，为调用方实际扣除。 */
+        CallSummary: {
+            /**
+             * Format: uuid
+             * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
+             */
+            id: string;
+            created_at: components["schemas"]["Timestamp"];
+            completed_at: components["schemas"]["NullableTimestamp"];
+            model_id: string | null;
+            requested_model: string;
+            format: components["schemas"]["Format"];
+            stream: boolean;
+            tag: string | null;
+            api_key: components["schemas"]["KeyRef"] | null;
+            outcome: components["schemas"]["CallOutcome"];
+            channel: components["schemas"]["ChannelRef"] | null;
+            usage: components["schemas"]["Usage"];
+            cost: components["schemas"]["Amount"];
+            fee: components["schemas"]["Amount"];
+            charged: components["schemas"]["Amount"];
+            ttft_ms: number | null;
+            duration_ms: number | null;
+        };
+        PriceSnapshot: {
+            base_prices: components["schemas"]["ModelPrices"];
+            tier: components["schemas"]["TierRef"] | null;
+            multiplier: components["schemas"]["Multiplier"];
+            fee_rate_nano: number;
+            prices: components["schemas"]["EffectivePrices"];
+        };
+        CallDetail: {
+            /**
+             * Format: uuid
+             * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
+             */
+            id: string;
+            created_at: components["schemas"]["Timestamp"];
+            completed_at: components["schemas"]["NullableTimestamp"];
+            model_id: string | null;
+            requested_model: string;
+            format: components["schemas"]["Format"];
+            stream: boolean;
+            tag: string | null;
+            api_key: components["schemas"]["KeyRef"] | null;
+            outcome: components["schemas"]["CallOutcome"];
+            channel: components["schemas"]["ChannelRef"] | null;
+            usage: components["schemas"]["Usage"];
+            cost: components["schemas"]["Amount"];
+            fee: components["schemas"]["Amount"];
+            charged: components["schemas"]["Amount"];
+            ttft_ms: number | null;
+            duration_ms: number | null;
+            routing_mode: components["schemas"]["RoutingMode"] | null;
+            /** @enum {string|null} */
+            routing_source: "default" | "account" | "key" | null;
+            client_user_agent: string | null;
+            attempts: components["schemas"]["CallAttempt"][];
+            price_snapshot: components["schemas"]["PriceSnapshot"] | null;
+            output_tokens_per_second: number | null;
+            inter_token_p50_ms: number | null;
+            inter_token_p95_ms: number | null;
+            response_bytes: number | null;
+            /** Format: uuid */
+            ledger_transaction_id: string | null;
+        };
+        CallDetailEnvelope: {
+            call: components["schemas"]["CallDetail"];
+        };
+        /** @description 当前筛选条件下的汇总。 */
+        CallStats: {
+            calls: number;
+            succeeded: number;
+            failed: number;
+            success_rate: components["schemas"]["Ratio"] | null;
+            charged: components["schemas"]["Amount"];
+            input_tokens: number;
+            output_tokens: number;
+            ttft_p50_ms: number | null;
+        };
+        CallPage: {
+            items: components["schemas"]["CallSummary"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+            summary: components["schemas"]["CallStats"];
+        };
+        UsageRow: {
+            /** @description 分组键：日期、模型名、Key ID 或标签（空标签为 ""）。 */
+            key: string;
             label: string;
+            calls: number;
+            succeeded: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_write_tokens: number;
+            cache_read_tokens: number;
+            charged: components["schemas"]["Amount"];
+        };
+        UsageReport: {
             /** @enum {string} */
-            tone: "danger" | "warning" | "info";
-            title: string;
-            detail: string;
-            /** @description 前端路由。 */
-            to: string;
+            group_by: "day" | "model" | "key" | "tag";
+            from: components["schemas"]["Timestamp"];
+            to: components["schemas"]["Timestamp"];
+            items: components["schemas"]["UsageRow"][];
+            total: components["schemas"]["UsageRow"];
         };
-        PendingItemList: {
-            items: components["schemas"]["PendingItem"][];
+        ChannelStats: {
+            from: components["schemas"]["Timestamp"];
+            to: components["schemas"]["Timestamp"];
+            calls: number;
+            succeeded: number;
+            success_rate: components["schemas"]["Ratio"] | null;
+            revenue: components["schemas"]["Amount"];
+            ttft_p50_ms: number | null;
+            output_tokens_per_second_p50: number | null;
+            by_model: {
+                model_id: string;
+                calls: number;
+                succeeded: number;
+                revenue: components["schemas"]["Amount"];
+            }[];
+            daily: {
+                date: components["schemas"]["Date"];
+                calls: number;
+                succeeded: number;
+                revenue: components["schemas"]["Amount"];
+            }[];
+            events: components["schemas"]["ChannelEvent"][];
         };
-        Dashboard: {
-            consumer_spent: components["schemas"]["Amount"];
-            provider_income: components["schemas"]["Amount"];
-            today_spent: components["schemas"]["Amount"];
-            today_succeeded_calls: number;
-            today_external_provider_income: components["schemas"]["Amount"];
-            active_key_count: number;
-            pool_count: number;
-            healthy_offer_count: number;
-            unhealthy_offer_count: number;
-            recent_calls: components["schemas"]["GatewayCall"][];
-        };
-        C2CPaymentMethod: {
+        /** @description 渠道所有者视角的调用，不含调用者身份。 */
+        ChannelCall: {
+            /** Format: uuid */
             id: string;
-            /** @enum {string} */
-            type: "wechat" | "alipay" | "bank_transfer" | "other";
-            contact: string;
-            instructions: string;
-            qr_available: boolean;
-            qr_url: string;
+            created_at: components["schemas"]["Timestamp"];
+            model_id: string | null;
+            format: components["schemas"]["Format"];
+            stream: boolean;
+            outcome: components["schemas"]["CallOutcome"];
+            usage: components["schemas"]["Usage"];
+            revenue: components["schemas"]["Amount"];
+            ttft_ms: number | null;
+            duration_ms: number | null;
+            error: {
+                status_code: number | null;
+                error_code: string | null;
+                error_message: string | null;
+            } | null;
         };
-        C2COrderPaymentMethod: {
+        ChannelCallPage: {
+            items: components["schemas"]["ChannelCall"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+        };
+        AdminCall: {
+            /**
+             * Format: uuid
+             * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
+             */
             id: string;
-            /** @enum {string} */
-            type: "wechat" | "alipay" | "bank_transfer" | "other";
-            position: number;
-            contact: string;
-            instructions: string;
-            qr_available: boolean;
-            qr_url: string;
+            created_at: components["schemas"]["Timestamp"];
+            completed_at: components["schemas"]["NullableTimestamp"];
+            model_id: string | null;
+            requested_model: string;
+            format: components["schemas"]["Format"];
+            stream: boolean;
+            tag: string | null;
+            api_key: components["schemas"]["KeyRef"] | null;
+            outcome: components["schemas"]["CallOutcome"];
+            channel: components["schemas"]["ChannelRef"] | null;
+            usage: components["schemas"]["Usage"];
+            cost: components["schemas"]["Amount"];
+            fee: components["schemas"]["Amount"];
+            charged: components["schemas"]["Amount"];
+            ttft_ms: number | null;
+            duration_ms: number | null;
+            account: components["schemas"]["AccountRef"];
         };
+        AdminCallPage: {
+            items: components["schemas"]["AdminCall"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+            summary: components["schemas"]["CallStats"];
+        };
+        PaymentMethod: {
+            /** @description 收款渠道名，例如 支付宝。 */
+            channel: string;
+            /** @description 收款账号与说明文字。 */
+            account: string;
+        };
+        /** @description 公开卖单；收款账号只对交易双方可见。 */
         C2COrder: {
+            /** Format: uuid */
             id: string;
-            owner_account_id: string;
-            owner_display_name: string;
+            seller: components["schemas"]["Party"];
+            available: components["schemas"]["Amount"];
+            min_per_trade: components["schemas"]["Amount"];
+            max_per_trade: components["schemas"]["NullableAmount"];
+            /** @description 每积分单价（人民币分）。 */
             unit_price_fen: number;
+            payment_channels: string[];
+            created_at: components["schemas"]["Timestamp"];
+        };
+        C2COrderPage: {
+            items: components["schemas"]["C2COrder"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+        };
+        /** @description 我的卖单；total = available + in_trade + sold + closed。 */
+        C2CMyOrder: {
+            /** Format: uuid */
+            id: string;
             total: components["schemas"]["Amount"];
             available: components["schemas"]["Amount"];
-            allocated: components["schemas"]["Amount"];
-            settled: components["schemas"]["Amount"];
+            in_trade: components["schemas"]["Amount"];
+            sold: components["schemas"]["Amount"];
             closed: components["schemas"]["Amount"];
-            minimum: components["schemas"]["Amount"];
-            maximum: components["schemas"]["Amount"];
+            unit_price_fen: number;
+            min_per_trade: components["schemas"]["Amount"];
+            max_per_trade: components["schemas"]["NullableAmount"];
+            payment_methods: components["schemas"]["PaymentMethod"][];
             /** @enum {string} */
-            status: "open" | "allocated" | "filled" | "cancelled";
-            takeable: boolean;
-            payment_types: ("wechat" | "alipay" | "bank_transfer" | "other")[];
-            payment_methods: components["schemas"]["C2COrderPaymentMethod"][];
+            status: "open" | "closed" | "filled";
             created_at: components["schemas"]["Timestamp"];
             updated_at: components["schemas"]["Timestamp"];
-            cancelled_at: components["schemas"]["Timestamp"] | null;
+            closed_at: components["schemas"]["NullableTimestamp"];
         };
-        C2COrderEnvelope: {
-            order: components["schemas"]["C2COrder"];
+        C2CMyOrderPage: {
+            items: components["schemas"]["C2CMyOrder"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
         };
-        /** @description 参与方视图；不含管理员专属的处罚事件。 */
+        C2CMyOrderEnvelope: {
+            order: components["schemas"]["C2CMyOrder"];
+        };
+        /** @description 只能卖正余额；挂单时积分转入 C2C 托管账户。 */
+        C2COrderCreateRequest: {
+            amount: components["schemas"]["Amount"];
+            unit_price_fen: number;
+            min_per_trade: components["schemas"]["Amount"];
+            max_per_trade?: components["schemas"]["NullableAmount"];
+            payment_methods: components["schemas"]["PaymentMethod"][];
+        };
+        C2CTradeCreateRequest: {
+            amount: components["schemas"]["Amount"];
+        };
         C2CTrade: {
+            /** Format: uuid */
             id: string;
+            /** Format: uuid */
             order_id: string;
-            buyer_account_id: string;
-            buyer_display_name: string;
-            seller_account_id: string;
-            seller_display_name: string;
-            quantity: components["schemas"]["Amount"];
-            unit_price_fen: number;
-            fiat_amount_fen: number;
             /** @enum {string} */
-            status: "awaiting_payment" | "paid" | "disputed" | "released_to_buyer" | "returned_to_seller" | "cancelled" | "expired";
-            payment_method: components["schemas"]["C2CPaymentMethod"] | null;
-            payment_reference: string;
-            payment_reference_deleted_at: components["schemas"]["Timestamp"] | null;
-            payment_deadline: components["schemas"]["Timestamp"];
-            review_due_at: components["schemas"]["Timestamp"] | null;
-            ledger_transaction_id: string;
-            statements: {
-                id: string;
-                actor_account_id: string;
-                actor_display_name: string;
-                text: string;
-                character_count: number;
-                created_at: components["schemas"]["Timestamp"];
-                deleted_at: components["schemas"]["Timestamp"] | null;
-            }[];
-            events: {
-                id: number;
-                actor_account_id: string;
-                action: string;
-                reason: string;
-                ledger_transaction_id: string;
-                created_at: components["schemas"]["Timestamp"];
-            }[];
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-            paid_at: components["schemas"]["Timestamp"] | null;
-            resolved_at: components["schemas"]["Timestamp"] | null;
-        };
-        /** @description 管理员视图，附带双方信用冻结状态与处罚事件。 */
-        C2CAdminTrade: {
-            id: string;
-            order_id: string;
-            buyer_account_id: string;
-            buyer_display_name: string;
-            seller_account_id: string;
-            seller_display_name: string;
-            quantity: components["schemas"]["Amount"];
+            viewer_role: "buyer" | "seller" | "admin";
+            buyer: components["schemas"]["Party"];
+            seller: components["schemas"]["Party"];
+            amount: components["schemas"]["Amount"];
             unit_price_fen: number;
-            fiat_amount_fen: number;
-            /** @enum {string} */
-            status: "awaiting_payment" | "paid" | "disputed" | "released_to_buyer" | "returned_to_seller" | "cancelled" | "expired";
-            payment_method: components["schemas"]["C2CPaymentMethod"] | null;
-            payment_reference: string;
-            payment_reference_deleted_at: components["schemas"]["Timestamp"] | null;
+            total_fen: number;
+            status: components["schemas"]["TradeStatus"];
             payment_deadline: components["schemas"]["Timestamp"];
-            review_due_at: components["schemas"]["Timestamp"] | null;
-            ledger_transaction_id: string;
-            statements: {
-                id: string;
-                actor_account_id: string;
-                actor_display_name: string;
-                text: string;
-                character_count: number;
-                created_at: components["schemas"]["Timestamp"];
-                deleted_at: components["schemas"]["Timestamp"] | null;
-            }[];
-            events: {
-                id: number;
-                actor_account_id: string;
-                action: string;
-                reason: string;
-                ledger_transaction_id: string;
-                created_at: components["schemas"]["Timestamp"];
-            }[];
+            payment_methods: components["schemas"]["PaymentMethod"][];
+            buyer_note: string | null;
+            /** Format: uuid */
+            dispute_opened_by: string | null;
+            buyer_statement: string | null;
+            seller_statement: string | null;
+            resolution_reason: string | null;
             created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-            paid_at: components["schemas"]["Timestamp"] | null;
-            resolved_at: components["schemas"]["Timestamp"] | null;
-            buyer_credit_frozen: boolean;
-            seller_credit_frozen: boolean;
+            paid_at: components["schemas"]["NullableTimestamp"];
+            released_at: components["schemas"]["NullableTimestamp"];
+            cancelled_at: components["schemas"]["NullableTimestamp"];
+            disputed_at: components["schemas"]["NullableTimestamp"];
+            resolved_at: components["schemas"]["NullableTimestamp"];
         };
         C2CTradeEnvelope: {
             trade: components["schemas"]["C2CTrade"];
         };
-        C2CAdminTradeEnvelope: {
-            trade: components["schemas"]["C2CAdminTrade"];
+        C2CTradePage: {
+            items: components["schemas"]["C2CTrade"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
         };
-        /** @description 管理员得到 C2CAdminTrade，其他账户得到 C2CTrade。 */
-        C2CTradeViewEnvelope: {
-            trade: components["schemas"]["C2CTrade"] | components["schemas"]["C2CAdminTrade"];
+        C2CPaidRequest: {
+            note?: string;
         };
-        C2CAdminTradeList: {
-            trades: components["schemas"]["C2CAdminTrade"][];
-        };
-        C2CMarket: {
-            metrics: {
-                guidance_price_fen: number;
-                latest_price_fen: number | null;
-                best_ask_fen: number | null;
-            };
-            sell_orders: components["schemas"]["C2COrder"][];
-        };
-        C2CMyActivity: {
-            orders: components["schemas"]["C2COrder"][];
-            trades: components["schemas"]["C2CTrade"][];
-        };
-        C2CPaymentMethodRequest: {
-            /** @enum {string} */
-            type: "wechat" | "alipay" | "bank_transfer" | "other";
-            contact?: string;
-            instructions?: string;
-            /** @description 多部分请求中承载收款码图片的文件字段名；无图片时留空。 */
-            qr_field?: string;
-        };
-        C2CCreateOrderRequest: {
-            unit_price_fen: number;
-            total: components["schemas"]["Amount"];
-            minimum: components["schemas"]["Amount"];
-            maximum: components["schemas"]["Amount"];
-            payment_methods: components["schemas"]["C2CPaymentMethodRequest"][];
-        };
-        C2CTakeOrderRequest: {
-            quantity: components["schemas"]["Amount"];
-            payment_method_id: string;
-        };
-        C2CMarkPaidRequest: {
-            payment_reference: string;
-        };
-        C2CStatementRequest: {
+        C2CDisputeRequest: {
             statement: string;
         };
-        C2CAdminCancelOrderRequest: {
-            reason: string;
-        };
         C2CResolveRequest: {
-            /** @enum {string} */
-            action: "release_to_buyer" | "return_to_seller" | "extend_review" | "restrict_buyer" | "restrict_seller";
+            /**
+             * @description buyer 判给买家（托管放行给买家）；seller 退回卖家。
+             * @enum {string}
+             */
+            result: "buyer" | "seller";
             reason: string;
         };
-        FeeRateVersion: {
-            version: number;
-            fee_rate: components["schemas"]["Amount"];
+        AdminAccount: {
+            /** Format: uuid */
+            id: string;
+            username: string;
+            display_name: string;
+            is_admin: boolean;
+            status: components["schemas"]["AccountStatus"];
+            must_change_password: boolean;
+            credit_limit: components["schemas"]["Amount"];
+            balance: components["schemas"]["Amount"];
+            available: components["schemas"]["Amount"];
+            created_at: components["schemas"]["Timestamp"];
+            updated_at: components["schemas"]["Timestamp"];
+            password_changed_at: components["schemas"]["NullableTimestamp"];
+        };
+        AdminAccountPage: {
+            items: components["schemas"]["AdminAccount"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+        };
+        AdminAccountEnvelope: {
+            account: components["schemas"]["AdminAccount"];
+        };
+        /** @description credit_limit 省略时使用平台默认信用额度。 */
+        CreateAccountRequest: {
+            username: string;
+            display_name: string;
+            credit_limit?: components["schemas"]["Amount"];
+            is_admin?: boolean;
+        };
+        /** @description initial_password 只在创建或重置时返回一次。 */
+        AccountWithInitialPassword: {
+            account: components["schemas"]["AdminAccount"];
+            initial_password: string;
+        };
+        /** @description 停用账户会使其全部会话失效；不能停用自己或撤销自己的管理员，也不能移除最后一个启用的管理员。 */
+        UpdateAccountRequest: {
+            display_name?: string;
+            status?: components["schemas"]["AccountStatus"];
+            credit_limit?: components["schemas"]["Amount"];
+            is_admin?: boolean;
+        };
+        /** @description amount 非零：正数加、负数减，对手方为平台收入账户。 */
+        AdjustRequest: {
+            amount: components["schemas"]["Amount"];
             reason: string;
-            created_by: {
-                id: string;
-                username: string;
-            } | null;
+        };
+        WriteOffRequest: {
+            reason: string;
+        };
+        LedgerPostingResponse: {
+            account: components["schemas"]["AdminAccount"];
+            /** Format: uuid */
+            transaction_id: string;
+            /** @description 幂等键重复时为 true，未重复记账。 */
+            replayed: boolean;
+        };
+        Settings: {
+            /** @description 手续费率，1e9 = 100%，默认 1000000 = 0.1%。 */
+            fee_rate_nano: number;
+            c2c_payment_timeout_minutes: number;
+            default_credit_limit: components["schemas"]["Amount"];
+            default_max_attempts: number;
+            default_ttft_timeout_ms: number;
+            default_total_timeout_ms: number;
+            default_cooldown_failures: number;
+            default_cooldown_seconds: number;
+            /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
+            extra_blocked_hosts: string[];
+            updated_at: components["schemas"]["Timestamp"];
+        };
+        /** @description 整体替换全部设置。 */
+        SettingsUpdateRequest: {
+            /** @description 手续费率，1e9 = 100%，默认 1000000 = 0.1%。 */
+            fee_rate_nano: number;
+            c2c_payment_timeout_minutes: number;
+            default_credit_limit: components["schemas"]["Amount"];
+            default_max_attempts: number;
+            default_ttft_timeout_ms: number;
+            default_total_timeout_ms: number;
+            default_cooldown_failures: number;
+            default_cooldown_seconds: number;
+            /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
+            extra_blocked_hosts: string[];
+        };
+        SettingsEnvelope: {
+            settings: components["schemas"]["Settings"];
+        };
+        AuditEntry: {
+            id: string;
+            actor: components["schemas"]["AccountRef"] | null;
+            action: string;
+            target_type: string;
+            target_id: string;
+            reason: string;
+            /** @description 操作详情（例如修改前后值）。 */
+            detail: Record<string, never>;
             created_at: components["schemas"]["Timestamp"];
         };
-        FeeRateEnvelope: {
-            fee_rate: components["schemas"]["FeeRateVersion"];
+        AuditPage: {
+            items: components["schemas"]["AuditEntry"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
         };
-        FeeRateHistory: {
-            current: components["schemas"]["FeeRateVersion"];
-            history: components["schemas"]["FeeRateVersion"][];
+        /** @description 管理员视角的渠道；上游 Key 不回显。 */
+        AdminChannel: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            base_url: string;
+            status: components["schemas"]["ChannelStatus"];
+            suspended_reason: string | null;
+            cooldown_until: components["schemas"]["NullableTimestamp"];
+            models: components["schemas"]["ChannelModel"][];
+            advanced: components["schemas"]["ChannelAdvanced"];
+            today: components["schemas"]["ChannelToday"];
+            created_at: components["schemas"]["Timestamp"];
+            updated_at: components["schemas"]["Timestamp"];
+            owner: components["schemas"]["AccountRef"];
         };
-        SetFeeRateRequest: {
-            expected_version: number;
-            fee_rate: string;
+        AdminChannelPage: {
+            items: components["schemas"]["AdminChannel"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
+        };
+        AdminChannelEnvelope: {
+            channel: components["schemas"]["AdminChannel"];
+        };
+        AdminChannelDetail: {
+            channel: components["schemas"]["AdminChannel"];
+            events: components["schemas"]["ChannelEvent"][];
+        };
+        ReasonRequest: {
             reason: string;
         };
-        OpsNegativeBalanceRisk: {
-            account_id: string;
-            username: string;
-            posted_balance: components["schemas"]["Amount"];
-            negative_since: string;
-            last_financial_activity: string;
-            inactive_days: number;
-            over_limit: boolean;
-            credit_limit: components["schemas"]["Amount"];
+        /** @description 实时现算的零和核对；total 正常为 "0"。 */
+        LedgerCheck: {
+            balanced: boolean;
+            total: components["schemas"]["Amount"];
+            checked_at: components["schemas"]["Timestamp"];
         };
-        OpsMetrics: {
-            from: components["schemas"]["Timestamp"];
-            to: components["schemas"]["Timestamp"];
-            ledger: components["schemas"]["LedgerMetrics"];
-            effective_credit: components["schemas"]["Amount"];
-            negative_balances: components["schemas"]["OpsNegativeBalanceRisk"][];
-            api: {
-                precheck_rejected: number;
-                reached_upstream: number;
+        AttentionItem: {
+            /** @enum {string} */
+            kind: "dispute" | "over_limit" | "negative_balance" | "channel_suspended" | "channel_failing" | "ledger_unbalanced" | "stuck_call";
+            /** @enum {string} */
+            severity: "warning" | "critical";
+            title: string;
+            count: number;
+            link: string;
+        };
+        AdminOverview: {
+            attention: components["schemas"]["AttentionItem"][];
+            ledger: components["schemas"]["LedgerCheck"];
+            today: {
+                calls: number;
                 succeeded: number;
-                all_failed: number;
-                incomplete_after_commit: number;
-                cancelled: number;
-                terminal_reached: number;
-                success_rate: string | null;
-                attempt_count: number;
-                attempt_succeeded: number;
-                average_ttft_milliseconds: number | null;
-                average_tokens_per_second: string | null;
-            };
-            consumption: {
-                consumer_spend: components["schemas"]["Amount"];
-                provider_income: components["schemas"]["Amount"];
-                own_usage_income: components["schemas"]["Amount"];
-                other_consumer_income: components["schemas"]["Amount"];
-                platform_fee: components["schemas"]["Amount"];
+                success_rate: components["schemas"]["Ratio"] | null;
+                spend: components["schemas"]["Amount"];
+                fee_revenue: components["schemas"]["Amount"];
             };
             c2c: {
-                orders: {
-                    status: string;
-                    count: number;
-                }[];
-                trades: {
-                    status: string;
-                    count: number;
-                }[];
-                quote: {
-                    last_traded_price_fen: number | null;
-                    best_ask_price_fen: number | null;
-                };
-            };
-            concentration: {
-                positive_user_count: number;
-                total_positive: components["schemas"]["Amount"];
-                top1_share: string | null;
-                top5_share: string | null;
-                hhi: string | null;
+                open_orders: number;
+                awaiting_payment: number;
+                open_disputes: number;
             };
         };
-        OpsMetricsEnvelope: {
-            metrics: components["schemas"]["OpsMetrics"];
+        /** @description user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。 */
+        AdminPointsBalances: {
+            user_positive: components["schemas"]["Amount"];
+            user_negative: components["schemas"]["Amount"];
+            credit_issued: components["schemas"]["Amount"];
+            c2c_escrow: components["schemas"]["Amount"];
+            platform_revenue: components["schemas"]["Amount"];
+            bad_debt: components["schemas"]["Amount"];
+            total: components["schemas"]["Amount"];
         };
-        OpsProviderIncome: {
-            from: components["schemas"]["Timestamp"];
-            to: components["schemas"]["Timestamp"];
-            total_income: components["schemas"]["Amount"];
-            other_consumer_income: components["schemas"]["Amount"];
-            own_usage_income: components["schemas"]["Amount"];
-            active_providers: number;
-            providers: {
-                account_id: string;
-                display_name: string;
-                total_income: components["schemas"]["Amount"];
-                other_consumer_income: components["schemas"]["Amount"];
-                own_usage_income: components["schemas"]["Amount"];
-                success_rate: string | null;
+        AdminPointsRisk: {
+            account: components["schemas"]["AccountRef"];
+            balance: components["schemas"]["Amount"];
+            credit_limit: components["schemas"]["Amount"];
+            available: components["schemas"]["Amount"];
+            /** @enum {string} */
+            kind: "over_limit" | "negative_inactive";
+            last_activity_at: components["schemas"]["NullableTimestamp"];
+        };
+        AdminPoints: {
+            balances: components["schemas"]["AdminPointsBalances"];
+            check: components["schemas"]["LedgerCheck"];
+            trend: {
+                date: components["schemas"]["Date"];
+                circulation: components["schemas"]["Amount"];
+                platform_revenue: components["schemas"]["Amount"];
+                bad_debt: components["schemas"]["Amount"];
+                c2c_escrow: components["schemas"]["Amount"];
             }[];
+            risks: components["schemas"]["AdminPointsRisk"][];
         };
-        OpsProviderIncomeEnvelope: {
-            provider_income: components["schemas"]["OpsProviderIncome"];
+        LedgerAccountRef: {
+            /** @enum {string} */
+            kind: "user" | "system";
+            account: components["schemas"]["AccountRef"] | null;
+            /** @enum {string|null} */
+            system_code: "platform_revenue" | "c2c_escrow" | "bad_debt" | null;
         };
-        OpsAnomalies: {
-            hard_anomalies: {
-                kind: string;
-                attention: boolean;
-                count: number;
-                detail: string;
-                drilldown: string;
-            }[];
-            attention_items: {
-                kind: string;
-                attention: boolean;
-                count: number;
-                detail: string;
-                drilldown: string;
-            }[];
-            hard_count: number;
-            checked_at: components["schemas"]["Timestamp"];
+        LedgerTransactionEntry: {
+            ledger_account: components["schemas"]["LedgerAccountRef"];
+            amount: components["schemas"]["Amount"];
+            balance_after: components["schemas"]["Amount"];
         };
-        OpsAnomaliesEnvelope: {
-            anomalies: components["schemas"]["OpsAnomalies"];
-        };
-        OpsInspection: {
+        LedgerTransaction: {
+            /** Format: uuid */
             id: string;
-            inspection_version: string;
-            triggered_by: string;
-            zero_sum_ok: boolean;
-            projection_ok: boolean;
-            call_settlement_ok: boolean;
-            c2c_consistency_ok: boolean;
-            zero_sum_difference: components["schemas"]["Amount"];
-            posted_projection_difference: components["schemas"]["Amount"];
-            asset_projection_difference: components["schemas"]["Amount"];
-            authorization_projection_difference: components["schemas"]["Amount"];
-            successful_calls_without_settlement: number;
-            settlements_without_ledger_transaction: number;
-            c2c_quantity_violations: number;
-            c2c_hold_violations: number;
-            checked_at: components["schemas"]["Timestamp"];
+            type: components["schemas"]["TransactionType"];
+            idempotency_key: string;
+            related: components["schemas"]["LedgerRelated"] | null;
+            actor: components["schemas"]["AccountRef"] | null;
+            reason: string;
+            created_at: components["schemas"]["Timestamp"];
+            entries: components["schemas"]["LedgerTransactionEntry"][];
         };
-        OpsInspectionEnvelope: {
-            inspection: components["schemas"]["OpsInspection"];
+        LedgerTransactionPage: {
+            items: components["schemas"]["LedgerTransaction"][];
+            /** @description 下一页游标；为 null 表示没有更多。 */
+            next_cursor: string | null;
         };
-        OpsInspectionList: {
-            inspections: components["schemas"]["OpsInspection"][];
+        LedgerTransactionEnvelope: {
+            transaction: components["schemas"]["LedgerTransaction"];
+        };
+        RepairCallRequest: {
+            /**
+             * @description charge 按调用记录的用量与价格快照补记账；void 标记为不收费的中断。
+             * @enum {string}
+             */
+            action: "charge" | "void";
+            reason: string;
+        };
+        RepairCallResponse: {
+            call: components["schemas"]["CallDetail"];
+            /** Format: uuid */
+            transaction_id: string | null;
         };
     };
     responses: {
-        /** @description 请求格式无效或查询参数非法（invalid_json、invalid_request、invalid_input）。 */
+        /** @description 请求格式无效或参数非法（invalid_json、invalid_request、invalid_cursor）。 */
         BadRequest: {
             headers: {
                 [name: string]: unknown;
@@ -2433,7 +2579,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description 版本或状态冲突（conflict、ledger_conflict、c2c_conflict、fee_rate_conflict 等）。 */
+        /** @description 状态冲突（conflict、already_initialized、last_administrator、idempotency_conflict 等）。 */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -2442,7 +2588,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description 业务校验失败（invalid_input、insufficient_spendable_capacity、unsafe_upstream 等）。 */
+        /** @description 业务校验失败（invalid_input、nothing_to_write_off、cannot_modify_self、unsafe_upstream 等）。 */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;
@@ -2460,8 +2606,26 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description 服务暂不可用（database_unavailable、gateway_unavailable）。 */
+        /** @description 服务暂不可用（database_unavailable）。 */
         Unavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description 上游不可达或返回错误（upstream_error）。 */
+        BadGateway: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description 接口已在契约中定义但尚未实现（not_implemented）。 */
+        NotImplemented: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2471,30 +2635,74 @@ export interface components {
         };
     };
     parameters: {
-        /** @description 账户 ID（UUID）。 */
+        /** @description 账户 ID。 */
         accountID: string;
-        /** @description 规范模型 ID；ID 可含 `/`，原样放入路径。 */
+        /** @description 模型名。 */
         modelID: string;
-        /** @description 渠道 ID。 */
-        channelID: string;
-        /** @description 报价 ID。 */
-        offerID: string;
         /** @description API Key ID。 */
         keyID: string;
-        /** @description 调用 ID。 */
+        /** @description 渠道 ID。 */
+        channelID: string;
+        /** @description 调用（请求）ID。 */
         callID: string;
-        /** @description C2C 订单 ID。 */
+        /** @description C2C 卖单 ID。 */
         orderID: string;
         /** @description C2C 交易 ID。 */
         tradeID: string;
-        /** @description 收款方式 ID。 */
-        methodID: string;
-        /** @description 系统账户类型。 */
-        systemKind: "platform_incentive" | "platform_loss";
-        /** @description 幂等键；相同键重复提交返回同一结果。 */
-        "Idempotency-Key": string;
-        /** @description 规范模型 ID 与动作，例如 `canonical/model:generateContent`。 */
+        /** @description 账本交易 ID。 */
+        transactionID: string;
+        /** @description 模型名与动作，例如 `gemini-2.5-flash:generateContent`。 */
         model: string;
+        /** @description 上一页返回的 next_cursor。 */
+        cursor: string;
+        /** @description 每页条数，1～100，默认 20。 */
+        limit: number;
+        /** @description 开始时间（含）。 */
+        from: string;
+        /** @description 结束时间（不含）。 */
+        to: string;
+        /** @description 搜索关键字。 */
+        q: string;
+        /** @description 模型名。 */
+        modelQuery: string;
+        /** @description 结果分类。 */
+        outcome: components["schemas"]["CallOutcome"];
+        /** @description API Key ID。 */
+        apiKeyIDQuery: string;
+        /** @description 账户 ID。 */
+        accountIDQuery: string;
+        /** @description 渠道 ID。 */
+        channelIDQuery: string;
+        /** @description 调用标签（X-AIHub-Tag）。 */
+        tag: string;
+        /** @description API 格式。 */
+        format: components["schemas"]["Format"];
+        /** @description 聚合维度。 */
+        groupBy: "day" | "model" | "key" | "tag";
+        /** @description 交易类型。 */
+        transactionType: components["schemas"]["TransactionType"];
+        /** @description json（默认）或 csv（Feature G）。 */
+        exportFormat: "json" | "csv";
+        /** @description 账户状态。 */
+        accountStatus: components["schemas"]["AccountStatus"];
+        /** @description 渠道状态。 */
+        channelStatus: components["schemas"]["ChannelStatus"];
+        /** @description 所有者账户 ID。 */
+        ownerID: string;
+        /** @description 我的角色。 */
+        tradeRole: "buyer" | "seller";
+        /** @description 交易状态。 */
+        tradeStatus: components["schemas"]["TradeStatus"];
+        /** @description 操作类型，例如 account.created。 */
+        auditAction: string;
+        /** @description 对象类型，例如 account、model。 */
+        targetType: string;
+        /** @description 对象 ID。 */
+        targetID: string;
+        /** @description 操作者账户 ID。 */
+        actorID: string;
+        /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
+        "Idempotency-Key": string;
     };
     requestBodies: never;
     headers: never;
@@ -2511,7 +2719,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 服务与数据库可用。 */
+            /** @description 成功 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2556,13 +2764,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 已创建管理员并登录。 */
+            /** @description 成功 */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceInitializeResponse"];
+                    "application/json": components["schemas"]["AccountEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2584,7 +2792,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 登录成功。 */
+            /** @description 成功 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2608,17 +2816,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 已退出，会话 Cookie 被清除。 */
+            /** @description 成功，无响应体。 */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
         };
     };
-    getSession: {
+    getMe: {
         parameters: {
             query?: never;
             header?: never;
@@ -2637,6 +2846,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     changePassword: {
@@ -2668,7 +2878,7 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
-    getAccount: {
+    getHome: {
         parameters: {
             query?: never;
             header?: never;
@@ -2683,18 +2893,549 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountEnvelope"];
+                    "application/json": components["schemas"]["HomeResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    listAccounts: {
+    listModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogModelList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 模型名。 */
+                modelID: components["parameters"]["modelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    setRouting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 模型名。 */
+                modelID: components["parameters"]["modelID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutingPreferenceInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingPreference"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    createKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyCreated"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    deleteKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功，无响应体。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    updateKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getKeySecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeySecret"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    setKeyRouting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+                /** @description 模型名。 */
+                modelID: components["parameters"]["modelID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutingPreferenceInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingPreference"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    deleteKeyRouting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API Key ID。 */
+                keyID: components["parameters"]["keyID"];
+                /** @description 模型名。 */
+                modelID: components["parameters"]["modelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功，无响应体。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    createChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    discoverChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelDiscoverRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelDiscoverResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    getChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    deleteChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功，无响应体。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    updateChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    testChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelTestRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelTestResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listCalls: {
         parameters: {
             query?: {
-                /** @description 按用户名或显示名搜索。 */
-                q?: string;
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 调用标签（X-AIHub-Tag）。 */
+                tag?: components["parameters"]["tag"];
+                /** @description API 格式。 */
+                format?: components["parameters"]["format"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
             };
             header?: never;
             path?: never;
@@ -2708,14 +3449,637 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountList"];
+                    "application/json": components["schemas"]["CallPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    streamCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Events 流；每个 event 的 data 为一条 JSON（CallSummary）。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 调用（请求）ID。 */
+                callID: components["parameters"]["callID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallDetailEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getUsage: {
+        parameters: {
+            query?: {
+                /** @description 聚合维度。 */
+                group_by?: components["parameters"]["groupBy"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 调用标签（X-AIHub-Tag）。 */
+                tag?: components["parameters"]["tag"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getChannelStats: {
+        parameters: {
+            query?: {
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+            };
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelStats"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listChannelCalls: {
+        parameters: {
+            query?: {
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelCallPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    streamChannelCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 渠道 ID。 */
+                channelID: components["parameters"]["channelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Events 流；每个 event 的 data 为一条 JSON（ChannelCall）。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Points"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    createAccount: {
+    listPointsEntries: {
+        parameters: {
+            query?: {
+                /** @description 交易类型。 */
+                type?: components["parameters"]["transactionType"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+                /** @description json（默认）或 csv（Feature G）。 */
+                format?: components["parameters"]["exportFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PointsEntryPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listC2COrders: {
+        parameters: {
+            query?: {
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2COrderPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    createC2COrder: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
+                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["C2COrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CMyOrderEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listMyC2COrders: {
+        parameters: {
+            query?: {
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CMyOrderPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    closeC2COrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 卖单 ID。 */
+                orderID: components["parameters"]["orderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CMyOrderEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    createC2CTrade: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
+                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
+            };
+            path: {
+                /** @description C2C 卖单 ID。 */
+                orderID: components["parameters"]["orderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["C2CTradeCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listMyC2CTrades: {
+        parameters: {
+            query?: {
+                /** @description 我的角色。 */
+                role?: components["parameters"]["tradeRole"];
+                /** @description 交易状态。 */
+                status?: components["parameters"]["tradeStatus"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getC2CTrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 交易 ID。 */
+                tradeID: components["parameters"]["tradeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    markC2CTradePaid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 交易 ID。 */
+                tradeID: components["parameters"]["tradeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["C2CPaidRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    releaseC2CTrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 交易 ID。 */
+                tradeID: components["parameters"]["tradeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    cancelC2CTrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 交易 ID。 */
+                tradeID: components["parameters"]["tradeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    disputeC2CTrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 交易 ID。 */
+                tradeID: components["parameters"]["tradeID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["C2CDisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listAdminAccounts: {
+        parameters: {
+            query?: {
+                /** @description 搜索关键字。 */
+                q?: components["parameters"]["q"];
+                /** @description 账户状态。 */
+                status?: components["parameters"]["accountStatus"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAdminAccount: {
         parameters: {
             query?: never;
             header?: never;
@@ -2745,12 +4109,12 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
-    updateAccount: {
+    updateAdminAccount: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description 账户 ID（UUID）。 */
+                /** @description 账户 ID。 */
                 accountID: components["parameters"]["accountID"];
             };
             cookie?: never;
@@ -2767,7 +4131,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountEnvelope"];
+                    "application/json": components["schemas"]["AdminAccountEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2778,21 +4142,17 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    resetAccountPassword: {
+    resetAdminAccountPassword: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description 账户 ID（UUID）。 */
+                /** @description 账户 ID。 */
                 accountID: components["parameters"]["accountID"];
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmptyRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description 成功 */
             200: {
@@ -2811,42 +4171,24 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
-    listModels: {
-        parameters: {
-            query?: {
-                /** @description 按名称或 ID 搜索。 */
-                q?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getModel: {
+    adjustAdminAccount: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
+                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
+            };
             path: {
-                /** @description 规范模型 ID；ID 可含 `/`，原样放入路径。 */
-                modelID: components["parameters"]["modelID"];
+                /** @description 账户 ID。 */
+                accountID: components["parameters"]["accountID"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustRequest"];
+            };
+        };
         responses: {
             /** @description 成功 */
             200: {
@@ -2854,20 +4196,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModelEnvelope"];
+                    "application/json": components["schemas"]["LedgerPostingResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    writeOffAdminAccount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 幂等键；相同键重复提交返回同一结果，不重复记账。 */
+                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
+            };
+            path: {
+                /** @description 账户 ID。 */
+                accountID: components["parameters"]["accountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteOffRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerPostingResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listAdminModels: {
         parameters: {
-            query?: {
-                /** @description 按名称或 ID 搜索。 */
-                q?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -2880,14 +4258,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModelList"];
+                    "application/json": components["schemas"]["AdminModelList"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    createModel: {
+    createAdminModel: {
         parameters: {
             query?: never;
             header?: never;
@@ -2896,7 +4274,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ModelRequest"];
+                "application/json": components["schemas"]["ModelCreateRequest"];
             };
         };
         responses: {
@@ -2906,7 +4284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModelEnvelope"];
+                    "application/json": components["schemas"]["AdminModelEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2916,45 +4294,19 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    getAdminModel: {
+    updateAdminModel: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description 规范模型 ID；ID 可含 `/`，原样放入路径。 */
-                modelID: components["parameters"]["modelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    updateModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 规范模型 ID；ID 可含 `/`，原样放入路径。 */
+                /** @description 模型名。 */
                 modelID: components["parameters"]["modelID"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ModelRequest"];
+                "application/json": components["schemas"]["ModelUpdateRequest"];
             };
         };
         responses: {
@@ -2964,18 +4316,17 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModelEnvelope"];
+                    "application/json": components["schemas"]["AdminModelEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
-    getWallet: {
+    getAdminSettings: {
         parameters: {
             query?: never;
             header?: never;
@@ -2990,20 +4341,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WalletResponse"];
+                    "application/json": components["schemas"]["SettingsEnvelope"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    listWalletEntries: {
+    updateAdminSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listAdminAudit: {
         parameters: {
             query?: {
-                /** @description 返回条数。 */
-                limit?: number;
-                /** @description 分录 ID 游标，返回早于该分录的记录。 */
-                before?: string;
+                /** @description 操作类型，例如 account.created。 */
+                action?: components["parameters"]["auditAction"];
+                /** @description 对象类型，例如 account、model。 */
+                target_type?: components["parameters"]["targetType"];
+                /** @description 对象 ID。 */
+                target_id?: components["parameters"]["targetID"];
+                /** @description 操作者账户 ID。 */
+                actor_id?: components["parameters"]["actorID"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
             };
             header?: never;
             path?: never;
@@ -3017,751 +4404,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LedgerEntryPage"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getLedgerMetrics: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerMetricsEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getAdminLedgerAccountWallet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 账户 ID（UUID）。 */
-                accountID: components["parameters"]["accountID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WalletEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    listAdminLedgerAccountEntries: {
-        parameters: {
-            query?: {
-                /** @description 返回条数。 */
-                limit?: number;
-                /** @description 分录 ID 游标。 */
-                before?: string;
-            };
-            header?: never;
-            path: {
-                /** @description 账户 ID（UUID）。 */
-                accountID: components["parameters"]["accountID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerEntryPage"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getAdminLedgerSystemWallet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 系统账户类型。 */
-                systemKind: components["parameters"]["systemKind"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WalletEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    listAdminLedgerSystemEntries: {
-        parameters: {
-            query?: {
-                /** @description 返回条数。 */
-                limit?: number;
-                /** @description 分录 ID 游标。 */
-                before?: string;
-            };
-            header?: never;
-            path: {
-                /** @description 系统账户类型。 */
-                systemKind: components["parameters"]["systemKind"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerEntryPage"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    createLedgerAdjustment: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LedgerAdjustmentRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerTransactionEnvelope"];
+                    "application/json": components["schemas"]["AuditPage"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    createBadDebtTransfer: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BadDebtRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerTransactionEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listChannels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateChannelRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    deleteChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    updateChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateChannelRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    publishChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    pauseChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    revokeChannelCredential: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    addChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddOfferRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerOfferEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    deleteChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerOfferEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    updateChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateOfferRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerOfferEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    disableChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerOfferEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    resumeChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnerOfferEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listOfferValidationAttempts: {
-        parameters: {
-            query?: {
-                /** @description 返回条数。 */
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationAttemptList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    validateChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ValidateOfferRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationAttemptEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listMarketOffers: {
-        parameters: {
-            query?: {
-                /** @description 模型 ID。 */
-                model_id?: string;
-                /** @description 协议。 */
-                protocol?: "openai_chat_completions" | "openai_responses" | "anthropic_messages" | "google_gemini_generate_content";
-                /** @description 按所有者名称搜索。 */
-                owner?: string;
-                /** @description 排序方式，缺省为 input_price。 */
-                sort?: "input_price" | "output_price" | "cache_write_price" | "cache_read_price" | "success_rate" | "ttft" | "tps";
-                /** @description 分页游标。 */
-                after?: string;
-                /** @description 返回条数。 */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MarketOfferPage"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getMarketChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MarketChannelEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     listAdminChannels: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 搜索关键字。 */
+                q?: components["parameters"]["q"];
+                /** @description 渠道状态。 */
+                status?: components["parameters"]["channelStatus"];
+                /** @description 所有者账户 ID。 */
+                owner_id?: components["parameters"]["ownerID"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3774,11 +4438,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminChannelList"];
+                    "application/json": components["schemas"]["AdminChannelPage"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
         };
     };
     getAdminChannel: {
@@ -3799,15 +4465,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminChannelEnvelope"];
+                    "application/json": components["schemas"]["AdminChannelDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    adminDeleteChannel: {
+    suspendAdminChannel: {
         parameters: {
             query?: never;
             header?: never;
@@ -3819,7 +4486,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VersionedRequest"];
+                "application/json": components["schemas"]["ReasonRequest"];
             };
         };
         responses: {
@@ -3838,9 +4505,10 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    adminPauseChannel: {
+    unsuspendAdminChannel: {
         parameters: {
             query?: never;
             header?: never;
@@ -3852,7 +4520,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VersionedRequest"];
+                "application/json": components["schemas"]["ReasonRequest"];
             };
         };
         responses: {
@@ -3871,379 +4539,18 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    adminListOfferValidationAttempts: {
+    listAdminDisputes: {
         parameters: {
             query?: {
-                /** @description 返回条数。 */
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationAttemptList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    adminValidateChannelOffer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 报价 ID。 */
-                offerID: components["parameters"]["offerID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ValidateOfferRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationAttemptEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    reencryptChannelCredentials: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReencryptRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReencryptResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listAPIKeys: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyConfigRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyWithSecret"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    deleteAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyVersionRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    updateAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyConfigRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    rotateAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyVersionRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyWithSecret"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    disableAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyVersionRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    enableAPIKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyVersionRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    addAPIKeyPoolMember: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API Key ID。 */
-                keyID: components["parameters"]["keyID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApiKeyPoolMemberRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listGatewayCalls: {
-        parameters: {
-            query?: {
-                /** @description 返回条数上限。 */
-                limit?: number;
+                /** @description 交易状态。 */
+                status?: components["parameters"]["tradeStatus"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
             };
             header?: never;
             path?: never;
@@ -4257,545 +4564,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GatewayCallList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getGatewayCall: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 调用 ID。 */
-                callID: components["parameters"]["callID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GatewayCallEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getDashboard: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Dashboard"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    listPendingItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PendingItemList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getC2CMarket: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CMarket"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createC2COrder: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CCreateOrderRequest"];
-                "multipart/form-data": {
-                    payload: string;
-                } & {
-                    [key: string]: string;
-                };
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2COrderEnvelope"];
+                    "application/json": components["schemas"]["C2CTradePage"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    getC2COrder: {
+    resolveAdminC2CTrade: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                /** @description C2C 订单 ID。 */
-                orderID: components["parameters"]["orderID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2COrderEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getC2CPaymentQR: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description C2C 订单 ID。 */
-                orderID: components["parameters"]["orderID"];
-                /** @description 收款方式 ID。 */
-                methodID: components["parameters"]["methodID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 已清洗的收款码图片，Content-Type 随图片格式。 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "image/png": string;
-                    "image/jpeg": string;
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    takeC2COrder: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 订单 ID。 */
-                orderID: components["parameters"]["orderID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CTakeOrderRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    cancelC2COrder: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 订单 ID。 */
-                orderID: components["parameters"]["orderID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2COrderEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    getC2CMyActivity: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CMyActivity"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getC2CTrade: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeViewEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    markC2CTradePaid: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CMarkPaidRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    cancelC2CTrade: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    confirmC2CReceipt: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    openC2CDispute: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CStatementRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    addC2CStatement: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 交易 ID。 */
-                tradeID: components["parameters"]["tradeID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CStatementRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradeEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listC2CDisputes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CAdminTradeList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    adminCancelC2COrder: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
-            path: {
-                /** @description C2C 订单 ID。 */
-                orderID: components["parameters"]["orderID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["C2CAdminCancelOrderRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2COrderEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    resolveC2CDispute: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description 幂等键；相同键重复提交返回同一结果。 */
-                "Idempotency-Key"?: components["parameters"]["Idempotency-Key"];
-            };
             path: {
                 /** @description C2C 交易 ID。 */
                 tradeID: components["parameters"]["tradeID"];
@@ -4814,7 +4595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["C2CAdminTradeEnvelope"];
+                    "application/json": components["schemas"]["C2CTradeEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -4823,13 +4604,57 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    getFeeRates: {
+    getAdminOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listAdminCalls: {
         parameters: {
             query?: {
-                /** @description 返回条数上限。 */
-                limit?: number;
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 调用标签（X-AIHub-Tag）。 */
+                tag?: components["parameters"]["tag"];
+                /** @description API 格式。 */
+                format?: components["parameters"]["format"];
+                /** @description 账户 ID。 */
+                account_id?: components["parameters"]["accountIDQuery"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
             };
             header?: never;
             path?: never;
@@ -4843,24 +4668,138 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FeeRateHistory"];
+                    "application/json": components["schemas"]["AdminCallPage"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
         };
     };
-    setFeeRate: {
+    streamAdminCalls: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Events 流；每个 event 的 data 为一条 JSON（AdminCall）。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getAdminPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPoints"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    listAdminLedgerTransactions: {
+        parameters: {
+            query?: {
+                /** @description 交易类型。 */
+                type?: components["parameters"]["transactionType"];
+                /** @description 账户 ID。 */
+                account_id?: components["parameters"]["accountIDQuery"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerTransactionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    getAdminLedgerTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 账本交易 ID。 */
+                transactionID: components["parameters"]["transactionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerTransactionEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
+    repairAdminLedgerCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 调用（请求）ID。 */
+                callID: components["parameters"]["callID"];
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SetFeeRateRequest"];
+                "application/json": components["schemas"]["RepairCallRequest"];
             };
         };
         responses: {
@@ -4870,140 +4809,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FeeRateEnvelope"];
+                    "application/json": components["schemas"]["RepairCallResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
-        };
-    };
-    getOpsMetrics: {
-        parameters: {
-            query: {
-                /** @description 窗口起点，RFC 3339（UTC）。 */
-                from: components["schemas"]["Timestamp"];
-                /** @description 窗口终点，RFC 3339（UTC），须晚于 from。 */
-                to: components["schemas"]["Timestamp"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsMetricsEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getOpsProviderIncome: {
-        parameters: {
-            query: {
-                /** @description 窗口起点，RFC 3339（UTC）。 */
-                from: components["schemas"]["Timestamp"];
-                /** @description 窗口终点，RFC 3339（UTC），须晚于 from。 */
-                to: components["schemas"]["Timestamp"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsProviderIncomeEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getOpsAnomalies: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsAnomaliesEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    listOpsInspections: {
-        parameters: {
-            query?: {
-                /** @description 返回条数上限。 */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsInspectionList"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    runOpsInspection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpsInspectionEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            501: components["responses"]["NotImplemented"];
         };
     };
     proxyOpenAIChat: {
@@ -5019,7 +4834,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 协议原生响应（含流式）与协议原生错误。 */
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -5041,7 +4856,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 协议原生响应（含流式）与协议原生错误。 */
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -5063,7 +4878,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 协议原生响应（含流式）与协议原生错误。 */
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -5077,7 +4892,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description 规范模型 ID 与动作，例如 `canonical/model:generateContent`。 */
+                /** @description 模型名与动作，例如 `gemini-2.5-flash:generateContent`。 */
                 model: components["parameters"]["model"];
             };
             cookie?: never;
@@ -5088,7 +4903,43 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 协议原生响应（含流式）与协议原生错误。 */
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listGatewayModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listGeminiModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;

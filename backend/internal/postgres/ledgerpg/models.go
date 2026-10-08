@@ -6,65 +6,15 @@ package ledgerpg
 
 import (
 	"time"
-
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-type LedgerAccount struct {
-	ID                  string
-	IdentityAccountID   *string
-	Kind                string
-	SystemCode          *string
-	PostedBalanceNano   money.Amount
-	AssetReservedNano   money.Amount
-	SpendAuthorizedNano money.Amount
-	Version             int64
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-}
-
-type LedgerEntry struct {
-	ID                      int64
-	TransactionID           string
-	LedgerAccountID         string
-	EntryOrdinal            int32
-	BusinessRole            string
-	AmountNano              money.Amount
-	PostedBalanceBeforeNano money.Amount
-	PostedBalanceAfterNano  money.Amount
-	CreatedAt               time.Time
-}
-
-type LedgerHold struct {
-	ID                   string
-	LedgerAccountID      string
-	CreateOperation      string
-	CreateIdempotencyKey string
-	Purpose              string
-	FundingPolicy        string
-	AmountNano           money.Amount
-	RemainingNano        money.Amount
-	CapturedNano         money.Amount
-	ReleasedNano         money.Amount
-	Status               string
-	Reason               string
-	BusinessType         string
-	BusinessID           string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-}
-
 type LedgerTransaction struct {
-	ID                      string
-	CommandOperation        string
-	IdempotencyKey          string
-	Kind                    string
-	Reason                  string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          *string
-	ReversalOfTransactionID *string
-	Sealed                  bool
-	CreatedAt               time.Time
-	HoldID                  *string
+	ID             string
+	Type           string
+	IdempotencyKey string
+	RelatedType    *string
+	RelatedID      *string
+	ActorID        *string
+	Reason         string
+	CreatedAt      time.Time
 }

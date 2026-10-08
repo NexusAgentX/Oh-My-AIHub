@@ -11,33 +11,17 @@ import (
 )
 
 type Account struct {
-	ID                 string
-	Username           string
-	DisplayName        string
-	PasswordHash       string
-	PasswordVersion    int64
-	Version            int64
-	MustChangePassword bool
-	IsAdmin            bool
-	Status             string
-	CreditLimitNano    money.Amount
-	PasswordChangedAt  *time.Time
-	DisabledAt         *time.Time
-	CreatedBy          *string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	CreditFrozen       bool
-}
-
-type LedgerAccount struct {
 	ID                  string
-	IdentityAccountID   *string
-	Kind                string
-	SystemCode          *string
-	PostedBalanceNano   money.Amount
-	AssetReservedNano   money.Amount
-	SpendAuthorizedNano money.Amount
-	Version             int64
+	Username            string
+	DisplayName         string
+	PasswordHash        string
+	PasswordVersion     int64
+	MustChangePassword  bool
+	IsAdmin             bool
+	Status              string
+	CreditLimitNano     money.Amount
+	DefaultKeyCreatedAt *time.Time
+	PasswordChangedAt   *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }

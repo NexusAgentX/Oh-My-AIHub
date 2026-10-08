@@ -7,663 +7,131 @@ package ledgerpg
 
 import (
 	"context"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-const applyHoldAmount = `-- name: ApplyHoldAmount :execrows
-UPDATE ledger_holds
-SET remaining_nano = remaining_nano - $1,
-    captured_nano = captured_nano + $2,
-    released_nano = released_nano + $3,
-    status = CASE WHEN remaining_nano = $1 THEN 'closed' ELSE 'active' END,
-    updated_at = now()
-WHERE id = $4 AND status = 'active' AND remaining_nano >= $1
+const getPoints = `-- name: GetPoints :one
+SELECT l.balance_nano, a.credit_limit_nano, l.updated_at
+FROM ledger_accounts l
+JOIN accounts a ON a.id = l.account_id
+WHERE l.account_id = $1
 `
 
-type ApplyHoldAmountParams struct {
-	AmountNano   money.Amount
-	CapturedNano money.Amount
-	ReleasedNano money.Amount
-	ID           string
-}
-
-func (q *Queries) ApplyHoldAmount(ctx context.Context, arg ApplyHoldAmountParams) (int64, error) {
-	result, err := q.db.Exec(ctx, applyHoldAmount,
-		arg.AmountNano,
-		arg.CapturedNano,
-		arg.ReleasedNano,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const completeLedgerCommand = `-- name: CompleteLedgerCommand :execrows
-UPDATE ledger_commands
-SET result_id = $1, result_payload = $2, completed_at = now()
-WHERE operation = $3 AND idempotency_key = $4
-  AND result_id IS NULL AND result_payload IS NULL AND completed_at IS NULL
-`
-
-type CompleteLedgerCommandParams struct {
-	ResultID       *string
-	ResultPayload  []byte
-	Operation      string
-	IdempotencyKey string
-}
-
-func (q *Queries) CompleteLedgerCommand(ctx context.Context, arg CompleteLedgerCommandParams) (int64, error) {
-	result, err := q.db.Exec(ctx, completeLedgerCommand,
-		arg.ResultID,
-		arg.ResultPayload,
-		arg.Operation,
-		arg.IdempotencyKey,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const findLedgerAccountIDByIdentity = `-- name: FindLedgerAccountIDByIdentity :one
-
-SELECT id::text FROM ledger_accounts WHERE identity_account_id = $1
-`
-
-// 记账 ---------------------------------------------------------------------
-func (q *Queries) FindLedgerAccountIDByIdentity(ctx context.Context, identityAccountID *string) (string, error) {
-	row := q.db.QueryRow(ctx, findLedgerAccountIDByIdentity, identityAccountID)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const findLedgerAccountIDBySystemCode = `-- name: FindLedgerAccountIDBySystemCode :one
-SELECT id::text FROM ledger_accounts WHERE system_code = $1
-`
-
-func (q *Queries) FindLedgerAccountIDBySystemCode(ctx context.Context, systemCode *string) (string, error) {
-	row := q.db.QueryRow(ctx, findLedgerAccountIDBySystemCode, systemCode)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const getAccountCreditState = `-- name: GetAccountCreditState :one
-SELECT credit_limit_nano, credit_frozen, status FROM accounts WHERE id = $1
-`
-
-type GetAccountCreditStateRow struct {
+type GetPointsRow struct {
+	BalanceNano     money.Amount
 	CreditLimitNano money.Amount
-	CreditFrozen    bool
-	Status          string
+	UpdatedAt       time.Time
 }
 
-// 信用状态不加锁：账户行由 identity 领域的写入方负责。
-func (q *Queries) GetAccountCreditState(ctx context.Context, id string) (GetAccountCreditStateRow, error) {
-	row := q.db.QueryRow(ctx, getAccountCreditState, id)
-	var i GetAccountCreditStateRow
-	err := row.Scan(&i.CreditLimitNano, &i.CreditFrozen, &i.Status)
+func (q *Queries) GetPoints(ctx context.Context, accountID *string) (GetPointsRow, error) {
+	row := q.db.QueryRow(ctx, getPoints, accountID)
+	var i GetPointsRow
+	err := row.Scan(&i.BalanceNano, &i.CreditLimitNano, &i.UpdatedAt)
 	return i, err
 }
 
-const getHold = `-- name: GetHold :one
-SELECT h.id, h.ledger_account_id, h.create_operation, h.create_idempotency_key, h.purpose, h.funding_policy, h.amount_nano, h.remaining_nano, h.captured_nano, h.released_nano, h.status, h.reason, h.business_type, h.business_id, h.created_at, h.updated_at, COALESCE(la.identity_account_id::text, '')::text AS owner_account_id
-FROM ledger_holds h JOIN ledger_accounts la ON la.id = h.ledger_account_id
-WHERE h.id = $1
+const getTransactionByKey = `-- name: GetTransactionByKey :one
+SELECT id, type, idempotency_key, related_type, related_id, actor_id, reason, created_at FROM ledger_transactions WHERE idempotency_key = $1
 `
 
-type GetHoldRow struct {
-	LedgerHold     LedgerHold
-	OwnerAccountID string
-}
-
-func (q *Queries) GetHold(ctx context.Context, id string) (GetHoldRow, error) {
-	row := q.db.QueryRow(ctx, getHold, id)
-	var i GetHoldRow
+func (q *Queries) GetTransactionByKey(ctx context.Context, idempotencyKey string) (LedgerTransaction, error) {
+	row := q.db.QueryRow(ctx, getTransactionByKey, idempotencyKey)
+	var i LedgerTransaction
 	err := row.Scan(
-		&i.LedgerHold.ID,
-		&i.LedgerHold.LedgerAccountID,
-		&i.LedgerHold.CreateOperation,
-		&i.LedgerHold.CreateIdempotencyKey,
-		&i.LedgerHold.Purpose,
-		&i.LedgerHold.FundingPolicy,
-		&i.LedgerHold.AmountNano,
-		&i.LedgerHold.RemainingNano,
-		&i.LedgerHold.CapturedNano,
-		&i.LedgerHold.ReleasedNano,
-		&i.LedgerHold.Status,
-		&i.LedgerHold.Reason,
-		&i.LedgerHold.BusinessType,
-		&i.LedgerHold.BusinessID,
-		&i.LedgerHold.CreatedAt,
-		&i.LedgerHold.UpdatedAt,
-		&i.OwnerAccountID,
+		&i.ID,
+		&i.Type,
+		&i.IdempotencyKey,
+		&i.RelatedType,
+		&i.RelatedID,
+		&i.ActorID,
+		&i.Reason,
+		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const getHoldForUpdate = `-- name: GetHoldForUpdate :one
-SELECT h.id, h.ledger_account_id, h.create_operation, h.create_idempotency_key, h.purpose, h.funding_policy, h.amount_nano, h.remaining_nano, h.captured_nano, h.released_nano, h.status, h.reason, h.business_type, h.business_id, h.created_at, h.updated_at, COALESCE(la.identity_account_id::text, '')::text AS owner_account_id
-FROM ledger_holds h JOIN ledger_accounts la ON la.id = h.ledger_account_id
-WHERE h.id = $1 FOR UPDATE OF h
-`
-
-type GetHoldForUpdateRow struct {
-	LedgerHold     LedgerHold
-	OwnerAccountID string
-}
-
-// 只锁 ledger_holds 行（FOR UPDATE OF h），账户行由随后的 LockLedgerAccount 加锁。
-func (q *Queries) GetHoldForUpdate(ctx context.Context, id string) (GetHoldForUpdateRow, error) {
-	row := q.db.QueryRow(ctx, getHoldForUpdate, id)
-	var i GetHoldForUpdateRow
-	err := row.Scan(
-		&i.LedgerHold.ID,
-		&i.LedgerHold.LedgerAccountID,
-		&i.LedgerHold.CreateOperation,
-		&i.LedgerHold.CreateIdempotencyKey,
-		&i.LedgerHold.Purpose,
-		&i.LedgerHold.FundingPolicy,
-		&i.LedgerHold.AmountNano,
-		&i.LedgerHold.RemainingNano,
-		&i.LedgerHold.CapturedNano,
-		&i.LedgerHold.ReleasedNano,
-		&i.LedgerHold.Status,
-		&i.LedgerHold.Reason,
-		&i.LedgerHold.BusinessType,
-		&i.LedgerHold.BusinessID,
-		&i.LedgerHold.CreatedAt,
-		&i.LedgerHold.UpdatedAt,
-		&i.OwnerAccountID,
-	)
-	return i, err
-}
-
-const getLedgerCommand = `-- name: GetLedgerCommand :one
-SELECT operation, payload_hash, COALESCE(result_id::text, '')::text AS result_id, result_payload
-FROM ledger_commands WHERE operation = $1 AND idempotency_key = $2
-`
-
-type GetLedgerCommandParams struct {
-	Operation      string
-	IdempotencyKey string
-}
-
-type GetLedgerCommandRow struct {
-	Operation     string
-	PayloadHash   []byte
-	ResultID      string
-	ResultPayload []byte
-}
-
-func (q *Queries) GetLedgerCommand(ctx context.Context, arg GetLedgerCommandParams) (GetLedgerCommandRow, error) {
-	row := q.db.QueryRow(ctx, getLedgerCommand, arg.Operation, arg.IdempotencyKey)
-	var i GetLedgerCommandRow
-	err := row.Scan(
-		&i.Operation,
-		&i.PayloadHash,
-		&i.ResultID,
-		&i.ResultPayload,
-	)
-	return i, err
-}
-
-const getMetrics = `-- name: GetMetrics :one
-WITH entry_totals AS (
-	SELECT ledger_account_id, sum(amount_nano::numeric) AS posted_source
-	FROM ledger_entries GROUP BY ledger_account_id
-), hold_totals AS (
-	SELECT ledger_account_id,
-	       COALESCE(sum(remaining_nano::numeric) FILTER (WHERE purpose = 'asset_reservation'), 0) AS asset_source,
-	       COALESCE(sum(remaining_nano::numeric) FILTER (WHERE purpose = 'spend_authorization'), 0) AS authorization_source
-	FROM ledger_holds GROUP BY ledger_account_id
-), reconciled AS (
-	SELECT la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at, a.credit_limit_nano, a.credit_frozen,
-	       COALESCE(et.posted_source, 0) AS posted_source,
-	       COALESCE(ht.asset_source, 0) AS asset_source,
-	       COALESCE(ht.authorization_source, 0) AS authorization_source
-	FROM ledger_accounts la
-	LEFT JOIN accounts a ON a.id = la.identity_account_id
-	LEFT JOIN entry_totals et ON et.ledger_account_id = la.id
-	LEFT JOIN hold_totals ht ON ht.ledger_account_id = la.id
-)
-SELECT
-	COALESCE(sum(posted_balance_nano::numeric), 0)::text AS total_posted,
-	COALESCE(sum(GREATEST(posted_balance_nano, 0)::numeric), 0)::text AS positive_posted,
-	COALESCE(sum(LEAST(posted_balance_nano, 0)::numeric), 0)::text AS negative_posted,
-	COALESCE(sum(CASE WHEN kind = 'user' THEN credit_limit_nano::numeric ELSE 0 END), 0)::text AS total_credit_limit,
-	COALESCE(sum(CASE WHEN kind = 'user' THEN GREATEST(0::numeric, -posted_balance_nano::numeric) ELSE 0 END), 0)::text AS used_credit,
-	COALESCE(sum(asset_reserved_nano::numeric), 0)::text AS asset_reserved,
-	COALESCE(sum(spend_authorized_nano::numeric), 0)::text AS spend_authorized,
-	COALESCE(max(posted_balance_nano) FILTER (WHERE kind = 'platform_incentive'), 0)::text AS incentive_posted,
-	COALESCE(max(posted_balance_nano) FILTER (WHERE kind = 'platform_loss'), 0)::text AS loss_posted,
-	(count(*) FILTER (WHERE kind = 'user' AND GREATEST(0::numeric, -posted_balance_nano::numeric) > CASE WHEN credit_frozen THEN 0 ELSE credit_limit_nano END::numeric))::bigint AS over_limit_accounts,
-	(count(*) FILTER (WHERE kind = 'user' AND credit_frozen))::bigint AS credit_frozen_accounts,
-	count(*)::bigint AS account_count,
-	COALESCE(sum(abs(posted_balance_nano::numeric - posted_source)), 0)::text AS posted_difference,
-	(count(*) FILTER (WHERE posted_balance_nano::numeric <> posted_source))::bigint AS posted_mismatch_accounts,
-	COALESCE(sum(abs(asset_reserved_nano::numeric - asset_source)), 0)::text AS asset_difference,
-	COALESCE(sum(abs(spend_authorized_nano::numeric - authorization_source)), 0)::text AS authorization_difference,
-	(count(*) FILTER (WHERE asset_reserved_nano::numeric <> asset_source OR spend_authorized_nano::numeric <> authorization_source))::bigint AS hold_mismatch_accounts
-FROM reconciled
-`
-
-type GetMetricsRow struct {
-	TotalPosted             string
-	PositivePosted          string
-	NegativePosted          string
-	TotalCreditLimit        string
-	UsedCredit              string
-	AssetReserved           string
-	SpendAuthorized         string
-	IncentivePosted         string
-	LossPosted              string
-	OverLimitAccounts       int64
-	CreditFrozenAccounts    int64
-	AccountCount            int64
-	PostedDifference        string
-	PostedMismatchAccounts  int64
-	AssetDifference         string
-	AuthorizationDifference string
-	HoldMismatchAccounts    int64
-}
-
-// 对账指标：所有聚合用 numeric 求和并以文本返回，避免 BIGINT 溢出。
-func (q *Queries) GetMetrics(ctx context.Context) (GetMetricsRow, error) {
-	row := q.db.QueryRow(ctx, getMetrics)
-	var i GetMetricsRow
-	err := row.Scan(
-		&i.TotalPosted,
-		&i.PositivePosted,
-		&i.NegativePosted,
-		&i.TotalCreditLimit,
-		&i.UsedCredit,
-		&i.AssetReserved,
-		&i.SpendAuthorized,
-		&i.IncentivePosted,
-		&i.LossPosted,
-		&i.OverLimitAccounts,
-		&i.CreditFrozenAccounts,
-		&i.AccountCount,
-		&i.PostedDifference,
-		&i.PostedMismatchAccounts,
-		&i.AssetDifference,
-		&i.AuthorizationDifference,
-		&i.HoldMismatchAccounts,
-	)
-	return i, err
-}
-
-const getSealedTransaction = `-- name: GetSealedTransaction :one
-SELECT t.id, t.command_operation, t.idempotency_key, t.kind, t.reason, t.reference_type, t.reference_id, t.actor_account_id, t.reversal_of_transaction_id, t.sealed, t.created_at, t.hold_id FROM ledger_transactions t WHERE t.id = $1 AND t.sealed
-`
-
-type GetSealedTransactionRow struct {
-	LedgerTransaction LedgerTransaction
-}
-
-func (q *Queries) GetSealedTransaction(ctx context.Context, id string) (GetSealedTransactionRow, error) {
-	row := q.db.QueryRow(ctx, getSealedTransaction, id)
-	var i GetSealedTransactionRow
-	err := row.Scan(
-		&i.LedgerTransaction.ID,
-		&i.LedgerTransaction.CommandOperation,
-		&i.LedgerTransaction.IdempotencyKey,
-		&i.LedgerTransaction.Kind,
-		&i.LedgerTransaction.Reason,
-		&i.LedgerTransaction.ReferenceType,
-		&i.LedgerTransaction.ReferenceID,
-		&i.LedgerTransaction.ActorAccountID,
-		&i.LedgerTransaction.ReversalOfTransactionID,
-		&i.LedgerTransaction.Sealed,
-		&i.LedgerTransaction.CreatedAt,
-		&i.LedgerTransaction.HoldID,
-	)
-	return i, err
-}
-
-const getWallet = `-- name: GetWallet :one
-
-SELECT la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at,
-	COALESCE(a.credit_limit_nano, 0)::bigint AS credit_limit_nano,
-	COALESCE(a.credit_frozen, false)::boolean AS credit_frozen,
-	COALESCE(a.status, 'active')::text AS account_status
-FROM ledger_accounts la
-LEFT JOIN accounts a ON a.id = la.identity_account_id
-WHERE la.identity_account_id = $1::uuid
-	OR la.system_code = $2::text
-`
-
-type GetWalletParams struct {
-	IdentityAccountID *string
-	SystemCode        *string
-}
-
-type GetWalletRow struct {
-	LedgerAccount   LedgerAccount
-	CreditLimitNano int64
-	CreditFrozen    bool
-	AccountStatus   string
-}
-
-// 账户读取 -----------------------------------------------------------------
-// 钱包：用户账户按 identity_account_id，系统账户按 system_code；调用方恰好传入其一。
-func (q *Queries) GetWallet(ctx context.Context, arg GetWalletParams) (GetWalletRow, error) {
-	row := q.db.QueryRow(ctx, getWallet, arg.IdentityAccountID, arg.SystemCode)
-	var i GetWalletRow
-	err := row.Scan(
-		&i.LedgerAccount.ID,
-		&i.LedgerAccount.IdentityAccountID,
-		&i.LedgerAccount.Kind,
-		&i.LedgerAccount.SystemCode,
-		&i.LedgerAccount.PostedBalanceNano,
-		&i.LedgerAccount.AssetReservedNano,
-		&i.LedgerAccount.SpendAuthorizedNano,
-		&i.LedgerAccount.Version,
-		&i.LedgerAccount.CreatedAt,
-		&i.LedgerAccount.UpdatedAt,
-		&i.CreditLimitNano,
-		&i.CreditFrozen,
-		&i.AccountStatus,
-	)
-	return i, err
-}
-
-const insertCaptureHoldEvent = `-- name: InsertCaptureHoldEvent :exec
-INSERT INTO ledger_hold_events (hold_id, command_operation, idempotency_key, kind, business_id, amount_nano, transaction_id, reason)
-VALUES ($1, $2, $3, 'capture', $4, $5, $6, $7)
-`
-
-type InsertCaptureHoldEventParams struct {
-	HoldID           string
-	CommandOperation string
-	IdempotencyKey   string
-	BusinessID       string
-	AmountNano       money.Amount
-	TransactionID    *string
-	Reason           string
-}
-
-func (q *Queries) InsertCaptureHoldEvent(ctx context.Context, arg InsertCaptureHoldEventParams) error {
-	_, err := q.db.Exec(ctx, insertCaptureHoldEvent,
-		arg.HoldID,
-		arg.CommandOperation,
-		arg.IdempotencyKey,
-		arg.BusinessID,
-		arg.AmountNano,
-		arg.TransactionID,
-		arg.Reason,
-	)
-	return err
 }
 
 const insertEntry = `-- name: InsertEntry :exec
-INSERT INTO ledger_entries (transaction_id, ledger_account_id, entry_ordinal, business_role, amount_nano, posted_balance_before_nano, posted_balance_after_nano)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_nano, balance_after_nano)
+VALUES ($1, $2, $3, $4)
 `
 
 type InsertEntryParams struct {
-	TransactionID           string
-	LedgerAccountID         string
-	EntryOrdinal            int32
-	BusinessRole            string
-	AmountNano              money.Amount
-	PostedBalanceBeforeNano money.Amount
-	PostedBalanceAfterNano  money.Amount
+	TransactionID    string
+	LedgerAccountID  string
+	AmountNano       money.Amount
+	BalanceAfterNano money.Amount
 }
 
 func (q *Queries) InsertEntry(ctx context.Context, arg InsertEntryParams) error {
 	_, err := q.db.Exec(ctx, insertEntry,
 		arg.TransactionID,
 		arg.LedgerAccountID,
-		arg.EntryOrdinal,
-		arg.BusinessRole,
 		arg.AmountNano,
-		arg.PostedBalanceBeforeNano,
-		arg.PostedBalanceAfterNano,
-	)
-	return err
-}
-
-const insertHold = `-- name: InsertHold :one
-
-INSERT INTO ledger_holds (
-	ledger_account_id, create_idempotency_key, purpose, funding_policy, amount_nano,
-	remaining_nano, reason, business_type, business_id
-) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8)
-RETURNING id::text
-`
-
-type InsertHoldParams struct {
-	LedgerAccountID      string
-	CreateIdempotencyKey string
-	Purpose              string
-	FundingPolicy        string
-	AmountNano           money.Amount
-	Reason               string
-	BusinessType         string
-	BusinessID           string
-}
-
-// 冻结 ---------------------------------------------------------------------
-func (q *Queries) InsertHold(ctx context.Context, arg InsertHoldParams) (string, error) {
-	row := q.db.QueryRow(ctx, insertHold,
-		arg.LedgerAccountID,
-		arg.CreateIdempotencyKey,
-		arg.Purpose,
-		arg.FundingPolicy,
-		arg.AmountNano,
-		arg.Reason,
-		arg.BusinessType,
-		arg.BusinessID,
-	)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const insertReleaseHoldEvent = `-- name: InsertReleaseHoldEvent :exec
-INSERT INTO ledger_hold_events (hold_id, command_operation, idempotency_key, kind, business_id, amount_nano, reason)
-VALUES ($1, $2, $3, 'release', $4, $5, $6)
-`
-
-type InsertReleaseHoldEventParams struct {
-	HoldID           string
-	CommandOperation string
-	IdempotencyKey   string
-	BusinessID       string
-	AmountNano       money.Amount
-	Reason           string
-}
-
-func (q *Queries) InsertReleaseHoldEvent(ctx context.Context, arg InsertReleaseHoldEventParams) error {
-	_, err := q.db.Exec(ctx, insertReleaseHoldEvent,
-		arg.HoldID,
-		arg.CommandOperation,
-		arg.IdempotencyKey,
-		arg.BusinessID,
-		arg.AmountNano,
-		arg.Reason,
+		arg.BalanceAfterNano,
 	)
 	return err
 }
 
 const insertTransaction = `-- name: InsertTransaction :one
-INSERT INTO ledger_transactions (command_operation, idempotency_key, kind, reason, reference_type, reference_id, actor_account_id, reversal_of_transaction_id, hold_id)
-VALUES ($1, $2, $3, $4, $5, $6,
-	NULLIF($7::text, '')::uuid, NULLIF($8::text, '')::uuid, NULLIF($9::text, '')::uuid)
-RETURNING id::text
+INSERT INTO ledger_transactions (type, idempotency_key, related_type, related_id, actor_id, reason)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (idempotency_key) DO NOTHING
+RETURNING id, created_at
 `
 
 type InsertTransactionParams struct {
-	CommandOperation        string
-	IdempotencyKey          string
-	Kind                    string
-	Reason                  string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          string
-	ReversalOfTransactionID string
-	HoldID                  string
+	Type           string
+	IdempotencyKey string
+	RelatedType    *string
+	RelatedID      *string
+	ActorID        *string
+	Reason         string
 }
 
-func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (string, error) {
+type InsertTransactionRow struct {
+	ID        string
+	CreatedAt time.Time
+}
+
+func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (InsertTransactionRow, error) {
 	row := q.db.QueryRow(ctx, insertTransaction,
-		arg.CommandOperation,
+		arg.Type,
 		arg.IdempotencyKey,
-		arg.Kind,
+		arg.RelatedType,
+		arg.RelatedID,
+		arg.ActorID,
 		arg.Reason,
-		arg.ReferenceType,
-		arg.ReferenceID,
-		arg.ActorAccountID,
-		arg.ReversalOfTransactionID,
-		arg.HoldID,
 	)
-	var id string
-	err := row.Scan(&id)
-	return id, err
+	var i InsertTransactionRow
+	err := row.Scan(&i.ID, &i.CreatedAt)
+	return i, err
 }
 
-const isGatewaySettlementTransaction = `-- name: IsGatewaySettlementTransaction :one
-SELECT EXISTS (
-	SELECT 1 FROM api_call_settlements
-	WHERE capture_transaction_id = $1 OR self_transaction_id = $1
-)::boolean AS settled
+const insertUserLedgerAccount = `-- name: InsertUserLedgerAccount :exec
+INSERT INTO ledger_accounts (kind, account_id) VALUES ('user', $1)
 `
 
-func (q *Queries) IsGatewaySettlementTransaction(ctx context.Context, transactionID *string) (bool, error) {
-	row := q.db.QueryRow(ctx, isGatewaySettlementTransaction, transactionID)
-	var settled bool
-	err := row.Scan(&settled)
-	return settled, err
-}
-
-const isTransactionReversed = `-- name: IsTransactionReversed :one
-SELECT EXISTS (
-	SELECT 1 FROM ledger_transactions WHERE reversal_of_transaction_id = $1
-)::boolean AS reversed
-`
-
-func (q *Queries) IsTransactionReversed(ctx context.Context, transactionID *string) (bool, error) {
-	row := q.db.QueryRow(ctx, isTransactionReversed, transactionID)
-	var reversed bool
-	err := row.Scan(&reversed)
-	return reversed, err
-}
-
-const listEntries = `-- name: ListEntries :many
-SELECT e.id, e.transaction_id, e.ledger_account_id, e.entry_ordinal, e.business_role, e.amount_nano, e.posted_balance_before_nano, e.posted_balance_after_nano, e.created_at,
-	la.kind AS account_kind,
-	COALESCE(la.identity_account_id::text, '')::text AS identity_account_id,
-	t.kind AS transaction_kind,
-	t.reason AS transaction_reason,
-	t.reference_type,
-	t.reference_id,
-	COALESCE(t.actor_account_id::text, '')::text AS actor_account_id,
-	COALESCE(t.reversal_of_transaction_id::text, '')::text AS reversal_of_transaction_id,
-	COALESCE(t.hold_id::text, '')::text AS hold_id,
-	COALESCE((
-		SELECT jsonb_agg(jsonb_build_object(
-			'account_kind', other_account.kind,
-			'identity_account_id', COALESCE(other_account.identity_account_id::text, ''),
-			'business_role', other_entry.business_role,
-			'amount_nano', other_entry.amount_nano
-		) ORDER BY other_entry.entry_ordinal)
-		FROM ledger_entries other_entry
-		JOIN ledger_accounts other_account ON other_account.id = other_entry.ledger_account_id
-		WHERE other_entry.transaction_id = e.transaction_id AND other_entry.id <> e.id
-	), '[]'::jsonb)::jsonb AS counterparties
-FROM ledger_entries e
-JOIN ledger_accounts la ON la.id = e.ledger_account_id
-JOIN ledger_transactions t ON t.id = e.transaction_id
-WHERE (la.identity_account_id = $1::uuid
-		OR la.system_code = $2::text)
-	AND ($3::bigint = 0 OR e.id < $3::bigint)
-ORDER BY e.id DESC
-LIMIT $4::bigint
-`
-
-type ListEntriesParams struct {
-	IdentityAccountID *string
-	SystemCode        *string
-	BeforeID          int64
-	RowLimit          int64
-}
-
-type ListEntriesRow struct {
-	LedgerEntry             LedgerEntry
-	AccountKind             string
-	IdentityAccountID       string
-	TransactionKind         string
-	TransactionReason       string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          string
-	ReversalOfTransactionID string
-	HoldID                  string
-	Counterparties          []byte
-}
-
-func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error) {
-	rows, err := q.db.Query(ctx, listEntries,
-		arg.IdentityAccountID,
-		arg.SystemCode,
-		arg.BeforeID,
-		arg.RowLimit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListEntriesRow
-	for rows.Next() {
-		var i ListEntriesRow
-		if err := rows.Scan(
-			&i.LedgerEntry.ID,
-			&i.LedgerEntry.TransactionID,
-			&i.LedgerEntry.LedgerAccountID,
-			&i.LedgerEntry.EntryOrdinal,
-			&i.LedgerEntry.BusinessRole,
-			&i.LedgerEntry.AmountNano,
-			&i.LedgerEntry.PostedBalanceBeforeNano,
-			&i.LedgerEntry.PostedBalanceAfterNano,
-			&i.LedgerEntry.CreatedAt,
-			&i.AccountKind,
-			&i.IdentityAccountID,
-			&i.TransactionKind,
-			&i.TransactionReason,
-			&i.ReferenceType,
-			&i.ReferenceID,
-			&i.ActorAccountID,
-			&i.ReversalOfTransactionID,
-			&i.HoldID,
-			&i.Counterparties,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) InsertUserLedgerAccount(ctx context.Context, accountID *string) error {
+	_, err := q.db.Exec(ctx, insertUserLedgerAccount, accountID)
+	return err
 }
 
 const listTransactionEntries = `-- name: ListTransactionEntries :many
-SELECT e.id, e.transaction_id, e.ledger_account_id, e.entry_ordinal, e.business_role, e.amount_nano, e.posted_balance_before_nano, e.posted_balance_after_nano, e.created_at, la.kind AS account_kind,
-	COALESCE(la.identity_account_id::text, '')::text AS identity_account_id
-FROM ledger_entries e JOIN ledger_accounts la ON la.id = e.ledger_account_id
-WHERE e.transaction_id = $1 ORDER BY e.entry_ordinal
+SELECT e.ledger_account_id, l.account_id, l.system_code, e.amount_nano, e.balance_after_nano
+FROM ledger_entries e
+JOIN ledger_accounts l ON l.id = e.ledger_account_id
+WHERE e.transaction_id = $1
+ORDER BY e.id
 `
 
 type ListTransactionEntriesRow struct {
-	LedgerEntry       LedgerEntry
-	AccountKind       string
-	IdentityAccountID string
+	LedgerAccountID  string
+	AccountID        *string
+	SystemCode       *string
+	AmountNano       money.Amount
+	BalanceAfterNano money.Amount
 }
 
 func (q *Queries) ListTransactionEntries(ctx context.Context, transactionID string) ([]ListTransactionEntriesRow, error) {
@@ -676,17 +144,11 @@ func (q *Queries) ListTransactionEntries(ctx context.Context, transactionID stri
 	for rows.Next() {
 		var i ListTransactionEntriesRow
 		if err := rows.Scan(
-			&i.LedgerEntry.ID,
-			&i.LedgerEntry.TransactionID,
-			&i.LedgerEntry.LedgerAccountID,
-			&i.LedgerEntry.EntryOrdinal,
-			&i.LedgerEntry.BusinessRole,
-			&i.LedgerEntry.AmountNano,
-			&i.LedgerEntry.PostedBalanceBeforeNano,
-			&i.LedgerEntry.PostedBalanceAfterNano,
-			&i.LedgerEntry.CreatedAt,
-			&i.AccountKind,
-			&i.IdentityAccountID,
+			&i.LedgerAccountID,
+			&i.AccountID,
+			&i.SystemCode,
+			&i.AmountNano,
+			&i.BalanceAfterNano,
 		); err != nil {
 			return nil, err
 		}
@@ -698,149 +160,146 @@ func (q *Queries) ListTransactionEntries(ctx context.Context, transactionID stri
 	return items, nil
 }
 
-const lockAccountAdminState = `-- name: LockAccountAdminState :one
-SELECT is_admin, status FROM accounts WHERE id = $1 FOR UPDATE
+const listUserEntries = `-- name: ListUserEntries :many
+SELECT e.id, e.transaction_id, t.type, t.reason, t.related_type, t.related_id,
+       e.amount_nano, e.balance_after_nano, c.api_key_id, k.name AS api_key_name, e.created_at
+FROM ledger_entries e
+JOIN ledger_accounts l ON l.id = e.ledger_account_id
+JOIN ledger_transactions t ON t.id = e.transaction_id
+LEFT JOIN calls c ON t.related_type = 'call' AND c.id = t.related_id
+LEFT JOIN api_keys k ON k.id = c.api_key_id
+WHERE l.account_id = $1
+  AND ($2::text = '' OR t.type = $2)
+  AND ($3::text = '' OR c.api_key_id::text = $3)
+  AND ($4::timestamptz IS NULL OR e.created_at >= $4)
+  AND ($5::timestamptz IS NULL OR e.created_at < $5)
+  AND ($6::bigint = 0 OR e.id < $6)
+ORDER BY e.id DESC
+LIMIT $7
 `
 
-type LockAccountAdminStateRow struct {
-	IsAdmin bool
-	Status  string
+type ListUserEntriesParams struct {
+	AccountID *string
+	Type      string
+	ApiKeyID  string
+	FromTime  *time.Time
+	ToTime    *time.Time
+	BeforeID  int64
+	RowLimit  int32
 }
 
-func (q *Queries) LockAccountAdminState(ctx context.Context, id string) (LockAccountAdminStateRow, error) {
-	row := q.db.QueryRow(ctx, lockAccountAdminState, id)
-	var i LockAccountAdminStateRow
-	err := row.Scan(&i.IsAdmin, &i.Status)
-	return i, err
+type ListUserEntriesRow struct {
+	ID               int64
+	TransactionID    string
+	Type             string
+	Reason           string
+	RelatedType      *string
+	RelatedID        *string
+	AmountNano       money.Amount
+	BalanceAfterNano money.Amount
+	ApiKeyID         *string
+	ApiKeyName       *string
+	CreatedAt        time.Time
 }
 
-const lockLedgerAccount = `-- name: LockLedgerAccount :one
-SELECT la.id, la.identity_account_id, la.kind, la.system_code, la.posted_balance_nano, la.asset_reserved_nano, la.spend_authorized_nano, la.version, la.created_at, la.updated_at FROM ledger_accounts la WHERE la.id = $1 FOR UPDATE
-`
-
-type LockLedgerAccountRow struct {
-	LedgerAccount LedgerAccount
-}
-
-// 行锁：调用方按 id 升序逐个加锁，保持全局锁顺序。
-func (q *Queries) LockLedgerAccount(ctx context.Context, id string) (LockLedgerAccountRow, error) {
-	row := q.db.QueryRow(ctx, lockLedgerAccount, id)
-	var i LockLedgerAccountRow
-	err := row.Scan(
-		&i.LedgerAccount.ID,
-		&i.LedgerAccount.IdentityAccountID,
-		&i.LedgerAccount.Kind,
-		&i.LedgerAccount.SystemCode,
-		&i.LedgerAccount.PostedBalanceNano,
-		&i.LedgerAccount.AssetReservedNano,
-		&i.LedgerAccount.SpendAuthorizedNano,
-		&i.LedgerAccount.Version,
-		&i.LedgerAccount.CreatedAt,
-		&i.LedgerAccount.UpdatedAt,
+func (q *Queries) ListUserEntries(ctx context.Context, arg ListUserEntriesParams) ([]ListUserEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listUserEntries,
+		arg.AccountID,
+		arg.Type,
+		arg.ApiKeyID,
+		arg.FromTime,
+		arg.ToTime,
+		arg.BeforeID,
+		arg.RowLimit,
 	)
-	return i, err
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserEntriesRow
+	for rows.Next() {
+		var i ListUserEntriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TransactionID,
+			&i.Type,
+			&i.Reason,
+			&i.RelatedType,
+			&i.RelatedID,
+			&i.AmountNano,
+			&i.BalanceAfterNano,
+			&i.ApiKeyID,
+			&i.ApiKeyName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const lockSealedTransaction = `-- name: LockSealedTransaction :one
-SELECT kind, reference_type FROM ledger_transactions WHERE id = $1 AND sealed FOR UPDATE
+const lockLedgerAccounts = `-- name: LockLedgerAccounts :many
+SELECT id, account_id, system_code, balance_nano
+FROM ledger_accounts
+WHERE account_id = ANY($1::uuid[])
+   OR system_code = ANY($2::text[])
+ORDER BY id
+FOR UPDATE
 `
 
-type LockSealedTransactionRow struct {
-	Kind          string
-	ReferenceType string
+type LockLedgerAccountsParams struct {
+	UserIds     []string
+	SystemCodes []string
 }
 
-func (q *Queries) LockSealedTransaction(ctx context.Context, id string) (LockSealedTransactionRow, error) {
-	row := q.db.QueryRow(ctx, lockSealedTransaction, id)
-	var i LockSealedTransactionRow
-	err := row.Scan(&i.Kind, &i.ReferenceType)
-	return i, err
+type LockLedgerAccountsRow struct {
+	ID          string
+	AccountID   *string
+	SystemCode  *string
+	BalanceNano money.Amount
 }
 
-const reserveLedgerCommand = `-- name: ReserveLedgerCommand :one
-INSERT INTO ledger_commands (idempotency_key, operation, payload_hash)
-VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
-RETURNING idempotency_key
+// Resolves and locks the ledger accounts of one posting in id order, so
+// concurrent postings over overlapping accounts cannot deadlock.
+func (q *Queries) LockLedgerAccounts(ctx context.Context, arg LockLedgerAccountsParams) ([]LockLedgerAccountsRow, error) {
+	rows, err := q.db.Query(ctx, lockLedgerAccounts, arg.UserIds, arg.SystemCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockLedgerAccountsRow
+	for rows.Next() {
+		var i LockLedgerAccountsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.SystemCode,
+			&i.BalanceNano,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateLedgerBalance = `-- name: UpdateLedgerBalance :exec
+UPDATE ledger_accounts SET balance_nano = $2, updated_at = now() WHERE id = $1
 `
 
-type ReserveLedgerCommandParams struct {
-	IdempotencyKey string
-	Operation      string
-	PayloadHash    []byte
+type UpdateLedgerBalanceParams struct {
+	ID          string
+	BalanceNano money.Amount
 }
 
-// 幂等命令：首次写入返回键，冲突时无行（pgx.ErrNoRows）表示重放或冲突。
-func (q *Queries) ReserveLedgerCommand(ctx context.Context, arg ReserveLedgerCommandParams) (string, error) {
-	row := q.db.QueryRow(ctx, reserveLedgerCommand, arg.IdempotencyKey, arg.Operation, arg.PayloadHash)
-	var idempotency_key string
-	err := row.Scan(&idempotency_key)
-	return idempotency_key, err
-}
-
-const sealTransaction = `-- name: SealTransaction :exec
-UPDATE ledger_transactions SET sealed = true WHERE id = $1
-`
-
-func (q *Queries) SealTransaction(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, sealTransaction, id)
-	return err
-}
-
-const setAccountReservations = `-- name: SetAccountReservations :exec
-UPDATE ledger_accounts
-SET asset_reserved_nano = $1, spend_authorized_nano = $2, version = version + 1, updated_at = now()
-WHERE id = $3
-`
-
-type SetAccountReservationsParams struct {
-	AssetReservedNano   money.Amount
-	SpendAuthorizedNano money.Amount
-	ID                  string
-}
-
-func (q *Queries) SetAccountReservations(ctx context.Context, arg SetAccountReservationsParams) error {
-	_, err := q.db.Exec(ctx, setAccountReservations, arg.AssetReservedNano, arg.SpendAuthorizedNano, arg.ID)
-	return err
-}
-
-const setAssetReserved = `-- name: SetAssetReserved :exec
-UPDATE ledger_accounts SET asset_reserved_nano = $1, version = version + 1, updated_at = now() WHERE id = $2
-`
-
-type SetAssetReservedParams struct {
-	AssetReservedNano money.Amount
-	ID                string
-}
-
-func (q *Queries) SetAssetReserved(ctx context.Context, arg SetAssetReservedParams) error {
-	_, err := q.db.Exec(ctx, setAssetReserved, arg.AssetReservedNano, arg.ID)
-	return err
-}
-
-const setPostedBalance = `-- name: SetPostedBalance :exec
-UPDATE ledger_accounts SET posted_balance_nano = $1, version = version + 1, updated_at = now() WHERE id = $2
-`
-
-type SetPostedBalanceParams struct {
-	PostedBalanceNano money.Amount
-	ID                string
-}
-
-func (q *Queries) SetPostedBalance(ctx context.Context, arg SetPostedBalanceParams) error {
-	_, err := q.db.Exec(ctx, setPostedBalance, arg.PostedBalanceNano, arg.ID)
-	return err
-}
-
-const setSpendAuthorized = `-- name: SetSpendAuthorized :exec
-UPDATE ledger_accounts SET spend_authorized_nano = $1, version = version + 1, updated_at = now() WHERE id = $2
-`
-
-type SetSpendAuthorizedParams struct {
-	SpendAuthorizedNano money.Amount
-	ID                  string
-}
-
-func (q *Queries) SetSpendAuthorized(ctx context.Context, arg SetSpendAuthorizedParams) error {
-	_, err := q.db.Exec(ctx, setSpendAuthorized, arg.SpendAuthorizedNano, arg.ID)
+func (q *Queries) UpdateLedgerBalance(ctx context.Context, arg UpdateLedgerBalanceParams) error {
+	_, err := q.db.Exec(ctx, updateLedgerBalance, arg.ID, arg.BalanceNano)
 	return err
 }

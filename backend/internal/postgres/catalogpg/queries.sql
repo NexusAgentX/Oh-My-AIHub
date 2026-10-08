@@ -1,83 +1,57 @@
 -- name: ListModels :many
 SELECT * FROM models
-WHERE (sqlc.arg(include_disabled)::boolean OR status = 'active')
-	AND (sqlc.arg(query)::text = '' OR id ILIKE '%' || sqlc.arg(query)::text || '%'
-		OR name ILIKE '%' || sqlc.arg(query)::text || '%'
-		OR provider ILIKE '%' || sqlc.arg(query)::text || '%')
-ORDER BY provider, name, id;
+WHERE enabled OR sqlc.arg(include_disabled)::boolean
+ORDER BY sort_order, id;
 
 -- name: GetModel :one
-SELECT * FROM models
-WHERE id = @id AND (sqlc.arg(include_disabled)::boolean OR status = 'active');
+SELECT * FROM models WHERE id = $1;
 
--- name: CreateModel :one
+-- name: LockModel :one
+SELECT * FROM models WHERE id = $1 FOR UPDATE;
+
+-- name: ListTiers :many
+SELECT * FROM model_price_tiers
+WHERE model_id = ANY(sqlc.arg(model_ids)::text[])
+ORDER BY model_id, seq;
+
+-- name: InsertModel :one
 INSERT INTO models (
-	id, name, provider, context_window, parameter_info,
-	input_modalities, output_modalities, supports_tools,
-	supports_structured_output, supports_vision,
-	input_price_nano_per_million, output_price_nano_per_million,
-	cache_write_price_nano_per_million, cache_read_price_nano_per_million,
-	status
-) VALUES (
-	@id, @name, @provider, @context_window, @parameter_info,
-	@input_modalities, @output_modalities, @supports_tools,
-	@supports_structured_output, @supports_vision,
-	@input_price_nano_per_million, @output_price_nano_per_million,
-	@cache_write_price_nano_per_million, @cache_read_price_nano_per_million,
-	@status
-)
+    id, display_name,
+    input_price_nano_per_million, output_price_nano_per_million,
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million,
+    enabled, sort_order, provider, context_window, input_modalities, output_modalities,
+    supports_tools, supports_structured_output, supports_vision, parameter_info
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *;
 
 -- name: UpdateModel :one
 UPDATE models SET
-	name = @name,
-	provider = @provider,
-	context_window = @context_window,
-	parameter_info = @parameter_info,
-	input_modalities = @input_modalities,
-	output_modalities = @output_modalities,
-	supports_tools = @supports_tools,
-	supports_structured_output = @supports_structured_output,
-	supports_vision = @supports_vision,
-	input_price_nano_per_million = @input_price_nano_per_million,
-	output_price_nano_per_million = @output_price_nano_per_million,
-	cache_write_price_nano_per_million = @cache_write_price_nano_per_million,
-	cache_read_price_nano_per_million = @cache_read_price_nano_per_million,
-	status = @status,
-	version = version + 1,
-	updated_at = now(),
-	price_updated_at = CASE
-		WHEN input_price_nano_per_million <> @input_price_nano_per_million
-			OR output_price_nano_per_million <> @output_price_nano_per_million
-			OR cache_write_price_nano_per_million <> @cache_write_price_nano_per_million
-			OR cache_read_price_nano_per_million <> @cache_read_price_nano_per_million
-			OR sqlc.arg(price_tiers_changed)::boolean
-		THEN now()
-		ELSE price_updated_at
-	END
-WHERE id = @id AND version = @expected_version
+    display_name = $2,
+    input_price_nano_per_million = $3,
+    output_price_nano_per_million = $4,
+    cache_write_price_nano_per_million = $5,
+    cache_read_price_nano_per_million = $6,
+    enabled = $7,
+    sort_order = $8,
+    provider = $9,
+    context_window = $10,
+    input_modalities = $11,
+    output_modalities = $12,
+    supports_tools = $13,
+    supports_structured_output = $14,
+    supports_vision = $15,
+    parameter_info = $16,
+    updated_at = now()
+WHERE id = $1
 RETURNING *;
 
--- name: ModelExists :one
-SELECT EXISTS (SELECT 1 FROM models WHERE id = @id);
+-- name: DeleteTiers :exec
+DELETE FROM model_price_tiers WHERE model_id = $1;
 
--- name: ListModelPriceTiers :many
-SELECT * FROM model_price_tiers
-WHERE model_id = ANY(@model_ids::text[])
-ORDER BY model_id, seq;
-
--- name: DeleteModelPriceTiers :exec
-DELETE FROM model_price_tiers WHERE model_id = @model_id;
-
--- name: InsertModelPriceTier :exec
+-- name: InsertTier :exec
 INSERT INTO model_price_tiers (
-	model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
-	start_minute_of_day, end_minute_of_day,
-	input_price_nano_per_million, output_price_nano_per_million,
-	cache_write_price_nano_per_million, cache_read_price_nano_per_million
-) VALUES (
-	@model_id, @seq, @name, @min_prompt_tokens, @max_prompt_tokens, @timezone, @weekdays,
-	@start_minute_of_day, @end_minute_of_day,
-	@input_price_nano_per_million, @output_price_nano_per_million,
-	@cache_write_price_nano_per_million, @cache_read_price_nano_per_million
-);
+    model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
+    start_minute_of_day, end_minute_of_day,
+    input_price_nano_per_million, output_price_nano_per_million,
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);

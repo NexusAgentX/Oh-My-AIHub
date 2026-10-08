@@ -81,8 +81,8 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time) bool {
 
 // Prices projects the tier into the standard four-bucket price set used by
 // the settlement formula.
-func (t PriceTier) Prices() OfficialPricesV1 {
-	return OfficialPricesV1{
+func (t PriceTier) Prices() Prices {
+	return Prices{
 		InputPerMillion:      t.InputPrice,
 		OutputPerMillion:     t.OutputPrice,
 		CacheWritePerMillion: t.CacheWritePrice,
@@ -95,7 +95,7 @@ func (t PriceTier) Prices() OfficialPricesV1 {
 // at 1) whose predicates all match, or the model's unconditional prices when
 // none does. The second return value is the matched tier sequence, 0 meaning
 // the default prices.
-func SelectPriceTier(defaultPrices OfficialPricesV1, tiers []PriceTier, promptTokens int64, at time.Time) (OfficialPricesV1, int) {
+func SelectPriceTier(defaultPrices Prices, tiers []PriceTier, promptTokens int64, at time.Time) (Prices, int) {
 	for index, tier := range tiers {
 		if tier.Matches(promptTokens, at) {
 			return tier.Prices(), index + 1
@@ -108,7 +108,7 @@ func SelectPriceTier(defaultPrices OfficialPricesV1, tiers []PriceTier, promptTo
 // on the prompt side, regardless of whether the upstream billed it as fresh
 // input, cache write, or cache read. All protocol adapters normalize usage
 // into these three disjoint buckets, so the sum is protocol-consistent.
-func PromptSideTokens(usage UsageV1) (int64, error) {
+func PromptSideTokens(usage Usage) (int64, error) {
 	total := usage.InputTokens + usage.CacheWriteTokens + usage.CacheReadTokens
 	if usage.InputTokens < 0 || usage.CacheWriteTokens < 0 || usage.CacheReadTokens < 0 || total < 0 {
 		return 0, ErrInvalidInput

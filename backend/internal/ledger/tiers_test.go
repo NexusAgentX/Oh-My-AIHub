@@ -96,7 +96,7 @@ func TestPriceTierInvalidTimezoneFailsClosed(t *testing.T) {
 }
 
 func TestSelectPriceTierFirstMatchWinsAndFallsBackToDefault(t *testing.T) {
-	defaults := OfficialPricesV1{InputPerMillion: mustPriceAmount(t, "1")}
+	defaults := Prices{InputPerMillion: mustPriceAmount(t, "1")}
 	longContext := PriceTier{MinPromptTokens: tierInt64(200_000), InputPrice: mustPriceAmount(t, "2")}
 	peak := PriceTier{Timezone: "UTC", StartMinute: tierInt16(0), EndMinute: tierInt16(1439), InputPrice: mustPriceAmount(t, "3")}
 	tiers := []PriceTier{longContext, peak}
@@ -116,66 +116,44 @@ func TestSelectPriceTierFirstMatchWinsAndFallsBackToDefault(t *testing.T) {
 }
 
 func TestPromptSideTokensSumsPromptBucketsAndIgnoresOutput(t *testing.T) {
-	usage := UsageV1{InputTokens: 100, OutputTokens: 999, CacheWriteTokens: 20, CacheReadTokens: 30}
+	usage := Usage{InputTokens: 100, OutputTokens: 999, CacheWriteTokens: 20, CacheReadTokens: 30}
 	total, err := PromptSideTokens(usage)
 	if err != nil || total != 150 {
 		t.Fatalf("PromptSideTokens = %d, %v; want 150, nil", total, err)
 	}
-	if _, err := PromptSideTokens(UsageV1{InputTokens: -1}); err == nil {
+	if _, err := PromptSideTokens(Usage{InputTokens: -1}); err == nil {
 		t.Fatal("negative usage accepted")
 	}
 }
 
-func TestCalculatePriceV2EqualsV1WithoutTiers(t *testing.T) {
-	usage := UsageV1{InputTokens: 1_234_567, OutputTokens: 987_654, CacheWriteTokens: 100_000, CacheReadTokens: 2_000_000}
-	prices := OfficialPricesV1{
-		InputPerMillion: mustPriceAmount(t, "1"), OutputPerMillion: mustPriceAmount(t, "2"),
-		CacheWritePerMillion: mustPriceAmount(t, "0.5"), CacheReadPerMillion: mustPriceAmount(t, "0.25"),
-	}
-	v1, err := CalculatePriceV1(usage, prices, 1_500_000_000, 1_000_000, false)
-	if err != nil {
-		t.Fatalf("CalculatePriceV1: %v", err)
-	}
-	v2, err := CalculatePriceV2(usage, prices, nil, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC), 1_500_000_000, 1_000_000, false)
-	if err != nil {
-		t.Fatalf("CalculatePriceV2: %v", err)
-	}
-	if v1.ProviderCharge != v2.ProviderCharge || v1.PlatformFee != v2.PlatformFee {
-		t.Fatalf("v2 without tiers diverged: v1 %+v v2 %+v", v1, v2)
-	}
-	if v2.TierSeq != 0 {
-		t.Fatalf("default selection reported tier seq %d", v2.TierSeq)
-	}
-}
-
 func TestCalculatePriceV2ChargesWholeRequestAtGeminiLongContextTier(t *testing.T) {
-	defaults := OfficialPricesV1{
+	defaults := Prices{
 		InputPerMillion: mustPriceAmount(t, "1.25"), OutputPerMillion: mustPriceAmount(t, "10"),
 	}
 	longTier := PriceTier{
 		MinPromptTokens: tierInt64(200_000),
 		InputPrice:      mustPriceAmount(t, "2.5"), OutputPrice: mustPriceAmount(t, "15"),
 	}
-	longUsage := UsageV1{InputTokens: 250_000, OutputTokens: 50_000}
-	longResult, err := CalculatePriceV2(longUsage, defaults, []PriceTier{longTier}, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC), 1_000_000_000, 0, false)
+	longUsage := Usage{InputTokens: 250_000, OutputTokens: 50_000}
+	longResult, err := CalculatePriceV2(longUsage, defaults, []PriceTier{longTier}, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC), 1_000_000_000, 0)
 	if err != nil {
 		t.Fatalf("CalculatePriceV2 long: %v", err)
 	}
-	if longResult.TierSeq != 1 || longResult.ProviderCharge != mustPriceAmount(t, "1.375") {
+	if longResult.TierSeq != 1 || longResult.Cost != mustPriceAmount(t, "1.375") {
 		t.Fatalf("long-context settlement = %+v, want tier 1 charge 1.375", longResult)
 	}
-	shortUsage := UsageV1{InputTokens: 150_000, OutputTokens: 50_000}
-	shortResult, err := CalculatePriceV2(shortUsage, defaults, []PriceTier{longTier}, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC), 1_000_000_000, 0, false)
+	shortUsage := Usage{InputTokens: 150_000, OutputTokens: 50_000}
+	shortResult, err := CalculatePriceV2(shortUsage, defaults, []PriceTier{longTier}, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC), 1_000_000_000, 0)
 	if err != nil {
 		t.Fatalf("CalculatePriceV2 short: %v", err)
 	}
-	if shortResult.TierSeq != 0 || shortResult.ProviderCharge != mustPriceAmount(t, "0.6875") {
+	if shortResult.TierSeq != 0 || shortResult.Cost != mustPriceAmount(t, "0.6875") {
 		t.Fatalf("short-context settlement = %+v, want default charge 0.6875", shortResult)
 	}
 }
 
 func TestCalculatePriceV2DeepSeekPeakAndOffPeakPriceIdenticalTiers(t *testing.T) {
-	defaults := OfficialPricesV1{
+	defaults := Prices{
 		InputPerMillion: mustPriceAmount(t, "1.5"), OutputPerMillion: mustPriceAmount(t, "4.5"),
 	}
 	morningPeak := PriceTier{
@@ -186,20 +164,20 @@ func TestCalculatePriceV2DeepSeekPeakAndOffPeakPriceIdenticalTiers(t *testing.T)
 	afternoonPeak := morningPeak
 	afternoonPeak.StartMinute, afternoonPeak.EndMinute = tierInt16(14*60), tierInt16(18*60)
 	tiers := []PriceTier{morningPeak, afternoonPeak}
-	usage := UsageV1{InputTokens: 1_000_000, OutputTokens: 1_000_000}
+	usage := Usage{InputTokens: 1_000_000, OutputTokens: 1_000_000}
 
-	peak, err := CalculatePriceV2(usage, defaults, tiers, time.Date(2026, 9, 7, 2, 0, 0, 0, time.UTC), 1_000_000_000, 0, false)
+	peak, err := CalculatePriceV2(usage, defaults, tiers, time.Date(2026, 9, 7, 2, 0, 0, 0, time.UTC), 1_000_000_000, 0)
 	if err != nil {
 		t.Fatalf("peak: %v", err)
 	}
-	if peak.TierSeq != 1 || peak.ProviderCharge != mustPriceAmount(t, "12") {
+	if peak.TierSeq != 1 || peak.Cost != mustPriceAmount(t, "12") {
 		t.Fatalf("peak settlement = %+v, want tier 1 charge 12", peak)
 	}
-	offPeak, err := CalculatePriceV2(usage, defaults, tiers, time.Date(2026, 9, 7, 5, 0, 0, 0, time.UTC), 1_000_000_000, 0, false)
+	offPeak, err := CalculatePriceV2(usage, defaults, tiers, time.Date(2026, 9, 7, 5, 0, 0, 0, time.UTC), 1_000_000_000, 0)
 	if err != nil {
 		t.Fatalf("off-peak: %v", err)
 	}
-	if offPeak.TierSeq != 0 || offPeak.ProviderCharge != mustPriceAmount(t, "6") {
+	if offPeak.TierSeq != 0 || offPeak.Cost != mustPriceAmount(t, "6") {
 		t.Fatalf("off-peak settlement = %+v, want default charge 6", offPeak)
 	}
 }

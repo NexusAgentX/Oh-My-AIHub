@@ -63,7 +63,7 @@ func (a *app) requireSameOrigin(next http.Handler) http.Handler {
 }
 
 func isExternalGatewayPath(path string) bool {
-	return path == "/v1/chat/completions" || path == "/v1/responses" || path == "/v1/messages" || strings.HasPrefix(path, "/v1beta/models/")
+	return strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/v1beta/")
 }
 
 func (a *app) requestScheme(r *http.Request) string {

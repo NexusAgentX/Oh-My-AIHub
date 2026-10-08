@@ -1,17 +1,15 @@
-// Package catalogpg is the PostgreSQL implementation of catalog.Store. It also
-// exports PriceTiersByModel so other domains can attach a model's conditional
-// price tiers to their own read models inside their own transaction.
+// Package catalogpg is the PostgreSQL implementation of catalog.Store.
 package catalogpg
 
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -23,253 +21,211 @@ type Store struct {
 	q    *Queries
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool, q: New(pool)}
-}
+func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool)} }
 
-func toModel(m Model) catalog.Model {
-	return catalog.Model{
-		ID:                       m.ID,
-		Name:                     m.Name,
-		Provider:                 m.Provider,
-		ContextWindow:            m.ContextWindow,
-		ParameterInfo:            m.ParameterInfo,
-		InputModalities:          m.InputModalities,
-		OutputModalities:         m.OutputModalities,
-		SupportsTools:            m.SupportsTools,
-		SupportsStructuredOutput: m.SupportsStructuredOutput,
-		SupportsVision:           m.SupportsVision,
-		InputPrice:               m.InputPriceNanoPerMillion,
-		OutputPrice:              m.OutputPriceNanoPerMillion,
-		CacheWritePrice:          m.CacheWritePriceNanoPerMillion,
-		CacheReadPrice:           m.CacheReadPriceNanoPerMillion,
-		Status:                   catalog.Status(m.Status),
-		Version:                  m.Version,
-		CreatedAt:                m.CreatedAt,
-		UpdatedAt:                m.UpdatedAt,
-		PriceUpdatedAt:           m.PriceUpdatedAt,
+func toModel(row Model, tiers []ModelPriceTier) catalog.Model {
+	model := catalog.Model{
+		ID: row.ID, DisplayName: row.DisplayName,
+		InputPrice: row.InputPriceNanoPerMillion, OutputPrice: row.OutputPriceNanoPerMillion,
+		CacheWritePrice: row.CacheWritePriceNanoPerMillion, CacheReadPrice: row.CacheReadPriceNanoPerMillion,
+		Enabled: row.Enabled, SortOrder: row.SortOrder, Provider: row.Provider, ContextWindow: row.ContextWindow,
+		InputModalities: row.InputModalities, OutputModalities: row.OutputModalities,
+		SupportsTools: row.SupportsTools, SupportsStructuredOutput: row.SupportsStructuredOutput, SupportsVision: row.SupportsVision,
+		ParameterInfo: row.ParameterInfo, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
-}
-
-func toPriceTier(t ModelPriceTier) ledger.PriceTier {
-	tier := ledger.PriceTier{
-		Name:            t.Name,
-		MinPromptTokens: t.MinPromptTokens,
-		MaxPromptTokens: t.MaxPromptTokens,
-		Timezone:        t.Timezone,
-		StartMinute:     t.StartMinuteOfDay,
-		EndMinute:       t.EndMinuteOfDay,
-		InputPrice:      t.InputPriceNanoPerMillion,
-		OutputPrice:     t.OutputPriceNanoPerMillion,
-		CacheWritePrice: t.CacheWritePriceNanoPerMillion,
-		CacheReadPrice:  t.CacheReadPriceNanoPerMillion,
-	}
-	if len(t.Weekdays) > 0 {
-		tier.Weekdays = make([]int, len(t.Weekdays))
-		for index, weekday := range t.Weekdays {
-			tier.Weekdays[index] = int(weekday)
+	for _, tier := range tiers {
+		var weekdays []int
+		for _, weekday := range tier.Weekdays {
+			weekdays = append(weekdays, int(weekday))
 		}
+		model.PriceTiers = append(model.PriceTiers, ledger.PriceTier{
+			Name: tier.Name, MinPromptTokens: tier.MinPromptTokens, MaxPromptTokens: tier.MaxPromptTokens,
+			Timezone: tier.Timezone, Weekdays: weekdays, StartMinute: tier.StartMinuteOfDay, EndMinute: tier.EndMinuteOfDay,
+			InputPrice: tier.InputPriceNanoPerMillion, OutputPrice: tier.OutputPriceNanoPerMillion,
+			CacheWritePrice: tier.CacheWritePriceNanoPerMillion, CacheReadPrice: tier.CacheReadPriceNanoPerMillion,
+		})
 	}
-	return tier
+	return model
 }
 
-// PriceTiersByModel loads the conditional price tiers of the given models,
-// keyed by model id. Rows arrive ordered by (model_id, seq), so each slice keeps
-// the stored tier sequence. db may be a pool or a transaction.
-func PriceTiersByModel(ctx context.Context, db DBTX, modelIDs []string) (map[string][]ledger.PriceTier, error) {
-	result := make(map[string][]ledger.PriceTier)
-	if len(modelIDs) == 0 {
-		return result, nil
-	}
-	rows, err := New(db).ListModelPriceTiers(ctx, modelIDs)
-	if err != nil {
-		return nil, err
-	}
+// withTiers loads the tiers of the given rows in one query.
+func withTiers(ctx context.Context, q *Queries, rows []Model) ([]catalog.Model, error) {
+	ids := make([]string, 0, len(rows))
 	for _, row := range rows {
-		result[row.ModelID] = append(result[row.ModelID], toPriceTier(row))
+		ids = append(ids, row.ID)
 	}
-	return result, nil
-}
-
-func attachPriceTiers(ctx context.Context, db DBTX, models []catalog.Model) ([]catalog.Model, error) {
-	ids := make([]string, 0, len(models))
-	for _, model := range models {
-		ids = append(ids, model.ID)
-	}
-	tiers, err := PriceTiersByModel(ctx, db, ids)
+	tiers, err := q.ListTiers(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	for index := range models {
-		models[index].PriceTiers = tiers[models[index].ID]
+	byModel := map[string][]ModelPriceTier{}
+	for _, tier := range tiers {
+		byModel[tier.ModelID] = append(byModel[tier.ModelID], tier)
+	}
+	models := make([]catalog.Model, 0, len(rows))
+	for _, row := range rows {
+		models = append(models, toModel(row, byModel[row.ID]))
 	}
 	return models, nil
 }
 
-func insertPriceTiers(ctx context.Context, q *Queries, modelID string, tiers []ledger.PriceTier) error {
+// List reads the catalog through db so other domains can read it inside
+// their own transaction.
+func List(ctx context.Context, db DBTX, includeDisabled bool) ([]catalog.Model, error) {
+	q := New(db)
+	rows, err := q.ListModels(ctx, includeDisabled)
+	if err != nil {
+		return nil, err
+	}
+	return withTiers(ctx, q, rows)
+}
+
+func (s *Store) ListModels(ctx context.Context, includeDisabled bool) ([]catalog.Model, error) {
+	return List(ctx, s.pool, includeDisabled)
+}
+
+func (s *Store) GetModel(ctx context.Context, id string) (catalog.Model, error) {
+	row, err := s.q.GetModel(ctx, id)
+	if err != nil {
+		return catalog.Model{}, mapError(err)
+	}
+	models, err := withTiers(ctx, s.q, []Model{row})
+	if err != nil {
+		return catalog.Model{}, err
+	}
+	return models[0], nil
+}
+
+func replaceTiers(ctx context.Context, q *Queries, modelID string, tiers []ledger.PriceTier) error {
+	if err := q.DeleteTiers(ctx, modelID); err != nil {
+		return err
+	}
 	for index, tier := range tiers {
 		var weekdays []int16
 		for _, weekday := range tier.Weekdays {
 			weekdays = append(weekdays, int16(weekday))
 		}
-		if err := q.InsertModelPriceTier(ctx, InsertModelPriceTierParams{
-			ModelID:                       modelID,
-			Seq:                           int32(index + 1),
-			Name:                          tier.Name,
-			MinPromptTokens:               tier.MinPromptTokens,
-			MaxPromptTokens:               tier.MaxPromptTokens,
-			Timezone:                      tier.Timezone,
-			Weekdays:                      weekdays,
-			StartMinuteOfDay:              tier.StartMinute,
-			EndMinuteOfDay:                tier.EndMinute,
-			InputPriceNanoPerMillion:      tier.InputPrice,
-			OutputPriceNanoPerMillion:     tier.OutputPrice,
-			CacheWritePriceNanoPerMillion: tier.CacheWritePrice,
-			CacheReadPriceNanoPerMillion:  tier.CacheReadPrice,
+		if err := q.InsertTier(ctx, InsertTierParams{
+			ModelID: modelID, Seq: int32(index + 1), Name: tier.Name,
+			MinPromptTokens: tier.MinPromptTokens, MaxPromptTokens: tier.MaxPromptTokens,
+			Timezone: tier.Timezone, Weekdays: weekdays, StartMinuteOfDay: tier.StartMinute, EndMinuteOfDay: tier.EndMinute,
+			InputPriceNanoPerMillion: tier.InputPrice, OutputPriceNanoPerMillion: tier.OutputPrice,
+			CacheWritePriceNanoPerMillion: tier.CacheWritePrice, CacheReadPriceNanoPerMillion: tier.CacheReadPrice,
 		}); err != nil {
-			return err
+			return mapError(err)
 		}
 	}
 	return nil
-}
-
-func (s *Store) ListModels(ctx context.Context, includeDisabled bool, query string) ([]catalog.Model, error) {
-	rows, err := s.q.ListModels(ctx, ListModelsParams{IncludeDisabled: includeDisabled, Query: query})
-	if err != nil {
-		return nil, err
-	}
-	models := make([]catalog.Model, 0, len(rows))
-	for _, row := range rows {
-		models = append(models, toModel(row))
-	}
-	return attachPriceTiers(ctx, s.pool, models)
-}
-
-func (s *Store) GetModel(ctx context.Context, id string, includeDisabled bool) (catalog.Model, error) {
-	row, err := s.q.GetModel(ctx, GetModelParams{ID: id, IncludeDisabled: includeDisabled})
-	if err != nil {
-		return catalog.Model{}, mapError(err)
-	}
-	withTiers, err := attachPriceTiers(ctx, s.pool, []catalog.Model{toModel(row)})
-	if err != nil {
-		return catalog.Model{}, err
-	}
-	return withTiers[0], nil
 }
 
 func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.Model) (catalog.Model, error) {
 	var created catalog.Model
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
-		row, err := q.CreateModel(ctx, CreateModelParams{
-			ID:                            model.ID,
-			Name:                          model.Name,
-			Provider:                      model.Provider,
-			ContextWindow:                 model.ContextWindow,
-			ParameterInfo:                 model.ParameterInfo,
-			InputModalities:               model.InputModalities,
-			OutputModalities:              model.OutputModalities,
-			SupportsTools:                 model.SupportsTools,
-			SupportsStructuredOutput:      model.SupportsStructuredOutput,
-			SupportsVision:                model.SupportsVision,
-			InputPriceNanoPerMillion:      model.InputPrice,
-			OutputPriceNanoPerMillion:     model.OutputPrice,
-			CacheWritePriceNanoPerMillion: model.CacheWritePrice,
-			CacheReadPriceNanoPerMillion:  model.CacheReadPrice,
-			Status:                        string(model.Status),
+		row, err := q.InsertModel(ctx, InsertModelParams{
+			ID: model.ID, DisplayName: model.DisplayName,
+			InputPriceNanoPerMillion: model.InputPrice, OutputPriceNanoPerMillion: model.OutputPrice,
+			CacheWritePriceNanoPerMillion: model.CacheWritePrice, CacheReadPriceNanoPerMillion: model.CacheReadPrice,
+			Enabled: model.Enabled, SortOrder: model.SortOrder, Provider: model.Provider, ContextWindow: model.ContextWindow,
+			InputModalities: model.InputModalities, OutputModalities: model.OutputModalities,
+			SupportsTools: model.SupportsTools, SupportsStructuredOutput: model.SupportsStructuredOutput,
+			SupportsVision: model.SupportsVision, ParameterInfo: model.ParameterInfo,
 		})
 		if err != nil {
-			// The original insert path returned raw errors; keep duplicates
-			// surfacing as the catalog conflict through mapError below.
 			return mapError(err)
 		}
-		created = toModel(row)
-		if err := insertPriceTiers(ctx, q, created.ID, model.PriceTiers); err != nil {
-			return mapError(err)
+		if err := replaceTiers(ctx, q, row.ID, model.PriceTiers); err != nil {
+			return err
 		}
+		models, err := withTiers(ctx, q, []Model{row})
+		if err != nil {
+			return err
+		}
+		created = models[0]
 		return auditpg.Record(ctx, tx, auditpg.Event{
-			ActorID: actorID, Action: "model.created", TargetType: "model", TargetID: created.ID,
-			Reason: "administrator created catalog model", Details: auditDetails(created, model.PriceTiers),
+			ActorID: actorID, Action: audit.ActionModelCreated, TargetType: "model", TargetID: row.ID,
+			Detail: map[string]any{"after": auditView(created)},
 		})
 	})
-	if err != nil {
-		return catalog.Model{}, err
-	}
-	created.PriceTiers = model.PriceTiers
-	return created, nil
+	return created, err
 }
 
-func (s *Store) UpdateModel(ctx context.Context, actorID, id string, expectedVersion int64, model catalog.Model) (catalog.Model, error) {
+func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func(catalog.Model) (catalog.Model, error)) (catalog.Model, error) {
 	var updated catalog.Model
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
-		existingTiers, err := PriceTiersByModel(ctx, tx, []string{id})
+		row, err := q.LockModel(ctx, id)
+		if err != nil {
+			return mapError(err)
+		}
+		currentModels, err := withTiers(ctx, q, []Model{row})
 		if err != nil {
 			return err
 		}
-		row, err := q.UpdateModel(ctx, UpdateModelParams{
-			ID:                            id,
-			ExpectedVersion:               expectedVersion,
-			Name:                          model.Name,
-			Provider:                      model.Provider,
-			ContextWindow:                 model.ContextWindow,
-			ParameterInfo:                 model.ParameterInfo,
-			InputModalities:               model.InputModalities,
-			OutputModalities:              model.OutputModalities,
-			SupportsTools:                 model.SupportsTools,
-			SupportsStructuredOutput:      model.SupportsStructuredOutput,
-			SupportsVision:                model.SupportsVision,
-			InputPriceNanoPerMillion:      model.InputPrice,
-			OutputPriceNanoPerMillion:     model.OutputPrice,
-			CacheWritePriceNanoPerMillion: model.CacheWritePrice,
-			CacheReadPriceNanoPerMillion:  model.CacheReadPrice,
-			Status:                        string(model.Status),
-			PriceTiersChanged:             !PriceTiersEqual(existingTiers[id], model.PriceTiers),
+		current := currentModels[0]
+		next, err := mutate(current)
+		if err != nil {
+			return err
+		}
+		saved, err := q.UpdateModel(ctx, UpdateModelParams{
+			ID: id, DisplayName: next.DisplayName,
+			InputPriceNanoPerMillion: next.InputPrice, OutputPriceNanoPerMillion: next.OutputPrice,
+			CacheWritePriceNanoPerMillion: next.CacheWritePrice, CacheReadPriceNanoPerMillion: next.CacheReadPrice,
+			Enabled: next.Enabled, SortOrder: next.SortOrder, Provider: next.Provider, ContextWindow: next.ContextWindow,
+			InputModalities: next.InputModalities, OutputModalities: next.OutputModalities,
+			SupportsTools: next.SupportsTools, SupportsStructuredOutput: next.SupportsStructuredOutput,
+			SupportsVision: next.SupportsVision, ParameterInfo: next.ParameterInfo,
 		})
 		if err != nil {
-			err = mapError(err)
-			if errors.Is(err, catalog.ErrNotFound) {
-				exists, queryErr := q.ModelExists(ctx, id)
-				if queryErr != nil {
-					return queryErr
-				}
-				if exists {
-					return catalog.ErrConflict
-				}
-			}
+			return mapError(err)
+		}
+		if err := replaceTiers(ctx, q, id, next.PriceTiers); err != nil {
 			return err
 		}
-		updated = toModel(row)
-		if err := q.DeleteModelPriceTiers(ctx, id); err != nil {
-			return mapError(err)
+		models, err := withTiers(ctx, q, []Model{saved})
+		if err != nil {
+			return err
 		}
-		if err := insertPriceTiers(ctx, q, id, model.PriceTiers); err != nil {
-			return mapError(err)
-		}
+		updated = models[0]
 		return auditpg.Record(ctx, tx, auditpg.Event{
-			ActorID: actorID, Action: "model.updated", TargetType: "model", TargetID: id,
-			Reason: "administrator updated catalog model", Details: auditDetails(updated, model.PriceTiers),
+			ActorID: actorID, Action: audit.ActionModelUpdated, TargetType: "model", TargetID: id,
+			Detail: map[string]any{"before": auditView(current), "after": auditView(updated)},
 		})
 	})
-	if err != nil {
-		return catalog.Model{}, err
+	return updated, err
+}
+
+// auditView keeps the price-relevant fields of a model for the audit log.
+func auditView(model catalog.Model) map[string]any {
+	tiers := make([]map[string]any, 0, len(model.PriceTiers))
+	for _, tier := range model.PriceTiers {
+		tiers = append(tiers, map[string]any{
+			"name": tier.Name, "min_prompt_tokens": tier.MinPromptTokens, "max_prompt_tokens": tier.MaxPromptTokens,
+			"timezone": tier.Timezone, "weekdays": tier.Weekdays, "start_minute_of_day": tier.StartMinute, "end_minute_of_day": tier.EndMinute,
+			"input_price": tier.InputPrice.String(), "output_price": tier.OutputPrice.String(),
+			"cache_write_price": tier.CacheWritePrice.String(), "cache_read_price": tier.CacheReadPrice.String(),
+		})
 	}
-	updated.PriceTiers = model.PriceTiers
-	return updated, nil
+	return map[string]any{
+		"display_name": model.DisplayName, "enabled": model.Enabled,
+		"input_price": model.InputPrice.String(), "output_price": model.OutputPrice.String(),
+		"cache_write_price": model.CacheWritePrice.String(), "cache_read_price": model.CacheReadPrice.String(),
+		"price_tiers": tiers,
+	}
 }
 
 func mapError(err error) error {
-	if err == nil {
-		return nil
-	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return catalog.ErrNotFound
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return catalog.ErrConflict
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505":
+			return catalog.ErrConflict
+		case "23514":
+			return catalog.ErrInvalidInput
+		}
 	}
-	return fmt.Errorf("catalog store: %w", err)
+	return err
 }
-
-var _ catalog.Store = (*Store)(nil)

@@ -1,563 +1,271 @@
+// Package ledger is the zero-sum points ledger (ADR-0005, ADR-0025).
+//
+// Every change of a balance is one balanced transaction: its entries sum to
+// zero, which the database also enforces with a single deferred constraint
+// trigger. There are no holds or freezes: a balance is one column updated in
+// the same database transaction that posts the entries. Business rules about
+// how far a balance may go (credit limit for API calls, positive balance for
+// C2C listings) are checked by the caller inside its own transaction, with the
+// Balance and CreditLimit helpers of the persistence package.
 package ledger
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
-	"fmt"
+	"math"
 	"strings"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-type AccountKind string
-
-const (
-	AccountUser      AccountKind = "user"
-	AccountIncentive AccountKind = "platform_incentive"
-	AccountLoss      AccountKind = "platform_loss"
-)
-
-type TransactionKind string
-
-const (
-	TransactionTransfer   TransactionKind = "transfer"
-	TransactionAdjustment TransactionKind = "admin_adjustment"
-	TransactionBadDebt    TransactionKind = "bad_debt_transfer"
-	TransactionCapture    TransactionKind = "hold_capture"
-	TransactionSelfUsage  TransactionKind = "self_channel_usage"
-	TransactionReversal   TransactionKind = "reversal"
-)
-
-type HoldPurpose string
-
-const (
-	HoldPurposeAssetReservation   HoldPurpose = "asset_reservation"
-	HoldPurposeSpendAuthorization HoldPurpose = "spend_authorization"
-)
-
-type HoldFundingPolicy string
-
-const (
-	HoldFundingCreditAllowed      HoldFundingPolicy = "credit_allowed"
-	HoldFundingSettledBalanceOnly HoldFundingPolicy = "settled_balance_only"
-)
-
-type HoldAmountMode string
-
-type EntryRole string
-
-const (
-	HoldAmountExact HoldAmountMode = "exact"
-	HoldAmountAll   HoldAmountMode = "all_remaining"
-)
-
-const (
-	EntryRoleConsumer         EntryRole = "consumer"
-	EntryRoleProvider         EntryRole = "provider"
-	EntryRoleSeller           EntryRole = "seller"
-	EntryRoleBuyer            EntryRole = "buyer"
-	EntryRoleAdjustmentSource EntryRole = "adjustment_source"
-	EntryRoleAdjustmentTarget EntryRole = "adjustment_target"
-	EntryRoleDebtor           EntryRole = "debtor"
-	EntryRolePlatformLoss     EntryRole = "platform_loss"
-	EntryRolePlatformFee      EntryRole = "platform_fee"
-	EntryRoleReversal         EntryRole = "reversal"
-)
-
 var (
-	ErrInvalidInput       = errors.New("invalid ledger input")
-	ErrNotFound           = errors.New("ledger resource not found")
-	ErrConflict           = errors.New("ledger conflict")
-	ErrInsufficientFunds  = errors.New("insufficient spending power")
-	ErrCreditFrozen       = errors.New("credit is frozen")
-	ErrUnbalanced         = errors.New("unbalanced transaction")
-	ErrAmountOverflow     = errors.New("ledger amount overflow")
-	ErrHoldClosed         = errors.New("hold is closed")
-	ErrHoldAmountExceeded = errors.New("hold amount exceeds remaining amount")
+	ErrInvalidInput   = errors.New("invalid ledger input")
+	ErrUnbalanced     = errors.New("unbalanced ledger transaction")
+	ErrAmountOverflow = errors.New("ledger amount overflow")
+	ErrNotFound       = errors.New("ledger resource not found")
+	// ErrConflict reports an idempotency key already used by a different
+	// transaction type or related object.
+	ErrConflict = errors.New("ledger idempotency conflict")
+	// ErrNothingToWriteOff reports a write-off for a non-negative balance.
+	ErrNothingToWriteOff = errors.New("balance is not negative")
 )
 
+type TransactionType string
+
+const (
+	TypeAPICall         TransactionType = "api_call"
+	TypeC2CList         TransactionType = "c2c_list"
+	TypeC2CRelease      TransactionType = "c2c_release"
+	TypeC2CReturn       TransactionType = "c2c_return"
+	TypeAdminAdjust     TransactionType = "admin_adjust"
+	TypeBadDebtWriteOff TransactionType = "bad_debt_writeoff"
+)
+
+func (t TransactionType) Valid() bool {
+	switch t {
+	case TypeAPICall, TypeC2CList, TypeC2CRelease, TypeC2CReturn, TypeAdminAdjust, TypeBadDebtWriteOff:
+		return true
+	}
+	return false
+}
+
+// SystemCode names one of the three platform-owned ledger accounts.
+type SystemCode string
+
+const (
+	SystemPlatformRevenue SystemCode = "platform_revenue"
+	SystemC2CEscrow       SystemCode = "c2c_escrow"
+	SystemBadDebt         SystemCode = "bad_debt"
+)
+
+func (c SystemCode) Valid() bool {
+	return c == SystemPlatformRevenue || c == SystemC2CEscrow || c == SystemBadDebt
+}
+
+// AccountRef names a ledger account: a user's (by identity account ID) or a
+// system account. Exactly one field is set.
 type AccountRef struct {
-	IdentityAccountID string
-	SystemKind        AccountKind
+	UserID string
+	System SystemCode
 }
 
-func UserAccount(accountID string) AccountRef {
-	return AccountRef{IdentityAccountID: accountID}
+func User(accountID string) AccountRef  { return AccountRef{UserID: accountID} }
+func System(code SystemCode) AccountRef { return AccountRef{System: code} }
+
+func (r AccountRef) valid() bool {
+	return (r.UserID != "") != (r.System != "") && (r.System == "" || r.System.Valid())
 }
 
-func SystemAccount(kind AccountKind) AccountRef {
-	return AccountRef{SystemKind: kind}
+// Related links a transaction to the business object that caused it.
+type Related struct {
+	Type string // call, c2c_order, c2c_trade, account
+	ID   string
 }
 
-type Wallet struct {
-	LedgerAccountID   string
-	IdentityAccountID string
-	Kind              AccountKind
-	PostedBalance     money.Amount
-	AssetReserved     money.Amount
-	SpendAuthorized   money.Amount
-	CreditLimit       money.Amount
-	CreditFrozen      bool
-	EffectiveCredit   money.Amount
-	SpendableCapacity money.Amount
-	OverLimit         bool
-	Status            identity.Status
-	UpdatedAt         time.Time
-}
-
-type Entry struct {
-	ID                      int64
-	TransactionID           string
-	LedgerAccountID         string
-	AccountKind             AccountKind
-	IdentityAccountID       string
-	Ordinal                 int
-	BusinessRole            EntryRole
-	Amount                  money.Amount
-	PostedBalanceBefore     money.Amount
-	PostedBalanceAfter      money.Amount
-	CreatedAt               time.Time
-	TransactionKind         TransactionKind
-	Reason                  string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          string
-	ReversalOfTransactionID string
-	HoldID                  string
-	Counterparties          []Counterparty
-}
-
-type Counterparty struct {
-	AccountKind       AccountKind
-	IdentityAccountID string
-	BusinessRole      EntryRole
-	Amount            money.Amount
+// Line is one requested entry. Callers net their amounts: each account
+// appears at most once per transaction.
+type Line struct {
+	Account AccountRef
+	Amount  money.Amount
 }
 
 type Transaction struct {
-	ID                      string
-	IdempotencyKey          string
-	Kind                    TransactionKind
-	Reason                  string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          string
-	ReversalOfTransactionID string
-	HoldID                  string
-	Entries                 []Entry
-	CreatedAt               time.Time
-}
-
-type Posting struct {
-	Account      AccountRef
-	BusinessRole EntryRole
-	Amount       money.Amount
-}
-
-type PostRequest struct {
-	IdempotencyKey          string
-	Kind                    TransactionKind
-	Reason                  string
-	ReferenceType           string
-	ReferenceID             string
-	ActorAccountID          string
-	ReversalOfTransactionID string
-	Entries                 []Posting
-}
-
-type Hold struct {
-	ID              string
-	LedgerAccountID string
-	OwnerAccountID  string
-	FundingPolicy   HoldFundingPolicy
-	Purpose         HoldPurpose
-	Amount          money.Amount
-	Remaining       money.Amount
-	Captured        money.Amount
-	Released        money.Amount
-	Status          string
-	BusinessType    string
-	BusinessID      string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-type CreateHoldRequest struct {
+	Type           TransactionType
 	IdempotencyKey string
+	Related        *Related
+	ActorID        string
+	Reason         string
+	Entries        []Line
+}
+
+// Validate checks the shape of a transaction before it reaches the database:
+// at least two non-zero entries on distinct accounts that sum to exactly zero.
+func (t Transaction) Validate() error {
+	if !t.Type.Valid() || strings.TrimSpace(t.IdempotencyKey) == "" || len(t.IdempotencyKey) > 200 || len(t.Entries) < 2 {
+		return ErrInvalidInput
+	}
+	if t.Related != nil {
+		switch t.Related.Type {
+		case "call", "c2c_order", "c2c_trade", "account":
+		default:
+			return ErrInvalidInput
+		}
+		if t.Related.ID == "" {
+			return ErrInvalidInput
+		}
+	}
+	seen := make(map[AccountRef]bool, len(t.Entries))
+	var sum int64
+	for _, line := range t.Entries {
+		if !line.Account.valid() || line.Amount == 0 || seen[line.Account] {
+			return ErrInvalidInput
+		}
+		seen[line.Account] = true
+		var overflow bool
+		sum, overflow = addChecked(sum, line.Amount.Nano())
+		if overflow {
+			return ErrAmountOverflow
+		}
+	}
+	if sum != 0 {
+		return ErrUnbalanced
+	}
+	return nil
+}
+
+// AddBalance applies an entry to a balance, rejecting int64 overflow.
+func AddBalance(balance, amount money.Amount) (money.Amount, error) {
+	sum, overflow := addChecked(balance.Nano(), amount.Nano())
+	if overflow {
+		return 0, ErrAmountOverflow
+	}
+	return money.FromNano(sum), nil
+}
+
+func addChecked(a, b int64) (int64, bool) {
+	if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
+		return 0, true
+	}
+	return a + b, false
+}
+
+type PostedEntry struct {
+	LedgerAccountID string
+	Account         AccountRef
+	Amount          money.Amount
+	BalanceAfter    money.Amount
+}
+
+// Posted is the stored transaction. Replayed is true when the idempotency key
+// already existed and nothing was booked again.
+type Posted struct {
+	ID        string
+	Type      TransactionType
+	CreatedAt time.Time
+	Replayed  bool
+	Entries   []PostedEntry
+}
+
+// Points is a user's balance and credit limit. The balance may go down to
+// -CreditLimit before API calls are refused.
+type Points struct {
+	Balance     money.Amount
+	CreditLimit money.Amount
+	UpdatedAt   time.Time
+}
+
+// Available is how much more the user may spend before reaching the credit
+// limit (balance + credit limit); it is negative once overdrawn past it.
+func (p Points) Available() money.Amount {
+	sum, overflow := addChecked(p.Balance.Nano(), p.CreditLimit.Nano())
+	if overflow {
+		return money.FromNano(math.MaxInt64)
+	}
+	return money.FromNano(sum)
+}
+
+// EntryView is one ledger entry of a user, joined with its transaction and,
+// for API calls, the API key that made the call.
+type EntryView struct {
+	ID            int64
+	TransactionID string
+	Type          TransactionType
+	Reason        string
+	RelatedType   string
+	RelatedID     string
+	Amount        money.Amount
+	BalanceAfter  money.Amount
+	APIKeyID      *string
+	APIKeyName    *string
+	CreatedAt     time.Time
+}
+
+type EntryFilter struct {
+	AccountID string
+	Type      TransactionType
+	APIKeyID  string
+	From      *time.Time
+	To        *time.Time
+	BeforeID  int64
+	Limit     int
+}
+
+// Adjustment is an administrator's manual credit (+) or debit (-) of a user
+// against the platform revenue account.
+type Adjustment struct {
+	ActorID        string
 	AccountID      string
 	Amount         money.Amount
-	FundingPolicy  HoldFundingPolicy
-	Purpose        HoldPurpose
 	Reason         string
-	BusinessType   string
-	BusinessID     string
-}
-
-type HoldAmount struct {
-	Mode   HoldAmountMode
-	Amount money.Amount
-}
-
-type MutateHoldRequest struct {
 	IdempotencyKey string
-	HoldID         string
-	BusinessID     string
-	Amount         HoldAmount
+}
+
+// WriteOff moves a user's whole negative balance into the bad debt account.
+type WriteOff struct {
+	ActorID        string
+	AccountID      string
 	Reason         string
-}
-
-type CaptureHoldRequest struct {
-	MutateHoldRequest
-	Credits       []Posting
-	ReferenceType string
-	ReferenceID   string
-}
-
-type CaptureResult struct {
-	Hold        Hold
-	Transaction Transaction
-}
-
-type Metrics struct {
-	TotalPostedBalance               string
-	PositivePostedBalance            string
-	NegativePostedBalance            string
-	TotalCreditLimit                 string
-	UsedCredit                       string
-	AssetReserved                    string
-	SpendAuthorized                  string
-	IncentivePostedBalance           string
-	LossPostedBalance                string
-	OverLimitAccounts                int64
-	CreditFrozenAccounts             int64
-	AccountCount                     int64
-	PostedProjectionDifference       string
-	PostedProjectionMismatchAccounts int64
-	AssetReservationDifference       string
-	SpendAuthorizationDifference     string
-	HoldProjectionMismatchAccounts   int64
+	IdempotencyKey string
 }
 
 type Store interface {
-	Wallet(context.Context, string) (Wallet, error)
-	Entries(context.Context, string, int64, int) ([]Entry, error)
-	WalletByRef(context.Context, AccountRef) (Wallet, error)
-	EntriesByRef(context.Context, AccountRef, int64, int) ([]Entry, error)
-	Metrics(context.Context) (Metrics, error)
-	Post(context.Context, PostRequest, [32]byte) (Transaction, error)
-	CreateHold(context.Context, CreateHoldRequest, [32]byte) (Hold, error)
-	ReleaseHold(context.Context, MutateHoldRequest, [32]byte) (Hold, error)
-	CaptureHold(context.Context, CaptureHoldRequest, [32]byte) (CaptureResult, error)
-	TransferBadDebt(context.Context, string, money.Amount, string, string, string, string, [32]byte) (Transaction, error)
-	Reverse(context.Context, string, string, string, string, string, [32]byte) (Transaction, error)
+	Points(ctx context.Context, accountID string) (Points, error)
+	ListEntries(ctx context.Context, filter EntryFilter) ([]EntryView, error)
+	Adjust(ctx context.Context, adjustment Adjustment) (Posted, error)
+	WriteOff(ctx context.Context, writeOff WriteOff) (Posted, error)
 }
 
 type Service struct {
 	store Store
 }
 
-func NewService(store Store) *Service {
-	return &Service{store: store}
+func NewService(store Store) *Service { return &Service{store: store} }
+
+func (s *Service) Points(ctx context.Context, accountID string) (Points, error) {
+	return s.store.Points(ctx, accountID)
 }
 
-func (s *Service) Wallet(ctx context.Context, accountID string) (Wallet, error) {
-	if strings.TrimSpace(accountID) == "" {
-		return Wallet{}, ErrInvalidInput
-	}
-	return s.store.Wallet(ctx, accountID)
-}
-
-func (s *Service) RecentEntries(ctx context.Context, accountID string, limit int) ([]Entry, error) {
-	return s.Entries(ctx, accountID, 0, limit)
-}
-
-func (s *Service) Entries(ctx context.Context, accountID string, beforeID int64, limit int) ([]Entry, error) {
-	if strings.TrimSpace(accountID) == "" || limit < 1 || limit > 100 {
+func (s *Service) Entries(ctx context.Context, filter EntryFilter) ([]EntryView, error) {
+	if filter.AccountID == "" || filter.Limit < 1 || filter.Limit > 100 || (filter.Type != "" && !filter.Type.Valid()) {
 		return nil, ErrInvalidInput
 	}
-	if beforeID < 0 {
-		return nil, ErrInvalidInput
-	}
-	return s.store.Entries(ctx, accountID, beforeID, limit)
+	return s.store.ListEntries(ctx, filter)
 }
 
-func (s *Service) Metrics(ctx context.Context, actor identity.Account) (Metrics, error) {
-	if !actor.IsAdmin {
-		return Metrics{}, identity.ErrForbidden
+func (s *Service) Adjust(ctx context.Context, adjustment Adjustment) (Posted, error) {
+	adjustment.Reason = strings.TrimSpace(adjustment.Reason)
+	if adjustment.ActorID == "" || adjustment.AccountID == "" || adjustment.Amount == 0 || adjustment.Amount.Nano() == math.MinInt64 ||
+		adjustment.Reason == "" || len([]rune(adjustment.Reason)) > 500 || adjustment.IdempotencyKey == "" {
+		return Posted{}, ErrInvalidInput
 	}
-	return s.store.Metrics(ctx)
+	return s.store.Adjust(ctx, adjustment)
 }
 
-func (s *Service) AdminWallet(ctx context.Context, actor identity.Account, account AccountRef) (Wallet, error) {
-	if !actor.IsAdmin {
-		return Wallet{}, identity.ErrForbidden
+func (s *Service) WriteOff(ctx context.Context, writeOff WriteOff) (Posted, error) {
+	writeOff.Reason = strings.TrimSpace(writeOff.Reason)
+	if writeOff.ActorID == "" || writeOff.AccountID == "" || writeOff.Reason == "" || len([]rune(writeOff.Reason)) > 500 || writeOff.IdempotencyKey == "" {
+		return Posted{}, ErrInvalidInput
 	}
-	if !validAccountRef(account) {
-		return Wallet{}, ErrInvalidInput
-	}
-	return s.store.WalletByRef(ctx, account)
-}
-
-func (s *Service) AdminEntries(ctx context.Context, actor identity.Account, account AccountRef, beforeID int64, limit int) ([]Entry, error) {
-	if !actor.IsAdmin {
-		return nil, identity.ErrForbidden
-	}
-	if !validAccountRef(account) || beforeID < 0 || limit < 1 || limit > 100 {
-		return nil, ErrInvalidInput
-	}
-	return s.store.EntriesByRef(ctx, account, beforeID, limit)
-}
-
-func (s *Service) post(ctx context.Context, request PostRequest) (Transaction, error) {
-	request = normalizePost(request)
-	if err := ValidatePostRequest(request); err != nil {
-		return Transaction{}, err
-	}
-	return s.store.Post(ctx, request, payloadHash(request))
-}
-
-func (s *Service) Transfer(ctx context.Context, key, fromAccountID, toAccountID string, amount money.Amount, reason, referenceType, referenceID string) (Transaction, error) {
-	if fromAccountID == toAccountID || amount <= 0 {
-		return Transaction{}, ErrInvalidInput
-	}
-	return s.post(ctx, PostRequest{
-		IdempotencyKey: key,
-		Kind:           TransactionTransfer,
-		Reason:         reason,
-		ReferenceType:  referenceType,
-		ReferenceID:    referenceID,
-		Entries: []Posting{
-			{Account: UserAccount(fromAccountID), BusinessRole: EntryRoleConsumer, Amount: -amount},
-			{Account: UserAccount(toAccountID), BusinessRole: EntryRoleProvider, Amount: amount},
-		},
-	})
-}
-
-func (s *Service) AdminAdjustment(ctx context.Context, actor identity.Account, key string, from, to AccountRef, amount money.Amount, reason, referenceType, referenceID string) (Transaction, error) {
-	if !actor.IsAdmin {
-		return Transaction{}, identity.ErrForbidden
-	}
-	if from == to || amount <= 0 {
-		return Transaction{}, ErrInvalidInput
-	}
-	return s.post(ctx, PostRequest{
-		IdempotencyKey: key,
-		Kind:           TransactionAdjustment,
-		Reason:         reason,
-		ReferenceType:  referenceType,
-		ReferenceID:    referenceID,
-		ActorAccountID: actor.ID,
-		Entries: []Posting{
-			{Account: from, BusinessRole: EntryRoleAdjustmentSource, Amount: -amount},
-			{Account: to, BusinessRole: EntryRoleAdjustmentTarget, Amount: amount},
-		},
-	})
-}
-
-func (s *Service) TransferBadDebt(ctx context.Context, actor identity.Account, key, accountID string, amount money.Amount, reason, referenceID string) (Transaction, error) {
-	if !actor.IsAdmin {
-		return Transaction{}, identity.ErrForbidden
-	}
-	request := struct {
-		Key, AccountID, Reason, ReferenceID, ActorID string
-		Amount                                       money.Amount
-	}{strings.TrimSpace(key), strings.TrimSpace(accountID), strings.TrimSpace(reason), strings.TrimSpace(referenceID), actor.ID, amount}
-	if !validKey(request.Key) || request.AccountID == "" || request.Amount <= 0 || request.Reason == "" || len(request.Reason) > 512 || request.ReferenceID == "" || len(request.ReferenceID) > 256 {
-		return Transaction{}, ErrInvalidInput
-	}
-	return s.store.TransferBadDebt(ctx, request.AccountID, request.Amount, request.Key, request.Reason, request.ReferenceID, actor.ID, payloadHash(request))
-}
-
-func (s *Service) RecordSelfChannelUsage(ctx context.Context, key, accountID string, amount money.Amount, referenceType, referenceID string) (Transaction, error) {
-	if amount <= 0 {
-		return Transaction{}, ErrInvalidInput
-	}
-	return s.post(ctx, PostRequest{
-		IdempotencyKey: key,
-		Kind:           TransactionSelfUsage,
-		Reason:         "account consumed its own shared channel",
-		ReferenceType:  referenceType,
-		ReferenceID:    referenceID,
-		Entries: []Posting{
-			{Account: UserAccount(accountID), BusinessRole: EntryRoleConsumer, Amount: -amount},
-			{Account: UserAccount(accountID), BusinessRole: EntryRoleProvider, Amount: amount},
-		},
-	})
-}
-
-func (s *Service) ReverseTransaction(ctx context.Context, actor identity.Account, key, originalTransactionID, reason, referenceID string) (Transaction, error) {
-	if !actor.IsAdmin {
-		return Transaction{}, identity.ErrForbidden
-	}
-	request := struct{ Key, OriginalID, Reason, ReferenceID, ActorID string }{
-		strings.TrimSpace(key), strings.TrimSpace(originalTransactionID), strings.TrimSpace(reason), strings.TrimSpace(referenceID), actor.ID,
-	}
-	if !validKey(request.Key) || request.OriginalID == "" || request.Reason == "" || len(request.Reason) > 512 || request.ReferenceID == "" || len(request.ReferenceID) > 256 {
-		return Transaction{}, ErrInvalidInput
-	}
-	return s.store.Reverse(ctx, request.Key, request.OriginalID, request.Reason, request.ReferenceID, request.ActorID, payloadHash(request))
-}
-
-func (s *Service) CreateHold(ctx context.Context, request CreateHoldRequest) (Hold, error) {
-	request.IdempotencyKey = strings.TrimSpace(request.IdempotencyKey)
-	request.AccountID = strings.TrimSpace(request.AccountID)
-	request.Reason = strings.TrimSpace(request.Reason)
-	request.BusinessType = strings.TrimSpace(request.BusinessType)
-	request.BusinessID = strings.TrimSpace(request.BusinessID)
-	validPurpose := (request.Purpose == HoldPurposeAssetReservation && request.FundingPolicy == HoldFundingSettledBalanceOnly) ||
-		(request.Purpose == HoldPurposeSpendAuthorization && request.FundingPolicy == HoldFundingCreditAllowed)
-	if !validKey(request.IdempotencyKey) || request.AccountID == "" || request.Amount <= 0 || request.Reason == "" || len(request.Reason) > 512 || request.BusinessType == "" || len(request.BusinessType) > 64 || request.BusinessID == "" || len(request.BusinessID) > 256 || !validPurpose {
-		return Hold{}, ErrInvalidInput
-	}
-	return s.store.CreateHold(ctx, request, payloadHash(request))
-}
-
-func (s *Service) ReleaseHold(ctx context.Context, request MutateHoldRequest) (Hold, error) {
-	request = normalizeHoldMutation(request)
-	if err := validateHoldMutation(request); err != nil {
-		return Hold{}, err
-	}
-	return s.store.ReleaseHold(ctx, request, payloadHash(request))
-}
-
-func (s *Service) CaptureHold(ctx context.Context, request CaptureHoldRequest) (CaptureResult, error) {
-	request.MutateHoldRequest = normalizeHoldMutation(request.MutateHoldRequest)
-	request.ReferenceType = strings.TrimSpace(request.ReferenceType)
-	request.ReferenceID = strings.TrimSpace(request.ReferenceID)
-	for index := range request.Credits {
-		request.Credits[index].Account.IdentityAccountID = strings.TrimSpace(request.Credits[index].Account.IdentityAccountID)
-		request.Credits[index].BusinessRole = EntryRole(strings.TrimSpace(string(request.Credits[index].BusinessRole)))
-	}
-	if err := validateHoldMutation(request.MutateHoldRequest); err != nil || request.ReferenceType == "" || len(request.ReferenceType) > 64 || request.ReferenceID == "" || len(request.ReferenceID) > 256 || len(request.Credits) < 1 || len(request.Credits) > 31 {
-		return CaptureResult{}, ErrInvalidInput
-	}
-	providerCount, buyerCount, feeCount := 0, 0, 0
-	for _, credit := range request.Credits {
-		if credit.Amount <= 0 || !validAccountRef(credit.Account) || (credit.BusinessRole != EntryRoleProvider && credit.BusinessRole != EntryRoleBuyer && credit.BusinessRole != EntryRolePlatformFee) {
-			return CaptureResult{}, ErrInvalidInput
-		}
-		switch credit.BusinessRole {
-		case EntryRoleProvider:
-			providerCount++
-		case EntryRoleBuyer:
-			buyerCount++
-		case EntryRolePlatformFee:
-			feeCount++
-		}
-	}
-	if providerCount+buyerCount != 1 || feeCount > 1 {
-		return CaptureResult{}, ErrInvalidInput
-	}
-	return s.store.CaptureHold(ctx, request, payloadHash(request))
-}
-
-func normalizePost(request PostRequest) PostRequest {
-	request.IdempotencyKey = strings.TrimSpace(request.IdempotencyKey)
-	request.Reason = strings.TrimSpace(request.Reason)
-	request.ReferenceType = strings.TrimSpace(request.ReferenceType)
-	request.ReferenceID = strings.TrimSpace(request.ReferenceID)
-	request.ActorAccountID = strings.TrimSpace(request.ActorAccountID)
-	for index := range request.Entries {
-		request.Entries[index].Account.IdentityAccountID = strings.TrimSpace(request.Entries[index].Account.IdentityAccountID)
-		request.Entries[index].BusinessRole = EntryRole(strings.TrimSpace(string(request.Entries[index].BusinessRole)))
-	}
-	return request
-}
-
-func ValidatePostRequest(request PostRequest) error {
-	if !validKey(request.IdempotencyKey) || request.Reason == "" || len(request.Reason) > 512 || request.ReferenceType == "" || request.ReferenceID == "" || len(request.ReferenceType) > 64 || len(request.ReferenceID) > 256 || len(request.Entries) < 2 || len(request.Entries) > 32 {
-		return ErrInvalidInput
-	}
-	if request.Kind != TransactionTransfer && request.Kind != TransactionAdjustment && request.Kind != TransactionSelfUsage {
-		return ErrInvalidInput
-	}
-	total := money.Amount(0)
-	for _, entry := range request.Entries {
-		if entry.Amount == 0 || entry.Amount.Nano() == -1<<63 || !validAccountRef(entry.Account) || entry.BusinessRole == "" || len(entry.BusinessRole) > 64 {
-			return ErrInvalidInput
-		}
-		var err error
-		total, err = Add(total, entry.Amount)
-		if err != nil {
-			return err
-		}
-	}
-	if total != 0 {
-		return ErrUnbalanced
-	}
-	if err := validatePostShape(request); err != nil {
-		return err
-	}
-	return nil
-}
-
-func validatePostShape(request PostRequest) error {
-	if len(request.Entries) != 2 {
-		return ErrInvalidInput
-	}
-	first, second := request.Entries[0], request.Entries[1]
-	switch request.Kind {
-	case TransactionTransfer:
-		if first.Account == second.Account || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleConsumer || second.BusinessRole != EntryRoleProvider {
-			return ErrInvalidInput
-		}
-	case TransactionAdjustment:
-		if first.Account == second.Account || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleAdjustmentSource || second.BusinessRole != EntryRoleAdjustmentTarget || request.ActorAccountID == "" {
-			return ErrInvalidInput
-		}
-	case TransactionSelfUsage:
-		if first.Account != second.Account || first.Account.IdentityAccountID == "" || first.Amount >= 0 || second.Amount <= 0 || first.BusinessRole != EntryRoleConsumer || second.BusinessRole != EntryRoleProvider {
-			return ErrInvalidInput
-		}
-	default:
-		return ErrInvalidInput
-	}
-	return nil
-}
-
-func normalizeHoldMutation(request MutateHoldRequest) MutateHoldRequest {
-	request.IdempotencyKey = strings.TrimSpace(request.IdempotencyKey)
-	request.HoldID = strings.TrimSpace(request.HoldID)
-	request.BusinessID = strings.TrimSpace(request.BusinessID)
-	request.Reason = strings.TrimSpace(request.Reason)
-	return request
-}
-
-func validateHoldMutation(request MutateHoldRequest) error {
-	if !validKey(request.IdempotencyKey) || request.HoldID == "" || request.BusinessID == "" || len(request.BusinessID) > 256 || request.Reason == "" || len(request.Reason) > 512 {
-		return ErrInvalidInput
-	}
-	if request.Amount.Mode == HoldAmountExact {
-		if request.Amount.Amount <= 0 {
-			return ErrInvalidInput
-		}
-		return nil
-	}
-	if request.Amount.Mode != HoldAmountAll || request.Amount.Amount != 0 {
-		return ErrInvalidInput
-	}
-	return nil
-}
-
-func validAccountRef(ref AccountRef) bool {
-	if ref.IdentityAccountID != "" {
-		return ref.SystemKind == ""
-	}
-	return ref.SystemKind == AccountIncentive || ref.SystemKind == AccountLoss
-}
-
-func validKey(key string) bool {
-	return len(key) >= 1 && len(key) <= 128
-}
-
-func payloadHash(value any) [32]byte {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		panic(fmt.Sprintf("ledger payload is not JSON encodable: %v", err))
-	}
-	return sha256.Sum256(encoded)
+	return s.store.WriteOff(ctx, writeOff)
 }

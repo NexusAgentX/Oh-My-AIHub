@@ -1,3 +1,5 @@
+// Package catalog is the model catalog: model names, four base prices
+// (points per million tokens) and conditional price tiers (ADR-0012).
 package catalog
 
 import (
@@ -9,24 +11,18 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-type Status string
-
 const (
-	StatusActive   Status = "active"
-	StatusDisabled Status = "disabled"
-
-	// MaxPriceNanoPerMillion is the public catalog ceiling. Combined with the
-	// channel multiplier ceiling of 1000x, the displayed per-million price is
-	// always representable by money.Amount.
+	// MaxPriceNanoPerMillion is the catalog ceiling of 100000 points per
+	// million tokens. Combined with the channel multiplier ceiling of 1000x,
+	// the effective per-million price stays representable by money.Amount.
 	MaxPriceNanoPerMillion money.Amount = 100_000 * money.Amount(money.Scale)
 
-	// MaxPriceTiers bounds the conditional tiers of one model. The storage
-	// schema enforces the same bound on tier sequence numbers.
+	// MaxPriceTiers bounds the conditional tiers of one model; the schema
+	// enforces the same bound on tier sequence numbers.
 	MaxPriceTiers = 16
 )
 
@@ -36,34 +32,118 @@ var (
 	ErrInvalidInput = errors.New("invalid model")
 )
 
+// Model IDs are the names clients send. They cannot contain "/" or ":" so
+// they fit one path segment, including Gemini's "{model}:generateContent".
+var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
 type Model struct {
 	ID                       string
-	Name                     string
-	Provider                 string
-	ContextWindow            int64
-	ParameterInfo            string
-	InputModalities          []string
-	OutputModalities         []string
-	SupportsTools            bool
-	SupportsStructuredOutput bool
-	SupportsVision           bool
+	DisplayName              string
 	InputPrice               money.Amount
 	OutputPrice              money.Amount
 	CacheWritePrice          money.Amount
 	CacheReadPrice           money.Amount
 	PriceTiers               []ledger.PriceTier
-	Status                   Status
-	Version                  int64
+	Enabled                  bool
+	SortOrder                int32
+	Provider                 string
+	ContextWindow            *int64
+	InputModalities          []string
+	OutputModalities         []string
+	SupportsTools            bool
+	SupportsStructuredOutput bool
+	SupportsVision           bool
+	ParameterInfo            string
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
-	PriceUpdatedAt           time.Time
+}
+
+// BasePrices projects the four base prices into the pricing formula input.
+func (m Model) BasePrices() ledger.Prices {
+	return ledger.Prices{
+		InputPerMillion: m.InputPrice, OutputPerMillion: m.OutputPrice,
+		CacheWritePerMillion: m.CacheWritePrice, CacheReadPerMillion: m.CacheReadPrice,
+	}
+}
+
+// ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
+type ModelPatch struct {
+	DisplayName              *string
+	InputPrice               *money.Amount
+	OutputPrice              *money.Amount
+	CacheWritePrice          *money.Amount
+	CacheReadPrice           *money.Amount
+	PriceTiers               *[]ledger.PriceTier
+	Enabled                  *bool
+	SortOrder                *int32
+	Provider                 *string
+	ContextWindow            **int64
+	InputModalities          *[]string
+	OutputModalities         *[]string
+	SupportsTools            *bool
+	SupportsStructuredOutput *bool
+	SupportsVision           *bool
+	ParameterInfo            *string
+}
+
+func (p ModelPatch) empty() bool {
+	return p == ModelPatch{}
+}
+
+// Apply returns the model with the patch applied.
+func (p ModelPatch) Apply(model Model) Model {
+	set := func(target *string, value *string) {
+		if value != nil {
+			*target = *value
+		}
+	}
+	setAmount := func(target *money.Amount, value *money.Amount) {
+		if value != nil {
+			*target = *value
+		}
+	}
+	setBool := func(target *bool, value *bool) {
+		if value != nil {
+			*target = *value
+		}
+	}
+	set(&model.DisplayName, p.DisplayName)
+	setAmount(&model.InputPrice, p.InputPrice)
+	setAmount(&model.OutputPrice, p.OutputPrice)
+	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
+	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
+	if p.PriceTiers != nil {
+		model.PriceTiers = *p.PriceTiers
+	}
+	setBool(&model.Enabled, p.Enabled)
+	if p.SortOrder != nil {
+		model.SortOrder = *p.SortOrder
+	}
+	set(&model.Provider, p.Provider)
+	if p.ContextWindow != nil {
+		model.ContextWindow = *p.ContextWindow
+	}
+	if p.InputModalities != nil {
+		model.InputModalities = *p.InputModalities
+	}
+	if p.OutputModalities != nil {
+		model.OutputModalities = *p.OutputModalities
+	}
+	setBool(&model.SupportsTools, p.SupportsTools)
+	setBool(&model.SupportsStructuredOutput, p.SupportsStructuredOutput)
+	setBool(&model.SupportsVision, p.SupportsVision)
+	set(&model.ParameterInfo, p.ParameterInfo)
+	return model
 }
 
 type Store interface {
-	ListModels(context.Context, bool, string) ([]Model, error)
-	GetModel(context.Context, string, bool) (Model, error)
-	CreateModel(context.Context, string, Model) (Model, error)
-	UpdateModel(context.Context, string, string, int64, Model) (Model, error)
+	ListModels(ctx context.Context, includeDisabled bool) ([]Model, error)
+	GetModel(ctx context.Context, id string) (Model, error)
+	// CreateModel inserts the model and its tiers and records an audit row.
+	CreateModel(ctx context.Context, actorID string, model Model) (Model, error)
+	// UpdateModel locks the model, passes the current value to mutate and
+	// stores the result (replacing tiers) with an audit row, in one transaction.
+	UpdateModel(ctx context.Context, actorID, id string, mutate func(Model) (Model, error)) (Model, error)
 }
 
 type Service struct {
@@ -74,59 +154,40 @@ func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (s *Service) ListPublic(ctx context.Context, query string) ([]Model, error) {
-	return s.store.ListModels(ctx, false, strings.TrimSpace(query))
+func (s *Service) List(ctx context.Context, includeDisabled bool) ([]Model, error) {
+	return s.store.ListModels(ctx, includeDisabled)
 }
 
-func (s *Service) GetPublic(ctx context.Context, id string) (Model, error) {
-	return s.store.GetModel(ctx, strings.TrimSpace(id), false)
+func (s *Service) Get(ctx context.Context, id string) (Model, error) {
+	return s.store.GetModel(ctx, strings.TrimSpace(id))
 }
 
-func (s *Service) ListAdmin(ctx context.Context, actor identity.Account, query string) ([]Model, error) {
-	if !actor.IsAdmin {
-		return nil, identity.ErrForbidden
-	}
-	return s.store.ListModels(ctx, true, strings.TrimSpace(query))
-}
-
-func (s *Service) GetAdmin(ctx context.Context, actor identity.Account, id string) (Model, error) {
-	if !actor.IsAdmin {
-		return Model{}, identity.ErrForbidden
-	}
-	return s.store.GetModel(ctx, strings.TrimSpace(id), true)
-}
-
-func (s *Service) Create(ctx context.Context, actor identity.Account, model Model) (Model, error) {
-	if !actor.IsAdmin {
-		return Model{}, identity.ErrForbidden
-	}
-	model = normalize(model)
-	if err := validate(model); err != nil {
+func (s *Service) Create(ctx context.Context, actorID string, model Model) (Model, error) {
+	model = Normalize(model)
+	if err := Validate(model); err != nil {
 		return Model{}, err
 	}
-	return s.store.CreateModel(ctx, actor.ID, model)
+	return s.store.CreateModel(ctx, actorID, model)
 }
 
-func (s *Service) Update(ctx context.Context, actor identity.Account, id string, expectedVersion int64, model Model) (Model, error) {
-	if !actor.IsAdmin {
-		return Model{}, identity.ErrForbidden
-	}
-	if expectedVersion <= 0 {
+func (s *Service) Update(ctx context.Context, actorID, id string, patch ModelPatch) (Model, error) {
+	if patch.empty() {
 		return Model{}, ErrInvalidInput
 	}
-	model = normalize(model)
-	model.ID = strings.TrimSpace(id)
-	if err := validate(model); err != nil {
-		return Model{}, err
-	}
-	return s.store.UpdateModel(ctx, actor.ID, id, expectedVersion, model)
+	return s.store.UpdateModel(ctx, actorID, id, func(current Model) (Model, error) {
+		updated := Normalize(patch.Apply(current))
+		if err := Validate(updated); err != nil {
+			return Model{}, err
+		}
+		return updated, nil
+	})
 }
 
-var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*(?:/[A-Za-z0-9][A-Za-z0-9._:-]*)*$`)
-
-func normalize(model Model) Model {
+// Normalize trims text, deduplicates modalities and tier weekdays and fills
+// the default tier timezone.
+func Normalize(model Model) Model {
 	model.ID = strings.TrimSpace(model.ID)
-	model.Name = strings.TrimSpace(model.Name)
+	model.DisplayName = strings.TrimSpace(model.DisplayName)
 	model.Provider = strings.TrimSpace(model.Provider)
 	model.ParameterInfo = strings.TrimSpace(model.ParameterInfo)
 	model.InputModalities = normalizeModalities(model.InputModalities)
@@ -149,9 +210,6 @@ func normalizePriceTiers(tiers []ledger.PriceTier) []ledger.PriceTier {
 			weekdays := make([]int, 0, len(tier.Weekdays))
 			seen := make(map[int]struct{}, len(tier.Weekdays))
 			for _, weekday := range tier.Weekdays {
-				if weekday < 1 || weekday > 7 {
-					continue
-				}
 				if _, ok := seen[weekday]; ok {
 					continue
 				}
@@ -183,23 +241,28 @@ func normalizeModalities(values []string) []string {
 		result = append(result, value)
 	}
 	sort.Strings(result)
+	if len(result) == 0 {
+		return []string{"text"}
+	}
 	return result
 }
 
-func validate(model Model) error {
-	if len(model.ID) > 128 || !modelIDPattern.MatchString(model.ID) || model.Name == "" || model.Provider == "" || model.ContextWindow <= 0 {
+func validPrice(price money.Amount) bool {
+	return price >= 0 && price <= MaxPriceNanoPerMillion
+}
+
+// Validate checks a normalized model against the catalog rules.
+func Validate(model Model) error {
+	if !modelIDPattern.MatchString(model.ID) || model.DisplayName == "" || utf8.RuneCountInString(model.DisplayName) > 128 {
 		return ErrInvalidInput
 	}
-	if len(model.InputModalities) == 0 || len(model.OutputModalities) == 0 {
+	if utf8.RuneCountInString(model.Provider) > 64 || utf8.RuneCountInString(model.ParameterInfo) > 500 {
 		return ErrInvalidInput
 	}
-	if model.Status != StatusActive && model.Status != StatusDisabled {
+	if model.ContextWindow != nil && *model.ContextWindow <= 0 {
 		return ErrInvalidInput
 	}
-	if model.InputPrice < 0 || model.InputPrice > MaxPriceNanoPerMillion ||
-		model.OutputPrice < 0 || model.OutputPrice > MaxPriceNanoPerMillion ||
-		model.CacheWritePrice < 0 || model.CacheWritePrice > MaxPriceNanoPerMillion ||
-		model.CacheReadPrice < 0 || model.CacheReadPrice > MaxPriceNanoPerMillion {
+	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
 	return validatePriceTiers(model.PriceTiers)
@@ -210,16 +273,10 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
-		if !tier.HasPredicate() {
+		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
 			return ErrInvalidInput
 		}
-		if utf8.RuneCountInString(tier.Name) > 64 {
-			return ErrInvalidInput
-		}
-		if tier.MinPromptTokens != nil && *tier.MinPromptTokens < 0 {
-			return ErrInvalidInput
-		}
-		if tier.MaxPromptTokens != nil && *tier.MaxPromptTokens < 0 {
+		if (tier.MinPromptTokens != nil && *tier.MinPromptTokens < 0) || (tier.MaxPromptTokens != nil && *tier.MaxPromptTokens < 0) {
 			return ErrInvalidInput
 		}
 		if tier.MinPromptTokens != nil && tier.MaxPromptTokens != nil && *tier.MinPromptTokens >= *tier.MaxPromptTokens {
@@ -239,10 +296,7 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		if _, err := time.LoadLocation(tier.Timezone); err != nil {
 			return ErrInvalidInput
 		}
-		if tier.InputPrice < 0 || tier.InputPrice > MaxPriceNanoPerMillion ||
-			tier.OutputPrice < 0 || tier.OutputPrice > MaxPriceNanoPerMillion ||
-			tier.CacheWritePrice < 0 || tier.CacheWritePrice > MaxPriceNanoPerMillion ||
-			tier.CacheReadPrice < 0 || tier.CacheReadPrice > MaxPriceNanoPerMillion {
+		if !validPrice(tier.InputPrice) || !validPrice(tier.OutputPrice) || !validPrice(tier.CacheWritePrice) || !validPrice(tier.CacheReadPrice) {
 			return ErrInvalidInput
 		}
 	}
