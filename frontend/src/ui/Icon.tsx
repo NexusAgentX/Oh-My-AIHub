@@ -77,6 +77,18 @@ const paths = {
   ),
   'arrow-left': <path d="m15 18-6-6 6-6" />,
   'chevron-right': <path d="m9 6 6 6-6 6" />,
+  'chevron-down': <path d="m6 9 6 6 6-6" />,
+  'arrow-up': <path d="M12 19V5m-6 6 6-6 6 6" />,
+  'arrow-down': <path d="M12 5v14m-6-6 6 6 6-6" />,
+  grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" />,
+  trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />,
+  live: (
+    <>
+      <circle cx="12" cy="12" r="2" />
+      <path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" />
+    </>
+  ),
+  download: <path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />,
   back: <path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />,
   check: <path d="m5 12 4 4L19 6" />,
   x: <path d="M6 6l12 12M18 6 6 18" />,

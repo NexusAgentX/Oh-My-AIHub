@@ -11,7 +11,12 @@ export {
   type ButtonVariant,
 } from './Button'
 export { Card, Metric, MetricGrid, PageHeader, type MetricTone } from './Card'
-export { Dialog, Drawer } from './Dialog'
+export { ConfirmDialog, Dialog, Drawer } from './Dialog'
+export { BarChart, Sparkline, type BarDatum } from './Chart'
+export { CopyButton, CopyField, copyText } from './Copy'
+export { Disclosure } from './Disclosure'
+export { ProgressBar } from './Progress'
+export { Switch } from './Switch'
 export {
   EmptyState,
   ErrorState,

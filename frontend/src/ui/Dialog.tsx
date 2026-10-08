@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
-import { IconButton } from './Button'
+import { Button, IconButton } from './Button'
 import { Icon } from './Icon'
 
 type OverlayProps = {
@@ -141,5 +141,57 @@ export function Drawer({
         </div>
       )}
     </dialog>
+  )
+}
+
+/** 风险确认：删除、放行、申诉等不可撤销的操作。 */
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  confirmLabel,
+  danger,
+  busy,
+  error,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  title: string
+  description?: string
+  confirmLabel: string
+  danger?: boolean
+  busy?: boolean
+  error?: string
+  children?: ReactNode
+}) {
+  return (
+    <Dialog
+      busy={busy}
+      description={description}
+      footer={
+        <>
+          <Button disabled={busy} onClick={onClose} type="button" variant="secondary">
+            取消
+          </Button>
+          <Button loading={busy} onClick={onConfirm} type="button" variant={danger ? 'danger' : 'primary'}>
+            {confirmLabel}
+          </Button>
+        </>
+      }
+      onClose={onClose}
+      open={open}
+      title={title}
+    >
+      {children}
+      {error && (
+        <div className="inline-error" role="alert">
+          {error}
+        </div>
+      )}
+    </Dialog>
   )
 }

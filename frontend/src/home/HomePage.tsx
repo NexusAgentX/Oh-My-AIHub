@@ -1,45 +1,144 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
-import { PasswordChangeForm } from '../auth/PasswordChangeForm'
-import { formatPointAmount } from '../money/format'
-import { Card, PageHeader, QueryBoundary, SuccessMessage } from '../ui'
-import { usePoints } from './queries'
+import { CallDetailDrawer, CallTable, summaryColumns, useCall } from '../calls'
+import type { CallSummary } from '../api/types'
+import { amountSign, formatPoints } from '../money/format'
+import { parseNanoPoints, formatNanoPoints } from '../money/amount'
+import { usePoints } from '../points/queries'
+import { ButtonLink, Card, EmptyState, Icon, Notice, PageHeader, QueryBoundary } from '../ui'
+import { useHome } from './queries'
+import { StartCard } from './StartCard'
 
-/** 占位首页：产品重写期间只展示账户与积分概况，完整首页由 Feature D 实现。 */
+/** 还能透支：可用额度与信用额度取小（余额为正时可用额度包含余额）。 */
+export function overdraftRemaining(available: string, creditLimit: string) {
+  const a = parseNanoPoints(available)
+  const c = parseNanoPoints(creditLimit)
+  const value = a < c ? a : c
+  return formatNanoPoints(value < 0n ? 0n : value)
+}
+
+function BalanceCard() {
+  const points = usePoints()
+  return (
+    <Card className="home-balance" title="余额">
+      <QueryBoundary errorFallback="余额加载失败" query={points}>
+        {(data) => (
+          <div className="balance-body">
+            <strong className={`balance-value num ${amountSign(data.balance) < 0 ? 'amount-negative' : ''}`}>
+              {formatPoints(data.balance, { digits: 2 })}
+              <small>积分</small>
+            </strong>
+            <span className="muted-copy">
+              还能透支 <span className="num">{formatPoints(overdraftRemaining(data.available, data.credit_limit), { digits: 2 })}</span>
+            </span>
+            <div className="balance-actions">
+              <ButtonLink size="sm" to="/points?tab=buy" variant="primary">
+                买积分
+              </ButtonLink>
+              <ButtonLink size="sm" to="/points?sell=1">
+                卖积分
+              </ButtonLink>
+            </div>
+          </div>
+        )}
+      </QueryBoundary>
+    </Card>
+  )
+}
+
+function TodayCard() {
+  const home = useHome()
+  return (
+    <Card className="home-today" title="今天">
+      <QueryBoundary errorFallback="今日数据加载失败" query={home}>
+        {(data) => (
+          <dl className="today-grid">
+            <div>
+              <dt>花费</dt>
+              <dd className="num">{formatPoints(data.today.spend)}</dd>
+            </div>
+            <div>
+              <dt>调用</dt>
+              <dd className="num">{data.today.calls.toLocaleString('zh-CN')}</dd>
+            </div>
+            <div>
+              <dt>渠道收入</dt>
+              <dd className="num amount-positive">{formatPoints(data.channels.today_revenue)}</dd>
+            </div>
+            <div>
+              <dt>在线渠道</dt>
+              <dd className="num">
+                {data.channels.online} / {data.channels.total}
+              </dd>
+            </div>
+          </dl>
+        )}
+      </QueryBoundary>
+    </Card>
+  )
+}
+
+function RecentCalls() {
+  const home = useHome()
+  const [selected, setSelected] = useState<string | null>(null)
+  const detail = useCall(selected)
+  return (
+    <Card
+      actions={
+        <ButtonLink size="sm" to="/usage" variant="quiet">
+          全部用量
+        </ButtonLink>
+      }
+      flush
+      title="最近调用"
+    >
+      <QueryBoundary errorFallback="最近调用加载失败" query={home}>
+        {(data) => (
+          <CallTable<CallSummary>
+            caption="最近调用"
+            columns={summaryColumns({ showKey: false, showFormat: false })}
+            empty={<EmptyState title="还没有调用" />}
+            onSelect={(row) => setSelected(row.id)}
+            rows={data.recent_calls.slice(0, 5)}
+          />
+        )}
+      </QueryBoundary>
+      <CallDetailDrawer onClose={() => setSelected(null)} open={Boolean(selected)} query={detail} />
+    </Card>
+  )
+}
+
+function PendingTradesBanner() {
+  const home = useHome()
+  const count = home.data?.pending_c2c_trades ?? 0
+  if (count <= 0) return null
+  return (
+    <Notice
+      action={
+        <ButtonLink icon={<Icon name="chevron-right" />} size="sm" to="/points?tab=trades">
+          去处理
+        </ButtonLink>
+      }
+      tone="warning"
+    >
+      有 {count} 笔积分交易等你处理
+    </Notice>
+  )
+}
+
 export function HomePage() {
   const { account } = useAuth()
-  const points = usePoints()
-  const [message, setMessage] = useState('')
   if (!account) return null
   return (
     <>
       <PageHeader title={`你好，${account.display_name}`} />
-      <div className="account-grid">
-        <Card flush title="积分">
-          <QueryBoundary query={points}>
-            {(data) => (
-              <dl className="detail-list">
-                <div>
-                  <dt>余额</dt>
-                  <dd className="num">{formatPointAmount(data.balance)}</dd>
-                </div>
-                <div>
-                  <dt>信用额度</dt>
-                  <dd className="num">{formatPointAmount(data.credit_limit)}</dd>
-                </div>
-                <div>
-                  <dt>可透支额度</dt>
-                  <dd className="num">{formatPointAmount(data.available)}</dd>
-                </div>
-              </dl>
-            )}
-          </QueryBoundary>
-        </Card>
-        <Card title="修改密码">
-          <SuccessMessage>{message}</SuccessMessage>
-          <PasswordChangeForm onChanged={() => setMessage('密码已更新')} submitLabel="更新密码" />
-        </Card>
+      <PendingTradesBanner />
+      <StartCard />
+      <div className="home-grid">
+        <BalanceCard />
+        <TodayCard />
       </div>
+      <RecentCalls />
     </>
   )
 }

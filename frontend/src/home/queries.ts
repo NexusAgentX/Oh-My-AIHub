@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
+import { apiGet } from '../api/client'
 
-export const pointsKeys = {
-  summary: ['points', 'summary'] as const,
+export const homeKeys = {
+  summary: ['home', 'summary'] as const,
 }
 
-/** 当前账户的积分概况（余额、信用额度、可透支额度）。 */
-export function usePoints() {
-  return useQuery({ queryKey: pointsKeys.summary, queryFn: () => api.points() })
+/** 首页聚合：余额、今日、渠道、默认 Key、待处理交易、最近调用。 */
+export function useHome() {
+  return useQuery({ queryKey: homeKeys.summary, queryFn: () => apiGet<'getHome'>('/api/home') })
 }
