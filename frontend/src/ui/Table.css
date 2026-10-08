@@ -1,7 +1,3 @@
-.table-panel { overflow: hidden; }
-.table-panel > .inline-error { margin: var(--space-4) var(--space-5) 0; }
-.table-toolbar h2 { margin-bottom: 0; }
-
 .toolbar {
   display: flex;
   align-items: center;
@@ -64,8 +60,7 @@
 
 .table-action { text-align: right !important; }
 .table-action .button { min-height: 34px; }
-.table-action-group,
-.mobile-card-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.table-action-group { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .table-action-group .button { min-height: 34px; padding-inline: var(--space-3); }
 
 .table-pagination {
@@ -95,12 +90,9 @@
   .mobile-data-card dl > div { display: flex; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
   .mobile-data-card dt { color: var(--muted); }
   .mobile-data-card dd { margin: 0; color: var(--ink); font-weight: 600; text-align: right; }
-  .mobile-card-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .mobile-card-actions .button { width: 100%; }
 }
 
 @media (max-width: 760px) {
-  .table-toolbar { align-items: stretch; flex-direction: column; }
   .toolbar { align-items: stretch; flex-direction: column; }
   .toolbar-main,
   .toolbar-end { width: 100%; }

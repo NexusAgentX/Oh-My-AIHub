@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/types'
 import { errorMessage } from '../api/query'
-import { formatPoints, formatRate } from '../gateway/presentation'
+import { formatDate, formatPoints, formatRate, PricePair, protocolLabels, ratingText } from '../gateway/presentation'
 import {
   Badge,
   Button,
@@ -25,10 +25,6 @@ import {
   ChannelStateBadge,
   ConfirmActionDialog,
   eligibilityLabel,
-  formatDate,
-  PricePair,
-  protocolLabels,
-  ratingText,
   TierCountBadge,
   TierPriceList,
 } from './presentation'

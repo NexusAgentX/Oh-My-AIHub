@@ -42,7 +42,7 @@ MVP 的 34 个页面各自用 `useState`/`useEffect` 手写加载、错误与重
    - 401 等会话变更仍由 `api/client.ts` 的 `authFailureHandler` 处理，与 Query 无关。
    - 旧 `WalletProvider` 删除，改为 `wallet/queries.ts` 的 `useWallet()`（形状不变）。其余页面在第二波改版时迁移。
 2. **设计 token**：`src/styles/tokens.css` 是颜色、字号、间距（4px 栅格）、圆角（卡片 12 / 按钮与输入 9）、阴影与布局尺寸的唯一来源。状态色为“柔和底色 + 深色文字”，芥末黄只用于导航选中色条、强调徽标与进度条，数字使用 `tabular-nums`，首要按钮为墨色实底。新代码只引用 `var(--token)`，不写十六进制颜色与裸 px 圆角。
-3. **组件与样式拆分**：基础组件位于 `src/ui/`，每个组件文件配同名 `.css`，页面一律从 `../ui` 引入；`src/styles/index.css` 按固定顺序导入 token、基础、UI、外壳与各领域样式。领域样式放在 `<domain>/<domain>.css`，只写本领域私有布局，通用外观必须用 UI 组件。旧 `ui/FormControls` 仅作兼容出口，待全部页面迁移后删除。
+3. **组件与样式拆分**：基础组件位于 `src/ui/`，每个组件文件配同名 `.css`，页面一律从 `../ui` 引入；`src/styles/index.css` 按固定顺序导入 token、基础、UI、外壳与各领域样式。领域样式放在 `<domain>/<domain>.css`，只写本领域私有布局，通用外观必须用 UI 组件。
 4. **外壳**：用户与管理员各一个 react-router layout route（`ProductLayout` / `AdminLayout`），页面不再包裹 `AppShell`。用户导航分“使用 API / 共享渠道 / 积分”，配置集中在 `layouts/navigation.ts`，每项必须使用唯一图标（有单测）；760px 以下改为底部 Tab 栏加“更多”抽屉。
 5. **无障碍**：Dialog / Drawer 基于原生 `<dialog>.showModal()`（焦点陷阱、Esc、焦点归还），路由切换后焦点移至主内容，提供“跳到主要内容”链接，所有图标按钮必须有 `aria-label`。
 

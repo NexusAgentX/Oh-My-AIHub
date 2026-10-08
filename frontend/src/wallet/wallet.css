@@ -1,4 +1,4 @@
-.ledger-time, .ledger-reference-id { color: var(--muted); font-size: var(--text-xs); }
+.ledger-time { color: var(--muted); font-size: var(--text-xs); }
 .ledger-kind { display: grid; gap: var(--space-1); }
 .ledger-kind small { color: var(--muted); font-size: var(--text-xs); }
 .ledger-reference { display: grid; gap: var(--space-1); }

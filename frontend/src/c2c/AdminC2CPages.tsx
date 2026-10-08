@@ -29,7 +29,7 @@ import {
   c2cDisputeParties,
   c2cStatusTone,
   c2cTradeStatusLabels,
-  canRestrictC2CParty,
+  c2cAdminDisputeActions,
   formatC2CDate,
   formatC2CFiat,
 } from './presentation'
@@ -189,7 +189,7 @@ export function AdminC2CDisputePage() {
                       </div>
                       <div>
                         <Button
-                          disabled={busy || party.creditFrozen === true || !canRestrictC2CParty(trade.status)}
+                          disabled={busy || party.creditFrozen === true || !c2cAdminDisputeActions(trade.status).resolve}
                           onClick={() => request({ kind: 'resolve', action: party.restrictAction })}
                           size="sm"
                           variant="danger"
@@ -204,14 +204,14 @@ export function AdminC2CDisputePage() {
                   ))}
                 </div>
                 <div className="admin-dispute-actions">
-                  <Button disabled={busy} onClick={() => request({ kind: 'resolve', action: 'release_to_buyer' })}>
+                  <Button disabled={busy || !c2cAdminDisputeActions(trade.status).resolve} onClick={() => request({ kind: 'resolve', action: 'release_to_buyer' })}>
                     放行给买家
                   </Button>
-                  <Button disabled={busy} onClick={() => request({ kind: 'resolve', action: 'return_to_seller' })} variant="secondary">
+                  <Button disabled={busy || !c2cAdminDisputeActions(trade.status).resolve} onClick={() => request({ kind: 'resolve', action: 'return_to_seller' })} variant="secondary">
                     退还给卖家
                   </Button>
                   <Button
-                    disabled={busy || trade.status !== 'disputed'}
+                    disabled={busy || !c2cAdminDisputeActions(trade.status).extendReview}
                     onClick={() => request({ kind: 'resolve', action: 'extend_review' })}
                     variant="secondary"
                   >

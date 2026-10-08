@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { IconButton } from './Button'
 import { Icon } from './Icon'
+import { blurNumberInputOnWheel } from './numberInput'
 
 type FieldMeta = {
   label: string
@@ -53,6 +54,7 @@ export function TextField({
   hint,
   id,
   className,
+  onWheel,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & FieldMeta) {
   const generatedID = useId()
@@ -61,6 +63,10 @@ export function TextField({
     <FieldFrame className={className} error={error} hint={hint} id={fieldID} label={label}>
       <input
         {...props}
+        onWheel={(event) => {
+          blurNumberInputOnWheel(event)
+          onWheel?.(event)
+        }}
         aria-describedby={describedBy(fieldID, { label, error, hint })}
         aria-invalid={Boolean(error)}
         className="input"

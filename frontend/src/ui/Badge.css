@@ -1,6 +1,5 @@
 .badge,
-.count-badge,
-.status-badge {
+.count-badge {
   display: inline-flex;
   width: fit-content;
   align-items: center;
@@ -20,10 +19,6 @@
 .badge-accent { color: var(--ink); background: var(--mustard-soft); box-shadow: inset 0 0 0 1px var(--mustard-border); }
 
 .count-badge { min-width: 20px; justify-content: center; padding: 0 7px; color: var(--ink); background: var(--mustard); }
-
-/* 旧状态类，随页面改版迁移到 Badge 后删除 */
-.status-active { color: var(--positive); background: var(--positive-soft); }
-.status-disabled { color: var(--warning); background: var(--warning-soft); }
 .step-badge {
   display: inline-flex;
   margin-bottom: var(--space-3);
