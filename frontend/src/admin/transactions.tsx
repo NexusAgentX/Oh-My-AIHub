@@ -73,6 +73,7 @@ export const auditActionLabels: Record<string, string> = {
   'ledger.write_off': '坏账核销',
   'model.created': '上架模型',
   'model.updated': '修改模型',
+  'model.deleted': '删除模型',
   'settings.updated': '修改平台设置',
 }
 

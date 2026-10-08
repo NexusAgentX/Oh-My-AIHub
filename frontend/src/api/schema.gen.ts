@@ -846,7 +846,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * 删除模型
+         * @description 删除模型、条件价格档及路由偏好；保留历史调用、账单及 Key 的模型限制和别名。有未删除渠道引用时拒绝删除。
+         */
+        delete: operations["deleteAdminModel"];
         options?: never;
         head?: never;
         /**
@@ -4425,6 +4429,31 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteAdminModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 模型名。 */
+                modelID: components["parameters"]["modelID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     updateAdminModel: {

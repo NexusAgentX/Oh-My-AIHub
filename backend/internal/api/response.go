@@ -79,6 +79,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "last_administrator", "不能移除最后一个启用的管理员")
 	case errors.Is(err, identity.ErrSelfModification):
 		writeError(w, http.StatusUnprocessableEntity, "cannot_modify_self", "不能停用、降级或重置自己的账户")
+	case errors.Is(err, catalog.ErrInUse):
+		writeError(w, http.StatusConflict, "model_in_use", "模型仍被渠道使用，请先从渠道移除该模型，或改为停用模型")
 	case errors.Is(err, identity.ErrConflict), errors.Is(err, catalog.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
 	case errors.Is(err, ledger.ErrConflict):

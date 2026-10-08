@@ -195,6 +195,39 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 	return updated, err
 }
 
+// DeleteModel removes catalog configuration atomically; historical calls and keys
+// identify models by name and are deliberately retained.
+func (s *Store) DeleteModel(ctx context.Context, actorID, id string) error {
+	return pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		row, err := q.LockModel(ctx, id)
+		if err != nil {
+			return mapError(err)
+		}
+		models, err := withTiers(ctx, q, []Model{row})
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM channel_models cm USING channels c WHERE cm.channel_id = c.id AND c.deleted_at IS NOT NULL AND cm.model_id = $1`, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM route_prefs WHERE model_id = $1`, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM models WHERE id = $1`, id); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				return catalog.ErrInUse
+			}
+			return err
+		}
+		return auditpg.Record(ctx, tx, auditpg.Event{
+			ActorID: actorID, Action: audit.ActionModelDeleted, TargetType: "model", TargetID: id,
+			Detail: map[string]any{"before": auditView(models[0])},
+		})
+	})
+}
+
 // auditView keeps the price-relevant fields of a model for the audit log.
 func auditView(model catalog.Model) map[string]any {
 	tiers := make([]map[string]any, 0, len(model.PriceTiers))

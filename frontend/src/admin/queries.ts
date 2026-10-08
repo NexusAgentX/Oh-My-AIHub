@@ -170,6 +170,14 @@ export function useWriteOffAccount() {
   )
 }
 
+export function useDeleteModel() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: adminApi.deleteModel,
+    onSuccess: () => client.invalidateQueries(),
+  })
+}
+
 export function useSaveModel() {
   return useAdminMutation(
     (

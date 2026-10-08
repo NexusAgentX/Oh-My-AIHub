@@ -28,6 +28,7 @@ const (
 
 var (
 	ErrNotFound     = errors.New("model not found")
+	ErrInUse        = errors.New("model is used by channels")
 	ErrConflict     = errors.New("model already exists")
 	ErrInvalidInput = errors.New("invalid model")
 )
@@ -137,6 +138,7 @@ func (p ModelPatch) Apply(model Model) Model {
 }
 
 type Store interface {
+	DeleteModel(ctx context.Context, actorID, id string) error
 	ListModels(ctx context.Context, includeDisabled bool) ([]Model, error)
 	GetModel(ctx context.Context, id string) (Model, error)
 	// CreateModel inserts the model and its tiers and records an audit row.
@@ -181,6 +183,10 @@ func (s *Service) Update(ctx context.Context, actorID, id string, patch ModelPat
 		}
 		return updated, nil
 	})
+}
+
+func (s *Service) Delete(ctx context.Context, actorID, id string) error {
+	return s.store.DeleteModel(ctx, actorID, id)
 }
 
 // Normalize trims text, deduplicates modalities and tier weekdays and fills
