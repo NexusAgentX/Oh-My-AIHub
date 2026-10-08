@@ -93,7 +93,29 @@ func hydrate(ctx context.Context, q *Queries, keys []apikey.Key, oldestID string
 	return keys, nil
 }
 
+func checkModelReferences(ctx context.Context, q *Queries, allowed []string, aliases map[string]string) error {
+	ids := append([]string{}, allowed...)
+	for _, id := range aliases {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	if len(ids) == 0 {
+		return nil
+	}
+	found, err := q.LockReferencedModels(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(found) != len(ids) {
+		return apikey.ErrInvalidInput
+	}
+	return nil
+}
 func insert(ctx context.Context, q *Queries, sealed apikey.Sealed) error {
+	if err := checkModelReferences(ctx, q, sealed.AllowedModels, sealed.ModelAliases); err != nil {
+		return err
+	}
 	aliases, err := json.Marshal(nonNilMap(sealed.ModelAliases))
 	if err != nil {
 		return err
@@ -137,6 +159,9 @@ func (s *Store) Create(ctx context.Context, sealed apikey.Sealed) (apikey.Key, e
 	var created apikey.Key
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := New(tx)
+		if err := q.LockKeyConfigWrites(ctx); err != nil {
+			return err
+		}
 		if err := q.LockAccount(ctx, sealed.OwnerID); err != nil {
 			return err
 		}
@@ -160,6 +185,9 @@ func (s *Store) EnsureDefault(ctx context.Context, sealed apikey.Sealed) (bool, 
 	created := false
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := New(tx)
+		if err := q.LockKeyConfigWrites(ctx); err != nil {
+			return err
+		}
 		if _, err := q.MarkDefaultKeyCreated(ctx, sealed.OwnerID); errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		} else if err != nil {
@@ -195,6 +223,9 @@ func (s *Store) Update(ctx context.Context, ownerID, id string, update apikey.Up
 	var updated apikey.Key
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := New(tx)
+		if err := q.LockKeyConfigWrites(ctx); err != nil {
+			return err
+		}
 		row, err := q.GetOwnerKeyForUpdate(ctx, GetOwnerKeyForUpdateParams{OwnerID: ownerID, ID: id})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apikey.ErrNotFound
@@ -226,6 +257,11 @@ func (s *Store) Update(ctx context.Context, ownerID, id string, update apikey.Up
 		}
 		if update.ModelAliases != nil {
 			key.ModelAliases = *update.ModelAliases
+		}
+		if update.AllowedModels != nil || update.ModelAliases != nil {
+			if err := checkModelReferences(ctx, q, key.AllowedModels, key.ModelAliases); err != nil {
+				return err
+			}
 		}
 		aliases, err := json.Marshal(nonNilMap(key.ModelAliases))
 		if err != nil {

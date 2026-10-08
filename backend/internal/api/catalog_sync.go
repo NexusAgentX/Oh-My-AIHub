@@ -22,17 +22,18 @@ func (a *app) catalogSyncRate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		ExchangeRate *string `json:"exchange_rate"`
+		ExchangeRate *string   `json:"exchange_rate"`
+		Providers    *[]string `json:"providers"`
 	}
 	if decodeJSON(w, r, &body) != nil {
 		writeInvalidJSON(w)
 		return
 	}
-	if body.ExchangeRate == nil {
-		writeError(w, 422, "invalid_input", "请提供换算率，留空字符串暂停价格换算")
+	if body.ExchangeRate == nil || body.Providers == nil {
+		writeError(w, 422, "invalid_input", "请提供换算率和提供商白名单（可为空）")
 		return
 	}
-	if err := a.catalogSync.SetRate(r.Context(), accountFromContext(r.Context()).ID, *body.ExchangeRate); err != nil {
+	if err := a.catalogSync.SetConfig(r.Context(), accountFromContext(r.Context()).ID, *body.ExchangeRate, *body.Providers); err != nil {
 		writeDomainError(w, err)
 		return
 	}

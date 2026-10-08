@@ -82,6 +82,8 @@ export const auditActionLabels: Record<string, string> = {
   'model.deleted': '删除模型',
   'model.synced': '同步模型',
   'catalog.sync.rate_updated': '修改模型换算率',
+  'catalog.sync.config_updated': '修改模型同步配置',
+  'model.sync_removed': '清理未使用同步模型',
   'catalog.sync.completed': '完成模型同步',
   'settings.updated': '修改平台设置',
 }

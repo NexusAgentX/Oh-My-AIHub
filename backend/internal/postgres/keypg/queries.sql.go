@@ -436,6 +436,39 @@ func (q *Queries) LockAccount(ctx context.Context, id string) error {
 	return err
 }
 
+const lockKeyConfigWrites = `-- name: LockKeyConfigWrites :exec
+LOCK TABLE api_keys IN ROW EXCLUSIVE MODE
+`
+
+func (q *Queries) LockKeyConfigWrites(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockKeyConfigWrites)
+	return err
+}
+
+const lockReferencedModels = `-- name: LockReferencedModels :many
+SELECT id FROM models WHERE id=ANY($1::text[]) ORDER BY id FOR KEY SHARE
+`
+
+func (q *Queries) LockReferencedModels(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, lockReferencedModels, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markDefaultKeyCreated = `-- name: MarkDefaultKeyCreated :one
 UPDATE accounts SET default_key_created_at = now()
 WHERE id = $1 AND default_key_created_at IS NULL

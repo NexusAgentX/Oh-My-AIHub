@@ -61,28 +61,28 @@ INSERT INTO model_price_tiers (
 SELECT model_id, info, sync_enabled FROM model_sources WHERE model_id=ANY(sqlc.arg(ids)::text[]) AND NOT ignored;
 
 -- name: GetSource :one
-SELECT model_id, ignored, sync_enabled, info FROM model_sources WHERE source_key=$1;
+SELECT model_id, ignored, sync_enabled, info FROM model_sources WHERE model_id=$1;
 
 -- name: GetSourceRaw :one
 SELECT raw_record FROM model_sources WHERE model_id=$1 AND NOT ignored;
 
 -- name: GetSyncStatus :one
-SELECT exchange_rate, started_at, finished_at, status, error, result FROM catalog_sync WHERE id;
+SELECT exchange_rate, providers, providers_configured, available_providers, report, started_at, finished_at, status, error, result FROM catalog_sync WHERE id;
 
--- name: LockSyncRate :one
-SELECT exchange_rate FROM catalog_sync WHERE id FOR UPDATE;
+-- name: LockSyncConfig :one
+SELECT exchange_rate, providers, providers_configured, config_version FROM catalog_sync WHERE id FOR UPDATE;
 
--- name: SetSyncRate :exec
-UPDATE catalog_sync SET exchange_rate=$1 WHERE id;
+-- name: SetSyncConfig :exec
+UPDATE catalog_sync SET exchange_rate=$1, providers=$2, providers_configured=true, config_version=config_version+1 WHERE id;
 
 -- name: StartSync :one
-UPDATE catalog_sync SET status='running', started_at=now(), error='' WHERE id RETURNING exchange_rate;
+UPDATE catalog_sync SET status='running', started_at=now(), error='' WHERE id RETURNING exchange_rate, providers, providers_configured, config_version;
 
 -- name: FailSync :exec
 UPDATE catalog_sync SET status='failed', finished_at=now(), error=$1 WHERE id;
 
 -- name: FinishSync :exec
-UPDATE catalog_sync SET status='succeeded', finished_at=now(), error='', result=$1 WHERE id;
+UPDATE catalog_sync SET status='succeeded', finished_at=now(), error='', result=$1, report=$2, available_providers=$3 WHERE id;
 
 -- name: TrySyncLock :one
 SELECT pg_try_advisory_lock(201201)::boolean;
@@ -93,23 +93,56 @@ SELECT pg_advisory_unlock(201201);
 -- name: LockModelWrites :exec
 SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(model_id)::text,201));
 
--- name: InsertSourceConflict :exec
-INSERT INTO model_sources(source_key,model_id,ignored,sync_enabled,raw_record,info,seen_at)
-VALUES($1,$2,true,false,$3,$4,$5) ON CONFLICT DO NOTHING;
-
 -- name: UpsertSource :exec
 INSERT INTO model_sources(source_key,model_id,raw_record,info,seen_at) VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(source_key) DO UPDATE SET raw_record=excluded.raw_record,info=excluded.info,seen_at=excluded.seen_at;
+ON CONFLICT(model_id) DO UPDATE SET source_key=excluded.source_key, ignored=false, raw_record=excluded.raw_record,info=excluded.info,seen_at=excluded.seen_at;
 
 -- name: SeenSource :exec
-UPDATE model_sources SET seen_at=$2 WHERE source_key=$1;
-
--- name: MarkMissingSources :exec
-UPDATE model_sources SET info=jsonb_set(info,'{status}','"missing"'::jsonb)
-WHERE NOT(source_key=ANY(sqlc.arg(keys)::text[])) AND NOT ignored AND sync_enabled;
+UPDATE model_sources SET seen_at=$2 WHERE model_id=$1;
 
 -- name: UpdateSourceControl :exec
 UPDATE model_sources SET sync_enabled=$2,info=$3 WHERE model_id=$1 AND NOT ignored;
 
 -- name: IgnoreSource :exec
 UPDATE model_sources SET ignored=true,sync_enabled=false WHERE model_id=$1;
+
+
+-- name: ListManagedSources :many
+SELECT s.model_id,s.source_key,s.info,s.sync_enabled FROM model_sources s JOIN models m ON m.id=s.model_id
+WHERE NOT s.ignored ORDER BY s.model_id;
+
+-- name: DeletedModels :many
+SELECT model_id FROM catalog_deleted_models;
+
+-- name: RememberDeletedModel :exec
+INSERT INTO catalog_deleted_models(model_id)
+ SELECT sqlc.arg(target_id)::text
+ UNION SELECT regexp_replace(s.source_key,'^.*/','') FROM model_sources s WHERE s.model_id=sqlc.arg(target_id)::text AND NOT s.ignored
+ ON CONFLICT DO NOTHING;
+
+-- name: RemoveOldConflictRecords :exec
+DELETE FROM model_sources WHERE ignored AND info->>'status'='conflict';
+
+-- name: RemoveSource :exec
+DELETE FROM model_sources WHERE model_id=$1;
+
+-- name: RemoveUnusedModel :exec
+DELETE FROM models WHERE id=$1;
+
+-- name: SetSourceRetention :exec
+UPDATE model_sources SET info=jsonb_set(jsonb_set(info,'{status}',to_jsonb(sqlc.arg(status)::text)),'{retained_reason}',to_jsonb(sqlc.arg(reason)::text)) WHERE model_id=sqlc.arg(target_id)::text;
+
+-- name: LockExplicitModelReferences :exec
+LOCK TABLE calls, api_keys IN SHARE ROW EXCLUSIVE MODE;
+
+-- name: ModelReferenceReasons :one
+SELECT
+ EXISTS(SELECT 1 FROM channel_models WHERE model_id=sqlc.arg(target_id)::text) AS channels,
+ EXISTS(SELECT 1 FROM calls WHERE model_id=sqlc.arg(target_id)::text OR requested_model=sqlc.arg(target_id)::text) AS calls,
+ EXISTS(SELECT 1 FROM route_prefs WHERE model_id=sqlc.arg(target_id)::text) AS routes,
+ EXISTS(SELECT 1 FROM api_keys WHERE sqlc.arg(target_id)::text=ANY(allowed_models)
+   OR model_aliases ? sqlc.arg(target_id)::text
+   OR EXISTS(SELECT 1 FROM jsonb_each_text(model_aliases) alias WHERE alias.value=sqlc.arg(target_id)::text)) AS keys;
+
+-- name: IsModelDeleted :one
+SELECT EXISTS(SELECT 1 FROM catalog_deleted_models WHERE model_id=$1);

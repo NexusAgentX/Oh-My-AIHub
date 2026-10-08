@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,16 +18,20 @@ import (
 var ErrBusy = errors.New("catalog sync already running")
 
 type Status struct {
-	ExchangeRate string         `json:"exchange_rate"`
-	StartedAt    *time.Time     `json:"started_at"`
-	FinishedAt   *time.Time     `json:"finished_at"`
-	Status       string         `json:"status"`
-	Error        string         `json:"error"`
-	Result       map[string]int `json:"result"`
+	Providers           []string       `json:"providers"`
+	ProvidersConfigured bool           `json:"providers_configured"`
+	AvailableProviders  []string       `json:"available_providers"`
+	Report              []Notice       `json:"report"`
+	ExchangeRate        string         `json:"exchange_rate"`
+	StartedAt           *time.Time     `json:"started_at"`
+	FinishedAt          *time.Time     `json:"finished_at"`
+	Status              string         `json:"status"`
+	Error               string         `json:"error"`
+	Result              map[string]int `json:"result"`
 }
 type Store interface {
 	SyncStatus(context.Context) (Status, error)
-	SetSyncRate(context.Context, string, string) error
+	SetSyncConfig(context.Context, string, string, []string) error
 	// RunSync holds a database advisory lock, including during fetch.
 	RunSync(context.Context, func(string) ([]Entry, error)) error
 	SourceRaw(context.Context, string) (json.RawMessage, error)
@@ -45,7 +50,17 @@ func (s *Service) Status(ctx context.Context) (Status, error) { return s.store.S
 
 var ratePattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})(\.[0-9]{1,9})?$`)
 
-func (s *Service) SetRate(ctx context.Context, actor, rate string) error {
+func (s *Service) SetConfig(ctx context.Context, actor, rate string, providers []string) error {
+	if len(providers) > 200 {
+		return catalog.ErrInvalidInput
+	}
+	seen := map[string]bool{}
+	for _, p := range providers {
+		if p == "" || len(p) > 64 || strings.TrimSpace(p) != p || seen[p] {
+			return catalog.ErrInvalidInput
+		}
+		seen[p] = true
+	}
 	if rate != "" {
 		if !ratePattern.MatchString(rate) {
 			return catalog.ErrInvalidInput
@@ -54,7 +69,7 @@ func (s *Service) SetRate(ctx context.Context, actor, rate string) error {
 			return catalog.ErrInvalidInput
 		}
 	}
-	return s.store.SetSyncRate(ctx, actor, rate)
+	return s.store.SetSyncConfig(ctx, actor, rate, providers)
 }
 func (s *Service) Raw(ctx context.Context, id string) (json.RawMessage, error) {
 	return s.store.SourceRaw(ctx, id)

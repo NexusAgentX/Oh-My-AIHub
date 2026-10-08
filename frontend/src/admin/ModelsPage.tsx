@@ -200,7 +200,7 @@ const columns: Column<AdminModel>[] = [
       </>
     ),
   },
-  { key: 'source', header: '来源', cell: (model) => !model.source ? '手工' : !model.source.sync_enabled ? '已退出同步' : model.source.status === 'waiting_rate' ? '待汇率' : model.source.status === 'needs_review' ? '需人工处理' : model.source.status === 'missing' ? '来源缺失' : '自动同步' },
+  { key: 'source', header: '来源', cell: (model) => !model.source ? '手工' : !model.source.sync_enabled ? '已退出同步' : model.source.status === 'retained' ? '保留旧模型' : model.source.status === 'waiting_rate' ? '待汇率' : model.source.status === 'needs_review' ? '需人工处理' : model.source.status === 'missing' ? '来源缺失' : '自动同步' },
   {
     key: 'enabled',
     header: '状态',

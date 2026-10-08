@@ -13,7 +13,7 @@ func TestValidateModelIDFitsOnePathSegment(t *testing.T) {
 	base := Model{
 		DisplayName: "Test Model",
 	}
-	for _, id := range []string{"", "openai/gpt-5", "gemini-2.5-flash:generateContent", "-model", ".model", "provider model", strings.Repeat("a", 129)} {
+	for _, id := range []string{"", "openai/gpt-5", "-model", ".model", "provider model", strings.Repeat("a", 129)} {
 		model := base
 		model.ID = id
 		if err := Validate(model); err == nil {
@@ -21,7 +21,7 @@ func TestValidateModelIDFitsOnePathSegment(t *testing.T) {
 		}
 	}
 
-	for _, id := range []string{"gpt-5", "claude-sonnet-4-5", "gemini-2.5-flash", "Qwen3_235B"} {
+	for _, id := range []string{"gpt-5", "claude-sonnet-4-5", "gemini-2.5-flash", "Qwen3_235B", "model-v1:0", "model@20250101"} {
 		model := base
 		model.ID = id
 		if err := Validate(model); err != nil {

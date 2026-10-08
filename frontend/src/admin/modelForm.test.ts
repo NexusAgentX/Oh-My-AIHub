@@ -146,7 +146,8 @@ describe('price tier list', () => {
   it('rejects model names with slashes or colons', () => {
     const form = { ...emptyModelForm(), displayName: 'x' }
     expect(validateModelForm({ ...form, id: 'org/model' }, true).id).toBeTruthy()
-    expect(validateModelForm({ ...form, id: 'gemini:flash' }, true).id).toBeTruthy()
+    expect(validateModelForm({ ...form, id: 'gemini:flash' }, true).id).toBeFalsy()
+    expect(validateModelForm({ ...form, id: 'claude@20250101' }, true).id).toBeFalsy()
     expect(validateModelForm({ ...form, id: 'claude-sonnet-4.5' }, true).id).toBeUndefined()
     expect(validateModelForm({ ...form, id: '' }, false).id).toBeUndefined()
   })

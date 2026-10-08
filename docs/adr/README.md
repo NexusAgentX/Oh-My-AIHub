@@ -65,3 +65,5 @@
 - [ADR-0030：以可靠 token 细分与实际响应事实定价](0030-price-reliable-token-breakdowns.md)
 
 - [ADR-0031：同步 Bifrost 目录并保留本地控制权](0031-sync-bifrost-catalog-with-local-control.md)
+
+- [ADR-0032：按有序提供商白名单同步并保护模型引用](0032-select-catalog-providers-and-preserve-references.md)

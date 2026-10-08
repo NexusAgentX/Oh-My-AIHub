@@ -46,7 +46,7 @@
 | --- | --- |
 | `internal/identity` | 受邀账户、Argon2id 密码、服务器端会话、首次改密、管理员创建/修改/重置账户；不能停用、降级或重置自己，不能移除最后一个启用管理员 |
 | `internal/ledger` | 账本领域：交易类型、系统账户、交易校验（至少两条、非零、账户不重复、合计为 0）、积分概况与账单读取、管理员调账与坏账核销；计价公式 v2（`CalculatePriceV2` 与条件价格档选择） |
-| `internal/catalogsync` | Bifrost 资料下载、精确换算与保守映射、异步启动/每日同步；来源持久化在 catalogpg（ADR-0031） |
+| `internal/catalogsync` | Bifrost 资料下载、精确换算与保守映射、异步启动/每日同步；来源持久化在 catalogpg（ADR-0031、ADR-0032） |
 | `internal/catalog` | 模型目录与条件价格档的规范化、校验与部分更新（`ModelPatch`，价格档整组替换） |
 | `internal/settings` | 单行平台设置的校验与更新 |
 | `internal/audit` | 审计日志读取；写入由各领域在自己的事务内调用 `auditpg.Record` |
@@ -170,3 +170,7 @@
 ### 外部模型目录同步
 
 `model_sources` 保存源键、原始记录、同步开关和删除/冲突忽略记录；`catalog_sync` 保存固定美元换算率、运行状态与计数。同步先完成受限下载与 JSON 验证，再在数据库事务内更新；事务级模型锁与管理员编辑/删除共用，数据库会话锁避免多个实例重入。全局汇率在应用事务里重新核验。模型来源摘要随管理员列表返回，原始 JSON 仅按需读取；有效价格仍在 models/model_price_tiers，历史账单快照不修改。source 的 price_ready 防止未定价模型启用。参考 ADR-0031。
+
+### 提供商筛选与原地整理（ADR-0032）
+
+`catalog_sync` 保存有序 providers、显式配置标志、递增配置版本、可选提供商和处理报告。初始未配置只刷新选项；配置后按 provider 顺序和完整源键排序确定同名来源。`model_sources` 以 model_id 为主键，可保留旧 ID 与同来源新短 ID；`catalog_deleted_models` 独立保存删除 ID，普通冲突/筛选不永久忽略。整理事务检查所有显式引用，保留旧 ID 原价格并写保留原因，未使用模型才删除；提供商仍在白名单时上游缺行只标 missing。调用/API Key 表写锁和模型行锁保护引用检查，Key 新写入在事务内再核验当前模型。新增0002迁移应用于v0.9.0数据库，不改0001。

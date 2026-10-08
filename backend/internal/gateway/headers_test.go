@@ -74,3 +74,10 @@ func TestClientResponseHeaders(t *testing.T) {
 		t.Fatalf("non-decompressed headers = %#v", kept)
 	}
 }
+
+func TestGeminiURLPreservesVersionColonAndAt(t *testing.T) {
+	got, err := UpstreamURL("https://relay.example", "/v1beta/models/client:0@date:generateContent", "", channel.FormatGemini, "upstream:1@date", authQuery, "key")
+	if err != nil || got != "https://relay.example/v1beta/models/upstream:1@date:generateContent?key=key" {
+		t.Fatalf("versioned model URL = %s, %v", got, err)
+	}
+}
