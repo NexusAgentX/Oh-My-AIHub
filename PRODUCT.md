@@ -11,7 +11,7 @@
 | A [#171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171) | 新基线迁移、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置、审计、用户积分基础接口 | 已实现 |
 | B [#172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172) | 透明网关、渠道、API Key 与路由、首页 | 待实现（接口返回 501） |
 | C [#173](https://github.com/NexusAgentX/Oh-My-AIHub/issues/173) | C2C 卖单市场与仲裁 | 已实现 |
-| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；依赖 B/C/G 接口的区块在其合并前显示 501 错误态） |
+| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；依赖 B/G 接口的区块在其合并前显示 501 错误态） |
 | E [#175](https://github.com/NexusAgentX/Oh-My-AIHub/issues/175) | 管理后台与落地页 | 已实现（依赖 B/G 接口的区块在其合并前显示 501 错误态） |
 | G [#176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176) | 调用与积分可观测性 | 待实现（接口返回 501） |
 | F [#177](https://github.com/NexusAgentX/Oh-My-AIHub/issues/177) | 文档收尾、发版与生产重建 | 待实现 |
