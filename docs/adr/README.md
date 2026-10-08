@@ -33,7 +33,7 @@
 ## 索引
 
 - [ADR-0001：采用 Binance 风格设计语言](0001-adopt-binance-inspired-design.md) — 已取代（由 ADR-0004 取代）
-- [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过（设计要求由 ADR-0015 取代）
+- [ADR-0002：采用人类定向、AI 执行的持续产品研发模型](0002-adopt-ai-native-product-workflow.md) — 已通过（设计要求由 ADR-0015 取代；用户验证要求由 ADR-0022 取代）
 - [ADR-0003：将 OpenPencil 可编辑设计源文件作为 Git 一等资产](0003-version-openpencil-design-assets-in-git.md) — 已取代（由 ADR-0015 取代）
 - [ADR-0004：原样采用 Airtable 设计分析规范](0004-adopt-airtable-design-analysis.md) — 已取代（由 ADR-0015 取代）
 - [ADR-0005：采用中心化零和复式账本作为积分清算核心](0005-adopt-centralized-zero-sum-ledger.md) — 已通过
@@ -53,3 +53,4 @@
 - [ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定](0019-frontend-query-and-design-conventions.md) — 已通过
 - [ADR-0020：跨领域原子提交由调用方持有事务](0020-adopt-caller-owned-transactions-across-persistence-domains.md) — 已通过
 - [ADR-0021：以 OpenAPI 作为前后端唯一契约来源](0021-openapi-as-single-api-contract.md) — 已通过
+- [ADR-0022：取消用户验证环节](0022-drop-user-validation-stage.md) — 已通过

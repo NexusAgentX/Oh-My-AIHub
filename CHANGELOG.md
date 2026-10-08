@@ -14,6 +14,7 @@
 
 ### 变更
 
+- 取消用户验证环节（Feature #154，ADR-0022）：任务状态只保留 Ready 与 Done；`AGENTS.md`、`PRODUCT.md`、`ROADMAP.md`、`README.md` 与 Issue 模板移除 Validated 与真实用户验证要求，删除小圈子试用 Runbook，关闭 #22。
 - 前端遗留清理与验收缺陷修复（Feature #148，Epic #109）：抽屉与对话框不再被 `.page-content` 的子元素间距推移（基础层改为排除 `dialog`，删除 `c2c.css` 局部补丁）；管理员争议详情在交易进入终态后禁用「放行给买家」「退还给卖家」「取消剩余挂单」（延长复核仅限 `disputed`，放行/退还/限制账户仅限 `paid`、`disputed`，与后端一致）；表单中聚焦的数字输入框滚动滚轮不再改变数值；删除旧 `.auth-*`、渠道旧编辑器/校验历史/管理员样式、C2C 已迁出的管理员样式、`ui/FormControls` 兼容出口与未引用的 `requestGate.ts`；渠道与网关页共用 `gateway/presentation` 中的 `protocolLabels`、`PricePair`、`formatDate`、`ratingText`。无后端与 API 变化。
 - 前端 API 类型改由 OpenAPI 生成（Feature #146，ADR-0021，Epic #109）：新增开发依赖 `openapi-typescript`（隔离在 `frontend/tools/openapi-types/`），从 `backend/api/openapi.yaml` 生成已提交的 `frontend/src/api/schema.gen.ts`，删除手写 `contracts.ts`，`api/types.ts` 提供别名；`client.ts` 的请求体与响应按 operationId 校验。CI 新增生成一致性检查，`mise run generate` 同时生成前端类型。规范修正：价格档请求 `weekdays` 允许 `null`，市场 `sort` 与钱包 `recovery_actions.kind` 补充枚举。无运行时行为、URL 或字段变化。
 - 后端重构遗留清理（Feature #147，Epic #109）：删除过渡类型 `postgres.LedgerTransaction` / `Store.WithLedgerTransaction`（测试改用 `pgx.Tx` + `ledgerpg.NewTx`，断言不变）；对既有未格式化的后端文件执行 `gofmt`，CI 新增 `gofmt -l backend` 检查；`POST /api/instance/initialize` 在请求体无法解析时改为返回 `400 invalid_json`（此前返回空的 200），OpenAPI 与契约测试同步。
