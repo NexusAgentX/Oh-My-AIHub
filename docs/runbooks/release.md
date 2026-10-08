@@ -1,6 +1,6 @@
 # 发版 Runbook
 
-适用范围：hub.isok.dev 生产实例的常规发版、重跑与回滚。生产链路结构、密钥与运行时事实见
+适用范围：ai.isok.dev 生产实例的常规发版、重跑与回滚。生产链路结构、密钥与运行时事实见
 `deployment.md` 与个人运维仓库 `remote-hosts/hk-vps/sites/oh-my-aihub/`；本文只讲操作步骤。
 
 ## 常规发版（vX.Y.Z）
@@ -38,7 +38,7 @@
 6. 部署脚本（VPS `/usr/local/sbin/oh-my-aihub-github-deploy`）自动完成：部署前加密备份 →
    Compose 镜像按 `tag@digest` 切换 → `up -d` → 等待 database/backend healthy →
    本机与公网 `/api/health` 烟测；任一步失败自动回滚到上一版 Compose。
-7. 人工验收：Actions 作业全绿；打开 `https://hub.isok.dev` 抽查本次变更；
+7. 人工验收：Actions 作业全绿；打开 `https://ai.isok.dev` 抽查本次变更；
    管理员确认 `/admin/ops` 巡检无硬异常。
 
 ## 重跑 / 回滚

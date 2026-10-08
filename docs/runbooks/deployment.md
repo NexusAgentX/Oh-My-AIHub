@@ -33,7 +33,7 @@
 3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。
 4. 升级后烟测同上；若巡检出现硬异常，按故障处理 Runbook 处置并保留现场。
 
-## 生产部署（hub.isok.dev）
+## 生产部署（ai.isok.dev）
 
 生产实例部署在 HK VPS，由 GitHub Actions 自动部署（`.github/workflows/release.yml`）。
 常规发版、审批上线、重跑/回滚与紧急手动部署的逐步操作见 `release.md`：
