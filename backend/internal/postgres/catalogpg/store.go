@@ -69,6 +69,9 @@ func withTiers(ctx context.Context, q *Queries, rows []Model) ([]catalog.Model, 
 	for _, row := range rows {
 		models = append(models, toModel(row, byModel[row.ID]))
 	}
+	if err := sources(ctx, q.db, models); err != nil {
+		return nil, err
+	}
 	return models, nil
 }
 
@@ -126,6 +129,9 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 	var created catalog.Model
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
+		if err := q.LockModelWrites(ctx, model.ID); err != nil {
+			return err
+		}
 		row, err := q.InsertModel(ctx, InsertModelParams{
 			ID: model.ID, DisplayName: model.DisplayName, TokenPrices: encodePrices(model.TokenPrices),
 			InputPriceNanoPerMillion: model.InputPrice, OutputPriceNanoPerMillion: model.OutputPrice,
@@ -158,6 +164,9 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 	var updated catalog.Model
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
+		if err := q.LockModelWrites(ctx, id); err != nil {
+			return err
+		}
 		row, err := q.LockModel(ctx, id)
 		if err != nil {
 			return mapError(err)
@@ -170,6 +179,27 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 		next, err := mutate(current)
 		if err != nil {
 			return err
+		}
+		if current.Source != nil {
+			if next.Source == nil {
+				return catalog.ErrInvalidInput
+			}
+			if current.Source.SyncEnabled && next.Source.SyncEnabled {
+				a, b := current, next
+				a.Enabled = b.Enabled
+				a.SortOrder = b.SortOrder
+				a.ParameterInfo = b.ParameterInfo
+				if !sameManaged(a, b) {
+					return catalog.ErrInvalidInput
+				}
+			}
+			if next.Enabled && !next.Source.PriceReady {
+				return catalog.ErrInvalidInput
+			}
+			raw, _ := json.Marshal(next.Source)
+			if err := q.UpdateSourceControl(ctx, UpdateSourceControlParams{ModelID: id, SyncEnabled: next.Source.SyncEnabled, Info: raw}); err != nil {
+				return err
+			}
 		}
 		saved, err := q.UpdateModel(ctx, UpdateModelParams{
 			ID: id, DisplayName: next.DisplayName, TokenPrices: encodePrices(next.TokenPrices),
@@ -204,6 +234,9 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 func (s *Store) DeleteModel(ctx context.Context, actorID, id string) error {
 	return pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
+		if err := q.LockModelWrites(ctx, id); err != nil {
+			return err
+		}
 		row, err := q.LockModel(ctx, id)
 		if err != nil {
 			return mapError(err)
@@ -216,6 +249,9 @@ func (s *Store) DeleteModel(ctx context.Context, actorID, id string) error {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM route_prefs WHERE model_id = $1`, id); err != nil {
+			return err
+		}
+		if err := q.IgnoreSource(ctx, id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM models WHERE id = $1`, id); err != nil {
@@ -245,7 +281,7 @@ func auditView(model catalog.Model) map[string]any {
 		})
 	}
 	return map[string]any{
-		"display_name": model.DisplayName, "enabled": model.Enabled,
+		"display_name": model.DisplayName, "enabled": model.Enabled, "source": model.Source,
 		"input_price": model.InputPrice.String(), "output_price": model.OutputPrice.String(),
 		"token_prices":      model.TokenPrices,
 		"cache_write_price": model.CacheWritePrice.String(), "cache_read_price": model.CacheReadPrice.String(),

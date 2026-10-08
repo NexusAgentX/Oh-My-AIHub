@@ -10,6 +10,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalogsync"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -25,6 +26,7 @@ const (
 )
 
 type Dependencies struct {
+	CatalogSync       *catalogsync.Service
 	Identity          *identity.Service
 	Catalog           *catalog.Service
 	Ledger            *ledger.Service
@@ -44,6 +46,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	catalogSync       *catalogsync.Service
 	identity          *identity.Service
 	catalog           *catalog.Service
 	ledger            *ledger.Service
@@ -74,6 +77,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
 		identity:          dependencies.Identity,
+		catalogSync:       dependencies.CatalogSync,
 		catalog:           dependencies.Catalog,
 		ledger:            dependencies.Ledger,
 		settings:          dependencies.Settings,

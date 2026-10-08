@@ -1238,6 +1238,76 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /api/admin/catalog-sync:
+    get:
+      operationId: getCatalogSync
+      tags: [admin-models]
+      summary: Bifrost 模型同步
+      x-access: admin
+      x-feature: A
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CatalogSyncStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: setCatalogSyncRate
+      tags: [admin-models]
+      summary: Bifrost 模型同步
+      x-access: admin
+      x-feature: A
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CatalogSyncRate'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CatalogSyncStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/admin/catalog-sync/run:
+    post:
+      operationId: runCatalogSync
+      tags: [admin-models]
+      summary: Bifrost 模型同步
+      x-access: admin
+      x-feature: A
+      security: [{sessionCookie: []}]
+      responses:
+        '202':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CatalogSyncAccepted'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/admin/models/{modelID}/source:
+    get:
+      operationId: getModelSource
+      tags: [admin-models]
+      summary: Bifrost 模型同步
+      x-access: admin
+      x-feature: A
+      security: [{sessionCookie: []}]
+      parameters:
+      - {name: modelID, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ModelSourceRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /api/admin/models:
     get:
       operationId: listAdminModels
@@ -2513,9 +2583,54 @@ components:
         prices: {$ref: '#/components/schemas/ModelPrices'}
       required: [prices]
       additionalProperties: false
+    ModelSource:
+      type: [object, 'null']
+      properties:
+        key: {type: string}
+        sync_enabled: {type: boolean}
+        status: {type: string}
+        problems: {type: array, items: {type: string}}
+        warnings: {type: array, items: {type: string}}
+        metadata: {type: object, additionalProperties: true}
+        last_seen_at: {type: string}
+        last_applied_at: {type: [string, 'null']}
+        applied_rate: {type: string}
+        price_ready: {type: boolean}
+      required: [key, sync_enabled, status, problems, warnings, metadata, last_seen_at, last_applied_at, applied_rate, price_ready]
+      additionalProperties: false
+    CatalogSyncRate:
+      type: object
+      properties:
+        exchange_rate: {type: string}
+      required: [exchange_rate]
+      additionalProperties: false
+    CatalogSyncStatus:
+      type: object
+      properties:
+        exchange_rate: {type: string}
+        started_at: {type: [string, 'null']}
+        finished_at: {type: [string, 'null']}
+        status: {type: string}
+        error: {type: string}
+        result: {type: object, additionalProperties: {type: integer}}
+      required: [exchange_rate, started_at, finished_at, status, error, result]
+      additionalProperties: false
+    CatalogSyncAccepted:
+      type: object
+      properties:
+        accepted: {type: boolean}
+      required: [accepted]
+      additionalProperties: false
+    ModelSourceRecord:
+      type: object
+      properties:
+        record: {type: object, additionalProperties: true}
+      required: [record]
+      additionalProperties: false
     AdminModel:
       type: object
       properties:
+        source: {$ref: '#/components/schemas/ModelSource'}
         id: {type: string}
         display_name: {type: string}
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
@@ -2583,6 +2698,7 @@ components:
     ModelUpdateRequest:
       type: object
       properties:
+        sync_enabled: {type: boolean}
         display_name: {type: string}
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         price_tiers:

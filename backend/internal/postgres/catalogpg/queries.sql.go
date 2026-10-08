@@ -7,6 +7,7 @@ package catalogpg
 
 import (
 	"context"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
@@ -17,6 +18,24 @@ DELETE FROM model_price_tiers WHERE model_id = $1
 
 func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
 	_, err := q.db.Exec(ctx, deleteTiers, modelID)
+	return err
+}
+
+const failSync = `-- name: FailSync :exec
+UPDATE catalog_sync SET status='failed', finished_at=now(), error=$1 WHERE id
+`
+
+func (q *Queries) FailSync(ctx context.Context, error string) error {
+	_, err := q.db.Exec(ctx, failSync, error)
+	return err
+}
+
+const finishSync = `-- name: FinishSync :exec
+UPDATE catalog_sync SET status='succeeded', finished_at=now(), error='', result=$1 WHERE id
+`
+
+func (q *Queries) FinishSync(ctx context.Context, result []byte) error {
+	_, err := q.db.Exec(ctx, finishSync, result)
 	return err
 }
 
@@ -49,6 +68,76 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getSource = `-- name: GetSource :one
+SELECT model_id, ignored, sync_enabled, info FROM model_sources WHERE source_key=$1
+`
+
+type GetSourceRow struct {
+	ModelID     string
+	Ignored     bool
+	SyncEnabled bool
+	Info        []byte
+}
+
+func (q *Queries) GetSource(ctx context.Context, sourceKey string) (GetSourceRow, error) {
+	row := q.db.QueryRow(ctx, getSource, sourceKey)
+	var i GetSourceRow
+	err := row.Scan(
+		&i.ModelID,
+		&i.Ignored,
+		&i.SyncEnabled,
+		&i.Info,
+	)
+	return i, err
+}
+
+const getSourceRaw = `-- name: GetSourceRaw :one
+SELECT raw_record FROM model_sources WHERE model_id=$1 AND NOT ignored
+`
+
+func (q *Queries) GetSourceRaw(ctx context.Context, modelID string) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getSourceRaw, modelID)
+	var raw_record []byte
+	err := row.Scan(&raw_record)
+	return raw_record, err
+}
+
+const getSyncStatus = `-- name: GetSyncStatus :one
+SELECT exchange_rate, started_at, finished_at, status, error, result FROM catalog_sync WHERE id
+`
+
+type GetSyncStatusRow struct {
+	ExchangeRate string
+	StartedAt    *time.Time
+	FinishedAt   *time.Time
+	Status       string
+	Error        string
+	Result       []byte
+}
+
+func (q *Queries) GetSyncStatus(ctx context.Context) (GetSyncStatusRow, error) {
+	row := q.db.QueryRow(ctx, getSyncStatus)
+	var i GetSyncStatusRow
+	err := row.Scan(
+		&i.ExchangeRate,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Status,
+		&i.Error,
+		&i.Result,
+	)
+	return i, err
+}
+
+const ignoreSource = `-- name: IgnoreSource :exec
+UPDATE model_sources SET ignored=true,sync_enabled=false WHERE model_id=$1
+`
+
+func (q *Queries) IgnoreSource(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, ignoreSource, modelID)
+	return err
 }
 
 const insertModel = `-- name: InsertModel :one
@@ -125,6 +214,30 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertSourceConflict = `-- name: InsertSourceConflict :exec
+INSERT INTO model_sources(source_key,model_id,ignored,sync_enabled,raw_record,info,seen_at)
+VALUES($1,$2,true,false,$3,$4,$5) ON CONFLICT DO NOTHING
+`
+
+type InsertSourceConflictParams struct {
+	SourceKey string
+	ModelID   string
+	RawRecord []byte
+	Info      []byte
+	SeenAt    time.Time
+}
+
+func (q *Queries) InsertSourceConflict(ctx context.Context, arg InsertSourceConflictParams) error {
+	_, err := q.db.Exec(ctx, insertSourceConflict,
+		arg.SourceKey,
+		arg.ModelID,
+		arg.RawRecord,
+		arg.Info,
+		arg.SeenAt,
+	)
+	return err
 }
 
 const insertTier = `-- name: InsertTier :exec
@@ -223,6 +336,36 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 	return items, nil
 }
 
+const listSources = `-- name: ListSources :many
+SELECT model_id, info, sync_enabled FROM model_sources WHERE model_id=ANY($1::text[]) AND NOT ignored
+`
+
+type ListSourcesRow struct {
+	ModelID     string
+	Info        []byte
+	SyncEnabled bool
+}
+
+func (q *Queries) ListSources(ctx context.Context, ids []string) ([]ListSourcesRow, error) {
+	rows, err := q.db.Query(ctx, listSources, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSourcesRow
+	for rows.Next() {
+		var i ListSourcesRow
+		if err := rows.Scan(&i.ModelID, &i.Info, &i.SyncEnabled); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTiers = `-- name: ListTiers :many
 SELECT model_id, seq, token_prices, service_tier, thinking_mode, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million FROM model_price_tiers
 WHERE model_id = ANY($1::text[])
@@ -295,6 +438,90 @@ func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const lockModelWrites = `-- name: LockModelWrites :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text,201))
+`
+
+func (q *Queries) LockModelWrites(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, lockModelWrites, modelID)
+	return err
+}
+
+const lockSyncRate = `-- name: LockSyncRate :one
+SELECT exchange_rate FROM catalog_sync WHERE id FOR UPDATE
+`
+
+func (q *Queries) LockSyncRate(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, lockSyncRate)
+	var exchange_rate string
+	err := row.Scan(&exchange_rate)
+	return exchange_rate, err
+}
+
+const markMissingSources = `-- name: MarkMissingSources :exec
+UPDATE model_sources SET info=jsonb_set(info,'{status}','"missing"'::jsonb)
+WHERE NOT(source_key=ANY($1::text[])) AND NOT ignored AND sync_enabled
+`
+
+func (q *Queries) MarkMissingSources(ctx context.Context, keys []string) error {
+	_, err := q.db.Exec(ctx, markMissingSources, keys)
+	return err
+}
+
+const releaseSyncLock = `-- name: ReleaseSyncLock :exec
+SELECT pg_advisory_unlock(201201)
+`
+
+func (q *Queries) ReleaseSyncLock(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, releaseSyncLock)
+	return err
+}
+
+const seenSource = `-- name: SeenSource :exec
+UPDATE model_sources SET seen_at=$2 WHERE source_key=$1
+`
+
+type SeenSourceParams struct {
+	SourceKey string
+	SeenAt    time.Time
+}
+
+func (q *Queries) SeenSource(ctx context.Context, arg SeenSourceParams) error {
+	_, err := q.db.Exec(ctx, seenSource, arg.SourceKey, arg.SeenAt)
+	return err
+}
+
+const setSyncRate = `-- name: SetSyncRate :exec
+UPDATE catalog_sync SET exchange_rate=$1 WHERE id
+`
+
+func (q *Queries) SetSyncRate(ctx context.Context, exchangeRate string) error {
+	_, err := q.db.Exec(ctx, setSyncRate, exchangeRate)
+	return err
+}
+
+const startSync = `-- name: StartSync :one
+UPDATE catalog_sync SET status='running', started_at=now(), error='' WHERE id RETURNING exchange_rate
+`
+
+func (q *Queries) StartSync(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, startSync)
+	var exchange_rate string
+	err := row.Scan(&exchange_rate)
+	return exchange_rate, err
+}
+
+const trySyncLock = `-- name: TrySyncLock :one
+SELECT pg_try_advisory_lock(201201)::boolean
+`
+
+func (q *Queries) TrySyncLock(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, trySyncLock)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const updateModel = `-- name: UpdateModel :one
@@ -383,4 +610,43 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateSourceControl = `-- name: UpdateSourceControl :exec
+UPDATE model_sources SET sync_enabled=$2,info=$3 WHERE model_id=$1 AND NOT ignored
+`
+
+type UpdateSourceControlParams struct {
+	ModelID     string
+	SyncEnabled bool
+	Info        []byte
+}
+
+func (q *Queries) UpdateSourceControl(ctx context.Context, arg UpdateSourceControlParams) error {
+	_, err := q.db.Exec(ctx, updateSourceControl, arg.ModelID, arg.SyncEnabled, arg.Info)
+	return err
+}
+
+const upsertSource = `-- name: UpsertSource :exec
+INSERT INTO model_sources(source_key,model_id,raw_record,info,seen_at) VALUES($1,$2,$3,$4,$5)
+ON CONFLICT(source_key) DO UPDATE SET raw_record=excluded.raw_record,info=excluded.info,seen_at=excluded.seen_at
+`
+
+type UpsertSourceParams struct {
+	SourceKey string
+	ModelID   string
+	RawRecord []byte
+	Info      []byte
+	SeenAt    time.Time
+}
+
+func (q *Queries) UpsertSource(ctx context.Context, arg UpsertSourceParams) error {
+	_, err := q.db.Exec(ctx, upsertSource,
+		arg.SourceKey,
+		arg.ModelID,
+		arg.RawRecord,
+		arg.Info,
+		arg.SeenAt,
+	)
+	return err
 }
