@@ -60,6 +60,9 @@ export const adminApi = {
   updateModel: (modelID: string, body: RequestBody<'updateAdminModel'>) =>
     patch<'updateAdminModel'>(`/api/admin/models/${id(modelID)}`, body),
 
+  deleteModel: (modelID: string) =>
+    request<void>(`/api/admin/models/${id(modelID)}`, { method: 'DELETE' }),
+
   settings: () => request<ResponseBody<'getAdminSettings'>>('/api/admin/settings'),
   updateSettings: (body: RequestBody<'updateAdminSettings'>) =>
     request<ResponseBody<'updateAdminSettings'>>('/api/admin/settings', {

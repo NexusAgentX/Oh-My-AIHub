@@ -401,6 +401,17 @@ func (s *fakeStore) UpdateModel(_ context.Context, actorID, id string, mutate fu
 	return next, nil
 }
 
+func (s *fakeStore) DeleteModel(_ context.Context, actorID, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.models[id]; !ok {
+		return catalog.ErrNotFound
+	}
+	delete(s.models, id)
+	s.record(actorID, audit.ActionModelDeleted, "model", id, "")
+	return nil
+}
+
 // --- settings.Store and audit.Store ---
 
 func (s *fakeStore) GetSettings(context.Context) (settings.Settings, error) {

@@ -235,9 +235,18 @@ func (a *app) updateAdminModel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"model": adminModelResponse(updated)})
 }
 
+func (a *app) deleteAdminModel(w http.ResponseWriter, r *http.Request) {
+	if err := a.catalog.Delete(r.Context(), accountFromContext(r.Context()).ID, r.PathValue("modelID")); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // registerAdminModelRoutes 注册管理员模型目录路由。
 func (a *app) registerAdminModelRoutes(r *router) {
 	r.admin("GET /api/admin/models", a.listAdminModels)
 	r.admin("POST /api/admin/models", a.createAdminModel)
 	r.admin("PATCH /api/admin/models/{modelID}", a.updateAdminModel)
+	r.admin("DELETE /api/admin/models/{modelID}", a.deleteAdminModel)
 }

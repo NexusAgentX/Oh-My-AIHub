@@ -20,6 +20,7 @@ const (
 	ActionLedgerWriteOff        = "ledger.write_off"
 	ActionC2CResolve            = "c2c.resolve"
 	ActionModelCreated          = "model.created"
+	ActionModelDeleted          = "model.deleted"
 	ActionModelUpdated          = "model.updated"
 	ActionSettingsUpdated       = "settings.updated"
 	ActionInstanceInitialized   = "instance.initialized"

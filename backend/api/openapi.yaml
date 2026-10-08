@@ -1280,6 +1280,24 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /api/admin/models/{modelID}:
+    delete:
+      operationId: deleteAdminModel
+      tags: [admin-models]
+      summary: 删除模型
+      description: 删除模型、条件价格档及路由偏好；保留历史调用、账单及 Key 的模型限制和别名。有未删除渠道引用时拒绝删除。
+      x-access: admin
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/modelID'}
+      responses:
+        '204':
+          description: 已删除
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
     patch:
       operationId: updateAdminModel
       tags: [admin-models]

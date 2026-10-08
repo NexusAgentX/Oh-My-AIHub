@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  ConfirmDialog,
   DataTable,
   Drawer,
   Icon,
@@ -27,7 +28,7 @@ import {
   type ModelErrors,
   type ModelForm,
 } from './modelForm'
-import { useAdminModels, useSaveModel } from './queries'
+import { useAdminModels, useDeleteModel, useSaveModel } from './queries'
 import { PriceFields, TierEditor } from './TierEditor'
 import type { AdminModel } from './types'
 
@@ -210,6 +211,8 @@ const columns: Column<AdminModel>[] = [
 
 export function ModelsPage() {
   const models = useAdminModels()
+  const remove = useDeleteModel()
+  const [deleting, setDeleting] = useState<AdminModel | null>(null)
   const [editing, setEditing] = useState<AdminModel | 'new' | null>(null)
   const close = () => setEditing(null)
   return (
@@ -233,9 +236,10 @@ export function ModelsPage() {
                   key: 'action',
                   header: '操作',
                   cell: (model) => (
-                    <Button onClick={() => setEditing(model)} size="sm" type="button" variant="secondary">
-                      编辑
-                    </Button>
+                    <div className="form-actions">
+                      <Button onClick={() => setEditing(model)} size="sm" type="button" variant="secondary">编辑</Button>
+                      <Button onClick={() => { remove.reset(); setDeleting(model) }} size="sm" type="button" variant="danger">删除</Button>
+                    </div>
                   ),
                 },
               ]}
@@ -246,6 +250,17 @@ export function ModelsPage() {
           )}
         </QueryBoundary>
       </Card>
+      <ConfirmDialog
+        busy={remove.isPending}
+        confirmLabel="删除"
+        danger
+        description="将删除模型、条件价格档及路由偏好，历史调用和账单保留。此操作不可撤销。"
+        error={remove.isError ? errorMessage(remove.error, '删除失败，请重试') : ''}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}
+        open={deleting !== null}
+        title={`删除 ${deleting?.id ?? '模型'}？`}
+      />
       <Drawer
         onClose={close}
         open={editing !== null}
