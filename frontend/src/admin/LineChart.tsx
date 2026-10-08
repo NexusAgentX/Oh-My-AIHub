@@ -139,29 +139,31 @@ export function LineChart({
           </span>
         ))}
       </figcaption>
-      <table className="visually-hidden">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">日期</th>
-            {series.map((item) => (
-              <th key={item.key} scope="col">
-                {item.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {labels.map((label, index) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
+      <div className="visually-hidden">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">日期</th>
               {series.map((item) => (
-                <td key={item.key}>{item.values[index] ?? '—'}</td>
+                <th key={item.key} scope="col">
+                  {item.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {labels.map((label, index) => (
+              <tr key={label}>
+                <th scope="row">{label}</th>
+                {series.map((item) => (
+                  <td key={item.key}>{item.values[index] ?? '—'}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   )
 }

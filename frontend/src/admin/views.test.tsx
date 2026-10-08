@@ -233,6 +233,18 @@ describe('needs-attention list', () => {
     expect(markup).toContain('去仲裁')
     expect(markup).toContain('小王超出信用额度 3.20')
   })
+
+  it('does not append attempt counts as item counts', () => {
+    const markup = renderToStaticMarkup(
+      <MemoryRouter>
+        <AttentionList
+          items={[{ kind: 'channel_failing', severity: 'warning', title: '渠道「甲」1 小时成功率 59%（64 次尝试）', count: 64, link: '/admin/channels/c1' }]}
+        />
+      </MemoryRouter>,
+    )
+    expect(markup).not.toContain('64 项')
+    expect(markup).toContain('href="/admin/channels/c1"')
+  })
 })
 
 describe('overview indicators', () => {

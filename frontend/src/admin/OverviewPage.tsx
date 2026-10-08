@@ -3,14 +3,15 @@ import { formatCount, formatFen, formatPoints, formatRatio, pointsRatio } from '
 import { useAdminOverview } from './queries'
 import type { AdminOverview, AttentionItem } from './types'
 
-const attentionKinds: Record<AttentionItem['kind'], { label: string; action: string; anchor?: string }> = {
+/** countless：count 不是条目数（如渠道异常的尝试次数），标题已写明数字，不再追加「· N 项」。 */
+const attentionKinds: Record<AttentionItem['kind'], { label: string; action: string; anchor?: string; countless?: boolean }> = {
   dispute: { label: '申诉', action: '去仲裁' },
   over_limit: { label: '透支', action: '查看用户' },
   negative_balance: { label: '负余额过久', action: '查看风险' },
   credit_concentration: { label: '积分集中', action: '查看集中度', anchor: 'risks' },
   channel_suspended: { label: '渠道下架', action: '查看渠道' },
-  channel_failing: { label: '渠道异常', action: '查看渠道' },
-  unbilled_usage: { label: '用量未读到', action: '查看调用' },
+  channel_failing: { label: '渠道异常', action: '查看渠道', countless: true },
+  unbilled_usage: { label: '用量未读到', action: '查看调用', countless: true },
   ledger_unbalanced: { label: '账本不平衡', action: '去核对', anchor: 'checks' },
   reconciliation_failed: { label: '记账或核对异常', action: '去核对', anchor: 'checks' },
   stuck_call: { label: '调用未结束', action: '查看调用' },
@@ -43,7 +44,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
             <Badge tone={tone}>{meta.label}</Badge>
             <span className="attention-title">
               {item.title}
-              {item.count > 1 && <span className="muted"> · {item.count} 项</span>}
+              {item.count > 1 && !meta.countless && <span className="muted"> · {item.count} 项</span>}
             </span>
             <ButtonLink size="sm" to={meta.link}>
               {meta.action}

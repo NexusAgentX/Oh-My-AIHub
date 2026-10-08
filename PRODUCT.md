@@ -11,9 +11,10 @@
 | A [#171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171) | 新基线迁移、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置、审计、用户积分基础接口 | 已实现 |
 | B [#172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172) | 透明网关、渠道、API Key 与路由、首页 | 已实现 |
 | C [#173](https://github.com/NexusAgentX/Oh-My-AIHub/issues/173) | C2C 卖单市场与仲裁 | 已实现 |
-| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；对齐 G 新增字段由 Feature H 完成） |
-| E [#175](https://github.com/NexusAgentX/Oh-My-AIHub/issues/175) | 管理后台与落地页 | 已实现（对齐 G 新增字段由 Feature H 完成） |
-| G [#176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176) | 调用与积分可观测性 | 后端已实现（界面对齐新增契约字段由 H [#183](https://github.com/NexusAgentX/Oh-My-AIHub/issues/183) 完成） |
+| D [#174](https://github.com/NexusAgentX/Oh-My-AIHub/issues/174) | 用户界面 | 已实现（9 个用户页面与外壳；G 新增字段已由 Feature H 对齐） |
+| E [#175](https://github.com/NexusAgentX/Oh-My-AIHub/issues/175) | 管理后台与落地页 | 已实现（G 新增字段已由 Feature H 对齐） |
+| G [#176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176) | 调用与积分可观测性 | 已实现（后端；界面已由 H [#183](https://github.com/NexusAgentX/Oh-My-AIHub/issues/183) 对齐） |
+| H [#183](https://github.com/NexusAgentX/Oh-My-AIHub/issues/183) | 前端对齐观测与积分契约 | 已实现 |
 | F [#177](https://github.com/NexusAgentX/Oh-My-AIHub/issues/177) | 文档收尾、发版与生产重建 | 待实现 |
 
 ## 产品定位
@@ -96,7 +97,7 @@ Oh-My-AIHub 是受邀小圈子使用的「**API 市场 + 积分 C2C 市场**」�
 - 申诉与仲裁：已付款后买卖双方都可以提交或更新各自陈述（≤1000 字），交易进入申诉中，积分保持在托管，只能由管理员判给买家（等同放行）或退回卖家，原因必填并写审计。
 - 收款方式账号只对买家（交易未结束时）、卖家和管理员可见；非交易双方的普通用户访问交易得到 404。
 
-### 可观测性（已实现，Feature G；界面对齐由 Feature H）
+### 可观测性（已实现，Feature G 后端、Feature H 界面对齐）
 
 请求 ID、尝试时间线、流式指标（首字、速度、token 间隔 p50/p95）、结果分类、筛选与汇总、实时流（SSE）、`X-AIHub-Tag` 调用标签、渠道健康事件、内网 Prometheus 指标、结构化日志、原始错误 30 天清理；管理员积分全局（流通、信用发行、托管、平台收入、坏账及合计为 0 的等式）、走势、实时核对、风险提示、交易浏览、操作记录。不做 OpenTelemetry 和推送告警。
 
