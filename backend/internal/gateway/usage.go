@@ -46,9 +46,11 @@ type Observer struct {
 	intervals []time.Duration
 	frames    int
 
-	usage      ledger.Usage
-	found      bool
-	responseID string
+	detail       ledger.UsageDetail
+	qwenObserved bool
+	usage        ledger.Usage
+	found        bool
+	responseID   string
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
 }
@@ -147,6 +149,12 @@ func (o *Observer) Finish() Observation {
 			}
 		}
 	}
+	if o.qwenObserved && o.detail.ThinkingMode == "" {
+		o.detail.ThinkingMode = "qwen_non_thinking"
+	}
+	if len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || len(o.detail.Notes) > 0 {
+		o.usage.Detail = &o.detail
+	}
 	observation := Observation{Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
 		sorted := append([]time.Duration(nil), o.intervals...)
@@ -172,6 +180,7 @@ func clamp(value int64) int64 {
 
 // absorb reads usage (and the response ID) out of one JSON object.
 func (o *Observer) absorb(raw []byte) {
+	defer o.absorbDetails(raw)
 	switch o.format {
 	case channel.FormatOpenAIChat:
 		o.absorbChat(raw)
@@ -185,7 +194,8 @@ func (o *Observer) absorb(raw []byte) {
 }
 
 type tokenDetails struct {
-	CachedTokens int64 `json:"cached_tokens"`
+	CachedTokens     int64 `json:"cached_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
 func (o *Observer) absorbChat(raw []byte) {
@@ -202,12 +212,13 @@ func (o *Observer) absorbChat(raw []byte) {
 	if json.Unmarshal(raw, &value) != nil || value.Usage == nil {
 		return
 	}
-	cached := int64(0)
+	cached, written := int64(0), int64(0)
 	if value.Usage.PromptTokensDetails != nil {
 		cached = value.Usage.PromptTokensDetails.CachedTokens
+		written = value.Usage.PromptTokensDetails.CacheWriteTokens
 	}
 	o.usage = ledger.Usage{
-		InputTokens: clamp(value.Usage.PromptTokens - cached), OutputTokens: clamp(value.Usage.CompletionTokens), CacheReadTokens: clamp(cached),
+		InputTokens: clamp(value.Usage.PromptTokens - cached - written), OutputTokens: clamp(value.Usage.CompletionTokens), CacheReadTokens: clamp(cached), CacheWriteTokens: clamp(written),
 	}
 	o.found = true
 }
@@ -222,11 +233,12 @@ func (o *Observer) setResponsesUsage(usage *responsesUsage) {
 	if usage == nil {
 		return
 	}
-	cached := int64(0)
+	cached, written := int64(0), int64(0)
 	if usage.InputTokensDetails != nil {
 		cached = usage.InputTokensDetails.CachedTokens
+		written = usage.InputTokensDetails.CacheWriteTokens
 	}
-	o.usage = ledger.Usage{InputTokens: clamp(usage.InputTokens - cached), OutputTokens: clamp(usage.OutputTokens), CacheReadTokens: clamp(cached)}
+	o.usage = ledger.Usage{InputTokens: clamp(usage.InputTokens - cached - written), OutputTokens: clamp(usage.OutputTokens), CacheReadTokens: clamp(cached), CacheWriteTokens: clamp(written)}
 	o.found = true
 }
 

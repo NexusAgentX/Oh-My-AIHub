@@ -35,6 +35,8 @@ var (
 
 // Model IDs are the names clients send. They cannot contain "/" or ":" so
 // they fit one path segment, including Gemini's "{model}:generateContent".
+var serviceTierPattern = regexp.MustCompile(`^(openai|anthropic|gemini):[A-Za-z0-9_-]{1,48}$`)
+
 var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type Model struct {
@@ -44,6 +46,7 @@ type Model struct {
 	OutputPrice              money.Amount
 	CacheWritePrice          money.Amount
 	CacheReadPrice           money.Amount
+	TokenPrices              map[string]money.Amount
 	PriceTiers               []ledger.PriceTier
 	Enabled                  bool
 	SortOrder                int32
@@ -62,6 +65,7 @@ type Model struct {
 // BasePrices projects the four base prices into the pricing formula input.
 func (m Model) BasePrices() ledger.Prices {
 	return ledger.Prices{
+		TokenPrices:     m.TokenPrices,
 		InputPerMillion: m.InputPrice, OutputPerMillion: m.OutputPrice,
 		CacheWritePerMillion: m.CacheWritePrice, CacheReadPerMillion: m.CacheReadPrice,
 	}
@@ -74,6 +78,7 @@ type ModelPatch struct {
 	OutputPrice              *money.Amount
 	CacheWritePrice          *money.Amount
 	CacheReadPrice           *money.Amount
+	TokenPrices              *map[string]money.Amount
 	PriceTiers               *[]ledger.PriceTier
 	Enabled                  *bool
 	SortOrder                *int32
@@ -113,6 +118,9 @@ func (p ModelPatch) Apply(model Model) Model {
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
 	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
+	if p.TokenPrices != nil {
+		model.TokenPrices = *p.TokenPrices
+	}
 	if p.PriceTiers != nil {
 		model.PriceTiers = *p.PriceTiers
 	}
@@ -208,6 +216,8 @@ func normalizePriceTiers(tiers []ledger.PriceTier) []ledger.PriceTier {
 	}
 	normalized := make([]ledger.PriceTier, 0, len(tiers))
 	for _, tier := range tiers {
+
+		tier.ServiceTier = strings.TrimSpace(tier.ServiceTier)
 		tier.Name = strings.TrimSpace(tier.Name)
 		if tier.Timezone = strings.TrimSpace(tier.Timezone); tier.Timezone == "" {
 			tier.Timezone = "UTC"
@@ -271,6 +281,9 @@ func Validate(model Model) error {
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
+	if !validTokenPrices(model.TokenPrices) {
+		return ErrInvalidInput
+	}
 	return validatePriceTiers(model.PriceTiers)
 }
 
@@ -279,6 +292,9 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
+		if !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
+			return ErrInvalidInput
+		}
 		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
 			return ErrInvalidInput
 		}
@@ -307,4 +323,13 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		}
 	}
 	return nil
+}
+
+func validTokenPrices(prices map[string]money.Amount) bool {
+	for key, value := range prices {
+		if ledger.TokenBucket(key) < 0 || !validPrice(value) {
+			return false
+		}
+	}
+	return true
 }

@@ -15,13 +15,16 @@ import (
 // matching tier in stored order wins and a model without conditional tiers
 // always prices with its unconditional catalog prices.
 //
-// Predicates are intentionally two-dimensional for now: prompt-side token
+// Predicates include optional response service/thinking facts, prompt-side token
 // volume (MinPromptTokens inclusive, MaxPromptTokens exclusive) and a weekly
 // time window expressed in the tier's IANA timezone (StartMinute inclusive,
 // EndMinute exclusive; Start > End crosses midnight and the window belongs to
 // its start day; Weekdays constrains that start day, empty means every day).
 type PriceTier struct {
 	Name            string
+	ServiceTier     string
+	ThinkingMode    string
+	TokenPrices     map[string]money.Amount
 	MinPromptTokens *int64
 	MaxPromptTokens *int64
 	Timezone        string
@@ -38,12 +41,22 @@ type PriceTier struct {
 // without predicates are meaningless next to the default prices and are
 // rejected by catalog validation.
 func (t PriceTier) HasPredicate() bool {
-	return t.MinPromptTokens != nil || t.MaxPromptTokens != nil || t.StartMinute != nil || len(t.Weekdays) > 0
+	return t.ServiceTier != "" || t.ThinkingMode != "" || t.MinPromptTokens != nil || t.MaxPromptTokens != nil || t.StartMinute != nil || len(t.Weekdays) > 0
 }
 
 // Matches evaluates every predicate of the tier against the prompt-side token
 // count and the call start time. An invalid timezone fails closed.
-func (t PriceTier) Matches(promptTokens int64, at time.Time) bool {
+func (t PriceTier) Matches(promptTokens int64, at time.Time, facts ...*UsageDetail) bool {
+	var detail *UsageDetail
+	if len(facts) > 0 {
+		detail = facts[0]
+	}
+	if t.ServiceTier != "" && (detail == nil || t.ServiceTier != detail.ServiceTier) {
+		return false
+	}
+	if t.ThinkingMode != "" && (detail == nil || t.ThinkingMode != detail.ThinkingMode) {
+		return false
+	}
 	if t.MinPromptTokens != nil && promptTokens < *t.MinPromptTokens {
 		return false
 	}
@@ -83,6 +96,7 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time) bool {
 // the settlement formula.
 func (t PriceTier) Prices() Prices {
 	return Prices{
+		TokenPrices:          t.TokenPrices,
 		InputPerMillion:      t.InputPrice,
 		OutputPerMillion:     t.OutputPrice,
 		CacheWritePerMillion: t.CacheWritePrice,
@@ -95,9 +109,9 @@ func (t PriceTier) Prices() Prices {
 // at 1) whose predicates all match, or the model's unconditional prices when
 // none does. The second return value is the matched tier sequence, 0 meaning
 // the default prices.
-func SelectPriceTier(defaultPrices Prices, tiers []PriceTier, promptTokens int64, at time.Time) (Prices, int) {
+func SelectPriceTier(defaultPrices Prices, tiers []PriceTier, promptTokens int64, at time.Time, facts ...*UsageDetail) (Prices, int) {
 	for index, tier := range tiers {
-		if tier.Matches(promptTokens, at) {
+		if tier.Matches(promptTokens, at, facts...) {
 			return tier.Prices(), index + 1
 		}
 	}

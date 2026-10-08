@@ -17,6 +17,7 @@ type Model struct {
 	OutputPriceNanoPerMillion     money.Amount
 	CacheWritePriceNanoPerMillion money.Amount
 	CacheReadPriceNanoPerMillion  money.Amount
+	TokenPrices                   []byte
 	Enabled                       bool
 	SortOrder                     int32
 	Provider                      string
@@ -34,6 +35,9 @@ type Model struct {
 type ModelPriceTier struct {
 	ModelID                       string
 	Seq                           int32
+	TokenPrices                   []byte
+	ServiceTier                   string
+	ThinkingMode                  string
 	Name                          string
 	MinPromptTokens               *int64
 	MaxPromptTokens               *int64

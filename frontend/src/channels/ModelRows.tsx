@@ -31,7 +31,7 @@ function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: F
   )
 }
 
-/** 选模型表格：卖、平台模型、上游名称、格式、倍率与按当前价格档的实际价。 */
+/** 选模型表格：卖、平台模型、上游名称、格式、倍率与按参考价格档的实际价。 */
 export function ModelRows({ rows, onChange }: { rows: ModelRow[]; onChange: (rows: ModelRow[]) => void }) {
   const catalog = useModels()
   const ids = [...new Set(rows.filter((row) => row.modelId).map((row) => row.modelId))]

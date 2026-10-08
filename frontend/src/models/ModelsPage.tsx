@@ -28,7 +28,7 @@ function ModelCard({ model }: { model: CatalogModel }) {
       </span>
       <dl className="model-card-prices">
         <div>
-          <dt>最低现价 入/出</dt>
+          <dt>最低参考价 入/出</dt>
           <dd className="num">
             {model.lowest_prices
               ? `${formatPoints(model.lowest_prices.input, { digits: 2 })} / ${formatPoints(model.lowest_prices.output, { digits: 2 })}`

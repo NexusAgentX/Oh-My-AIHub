@@ -6,15 +6,32 @@ import { FormatTags } from '../calls'
 import { formatPoints } from '../money/format'
 import { Badge, Button, Card, Disclosure, InlineError, PageHeader, QueryBoundary, SuccessMessage } from '../ui'
 import { currentPrices, tierCondition } from './pricing'
+import { tokenPriceLabels } from './tokenPricing'
 import { useModel, useSetRouting } from './queries'
 import { RoutingEditor } from './RoutingEditor'
 import { draftFromPreference, sameDraft, toRoutingInput, type RoutingDraft } from './routing'
 
-function PriceLine({ prices }: { prices: { input: string; output: string; cache_read: string; cache_write: string } }) {
+function PriceLine({
+  prices,
+}: {
+  prices: {
+    input: string
+    output: string
+    cache_read: string
+    cache_write: string
+    token_prices?: Record<string, string>
+  }
+}) {
   return (
     <span className="num">
       输入 {formatPoints(prices.input, { digits: 2 })} / 输出 {formatPoints(prices.output, { digits: 2 })} · 缓存读{' '}
       {formatPoints(prices.cache_read, { digits: 2 })} / 写 {formatPoints(prices.cache_write, { digits: 2 })}
+      {Object.entries(prices.token_prices ?? {}).map(([key, value]) => (
+        <small key={key}>
+          {' '}
+          · {tokenPriceLabels[key]} {value}
+        </small>
+      ))}
     </span>
   )
 }
@@ -22,7 +39,9 @@ function PriceLine({ prices }: { prices: { input: string; output: string; cache_
 function PriceDetails({ detail }: { detail: ModelDetail }) {
   return (
     <Disclosure title="价格详情">
-      <p className="muted-copy">积分 / 百万 token</p>
+      <p className="muted-copy">
+        积分 / 百万 token。细分价未设置时继承本组通用价；缺少可靠明细时按通用价结算。工具、容器、存储附加费未覆盖。
+      </p>
       <dl className="price-rules">
         <div>
           <dt>基准价</dt>
@@ -34,7 +53,7 @@ function PriceDetails({ detail }: { detail: ModelDetail }) {
           <div key={tier.seq}>
             <dt>
               {tier.name}
-              {detail.model.current_tier?.seq === tier.seq && <Badge tone="accent">现在</Badge>}
+              {detail.model.current_tier?.seq === tier.seq && <Badge tone="accent">时间参考</Badge>}
             </dt>
             <dd>
               <span className="muted">{tierCondition(tier)}</span>
@@ -105,8 +124,8 @@ export function ModelDetailPage() {
             />
             <div className="model-summary">
               <Badge tone="accent">
-                现在：{current.name} · 输入 {formatPoints(current.prices.input, { digits: 2 })} / 输出{' '}
-                {formatPoints(current.prices.output, { digits: 2 })}
+                参考价（实际按调用条件）：{current.name} · 输入 {formatPoints(current.prices.input, { digits: 2 })} /
+                输出 {formatPoints(current.prices.output, { digits: 2 })}
               </Badge>
               <span className="model-summary-formats">
                 <span className="muted">可用格式</span>

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -150,19 +151,21 @@ func Limits2(advanced channel.Advanced, defaults settings.Settings) Limits {
 
 // callState is everything known about one call while it runs.
 type callState struct {
-	id            string
-	started       time.Time
-	key           KeyAuth
-	format        channel.Format
-	stream        bool
-	requested     string
-	modelID       string
-	tag           string
-	userAgent     string
-	mode          routing.Mode
-	source        routing.Source
-	attempts      []Attempt
-	lastChannelID string
+	id                   string
+	started              time.Time
+	key                  KeyAuth
+	format               channel.Format
+	stream               bool
+	requested            string
+	modelID              string
+	tag                  string
+	userAgent            string
+	mode                 routing.Mode
+	source               routing.Source
+	attempts             []Attempt
+	lastChannelID        string
+	thinkingRequested    *bool
+	requestedServiceTier string
 }
 
 // ---- authentication ----
@@ -264,6 +267,13 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 
+	var pricingRequest struct {
+		EnableThinking *bool  `json:"enable_thinking"`
+		ServiceTier    string `json:"service_tier"`
+	}
+	_ = json.Unmarshal(body, &pricingRequest)
+	call.thinkingRequested = pricingRequest.EnableThinking
+	call.requestedServiceTier = pricingRequest.ServiceTier
 	var scan objectScan
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
@@ -813,6 +823,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 	w.WriteHeader(response.StatusCode)
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
+	observer.detail.RequestedServiceTier = call.requestedServiceTier
+	if call.format == channel.FormatOpenAIChat && call.thinkingRequested != nil && !*call.thinkingRequested {
+		observer.qwenObserved = true
+	}
 	var written int64
 	clientGone, upstreamBroke := false, false
 	emit := func(chunk []byte) bool {
@@ -928,7 +942,7 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 
 func priceSnapshot(model catalog.Model, priced ledger.PriceResult, multiplierNano, feeRateNano int64, usage ledger.Usage, at time.Time) []byte {
 	prompt, _ := ledger.PromptSideTokens(usage)
-	effective, seq := ledger.SelectPriceTier(model.BasePrices(), model.PriceTiers, prompt, at)
+	effective, seq := ledger.SelectPriceTier(model.BasePrices(), model.PriceTiers, prompt, at, usage.Detail)
 	multiplier := func(price money.Amount) string { return ledger.ScalePrice(price, multiplierNano).String() }
 	price := func(amount money.Amount) string { return amount.String() }
 	snapshot := map[string]any{
@@ -936,17 +950,52 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, multiplierNan
 			"input": price(model.InputPrice), "output": price(model.OutputPrice),
 			"cache_write": price(model.CacheWritePrice), "cache_read": price(model.CacheReadPrice),
 		},
-		"tier":          nil,
-		"multiplier":    money.FromNano(multiplierNano).String(),
-		"fee_rate_nano": feeRateNano,
+		"detail":            usage.Detail,
+		"token_prices":      map[string]string{},
+		"base_token_prices": map[string]string{},
+		"selected_prices":   map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}},
+		"tier":              nil,
+		"multiplier":        money.FromNano(multiplierNano).String(),
+		"fee_rate_nano":     feeRateNano,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),
 		},
 	}
+	for key, value := range effective.TokenPrices {
+		snapshot["token_prices"].(map[string]string)[key] = multiplier(value)
+		snapshot["selected_prices"].(map[string]any)["token_prices"].(map[string]string)[key] = value.String()
+	}
+	for key, value := range model.TokenPrices {
+		snapshot["base_token_prices"].(map[string]string)[key] = value.String()
+	}
+	if usage.Detail == nil {
+		snapshot["detail"] = &ledger.UsageDetail{Notes: []string{"未提供可靠细分，按通用价格结算"}}
+	} else if len(usage.Detail.Tokens) == 0 {
+		detail := *usage.Detail
+		detail.Notes = append(append([]string(nil), detail.Notes...), "未提供可靠细分，按通用价格结算")
+		snapshot["detail"] = &detail
+	}
 	if seq > 0 {
 		snapshot["tier"] = map[string]any{"seq": seq, "name": model.PriceTiers[seq-1].Name}
 	}
+	detail := ledger.UsageDetail{}
+	if saved, ok := snapshot["detail"].(*ledger.UsageDetail); ok && saved != nil {
+		detail = *saved
+		detail.Notes = append([]string(nil), saved.Notes...)
+	}
+	remaining := []int64{usage.InputTokens, usage.OutputTokens, usage.CacheWriteTokens, usage.CacheReadTokens}
+	for key, n := range detail.Tokens {
+		if bucket := ledger.TokenBucket(key); bucket >= 0 {
+			remaining[bucket] -= n
+		}
+	}
+	for i, n := range remaining {
+		if n > 0 {
+			detail.Notes = append(detail.Notes, fmt.Sprintf("%s通用余量 %d tokens（无可靠细分，按本组通用价）", []string{"输入", "输出", "缓存写", "缓存读"}[i], n))
+		}
+	}
+	snapshot["detail"] = &detail
 	encoded, _ := json.Marshal(snapshot)
 	return encoded
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { tokenPriceLabels } from '../models/tokenPricing'
 import { Button, Checkbox, IconButton, Icon, InlineError, TextField } from '../ui'
 import {
   emptyTier,
@@ -27,7 +28,7 @@ export function PriceFields({
   error?: string
   legend: string
 }) {
-  const field = (key: keyof PricesForm, label: string) => (
+  const field = (key: 'input' | 'output' | 'cache_read' | 'cache_write', label: string) => (
     <TextField
       inputMode="decimal"
       label={label}
@@ -44,6 +45,24 @@ export function PriceFields({
         {field('cache_read', '缓存读')}
         {field('cache_write', '缓存写')}
       </div>
+      <details>
+        <summary>细分 token 单价</summary>
+        <p className="muted-copy">留空继承本组通用价，0 为免费。上游缺少可靠明细时按通用价结算，账单标记未细分。</p>
+        <div className="field-row price-grid">
+          {Object.entries(tokenPriceLabels).map(([key, label]) => (
+            <TextField
+              key={key}
+              label={label}
+              inputMode="decimal"
+              value={prices.token_prices?.[key] ?? ''}
+              placeholder="继承通用价"
+              onChange={(event) =>
+                onChange({ ...prices, token_prices: { ...prices.token_prices, [key]: event.target.value } })
+              }
+            />
+          ))}
+        </div>
+      </details>
       <InlineError>{error}</InlineError>
     </fieldset>
   )
@@ -75,11 +94,48 @@ function TierEditForm({
         onChange={(event) => set({ name: event.target.value })}
         value={form.name}
       />
+      <TextField
+        list="service-tier-presets"
+        label="实际服务档位（可选）"
+        placeholder="例如 openai:default、anthropic:priority"
+        value={form.serviceTier ?? ''}
+        onChange={(event) => set({ serviceTier: event.target.value })}
+      />
+      <datalist id="service-tier-presets">
+        {[
+          ['openai:default', 'OpenAI 标准'],
+          ['openai:priority', 'OpenAI 优先'],
+          ['openai:fast', 'OpenAI 快速'],
+          ['openai:flex', 'OpenAI Flex'],
+          ['anthropic:standard', 'Anthropic 标准'],
+          ['anthropic:priority', 'Anthropic 优先'],
+          ['gemini:STANDARD', 'Gemini 标准'],
+          ['gemini:PRIORITY', 'Gemini 优先'],
+          ['gemini:FLEX', 'Gemini Flex'],
+        ].map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </datalist>
+      <label>
+        百炼实际思考模式（可选）
+        <select value={form.thinkingMode ?? ''} onChange={(event) => set({ thinkingMode: event.target.value })}>
+          <option value="">不限</option>
+          <option value="qwen_thinking">已输出思考</option>
+          <option value="qwen_non_thinking">未输出思考</option>
+        </select>
+      </label>
+      <p className="muted-copy">
+        服务档位以响应为准；百炼条件仅适用于按实际思考输出定价的模型。未知事实不命中特定条件。
+      </p>
       <Checkbox
         checked={form.useTokens}
         label="按输入侧 token 区间（输入 + 缓存写 + 缓存读）"
         onChange={(event) =>
-          set(event.target.checked ? { useTokens: true } : { useTokens: false, minPromptTokens: '', maxPromptTokens: '' })
+          set(
+            event.target.checked ? { useTokens: true } : { useTokens: false, minPromptTokens: '', maxPromptTokens: '' },
+          )
         }
       />
       {form.useTokens && (

@@ -9,6 +9,8 @@ function minuteText(minute: number) {
 /** 价格档的命中条件，例如「周一至周五 · 22:00–08:00（Asia/Shanghai）· 输入 ≥ 200k」。 */
 export function tierCondition(tier: PriceTier) {
   const parts: string[] = []
+  if (tier.service_tier) parts.push(`服务档位 ${tier.service_tier}`)
+  if (tier.thinking_mode) parts.push(tier.thinking_mode === 'qwen_thinking' ? '百炼实际思考' : '百炼未输出思考')
   if (tier.weekdays && tier.weekdays.length > 0 && tier.weekdays.length < 7) {
     parts.push(`周${tier.weekdays.map((day) => weekdayNames[day - 1] ?? day).join('、')}`)
   }
@@ -27,7 +29,10 @@ export function tierCondition(tier: PriceTier) {
 }
 
 /** 当前生效的价格：命中档位的价格，未命中时为基准价。 */
-export function currentPrices(detail: Pick<ModelDetail, 'model' | 'price_tiers'>): { name: string; prices: ModelPrices } {
+export function currentPrices(detail: Pick<ModelDetail, 'model' | 'price_tiers'>): {
+  name: string
+  prices: ModelPrices
+} {
   const seq = detail.model.current_tier?.seq
   const tier = seq === undefined ? undefined : detail.price_tiers.find((item) => item.seq === seq)
   return tier ? { name: tier.name, prices: tier.prices } : { name: '基准价', prices: detail.model.base_prices }
