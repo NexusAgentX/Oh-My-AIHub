@@ -39,7 +39,7 @@
    Compose 镜像按 `tag@digest` 切换 → `up -d` → 等待 database/backend healthy →
    本机与公网 `/api/health` 烟测；任一步失败自动回滚到上一版 Compose。
 7. 人工验收：Actions 作业全绿；打开 `https://ai.isok.dev` 抽查本次变更；
-   管理员确认 `/admin/ops` 巡检无硬异常。
+   管理员确认 `/admin/points` 的实时账本核对无异常。
 
 ## 重跑 / 回滚
 
@@ -71,3 +71,24 @@ ghcr.io/nexusagentx/oh-my-aihub-backend:vX.Y.Z`）获取。
 - 发版不触碰 VPS 上的 `.env`、`backup.env` 与密钥环。
 - 部署前备份自动生成在 `/data/oh-my-aihub/backups`，保留 7 天；密钥环与备份的配套
   关系见备份恢复 Runbook。
+
+## v0.7.0 → v0.8.0 数据库前置步骤
+
+本次定价字段已直接加入数据库基线，既有数据库不会重新执行基线。生产先运行
+`sudo systemctl start oh-my-aihub-backup.service`，确认服务 Result=success、
+ExecMainStatus=0（备份脚本同时验证解密及 pg_restore 清单），再执行以下事务。
+只适用于已确认缺少这些列的 v0.7.0 数据库；保留全部现有数据，旧镜像可以继续运行。
+
+```sql
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+ALTER TABLE models ADD COLUMN token_prices jsonb NOT NULL DEFAULT '{}'::jsonb
+  CHECK (jsonb_typeof(token_prices) = 'object');
+ALTER TABLE model_price_tiers
+  ADD COLUMN token_prices jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(token_prices) = 'object'),
+  ADD COLUMN service_tier text NOT NULL DEFAULT '',
+  ADD COLUMN thinking_mode text NOT NULL DEFAULT '';
+COMMIT;
+```
+
+核对列存在后再批准部署。若事务失败则停止发布并检查原因；镜像回滚时可以保留这些附加列。
