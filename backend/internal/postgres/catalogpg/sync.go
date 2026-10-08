@@ -261,7 +261,7 @@ func (s *Store) RunSync(ctx context.Context, fetch func(string) ([]catalogsync.E
 		}
 		if deleted[modelID] || sourceRow.Ignored {
 			counts["skipped"]++
-			report = append(report, catalogsync.Notice{modelID, entry.Key, "用户已删除，不重新创建"})
+			report = append(report, catalogsync.Notice{ModelID: modelID, SourceKey: entry.Key, Reason: "用户已删除，不重新创建"})
 			continue
 		}
 		row, err := q.LockModel(ctx, modelID)
@@ -271,12 +271,12 @@ func (s *Store) RunSync(ctx context.Context, fetch func(string) ([]catalogsync.E
 		}
 		if hasModel && !existing {
 			counts["conflict"]++
-			report = append(report, catalogsync.Notice{modelID, entry.Key, "已有手工模型，不接管"})
+			report = append(report, catalogsync.Notice{ModelID: modelID, SourceKey: entry.Key, Reason: "已有手工模型，不接管"})
 			continue
 		}
 		if existing && !sourceRow.SyncEnabled {
 			counts["skipped"]++
-			report = append(report, catalogsync.Notice{modelID, entry.Key, "已退出同步，保留当前模型"})
+			report = append(report, catalogsync.Notice{ModelID: modelID, SourceKey: entry.Key, Reason: "已退出同步，保留当前模型"})
 			continue
 		}
 		oldInfoRaw := sourceRow.Info
