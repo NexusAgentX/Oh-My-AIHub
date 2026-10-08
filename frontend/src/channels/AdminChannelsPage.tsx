@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ButtonLink, Card, DataTable, EmptyState, Metric, MetricGrid, PageHeader, QueryBoundary, Segmented, Toolbar } from '../ui'
 import { AdminChannelBadge } from './AdminChannelBadge'
 import { useAdminChannelsQuery } from './adminQueries'
-import { formatDate, ratingText } from './presentation'
+import { formatDate, ratingText } from '../gateway/presentation'
 
 type Filter = 'all' | 'published' | 'paused' | 'no_credential'
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Channel } from '../api/types'
-import { formatPoints } from '../gateway/presentation'
+import { formatDate, formatPoints, ratingText } from '../gateway/presentation'
 import {
   ButtonLink,
   Card,
@@ -13,7 +13,7 @@ import {
   QueryBoundary,
   type Column,
 } from '../ui'
-import { ChannelStateBadge, formatDate, ratingText } from './presentation'
+import { ChannelStateBadge } from './presentation'
 import { useChannelsQuery } from './queries'
 import { sumIncome, summarizeChannel } from './summary'
 

@@ -27,7 +27,8 @@ import {
   type ModelGroup,
   type OfferDraft,
 } from './editorModel'
-import { ConfirmActionDialog, protocolLabels } from './presentation'
+import { protocolLabels } from '../gateway/presentation'
+import { ConfirmActionDialog } from './presentation'
 import {
   useCatalogModelsQuery,
   useChannelQuery,

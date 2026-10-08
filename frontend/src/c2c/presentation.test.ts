@@ -10,7 +10,7 @@ import {
   c2cTradeRole,
   isC2COrderCancellable,
   validateOrderDraft,
-  canRestrictC2CParty,
+  c2cAdminDisputeActions,
   formatC2CFiat,
   isC2CTradeTerminal,
   parseC2CPriceFen,
@@ -51,11 +51,12 @@ describe('C2C presentation', () => {
     expect(c2cDisputeParties(participantView).every((party) => party.creditFrozen === undefined)).toBe(true)
   })
 
-  it('allows party restriction only while administrators can still resolve the trade', () => {
-    expect(canRestrictC2CParty('disputed')).toBe(true)
-    expect(canRestrictC2CParty('paid')).toBe(true)
-    for (const status of ['awaiting_payment', 'released_to_buyer', 'returned_to_seller', 'cancelled', 'expired'] as const) {
-      expect(canRestrictC2CParty(status)).toBe(false)
+  it('enables dispute actions exactly as the backend accepts them for each trade status', () => {
+    expect(c2cAdminDisputeActions('disputed')).toEqual({ resolve: true, extendReview: true, cancelOrder: true })
+    expect(c2cAdminDisputeActions('paid')).toEqual({ resolve: true, extendReview: false, cancelOrder: true })
+    expect(c2cAdminDisputeActions('awaiting_payment')).toEqual({ resolve: false, extendReview: false, cancelOrder: true })
+    for (const status of ['released_to_buyer', 'returned_to_seller', 'cancelled', 'expired'] as const) {
+      expect(c2cAdminDisputeActions(status)).toEqual({ resolve: false, extendReview: false, cancelOrder: false })
     }
   })
 })

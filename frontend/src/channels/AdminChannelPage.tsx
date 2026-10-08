@@ -23,7 +23,7 @@ import {
   useValidateOffer,
   useValidationAttemptsQuery,
 } from './adminQueries'
-import { formatDate, protocolLabels, ratingText } from './presentation'
+import { formatDate, protocolLabels, ratingText } from '../gateway/presentation'
 
 type Action = { kind: 'validate'; offer: AdminChannelOffer } | { kind: 'pause' | 'delete' }
 

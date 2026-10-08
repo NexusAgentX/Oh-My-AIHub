@@ -143,7 +143,7 @@
 
 .page-content { width: min(100%, var(--content-max)); margin: 0 auto; padding: 28px 28px 48px; }
 .page-content:focus { outline: none; }
-.page-content > * + * { margin-top: var(--space-4); }
+.page-content > * + *:not(dialog) { margin-top: var(--space-4); } /* Dialog/Drawer 是脱离文档流的浮层，不参与内容间距 */
 .page-content > .page-heading + * { margin-top: 0; }
 
 /* 底部 Tab 栏（≤760px） */
@@ -169,21 +169,6 @@
 
 .drawer-nav { padding-bottom: var(--space-4); }
 .drawer-nav .nav-item { min-height: 44px; }
-
-/* 认证页 */
-.auth-shell { display: grid; min-height: 100vh; padding: var(--space-8) var(--space-5); place-items: center; background: var(--soft); }
-.auth-card {
-  width: min(480px, 100%);
-  padding: clamp(28px, 6vw, 44px);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: var(--canvas);
-}
-.auth-card > .brand { margin-bottom: 42px; }
-.auth-heading { margin-bottom: 28px; }
-.auth-heading h1 { margin-bottom: 7px; }
-.auth-heading p { margin-bottom: 0; color: var(--muted); font-size: var(--text-base); }
-.auth-form > .button { width: 100%; min-height: 48px; margin-top: var(--space-1); border-radius: var(--radius-lg); }
 
 @media (max-width: 960px) {
   .page-content { padding: 24px var(--space-5) 40px; }
@@ -217,9 +202,4 @@
     border-top: 1px solid var(--hairline);
     background: var(--canvas);
   }
-}
-
-@media (max-width: 390px) {
-  .auth-shell { padding: 0; background: var(--canvas); }
-  .auth-card { min-height: 100vh; padding: 28px var(--space-5); border: 0; border-radius: 0; }
 }

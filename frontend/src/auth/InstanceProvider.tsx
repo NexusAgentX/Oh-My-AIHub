@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Outlet } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { LoadingState } from '../ui/FormControls'
+import { LoadingState } from '../ui'
 
 type InstanceState = {
   ready: boolean

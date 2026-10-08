@@ -106,8 +106,21 @@ export function c2cDisputeParties(trade: C2CTradeView): C2CDisputeParty[] {
   ]
 }
 
-export function canRestrictC2CParty(status: C2CTradeStatus) {
-  return status === 'paid' || status === 'disputed'
+export type C2CAdminDisputeActions = {
+  /** 放行 / 退还 / 限制账户：后端仅接受 paid 与 disputed 的交易。 */
+  resolve: boolean
+  /** 延长复核：后端仅接受 disputed。 */
+  extendReview: boolean
+  /** 取消剩余挂单：交易进入终态后不再提供。 */
+  cancelOrder: boolean
+}
+
+export function c2cAdminDisputeActions(status: C2CTradeStatus): C2CAdminDisputeActions {
+  return {
+    resolve: status === 'paid' || status === 'disputed',
+    extendReview: status === 'disputed',
+    cancelOrder: !isC2CTradeTerminal(status),
+  }
 }
 
 /** 挂单发布方向对应的承接动作：卖单由买家承接（购买），买单由卖家承接（出售）。 */

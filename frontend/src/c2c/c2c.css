@@ -1,8 +1,6 @@
 /* 用户侧 C2C：市场、挂单、承接抽屉、我的 C2C、交易详情。通用外观使用 src/ui 组件。 */
 .c2c-owner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .c2c-confirm-copy { margin: 0 0 var(--space-3); color: var(--body); line-height: 1.6; }
-.page-content > .drawer { margin: 0; max-width: 100vw; } /* 抑制 .page-content > * + * 的顶部间距 */
-.page-content > dialog.modal { margin-top: auto; }
 .c2c-wrap { overflow-wrap: anywhere; }
 .c2c-section { margin-top: var(--space-4); }
 
@@ -65,38 +63,17 @@
 .c2c-statement-list article header span { color: var(--muted); font-size: var(--text-xs); }
 .c2c-statement-list article p { margin: var(--space-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-/* 管理员争议页（AdminC2CPages.tsx）仍在使用，随其改版时删除 */
-.c2c-page-heading { align-items: center; }
-.c2c-form-section { display: grid; gap: 18px; padding: 20px; }
-.c2c-admin-dispute-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .7fr); align-items: start; gap: var(--space-5); }
-.c2c-dispute-history, .c2c-admin-resolution { overflow: hidden; }
-.c2c-dispute-history .c2c-statement-list { padding: 14px; background: var(--soft); }
-.c2c-admin-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-.c2c-admin-actions .button { min-width: 0; padding-inline: 10px; }
-.c2c-admin-parties { display: grid; gap: var(--space-2); }
-.c2c-admin-parties > span { color: var(--muted); font-size: var(--text-sm); font-weight: 600; }
-.c2c-admin-party { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
-.c2c-admin-party > div { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
-.c2c-admin-party strong { overflow: hidden; font-size: var(--text-base); text-overflow: ellipsis; white-space: nowrap; }
-.c2c-admin-metrics .metric-card strong { overflow: hidden; font-size: clamp(1.15rem, 2vw, 1.6rem); text-overflow: ellipsis; white-space: nowrap; }
-
-@media (max-width: 1180px) {
-  .c2c-admin-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .c2c-admin-party { align-items: flex-start; flex-direction: column; }
-}
 
 @media (max-width: 960px) {
-  .c2c-trade-layout, .c2c-admin-dispute-layout { grid-template-columns: 1fr; }
+  .c2c-trade-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
-  .c2c-page-heading { align-items: stretch; flex-direction: column; }
   .c2c-editor-grid { grid-template-columns: 1fr; }
   .c2c-editor-actions .button { flex: 1; }
   .c2c-trade-values { grid-template-columns: 1fr; }
   .c2c-events li { grid-template-columns: 1fr; gap: var(--space-1); }
   .c2c-action-row .button { flex: 1; }
-  .c2c-admin-actions { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 390px) {

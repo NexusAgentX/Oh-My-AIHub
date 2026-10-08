@@ -1,26 +1,12 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type {
   ChannelOfferStatus,
-  ChannelProtocol,
   ChannelStatus,
   PriceTier,
   ValidationStatus,
 } from '../api/types'
-import { Button } from '../ui/FormControls'
-import { Badge, type BadgeTone } from '../ui/Badge'
-import { Dialog } from '../ui/Dialog'
-import { InlineError } from '../ui/Feedback'
-
-export const protocolLabels: Record<ChannelProtocol, string> = {
-  openai_chat_completions: 'OpenAI Chat Completions',
-  openai_responses: 'OpenAI Responses',
-  anthropic_messages: 'Anthropic Messages',
-  google_gemini_generate_content: 'Gemini GenerateContent',
-}
-
-export function PricePair({ first, second }: { first?: string | null; second?: string | null }) {
-  return <span className="channel-price-pair"><span>{first ?? '—'} / {second ?? '—'}</span><small>积分 / 百万 tokens</small></span>
-}
+import { Badge, Button, Dialog, InlineError, type BadgeTone } from '../ui'
+import { PricePair } from '../gateway/presentation'
 
 function formatTokenBound(value: number): string {
   if (value >= 1_000_000 && value % 1_000_000 === 0) return `${value / 1_000_000}M`
@@ -123,97 +109,6 @@ export function eligibilityLabel(reason: string) {
     case 'price_unrepresentable': return '价格不可用'
     default: return '当前不可用'
   }
-}
-
-export function formatDate(value?: string | null) {
-  if (!value) return '—'
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-export function ratingText(rating: string | null, count: number) {
-  return rating ? `${rating} · ${count}` : '暂无评分'
-}
-
-export function ConfirmDialog({
-  open,
-  title,
-  description,
-  confirmLabel,
-  danger = false,
-  busy = false,
-  confirmDisabled = false,
-  children,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean
-  title: string
-  description?: string
-  confirmLabel: string
-  danger?: boolean
-  busy?: boolean
-  confirmDisabled?: boolean
-  children?: ReactNode
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  const reference = useRef<HTMLDialogElement>(null)
-  const triggerReference = useRef<HTMLElement | null>(null)
-  const titleID = useId()
-
-  useEffect(() => {
-    const dialog = reference.current
-    if (!dialog) return
-    if (open && !dialog.open) {
-      triggerReference.current = document.activeElement as HTMLElement | null
-      dialog.showModal()
-      requestAnimationFrame(() => dialog.querySelector<HTMLElement>('button, input, textarea')?.focus())
-    } else if (!open && dialog.open) {
-      dialog.close()
-    }
-  }, [open])
-
-  const close = () => {
-    if (busy) return
-    onCancel()
-    requestAnimationFrame(() => triggerReference.current?.focus())
-  }
-
-  return (
-    <dialog
-      aria-labelledby={titleID}
-      className="modal"
-      onCancel={(event) => {
-        event.preventDefault()
-        close()
-      }}
-      onClose={() => {
-        if (open) onCancel()
-      }}
-      ref={reference}
-    >
-      <div className="modal-form">
-        <header className="modal-heading">
-          <div>
-            <h2 id={titleID}>{title}</h2>
-            {description && <p>{description}</p>}
-          </div>
-        </header>
-        {children}
-        <div className="modal-actions">
-          <Button disabled={busy} onClick={close} type="button" variant="secondary">取消</Button>
-          <Button disabled={busy || confirmDisabled} onClick={onConfirm} type="button" variant={danger ? 'danger' : 'primary'}>
-            {busy ? '处理中' : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </dialog>
-  )
 }
 
 /** 风险确认对话框：基于 ui/Dialog，错误显示在对话框内，处理中禁止关闭。 */

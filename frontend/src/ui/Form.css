@@ -65,9 +65,7 @@
 
 .form-section > legend { margin-bottom: var(--space-3); padding: 0; }
 
-.auth-form,
-.stack-form,
-.modal-form { display: grid; gap: 18px; }
+.stack-form { display: grid; gap: 18px; }
 
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .field-row-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
