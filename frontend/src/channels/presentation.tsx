@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import type {
   ChannelOfferStatus,
   ChannelStatus,
@@ -158,37 +158,5 @@ export function ConfirmActionDialog({
       {children}
       <InlineError>{error}</InlineError>
     </Dialog>
-  )
-}
-
-export function StarRating({
-  value,
-  disabled,
-  onChange,
-}: {
-  value: number | null
-  disabled?: boolean
-  onChange: (score: number) => void
-}) {
-  const groupName = useId()
-  return (
-    <fieldset className="star-rating" disabled={disabled}>
-      <legend>你的评分</legend>
-      <div aria-label="渠道评分" role="radiogroup">
-        {[1, 2, 3, 4, 5].map((score) => (
-          <label key={score}>
-            <input
-              checked={value === score}
-              name={groupName}
-              onChange={() => onChange(score)}
-              type="radio"
-              value={score}
-            />
-            <span aria-hidden="true">★</span>
-            <span className="visually-hidden">{score} 星</span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
   )
 }

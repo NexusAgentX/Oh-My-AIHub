@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { AuthorizedValidationAttempt, Channel, ChannelOffer } from '../api/types'
 import { errorMessage } from '../api/query'
-import { formatDate, formatPoints, formatRate, PricePair, protocolLabels, ratingText } from '../gateway/presentation'
+import { formatDate, formatPoints, formatRate, PricePair, protocolLabels } from '../gateway/presentation'
 import {
   Badge,
   Button,
@@ -265,7 +265,6 @@ function ChannelDetail({ channel }: { channel: Channel }) {
           value={summary.income === null ? '—' : formatPoints(summary.income)}
         />
         <Metric hint={`已启用 ${summary.enabledCount} / ${summary.offers.length}`} label="可用报价" value={summary.eligibleCount} />
-        <Metric label="评分" value={channel.average_rating ?? '—'} hint={ratingText(channel.average_rating, channel.rating_count)} />
       </MetricGrid>
 
       <Card flush>

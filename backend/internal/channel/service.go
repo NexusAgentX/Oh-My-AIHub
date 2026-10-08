@@ -240,7 +240,7 @@ func (s *Service) ListMarket(ctx context.Context, actor identity.Account, query 
 		query.Sort = "input_price"
 	}
 	if query.Sort != "input_price" && query.Sort != "output_price" && query.Sort != "cache_write_price" && query.Sort != "cache_read_price" &&
-		query.Sort != "rating" && query.Sort != "success_rate" && query.Sort != "ttft" && query.Sort != "tps" {
+		query.Sort != "success_rate" && query.Sort != "ttft" && query.Sort != "tps" {
 		return nil, "", ErrInvalidInput
 	}
 	if query.Limit <= 0 {
@@ -249,21 +249,14 @@ func (s *Service) ListMarket(ctx context.Context, actor identity.Account, query 
 	if query.Limit > 100 {
 		return nil, "", ErrInvalidInput
 	}
-	return s.store.ListMarketOffers(ctx, actor.ID, query)
+	return s.store.ListMarketOffers(ctx, query)
 }
 
 func (s *Service) GetMarketChannel(ctx context.Context, actor identity.Account, channelID string) (Channel, error) {
 	if !readyActor(actor) {
 		return Channel{}, ErrForbidden
 	}
-	return s.store.GetMarketChannel(ctx, actor.ID, strings.TrimSpace(channelID))
-}
-
-func (s *Service) Rate(ctx context.Context, actor identity.Account, channelID string, score int) (Channel, error) {
-	if !readyActor(actor) || score < 1 || score > 5 {
-		return Channel{}, ErrInvalidInput
-	}
-	return s.store.UpsertRating(ctx, actor.ID, strings.TrimSpace(channelID), score)
+	return s.store.GetMarketChannel(ctx, strings.TrimSpace(channelID))
 }
 
 func (s *Service) ListAdmin(ctx context.Context, actor identity.Account) ([]Channel, error) {

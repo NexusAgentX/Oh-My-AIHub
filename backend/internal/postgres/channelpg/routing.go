@@ -38,12 +38,7 @@ func ResolveRoutingTargets(ctx context.Context, db DBTX, offerIDs []string) ([]c
 		status.ChannelID, status.ChannelDisplayName = row.ChannelID, row.ChannelDisplayName
 		status.OwnerAccountID, status.OwnerDisplayName = row.OwnerAccountID, row.OwnerDisplayName
 		status.ModelID, status.ModelName, status.ModelProvider = row.ModelID, row.ModelName, row.ModelProvider
-		status.RatingCount = row.RatingCount
 		status.Protocol = channel.Protocol(row.Protocol)
-		if row.AverageRating != "" {
-			value := row.AverageRating
-			status.AverageRating = &value
-		}
 		status.Multiplier = row.MultiplierNano
 		prices, priceErr := channel.CalculateBenchmarkPrices(channel.Offer{
 			Multiplier: row.MultiplierNano, InputPrice: row.InputPriceNanoPerMillion, OutputPrice: row.OutputPriceNanoPerMillion,

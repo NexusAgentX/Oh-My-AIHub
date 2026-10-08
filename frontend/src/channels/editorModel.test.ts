@@ -50,8 +50,6 @@ function channel(offers: ChannelOffer[]): Channel {
     status: 'draft',
     version: 1,
     offers,
-    average_rating: null,
-    rating_count: 0,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   }

@@ -19,6 +19,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/dashboard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/feerate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -322,8 +323,7 @@ func contractChannel() channel.Channel {
 		ID: "chan-1", OwnerAccountID: "acct-1", OwnerDisplayName: "分享者", DisplayName: "我的渠道",
 		NormalizedBaseURL: "https://api.example.com/v1", CredentialConfigured: true, CredentialVersion: 2,
 		CredentialUpdatedAt: &contractTime, Status: channel.StatusPublished, Version: 5,
-		Offers: []channel.Offer{contractOffer()}, AverageRating: contractPointer("4.5"), RatingCount: 2,
-		CurrentUserRating: contractPointer(5), CreatedAt: contractTime, UpdatedAt: contractTime,
+		Offers: []channel.Offer{contractOffer()}, CreatedAt: contractTime, UpdatedAt: contractTime,
 	}
 }
 
@@ -483,7 +483,7 @@ func TestOpenAPIChannelResponses(t *testing.T) {
 	spec.assertSchema(t, "OwnerOffer", ownerOfferResponse(item.Offers[0]))
 	bare := item
 	bare.Offers = []channel.Offer{{ID: "o2", ModelID: "m", Protocol: channel.ProtocolGemini, Status: channel.OfferDisabled, Multiplier: unit}}
-	bare.AverageRating, bare.CredentialUpdatedAt = nil, nil
+	bare.CredentialUpdatedAt = nil
 	spec.assertSchema(t, "OwnerChannel", ownerChannelResponse(bare))
 	spec.assertSchema(t, "AdminChannel", adminChannelResponse(item))
 	spec.assertSchema(t, "AdminChannel", adminChannelResponse(bare))
@@ -526,6 +526,16 @@ func TestOpenAPIGatewayResponses(t *testing.T) {
 	spec.assertSchema(t, "Dashboard", dashboardResponse(gateway.Dashboard{
 		ConsumerSpent: unit, ProviderIncome: unit, ActiveKeyCount: 1, RecentCalls: []gateway.Call{call, rejected},
 	}))
+}
+
+func TestOpenAPIPendingItemResponses(t *testing.T) {
+	spec := loadOpenAPI(t)
+	items := []dashboard.PendingItem{
+		{ID: "c2c-release-t1", Kind: dashboard.KindC2CRelease, Label: "待放行", Tone: dashboard.ToneWarning, Title: "买家 已付款 ¥10.00", Detail: "确认收款后放行 10 积分", To: "/c2c/trades/t1"},
+		{ID: "route-single-k1-p1", Kind: dashboard.KindRouteSingle, Label: "单渠道", Tone: dashboard.ToneInfo, Title: "GPT-5", Detail: "主力", To: "/market?model=m&protocol=openai_responses"},
+	}
+	spec.assertSchema(t, "PendingItemList", pendingItemListResponse(items))
+	spec.assertSchema(t, "PendingItemList", pendingItemListResponse(nil))
 }
 
 func TestOpenAPIC2CResponses(t *testing.T) {

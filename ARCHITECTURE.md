@@ -30,10 +30,10 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包（含余额不足提示）、模型目录、渠道配置、API 市场（筛选条件存于 URL，查询在 `channels/marketQueries.ts`）、公开渠道详情与加入路由抽屉、平台 Key 与路由（模型协议池）设置抽屉、含快速开始与待处理事项的工作台（待处理事项由 `gateway/queries.ts` 在前端组合现有接口）、调用记录、C2C 市场（承接抽屉、交易详情与确认对话框）与管理员后台界面（运营台 `/admin/ops` 以分区合并总览、共享者收入、试用与巡检、账本与费率，`/admin/providers` 重定向；账户、模型目录含条件价格档抽屉编辑器、渠道治理与争议处理） |
-| 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、评分、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
+| 前端 | `frontend/` | React 单页应用（TanStack Query 管理服务端状态；`src/styles/tokens.css` 为设计 token 来源，`src/ui/` 为基础组件，`src/layouts/` 提供用户与管理员两个 layout route、分组导航、余额顶栏与移动端底部 Tab 栏，各领域查询位于 `<domain>/queries.ts`，见 ADR-0019）；提供公共落地页、身份、账户、钱包（含余额不足提示）、模型目录、渠道配置、API 市场（筛选条件存于 URL，查询在 `channels/marketQueries.ts`）、公开渠道详情与加入路由抽屉、平台 Key 与路由（模型协议池）设置抽屉、含快速开始与待处理事项的工作台（待处理事项由后端 `GET /api/dashboard/pending-items` 聚合，前端只渲染）、调用记录、C2C 市场（承接抽屉、交易详情与确认对话框）与管理员后台界面（运营台 `/admin/ops` 以分区合并总览、共享者收入、试用与巡检、账本与费率，`/admin/providers` 重定向；账户、模型目录含条件价格档抽屉编辑器、渠道治理与争议处理） |
+| 后端 | `backend/` | Go HTTP 服务；提供身份、目录、账本、渠道生命周期、校验、市场、工作台待处理事项聚合、C2C 订单与交易和管理员治理 JSON API，以及 Chat Completions、Responses、Anthropic Messages 和 Gemini GenerateContent 原生代理入口 |
 | API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是 `/api/**` JSON 契约的唯一来源（`/v1`、`/v1beta` 只登记路径与认证），`x-access` 声明各路由门禁；`internal/api` 按领域文件注册路由，`router` 依 access 包裹会话、首次改密与管理员门禁，全局中间件链为“写超时 → 安全头 → 同源校验 → mux”，限流状态集中在 `rateLimits`；契约测试对照路由表并用规范 schema 校验响应（见 [ADR-0021](docs/adr/0021-openapi-as-single-api-contract.md)）；前端 API 类型由它经 `openapi-typescript` 生成为已提交的 `frontend/src/api/schema.gen.ts`（生成器隔离在 `frontend/tools/openapi-types/`，因其需要 TypeScript 5 编译器 API；`npm --prefix frontend run generate:api` 或 `mise run generate`），`frontend/src/api/types.ts` 提供简洁别名与 `RequestBody` / `ResponseBody`，`client.ts` 据此对请求体与响应做类型校验，CI 以 `git diff --exit-code` 校验生成物与规范一致 |
-| 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、评分、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
+| 数据库 | PostgreSQL 18 | 持久化账户、会话、模型、不可变账本、渠道、加密凭据、报价、校验历史、C2C 订单与交易、加密支付资料、平台 Key 摘要、池、调用快照、尝试、结算、指标与审计事件 |
 | 持久化分层 | `backend/internal/postgres/`、`backend/sqlc.yaml` | 组合根 `postgres.Store` 嵌入各领域持久化包；已迁移领域（身份、模型目录、API 手续费率、账本、渠道、C2C、网关、运营指标，加共享的审计与事务辅助）在 `<domain>pg/` 中以 `queries.sql` 加 sqlc 生成代码实现领域服务定义的 Store 接口；全部领域均已迁移（见 [ADR-0017](docs/adr/0017-adopt-sqlc-domain-persistence-layering.md)）；账本与业务行需原子提交时，业务领域自己开启 `pgx.Tx` 并用 `ledgerpg.NewTx(tx)` 得到绑定该事务的账本 Store，事务与提交始终由调用方持有（见 [ADR-0020](docs/adr/0020-adopt-caller-owned-transactions-across-persistence-domains.md)） |
 | 数据库迁移 | `backend/internal/database/migrations/`、`backend/cmd/migrate/` | 以嵌入式 SQL-only Goose 迁移建立并演进数据库结构 |
 | 开发任务 | `mise.toml` | 固定工具版本并提供安装、开发、测试、构建和运行命令 |
@@ -65,7 +65,7 @@
 - 幂等命令、封存交易、有序不可变分录、资产冻结/消费授权持有及其不可变 capture/release 事件。
 - 渠道生命周期与管理版本、每个模型的共享倍率、各原生协议报价及其版本和逻辑删除快照。
 - 使用版本化密钥标识、随机 nonce、AEAD 密文和渠道/凭据版本绑定信息保存的上游凭据；接口只返回是否配置与更新时间。
-- 每次渠道校验的不可变尝试、分类、HTTP 状态、时延和授权范围内的原始错误，以及每个账户对渠道唯一的当前评分。
+- 每次渠道校验的不可变尝试、分类、HTTP 状态、时延和授权范围内的原始错误。
 - 平台 API Key 的不可逆 SHA-256 摘要、公开前缀、代次、active/disabled/deleted 状态和配置版本；完整 Key 不持久化。
 - 每把 Key 的唯一模型协议池、稳定报价成员和连续优先级，以及调用时的不可变候选、价格、凭据版本、费率和预授权快照。
 - 调用、上游尝试、心跳租约、语义提交标记、四类归一用量、结算结果、终结载荷摘要、恢复状态和真实 TTFT/TPS/成功率/调用量聚合。
@@ -97,9 +97,9 @@ PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可
 - 幂等操作以“操作命名空间 + 键 + 载荷摘要”识别；同载荷永久重放首次结果快照，异载荷冲突。计价公式 v1 使用任意精度整数中间值，四类用量合计后的提供者费用与平台手续费分别向上取整；具体见 [ADR-0008](docs/adr/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)。模型可再配置最多 16 条条件价格档（prompt token 区间与带时区时间窗两类谓词 AND 组合，首个命中生效、整单按档、默认档兜底）：计价公式 v2 在同一取整内核前先按“prompt 侧 token 总量 + 请求开始时刻”选档，无档位模型结果与 v1 逐 nano 一致，`api_calls.formula_version` 区分版本且不改写历史；具体见 [ADR-0012](docs/adr/0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)。
 - 上游凭据使用环境注入的版本化 AES-256-GCM 密钥环加密，密文绑定渠道、凭据版本和密钥 ID；服务启动时验证全部存活凭据可解密，密钥轮换通过管理员批量重加密完成。明文只存在于一次请求所需的进程内对象，不进入 API 投影、日志或历史。具体见 [ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)。
 - 渠道 Base URL 只允许 HTTPS 域名和根前缀，默认只允许 443；保存及每次访问都解析 DNS 并拒绝本机、私有、链路本地、保留、文档、转换和隧道地址。实际连接固定到本次校验通过的地址，禁止环境代理、重定向和连接复用；`api.openai.com` 及其子域永久禁用。
-- 渠道采用草稿、已发布、暂停、已删除状态，报价采用启用、停用、已删除状态。发布要求至少一个当前版本校验通过的启用报价；Base URL 或凭据变化会使全部存活报价校验失效，单个 `upstream_model_id` 变化只使对应报价失效，名称、倍率及渠道或报价启停不会触发安全重验。删除为不可逆逻辑删除，历史报价倍率、校验和评分保留。
+- 渠道采用草稿、已发布、暂停、已删除状态，报价采用启用、停用、已删除状态。发布要求至少一个当前版本校验通过的启用报价；Base URL 或凭据变化会使全部存活报价校验失效，单个 `upstream_model_id` 变化只使对应报价失效，名称、倍率及渠道或报价启停不会触发安全重验。删除为不可逆逻辑删除，历史报价倍率与校验保留。
 - 报价校验在共享者确认可能产生费用后，向当前 Base URL 发出非流式 `ping` 探测，四种协议的输出上限均为 64 token，总超时 15 秒。该上限用于覆盖推理模型内部 thinking 所需的少量 token，而不是按模型分支探测或接近上下文窗口的用量。
-- 已发布渠道只有在账户启用、无需首次改密、凭据存在且报价当前校验通过时进入市场和路由资格投影。市场以稳定报价为行，支持模型、协议、共享者筛选以及价格或评分排序；游标即使对应报价随后失去资格仍保持确定分页位置。
+- 已发布渠道只有在账户启用、无需首次改密、凭据存在且报价当前校验通过时进入市场和路由资格投影。市场以稳定报价为行，支持模型、协议、共享者筛选以及价格排序；游标即使对应报价随后失去资格仍保持确定分页位置。
 - 共享者管理接口可读取自己的 Base URL、上游模型 ID 和授权校验历史；公开市场和管理员通用治理 DTO 不包含完整 Base URL、凭据、上游模型 ID、原始错误或共享者收入。管理员可以通过独立校验历史接口读取原始错误，并能查看、重验及带原因暂停或删除，但不能代替共享者修改商业配置。
 - 模型目录四类基准价与每条条件档四价单项上限均为 100,000 积分/百万 token；配合九位定点 `0～1000` 倍报价倍率，公开价格和后续结算费用保持在金额类型的可表示范围内，Go 领域校验与数据库约束共同拒绝越界写入。
 - 平台 API Key 由服务端生成，只保存摘要、前缀、代次、状态和版本；创建及轮换响应只展示一次完整 Key，旧代次在轮换提交时立即失效。Key 配置、状态、轮换和删除使用 CAS，删除保留历史墓碑。具体见 [ADR-0010](docs/adr/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)。
@@ -110,6 +110,7 @@ PostgreSQL 是唯一持久化依赖。渠道校验只有在用户明确确认可
 - 全局 API 手续费率由管理员通过 `GET/PUT /api/admin/fee-rate` 维护，在运营台「账本与费率」分区查看当前值与历史并设置新值：比率以九位小数十进制字符串传递，范围 0～1（0%～100%）；每次修改在表锁串行化的事务内按期望当前版本 CAS 追加新版本（不更新旧行）并写入统一审计。调用快照读取建立快照时最新的版本，因此修改只影响之后的新调用，历史调用保留各自 `fee_rate_version`/`fee_rate_nano`。
 - 流式提交点按协议语义事件判断，角色、心跳、空增量和 usage 元数据不锁定候选；成功终止事件在结算后才发送，缺少可结算用量的流先交付终止帧再零收费终结。调用、尝试、finalizer 和 orphan 恢复使用行锁、唯一约束、载荷摘要和调用 ID 幂等，禁止重复扣款、收入或释放。
 - 请求和响应正文只在受限进程内内存中处理，不进入数据库、缓存、审计或日志。调用长期保存统计、价格/用量快照、HTTP 状态、错误码和最多 4096 字节的原始错误消息；消费者、相关共享者和管理员使用不同投影读取。
+- 工作台待处理事项（`internal/dashboard`）：`GET /api/dashboard/pending-items` 由独立只读聚合服务按当前账户复用 API Key、渠道与 C2C 三个领域服务计算，不拥有持久化状态；种类为待放行、待付款（只看交易买卖双方身份与状态，与订单方向无关）、校验失败、已暂停、含不可用渠道的路由与单渠道路由，按种类固定排序、不分页，任一来源失败则整体失败。C2C 一项取自 `MyActivity` 的最近 200 笔交易。条目文案、徽标强度与跳转路由由服务端给出，前端只渲染。
 - 用户总览、Key/池、调用记录和渠道页面使用真实调用事实展示消费、收入、渠道健康、成功率、TTFT、TPS 和调用量；工作台额外提供 UTC 当日消费、成功调用和外部渠道收入。API 市场支持按成功率、TTFT 与 TPS 确定性游标排序，无样本保持空值。
 - 管理员共享者收入页按 UTC 窗口列出每个共享者的总收入、外部消费收入、自有调用收入和尝试成功率；投影只含显示名与金额，空样本成功率保持空值。公开渠道详情通过独立页把当前合格报价加入指定 Key 的模型协议池。
 - 人民币在 C2C 双方之间直接流转，平台只冻结和划转积分。

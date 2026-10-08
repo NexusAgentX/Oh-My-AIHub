@@ -133,9 +133,6 @@ type Channel struct {
 	Status                  Status
 	Version                 int64
 	Offers                  []Offer
-	AverageRating           *string
-	RatingCount             int64
-	CurrentUserRating       *int
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 }
@@ -230,8 +227,6 @@ type MarketOffer struct {
 	PriceTiers         []ledger.PriceTier
 	ValidationStatus   ValidationStatus
 	LastTestedAt       *time.Time
-	AverageRating      *string
-	RatingCount        int64
 	CallSuccessRate    *string
 	TTFTMilliseconds   *int64
 	TokensPerSecond    *string
@@ -308,9 +303,8 @@ type Store interface {
 	CompleteValidation(context.Context, ValidationAttempt) error
 	ExpireValidationAttempts(context.Context, time.Time) (int64, error)
 	ListValidationAttempts(context.Context, identity.Account, string, int) ([]ValidationAttempt, error)
-	ListMarketOffers(context.Context, string, MarketQuery) ([]MarketOffer, string, error)
-	GetMarketChannel(context.Context, string, string) (Channel, error)
-	UpsertRating(context.Context, string, string, int) (Channel, error)
+	ListMarketOffers(context.Context, MarketQuery) ([]MarketOffer, string, error)
+	GetMarketChannel(context.Context, string) (Channel, error)
 	ListAdminChannels(context.Context) ([]Channel, error)
 	GetAdminChannel(context.Context, string) (Channel, error)
 	CredentialInventory(context.Context) ([]ReencryptTarget, error)

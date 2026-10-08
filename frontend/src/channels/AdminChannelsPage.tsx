@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ButtonLink, Card, DataTable, EmptyState, Metric, MetricGrid, PageHeader, QueryBoundary, Segmented, Toolbar } from '../ui'
 import { AdminChannelBadge } from './AdminChannelBadge'
 import { useAdminChannelsQuery } from './adminQueries'
-import { formatDate, ratingText } from '../gateway/presentation'
+import { formatDate } from '../gateway/presentation'
 
 type Filter = 'all' | 'published' | 'paused' | 'no_credential'
 
@@ -64,7 +64,6 @@ export function AdminChannelsPage() {
                   numeric: true,
                   cell: (item) => item.offers.filter((offer) => offer.status !== 'deleted').length,
                 },
-                { key: 'rating', header: '评分', cell: (item) => ratingText(item.average_rating, item.rating_count) },
                 { key: 'updated', header: '更新', cell: (item) => formatDate(item.updated_at) },
                 {
                   key: 'actions',

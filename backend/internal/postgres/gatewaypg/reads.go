@@ -48,7 +48,6 @@ func (s *Store) Dashboard(ctx context.Context, accountID string) (gateway.Dashbo
 		PoolCount:                   totals.PoolCount,
 		HealthyOfferCount:           totals.HealthyOfferCount,
 		UnhealthyOfferCount:         totals.UnhealthyOfferCount,
-		PendingItems:                totals.PendingItems,
 	}
 	actor := identity.Account{ID: accountID, Status: identity.StatusActive}
 	recent, err := s.ListCalls(ctx, actor, 5)

@@ -180,7 +180,7 @@ func TestC2CSellOnlyMigrationRejectsUnfinishedBuyState(t *testing.T) {
 				t.Fatalf("schema version after refused migration = %d, %v", version, err)
 			}
 			var sideCheck bool
-			if err := book.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'c2c_orders_sell_only_check')`).Scan(&sideCheck); err != nil || sideCheck {
+			if err := book.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'c2c_orders_sell_only_check' AND conrelid = 'c2c_orders'::regclass)`).Scan(&sideCheck); err != nil || sideCheck {
 				t.Fatalf("refused migration left partial changes: %v, %v", sideCheck, err)
 			}
 			if after := fingerprint(t, ctx, book.pool); after != before {

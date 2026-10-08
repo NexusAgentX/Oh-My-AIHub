@@ -648,23 +648,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/market/channels/{channelID}/rating": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 为渠道评分 */
-        put: operations["rateMarketChannel"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/channels": {
         parameters: {
             query?: never;
@@ -906,6 +889,26 @@ export interface paths {
         };
         /** 使用看板 */
         get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/pending-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 工作台待处理事项
+         * @description 服务端聚合当前用户的待处理事项：待放行 / 待付款的 C2C 交易、校验失败或已暂停的渠道、含不可用渠道的路由、只有一个渠道的路由。按种类固定排序，不分页。
+         */
+        get: operations["listPendingItems"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1775,8 +1778,6 @@ export interface components {
             status: "draft" | "published" | "paused" | "deleted";
             version: number;
             offers: components["schemas"]["OwnerOffer"][];
-            average_rating: string | null;
-            rating_count: number;
             created_at: components["schemas"]["Timestamp"];
             updated_at: components["schemas"]["Timestamp"];
         };
@@ -1811,8 +1812,6 @@ export interface components {
             status: "draft" | "published" | "paused" | "deleted";
             version: number;
             offers: components["schemas"]["AdminChannelOffer"][];
-            average_rating: string | null;
-            rating_count: number;
             created_at: components["schemas"]["Timestamp"];
             updated_at: components["schemas"]["Timestamp"];
         };
@@ -1841,8 +1840,6 @@ export interface components {
             price_tiers: components["schemas"]["PriceTier"][];
             /** @enum {string} */
             validation_status: "in_progress" | "passed" | "failed";
-            average_rating: string | null;
-            rating_count: number;
             last_tested_at: components["schemas"]["Timestamp"] | null;
             call_success_rate: string | null;
             ttft_milliseconds: number | null;
@@ -1862,9 +1859,6 @@ export interface components {
             /** @enum {string} */
             status: "draft" | "published" | "paused" | "deleted";
             offers: components["schemas"]["MarketOffer"][];
-            average_rating: string | null;
-            rating_count: number;
-            current_user_rating: number | null;
         };
         MarketChannelEnvelope: {
             channel: components["schemas"]["MarketChannel"];
@@ -1908,9 +1902,6 @@ export interface components {
         };
         ValidateOfferRequest: {
             confirmed_upstream_cost?: boolean;
-        };
-        RatingRequest: {
-            score: number;
         };
         ReencryptRequest: {
             limit?: number;
@@ -2060,6 +2051,22 @@ export interface components {
         GatewayCallList: {
             calls: components["schemas"]["GatewayCall"][];
         };
+        PendingItem: {
+            id: string;
+            /** @enum {string} */
+            kind: "c2c_release" | "c2c_payment" | "channel_failed" | "channel_paused" | "route_ineligible" | "route_single";
+            /** @description 事项类别徽标文字。 */
+            label: string;
+            /** @enum {string} */
+            tone: "danger" | "warning" | "info";
+            title: string;
+            detail: string;
+            /** @description 前端路由。 */
+            to: string;
+        };
+        PendingItemList: {
+            items: components["schemas"]["PendingItem"][];
+        };
         Dashboard: {
             consumer_spent: components["schemas"]["Amount"];
             provider_income: components["schemas"]["Amount"];
@@ -2070,7 +2077,6 @@ export interface components {
             pool_count: number;
             healthy_offer_count: number;
             unhealthy_offer_count: number;
-            pending_items: number;
             recent_calls: components["schemas"]["GatewayCall"][];
         };
         C2CPaymentMethod: {
@@ -3741,7 +3747,7 @@ export interface operations {
                 /** @description 按所有者名称搜索。 */
                 owner?: string;
                 /** @description 排序方式，缺省为 input_price。 */
-                sort?: "input_price" | "output_price" | "cache_write_price" | "cache_read_price" | "rating" | "success_rate" | "ttft" | "tps";
+                sort?: "input_price" | "output_price" | "cache_write_price" | "cache_read_price" | "success_rate" | "ttft" | "tps";
                 /** @description 分页游标。 */
                 after?: string;
                 /** @description 返回条数。 */
@@ -3791,38 +3797,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-        };
-    };
-    rateMarketChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RatingRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MarketChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
         };
     };
     listAdminChannels: {
@@ -4373,6 +4347,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listPendingItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingItemList"];
                 };
             };
             401: components["responses"]["Unauthorized"];

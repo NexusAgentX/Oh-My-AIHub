@@ -35,10 +35,10 @@ describe('channel client contracts', () => {
       modelID: 'openai/gpt 5',
       protocol: 'openai_responses',
       owner: '共享 者',
-      sort: 'rating',
+      sort: 'success_rate',
       after: 'offer/id',
       limit: 12,
-    })).toBe('/api/market/offers?limit=12&model_id=openai%2Fgpt+5&protocol=openai_responses&owner=%E5%85%B1%E4%BA%AB+%E8%80%85&sort=rating&after=offer%2Fid')
+    })).toBe('/api/market/offers?limit=12&model_id=openai%2Fgpt+5&protocol=openai_responses&owner=%E5%85%B1%E4%BA%AB+%E8%80%85&sort=success_rate&after=offer%2Fid')
   })
 
   it('sends channel CAS when adding an offer', async () => {
