@@ -157,3 +157,6 @@
   .chart-card .panel-actions { width: 100%; margin-left: 0; }
   .chart-controls { width: 100%; }
 }
+
+/* 调用页：用户与渠道筛选放在共享筛选条之前 */
+.admin-call-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }

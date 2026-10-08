@@ -1,5 +1,5 @@
 /* 应用外壳：侧边栏 + 顶栏 + 内容区 + 移动端底部 Tab 栏 */
-.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: var(--soft); }
+.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: linear-gradient(to right, var(--canvas) var(--sidebar-width), var(--soft) 0); }
 
 .skip-link {
   position: absolute;
@@ -64,18 +64,60 @@
 .nav-item-active { color: var(--ink); background: var(--selected); box-shadow: inset 3px 0 0 var(--mustard); font-weight: 600; }
 .nav-item-active:hover { background: var(--selected); }
 .nav-item-active .icon { color: var(--ink); }
-.nav-item-switch { margin-top: var(--space-2); border: 1px dashed var(--hairline); }
 
-.sidebar-account {
+.sidebar-brand { padding: 0 var(--space-2); color: inherit; }
+.sidebar-brand:hover { text-decoration: none; }
+
+.sidebar-account { position: relative; margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--hairline); }
+.sidebar-account-button {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
-  gap: var(--space-2);
-  margin-top: auto;
-  padding: var(--space-3) var(--space-2) 0 10px;
-  border-top: 1px solid var(--hairline);
+  gap: 10px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
-.sidebar-account-link { display: flex; min-width: 0; flex: 1; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
-.sidebar-account-link:hover { text-decoration: none; }
+.sidebar-account-button:hover,
+.sidebar-account-button[aria-expanded='true'] { background: var(--soft); }
+.sidebar-account-button > .icon { color: var(--muted); }
+
+.account-menu {
+  position: absolute;
+  z-index: var(--z-sidebar);
+  right: 0;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  padding: var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  box-shadow: var(--shadow-pop);
+}
+.account-menu-item {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--body);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.account-menu-item:hover { background: var(--soft); text-decoration: none; }
+.account-menu-item .icon { color: var(--muted); }
 
 .avatar {
   display: grid;
@@ -93,7 +135,7 @@
 .sidebar-account-copy { display: grid; min-width: 0; flex: 1; line-height: 1.35; }
 .sidebar-account-copy strong,
 .sidebar-account-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-account-copy span { color: var(--muted); font-size: var(--text-xs); }
+.sidebar-account-copy > span { color: var(--muted); font-size: var(--text-xs); }
 
 /* 顶栏 */
 .workspace { min-width: 0; }
@@ -110,9 +152,9 @@
   border-bottom: 1px solid var(--hairline);
   background: var(--canvas);
 }
-.topbar-brand { display: none; }
+.topbar-brand { display: none; color: inherit; }
+.topbar-brand:hover { text-decoration: none; }
 .topbar-crumb { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
-.topbar-switch { margin-left: auto; font-weight: 600; }
 
 .wallet-chip {
   display: flex;
@@ -129,7 +171,7 @@
 }
 .wallet-chip:hover { border-color: #cfd2d7; text-decoration: none; }
 .wallet-chip strong { color: var(--ink); font-size: var(--text-base); }
-.wallet-chip-link { padding-left: 10px; border-left: 1px solid var(--hairline); color: var(--link); font-size: var(--text-sm); }
+.wallet-chip strong .amount-negative { color: var(--danger); }
 
 .session-alert {
   margin: var(--space-4) 28px 0;
@@ -146,7 +188,7 @@
 .page-content > * + *:not(dialog) { margin-top: var(--space-4); } /* Dialog/Drawer 是脱离文档流的浮层，不参与内容间距 */
 .page-content > .page-heading + * { margin-top: 0; }
 
-/* 底部 Tab 栏（≤760px） */
+/* 底部 Tab 栏（<768px） */
 .bottom-bar { display: none; }
 
 .bottom-tab {
@@ -167,8 +209,9 @@
 .bottom-tab-active { color: var(--ink); font-weight: 600; }
 .bottom-tab-active .icon { color: var(--mustard); }
 
-.drawer-nav { padding-bottom: var(--space-4); }
-.drawer-nav .nav-item { min-height: 44px; }
+@media (min-width: 768px) {
+  .wallet-chip { display: none; }
+}
 
 @media (max-width: 960px) {
   .page-content { padding: 24px var(--space-5) 40px; }
@@ -176,15 +219,14 @@
   .session-alert { margin-inline: var(--space-5); }
 }
 
-@media (max-width: 760px) {
-  .app-shell { display: block; }
+@media (max-width: 767px) {
+  .app-shell { display: block; background: var(--soft); }
   .sidebar { display: none; }
   .topbar { height: 56px; padding-inline: var(--space-4); }
   .topbar-brand { display: block; }
   .topbar-brand .brand-copy { display: none; }
-  .topbar-crumb { min-width: 0; flex: 1; color: var(--ink); font-weight: 600; }
-  .wallet-chip { margin-left: 0; }
-  .wallet-chip-link { display: none; }
+  .topbar-crumb { display: none; }
+  .wallet-chip { margin-left: auto; }
   .session-alert { margin: var(--space-3) var(--space-4) 0; }
   .page-content { padding: var(--space-4) var(--space-4) calc(var(--bottom-bar-height) + 32px); }
 

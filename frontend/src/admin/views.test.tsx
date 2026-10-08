@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, matchRoutes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { appRoutes } from '../App'
+import { adminStreamPath } from './CallsPage'
 import { adminNavigation, adminTabCount, findAdminNavItem } from './navigation'
 import { AttentionList } from './OverviewPage'
 import { LedgerEquation } from './PointsPage'
@@ -111,5 +112,17 @@ describe('admin shell', () => {
     const matches = matchRoutes(appRoutes, pathname)
     expect(matches?.some((match) => match.route.path === '/admin')).toBe(true)
     expect(matches?.at(-1)?.route.path).toBe(path)
+  })
+})
+
+describe('admin calls live stream', () => {
+  it('passes the channel filter to the stream and turns live off for a single user', () => {
+    expect(adminStreamPath('', '')).toBe('/api/admin/calls/stream')
+    expect(adminStreamPath('', 'c1')).toBe('/api/admin/calls/stream?channel_id=c1')
+    expect(adminStreamPath('u1', 'c1')).toBeUndefined()
+  })
+
+  it('routes /admin/calls inside the admin layout', () => {
+    expect(matchRoutes(appRoutes, '/admin/calls')?.at(-1)?.route.path).toBe('calls')
   })
 })
