@@ -127,6 +127,7 @@ mise run down
 ```bash
 mise run test
 mise run check-sqlc # 修改 queries.sql 或迁移后，先 mise run generate 重新生成并提交
+mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run generate 重新生成前端 API 类型并提交
 mise run test-backend-integration
 docker compose config --quiet
 mise run check-proxy-trust # 需要已按上文启动安全栈
