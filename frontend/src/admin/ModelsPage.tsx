@@ -157,7 +157,7 @@ function ModelEditor({
           </fieldset>
           <TextareaField
             error={errors.parameterInfo}
-            label="参数说明"
+            label="模型备注"
             maxLength={500}
             onChange={(event) => set({ parameterInfo: event.target.value })}
             rows={3}
