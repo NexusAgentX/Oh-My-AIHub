@@ -13,6 +13,7 @@ type rateLimits struct {
 	loginIPAttempts      *loginLimiter
 	passwordChanges      *loginLimiter
 	passwordChangeIPs    *loginLimiter
+	channelProbes        *loginLimiter
 	loginPasswordSlots   chan struct{}
 	accountPasswordSlots chan struct{}
 }
@@ -25,6 +26,7 @@ func newRateLimits() rateLimits {
 		loginIPAttempts:      newLoginLimiter(60, 15*time.Minute, 10_000),
 		passwordChanges:      newLoginLimiter(8, 15*time.Minute, 10_000),
 		passwordChangeIPs:    newLoginLimiter(32, 15*time.Minute, 10_000),
+		channelProbes:        newLoginLimiter(10, time.Minute, 10_000),
 		loginPasswordSlots:   make(chan struct{}, 2),
 		accountPasswordSlots: make(chan struct{}, 2),
 	}

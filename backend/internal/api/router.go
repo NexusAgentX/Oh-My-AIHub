@@ -55,6 +55,13 @@ func (r *router) handle(pattern string, level access, handler http.HandlerFunc) 
 	r.mux.Handle(pattern, r.wrap(level, handler))
 }
 
+// feature registers a contract route implemented by a later feature of Epic
+// #170 (the route table records which feature owns it).
+func (r *router) feature(feature string, pattern string, level access, handler http.HandlerFunc) {
+	r.table = append(r.table, route{pattern: pattern, access: level, feature: feature, implemented: true})
+	r.mux.Handle(pattern, r.wrap(level, handler))
+}
+
 func (r *router) public(pattern string, handler http.HandlerFunc) {
 	r.handle(pattern, accessPublic, handler)
 }

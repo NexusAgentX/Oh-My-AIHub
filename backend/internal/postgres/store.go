@@ -8,7 +8,10 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/catalogpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/gatewaypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/identitypg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/keypg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 )
@@ -19,6 +22,10 @@ type Store struct {
 	Settings *settingspg.Store
 	Audit    *auditpg.Store
 	Ledger   *ledgerpg.Store
+	Channels *channelpg.Store
+	Keys     *keypg.Store
+	Routes   *keypg.Routes
+	Gateway  *gatewaypg.Store
 }
 
 func New(pool *pgxpool.Pool) *Store {
@@ -28,5 +35,9 @@ func New(pool *pgxpool.Pool) *Store {
 		Settings: settingspg.NewStore(pool),
 		Audit:    auditpg.NewStore(pool),
 		Ledger:   ledgerpg.NewStore(pool),
+		Channels: channelpg.NewStore(pool),
+		Keys:     keypg.NewStore(pool),
+		Routes:   keypg.NewRoutes(pool),
+		Gateway:  gatewaypg.NewStore(pool),
 	}
 }

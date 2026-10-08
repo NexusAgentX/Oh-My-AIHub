@@ -46,7 +46,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
 
-产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、C2C 与观测接口当前返回 `501 not_implemented`，前端只保留公开落地页、`/initialize` 实例初始化、登录、首次改密与占位首页。进度见 `PRODUCT.md`。
+产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；C2C 与观测接口当前返回 `501 not_implemented`，网关、渠道、API Key、路由、模型浏览与首页已由 Feature B 实现，前端只保留公开落地页、`/initialize` 实例初始化、登录、首次改密与占位首页。进度见 `PRODUCT.md`。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 
@@ -84,7 +84,7 @@ export C2C_PRIVATE_DATA_ACTIVE_KEY_ID='v1'
 mise run dev-backend
 ```
 
-`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留；密钥环和数据库备份必须配套保存，不能每次启动临时生成。服务启动时校验密钥环格式；重写后的渠道与平台 API Key 使用它加密（Feature B）。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，额外禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 追加。`api.openai.com` 及其子域永久禁用，不能通过配置解除。
+`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留；密钥环和数据库备份必须配套保存，不能每次启动临时生成。服务启动时校验密钥环格式；渠道的上游 Key 与平台 API Key 使用它加密。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，额外禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 追加。`api.openai.com` 及其子域永久禁用，不能通过配置解除。
 
 `C2C_PRIVATE_DATA_KEYRING` 采用相同的 `key-id=base64-key` 语法，但必须使用与上游凭据不同的密钥，用于加密 C2C 收款方式文字（Feature C）。服务启动时校验密钥环格式；任何仍被库存引用的旧密钥都必须保留。该密钥环同样必须与数据库备份配套保存，不得每次启动临时生成。
 
@@ -96,7 +96,7 @@ mise run dev-frontend
 
 前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。后端改用其他端口（`PORT`）时，可用 `AIHUB_BACKEND_ORIGIN=http://127.0.0.1:<端口>` 覆盖 Vite 的代理目标。
 
-外部模型 API 入口（OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini）由 Feature B 重新实现，当前返回 `501 not_implemented`。
+外部模型 API 入口（OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini 与两个模型列表）已实现：用首页给出的平台 API Key 指向后端地址即可调用，请求按原生格式透传，不做格式转换。
 
 本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
 

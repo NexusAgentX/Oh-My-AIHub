@@ -1,6 +1,6 @@
 # ADR-0014：网关采用原生协议透传，计费约束仅在结算层执行
 
-- 状态：已通过
+- 状态：已取代（由 [ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md) 取代）
 - 日期：2026-09-04
 - 决策者：仓库维护者
 - 关联内容：[ADR-0010](0010-adopt-snapshot-gateway-and-idempotent-settlement.md)、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[Feature #87](https://github.com/NexusAgentX/Oh-My-AIHub/issues/87)

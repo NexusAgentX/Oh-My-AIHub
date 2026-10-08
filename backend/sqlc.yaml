@@ -37,6 +37,9 @@ sql:
           - db_type: pg_catalog.int8
             nullable: true
             go_type: { type: "int64", pointer: true }
+          - db_type: pg_catalog.float8
+            nullable: true
+            go_type: { type: "float64", pointer: true }
           - db_type: pg_catalog.int2
             nullable: true
             go_type: { type: "int16", pointer: true }
@@ -64,6 +67,18 @@ sql:
           - column: "model_price_tiers.cache_write_price_nano_per_million"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "model_price_tiers.cache_read_price_nano_per_million"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "channels.daily_revenue_cap_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
+          - column: "api_keys.budget_daily_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
+          - column: "api_keys.budget_monthly_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
+          - column: "api_keys.budget_total_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
+          - column: "calls.cost_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "calls.fee_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "ledger_accounts.balance_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
@@ -99,3 +114,24 @@ sql:
         <<: *gen
         package: ledgerpg
         out: internal/postgres/ledgerpg
+  - <<: *domain
+    queries: internal/postgres/channelpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: channelpg
+        out: internal/postgres/channelpg
+  - <<: *domain
+    queries: internal/postgres/keypg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: keypg
+        out: internal/postgres/keypg
+  - <<: *domain
+    queries: internal/postgres/gatewaypg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: gatewaypg
+        out: internal/postgres/gatewaypg

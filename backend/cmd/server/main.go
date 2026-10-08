@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/netip"
 	"os"
@@ -14,11 +15,13 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/api"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
@@ -81,17 +84,59 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// 上游凭据密钥环与出站策略由 Feature B 的渠道与网关使用。
-	_, _ = credentialKeyring, outboundPolicy
+
+	catalogService := catalog.NewService(store.Catalog)
+	settingsService := settings.NewService(store.Settings)
+	modelIDs := func(ctx context.Context) ([]string, error) {
+		models, err := catalogService.List(ctx, true)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0, len(models))
+		for _, model := range models {
+			ids = append(ids, model.ID)
+		}
+		return ids, nil
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	bus := gateway.NewBus()
+	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
+		bus.Publish(gateway.Event{Kind: channelEventKind(kind), At: time.Now(), ChannelID: channelID, Detail: reason})
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := store.Gateway.RecordChannelEvent(ctx, channelID, kind, reason); err != nil {
+				logger.Error("recording channel event failed", "channel_id", channelID, "kind", kind, "error", err)
+			}
+		}()
+	})
+	engine := gateway.NewEngine(gateway.Dependencies{
+		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
+		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: bus, Logger: logger, Runtime: runtime,
+	})
+	reaperContext, stopReaper := context.WithCancel(context.Background())
+	defer stopReaper()
+	go engine.RunReaper(reaperContext, time.Minute)
 
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			Identity:          identityService,
-			Catalog:           catalog.NewService(store.Catalog),
-			Ledger:            ledger.NewService(store.Ledger),
-			Settings:          settings.NewService(store.Settings),
-			Audit:             audit.NewService(store.Audit),
+			Identity: identityService,
+			Catalog:  catalogService,
+			Ledger:   ledger.NewService(store.Ledger),
+			Settings: settingsService,
+			Audit:    audit.NewService(store.Audit),
+			Keys:     apikey.NewService(store.Keys, credentialKeyring, modelIDs),
+			Channels: channel.NewService(channel.Dependencies{
+				Store: store.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
+				BlockedHosts: func(ctx context.Context) ([]string, error) {
+					value, err := settingsService.Get(ctx)
+					return value.ExtraBlockedHosts, err
+				},
+			}),
+			Routing:           store.Routes,
+			Gateway:           engine,
+			Browse:            store.Gateway,
 			DatabaseReady:     pool.Ping,
 			CookieSecure:      cookieSecure,
 			TrustedProxyCIDRs: trustedProxyCIDRs,
@@ -123,6 +168,16 @@ func main() {
 			log.Printf("graceful shutdown failed: %v", err)
 		}
 	}
+}
+
+func channelEventKind(kind string) gateway.EventKind {
+	switch kind {
+	case channel.EventCooldownStarted:
+		return gateway.EventChannelCooldown
+	case channel.EventCooldownEnded:
+		return gateway.EventChannelRecover
+	}
+	return gateway.EventChannelLimit
 }
 
 func parseCommaSeparated(value string) []string {

@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -81,7 +84,18 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "idempotency_conflict", "幂等键已用于其他操作")
 	case errors.Is(err, ledger.ErrNothingToWriteOff):
 		writeError(w, http.StatusUnprocessableEntity, "nothing_to_write_off", "余额不为负，无需核销")
-	case errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
+	case errors.Is(err, channel.ErrNotFound), errors.Is(err, apikey.ErrNotFound), errors.Is(err, routing.ErrNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
+	case errors.Is(err, apikey.ErrLimitReached):
+		writeError(w, http.StatusConflict, "key_limit_reached", "API Key 数量已达上限")
+	case errors.Is(err, channel.ErrSuspended):
+		writeError(w, http.StatusConflict, "channel_suspended", "渠道已被管理员下架，不能自行上架")
+	case errors.Is(err, channel.ErrConflict):
+		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
+	case errors.Is(err, channel.ErrUnsafeUpstream):
+		writeError(w, http.StatusUnprocessableEntity, "unsafe_upstream", "上游地址未通过出站安全校验")
+	case errors.Is(err, channel.ErrInvalidInput), errors.Is(err, apikey.ErrInvalidInput), errors.Is(err, routing.ErrInvalidInput),
+		errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
 		errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount),
 		errors.Is(err, settings.ErrInvalidInput), errors.Is(err, audit.ErrInvalidInput):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")

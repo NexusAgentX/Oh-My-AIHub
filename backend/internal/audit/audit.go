@@ -22,6 +22,9 @@ const (
 	ActionModelUpdated          = "model.updated"
 	ActionSettingsUpdated       = "settings.updated"
 	ActionInstanceInitialized   = "instance.initialized"
+	ActionChannelSuspended      = "channel.suspended"
+	ActionChannelUnsuspended    = "channel.unsuspended"
+	ActionAPIKeyReveal          = "api_key.reveal"
 )
 
 type Actor struct {

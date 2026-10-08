@@ -6,10 +6,14 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -24,6 +28,11 @@ type Dependencies struct {
 	Ledger            *ledger.Service
 	Settings          *settings.Service
 	Audit             *audit.Service
+	Keys              *apikey.Service
+	Channels          *channel.Service
+	Routing           routing.Store
+	Gateway           *gateway.Engine
+	Browse            gateway.Browse
 	DatabaseReady     func(context.Context) error
 	CookieSecure      bool
 	TrustedProxyCIDRs []netip.Prefix
@@ -35,6 +44,11 @@ type app struct {
 	ledger            *ledger.Service
 	settings          *settings.Service
 	audit             *audit.Service
+	keys              *apikey.Service
+	channels          *channel.Service
+	routing           routing.Store
+	gateway           *gateway.Engine
+	browse            gateway.Browse
 	databaseReady     func(context.Context) error
 	cookieSecure      bool
 	cookieName        string
@@ -56,6 +70,11 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		ledger:            dependencies.Ledger,
 		settings:          dependencies.Settings,
 		audit:             dependencies.Audit,
+		keys:              dependencies.Keys,
+		channels:          dependencies.Channels,
+		routing:           dependencies.Routing,
+		gateway:           dependencies.Gateway,
+		browse:            dependencies.Browse,
 		databaseReady:     dependencies.DatabaseReady,
 		cookieSecure:      dependencies.CookieSecure,
 		cookieName:        defaultSessionCookie,
@@ -70,6 +89,10 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerAdminAccountRoutes(routes)
 	application.registerAdminModelRoutes(routes)
 	application.registerAdminSettingsRoutes(routes)
+	application.registerKeyRoutes(routes)
+	application.registerBrowseRoutes(routes)
+	application.registerChannelRoutes(routes)
+	application.registerGatewayRoutes(routes)
 	registerPlannedRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table

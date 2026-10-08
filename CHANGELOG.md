@@ -6,11 +6,13 @@
 
 ### 升级须知
 
-- 产品原地重写（Epic #170）进行中：数据库基线已原地重写（ADR-0026），旧数据库不能升级，开发数据库须 `docker compose down -v` 后重建。网关、渠道、API Key、C2C 与观测接口暂时返回 `501 not_implemented`，界面只保留登录、实例初始化、首次改密与占位首页，生产在发版（Feature F）时重建。
+- 产品原地重写（Epic #170）进行中：数据库基线已原地重写（ADR-0026），旧数据库不能升级，开发数据库须 `docker compose down -v` 后重建。C2C 与观测接口暂时返回 `501 not_implemented`，界面只保留登录、实例初始化、首次改密与占位首页，生产在发版（Feature F）时重建。
 
 ### 变更
 
 - 地基重写（Feature #171，Epic #170）：`0001_baseline.sql` 原地重写为 18 张表（身份与审计、平台设置、模型目录与条件价格档、渠道、API Key 与路由、调用、账本、C2C），删除持有/冻结、账本命令、投影与对账触发器群、费率版本、渠道凭据与报价校验、路由池、调用候选/尝试/结算/补偿、C2C 命令/事件/支付方式/争议陈述与巡检表。账本只保留一个零和约束触发器与分录不可变触发器，余额只存一列；新增 `ledgerpg.Post`（调用方事务内过账、幂等键、按序加锁、`balance_after`）与系统账户 `platform_revenue`、`c2c_escrow`、`bad_debt`；删除账户信用冻结（ADR-0025）。`backend/api/openapi.yaml` 重写为完整契约（约 70 个 JSON 接口与 6 个外部入口），错误统一为 `{"error": "<code>", "message": "..."}`，列表统一游标分页；未实现接口返回 501，契约测试对照 `x-access`、`x-feature` 与实现状态。已实现：实例初始化、登录与退出、`GET /api/me`、`POST /api/me/password`、`GET /api/points`、`GET /api/points/entries`、管理员账户（创建、修改、重置密码、调账、坏账核销）、模型目录（`PATCH` 部分更新，价格档整组替换）、平台设置与审计查询。旧的 `/api/auth/session`、`/api/account*`、钱包、市场、渠道、网关、C2C、运营与手续费率接口删除。计价保留公式 v2 内核（`CalculatePriceV2`），删除预授权与自有渠道分支。前端删除依赖旧接口的全部页面，保留可构建外壳。恢复演练脚本改为直接核对账本余额合计为 0 且与分录一致。
+
+- 透明网关、渠道、API Key 与路由（Feature #172，Epic #170）：`POST /v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/{model}:generateContent|:streamGenerateContent` 与 `GET /v1/models`、`/v1beta/models` 上线；请求体除顶层 `model`（及 Chat 流式的 `include_usage`）外与客户端发送的字节一致，响应原样回写并旁路读取用量，失败自动换渠道，请求结束后一次记账（不预扣，ADR-0027）。新增渠道（添加、发现上游模型、格式测试、上下架、软删除）、API Key（最多 20 把、默认 Key、再次复制、预算、别名、可用模型，ADR-0028）、按用户按模型的路由（便宜/稳定/快速/手动，Key 级覆盖）、模型浏览与首页、管理员渠道治理；每次调用有请求 ID（`X-AIHub-Request-Id`）、尝试时间线、流式指标与 `X-AIHub-Tag`，进程内事件总线与结构化日志供 Feature G 订阅。ADR-0010、ADR-0014、ADR-0016 被取代，ADR-0008 的预授权部分不再适用。
 
 ## v0.6.0 - 2026-10-08
 

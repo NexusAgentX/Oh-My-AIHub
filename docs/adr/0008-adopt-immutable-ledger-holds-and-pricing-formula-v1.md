@@ -1,6 +1,6 @@
 # ADR-0008：采用不可变账本、双持有投影与计价公式 v1
 
-- 状态：已通过（持有、投影、命令幂等与信用冻结部分由 [ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md) 取代）
+- 状态：已通过（持有、投影、命令幂等与信用冻结部分由 [ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md) 取代；API 预授权部分由 [ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md) 取代）
 - 日期：2026-09-02
 - 决策者：仓库维护者
 - 关联内容：[Feature #18](https://github.com/NexusAgentX/Oh-My-AIHub/issues/18)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)、[ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)、[ADR-0006](0006-adopt-postgresql-goose-and-fixed-point-amounts.md)
