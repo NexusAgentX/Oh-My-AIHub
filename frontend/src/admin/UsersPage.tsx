@@ -24,7 +24,7 @@ import {
 } from '../ui'
 import { ConfirmActionDialog, DetailList, LoadMore, OneTimeSecretDialog } from './components'
 import { secretReducer } from './confirm'
-import { formatDateTime, formatPoints, isAmount, isNegative, pointsRatio } from './format'
+import { formatDateTime, formatLastActive, formatPoints, isAmount, isNegative, pointsRatio } from './format'
 import {
   useAdjustAccount,
   useAdminAccounts,
@@ -85,7 +85,7 @@ const columns: Column<AdminAccount>[] = [
       </>
     ),
   },
-  { key: 'created', header: '创建时间', hideOnMobile: true, cell: (account) => formatDateTime(account.created_at) },
+  { key: 'active', header: '最近活跃', hideOnMobile: true, cell: (account) => formatLastActive(account.last_active_at) },
 ]
 
 function CreateUserDialog({
@@ -247,6 +247,7 @@ function UserDrawerBody({
           ['余额', <Balance value={account.balance} />],
           ['还能透支', <span className="num">{formatPoints(account.available)}</span>],
           ['已用信用', `${formatPoints(creditUsed(account))}（${Math.round(pointsRatio(creditUsed(account), account.credit_limit))}%）`],
+          ['最近活跃', account.last_active_at ? formatDateTime(account.last_active_at) : '从未'],
           ['创建时间', formatDateTime(account.created_at)],
           ['密码修改', account.must_change_password ? '等待首次改密' : formatDateTime(account.password_changed_at)],
         ]}

@@ -78,6 +78,21 @@ export const callColumns = {
   }),
 }
 
+/** 换过渠道（尝试次数大于 1）时显示「换了 N 次」。 */
+export function switchedLabel(attempts: number) {
+  return attempts > 1 ? `换了 ${attempts - 1} 次` : null
+}
+
+function ChannelCell({ name, attempts }: { name: string | null; attempts: number }) {
+  const switched = switchedLabel(attempts)
+  return (
+    <span className="call-channel">
+      {name ?? <span className="muted">—</span>}
+      {switched && <small className="call-switched">{switched}</small>}
+    </span>
+  )
+}
+
 /** 调用者视角（用户与管理员）：含渠道、Key 与花费。 */
 export function summaryColumns<T extends CallSummary>({
   showKey = true,
@@ -89,7 +104,7 @@ export function summaryColumns<T extends CallSummary>({
     {
       key: 'channel',
       header: '渠道',
-      cell: (row) => row.channel?.name ?? <span className="muted">—</span>,
+      cell: (row) => <ChannelCell attempts={row.attempt_count} name={row.channel?.name ?? null} />,
     },
   ]
   if (showKey) {
@@ -114,7 +129,16 @@ export function channelCallColumns(): CallColumn<ChannelCall>[] {
     callColumns.tokens<ChannelCall>(),
     callColumns.ttft<ChannelCall>(),
     { key: 'revenue', header: '收入', numeric: true, cell: (row) => <span className="amount-positive">{formatPoints(row.revenue)}</span> },
-    callColumns.outcome<ChannelCall>(),
+    {
+      key: 'outcome',
+      header: '结果',
+      cell: (row) => (
+        <span className="call-outcome">
+          <OutcomeBadge outcome={row.outcome} />
+          {!row.served && <small className="muted">已换走</small>}
+        </span>
+      ),
+    },
     {
       key: 'error',
       header: '错误',

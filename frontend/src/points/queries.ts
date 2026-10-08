@@ -6,6 +6,7 @@ import type { PointsEntryPage, TradeStatus } from '../api/types'
 export const pointsKeys = {
   all: ['points'] as const,
   summary: ['points', 'summary'] as const,
+  period: (from?: string, to?: string) => ['points', 'period', from, to] as const,
   entries: (params: QueryParams) => ['points', 'entries', params] as const,
 }
 
@@ -17,12 +18,23 @@ export const c2cKeys = {
   trade: (id: string) => ['c2c', 'trade', id] as const,
 }
 
-/** 当前账户的积分概况（余额、信用额度、可透支额度；G 补充走势与期间对账）。 */
+/** 当前账户的积分概况（余额、信用额度、可透支额度、30 天走势与本月对账）。 */
 export function usePoints() {
   return useQuery({ queryKey: pointsKeys.summary, queryFn: () => apiGet<'getPoints'>('/api/points') })
 }
 
+/** 指定期间（如账单所选月份）的对账；与 usePoints 同一接口，按期间单独缓存。 */
+export function usePointsPeriod(from?: string, to?: string) {
+  return useQuery({
+    queryKey: pointsKeys.period(from, to),
+    queryFn: () => apiGet<'getPoints'>('/api/points', { from, to }),
+    select: (data) => data.period,
+  })
+}
+
 export type EntryParams = {
+  /** 汇总方式；省略则不返回 summary */
+  group?: 'day' | 'key'
   type?: string
   api_key_id?: string
   from?: string
@@ -39,7 +51,7 @@ export function usePointsEntries(params: EntryParams) {
   })
 }
 
-/** 账单 CSV 导出（G）：先取回再下载，失败（如 501）时抛出可展示的错误。 */
+/** 账单 CSV 导出：先取回再下载，失败时抛出可展示的错误。 */
 export async function downloadEntriesCsv(params: EntryParams) {
   const response = await fetch(withQuery('/api/points/entries', { ...params, format: 'csv' }), {
     credentials: 'same-origin',

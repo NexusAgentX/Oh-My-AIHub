@@ -12,6 +12,7 @@ type Page<T> = CursorPage<T> & { summary?: CallStats }
 
 /** 实时到达的一条是否符合当前筛选（时间范围由服务端流保证为最新，不再比较）。 */
 export function matchesFilters(row: CallRowBase & Record<string, unknown>, params: CallListParams) {
+  if (params.request_id && row.id !== params.request_id) return false
   if (params.model && row.model_id !== params.model) return false
   if (params.outcome && row.outcome !== params.outcome) return false
   if (params.format && row.format !== params.format) return false

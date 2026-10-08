@@ -1,6 +1,6 @@
 # 架构说明
 
-> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature B（#172）已交付透明网关、渠道、API Key、路由、模型浏览与首页；Feature C（#173）已交付 C2C 卖单市场；Feature D（#174）、E（#175）已交付用户界面、管理后台与落地页；Feature G（#176）已交付调用与积分可观测性的后端（查询、实时流、指标、核对、补记），前端与新增契约字段的对齐由 Feature H（#183）完成。
+> 状态：产品重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）。Feature A（#171）已交付新数据库基线、完整 OpenAPI 契约、身份与会话、账本核心、模型目录、平台设置与审计；Feature B（#172）已交付透明网关、渠道、API Key、路由、模型浏览与首页；Feature C（#173）已交付 C2C 卖单市场；Feature D（#174）、E（#175）已交付用户界面、管理后台与落地页；Feature G（#176）已交付调用与积分可观测性的后端（查询、实时流、指标、核对、补记），Feature H（#183）已把用户界面与管理后台对齐到 G 扩展后的契约。
 
 本文档描述仓库当前真实存在的系统结构，再单独列出已确认但尚未实现的目标约束。不得把目标约束当作当前代码能力。
 
@@ -30,7 +30,7 @@
 
 | 组件 | 位置 | 当前职责 |
 | --- | --- | --- |
-| 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。外壳为 `src/layouts/`：桌面左侧分组侧栏（使用 API / 共享 / 积分，底部账户菜单与余额），<768px 为顶部条 + 底部 5 个 Tab（首页、模型、渠道、积分、我的）。用户页面按领域分目录，查询在各自 `queries.ts`，类型来自 `schema.gen.ts`：`home/`（`/home`）、`models/`（`/models`、`/models/:model`，含账号级与 Key 级共用的路由编辑器）、`keys/`（`/keys` 与抽屉）、`usage/`（`/usage`）、`channels/`（`/channels`、`/channels/new` 三步向导、`/channels/:id`）、`points/`（`/points` 各 Tab、`/points/trades/:id`、买卖抽屉）、`account/`（`/account`、移动端 `/me`）。`src/calls/` 是调用观测的共享组件（列表、筛选、汇总、SSE 实时 hook、调用详情抽屉与尝试时间线），按接口路径参数化，供用户用量、渠道编辑页与管理后台复用。接口出错的区块显示可重试的错误态。实例初始化、登录与首次改密沿用原流程。公开落地页在 `src/welcome/`（已登录访问 `/` 跳到 `/home`）。管理后台在 `src/admin/`（Feature E）：自带外壳 `AdminFrame`（复用 `layout.css` 的侧栏与底部 Tab 样式，移动端前 4 项进 Tab、其余进「更多」）与 `RequireAdmin` 门禁，`/admin` 下有概览、调用、积分、用户、模型、渠道、申诉、设置 8 页；查询与写操作集中在 `admin/api.ts` 与 `admin/queries.ts`（写成功后失效 `['admin']` 前缀），调用页复用 `src/calls/`，需要原因的操作统一用两步确认对话框，一次性密码关闭即丢弃 |
+| 前端 | `frontend/` | React 单页应用（TanStack Query、`src/styles/tokens.css` 设计 token、`src/ui/` 基础组件、`src/ui/Icon.tsx` 图标集，见 ADR-0019）。外壳为 `src/layouts/`：桌面左侧分组侧栏（使用 API / 共享 / 积分，底部账户菜单与余额），<768px 为顶部条 + 底部 5 个 Tab（首页、模型、渠道、积分、我的）。用户页面按领域分目录，查询在各自 `queries.ts`，类型来自 `schema.gen.ts`：`home/`（`/home`）、`models/`（`/models`、`/models/:model`，含账号级与 Key 级共用的路由编辑器）、`keys/`（`/keys` 与抽屉）、`usage/`（`/usage`）、`channels/`（`/channels`、`/channels/new` 三步向导、`/channels/:id`）、`points/`（`/points` 各 Tab、`/points/trades/:id`、买卖抽屉）、`account/`（`/account`、移动端 `/me`）。`src/calls/` 是调用观测的共享组件（列表、筛选、汇总、SSE 实时 hook、调用详情抽屉与尝试时间线），按接口路径参数化，供用户用量、渠道编辑页与管理后台复用；列表的渠道列在尝试次数大于 1 时显示「换了 N 次」，汇总显示首字 p50/p95，请求 ID 是列表的精确筛选（`request_id`，设置后忽略时间范围）。积分账单的对账条按调用支出、渠道收入、C2C 买入、C2C 卖出（含退回）、调账与核销拆分，按所选月份以 `from`/`to` 查询 `GET /api/points`；按天/按 Key 汇总传 `group`。渠道编辑页统计显示 24h/7d 成功率、首字与速度 p50/p95、按小时或按天趋势、今日收入上限进度、失败按状态码分布与最近失败（含上游原始错误）。接口出错的区块显示可重试的错误态。实例初始化、登录与首次改密沿用原流程。公开落地页在 `src/welcome/`（已登录访问 `/` 跳到 `/home`）。管理后台在 `src/admin/`（Feature E）：自带外壳 `AdminFrame`（复用 `layout.css` 的侧栏与底部 Tab 样式，移动端前 4 项进 Tab、其余进「更多」）与 `RequireAdmin` 门禁，`/admin` 下有概览、调用、积分、用户、模型、渠道、申诉、设置 8 页；查询与写操作集中在 `admin/api.ts` 与 `admin/queries.ts`（写成功后失效 `['admin']` 前缀），调用页复用 `src/calls/`，需要原因的操作统一用两步确认对话框，一次性密码关闭即丢弃。概览的「需要处理」按 `AttentionItem.kind` 给出专属文案并跳转（核对与集中度类定位到积分页 `#checks`、`#risks`）；积分页走势时间窗走后端 `days` 参数，五项核对逐项展示并对漏记调用逐条补记或作废，交易浏览可按关联对象（`related_type`/`related_id`）筛选，交易抽屉显示变动前后余额、价格快照与相关用户最近的人工操作；申诉详情的相关账本按交易与所属卖单的关联对象查询 |
 | 后端 | `backend/` | Go `net/http` 服务。`cmd/server` 组装服务并在启动时校验 `UPSTREAM_CREDENTIAL_*`、`UPSTREAM_*` 出站配置与 `C2C_PRIVATE_DATA_*` 密钥环；`cmd/migrate` 执行迁移 |
 | API 契约 | `backend/api/openapi.yaml`、`backend/internal/api/` | OpenAPI 3.1 是唯一契约（ADR-0021），定义约 70 个 JSON 接口与 6 个外部模型 API 入口；`x-access` 声明门禁，`x-feature` 标明负责实现的 Feature。`internal/api` 的 `router` 按 access 包裹会话、首次改密与管理员门禁；路由经 `handle`（A）或 `implement`（B 起）注册。契约测试逐项对照路由表、门禁与 Feature，并用规范 schema 校验每个真实响应；PostgreSQL 集成测试同样用规范校验每个 `/api` 响应。前端类型由它生成为已提交的 `frontend/src/api/schema.gen.ts` |
 | 数据库 | PostgreSQL 18 | 18 张表，见下文“数据与状态” |
@@ -146,7 +146,7 @@
 
 ## 已确认但未实现的目标边界
 
-- 前端对齐 Feature G 补齐的契约字段（尝试次数、p95、错误分布、对账拆分、五项核对等）由 Feature H（#183）完成；联调与发版由 Feature F（#177）完成。
+- 联调与发版由 Feature F（#177）完成。
 
 ## 架构原则
 

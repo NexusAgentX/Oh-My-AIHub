@@ -46,7 +46,7 @@ MVP 已完成，后续需求明确后直接基于现有代码实施，无需独�
 - 本地工具链：mise。
 - 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
 
-产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、路由、模型浏览与首页（Feature B）、C2C（Feature C）以及调用与积分可观测性（Feature G：调用查询与实时流、用量、渠道统计、积分对账与核对、管理员概览、Prometheus 指标）的后端已实现；前端用户界面、管理后台与落地页已按新信息架构重写，与 Feature G 新增契约字段的对齐由 Feature H 完成。进度见 `PRODUCT.md`。
+产品正在按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」。`backend/api/openapi.yaml` 已定义全部接口；网关、渠道、API Key、路由、模型浏览与首页（Feature B）、C2C（Feature C）以及调用与积分可观测性（Feature G：调用查询与实时流、用量、渠道统计、积分对账与核对、管理员概览、Prometheus 指标）的后端已实现；前端用户界面、管理后台与落地页已按新信息架构重写，并已对齐 Feature G 新增的契约字段（Feature H）。进度见 `PRODUCT.md`。
 
 模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
 

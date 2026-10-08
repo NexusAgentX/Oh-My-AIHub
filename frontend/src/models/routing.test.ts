@@ -3,6 +3,7 @@ import type { ModelChannel, RoutingPreference } from '../api/types'
 import {
   advancedChanged,
   changeMode,
+  channelStateLabel,
   draftFromPreference,
   moveChannel,
   moveTo,
@@ -72,5 +73,21 @@ describe('routing editor logic', () => {
   it('counts changed advanced settings', () => {
     const draft = draftFromPreference(preference({ max_attempts: 2 }), channels)
     expect(advancedChanged(draft)).toBe(1)
+  })
+})
+
+describe('channel state label', () => {
+  it('shows the remaining daily cap for a limited channel', () => {
+    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: '0.125' }).label).toBe('今日额度剩 12%')
+    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: '0' }).label).toBe('今日额度剩 0%')
+  })
+
+  it('falls back to 已达上限 when the limit is not the daily cap', () => {
+    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: null }).label).toBe('已达上限')
+  })
+
+  it('shows cooldown minutes and online', () => {
+    expect(channelStateLabel({ ...channel('a'), state: 'cooldown', cooldown_remaining_seconds: 90 }).label).toBe('冷却中 2 分钟')
+    expect(channelStateLabel(channel('a')).label).toBe('在线')
   })
 })

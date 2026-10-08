@@ -96,3 +96,12 @@ export function daysSince(value: string | null | undefined, now = Date.now()) {
   if (!value) return null
   return Math.max(0, Math.floor((now - new Date(value).getTime()) / 86_400_000))
 }
+
+/** 最近活跃：1 小时内「刚刚」，24 小时内「N 小时前」，其余「N 天前」，从未活跃「从未」。 */
+export function formatLastActive(value: string | null | undefined, now = Date.now()) {
+  if (!value) return '从未'
+  const hours = Math.floor((now - new Date(value).getTime()) / 3_600_000)
+  if (hours < 1) return '刚刚'
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.floor(hours / 24)} 天前`
+}

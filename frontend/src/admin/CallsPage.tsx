@@ -64,7 +64,10 @@ function FilterSelect({
 
 export function CallsPage() {
   const [search, setSearch] = useSearchParams()
-  const [filters, setFilters] = useState<CallFilterState>(emptyCallFilters)
+  const [filters, setFilters] = useState<CallFilterState>(() => ({
+    ...emptyCallFilters,
+    outcome: search.get('outcome') ?? '',
+  }))
   const accountID = search.get('account_id') ?? ''
   const channelID = search.get('channel_id') ?? ''
   const openCall = search.get('call')
@@ -122,7 +125,6 @@ export function CallsPage() {
               <CallFilterBar
                 models={models.data?.items.map((model) => model.id)}
                 onChange={setFilters}
-                onSearchId={(id) => setParam('call', id)}
                 value={filters}
               />
             </div>

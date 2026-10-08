@@ -21,6 +21,10 @@
 .call-model { display: block; overflow-wrap: anywhere; }
 .call-format small,
 .data-table td .call-format small { display: inline; margin-left: 6px; color: var(--muted); font-size: var(--text-xs); }
+.call-channel,
+.call-outcome { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.call-switched { color: var(--warning); font-size: var(--text-xs); white-space: nowrap; }
+.call-outcome small { font-size: var(--text-xs); }
 .call-error { display: grid; max-width: 320px; color: var(--danger-ink); font-size: var(--text-sm); }
 .call-error strong { color: inherit; }
 .call-error-message {

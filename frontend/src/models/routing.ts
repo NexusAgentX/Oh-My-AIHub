@@ -90,6 +90,10 @@ export function channelStateLabel(channel: ModelChannel) {
     const minutes = Math.max(1, Math.ceil((channel.cooldown_remaining_seconds ?? 60) / 60))
     return { label: `冷却中 ${minutes} 分钟`, tone: 'warning' as const }
   }
-  if (channel.state === 'limited') return { label: '已达上限', tone: 'warning' as const }
+  if (channel.state === 'limited') {
+    const remaining = channel.daily_cap_remaining
+    if (remaining === null || remaining === undefined) return { label: '已达上限', tone: 'warning' as const }
+    return { label: `今日额度剩 ${Math.floor(Number(remaining) * 100)}%`, tone: 'warning' as const }
+  }
   return { label: '在线', tone: 'success' as const }
 }

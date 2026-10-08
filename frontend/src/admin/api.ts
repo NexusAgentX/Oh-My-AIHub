@@ -32,7 +32,7 @@ const id = encodeURIComponent
 /** 管理员接口。路径与结构以 backend/api/openapi.yaml 为准。 */
 export const adminApi = {
   overview: () => request<ResponseBody<'getAdminOverview'>>('/api/admin/overview'),
-  points: () => request<ResponseBody<'getAdminPoints'>>('/api/admin/points'),
+  points: (days?: number) => request<ResponseBody<'getAdminPoints'>>(withQuery('/api/admin/points', { days })),
 
   accounts: (query: QueryOf<'listAdminAccounts'>) =>
     request<ResponseBody<'listAdminAccounts'>>(withQuery('/api/admin/accounts', query)),
