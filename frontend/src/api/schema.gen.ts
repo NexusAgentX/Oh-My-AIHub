@@ -1608,6 +1608,8 @@ export interface components {
         ModelSource: {
             key: string;
             sync_enabled: boolean;
+            retained_reason?: string;
+            applied_source_key?: string;
             status: string;
             problems: string[];
             warnings: string[];
@@ -1621,8 +1623,18 @@ export interface components {
         } | null;
         CatalogSyncRate: {
             exchange_rate: string;
+            providers: string[];
+        };
+        CatalogSyncNotice: {
+            model_id: string;
+            source_key: string;
+            reason: string;
         };
         CatalogSyncStatus: {
+            providers: string[];
+            providers_configured: boolean;
+            available_providers: string[];
+            report: components["schemas"]["CatalogSyncNotice"][];
             exchange_rate: string;
             started_at: string | null;
             finished_at: string | null;
@@ -1666,7 +1678,7 @@ export interface components {
             model: components["schemas"]["AdminModel"];
         };
         ModelCreateRequest: {
-            /** @description 模型名，即客户端请求中的 model；不含 / 与 :。 */
+            /** @description 模型名，即客户端请求中的 model；不含 /；允许 : 和 @。 */
             id: string;
             display_name: string;
             base_prices: components["schemas"]["ModelPrices"];

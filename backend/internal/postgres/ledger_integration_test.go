@@ -27,8 +27,8 @@ func TestBaselineMigrationCreatesTheRewrittenSchema(t *testing.T) {
 		WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name <> 'goose_db_version'`).Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 20 {
-		t.Fatalf("baseline tables = %d, want 20", tables)
+	if tables != 21 {
+		t.Fatalf("baseline tables = %d, want 21", tables)
 	}
 	var systemAccounts, settingsRows, feeRate int64
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ledger_accounts WHERE kind = 'system'`).Scan(&systemAccounts); err != nil {

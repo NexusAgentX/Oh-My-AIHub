@@ -251,6 +251,9 @@ func (s *Store) DeleteModel(ctx context.Context, actorID, id string) error {
 		if _, err := tx.Exec(ctx, `DELETE FROM route_prefs WHERE model_id = $1`, id); err != nil {
 			return err
 		}
+		if err := q.RememberDeletedModel(ctx, id); err != nil {
+			return err
+		}
 		if err := q.IgnoreSource(ctx, id); err != nil {
 			return err
 		}

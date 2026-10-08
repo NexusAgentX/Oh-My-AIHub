@@ -14,6 +14,7 @@ func TestCatalogSyncLifecycle(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	svc := catalog.NewService(e.store.Catalog)
+	_ = e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "", []string{"openai"})
 	raw := `{"mode":"chat","provider":"openai","input_cost_per_token":0.000001,"output_cost_per_token":0.000002}`
 	run := func(keys ...string) {
 		t.Helper()
@@ -48,7 +49,7 @@ func TestCatalogSyncLifecycle(t *testing.T) {
 	if _, err := svc.Update(ctx, e.admin.id, m.ID, catalog.ModelPatch{Enabled: &yes}); err == nil {
 		t.Fatal("unpriced enabled")
 	}
-	if err := e.store.Catalog.SetSyncRate(ctx, e.admin.id, "2"); err != nil {
+	if err := e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "2", []string{"openai"}); err != nil {
 		t.Fatal(err)
 	}
 	run("new-model")
@@ -106,8 +107,8 @@ func TestCatalogSyncInFlightOptOutAndRateChange(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	svc := catalog.NewService(e.store.Catalog)
-	_ = e.store.Catalog.SetSyncRate(ctx, e.admin.id, "1")
-	raw := json.RawMessage(`{"mode":"chat","input_cost_per_token":0.000001,"output_cost_per_token":0}`)
+	_ = e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "1", []string{"openai"})
+	raw := json.RawMessage(`{"mode":"chat","provider":"openai","input_cost_per_token":0.000001,"output_cost_per_token":0}`)
 	if err := e.store.Catalog.RunSync(ctx, func(rate string) ([]catalogsync.Entry, error) {
 		return []catalogsync.Entry{catalogsync.Parse("race-model", raw, rate)}, nil
 	}); err != nil {
@@ -137,7 +138,7 @@ func TestCatalogSyncInFlightOptOutAndRateChange(t *testing.T) {
 		t.Fatal("inflight optout overwritten")
 	}
 	err := e.store.Catalog.RunSync(ctx, func(rate string) ([]catalogsync.Entry, error) {
-		if err := e.store.Catalog.SetSyncRate(ctx, e.admin.id, "3"); err != nil {
+		if err := e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "3", []string{"openai"}); err != nil {
 			t.Fatal(err)
 		}
 		return []catalogsync.Entry{catalogsync.Parse("rate-race", raw, rate)}, nil
@@ -154,7 +155,7 @@ func TestCatalogSyncInvalidUpdateRetainsAppliedPriceAndRate(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	svc := catalog.NewService(e.store.Catalog)
-	_ = e.store.Catalog.SetSyncRate(ctx, e.admin.id, "2")
+	_ = e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "2", []string{"openai"})
 	run := func(raw string) {
 		t.Helper()
 		if err := e.store.Catalog.RunSync(ctx, func(rate string) ([]catalogsync.Entry, error) {
@@ -163,14 +164,14 @@ func TestCatalogSyncInvalidUpdateRetainsAppliedPriceAndRate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	run(`{"mode":"chat","input_cost_per_token":0.000001,"output_cost_per_token":0.000002}`)
-	_ = e.store.Catalog.SetSyncRate(ctx, e.admin.id, "3")
-	run(`{"mode":"chat","input_cost_per_token":0.000005,"output_cost_per_token":0.000002,"regional_processing_uplift_multiplier_us":1.1}`)
+	run(`{"mode":"chat","provider":"openai","input_cost_per_token":0.000001,"output_cost_per_token":0.000002}`)
+	_ = e.store.Catalog.SetSyncConfig(ctx, e.admin.id, "3", []string{"openai"})
+	run(`{"mode":"chat","provider":"openai","input_cost_per_token":0.000005,"output_cost_per_token":0.000002,"regional_processing_uplift_multiplier_us":1.1}`)
 	m, err := svc.Get(ctx, "preserved-model")
 	if err != nil || m.InputPrice.String() != "2" || m.Source.AppliedRate != "2" || m.Source.Status != "needs_review" || !m.Source.PriceReady {
 		t.Fatalf("last effective price lost %+v %v", m, err)
 	}
-	run(`{"mode":"chat","input_cost_per_token":0.000005,"output_cost_per_token":0.000002}`)
+	run(`{"mode":"chat","provider":"openai","input_cost_per_token":0.000005,"output_cost_per_token":0.000002}`)
 	m, _ = svc.Get(ctx, m.ID)
 	if m.InputPrice.String() != "15" || m.Source.AppliedRate != "3" || m.Source.Status != "ready" {
 		t.Fatal(m)

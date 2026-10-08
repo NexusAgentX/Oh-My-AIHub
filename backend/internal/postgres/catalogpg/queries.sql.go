@@ -21,6 +21,30 @@ func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
 	return err
 }
 
+const deletedModels = `-- name: DeletedModels :many
+SELECT model_id FROM catalog_deleted_models
+`
+
+func (q *Queries) DeletedModels(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, deletedModels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var model_id string
+		if err := rows.Scan(&model_id); err != nil {
+			return nil, err
+		}
+		items = append(items, model_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const failSync = `-- name: FailSync :exec
 UPDATE catalog_sync SET status='failed', finished_at=now(), error=$1 WHERE id
 `
@@ -31,11 +55,17 @@ func (q *Queries) FailSync(ctx context.Context, error string) error {
 }
 
 const finishSync = `-- name: FinishSync :exec
-UPDATE catalog_sync SET status='succeeded', finished_at=now(), error='', result=$1 WHERE id
+UPDATE catalog_sync SET status='succeeded', finished_at=now(), error='', result=$1, report=$2, available_providers=$3 WHERE id
 `
 
-func (q *Queries) FinishSync(ctx context.Context, result []byte) error {
-	_, err := q.db.Exec(ctx, finishSync, result)
+type FinishSyncParams struct {
+	Result             []byte
+	Report             []byte
+	AvailableProviders []string
+}
+
+func (q *Queries) FinishSync(ctx context.Context, arg FinishSyncParams) error {
+	_, err := q.db.Exec(ctx, finishSync, arg.Result, arg.Report, arg.AvailableProviders)
 	return err
 }
 
@@ -71,7 +101,7 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 }
 
 const getSource = `-- name: GetSource :one
-SELECT model_id, ignored, sync_enabled, info FROM model_sources WHERE source_key=$1
+SELECT model_id, ignored, sync_enabled, info FROM model_sources WHERE model_id=$1
 `
 
 type GetSourceRow struct {
@@ -81,8 +111,8 @@ type GetSourceRow struct {
 	Info        []byte
 }
 
-func (q *Queries) GetSource(ctx context.Context, sourceKey string) (GetSourceRow, error) {
-	row := q.db.QueryRow(ctx, getSource, sourceKey)
+func (q *Queries) GetSource(ctx context.Context, modelID string) (GetSourceRow, error) {
+	row := q.db.QueryRow(ctx, getSource, modelID)
 	var i GetSourceRow
 	err := row.Scan(
 		&i.ModelID,
@@ -105,16 +135,20 @@ func (q *Queries) GetSourceRaw(ctx context.Context, modelID string) ([]byte, err
 }
 
 const getSyncStatus = `-- name: GetSyncStatus :one
-SELECT exchange_rate, started_at, finished_at, status, error, result FROM catalog_sync WHERE id
+SELECT exchange_rate, providers, providers_configured, available_providers, report, started_at, finished_at, status, error, result FROM catalog_sync WHERE id
 `
 
 type GetSyncStatusRow struct {
-	ExchangeRate string
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
-	Status       string
-	Error        string
-	Result       []byte
+	ExchangeRate        string
+	Providers           []string
+	ProvidersConfigured bool
+	AvailableProviders  []string
+	Report              []byte
+	StartedAt           *time.Time
+	FinishedAt          *time.Time
+	Status              string
+	Error               string
+	Result              []byte
 }
 
 func (q *Queries) GetSyncStatus(ctx context.Context) (GetSyncStatusRow, error) {
@@ -122,6 +156,10 @@ func (q *Queries) GetSyncStatus(ctx context.Context) (GetSyncStatusRow, error) {
 	var i GetSyncStatusRow
 	err := row.Scan(
 		&i.ExchangeRate,
+		&i.Providers,
+		&i.ProvidersConfigured,
+		&i.AvailableProviders,
+		&i.Report,
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.Status,
@@ -216,30 +254,6 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 	return i, err
 }
 
-const insertSourceConflict = `-- name: InsertSourceConflict :exec
-INSERT INTO model_sources(source_key,model_id,ignored,sync_enabled,raw_record,info,seen_at)
-VALUES($1,$2,true,false,$3,$4,$5) ON CONFLICT DO NOTHING
-`
-
-type InsertSourceConflictParams struct {
-	SourceKey string
-	ModelID   string
-	RawRecord []byte
-	Info      []byte
-	SeenAt    time.Time
-}
-
-func (q *Queries) InsertSourceConflict(ctx context.Context, arg InsertSourceConflictParams) error {
-	_, err := q.db.Exec(ctx, insertSourceConflict,
-		arg.SourceKey,
-		arg.ModelID,
-		arg.RawRecord,
-		arg.Info,
-		arg.SeenAt,
-	)
-	return err
-}
-
 const insertTier = `-- name: InsertTier :exec
 INSERT INTO model_price_tiers (
     model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
@@ -288,6 +302,54 @@ func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
 		arg.ThinkingMode,
 	)
 	return err
+}
+
+const isModelDeleted = `-- name: IsModelDeleted :one
+SELECT EXISTS(SELECT 1 FROM catalog_deleted_models WHERE model_id=$1)
+`
+
+func (q *Queries) IsModelDeleted(ctx context.Context, modelID string) (bool, error) {
+	row := q.db.QueryRow(ctx, isModelDeleted, modelID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listManagedSources = `-- name: ListManagedSources :many
+SELECT s.model_id,s.source_key,s.info,s.sync_enabled FROM model_sources s JOIN models m ON m.id=s.model_id
+WHERE NOT s.ignored ORDER BY s.model_id
+`
+
+type ListManagedSourcesRow struct {
+	ModelID     string
+	SourceKey   string
+	Info        []byte
+	SyncEnabled bool
+}
+
+func (q *Queries) ListManagedSources(ctx context.Context) ([]ListManagedSourcesRow, error) {
+	rows, err := q.db.Query(ctx, listManagedSources)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListManagedSourcesRow
+	for rows.Next() {
+		var i ListManagedSourcesRow
+		if err := rows.Scan(
+			&i.ModelID,
+			&i.SourceKey,
+			&i.Info,
+			&i.SyncEnabled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listModels = `-- name: ListModels :many
@@ -409,6 +471,15 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 	return items, nil
 }
 
+const lockExplicitModelReferences = `-- name: LockExplicitModelReferences :exec
+LOCK TABLE calls, api_keys IN SHARE ROW EXCLUSIVE MODE
+`
+
+func (q *Queries) LockExplicitModelReferences(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockExplicitModelReferences)
+	return err
+}
+
 const lockModel = `-- name: LockModel :one
 SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1 FOR UPDATE
 `
@@ -449,25 +520,56 @@ func (q *Queries) LockModelWrites(ctx context.Context, modelID string) error {
 	return err
 }
 
-const lockSyncRate = `-- name: LockSyncRate :one
-SELECT exchange_rate FROM catalog_sync WHERE id FOR UPDATE
+const lockSyncConfig = `-- name: LockSyncConfig :one
+SELECT exchange_rate, providers, providers_configured, config_version FROM catalog_sync WHERE id FOR UPDATE
 `
 
-func (q *Queries) LockSyncRate(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, lockSyncRate)
-	var exchange_rate string
-	err := row.Scan(&exchange_rate)
-	return exchange_rate, err
+type LockSyncConfigRow struct {
+	ExchangeRate        string
+	Providers           []string
+	ProvidersConfigured bool
+	ConfigVersion       int64
 }
 
-const markMissingSources = `-- name: MarkMissingSources :exec
-UPDATE model_sources SET info=jsonb_set(info,'{status}','"missing"'::jsonb)
-WHERE NOT(source_key=ANY($1::text[])) AND NOT ignored AND sync_enabled
+func (q *Queries) LockSyncConfig(ctx context.Context) (LockSyncConfigRow, error) {
+	row := q.db.QueryRow(ctx, lockSyncConfig)
+	var i LockSyncConfigRow
+	err := row.Scan(
+		&i.ExchangeRate,
+		&i.Providers,
+		&i.ProvidersConfigured,
+		&i.ConfigVersion,
+	)
+	return i, err
+}
+
+const modelReferenceReasons = `-- name: ModelReferenceReasons :one
+SELECT
+ EXISTS(SELECT 1 FROM channel_models WHERE model_id=$1::text) AS channels,
+ EXISTS(SELECT 1 FROM calls WHERE model_id=$1::text OR requested_model=$1::text) AS calls,
+ EXISTS(SELECT 1 FROM route_prefs WHERE model_id=$1::text) AS routes,
+ EXISTS(SELECT 1 FROM api_keys WHERE $1::text=ANY(allowed_models)
+   OR model_aliases ? $1::text
+   OR EXISTS(SELECT 1 FROM jsonb_each_text(model_aliases) alias WHERE alias.value=$1::text)) AS keys
 `
 
-func (q *Queries) MarkMissingSources(ctx context.Context, keys []string) error {
-	_, err := q.db.Exec(ctx, markMissingSources, keys)
-	return err
+type ModelReferenceReasonsRow struct {
+	Channels bool
+	Calls    bool
+	Routes   bool
+	Keys     bool
+}
+
+func (q *Queries) ModelReferenceReasons(ctx context.Context, targetID string) (ModelReferenceReasonsRow, error) {
+	row := q.db.QueryRow(ctx, modelReferenceReasons, targetID)
+	var i ModelReferenceReasonsRow
+	err := row.Scan(
+		&i.Channels,
+		&i.Calls,
+		&i.Routes,
+		&i.Keys,
+	)
+	return i, err
 }
 
 const releaseSyncLock = `-- name: ReleaseSyncLock :exec
@@ -479,38 +581,109 @@ func (q *Queries) ReleaseSyncLock(ctx context.Context) error {
 	return err
 }
 
-const seenSource = `-- name: SeenSource :exec
-UPDATE model_sources SET seen_at=$2 WHERE source_key=$1
+const rememberDeletedModel = `-- name: RememberDeletedModel :exec
+INSERT INTO catalog_deleted_models(model_id)
+ SELECT $1::text
+ UNION SELECT regexp_replace(s.source_key,'^.*/','') FROM model_sources s WHERE s.model_id=$1::text AND NOT s.ignored
+ ON CONFLICT DO NOTHING
 `
 
-type SeenSourceParams struct {
-	SourceKey string
-	SeenAt    time.Time
-}
-
-func (q *Queries) SeenSource(ctx context.Context, arg SeenSourceParams) error {
-	_, err := q.db.Exec(ctx, seenSource, arg.SourceKey, arg.SeenAt)
+func (q *Queries) RememberDeletedModel(ctx context.Context, targetID string) error {
+	_, err := q.db.Exec(ctx, rememberDeletedModel, targetID)
 	return err
 }
 
-const setSyncRate = `-- name: SetSyncRate :exec
-UPDATE catalog_sync SET exchange_rate=$1 WHERE id
+const removeOldConflictRecords = `-- name: RemoveOldConflictRecords :exec
+DELETE FROM model_sources WHERE ignored AND info->>'status'='conflict'
 `
 
-func (q *Queries) SetSyncRate(ctx context.Context, exchangeRate string) error {
-	_, err := q.db.Exec(ctx, setSyncRate, exchangeRate)
+func (q *Queries) RemoveOldConflictRecords(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, removeOldConflictRecords)
+	return err
+}
+
+const removeSource = `-- name: RemoveSource :exec
+DELETE FROM model_sources WHERE model_id=$1
+`
+
+func (q *Queries) RemoveSource(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, removeSource, modelID)
+	return err
+}
+
+const removeUnusedModel = `-- name: RemoveUnusedModel :exec
+DELETE FROM models WHERE id=$1
+`
+
+func (q *Queries) RemoveUnusedModel(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, removeUnusedModel, id)
+	return err
+}
+
+const seenSource = `-- name: SeenSource :exec
+UPDATE model_sources SET seen_at=$2 WHERE model_id=$1
+`
+
+type SeenSourceParams struct {
+	ModelID string
+	SeenAt  time.Time
+}
+
+func (q *Queries) SeenSource(ctx context.Context, arg SeenSourceParams) error {
+	_, err := q.db.Exec(ctx, seenSource, arg.ModelID, arg.SeenAt)
+	return err
+}
+
+const setSourceRetention = `-- name: SetSourceRetention :exec
+UPDATE model_sources SET info=jsonb_set(jsonb_set(info,'{status}',to_jsonb($1::text)),'{retained_reason}',to_jsonb($2::text)) WHERE model_id=$3::text
+`
+
+type SetSourceRetentionParams struct {
+	Status   string
+	Reason   string
+	TargetID string
+}
+
+func (q *Queries) SetSourceRetention(ctx context.Context, arg SetSourceRetentionParams) error {
+	_, err := q.db.Exec(ctx, setSourceRetention, arg.Status, arg.Reason, arg.TargetID)
+	return err
+}
+
+const setSyncConfig = `-- name: SetSyncConfig :exec
+UPDATE catalog_sync SET exchange_rate=$1, providers=$2, providers_configured=true, config_version=config_version+1 WHERE id
+`
+
+type SetSyncConfigParams struct {
+	ExchangeRate string
+	Providers    []string
+}
+
+func (q *Queries) SetSyncConfig(ctx context.Context, arg SetSyncConfigParams) error {
+	_, err := q.db.Exec(ctx, setSyncConfig, arg.ExchangeRate, arg.Providers)
 	return err
 }
 
 const startSync = `-- name: StartSync :one
-UPDATE catalog_sync SET status='running', started_at=now(), error='' WHERE id RETURNING exchange_rate
+UPDATE catalog_sync SET status='running', started_at=now(), error='' WHERE id RETURNING exchange_rate, providers, providers_configured, config_version
 `
 
-func (q *Queries) StartSync(ctx context.Context) (string, error) {
+type StartSyncRow struct {
+	ExchangeRate        string
+	Providers           []string
+	ProvidersConfigured bool
+	ConfigVersion       int64
+}
+
+func (q *Queries) StartSync(ctx context.Context) (StartSyncRow, error) {
 	row := q.db.QueryRow(ctx, startSync)
-	var exchange_rate string
-	err := row.Scan(&exchange_rate)
-	return exchange_rate, err
+	var i StartSyncRow
+	err := row.Scan(
+		&i.ExchangeRate,
+		&i.Providers,
+		&i.ProvidersConfigured,
+		&i.ConfigVersion,
+	)
+	return i, err
 }
 
 const trySyncLock = `-- name: TrySyncLock :one
@@ -629,7 +802,7 @@ func (q *Queries) UpdateSourceControl(ctx context.Context, arg UpdateSourceContr
 
 const upsertSource = `-- name: UpsertSource :exec
 INSERT INTO model_sources(source_key,model_id,raw_record,info,seen_at) VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(source_key) DO UPDATE SET raw_record=excluded.raw_record,info=excluded.info,seen_at=excluded.seen_at
+ON CONFLICT(model_id) DO UPDATE SET source_key=excluded.source_key, ignored=false, raw_record=excluded.raw_record,info=excluded.info,seen_at=excluded.seen_at
 `
 
 type UpsertSourceParams struct {

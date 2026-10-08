@@ -2588,6 +2588,8 @@ components:
       properties:
         key: {type: string}
         sync_enabled: {type: boolean}
+        retained_reason: {type: string}
+        applied_source_key: {type: string}
         status: {type: string}
         problems: {type: array, items: {type: string}}
         warnings: {type: array, items: {type: string}}
@@ -2602,18 +2604,31 @@ components:
       type: object
       properties:
         exchange_rate: {type: string}
-      required: [exchange_rate]
+        providers: {type: array, maxItems: 200, uniqueItems: true, items: {type: string, minLength: 1, maxLength: 64}}
+      required: [exchange_rate, providers]
+      additionalProperties: false
+    CatalogSyncNotice:
+      type: object
+      properties:
+        model_id: {type: string}
+        source_key: {type: string}
+        reason: {type: string}
+      required: [model_id, source_key, reason]
       additionalProperties: false
     CatalogSyncStatus:
       type: object
       properties:
+        providers: {type: array, items: {type: string}}
+        providers_configured: {type: boolean}
+        available_providers: {type: array, items: {type: string}}
+        report: {type: array, items: {$ref: '#/components/schemas/CatalogSyncNotice'}}
         exchange_rate: {type: string}
         started_at: {type: [string, 'null']}
         finished_at: {type: [string, 'null']}
         status: {type: string}
         error: {type: string}
         result: {type: object, additionalProperties: {type: integer}}
-      required: [exchange_rate, started_at, finished_at, status, error, result]
+      required: [exchange_rate, providers, providers_configured, available_providers, report, started_at, finished_at, status, error, result]
       additionalProperties: false
     CatalogSyncAccepted:
       type: object
@@ -2672,7 +2687,7 @@ components:
     ModelCreateRequest:
       type: object
       properties:
-        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$', description: '模型名，即客户端请求中的 model；不含 / 与 :。'}
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$', description: '模型名，即客户端请求中的 model；不含 /；允许 : 和 @。'}
         display_name: {type: string}
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         price_tiers:

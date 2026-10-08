@@ -85,3 +85,10 @@ SELECT route_pref_id, channel_id, position, excluded
 FROM route_pref_channels
 WHERE route_pref_id = ANY(sqlc.arg(pref_ids)::uuid[])
 ORDER BY route_pref_id, position;
+
+
+-- name: LockKeyConfigWrites :exec
+LOCK TABLE api_keys IN ROW EXCLUSIVE MODE;
+
+-- name: LockReferencedModels :many
+SELECT id FROM models WHERE id=ANY(sqlc.arg(ids)::text[]) ORDER BY id FOR KEY SHARE;

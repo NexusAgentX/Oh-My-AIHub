@@ -354,7 +354,7 @@ export function changedModelAdvanced(form: ModelForm) {
   ].filter(Boolean).length
 }
 
-const modelIDPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
+const modelIDPattern = /^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/
 
 export type ModelErrors = Partial<
   Record<'id' | 'displayName' | 'prices' | 'sortOrder' | 'contextWindow' | 'parameterInfo' | 'tiers', string>
@@ -363,7 +363,7 @@ export type ModelErrors = Partial<
 export function validateModelForm(form: ModelForm, creating: boolean): ModelErrors {
   const errors: ModelErrors = {}
   if (creating && !modelIDPattern.test(form.id.trim())) {
-    errors.id = '字母或数字开头，只含字母、数字、. _ -，最多 128 个字符'
+    errors.id = '字母或数字开头，只含字母、数字、. _ - : @，最多 128 个字符'
   }
   const name = form.displayName.trim()
   if (!name) errors.displayName = '请填写显示名'

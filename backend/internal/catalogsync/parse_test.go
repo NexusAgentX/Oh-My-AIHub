@@ -66,7 +66,7 @@ func TestDecodeAndIdentity(t *testing.T) {
 			t.Fatal(body)
 		}
 	}
-	if ModelID("gpt-4") != "gpt-4" || ModelID("a/b") == ModelID("a:b") || !legalID.MatchString(ModelID("a/b")) {
+	if ModelID("gpt-4") != "gpt-4" || ModelID("prefix/a/b") != "b" || !legalID.MatchString(ModelID("a/b")) {
 		t.Fatal("unstable identity")
 	}
 }
@@ -98,12 +98,7 @@ func TestRealDatasheet(t *testing.T) {
 		t.Fatal(err)
 	}
 	ready, review := 0, 0
-	ids := map[string]bool{}
 	for _, e := range entries {
-		if ids[e.Model.ID] {
-			t.Fatalf("duplicate ID %s", e.Model.ID)
-		}
-		ids[e.Model.ID] = true
 		if len(e.Problems) == 0 {
 			ready++
 		} else {

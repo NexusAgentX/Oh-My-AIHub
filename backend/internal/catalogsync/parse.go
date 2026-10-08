@@ -3,7 +3,6 @@ package catalogsync
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,23 +35,10 @@ type Entry struct {
 	Warnings []string
 }
 
-var legalID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
-var unsafeID = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+var legalID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$`)
 
-func ModelID(key string) string {
-	if legalID.MatchString(key) {
-		return key
-	}
-	stem := strings.Trim(unsafeID.ReplaceAllString(key, "-"), "-._")
-	if stem == "" {
-		stem = "model"
-	}
-	if len(stem) > 100 {
-		stem = stem[:100]
-	}
-	hash := sha256.Sum256([]byte(key))
-	return fmt.Sprintf("%s-%x", stem, hash[:8])
-}
+// ModelID preserves the complete last source-key component, including versions.
+func ModelID(key string) string { return key[strings.LastIndex(key, "/")+1:] }
 
 // Decode requires a complete nonempty object; a truncated fetch must never mark records missing.
 func Decode(data []byte, rate string) ([]Entry, error) {
@@ -147,9 +133,6 @@ func Parse(key string, raw json.RawMessage, rate string) Entry {
 		rate = "1"
 	}
 	e.Model = catalog.Model{ID: ModelID(key), DisplayName: key, Provider: r.Text("provider"), InputModalities: []string{"text"}, OutputModalities: []string{"text"}, SupportsTools: r.Bool("supports_function_calling"), SupportsStructuredOutput: r.Bool("supports_response_schema") || r.Bool("supports_native_structured_output"), SupportsVision: r.Bool("supports_vision") || r.Bool("supports_image_input")}
-	if len(e.Model.DisplayName) > 128 {
-		e.Model.DisplayName = e.Model.ID
-	}
 	if len(e.Model.Provider) > 64 {
 		e.Problems = append(e.Problems, "provider exceeds 64 characters")
 		e.Model.Provider = ""

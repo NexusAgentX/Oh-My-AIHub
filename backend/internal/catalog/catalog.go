@@ -33,11 +33,10 @@ var (
 	ErrInvalidInput = errors.New("invalid model")
 )
 
-// Model IDs are the names clients send. They cannot contain "/" or ":" so
-// they fit one path segment, including Gemini's "{model}:generateContent".
+// Model IDs fit one URL path segment. Gemini actions are parsed at the final colon.
 var serviceTierPattern = regexp.MustCompile(`^(openai|anthropic|gemini):[A-Za-z0-9_-]{1,48}$`)
 
-var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$`)
 
 type Model struct {
 	Source                   *SourceInfo
