@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, apiGet, apiSend, changesAuthenticatedAccount, withQuery } from './client'
+import { api, ApiError, apiGet, apiSend, changesAuthenticatedAccount, request, withQuery } from './client'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -20,6 +20,16 @@ describe('changesAuthenticatedAccount', () => {
 })
 
 describe('typed helpers', () => {
+  it('lets the browser set multipart boundaries and preserves same-origin authentication', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}'))
+    vi.stubGlobal('fetch', fetchMock)
+    const body = new FormData(); body.append('file', new Blob(['file']), 'file.txt')
+    await request('/api/forum/attachments', { method: 'POST', body })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
+    expect(init?.credentials).toBe('same-origin')
+    expect(init?.body).toBe(body)
+  })
   it('builds query strings without empty values', () => {
     expect(withQuery('/api/calls', { model: 'gpt-5', outcome: '', cursor: undefined, limit: 50 })).toBe('/api/calls?model=gpt-5&limit=50')
     expect(withQuery('/api/calls', {})).toBe('/api/calls')
