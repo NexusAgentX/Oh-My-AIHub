@@ -163,6 +163,11 @@ func normalizeRootPath(escaped string) (string, error) {
 	if cleaned == "/" {
 		return "", nil
 	}
+	// Accept the API base commonly copied from OpenAI-compatible clients.
+	// Validate the original path above before removing the version suffix.
+	if strings.HasSuffix(cleaned, "/v1") {
+		cleaned = strings.TrimSuffix(cleaned, "/v1")
+	}
 	segments = strings.Split(strings.Trim(cleaned, "/"), "/")
 	for _, segment := range segments {
 		lower := strings.ToLower(segment)

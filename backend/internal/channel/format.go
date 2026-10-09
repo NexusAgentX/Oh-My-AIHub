@@ -20,6 +20,7 @@ const (
 )
 
 var ErrInvalidInput = errors.New("invalid channel input")
+var ErrInvalidBaseURL = errors.New("invalid channel base URL")
 
 // EncryptedCredential is one AEAD-sealed secret bound to its owner record,
 // version and key ID.

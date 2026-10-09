@@ -52,10 +52,14 @@ func TestNormalizeBaseURLAndPermanentOfficialEndpointBan(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid := map[string]string{
-		"https://Gateway.Example./relay/":   "https://gateway.example/relay",
-		"https://bücher.example:443/root":   "https://xn--bcher-kva.example/root",
-		"https://api.openai.com.evil":       "https://api.openai.com.evil",
-		"https://gateway.example:8443/root": "https://gateway.example:8443/root",
+		"https://gateway.example/v1":          "https://gateway.example",
+		"https://gateway.example/v1/":         "https://gateway.example",
+		" https://gateway.example/relay/v1/ ": "https://gateway.example/relay",
+		"https://gateway.example/relayv1":     "https://gateway.example/relayv1",
+		"https://Gateway.Example./relay/":     "https://gateway.example/relay",
+		"https://bücher.example:443/root":     "https://xn--bcher-kva.example/root",
+		"https://api.openai.com.evil":         "https://api.openai.com.evil",
+		"https://gateway.example:8443/root":   "https://gateway.example:8443/root",
 	}
 	for input, expected := range valid {
 		actual, err := policy.NormalizeBaseURL(input)
@@ -67,7 +71,8 @@ func TestNormalizeBaseURLAndPermanentOfficialEndpointBan(t *testing.T) {
 		"http://gateway.example", "https://user@gateway.example", "https://gateway.example?", "https://gateway.example?q=1",
 		"https://gateway.example#fragment", "https://127.0.0.1", "https://[2001:4860:4860::8888]",
 		"https://api.openai.com", "https://API.OPENAI.COM.", "https://sub.api.openai.com", "https://blocked.example",
-		"https://gateway.example:444", "https://gateway.example/v1", "https://gateway.example/v1beta/models",
+		"https://gateway.example:444", "https://gateway.example/v1/chat/completions",
+		"https://gateway.example/v1/v1", "https://gateway.example/../v1", "https://gateway.example/v1beta/models",
 		"https://gateway.example/%2e%2e/root", "https://gateway.example/root%2fescape", "https://gateway.example/root\\escape",
 		"https://gateway.example/%252e%252e", "https://gateway.example/root%252fadmin", "https://gateway.example/%2576%2531",
 	}
