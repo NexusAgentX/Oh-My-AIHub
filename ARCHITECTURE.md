@@ -92,6 +92,10 @@
 7. **回写与旁路**：响应头（去掉 hop-by-hop 与 `Set-Cookie`）与正文逐块原样写回并 flush，旁路解析器读取用量与首字/速度/token 间隔，解析失败不影响返回。
 8. **记账**：结束时在一个事务内关闭 `calls` 并过账（见 ADR-0027）；读不到用量为 `succeeded_unbilled`；客户端断开或上游输出后中断按已读到的用量记账。后台每分钟把超过一小时零一分钟仍为 `in_progress` 的调用标为 `interrupted`。
 
+## 渠道格式测试
+
+渠道格式测试使用流式请求（Gemini 为 `streamGenerateContent?alt=sse`），通过 `GatewayClient` 保留固定出站安全策略与 30 秒总超时，不叠加 `ClientFor` 的 10 秒响应头限制。检测 SSE 完成、错误和截断，合法非流式 JSON 可回退识别；不自动追加非流式重试。发现模型仍使用 `ClientFor` 的短超时。
+
 ## 数据与状态
 
 金额一律为 `bigint` 纳积分（1 积分 = 1e9）；人民币为整数分；费率为纳比率（1e9 = 100%）；时间为 `timestamptz`。

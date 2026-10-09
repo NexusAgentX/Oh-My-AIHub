@@ -435,9 +435,10 @@ type Outbound interface {
 	NormalizeBaseURL(raw string) (string, error)
 	// ValidateBaseURL normalizes and additionally checks DNS resolution.
 	ValidateBaseURL(ctx context.Context, raw string) (string, error)
-	// Client returns a client for short, bounded calls (discovery, tests).
+	// Client returns a client for short, bounded calls (model discovery).
 	Client(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
-	// GatewayClient returns the client of one forwarded request.
+	// GatewayClient returns a client without a separate response-header deadline,
+	// for forwarded requests and streaming format tests.
 	GatewayClient(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
 	// WithExtraBlockedHosts adds the administrator-managed host block list.
 	WithExtraBlockedHosts(hosts []string) (Outbound, error)

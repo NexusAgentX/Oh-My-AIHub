@@ -200,13 +200,13 @@ func testBody(format Format, upstreamModel string) []byte {
 	model, _ := json.Marshal(upstreamModel)
 	switch format {
 	case FormatOpenAIResponses:
-		return []byte(fmt.Sprintf(`{"model":%s,"input":"hi","max_output_tokens":16}`, model))
+		return []byte(fmt.Sprintf(`{"model":%s,"input":"hi","max_output_tokens":16,"stream":true}`, model))
 	case FormatAnthropic:
-		return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1}`, model))
+		return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":true}`, model))
 	case FormatGemini:
 		return []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":1}}`)
 	}
-	return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1}`, model))
+	return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":true}`, model))
 }
 
 // TestRequest selects what to probe; empty slices mean everything.
@@ -319,19 +319,25 @@ func (s *Service) probeOnce(ctx context.Context, policy Outbound, channel Channe
 		return outcome
 	}
 	started := time.Now()
-	client, err := policy.Client(ctx, channel.BaseURL, testTimeout)
+	client, err := policy.GatewayClient(ctx, channel.BaseURL, testTimeout)
 	if err != nil {
 		return fail(nil, "出站校验未通过", started)
 	}
-	target, err := BuildEndpoint(channel.BaseURL, format, model.UpstreamModel, false)
+	target, err := BuildEndpoint(channel.BaseURL, format, model.UpstreamModel, true)
 	if err != nil {
 		return fail(nil, "无法构造请求地址", started)
+	}
+	if format == FormatGemini {
+		query := target.Query()
+		query.Set("alt", "sse")
+		target.RawQuery = query.Encode()
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), strings.NewReader(string(testBody(format, model.UpstreamModel))))
 	if err != nil {
 		return fail(nil, "无法构造请求", started)
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "text/event-stream")
 	ApplyAuthentication(request, format, secret)
 	response, err := client.Do(request)
 	if err != nil {
@@ -342,13 +348,16 @@ func (s *Service) probeOnce(ctx context.Context, policy Outbound, channel Channe
 		return fail(nil, "连接失败", started)
 	}
 	defer response.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(response.Body, testBodyLimit))
 	status := response.StatusCode
 	outcome.StatusCode = &status
-	outcome.DurationMS = int(time.Since(started).Milliseconds())
-	if status >= 200 && status < 300 {
-		outcome.OK = true
-		return outcome
+	if status < 200 || status >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, testBodyLimit))
+		return fail(&status, fmt.Sprintf("HTTP %d %s", status, strings.TrimSpace(string(body))), started)
 	}
-	return fail(&status, fmt.Sprintf("HTTP %d %s", status, strings.TrimSpace(string(body))), started)
+	if err := validateTestResponse(response, format); err != nil {
+		return fail(&status, err.Error(), started)
+	}
+	outcome.DurationMS = int(time.Since(started).Milliseconds())
+	outcome.OK = true
+	return outcome
 }
