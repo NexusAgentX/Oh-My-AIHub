@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { CatalogModel, Format } from '../api/types'
+import type { CatalogModel } from '../api/types'
 import { FormatTags, formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
-import { Badge, EmptyState, PageHeader, QueryBoundary, SearchInput, Segmented, Toolbar } from '../ui'
+import { Badge, Button, Checkbox, Disclosure, EmptyState, PageHeader, QueryBoundary, SearchInput, Segmented, SelectField, Switch, TextField, Toolbar } from '../ui'
 import { contextText } from './pricing'
 import { useModels } from './queries'
 
-type FormatFilter = Format | 'all'
+import { capabilities, contextFilterError, defaultFilters, filterModels, priceFilterError, type ModelFilters } from './filters'
 
 function ModelCard({ model }: { model: CatalogModel }) {
   const context = contextText(model.context_window)
@@ -45,43 +45,60 @@ function ModelCard({ model }: { model: CatalogModel }) {
   )
 }
 
-export function filterModels(models: CatalogModel[], query: string, format: FormatFilter) {
-  const needle = query.trim().toLowerCase()
-  return models.filter(
-    (model) =>
-      (format === 'all' || model.formats.includes(format)) &&
-      (!needle ||
-        model.id.toLowerCase().includes(needle) ||
-        model.display_name.toLowerCase().includes(needle) ||
-        model.provider.toLowerCase().includes(needle)),
-  )
-}
+const formatOptions = [
+  { key: 'all' as const, label: '全部' },
+  ...formats.map((key) => ({ key, label: formatLabels[key] })),
+]
 
 export function ModelsPage() {
   const models = useModels()
-  const [query, setQuery] = useState('')
-  const [format, setFormat] = useState<FormatFilter>('all')
-  const options = useMemo(
-    () => [{ key: 'all' as FormatFilter, label: '全部' }, ...formats.map((key) => ({ key: key as FormatFilter, label: formatLabels[key] }))],
-    [],
-  )
+  const [filters, setFilters] = useState<ModelFilters>(defaultFilters)
+  const update = <K extends keyof ModelFilters>(key: K, value: ModelFilters[K]) =>
+    setFilters((current) => ({ ...current, [key]: value }))
+  const advancedCount = [filters.provider, filters.minContext, filters.maxInput, filters.maxOutput,
+    ...capabilities.map(({ key }) => filters[key])].filter(Boolean).length
+  const active = advancedCount > 0 || filters.query !== '' || filters.format !== 'all' || filters.onlineOnly
+  const invalid = Boolean(contextFilterError(filters.minContext) || priceFilterError(filters.maxInput) || priceFilterError(filters.maxOutput))
+  const providers = [...new Set((models.data?.items ?? []).map((model) => model.provider).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   return (
     <>
       <PageHeader title="模型" />
       <Toolbar>
-        <SearchInput label="搜索模型" onChange={(event) => setQuery(event.target.value)} placeholder="搜索模型" value={query} />
-        <Segmented label="按格式筛选" onChange={setFormat} options={options} value={format} />
+        <SearchInput label="搜索模型" onChange={(event) => update('query', event.target.value)} placeholder="搜索模型" value={filters.query} />
+        <Segmented label="按格式筛选" onChange={(value) => update('format', value)} options={formatOptions} value={filters.format} />
+        <Switch label="仅看有在线渠道" checked={filters.onlineOnly} onChange={(value) => update('onlineOnly', value)} />
       </Toolbar>
+      <Disclosure title="更多筛选" changed={advancedCount}>
+        <div className="model-filters">
+          <SelectField label="提供商" value={filters.provider} onChange={(event) => update('provider', event.target.value)}>
+            <option value="">全部提供商</option>
+            {providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+          </SelectField>
+          <TextField label="最低上下文（token）" inputMode="numeric" placeholder="不限" value={filters.minContext}
+            error={contextFilterError(filters.minContext)} onChange={(event) => update('minContext', event.target.value)} />
+          <TextField label="输入参考价上限" inputMode="decimal" placeholder="不限" value={filters.maxInput}
+            hint="积分 / 百万 token" error={priceFilterError(filters.maxInput)} onChange={(event) => update('maxInput', event.target.value)} />
+          <TextField label="输出参考价上限" inputMode="decimal" placeholder="不限" value={filters.maxOutput}
+            hint="积分 / 百万 token" error={priceFilterError(filters.maxOutput)} onChange={(event) => update('maxOutput', event.target.value)} />
+        </div>
+        <fieldset className="model-filter-capabilities">
+          <legend>模型能力（同时满足）</legend>
+          {capabilities.map(({ key, label }) => <Checkbox key={key} label={label} checked={filters[key]} onChange={(event) => update(key, event.target.checked)} />)}
+        </fieldset>
+      </Disclosure>
       <QueryBoundary errorFallback="模型列表加载失败" query={models}>
         {(data) => {
-          const rows = filterModels(data.items, query, format)
-          if (rows.length === 0) return <EmptyState title={data.items.length === 0 ? '暂无模型' : '没有匹配的模型'} />
+          const rows = filterModels(data.items, filters)
           return (
-            <div className="model-grid">
-              {rows.map((model) => (
-                <ModelCard key={model.id} model={model} />
-              ))}
-            </div>
+            <>
+              <div className="model-filter-summary">
+                <span role="status">{invalid ? '请修正筛选条件' : `显示 ${rows.length} / ${data.items.length} 个模型`}</span>
+                <Button type="button" variant="quiet" size="sm" disabled={!active} onClick={() => setFilters(defaultFilters)}>清空筛选</Button>
+              </div>
+              {rows.length === 0
+                ? <EmptyState title={invalid ? '筛选条件有误' : data.items.length === 0 ? '暂无模型' : '没有匹配的模型'} />
+                : <div className="model-grid">{rows.map((model) => <ModelCard key={model.id} model={model} />)}</div>}
+            </>
           )
         }}
       </QueryBoundary>
