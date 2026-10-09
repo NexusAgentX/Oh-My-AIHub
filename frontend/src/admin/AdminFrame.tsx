@@ -24,7 +24,7 @@ function NavItems({ items, onNavigate }: { items: AdminNavItem[]; onNavigate?: (
   )
 }
 
-function BackToProduct({ onNavigate }: { onNavigate?: () => void }) {
+function AdminFooter({ showBackLink = false, onNavigate }: { showBackLink?: boolean; onNavigate?: () => void }) {
   const { account } = useAuth()
   return (
     <div className="admin-sidebar-footer">
@@ -37,10 +37,12 @@ function BackToProduct({ onNavigate }: { onNavigate?: () => void }) {
           <span>管理员</span>
         </span>
       </div>
-      <Link className="admin-back-link" onClick={onNavigate} to="/home">
-        <Icon name="back" />
-        <span>返回产品</span>
-      </Link>
+      {showBackLink && (
+        <Link className="admin-back-link" onClick={onNavigate} to="/home">
+          <Icon name="back" />
+          <span>返回产品</span>
+        </Link>
+      )}
     </div>
   )
 }
@@ -80,7 +82,7 @@ export function AdminFrame() {
         <nav aria-label="管理后台导航" className="sidebar-nav">
           <NavItems items={adminNavigation} />
         </nav>
-        <BackToProduct />
+        <AdminFooter />
       </aside>
       <div className="workspace">
         <header className="topbar">
@@ -127,7 +129,7 @@ export function AdminFrame() {
         <nav aria-label="管理后台全部导航" className="sidebar-nav drawer-nav">
           <NavItems items={adminNavigation} onNavigate={() => setMoreOpen(false)} />
         </nav>
-        <BackToProduct onNavigate={() => setMoreOpen(false)} />
+        <AdminFooter showBackLink onNavigate={() => setMoreOpen(false)} />
       </Drawer>
     </div>
   )
