@@ -884,8 +884,12 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 		TTFTMS: &ttftFromStart, DurationMS: duration, ResponseBytes: written, UpstreamResponseID: observation.ResponseID,
 		IntervalP50MS: observation.IntervalP50MS, IntervalP95MS: observation.IntervalP95MS,
 	}
-	if streamMillis := duration - ttftFromStart; observation.Found && observation.Usage.OutputTokens > 0 && streamMillis > 0 {
-		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(streamMillis)
+	speedMillis := duration
+	if call.stream {
+		speedMillis -= ttftFromStart
+	}
+	if observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
+		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
 		finish.TokensPerSecond = &speed
 	}
 	if observation.Found {

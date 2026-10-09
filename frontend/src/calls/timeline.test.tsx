@@ -53,6 +53,25 @@ describe('attempt timeline segments', () => {
     expect(attemptSegments(interrupted, 800).at(-1)?.kind).toBe('failed')
   })
 
+  it('renders non-streaming average speed and unavailable duration results', () => {
+    const call = {
+      stream: false,
+      duration_ms: 2380,
+      ttft_ms: 2377,
+      output_tokens_per_second: 6 / 2.38,
+      inter_token_p50_ms: null,
+      inter_token_p95_ms: null,
+      usage: { input_tokens: 1, output_tokens: 6, cache_read_tokens: 0, cache_write_tokens: 0 },
+    } as CallDetail
+    const render = (value: CallDetail) => renderToStaticMarkup(<AttemptTimeline attempts={[succeeded]} call={value} />)
+    expect(render(call)).toContain('2.5 tokens/s')
+    for (const duration of [0, null]) {
+      const markup = render({ ...call, duration_ms: duration, output_tokens_per_second: null })
+      expect(markup).toContain('速度</dt><dd class="num">—</dd>')
+      expect(markup).not.toMatch(/Infinity|NaN/)
+    }
+  })
+
   it('renders status code, raw upstream error and streaming metrics', () => {
     const call = {
       ttft_ms: 300,
