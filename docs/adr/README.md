@@ -65,3 +65,4 @@
 - [ADR-0030：以可靠 token 细分与实际响应事实定价](0030-price-reliable-token-breakdowns.md)
 
 - [ADR-0031：论坛附件采用受限 PostgreSQL 存储并继承内容权限](0031-store-forum-attachments-in-postgresql.md) — 已通过
+- [ADR-0032：论坛采用 Vditor 源码编辑与统一 Markdown 渲染](0032-use-vditor-for-forum-markdown.md) — 已通过

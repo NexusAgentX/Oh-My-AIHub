@@ -41,6 +41,8 @@ export function MePage() {
       <nav aria-label="我的" className="me-links">
         <MeLink icon="key" label="API Key" to="/keys" />
         <MeLink icon="chart" label="用量" to="/usage" />
+        <MeLink icon="message" label="论坛" to="/forum" />
+        <MeLink icon="ticket" label={account.is_admin ? '全部工单' : '我的工单'} to="/forum/tickets" />
         <MeLink icon="settings" label="账户设置" to="/account" />
         {account.is_admin && <MeLink icon="shield" label="管理后台" to="/admin" />}
       </nav>

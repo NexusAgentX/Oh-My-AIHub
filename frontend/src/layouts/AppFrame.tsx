@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { usePoints } from '../points/queries'
@@ -8,6 +8,7 @@ import { Icon } from '../ui'
 import { Brand } from './Brand'
 import {
   findMobileTab,
+  findNavItem,
   mobileTabs,
   pageTitle,
   type MobileTab,
@@ -31,20 +32,23 @@ export function useSignOut() {
 }
 
 function NavGroups({ groups }: { groups: NavGroup[] }) {
+  const { pathname } = useLocation()
+  const current = findNavItem(groups, pathname)
   return (
     <>
       {groups.map((group) => (
         <div aria-label={group.label} className="nav-group" key={group.label} role="group">
           <h6 aria-hidden="true">{group.label}</h6>
           {group.items.map((item) => (
-            <NavLink
-              className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
+            <Link
+              className={`nav-item ${current?.to === item.to ? 'nav-item-active' : ''}`}
+              aria-current={current?.to === item.to ? 'page' : undefined}
               key={item.to}
               to={item.to}
             >
               <Icon name={item.icon} />
               <span>{item.label}</span>
-            </NavLink>
+            </Link>
           ))}
         </div>
       ))}

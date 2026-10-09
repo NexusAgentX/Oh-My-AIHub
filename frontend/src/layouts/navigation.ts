@@ -31,6 +31,13 @@ export const productNavigation: NavGroup[] = [
     label: '积分',
     items: [{ label: '积分', to: '/points', icon: 'wallet' }],
   },
+  {
+    label: '交流',
+    items: [
+      { label: '论坛', to: '/forum', icon: 'message' },
+      { label: '工单', to: '/forum/tickets', icon: 'ticket' },
+    ],
+  },
 ]
 
 export type MobileTab = {
@@ -47,7 +54,7 @@ export const mobileTabs: MobileTab[] = [
   { label: '模型', to: '/models', icon: 'store' },
   { label: '渠道', to: '/channels', icon: 'server' },
   { label: '积分', to: '/points', icon: 'wallet' },
-  { label: '我的', to: '/me', icon: 'account', also: ['/keys', '/usage', '/account'] },
+  { label: '我的', to: '/me', icon: 'account', also: ['/keys', '/usage', '/account', '/forum'] },
 ]
 
 export function flattenNavigation(groups: NavGroup[]) {

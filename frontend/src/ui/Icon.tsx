@@ -63,6 +63,8 @@ const paths = {
     </>
   ),
   // 通用
+  message: <path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" />,
+  ticket: <path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4zM15 5v3m0 3v2m0 3v3" />,
   account: (
     <>
       <circle cx="12" cy="8" r="3" />

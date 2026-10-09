@@ -84,7 +84,7 @@ function AppProviders() {
 }
 
 export const appRoutes = createRoutesFromElements(
-  <Route element={<AppProviders />}>
+  <Route element={<AppProviders />} HydrateFallback={FullPageLoading}>
     <Route element={<InstanceInitializePage />} path="/initialize" />
     <Route element={<RequireInitialized />}>
     <Route element={<WelcomePage />} path="/welcome" />
@@ -107,6 +107,13 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<UsagePage />} path="/usage" />
           <Route element={<MePage />} path="/me" />
           <Route element={<AccountPage />} path="/account" />
+          <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).ForumPage })} path="/forum" />
+          <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).TicketsPage })} path="/forum/tickets" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).NewTopicPage })} path="/forum/new" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).NewTicketPage })} path="/forum/tickets/new" />
+          <Route lazy={async () => ({ Component: (await import('./forum/BoardsPage')).BoardsPage })} path="/forum/boards" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicPage')).TopicPage })} path="/forum/topics/:id" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).EditTopicPage })} path="/forum/topics/:id/edit" />
         </Route>
         {adminRoutes}
       </Route>

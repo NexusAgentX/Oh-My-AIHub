@@ -15,8 +15,8 @@ describe('navigation', () => {
     expect(new Set(items.map((item) => item.to)).size).toBe(items.length)
   })
 
-  it('groups the sidebar as 使用 API / 共享 / 积分', () => {
-    expect(productNavigation.map((group) => group.label)).toEqual(['使用 API', '共享', '积分'])
+  it('groups the sidebar including forum navigation', () => {
+    expect(productNavigation.map((group) => group.label)).toEqual(['使用 API', '共享', '积分', '交流'])
     expect(productNavigation[0].items.map((item) => item.icon)).toEqual(['home', 'store', 'key', 'chart'])
   })
 
@@ -32,6 +32,8 @@ describe('navigation', () => {
     expect(findNavItem(productNavigation, '/points/trades/abc')?.label).toBe('积分')
     expect(findNavItem(productNavigation, '/account/password')).toBeUndefined()
     expect(findNavItem(productNavigation, '/modelsx')).toBeUndefined()
+    expect(findNavItem(productNavigation, '/forum/tickets/new')?.label).toBe('工单')
+    expect(findNavItem(productNavigation, '/forum/new')?.label).toBe('论坛')
   })
 
   it('maps API Key, 用量 and 账户设置 to the 我的 tab on mobile', () => {
@@ -39,6 +41,7 @@ describe('navigation', () => {
     expect(findMobileTab(mobileTabs, '/usage')?.label).toBe('我的')
     expect(findMobileTab(mobileTabs, '/account')?.label).toBe('我的')
     expect(findMobileTab(mobileTabs, '/me')?.label).toBe('我的')
+    expect(findMobileTab(mobileTabs, '/forum/tickets')?.label).toBe('我的')
     expect(findMobileTab(mobileTabs, '/channels/abc')?.label).toBe('渠道')
     expect(findMobileTab(mobileTabs, '/points/trades/1')?.label).toBe('积分')
   })
