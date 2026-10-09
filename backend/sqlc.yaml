@@ -167,3 +167,10 @@ sql:
         <<: *gen
         package: observepg
         out: internal/postgres/observepg
+  - <<: *domain
+    queries: internal/postgres/forumpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: forumpg
+        out: internal/postgres/forumpg

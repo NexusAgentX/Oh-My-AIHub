@@ -11,6 +11,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -25,6 +26,7 @@ const (
 )
 
 type Dependencies struct {
+	Forum             *forum.Service
 	Identity          *identity.Service
 	Catalog           *catalog.Service
 	Ledger            *ledger.Service
@@ -44,6 +46,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	forum             *forum.Service
 	identity          *identity.Service
 	catalog           *catalog.Service
 	ledger            *ledger.Service
@@ -73,6 +76,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		forum:             dependencies.Forum,
 		identity:          dependencies.Identity,
 		catalog:           dependencies.Catalog,
 		ledger:            dependencies.Ledger,
@@ -106,6 +110,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerGatewayRoutes(routes)
 	application.registerC2CRoutes(routes)
 	application.registerObserveRoutes(routes)
+	application.registerForumRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

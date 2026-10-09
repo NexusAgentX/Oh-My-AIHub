@@ -3,10 +3,11 @@ openapi: 3.1.0
 info:
   title: Oh-My-AIHub API
   version: 0.7.0-dev
-  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；列表统一游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
+  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；论坛列表使用页码分页（page / limit → items / total / page / limit）；其余列表使用游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
+- {name: forum, description: 登录成员论坛与私密工单}
 - {name: instance, description: 实例与健康检查}
 - {name: auth, description: 认证与当前账户}
 - {name: home, description: 首页}
@@ -24,6 +25,655 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  "/api/forum/boards":
+    get:
+      operationId: listForumBoards
+      tags:
+      - forum
+      summary: listForumBoards
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumBoardList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+    post:
+      operationId: createForumBoard
+      tags:
+      - forum
+      summary: createForumBoard
+      x-access: admin
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumBoard"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumBoardInput"
+  "/api/forum/boards/{id}":
+    patch:
+      operationId: updateForumBoard
+      tags:
+      - forum
+      summary: updateForumBoard
+      x-access: admin
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumBoard"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumBoardInput"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteForumBoard
+      tags:
+      - forum
+      summary: deleteForumBoard
+      x-access: admin
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '204':
+          description: 成功
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/forum/topics":
+    get:
+      operationId: listForumTopics
+      tags:
+      - forum
+      summary: listForumTopics
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumTopicPage"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum:
+          - discussion
+          - ticket
+          default: discussion
+      - name: board_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+    post:
+      operationId: createForumTopic
+      tags:
+      - forum
+      summary: createForumTopic
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumTopic"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumTopicInput"
+  "/api/forum/topics/{id}":
+    get:
+      operationId: getForumTopic
+      tags:
+      - forum
+      summary: getForumTopic
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumTopic"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateForumTopic
+      tags:
+      - forum
+      summary: updateForumTopic
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumTopic"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumTopicEdit"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteForumTopic
+      tags:
+      - forum
+      summary: deleteForumTopic
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '204':
+          description: 成功
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/forum/topics/{id}/status":
+    patch:
+      operationId: updateForumTopicStatus
+      tags:
+      - forum
+      summary: updateForumTopicStatus
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumTopic"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumStatusInput"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/forum/topics/{id}/replies":
+    get:
+      operationId: listForumReplies
+      tags:
+      - forum
+      summary: listForumReplies
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumReplyPage"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+    post:
+      operationId: createForumReply
+      tags:
+      - forum
+      summary: createForumReply
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumReply"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumContentInput"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/forum/replies/{id}":
+    patch:
+      operationId: updateForumReply
+      tags:
+      - forum
+      summary: updateForumReply
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumReply"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ForumContentInput"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteForumReply
+      tags:
+      - forum
+      summary: deleteForumReply
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '204':
+          description: 成功
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/forum/attachments":
+    post:
+      operationId: uploadForumAttachment
+      tags:
+      - forum
+      summary: uploadForumAttachment
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ForumAttachment"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+        '413':
+          description: 单文件最多 10 MiB；请求最多 11 MiB
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '429':
+          description: 每账户每分钟最多 30 次上传，全局最多 2 个同时处理
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+  "/api/forum/attachments/{id}":
+    get:
+      operationId: downloadForumAttachment
+      tags:
+      - forum
+      summary: downloadForumAttachment
+      x-access: ready
+      x-feature: '239'
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: 鉴权文件；PNG/JPEG/GIF 内联，其他文件强制下载。临时文件仅上传者可读，绑定后遵循主题权限。
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '422':
+          "$ref": "#/components/responses/Unprocessable"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   /api/health:
     get:
       operationId: getHealth
@@ -2167,6 +2817,314 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    ForumAuthor:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - display_name
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+    ForumBoard:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - description
+      - sort_order
+      - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        sort_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    ForumBoardInput:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 2000
+          description: 最多 2000 UTF-8 字节。
+        sort_order:
+          type: integer
+          format: int32
+    ForumBoardList:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ForumBoard"
+    ForumAttachment:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - media_type
+      - size
+      - url
+      - inline
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+        url:
+          type: string
+        inline:
+          type: boolean
+    ForumTopic:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - body
+      - author
+      - created_at
+      - updated_at
+      - attachments
+      - kind
+      - board_id
+      - title
+      - status
+      - reply_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        author:
+          "$ref": "#/components/schemas/ForumAuthor"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ForumAttachment"
+        kind:
+          type: string
+          enum:
+          - discussion
+          - ticket
+        board_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        title:
+          type: string
+        status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - pending
+          - in_progress
+          - resolved
+          - closed
+          -
+        reply_count:
+          type: integer
+    ForumReply:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - body
+      - author
+      - created_at
+      - updated_at
+      - attachments
+      - topic_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        author:
+          "$ref": "#/components/schemas/ForumAuthor"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ForumAttachment"
+        topic_id:
+          type: string
+          format: uuid
+    ForumContentInput:
+      type: object
+      additionalProperties: false
+      required:
+      - body
+      - attachment_ids
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 262144
+          description: Markdown 源码，最多 262144 UTF-8 字节。
+        attachment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 20
+          uniqueItems: true
+          description: 必填非 null；编辑时包含全部保留的附件 ID，显式空数组删除当前内容的全部附件。附件不能跨内容重绑定。
+    ForumTopicEdit:
+      type: object
+      additionalProperties: false
+      required:
+      - title
+      - body
+      - attachment_ids
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        body:
+          type: string
+          minLength: 1
+          maxLength: 262144
+          description: Markdown 源码，最多 262144 UTF-8 字节。
+        attachment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 20
+          uniqueItems: true
+          description: 必填非 null；编辑时包含全部保留的附件 ID，显式空数组删除当前内容的全部附件。附件不能跨内容重绑定。
+    ForumTopicInput:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - title
+      - body
+      - attachment_ids
+      properties:
+        kind:
+          type: string
+          enum:
+          - discussion
+          - ticket
+        board_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        body:
+          type: string
+          minLength: 1
+          maxLength: 262144
+          description: Markdown 源码，最多 262144 UTF-8 字节。
+        attachment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 20
+          uniqueItems: true
+          description: 必填非 null；编辑时包含全部保留的附件 ID，显式空数组删除当前内容的全部附件。附件不能跨内容重绑定。
+    ForumStatusInput:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - pending
+          - in_progress
+          - resolved
+          - closed
+    ForumTopicPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - total
+      - page
+      - limit
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ForumTopic"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+    ForumReplyPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - total
+      - page
+      - limit
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ForumReply"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
     Amount: {type: string, pattern: '^-?[0-9]+(\.[0-9]{1,9})?$', description: 积分金额的十进制字符串，最多 9 位小数，不使用浮点数，例如 "12.5"。}
     NullableAmount: {type: [string, 'null'], pattern: '^-?[0-9]+(\.[0-9]{1,9})?$', description: 可空的积分金额十进制字符串。}
     Price: {type: string, pattern: '^(0|[1-9][0-9]{0,5})(\.[0-9]{1,9})?$', description: 单价（积分/百万 token）的十进制字符串，0～100000，最多 9 位小数。}

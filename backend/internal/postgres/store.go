@@ -4,6 +4,7 @@
 package postgres
 
 import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/forumpg"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -19,6 +20,7 @@ import (
 )
 
 type Store struct {
+	Forum    *forumpg.Store
 	Identity *identitypg.Store
 	Catalog  *catalogpg.Store
 	Settings *settingspg.Store
@@ -34,6 +36,7 @@ type Store struct {
 
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{
+		Forum:    forumpg.NewStore(pool),
 		Identity: identitypg.NewStore(pool),
 		Catalog:  catalogpg.NewStore(pool),
 		Settings: settingspg.NewStore(pool),
