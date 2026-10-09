@@ -245,7 +245,16 @@ func callDetailJSON(detail observe.CallDetail) map[string]any {
 	call["client_user_agent"] = optionalString(detail.ClientUserAgent)
 	call["attempts"] = attempts
 	call["price_snapshot"] = rawJSONOrNil(detail.PriceSnapshot)
-	call["output_tokens_per_second"] = detail.TokensPerSecond
+	speed := detail.TokensPerSecond
+	if !detail.Stream {
+		// Non-streaming speed is the end-to-end average, including all attempts.
+		speed = nil
+		if detail.DurationMS != nil && *detail.DurationMS > 0 && detail.Usage.OutputTokens > 0 {
+			value := float64(detail.Usage.OutputTokens) * 1000 / float64(*detail.DurationMS)
+			speed = &value
+		}
+	}
+	call["output_tokens_per_second"] = speed
 	call["inter_token_p50_ms"] = detail.IntervalP50MS
 	call["inter_token_p95_ms"] = detail.IntervalP95MS
 	call["response_bytes"] = detail.ResponseBytes
