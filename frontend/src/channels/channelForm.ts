@@ -20,6 +20,7 @@ export type ModelRow = {
   multiplier: string
   /** 每种格式最近一次测试是否通过 */
   passed: Partial<Record<Format, boolean>>
+  errors?: Partial<Record<Format, string>>
 }
 
 export type HeaderSetRow = { name: string; value: string }
@@ -77,6 +78,7 @@ export function rowsFromChannel(channel: Channel): ModelRow[] {
     upstream: model.upstream_model,
     formats: model.formats,
     multiplier: model.multiplier,
+    errors: Object.fromEntries(Object.entries(model.format_tests).filter(([, test]) => !test.ok).map(([format, test]) => [format, test.error || '测试未通过'])),
     passed: Object.fromEntries(Object.entries(model.format_tests).map(([format, test]) => [format, test.ok])),
   }))
 }
@@ -90,9 +92,14 @@ export function applyTestResults(rows: ModelRow[], results: ChannelTestResult[])
     const mine = results.filter((result) => result.model_id === row.modelId)
     if (mine.length === 0) return row
     const passed = { ...row.passed }
-    for (const result of mine) passed[result.format] = result.ok
+    const errors = { ...row.errors }
+    for (const result of mine) {
+      passed[result.format] = result.ok
+      if (result.ok) delete errors[result.format]
+      else errors[result.format] = result.error || '测试未通过'
+    }
     const ok = mine.filter((result) => result.ok).map((result) => result.format)
-    return { ...row, passed, formats: ok.length > 0 ? ok : row.formats }
+    return { ...row, passed, errors, formats: ok.length > 0 ? ok : row.formats }
   })
 }
 
