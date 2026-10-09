@@ -46,11 +46,13 @@ type Observer struct {
 	intervals []time.Duration
 	frames    int
 
-	detail       ledger.UsageDetail
-	qwenObserved bool
-	usage        ledger.Usage
-	found        bool
-	responseID   string
+	detail         ledger.UsageDetail
+	qwenObserved   bool
+	anthropicSpeed string
+	anthropicTier  string
+	usage          ledger.Usage
+	found          bool
+	responseID     string
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
 }

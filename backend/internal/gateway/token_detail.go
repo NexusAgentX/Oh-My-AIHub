@@ -87,7 +87,7 @@ func (o *Observer) absorbDetails(raw []byte) {
 		prefix = "gemini:"
 	}
 	if tier := textValue(value["service_tier"]); tier != "" {
-		o.detail.ServiceTier = prefix + tier
+		o.setServiceTier(prefix + tier)
 	}
 	if o.format == channel.FormatOpenAIChat {
 		var choices []map[string]json.RawMessage
@@ -109,10 +109,19 @@ func (o *Observer) absorbDetails(raw []byte) {
 	}
 	usage := object(value["usage"])
 	if tier := textValue(usage["service_tier"]); tier != "" {
-		o.detail.ServiceTier = prefix + tier
+		o.setServiceTier(prefix + tier)
 	}
 	switch o.format {
 	case channel.FormatAnthropic:
+		// Speed is a separate response fact: later tier-only frames must not
+		// erase it. An explicit non-fast speed replaces an earlier fast fact.
+		if speed, present := usage["speed"]; present {
+			o.anthropicSpeed = textValue(speed)
+		}
+		o.detail.ServiceTier = o.anthropicTier
+		if o.anthropicSpeed == "fast" {
+			o.detail.ServiceTier = "anthropic:fast"
+		}
 		if _, changed := usage["cache_creation_input_tokens"]; changed {
 			old := map[string]int64{}
 			for key, n := range o.detail.Tokens {
@@ -181,7 +190,7 @@ func (o *Observer) absorbDetails(raw []byte) {
 		o.setBucket("cache_read_", nil, o.usage.CacheReadTokens)
 		o.setBucket("output_", nil, o.usage.OutputTokens)
 		if tier := textValue(usage["serviceTier"]); tier != "" {
-			o.detail.ServiceTier = prefix + tier
+			o.setServiceTier(prefix + tier)
 		}
 		prompt, pok := modalityCounts(usage["promptTokensDetails"])
 		cached, cok := modalityCounts(usage["cacheTokensDetails"])
@@ -233,5 +242,14 @@ func (o *Observer) absorbDetails(raw []byte) {
 			o.detail.ToolPromptTokens = n
 			o.note("工具提示token已观察，独立计价语义未覆盖")
 		}
+	}
+}
+
+// Keep the upstream tier separate from the effective fast pricing condition.
+func (o *Observer) setServiceTier(tier string) {
+	if o.format == channel.FormatAnthropic {
+		o.anthropicTier = tier
+	} else {
+		o.detail.ServiceTier = tier
 	}
 }

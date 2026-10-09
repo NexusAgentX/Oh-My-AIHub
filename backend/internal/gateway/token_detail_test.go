@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -125,5 +126,77 @@ func TestSnapshotKeepsExactWinningPricesBeforeMultiplier(t *testing.T) {
 	}
 	if snapshot.Selected.Input != "0.000000001" || snapshot.Selected.Tokens["input_audio"] != "0.000000001" || snapshot.Multiplier != "0.1" {
 		t.Fatal(string(raw))
+	}
+}
+
+func TestAnthropicSpeedPricing(t *testing.T) {
+	for _, tc := range []struct {
+		name, speed, tail string
+		fast              bool
+	}{
+		{"fast", `,"speed":"fast"`, "", true},
+		{"standard", `,"speed":"standard"`, "", false},
+		{"missing", "", "", false},
+		{"unknown", `,"speed":"unknown"`, "", false},
+		{"later tier", `,"speed":"fast"`, `{"service_tier":"standard","usage":{"service_tier":"standard","output_tokens":1000000}}`, true},
+		{"delta fast", "", `{"usage":{"speed":"fast","output_tokens":1000000}}`, true},
+		{"delta standard", `,"speed":"fast"`, `{"usage":{"speed":"standard","output_tokens":1000000}}`, false},
+	} {
+		for _, stream := range []bool{false, true} {
+			if !stream && tc.tail != "" {
+				continue
+			}
+			t.Run(fmt.Sprintf("%s/stream=%v", tc.name, stream), func(t *testing.T) {
+				body := `{"usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_creation_input_tokens":2000000,"cache_read_input_tokens":1000000,"cache_creation":{"ephemeral_5m_input_tokens":1000000,"ephemeral_1h_input_tokens":1000000},"service_tier":"standard"` + tc.speed + `}}`
+				contentType := "application/json"
+				if stream {
+					contentType = "text/event-stream"
+					body = "event: message_start\ndata: {\"type\":\"message_start\",\"message\":" + body + "}\n\n"
+					if tc.tail != "" {
+						body += "event: message_delta\ndata: " + tc.tail + "\n\n"
+					}
+				}
+				got := observe(channel.FormatAnthropic, stream, contentType, body, 7)
+				wantTier := "anthropic:standard"
+				if tc.fast {
+					wantTier = "anthropic:fast"
+				}
+				if !got.Found || got.Usage.Detail == nil || got.Usage.Detail.ServiceTier != wantTier {
+					t.Fatalf("usage: %+v detail: %+v", got.Usage, got.Usage.Detail)
+				}
+				base := ledger.Prices{InputPerMillion: 1, OutputPerMillion: 1, CacheWritePerMillion: 1, CacheReadPerMillion: 1}
+				tiers := []ledger.PriceTier{{ServiceTier: "anthropic:fast", InputPrice: 2, OutputPrice: 3, CacheWritePrice: 4, CacheReadPrice: 5, TokenPrices: map[string]money.Amount{"cache_write_5m": 6, "cache_write_1h": 7}}}
+				priced, err := ledger.CalculatePriceV2(got.Usage, base, tiers, time.Now(), ledger.FixedPointScale, 0)
+				want := money.Amount(5)
+				if tc.fast {
+					want = 23
+				}
+				if err != nil || priced.Cost != want {
+					t.Fatalf("price=%+v err=%v want=%v", priced, err, want)
+				}
+			})
+		}
+	}
+}
+
+func TestAnthropicFastWithoutServiceTierAndRequestFallback(t *testing.T) {
+	for _, speed := range []string{"fast", "standard", ""} {
+		t.Run(speed, func(t *testing.T) {
+			o := NewObserver(channel.FormatAnthropic, false, "application/json")
+			// A requested premium tier is metadata, never an actual billing fact.
+			o.detail.RequestedServiceTier = "fast"
+			o.Write([]byte(`{"usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_creation_input_tokens":1000000,"cache_read_input_tokens":1000000,"speed":"`+speed+`"}}`), time.Now())
+			got := o.Finish()
+			tiers := []ledger.PriceTier{{ServiceTier: "anthropic:fast", InputPrice: 2, OutputPrice: 3, CacheWritePrice: 4, CacheReadPrice: 5}}
+			base := ledger.Prices{InputPerMillion: 1, OutputPerMillion: 1, CacheWritePerMillion: 1, CacheReadPerMillion: 1}
+			priced, err := ledger.CalculatePriceV2(got.Usage, base, tiers, time.Now(), ledger.FixedPointScale, 0)
+			want := money.Amount(4)
+			if speed == "fast" {
+				want = 14
+			}
+			if err != nil || priced.Cost != want {
+				t.Fatalf("price=%+v err=%v want=%v", priced, err, want)
+			}
+		})
 	}
 }
