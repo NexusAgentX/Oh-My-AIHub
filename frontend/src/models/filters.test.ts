@@ -15,10 +15,9 @@ const unknown = { ...model, id: 'unknown', context_window: null, supports_tools:
 const items = [model, offline, unknown]
 
 describe('model catalog filters', () => {
-  it('preserves the catalog and order by default; online excludes zero channels and clearing restores all', () => {
-    expect(filterModels(items, defaultFilters)).toEqual(items)
-    expect(filterModels(items, { ...defaultFilters, onlineOnly: true })).toEqual([model, unknown])
-    expect(filterModels(items, defaultFilters)).toEqual(items)
+  it('defaults to online models in catalog order; disabling online restores all', () => {
+    expect(filterModels(items, defaultFilters)).toEqual([model, unknown])
+    expect(filterModels(items, { ...defaultFilters, onlineOnly: false })).toEqual(items)
   })
   it('searches id, display name and provider without case or surrounding whitespace', () => {
     for (const query of [' GPT-DEMO ', 'DEMO MODEL', 'openai']) {
@@ -36,7 +35,7 @@ describe('model catalog filters', () => {
     expect(filterModels(items, { ...filters, format: 'gemini' })).toEqual([])
   })
   it('uses inclusive context limits and excludes unknown context even at zero', () => {
-    expect(filterModels(items, { ...defaultFilters, minContext: '0' })).toEqual([model, offline])
+    expect(filterModels(items, { ...defaultFilters, onlineOnly: false, minContext: '0' })).toEqual([model, offline])
     expect(filterModels(items, { ...defaultFilters, minContext: '128001' })).toEqual([])
   })
   it('compares exact nano prices and excludes missing prices, including zero limits', () => {
@@ -52,6 +51,6 @@ describe('model catalog filters', () => {
     expect(contextFilterError(' 128000 ')).toBeUndefined()
     expect(filterModels(items, { ...defaultFilters, maxInput: '-1' })).toEqual([])
     expect(filterModels(items, { ...defaultFilters, minContext: '1.5' })).toEqual([])
-    expect(filterModels(items, { ...defaultFilters, maxInput: ' ', minContext: ' ' })).toEqual(items)
+    expect(filterModels(items, { ...defaultFilters, onlineOnly: false, maxInput: ' ', minContext: ' ' })).toEqual(items)
   })
 })

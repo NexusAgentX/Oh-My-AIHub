@@ -19,7 +19,7 @@ export type ModelFilters = {
   maxOutput: string
 }
 export const defaultFilters: ModelFilters = {
-  query: '', format: 'all', onlineOnly: false, provider: '',
+  query: '', format: 'all', onlineOnly: true, provider: '',
   supports_tools: false, supports_structured_output: false, supports_vision: false,
   minContext: '', maxInput: '', maxOutput: '',
 }

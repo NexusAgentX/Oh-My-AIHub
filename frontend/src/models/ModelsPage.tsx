@@ -93,7 +93,7 @@ export function ModelsPage() {
             <>
               <div className="model-filter-summary">
                 <span role="status">{invalid ? '请修正筛选条件' : `显示 ${rows.length} / ${data.items.length} 个模型`}</span>
-                <Button type="button" variant="quiet" size="sm" disabled={!active} onClick={() => setFilters(defaultFilters)}>清空筛选</Button>
+                <Button type="button" variant="quiet" size="sm" disabled={!active} onClick={() => setFilters({ ...defaultFilters, onlineOnly: false })}>清空筛选</Button>
               </div>
               {rows.length === 0
                 ? <EmptyState title={invalid ? '筛选条件有误' : data.items.length === 0 ? '暂无模型' : '没有匹配的模型'} />
