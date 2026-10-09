@@ -30,7 +30,7 @@
 .price-rules dt { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--ink); font-weight: 600; }
 .price-rules dd { display: grid; gap: 2px; margin: 0; }
 
-.routing-editor { display: grid; gap: var(--space-4); }
+.routing-editor { container: routing / inline-size; min-width: 0; display: grid; gap: var(--space-4); }
 .routing-mode { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .routing-list { display: grid; gap: 0; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: var(--radius-md); list-style: none; }
 .routing-row {
@@ -69,7 +69,7 @@
 .routing-metrics dt { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
 .routing-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 
-@media (max-width: 960px) {
+@container routing (max-width: 720px) {
   .routing-row,
   .routing-list-manual .routing-row { grid-template-columns: auto minmax(0, 1fr); }
   .routing-list-manual .routing-row { grid-template-columns: auto auto minmax(0, 1fr); }
