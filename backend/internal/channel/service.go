@@ -71,8 +71,7 @@ func validName(name string) bool {
 	return name != "" && utf8.RuneCountInString(name) <= 64 && !hasControl(name)
 }
 
-// validateBase normalizes the Base URL under the egress policy and maps every
-// policy refusal to ErrInvalidInput.
+// validateBase normalizes the Base URL and preserves actionable address errors.
 func (s *Service) validateBase(ctx context.Context, raw string) (string, error) {
 	policy, err := s.outbound(ctx)
 	if err != nil {
@@ -80,10 +79,10 @@ func (s *Service) validateBase(ctx context.Context, raw string) (string, error) 
 	}
 	normalized, err := policy.ValidateBaseURL(ctx, raw)
 	if err != nil {
-		if errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrUnsafeUpstream) {
-			return "", ErrInvalidInput
+		if errors.Is(err, ErrUnsafeUpstream) {
+			return "", ErrUnsafeUpstream
 		}
-		return "", ErrInvalidInput
+		return "", ErrInvalidBaseURL
 	}
 	return normalized, nil
 }

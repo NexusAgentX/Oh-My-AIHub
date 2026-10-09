@@ -95,6 +95,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "channel_suspended", "渠道已被管理员下架，不能自行上架")
 	case errors.Is(err, channel.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
+	case errors.Is(err, channel.ErrInvalidBaseURL):
+		writeError(w, http.StatusUnprocessableEntity, "invalid_base_url", "Base URL 无效：请填写 HTTPS 中转站根地址，可带 /v1 后缀，不要包含具体接口路径、查询参数或片段")
 	case errors.Is(err, channel.ErrUnsafeUpstream):
 		writeError(w, http.StatusUnprocessableEntity, "unsafe_upstream", "上游地址未通过出站安全校验")
 	case errors.Is(err, c2c.ErrForbidden):
