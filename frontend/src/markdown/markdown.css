@@ -1,3 +1,12 @@
+/* Vditor inserts its sprite into body with inline styles blocked by our CSP.
+   Keep only that sprite out of layout; toolbar SVGs still reference its symbols. */
+body > svg:has(> defs > #vditor-icon-bold) {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .markdown-editor { min-width: 0; color: var(--body); }
 .markdown-editor-actions, .markdown-editor-actions > div { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .markdown-editor-actions { justify-content: space-between; margin-bottom: var(--space-2); }
