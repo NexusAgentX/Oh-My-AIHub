@@ -80,3 +80,10 @@
   .routing-use,
   .routing-handle { width: 44px; height: 44px; }
 }
+
+.model-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.model-filter-capabilities { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: 0; margin: var(--space-3) 0 0; border: 0; }
+.model-filter-capabilities legend { margin-bottom: var(--space-2); font-size: var(--text-sm); }
+.model-filter-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) 0; color: var(--muted); font-size: var(--text-sm); }
+@media (max-width: 960px) { .model-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .model-filters { grid-template-columns: minmax(0, 1fr); } }
