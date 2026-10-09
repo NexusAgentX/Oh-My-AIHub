@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+const (
+	testStreamLimit = 4 << 20
+	testEventLimit  = 1 << 20
+)
+
 // A 200 only confirms the stream opened, not that the model ran successfully.
 func validateTestResponse(response *http.Response, format Format) error {
 	if !strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
@@ -27,10 +32,15 @@ func validateTestResponse(response *http.Response, format Format) error {
 		_, err = testEvent(format, body)
 		return err
 	}
-	scanner := bufio.NewScanner(io.LimitReader(response.Body, testBodyLimit+1))
-	scanner.Buffer(make([]byte, 4096), testBodyLimit+1)
+	limited := &io.LimitedReader{R: response.Body, N: testStreamLimit + 1}
+	scanner := bufio.NewScanner(limited)
+	scanner.Buffer(make([]byte, 4096), testEventLimit+1)
 	var data []string
+	eventBytes := 0
 	for scanner.Scan() {
+		if limited.N == 0 {
+			return errors.New("测试流超过 4 MiB 总大小限制")
+		}
 		line := scanner.Text()
 		if line == "" {
 			if len(data) == 0 {
@@ -38,6 +48,7 @@ func validateTestResponse(response *http.Response, format Format) error {
 			}
 			done, err := testEvent(format, []byte(strings.Join(data, "\n")))
 			data = nil
+			eventBytes = 0
 			if err != nil {
 				return err
 			}
@@ -45,13 +56,23 @@ func validateTestResponse(response *http.Response, format Format) error {
 				return nil
 			}
 		} else if strings.HasPrefix(line, "data:") {
+			eventBytes += len(line) + 1
+			if eventBytes > testEventLimit {
+				return errors.New("测试流单事件超过 1 MiB 限制")
+			}
 			data = append(data, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
 		}
+	}
+	if limited.N == 0 {
+		return errors.New("测试流超过 4 MiB 总大小限制")
+	}
+	if errors.Is(scanner.Err(), bufio.ErrTooLong) {
+		return errors.New("测试流单行超过 1 MiB 限制")
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("读取测试流失败: %w", err)
 	}
-	return errors.New("测试流未正常结束或超过大小限制")
+	return errors.New("测试流未正常结束")
 }
 
 func testEvent(format Format, data []byte) (bool, error) {

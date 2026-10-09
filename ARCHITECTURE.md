@@ -94,7 +94,7 @@
 
 ## 渠道格式测试
 
-渠道格式测试使用流式请求（Gemini 为 `streamGenerateContent?alt=sse`），通过 `GatewayClient` 保留固定出站安全策略与 30 秒总超时，不叠加 `ClientFor` 的 10 秒响应头限制。检测 SSE 完成、错误和截断，合法非流式 JSON 可回退识别；不自动追加非流式重试。发现模型仍使用 `ClientFor` 的短超时。
+渠道格式测试使用流式请求（Gemini 为 `streamGenerateContent?alt=sse`），通过 `GatewayClient` 保留固定出站安全策略与 30 秒总超时，不叠加 `ClientFor` 的 10 秒响应头限制。SSE 总读取上限为 4 MiB，单事件/单行上限为 1 MiB，与错误正文及非流式 JSON 的 64 KiB 上限分离；超限和截断分别报错。检测 SSE 完成、错误和截断，合法非流式 JSON 可回退识别；不自动追加非流式重试。发现模型仍使用 `ClientFor` 的短超时。
 
 ## 数据与状态
 
