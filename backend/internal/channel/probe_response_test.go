@@ -126,3 +126,33 @@ func TestProbeClientKeepsTotalDeadlineWithoutHeaderDeadline(t *testing.T) {
 		t.Fatal("discovery deadlines changed")
 	}
 }
+
+func TestResponsesStreamLargerThanShortBodyLimit(t *testing.T) {
+	// Real relays repeat response metadata in created/in_progress/completed.
+	// Even a tiny generated answer can therefore exceed the short JSON limit.
+	body := ""
+	for _, event := range []string{"response.created", "response.in_progress", "response.completed"} {
+		body += `data: {"type":"` + event + `","response":{"metadata":"` + strings.Repeat("x", 30<<10) + `"}}` + "\n\n"
+	}
+	response := &http.Response{Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(body))}
+	if err := validateTestResponse(response, FormatOpenAIResponses); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProbeStreamLimitsHaveDistinctErrors(t *testing.T) {
+	for _, tc := range []struct{ name, body, want string }{
+		{"total", strings.Repeat(": heartbeat\n\n", testStreamLimit/12+1), "4 MiB"},
+		{"line", "data: " + strings.Repeat("x", testEventLimit+1), "单行"},
+		{"event", strings.Repeat("data: "+strings.Repeat("x", 1024)+"\n", 1025) + "\n", "单事件"},
+		{"truncated", "data: {\"type\":\"response.created\"}\n\n", "未正常结束"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := &http.Response{Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(tc.body))}
+			err := validateTestResponse(response, FormatOpenAIResponses)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
