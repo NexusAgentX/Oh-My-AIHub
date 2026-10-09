@@ -70,7 +70,7 @@ mise run install
 mise run dev-database
 ```
 
-迁移只有一份基线 `0001_baseline.sql`，产品重写时已原地重写（ADR-0024、ADR-0026）。模型细分价格（#190）也在该基线中新增列。更早创建的开发数据库与它不兼容，须先用 `docker compose down -v` 删除数据卷再重新启动。
+迁移由基线 `0001_baseline.sql` 与后续编号脚本组成（ADR-0024、ADR-0026）。`0002_forum.sql` 新增论坛表；Goose 记录已执行版本，新空库依次执行，现有 v0.9.1 数据库只追加论坛迁移，保留原有数据。更早版本涉及的基线调整与升级前置要求见[发布手册](docs/runbooks/release.md)，不要通过删除生产数据卷处理升级。
 
 首次运行时，启动后端与前端后访问 `/initialize`，在网页上创建唯一的初始管理员。
 
