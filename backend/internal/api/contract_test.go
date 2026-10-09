@@ -243,9 +243,9 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 			t.Errorf("%s: 非外部入口必须位于 /api/ 下", key)
 		}
 		switch operation.body["x-feature"] {
-		case "A", "B", "C", "G":
+		case "A", "B", "C", "G", "239":
 		default:
-			t.Errorf("%s: x-feature 须为 A/B/C/G", key)
+			t.Errorf("%s: x-feature 须为 A/B/C/G/239", key)
 		}
 		responses := operation.body["responses"].(map[string]any)
 		if access != "gateway_key" && operation.method != "GET" && responses["403"] == nil {

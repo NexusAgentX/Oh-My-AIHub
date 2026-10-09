@@ -63,3 +63,5 @@
 - [ADR-0029：观测现算不存快照，指标走内网端口](0029-compute-observability-on-demand-with-internal-metrics.md) — 已通过
 
 - [ADR-0030：以可靠 token 细分与实际响应事实定价](0030-price-reliable-token-breakdowns.md)
+
+- [ADR-0031：论坛附件采用受限 PostgreSQL 存储并继承内容权限](0031-store-forum-attachments-in-postgresql.md) — 已通过

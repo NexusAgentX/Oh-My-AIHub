@@ -21,6 +21,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -124,6 +125,8 @@ func main() {
 	backgroundContext, stopBackground := context.WithCancel(context.Background())
 	defer stopBackground()
 	go runC2CExpiry(backgroundContext, c2cService)
+	forumService := forum.NewService(store.Forum)
+	go runForumCleanup(backgroundContext, forumService, logger)
 
 	observeService := observe.NewService(store.Observe)
 	feed := observe.NewFeed(observeService, bus, logger)
@@ -144,6 +147,7 @@ func main() {
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
 			Identity: identityService,
+			Forum:    forumService,
 			Catalog:  catalogService,
 			Ledger:   ledger.NewService(store.Ledger),
 			Settings: settingsService,
@@ -314,4 +318,21 @@ func parseTrustedProxyCIDRs(value string) ([]netip.Prefix, error) {
 		prefixes = append(prefixes, prefix.Masked())
 	}
 	return prefixes, nil
+}
+
+func runForumCleanup(ctx context.Context, service *forum.Service, logger *slog.Logger) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		cleanupContext, cancel := context.WithTimeout(ctx, time.Minute)
+		if _, err := service.Cleanup(cleanupContext); err != nil && ctx.Err() == nil {
+			logger.Error("forum attachment cleanup failed", "error", err)
+		}
+		cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
