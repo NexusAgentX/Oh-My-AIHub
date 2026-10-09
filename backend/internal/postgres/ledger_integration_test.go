@@ -18,7 +18,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 )
 
-func TestBaselineMigrationCreatesTheRewrittenSchema(t *testing.T) {
+func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	pool, _ := isolatedDatabase(t)
 	ctx := context.Background()
 	var tables int
@@ -27,8 +27,8 @@ func TestBaselineMigrationCreatesTheRewrittenSchema(t *testing.T) {
 		WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name <> 'goose_db_version'`).Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 18 {
-		t.Fatalf("baseline tables = %d, want 18", tables)
+	if tables != 22 {
+		t.Fatalf("schema tables = %d, want 22", tables)
 	}
 	var systemAccounts, settingsRows, feeRate int64
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ledger_accounts WHERE kind = 'system'`).Scan(&systemAccounts); err != nil {

@@ -325,6 +325,13 @@ func TestObserveUsageSpendAndRevenue(t *testing.T) {
 func TestObservePointsReconcileTrendAndEntries(t *testing.T) {
 	o := newObserved(t)
 	o.adjust(o.consumer, "5")
+	// The report's cutoff must follow the database timestamps of the fixture,
+	// even when PostgreSQL runs in a VM whose clock is slightly ahead of the host.
+	var reportAt time.Time
+	if err := o.pool.QueryRow(context.Background(), `SELECT clock_timestamp()`).Scan(&reportAt); err != nil {
+		t.Fatal(err)
+	}
+	o.observe.SetClock(func() time.Time { return reportAt })
 	points := o.get(o.consumer, "/api/points")
 	period := asMap(t, points["period"])
 	if period["difference"] != "0" || period["call_spend"] != "-0.08008" || period["adjustments"] != "5" || period["opening_balance"] != "0" || period["closing_balance"] != "4.91992" {
@@ -923,6 +930,11 @@ func TestObserveStreamsDeliverStartAndFinishAndRespectScope(t *testing.T) {
 						case strings.HasPrefix(line, "data: "):
 							var data map[string]any
 							_ = json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &data)
+							// Fixture calls may still be in the asynchronous feed queue.
+							// Assert the live call's events, not unrelated setup events.
+							if data["id"] != id {
+								continue
+							}
 							data["_event"] = kind
 							events = append(events, data)
 						}
