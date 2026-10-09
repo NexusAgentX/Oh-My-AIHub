@@ -161,7 +161,7 @@ mise run check-proxy-trust # 需要已按上文启动安全栈
 
 ## Markdown 组件
 
-`frontend/src/markdown` 提供 `MarkdownEditor` 与 `MarkdownContent`。编辑器采用 [Vditor 4.0.0](https://github.com/Vanessa219/vditor)（MIT），默认源码＋预览分屏，窄屏上下排列。两种展示都复用 Vditor 的 Lute 引擎，使用 [DOMPurify 3.4.16](https://github.com/cure53/DOMPurify)（Apache-2.0 / MPL-2.0）净化、[highlight.js 11.11.1](https://github.com/highlightjs/highlight.js)（BSD-3-Clause）高亮常用代码语言。依赖版本锁定在 `frontend/package-lock.json`；`jsdom` 仅用于组件与渲染测试。许可副本随前端部署到 `/licenses/markdown.txt`。
+`frontend/src/markdown` 提供 `MarkdownEditor` 与 `MarkdownContent`。编辑器采用 [Vditor 4.0.0](https://github.com/Vanessa219/vditor)（MIT），默认源码＋预览分屏，窄屏上下排列。两种展示都复用 Vditor 的 [Lute 引擎](https://github.com/88250/lute)（Mulan PSL v2），使用 [DOMPurify 3.4.16](https://github.com/cure53/DOMPurify)（Apache-2.0 / MPL-2.0）净化、[highlight.js 11.11.1](https://github.com/highlightjs/highlight.js)（BSD-3-Clause）高亮常用代码语言。依赖版本锁定在 `frontend/package-lock.json`；`jsdom` 仅用于组件与渲染测试。许可副本随前端部署到 `/licenses/markdown.txt`。
 
 `MarkdownEditor` 接收 `value`、`onChange(value)`、可选 `upload(file): Promise<{ url, name, isImage }>`、`onUploadingChange(boolean)`、`disabled`、`label` 与 `placeholder`；`MarkdownContent` 接收 `value` 和可选 `className`。上传函数负责调用业务 API，结果地址必须为 `/api/forum/attachments/{uuid}`。提交按钮应随上传状态禁用，页面切换帖子、工单或草稿时应以其 ID 作为编辑器的 React `key`，避免复用未完成上传与撤销历史。编辑器不使用本地草稿缓存，上传成功才插入 Markdown，文件名按 Markdown 转义。
 
