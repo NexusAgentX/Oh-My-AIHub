@@ -61,7 +61,7 @@ function SellForm({ onDone }: { onDone: () => void }) {
         onChange={(event) => set({ amount: event.target.value.trim() })}
         value={form.amount}
       />
-      <TextField inputMode="decimal" label="单价（元 / 积分）" onChange={(event) => set({ unitPrice: event.target.value.trim() })} placeholder="0.92" value={form.unitPrice} />
+      <TextField inputMode="decimal" label="单价（元 / 积分）" onChange={(event) => set({ unitPrice: event.target.value.trim() })} placeholder="请输入单价" value={form.unitPrice} />
       <div className="field-row">
         <TextField inputMode="decimal" label="单笔最少" onChange={(event) => set({ minPerTrade: event.target.value.trim() })} value={form.minPerTrade} />
         <TextField inputMode="decimal" label="单笔最多" onChange={(event) => set({ maxPerTrade: event.target.value.trim() })} placeholder="不限" value={form.maxPerTrade} />
