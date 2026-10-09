@@ -77,13 +77,15 @@ function ModelsSection({
   summary,
   onTest,
   testing,
+  testingModel,
   testError,
 }: {
   rows: ModelRow[]
   onRows: (rows: ModelRow[]) => void
   summary: { total: number; matched: number } | null
-  onTest: () => void
+  onTest: (modelId?: string) => void
   testing: boolean
+  testingModel: string | null
   testError: string
 }) {
   return (
@@ -94,7 +96,7 @@ function ModelsSection({
         </p>
       )}
       <div className="channel-models-actions">
-        <Button disabled={!rows.some((row) => row.sell && row.modelId)} loading={testing} onClick={onTest} size="sm" type="button" variant="secondary">
+        <Button disabled={testing || !rows.some((row) => row.sell && row.modelId)} loading={testing && testingModel === null} onClick={() => onTest()} size="sm" type="button" variant="secondary">
           测试格式
         </Button>
         <Button icon={<Icon name="plus" />} onClick={() => onRows([...rows, emptyRow()])} size="sm" type="button" variant="quiet">
@@ -102,7 +104,7 @@ function ModelsSection({
         </Button>
       </div>
       <InlineError>{testError}</InlineError>
-      <ModelRows onChange={onRows} rows={rows} />
+      <ModelRows onChange={onRows} onTest={onTest} rows={rows} testing={testing} testingModel={testingModel} />
     </div>
   )
 }
@@ -120,6 +122,8 @@ function ChannelWizard() {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [testError, setTestError] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testingModel, setTestingModel] = useState<string | null>(null)
   const discover = useDiscoverChannel()
   const create = useCreateChannel()
   const update = useUpdateChannel()
@@ -163,22 +167,27 @@ function ChannelWizard() {
     return channel
   }
 
-  const runTest = async () => {
+  const runTest = async (modelId?: string) => {
+    if (testing) return
     setTestError('')
     const problem = validateRows(rows)
     if (problem) {
       setTestError(problem)
       return
     }
+    setTesting(true)
+    setTestingModel(modelId ?? null)
     try {
       const channel = await save('unlisted')
       const result = await test.mutateAsync({
         id: channel.id,
-        body: { model_ids: rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
+        body: { model_ids: modelId ? [modelId] : rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
       })
       setRows((current) => applyTestResults(current, result.results))
     } catch (caught) {
       setTestError(errorMessage(caught, '测试失败，请重试'))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -235,11 +244,12 @@ function ChannelWizard() {
           <div className="stack-form">
             <ModelsSection
               onRows={setRows}
-              onTest={() => void runTest()}
+              onTest={(modelId) => void runTest(modelId)}
               rows={rows}
               summary={summary}
               testError={testError}
-              testing={test.isPending || (create.isPending && !channelId)}
+              testing={testing}
+              testingModel={testingModel}
             />
             <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
               <AdvancedFields form={advanced} onChange={setAdvanced} />
@@ -355,6 +365,8 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
   const [summary, setSummary] = useState<{ total: number; matched: number } | null>(null)
   const [error, setError] = useState('')
   const [testError, setTestError] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testingModel, setTestingModel] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const discover = useDiscoverChannel()
@@ -404,22 +416,27 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
     )
   }
 
-  const runTest = async () => {
+  const runTest = async (modelId?: string) => {
+    if (testing) return
     setTestError('')
     const problem = validateRows(rows)
     if (problem) {
       setTestError(problem)
       return
     }
+    setTesting(true)
+    setTestingModel(modelId ?? null)
     try {
       await update.mutateAsync({ id: channel.id, body: body() })
       const result = await test.mutateAsync({
         id: channel.id,
-        body: { model_ids: rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
+        body: { model_ids: modelId ? [modelId] : rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
       })
       setRows((current) => applyTestResults(current, result.results))
     } catch (caught) {
       setTestError(errorMessage(caught, '测试失败，请重试'))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -462,11 +479,12 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
         <Card title="模型">
           <ModelsSection
             onRows={setRows}
-            onTest={() => void runTest()}
+            onTest={(modelId) => void runTest(modelId)}
             rows={rows}
             summary={summary}
             testError={testError}
-            testing={test.isPending}
+            testing={testing}
+            testingModel={testingModel}
           />
         </Card>
         <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">

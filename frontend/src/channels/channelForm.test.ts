@@ -30,6 +30,12 @@ describe('channel wizard', () => {
     expect(tested[0].formats).toEqual(['openai_chat', 'anthropic'])
     expect(tested[0].passed).toEqual({ openai_chat: true, openai_responses: false, anthropic: true })
     expect(tested[1]).toBe(rows[1])
+    expect(tested[0].errors).toEqual({ openai_responses: 'no' })
+    const retried = applyTestResults(tested, [
+      { model_id: 'gpt-5', format: 'openai_responses', ok: true, status_code: 200, error: null, duration_ms: 10 },
+    ])
+    expect(retried[0].errors).toEqual({})
+    expect(retried[1]).toBe(rows[1])
   })
 
   it('rejects selling a model without a platform match or format', () => {
