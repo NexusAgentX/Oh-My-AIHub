@@ -24,7 +24,7 @@ const previewIcon = strokeIcon('<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9
 const baseToolbar = ['headings', 'bold', 'italic', 'strike', '|', 'list', 'ordered-list', 'check', 'quote', '|', 'link', 'code', 'inline-code', 'table', '|', 'undo', 'redo']
 
 export function MarkdownEditor(props: MarkdownEditorProps) {
-  const { value, disabled = false, label = '正文', placeholder = '使用 Markdown 编写内容' } = props
+  const { value, disabled = false, placeholder = '使用 Markdown 编写内容' } = props
   const id = useId()
   const host = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -118,6 +118,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
           editor.current = instance!
           const textarea = container.querySelector('textarea.vditor-sv')!
           textarea.id = `${id}-source`
+          textarea.setAttribute('aria-label', latest.current.label ?? '正文')
           textarea.setAttribute('aria-describedby', `${id}-status`)
           if (latest.current.disabled) instance!.disabled()
           if (instance!.getValue() !== latest.current.value) instance!.setValue(latest.current.value)
@@ -162,7 +163,6 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
   }, [showPreview, disabled, uploading, ready, id])
 
   return <div className="markdown-editor" aria-busy={!ready || uploading}>
-    <label className="markdown-editor-label" htmlFor={`${id}-source`}>{label}</label>
     <input ref={input} type="file" multiple hidden disabled={disabled || uploading || !ready} aria-label="上传图片或附件"
       onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ''; void uploadFiles(files) }} />
     <div className={`markdown-editor-panes${showPreview ? ' markdown-editor-panes--split' : ''}`}>

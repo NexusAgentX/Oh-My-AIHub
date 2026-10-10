@@ -8,7 +8,6 @@ body > svg:has(> defs > #vditor-icon-bold) {
 }
 
 .markdown-editor { min-width: 0; color: var(--body); }
-.markdown-editor-label { display: block; margin-bottom: var(--space-2); font-weight: 600; }
 .markdown-editor button:focus-visible, .markdown-editor textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .markdown-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; border: var(--sticker-border); border-radius: var(--radius-md); transition: box-shadow var(--duration) ease; }
 .markdown-editor-panes:focus-within { box-shadow: 3px 3px 0 var(--mustard); }
