@@ -56,11 +56,15 @@
 .call-card-button { width: 100%; color: inherit; cursor: pointer; font: inherit; text-align: left; }
 
 .call-explorer { display: grid; gap: var(--space-3); }
-.call-explorer-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+/* 筛选控件与“实时”开关排在同一个流里，开关靠行尾，不会单独掉到一行 */
+.call-explorer-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.call-explorer-bar > .call-filters { display: contents; }
+.call-explorer-bar > .live-toggle { margin-left: auto; }
 .call-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-.filter-select .input { width: auto; min-width: 120px; height: 34px; font-size: var(--text-sm); }
+/* 筛选控件统一用标准控件高度，与分段控件一样高 */
+.filter-select .input { width: auto; min-width: 120px; }
 .filter-inline-form { display: flex; align-items: center; gap: var(--space-2); }
-.filter-inline-form .input { width: 140px; height: 34px; font-size: var(--text-sm); }
+.filter-inline-form .input { width: 140px; }
 .filter-id-form .input { width: 220px; }
 
 .call-stats {
@@ -83,19 +87,23 @@
 .live-error { display: inline-flex; align-items: center; gap: 4px; color: var(--danger); }
 
 .call-detail { display: grid; gap: var(--space-5); }
-.call-detail-id { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+/* 请求 ID 与幽灵复制按钮一行，和下方明细之间只留一行的间距 */
+.call-detail-id { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); margin: calc(-1 * var(--space-2)) 0 calc(-1 * var(--space-3)); }
 .call-detail-id code { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: var(--text-sm); }
-.call-detail-grid { display: grid; gap: 0; margin: 0; }
-.call-detail-grid > div {
+/* 调用信息与计价明细同一种排法：左侧标签一栏，值左对齐，不换成右对齐加粗的通用明细列表 */
+.call-detail :is(.call-detail-grid, .detail-list) { display: grid; gap: 0; margin: 0; padding: 0; }
+.call-detail :is(.call-detail-grid, .detail-list) > div,
+.call-detail .detail-list > div:last-child {
   display: grid;
+  min-height: 0;
   grid-template-columns: 88px minmax(0, 1fr);
   gap: var(--space-3);
   padding: 8px 0;
   border-bottom: 1px solid var(--hairline);
   font-size: var(--text-sm);
 }
-.call-detail-grid dt { color: var(--muted); }
-.call-detail-grid dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.call-detail :is(.call-detail-grid, .detail-list) dt { color: var(--muted); font-size: inherit; }
+.call-detail :is(.call-detail-grid, .detail-list) dd { margin: 0; color: var(--ink); font-size: inherit; font-weight: 400; text-align: left; overflow-wrap: anywhere; }
 .call-detail-section { display: grid; gap: var(--space-3); }
 .call-detail-section h3 { margin: 0; color: var(--ink); font-size: var(--text-base); }
 
@@ -143,8 +151,10 @@
   .call-stats > div { border-left: 0; border-top: 1px solid var(--hairline); }
   .call-stats > div:nth-child(-n + 2) { border-top: 0; }
   .call-stats > div:nth-child(even) { border-left: 1px solid var(--hairline); }
+  .call-explorer-bar,
   .call-filters { align-items: stretch; }
   .call-filters > * { flex: 1 1 140px; }
+  .call-filters > .segmented { flex-basis: 100%; } /* 四个时间段占满一行，不被挤到半宽 */
   .filter-select .input,
   .filter-inline-form .input { width: 100%; min-width: 0; height: 44px; }
   .filter-inline-form { flex: 1 1 100%; }

@@ -9,7 +9,7 @@ import { segments } from './LineChart'
 import { AttentionList, Indicators, attentionMeta } from './OverviewPage'
 import { LedgerEquation, riskColumns, trendGroups } from './PointsPage'
 import { ledgerChecks, ledgerEquation } from './pointsView'
-import { PriceSnapshotView, TransactionDetail } from './transactions'
+import { PriceSnapshotView, TransactionDetail, pricingNotes } from './transactions'
 import type { AdminOverview, AdminPoints, AdminPointsBalances, LedgerChecks, LedgerTransaction } from './types'
 
 const balances: AdminPointsBalances = {
@@ -201,6 +201,31 @@ describe('admin points views', () => {
     expect(markup).toContain('调账')
     expect(markup).toContain('补偿')
     expect(renderToStaticMarkup(<PriceSnapshotView snapshot={{ ...transaction.price_snapshot!, tier: null }} />)).toContain('基准价')
+  })
+
+  it('condenses pricing notes and hides empty snapshot facts', () => {
+    const remainders = ['输入通用余量 499 tokens（无可靠细分，按本组通用价）', '缓存读通用余量 63488 tokens（无可靠细分，按本组通用价）']
+    expect(pricingNotes(['未提供可靠细分，按通用价格结算', ...remainders], false)).toEqual(['未提供可靠细分，按通用价格结算'])
+    expect(pricingNotes(['缓存TTL未细分，使用通用缓存写价', ...remainders], true)).toEqual([
+      '缓存TTL未细分，使用通用缓存写价',
+      '其余按通用价：输入 499 · 缓存读 63,488 tokens',
+    ])
+    const markup = renderToStaticMarkup(
+      <PriceSnapshotView
+        snapshot={{
+          base_prices: { input: '1', output: '2', cache_read: '0.1', cache_write: '1.25' },
+          tier: null,
+          multiplier: '1',
+          fee_rate_nano: 0,
+          prices: { input: '1', output: '2', cache_read: '0.1', cache_write: '1.25' },
+          detail: { notes: ['未提供可靠细分，按通用价格结算', ...remainders] },
+        }}
+      />,
+    )
+    expect(markup.match(/计价说明/g)).toHaveLength(1)
+    expect(markup).not.toContain('通用余量')
+    expect(markup).not.toContain('服务档位')
+    expect(markup).not.toContain('百炼思考模式')
   })
 
   it('formats last activity', () => {
