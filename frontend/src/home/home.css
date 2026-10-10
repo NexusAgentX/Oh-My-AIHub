@@ -7,15 +7,31 @@
 .tabs { min-width: 0; }
 .start-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .start-key-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: 4px; font-size: var(--text-sm); }
-.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-4); }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; gap: var(--space-4); }
+
+/* 余额卡（首页与积分页共用）：芥末贴纸，桌面上整页唯一微倾斜的一张；卡内文字一律 --on-color */
+.home-balance,
+.points-balance { background: var(--mustard); transform: rotate(-0.4deg); }
+:is(.home-balance, .points-balance) :is(.panel-heading h2, .balance-value, .balance-value small, .muted-copy, .amount-negative) { color: var(--on-color); }
+:is(.home-balance, .points-balance) .button-primary,
+:is(.home-balance, .points-balance) .button-primary:active { color: var(--mustard); background: var(--on-color); }
+:is(.home-balance, .points-balance) .button-primary:hover:not(:disabled) { color: var(--mustard-hover); background: var(--on-color); }
 .balance-body { display: grid; gap: var(--space-2); }
-.balance-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
-.balance-value small { margin-left: 6px; color: var(--muted); font-size: var(--text-sm); font-weight: 500; }
+.balance-value { font-family: var(--font-display); font-size: 52px; font-weight: 800; line-height: 1; }
+.balance-value small { margin-left: 6px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; }
 .balance-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
-.today-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
-.today-grid dt { color: var(--muted); font-size: var(--text-sm); }
-.today-grid dd { margin: 2px 0 0; color: var(--ink); font-size: var(--text-xl); font-weight: 600; }
-.today-grid dd.amount-positive { color: var(--positive); }
+
+/* 今日数据：四张糖果色小贴纸 */
+.today-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0; }
+.today-grid > div { padding: var(--space-3) 14px; border: var(--sticker-border); border-radius: var(--radius-md); color: var(--on-color); box-shadow: var(--shadow-xs); }
+/* 颜色按含义：花费（支出）粉、调用蓝、渠道收入绿、在线渠道芥末 */
+.today-grid > div:nth-child(1) { background: var(--rose); }
+.today-grid > div:nth-child(2) { background: var(--sky); }
+.today-grid > div:nth-child(3) { background: var(--mint); }
+.today-grid > div:nth-child(4) { background: var(--mustard); }
+.today-grid dt { color: var(--on-color); font-size: var(--text-sm); font-weight: 600; }
+.today-grid dd,
+.today-grid dd.amount-positive { margin: 2px 0 0; color: var(--on-color); font-family: var(--font-display); font-size: 28px; font-weight: 800; line-height: 1.15; }
 
 @media (max-width: 960px) {
   .home-grid,
@@ -25,6 +41,8 @@
   .home-page > .page-heading,
   .home-page > .notice { order: -2; }
   .home-page > .home-grid { order: -1; }
-  .balance-value { font-size: var(--text-2xl); }
-  .today-grid dd { font-size: var(--text-lg); }
+  .home-balance,
+  .points-balance { transform: none; }
+  .balance-value { font-size: 42px; }
+  .today-grid dd { font-size: var(--text-xl); }
 }

@@ -35,6 +35,7 @@
   --rose: #ffbfd0; /* 危险、失败、支出 */
   --sky: #a9d8f5; /* 信息、进行中 */
   --mint: #bfe5ab; /* 正常、成功、收入 */
+  --sheen: #fffaf0; /* 芥末色块上的高光，深浅主题都是亮色 */
 
   /* 状态文字 */
   --positive: #1d7a52;
@@ -68,8 +69,8 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     "Noto Sans CJK SC", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-  /* 标题与数字；自托管 Baloo 2 与源泉圆体落地（Feature #297）前回退系统字体 */
-  --font-display: var(--font-sans);
+  /* 标题与数字：Baloo 2 管拉丁字母与数字，源泉圆体管中文（fonts.css），缺字时回退系统字体 */
+  --font-display: "Baloo 2", "GenSen Rounded", var(--font-sans);
   --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -136,6 +137,7 @@
   --rose: #c98aa0;
   --sky: #6c9fc2;
   --mint: #7aab69;
+  --sheen: #ecd9a8;
 
   --positive: #7fcf9f;
   --warning: #e9bb5f;

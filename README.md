@@ -153,3 +153,19 @@ CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运�
 Lute、中文资源和图标通过 Vite 的 `?url&no-inline` 生成本站静态文件，不调用外部 CDN、不生成 data URL 脚本。编辑区只接收 Markdown 文本和上传文件；阅读与预览禁用原始 HTML、外站图片、危险链接以及图表/数学/媒体的额外脚本。保留表格、任务列表与代码块等常用语法。页面接入应使用路由懒加载：Lute 静态脚本约 3.74 MB（未压缩），无需让其他页面提前下载。
 
 聚焦验证：`npm --prefix frontend test -- src/markdown`，类型及集成构建：`npm --prefix frontend run build`。
+
+## 字体
+
+标题与数字使用自托管字体（规则见 `DESIGN.md`），不调用外部字体服务：
+
+- [Baloo 2](https://github.com/EkType/Baloo2)（SIL OFL 1.1）：拉丁字母与数字，取 `@fontsource/baloo-2` 5.3.0 的 latin 800 字重，未改动。
+- [源泉圓體](https://github.com/ButTaiwan/gensen-font)（SIL OFL 1.1）：中文，取 GenSenMaruGothic TW TTF 1.301 的 Bold 字重。
+  - 按 `unicode-range` 切成约 80 个 WOFF2 切片，浏览器只下载页面用到的字。
+  - 字体文件位于 `frontend/public/fonts/`，共约 6 MiB。
+
+`frontend/src/styles/fonts.css` 与字体文件由 `python3 frontend/tools/fonts/build.py` 生成：
+- 脚本需要 `fonttools` 与 `brotli`。
+- 字体包从 npm 下载，按固定的 sha512 校验。
+- 前端文案大量变动后可重新生成，让常用字留在前几个切片。
+
+许可副本随前端部署到 `/licenses/fonts.txt`。

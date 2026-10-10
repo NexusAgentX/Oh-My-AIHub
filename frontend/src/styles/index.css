@@ -1,7 +1,8 @@
 /*
- * 样式入口：顺序固定——token、基础、UI 组件、外壳，最后是各领域样式。
+ * 样式入口：顺序固定——字体、token、基础、UI 组件、外壳，最后是各领域样式。
  * 领域样式只写本领域私有的布局；通用外观必须使用 src/ui 组件与 token。
  */
+@import './fonts.css';
 @import './tokens.css';
 @import './base.css';
 
@@ -18,6 +19,7 @@
 @import '../ui/Switch.css';
 @import '../ui/Progress.css';
 @import '../ui/Chart.css';
+@import '../ui/Mascot.css';
 
 @import '../layouts/layout.css';
 @import '../theme/theme.css';

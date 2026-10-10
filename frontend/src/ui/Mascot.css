@@ -1,0 +1,15 @@
+/* 吉祥物与标志共用的贴纸描画：芥末面、墨线、硬投影 */
+.mascot { display: block; flex: 0 0 auto; overflow: visible; }
+.mascot-shadow { fill: var(--shadow-ink); }
+.mascot-body { fill: var(--mustard); stroke: var(--line); stroke-width: 4; stroke-linejoin: round; }
+.mascot-ink { fill: var(--on-color); }
+.mascot-blush { fill: var(--rose); }
+.mascot-sheen { fill: var(--sheen); }
+.mascot-smile { fill: none; stroke: var(--on-color); stroke-width: 2.6; stroke-linecap: round; }
+
+/* 芥末滴轻轻弹跳；开启“减少动态效果”时由 base.css 统一停掉 */
+.mascot-bounce { animation: mascot-bounce 2.4s ease-in-out infinite; }
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}

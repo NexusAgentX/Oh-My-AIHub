@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button } from './Button'
-import { Icon } from './Icon'
+import { Mascot } from './Mascot'
 
 /** 内联错误：无内容时不渲染，可直接传 `error` 字符串。 */
 export function InlineError({ children }: { children: ReactNode }) {
@@ -16,7 +16,8 @@ export function SuccessMessage({ children }: { children: ReactNode }) {
   if (!children) return null
   return (
     <div className="success-message" role="status">
-      {children}
+      <Mascot kind="drop" size={22} />
+      <span>{children}</span>
     </div>
   )
 }
@@ -50,7 +51,7 @@ export function LoadingState({ label = '正在加载' }: { label?: string }) {
   )
 }
 
-/** 空态：说明为什么为空，必要时给出下一步操作。 */
+/** 空态：惊讶脸吉祥物加一句说明，必要时给出下一步操作。 */
 export function EmptyState({
   title,
   description,
@@ -62,6 +63,7 @@ export function EmptyState({
 }) {
   return (
     <div className="empty-state">
+      <Mascot kind="oh" size={48} />
       <strong>{title}</strong>
       {description && <p>{description}</p>}
       {action}
@@ -79,7 +81,7 @@ export function ErrorState({
 }) {
   return (
     <div className="empty-state error-state" role="alert">
-      <Icon name="alert" size={22} />
+      <Mascot kind="oh" size={48} />
       <strong>{message}</strong>
       {onRetry && (
         <Button onClick={onRetry} size="sm" variant="secondary">

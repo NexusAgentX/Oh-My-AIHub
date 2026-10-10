@@ -1,22 +1,26 @@
 import { useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { ButtonLink, Icon, type IconName } from '../ui'
-import { Brand } from '../layouts/Brand'
+import { ButtonLink, Icon, Mascot, type IconName } from '../ui'
+import { BrandMark } from '../layouts/Brand'
 
-const markets: Array<{ icon: IconName; title: string; body: string }> = [
+/** tone 按含义取色：用 API 为信息蓝，卖 API 是收入绿，积分是芥末。 */
+const markets: Array<{ icon: IconName; tone: 'sky' | 'mint' | 'mustard'; title: string; body: string }> = [
   {
     icon: 'key',
+    tone: 'sky',
     title: '用 API',
     body: '一个地址、一把 Key 用多个中转站；按价格、稳定或速度自动选，失败自动换下一个。',
   },
   {
     icon: 'server',
+    tone: 'mint',
     title: '卖 API',
     body: '把已充值的中转站共享出来，按倍率赚积分；上游 Key 加密保存，不对外显示。',
   },
   {
     icon: 'coins',
+    tone: 'mustard',
     title: '积分',
     body: '信用额度起步；用户之间站外人民币买卖积分。',
   },
@@ -43,7 +47,7 @@ export function WelcomePage() {
       </a>
       <header className="welcome-header">
         <Link aria-label="Oh-My-AIHub 首页" to="/">
-          <Brand />
+          <BrandMark size={36} />
         </Link>
         <ButtonLink size="sm" to="/login" variant="secondary">
           登录
@@ -52,23 +56,29 @@ export function WelcomePage() {
 
       <main className="welcome-main" id="welcome-main">
         <section aria-labelledby="welcome-title" className="welcome-hero">
-          <p className="welcome-eyebrow">API 市场 + 积分市场</p>
-          <h1 id="welcome-title">用大家的中转站，也把你的共享出去</h1>
-          <div className="welcome-actions">
-            <ButtonLink icon={<Icon name="chevron-right" />} to="/login" variant="primary">
-              登录
-            </ButtonLink>
-            <span className="welcome-invite">
-              <Icon name="shield" />
-              受邀制，账号由管理员创建
-            </span>
+          <div className="welcome-hero-copy">
+            <p className="welcome-lockup">
+              Oh-My-<span>AIHub</span>
+            </p>
+            <p className="welcome-eyebrow">API 市场 + 积分市场</p>
+            <h1 id="welcome-title">用大家的中转站，也把你的共享出去</h1>
+            <div className="welcome-actions">
+              <ButtonLink icon={<Icon name="chevron-right" />} to="/login" variant="primary">
+                登录
+              </ButtonLink>
+              <span className="welcome-invite">
+                <Icon name="shield" />
+                受邀制，账号由管理员创建
+              </span>
+            </div>
           </div>
+          <Mascot bounce kind="drop" size={132} />
         </section>
 
         <ul aria-label="能做什么" className="welcome-values">
           {markets.map((item) => (
             <li key={item.title}>
-              <span className="welcome-value-icon">
+              <span className={`welcome-value-icon welcome-value-${item.tone}`}>
                 <Icon name={item.icon} />
               </span>
               <strong>{item.title}</strong>
