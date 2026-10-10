@@ -5,14 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+# 并发：PR 同一引用的新提交取消旧运行；main 上每个提交使用独立的并发组，永不取消。
+# 推送到 main 的范围化运行（见 scripts/ci-changes.sh --push）信任它的父提交已有结论，所以 main 上每个提交都必须跑完。
+# 只去掉 cancel-in-progress 不够：同一并发组里最多保留一个等待中的运行，更早排队的运行仍会被取消；
+# 因此 push 事件的组名带上提交号，让每个提交各占一个组。
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.ref) || format('ci-push-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # 任务关系：changes 先判定改动范围，frontend、backend、integration、images 按需并行运行，gates 汇总。
 # main 规则集的必需检查是 gates 与 integration。按改动范围跳过的任务（job 级 if）在分支保护中按成功处理，
 # 因此 gates 总是运行（if: always()），并用 scripts/ci-gate.sh 把“被跳过”与“确实不需要”对上号：
 # 任何需要运行的任务失败、被取消或被连带跳过，gates 都会失败。判定规则见 scripts/ci-changes.sh。
+# 推送到 main 时，合并提交的代码树与已同步 PR 头相同则所有任务都跳过（PR 上已验证），此时 gates 仍运行并通过；
+# 其余推送只运行本次推送带来的改动所涉及的任务。
 jobs:
   changes:
     name: changes
@@ -37,12 +43,14 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
         run: |
-          if [ "$EVENT_NAME" = pull_request ]; then
-            flags="$(scripts/ci-changes.sh --diff "$BASE_SHA" "$HEAD_SHA")"
-          else
-            flags="$(scripts/ci-changes.sh --all)"
-          fi
+          case "$EVENT_NAME" in
+            pull_request) flags="$(scripts/ci-changes.sh --diff "$BASE_SHA" "$HEAD_SHA")" ;;
+            push) flags="$(scripts/ci-changes.sh --push "$PUSH_BEFORE" "$PUSH_AFTER")" ;;
+            *) flags="$(scripts/ci-changes.sh --all)" ;;
+          esac
           echo "$flags" | tee -a "$GITHUB_OUTPUT"
           {
             echo "### Change scope"

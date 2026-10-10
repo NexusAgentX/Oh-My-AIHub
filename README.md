@@ -121,12 +121,14 @@ mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run ge
 mise run test-backend-integration # 需要 Docker；直接 go test 且未设置 TEST_DATABASE_URL 时这些测试会跳过
 mise run check-migrations # 已发布迁移（最新正式 tag）只允许新增，不得修改、删除或重命名
 mise run check-migration-upgrade # 最新正式 tag 建库后，用当前代码升级到最新迁移版本；需要 Docker
-mise run test-ci-scripts # 修改 CI 改动范围判定（scripts/ci-changes.sh）或汇总判定（scripts/ci-gate.sh）后运行
+mise run test-ci-scripts # 修改 CI 改动范围判定（scripts/ci-changes.sh）、汇总判定（scripts/ci-gate.sh）或发版复用判定（scripts/ci-reuse-check.sh）后运行
 docker compose config --quiet
 mise run check-proxy-trust # 需要已按上文启动安全栈
 ```
 
-CI（`.github/workflows/ci.yml`）先由 `changes` 任务按改动文件判定范围（规则写在 `scripts/ci-changes.sh` 开头），再按需并行运行 `frontend`、`backend`、`integration`、`images`，最后由 `gates` 汇总：纯文档改动不运行检查，只改前端不跑后端与集成测试，只改后端不跑前端；`backend/api/openapi.yaml`、`.github/`、`mise.toml`、`scripts/`、`compose.yaml` 等共享输入变化时全部运行；推送到 `main` 始终全量运行。`main` 规则集的必需检查是 `gates` 与 `integration`：被跳过的任务在分支保护中按成功处理，`gates` 则核对每个应当运行的任务都成功，失败、取消或被连带跳过都会使 `gates` 失败。`images` 在 Dockerfile、`.dockerignore`、`frontend/nginx.conf`、依赖清单与锁文件，或 CI 与 Compose 定义变化时（只改 Dockerfile 或 `.dockerignore` 时仅运行 `images`），构建前后端镜像（仅 `linux/amd64`，不推送），并用渲染后的 Nginx 模板执行 `nginx -T` 校验；发版时的多架构构建见 `release.yml`。
+CI（`.github/workflows/ci.yml`）先由 `changes` 任务按改动文件判定范围（规则写在 `scripts/ci-changes.sh` 开头），再按需并行运行 `frontend`、`backend`、`integration`、`images`，最后由 `gates` 汇总：纯文档改动不运行检查，只改前端不跑后端与集成测试，只改后端不跑前端；`backend/api/openapi.yaml`、`.github/`、`mise.toml`、`scripts/`、`compose.yaml` 等共享输入变化时全部运行。`main` 规则集的必需检查是 `gates` 与 `integration`：被跳过的任务在分支保护中按成功处理，`gates` 则核对每个应当运行的任务都成功，失败、取消或被连带跳过都会使 `gates` 失败。`images` 在 Dockerfile、`.dockerignore`、`frontend/nginx.conf`、依赖清单与锁文件，或 CI 与 Compose 定义变化时（只改 Dockerfile 或 `.dockerignore` 时仅运行 `images`），构建前后端镜像（仅 `linux/amd64`，不推送），并用渲染后的 Nginx 模板执行 `nginx -T` 校验；发版时的多架构构建见 `release.yml`。
+
+推送到 `main` 时不再一律全量运行：合并提交的第一个父提交是 PR 头的祖先（合并时 PR 已同步 `main`）且代码树与 PR 头相同时，PR 上已验证过同一份代码，所有任务跳过，`gates` 直接通过；其余推送只按 `before..after` 带来的改动运行受影响的任务（判定顺序见 `scripts/ci-changes.sh --push` 的注释），`before` 缺失、全零或不是 `after` 的祖先时全量运行。范围化运行信任父提交已有结论，所以 `main` 上每个提交使用独立的并发组、从不被取消（PR 上同一引用的新提交仍取消旧运行）。发版时 `release.yml` 的 `gates` 先查询标签提交在 `main` 上的 `ci` 运行：最新一次已成功就复用其结果并在摘要中记录运行网址，否则（没有、进行中、失败、取消或查询出错）照常运行 `mise run check-release`。
 
 CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运行 `./internal/postgres` 与 `./internal/database` 的数据库集成测试，并执行上述两项迁移检查。CI 设置了 `AIHUB_REQUIRE_TEST_DATABASE=1`：缺少 `TEST_DATABASE_URL` 时集成测试失败而不是跳过；本地不设置该变量时仍然跳过。迁移检查依赖完整 Git 历史与 tag（浅克隆请先 `git fetch --tags --unshallow`）。
 

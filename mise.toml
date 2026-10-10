@@ -68,7 +68,7 @@ go -C backend test -count=1 ./internal/postgres ./internal/database
 ]
 
 [tasks.test-ci-scripts]
-description = "Test the CI change-scope classification and the gates aggregation (scripts/ci-changes.sh, scripts/ci-gate.sh)"
+description = "Test the CI change-scope classification (incl. pushes to main), the gates aggregation and the release reuse check (scripts/ci-changes.sh, scripts/ci-gate.sh, scripts/ci-reuse-check.sh)"
 run = "scripts/test-ci.sh"
 
 [tasks.check-migrations]

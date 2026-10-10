@@ -119,12 +119,46 @@ jobs:
     if: github.event_name == 'push' && github.repository == 'NexusAgentX/Oh-My-AIHub'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # 只需读取代码和查询 Actions 运行；不继承工作流级别的写权限。
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v7
+      # 标签提交已在 main 上通过 ci（其检查是 check-release 的超集）时复用该结果，不再重复运行。
+      # 判定见 scripts/ci-reuse-check.sh：只认 ci.yml 在 main 上为这个提交触发的 push 运行，且最新一次已成功。
+      # 查询失败、没有运行、仍在进行、失败或取消，都不复用，改为下面的 check-release。
+      - name: Reuse the CI result of this commit on main
+        id: reuse
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          sha="$(git rev-parse HEAD)"
+          reused=false
+          url=""
+          if runs="$(gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&branch=main&per_page=100")" \
+            && url="$(printf '%s' "$runs" | scripts/ci-reuse-check.sh "$sha")"; then
+            reused=true
+          fi
+          echo "reused=${reused}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release gates"
+            echo
+            if [ "$reused" = true ]; then
+              echo "reused CI run ${url} for commit \`${sha}\`; \`check-release\` skipped."
+            else
+              echo "No successful CI run of commit \`${sha}\` on main was found; running \`check-release\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: jdx/mise-action@v5
+        if: steps.reuse.outputs.reused != 'true'
         with:
           install: true
       - name: Restore npm and Go caches
+        if: steps.reuse.outputs.reused != 'true'
         uses: actions/cache@v6
         with:
           path: |
@@ -135,6 +169,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-
       - name: Run release gates
+        if: steps.reuse.outputs.reused != 'true'
         run: mise run check-release
 
   images:
