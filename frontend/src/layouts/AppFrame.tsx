@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { usePoints } from '../points/queries'
 import { amountSign, formatPoints } from '../money/format'
 import { ThemeToggle } from '../theme/ThemeSwitcher'
-import { Icon, PageBackSlot } from '../ui'
+import { Icon, TopbarSlot } from '../ui'
 import { Brand } from './Brand'
 import {
   findMobileTab,
@@ -174,7 +174,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   const location = useLocation()
   const alertReference = useRef<HTMLDivElement>(null)
   const mainReference = useRef<HTMLElement>(null)
-  const [backSlot, setBackSlot] = useState<HTMLDivElement | null>(null)
+  const [topbarSlot, setTopbarSlot] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (signOutError) alertReference.current?.focus()
@@ -190,7 +190,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   }, [location.pathname])
 
   return (
-    <PageBackSlot.Provider value={backSlot}>
+    <TopbarSlot.Provider value={topbarSlot}>
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
         跳到主要内容
@@ -209,8 +209,8 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
           <Link aria-label="首页" className="topbar-brand" to="/home">
             <Brand />
           </Link>
-          {/* 详情页的“‹ 上一级”渲染到这里（PageHeader 的 back）；一级页面留空，不重复页面标题 */}
-          <div className="topbar-back" ref={setBackSlot} />
+          {/* 页面标题区把“‹ 上一级”和滚出屏幕后的标题渲染到这里；页面顶部时不重复标题 */}
+          <div className="topbar-context" ref={setTopbarSlot} />
           <ThemeToggle />
           <Link className="wallet-chip" to="/points">
             <span>余额</span>
@@ -230,6 +230,6 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
       </div>
       <BottomTabs pathname={location.pathname} tabs={mobileTabs} />
     </div>
-    </PageBackSlot.Provider>
+    </TopbarSlot.Provider>
   )
 }

@@ -1,5 +1,5 @@
-import type { ElementType, ReactNode } from 'react'
-import { PageBackLink, type PageBack } from './PageBack'
+import { useRef, type ElementType, type ReactNode } from 'react'
+import { TopbarContext, type PageBack } from './TopbarSlot'
 
 /**
  * 卡片：白底、12px 圆角、细边框。
@@ -39,23 +39,29 @@ export function Card({
   )
 }
 
-/** 页面标题区：标题、一句说明、右侧主要操作。详情页用 back 指明上一级，显示在顶栏左侧。 */
+/**
+ * 页面标题区：标题、一句说明、右侧主要操作。
+ * 详情页用 back 指明上一级，显示在顶栏左侧；标题滚出屏幕后顶栏显示 topbarTitle（默认同 title）。
+ */
 export function PageHeader({
   title,
+  topbarTitle,
   description,
   actions,
   back,
 }: {
   title: ReactNode
+  topbarTitle?: ReactNode
   description?: ReactNode
   actions?: ReactNode
   back?: PageBack
 }) {
+  const heading = useRef<HTMLHeadingElement>(null)
   return (
     <header className="page-heading">
       <div className="page-heading-copy">
-        {back && <PageBackLink back={back} />}
-        <h1>{title}</h1>
+        <TopbarContext back={back} heading={heading} title={topbarTitle ?? title} />
+        <h1 ref={heading}>{title}</h1>
         {description && <p>{description}</p>}
       </div>
       {actions && <div className="page-heading-actions">{actions}</div>}
