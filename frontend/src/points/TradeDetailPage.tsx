@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import type { C2CTrade } from '../api/types'
 import { formatFen, formatPoints } from '../money/format'
 import { formatDateTime } from '../money/time'
-import { Card, PageHeader, QueryBoundary } from '../ui'
+import { Card, Mascot, PageHeader, QueryBoundary } from '../ui'
 import { useC2CTrade } from './queries'
 import { PaymentCountdown, PaymentInfo, TradeActions, TradeStatusBadge } from './TradeParts'
 
@@ -35,6 +35,7 @@ function TradeDetail({ trade }: { trade: C2CTrade }) {
           <div className="stack-form">
             <div className="trade-head">
               <TradeStatusBadge status={trade.status} />
+              {trade.status === 'released' && <Mascot kind="drop" size={32} />}
               {trade.status === 'awaiting_payment' && <PaymentCountdown deadline={trade.payment_deadline} />}
             </div>
             <dl className="detail-list trade-facts">

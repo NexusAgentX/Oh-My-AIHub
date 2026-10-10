@@ -23,6 +23,7 @@ export {
   InlineError,
   LoadingState,
   Notice,
+  PageLoading,
   SuccessMessage,
 } from './Feedback'
 export {

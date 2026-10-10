@@ -26,13 +26,14 @@ import { ModelDetailPage } from './models/ModelDetailPage'
 import { ModelsPage } from './models/ModelsPage'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
+import { NotFoundPage } from './layouts/NotFoundPage'
 import { ProductLayout } from './layouts/ProductLayout'
-import { LoadingState } from './ui'
+import { PageLoading } from './ui'
 import { LandingRoute, WelcomePage } from './welcome/WelcomePage'
 
 function RequireSession() {
   const { account, loading } = useAuth()
-  if (loading) return <FullPageLoading />
+  if (loading) return <PageLoading />
   if (!account) return <Navigate replace to="/login" />
   return <Outlet />
 }
@@ -45,13 +46,6 @@ function RequireReadyAccount() {
   return <Outlet />
 }
 
-function FullPageLoading() {
-  return (
-    <main className="route-loading">
-      <LoadingState />
-    </main>
-  )
-}
 
 const queryClient = createQueryClient()
 
@@ -84,12 +78,12 @@ function AppProviders() {
 }
 
 export const appRoutes = createRoutesFromElements(
-  <Route element={<AppProviders />} HydrateFallback={FullPageLoading}>
+  <Route element={<AppProviders />} HydrateFallback={PageLoading}>
     <Route element={<InstanceInitializePage />} path="/initialize" />
     <Route element={<RequireInitialized />}>
     <Route element={<WelcomePage />} path="/welcome" />
     <Route element={<LandingRoute />} path="/" />
-    <Route element={<LandingRoute />} path="*" />
+    <Route element={<NotFoundPage />} path="*" />
     <Route element={<LoginPage />} path="/login" />
     <Route element={<RequireSession />}>
       <Route element={<FirstPasswordChangePage />} path="/account/password" />

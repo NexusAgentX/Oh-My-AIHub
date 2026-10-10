@@ -4,6 +4,8 @@
 .points-balance-main { display: grid; gap: var(--space-1); max-width: 420px; }
 .points-trend { display: grid; gap: var(--space-1); }
 .points-balance .sparkline { color: var(--on-color); }
+.points-balance .progress { border-color: var(--on-color); background: color-mix(in srgb, var(--on-color) 16%, transparent); }
+.points-balance .progress > i { background: var(--on-color); }
 .points-balance .progress-warn > i { background: var(--rose); }
 .points-balance-actions { display: flex; gap: var(--space-2); }
 

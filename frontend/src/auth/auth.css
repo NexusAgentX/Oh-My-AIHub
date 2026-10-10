@@ -20,6 +20,7 @@
 .identity-brand:hover { text-decoration: none; }
 
 .identity-heading { margin-bottom: var(--space-6); }
+.identity-heading .mascot { margin-bottom: var(--space-4); }
 .identity-heading p { margin: var(--space-1) 0 0; color: var(--muted); }
 
 .identity-form { display: grid; gap: var(--space-4); }

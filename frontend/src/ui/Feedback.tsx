@@ -51,19 +51,36 @@ export function LoadingState({ label = '正在加载' }: { label?: string }) {
   )
 }
 
-/** 空态：惊讶脸吉祥物加一句说明，必要时给出下一步操作。 */
+/** 整页加载（路由懒加载、会话与实例检查）：轻轻弹跳的芥末滴；卡片内的加载用 LoadingState。 */
+export function PageLoading({ label = '正在加载' }: { label?: string }) {
+  return (
+    <main className="route-loading">
+      <div aria-live="polite" className="loading-state" role="status">
+        <Mascot bounce kind="drop" size={48} />
+        {label}
+      </div>
+    </main>
+  )
+}
+
+/**
+ * 空态：惊讶脸吉祥物加一句说明，必要时给出下一步操作。
+ * 同一屏可能同时出现多个空态（如统计面板的几个分区）时，次要的传 mascot={false}，保证每屏最多一个吉祥物。
+ */
 export function EmptyState({
   title,
   description,
   action,
+  mascot = true,
 }: {
   title: string
   description?: string
   action?: ReactNode
+  mascot?: boolean
 }) {
   return (
     <div className="empty-state">
-      <Mascot kind="oh" size={48} />
+      {mascot && <Mascot kind="oh" size={48} />}
       <strong>{title}</strong>
       {description && <p>{description}</p>}
       {action}

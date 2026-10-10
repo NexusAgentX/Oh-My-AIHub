@@ -13,7 +13,7 @@ export function FirstPasswordChangePage() {
   }
 
   return (
-    <AuthShell badge="首次登录" title="设置你的密码">
+    <AuthShell badge="首次登录" mascot="drop" title="设置你的密码">
       <PasswordChangeForm
         currentLabel="初始密码"
         onChanged={(current) => navigate(defaultDestination(current), { replace: true })}
