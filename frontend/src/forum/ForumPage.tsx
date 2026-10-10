@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
-import { Button, ButtonLink, EmptyState, InlineError, PageHeader, QueryBoundary, SearchInput, SelectField } from '../ui'
+import { Button, ButtonLink, EmptyState, InlineError, PageHeader, QueryBoundary, SearchInput } from '../ui'
 import { ForumPagination, ForumTabs, TicketBadge } from './components'
 import { forumTime, pageNumber, type Kind } from './model'
 import { useBoards, useTopics } from './queries'
@@ -32,10 +32,11 @@ function TopicList({ kind }: { kind: Kind }) {
     <ForumTabs />
     <div className="forum-filters">
       <ForumSearch key={query} query={query} onSearch={(value) => setFilter('q', value)} />
-      {!tickets && <SelectField label="板块" value={boardID} onChange={(event) => setFilter('board', event.target.value)}>
+      {/* 和搜索框同一行，不显示字段标签（“全部板块”已说明用途），标签只给读屏 */}
+      {!tickets && <select aria-label="板块" className="input select-input forum-board-select" value={boardID} onChange={(event) => setFilter('board', event.target.value)}>
         <option value="">全部板块</option>
         {boards.data?.items.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
-      </SelectField>}
+      </select>}
       {!tickets && account?.is_admin && <ButtonLink to="/forum/boards">管理板块</ButtonLink>}
     </div>
     {!tickets && boards.isError && <InlineError>{errorMessage(boards.error, '板块加载失败')}</InlineError>}
