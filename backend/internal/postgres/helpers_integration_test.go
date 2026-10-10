@@ -19,11 +19,16 @@ import (
 )
 
 // isolatedDatabase migrates the baseline into a fresh schema of
-// TEST_DATABASE_URL and returns a pool bound to it. Tests skip without a database.
+// TEST_DATABASE_URL and returns a pool bound to it. Tests skip without a
+// database, unless AIHUB_REQUIRE_TEST_DATABASE is set (CI), where a missing
+// database fails the test instead of silently skipping it.
 func isolatedDatabase(t *testing.T) (*pgxpool.Pool, *storepg.Store) {
 	t.Helper()
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
+		if os.Getenv("AIHUB_REQUIRE_TEST_DATABASE") != "" {
+			t.Fatal("TEST_DATABASE_URL is not set but AIHUB_REQUIRE_TEST_DATABASE demands a database")
+		}
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
 	ctx := context.Background()

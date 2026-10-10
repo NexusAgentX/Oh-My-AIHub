@@ -16,6 +16,9 @@ import (
 func TestForumMigrationUpgradesExistingDatabaseWithoutChangingData(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
+		if os.Getenv("AIHUB_REQUIRE_TEST_DATABASE") != "" {
+			t.Fatal("TEST_DATABASE_URL is not set but AIHUB_REQUIRE_TEST_DATABASE demands a database")
+		}
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
 	ctx := context.Background()

@@ -47,3 +47,65 @@ jobs:
         run: mise exec -- go -C backend test -race ./...
       - name: Compose configuration
         run: docker compose config --quiet
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: oh_my_aihub
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: oh_my_aihub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oh_my_aihub -d oh_my_aihub_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # 缺少数据库时集成测试失败而不是跳过，防止静默 skip。
+      AIHUB_REQUIRE_TEST_DATABASE: "1"
+      TEST_DATABASE_URL: postgres://oh_my_aihub:ci-only-password@127.0.0.1:5432/oh_my_aihub_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 迁移守卫与升级路径检查需要完整历史和 tag 才能找到最新正式发布。
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+      - name: Restore Go caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Published migrations are append-only
+        run: scripts/check-migrations.sh
+      - name: Upgrade path from the latest release tag
+        run: mise exec -- scripts/check-migration-upgrade.sh
+      - name: PostgreSQL integration tests with race detector
+        id: tests
+        shell: bash
+        run: |
+          mise exec -- go -C backend test -race -count=1 -v ./internal/postgres ./internal/database 2>&1 | tee "$RUNNER_TEMP/integration.log"
+      - name: Integration test summary
+        if: always() && steps.tests.conclusion != 'skipped'
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/integration.log"
+          if [ ! -f "$log" ]; then echo "integration log not found"; exit 1; fi
+          passed="$(grep -c '^--- PASS' "$log" || true)"
+          failed="$(grep -c '^--- FAIL' "$log" || true)"
+          skipped="$(grep -c '^--- SKIP' "$log" || true)"
+          echo "PostgreSQL integration tests: passed=$passed failed=$failed skipped=$skipped" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$skipped" -ne 0 ] || [ "$passed" -eq 0 ]; then
+            echo "integration tests must run without skips" >&2
+            exit 1
+          fi

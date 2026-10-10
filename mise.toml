@@ -55,7 +55,24 @@ run = [
 AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
 PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
 TEST_DATABASE_URL="postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable" \
-go -C backend test -count=1 ./internal/postgres
+go -C backend test -count=1 ./internal/postgres ./internal/database
+''',
+]
+
+[tasks.check-migrations]
+description = "Fail when a migration from the latest release tag was modified, deleted or renamed"
+run = "scripts/check-migrations.sh"
+
+[tasks.check-migration-upgrade]
+description = "Migrate a fresh database with the latest release tag, then upgrade it with the current code"
+run = [
+  "docker compose up -d --wait database",
+  '''
+AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
+PSQL="docker compose exec -T database psql -U oh_my_aihub" \
+PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
+TEST_DATABASE_URL="postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable" \
+scripts/check-migration-upgrade.sh
 ''',
 ]
 
