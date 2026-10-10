@@ -89,7 +89,9 @@
 
 .call-detail { display: grid; gap: var(--space-5); }
 /* 请求 ID 与幽灵复制按钮一行，和下方明细之间只留一行的间距 */
-.call-detail-id { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); margin: calc(-1 * var(--space-2)) 0 calc(-1 * var(--space-3)); }
+.call-detail-id { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); margin-bottom: calc(-1 * var(--space-3)); }
+/* 不往上提：滚动区上沿会裁掉复制按钮的悬停底色。桌面上按钮缩到与 ID 一行相称的 32px，手机保留 44px 触控区 */
+@media (min-width: 768px) { .call-detail-id .icon-button { width: 32px; height: 32px; } }
 .call-detail-id code { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: var(--text-sm); }
 /* 调用信息与计价明细同一种排法：左侧标签一栏，值左对齐，不换成右对齐加粗的通用明细列表 */
 .call-detail :is(.call-detail-grid, .detail-list) { display: grid; gap: 0; margin: 0; padding: 0; }
