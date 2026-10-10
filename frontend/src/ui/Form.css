@@ -54,6 +54,47 @@
   text-overflow: ellipsis;
 }
 
+/*
+ * 弹出的选项列表：支持可定制下拉框的浏览器（Chrome、Edge 135+）画成贴纸浮层。
+ * Safari、Firefox 与触屏设备仍用系统列表（手机上系统滚轮更好用）。
+ */
+@supports (appearance: base-select) {
+  @media (hover: hover) and (pointer: fine) {
+    .select-input,
+    .select-input::picker(select) { appearance: base-select; }
+    /* 选中项过长时单行省略，不换行撑高 */
+    .select-input { display: block; overflow: hidden; line-height: calc(var(--control-height) - 2 * var(--stroke)); white-space: nowrap; }
+    .select-input::picker-icon { display: none; } /* 收起时的箭头沿用上面的渐变 */
+    .select-input::picker(select) {
+      max-height: min(320px, 60dvh);
+      margin-block: 6px;
+      padding: 4px;
+      overflow-y: auto;
+      border: var(--sticker-border);
+      border-radius: var(--radius-md);
+      color: var(--ink);
+      background: var(--canvas);
+      box-shadow: var(--shadow-md);
+      scrollbar-width: thin;
+      scrollbar-color: var(--hairline-strong) transparent;
+    }
+    .select-input option {
+      display: flex;
+      min-height: 34px;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 0 var(--space-3);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .select-input option::checkmark { order: 1; margin-left: auto; color: var(--mustard-text); }
+    .select-input option:hover,
+    .select-input option:focus-visible { outline: 0; background: var(--hover); }
+    .select-input option:checked { font-weight: 700; background: var(--selected); }
+    .select-input option:disabled { color: var(--muted); cursor: not-allowed; }
+  }
+}
+
 .textarea-input { height: auto; min-height: 96px; padding-block: 10px; resize: vertical; }
 
 .password-input { position: relative; display: block; }
