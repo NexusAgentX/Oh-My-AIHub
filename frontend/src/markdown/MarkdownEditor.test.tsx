@@ -41,13 +41,13 @@ async function choose(file: File) {
 }
 
 describe('MarkdownEditor lifecycle and upload boundary', () => {
-  it('initializes once in StrictMode, disables cache and associates the source label', async () => {
+  it('initializes once in StrictMode, disables cache and names the source textarea', async () => {
     await act(async () => root.render(<StrictMode><MarkdownEditor value="hello" onChange={vi.fn()} disabled /></StrictMode>))
     expect(state.instances).toHaveLength(1)
     expect(state.instances[0].options.cache?.enable).toBe(false)
     expect(state.instances[0].options.preview?.mode).toBe('editor')
     expect(state.instances[0].disabled).toHaveBeenCalled()
-    expect(host.querySelector('label')?.htmlFor).toBe(host.querySelector('textarea')?.id)
+    expect(host.querySelector('textarea')?.getAttribute('aria-label')).toBe('正文')
     expect(host.querySelector('.markdown-editor-source')?.hasAttribute('inert')).toBe(true)
   })
   it('hides the preview by default and puts upload and preview at the end of the toolbar', async () => {
