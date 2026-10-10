@@ -70,4 +70,4 @@ v0.6.0 的网关围绕“预授权上限 → 冻结 → 交付 → 结算/补偿
 
 ## 替代关系
 
-取代 [ADR-0010](0010-adopt-snapshot-gateway-and-idempotent-settlement.md)、[ADR-0014](0014-adopt-native-passthrough-gateway.md)、[ADR-0016](0016-decouple-gateway-delivery-from-settlement.md)；[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) 中 API 预授权的部分不再适用（计价内核沿用，见 ADR-0012）。
+取代 [ADR-0010](archive/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)、[ADR-0014](archive/0014-adopt-native-passthrough-gateway.md)、[ADR-0016](archive/0016-decouple-gateway-delivery-from-settlement.md)；[ADR-0008](archive/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) 中 API 预授权的部分不再适用（计价内核沿用，见 ADR-0012）。

@@ -2,53 +2,28 @@
 
 Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在 C2C 市场挂卖单出售所得积分。
 
-MVP 已完成，涵盖公开产品入口、受邀账户、模型目录、API 渠道共享、平台 Key 与四协议代理、积分结算和 C2C 卖单市场。后续直接基于需求和现有代码迭代。已确认需求见 `PRODUCT.md`，推进顺序见 `ROADMAP.md`，当前系统结构见 `ARCHITECTURE.md`。
+当前提供受邀账户、模型目录、渠道共享、平台 API Key 与四种原生协议的透明网关、积分结算、C2C 卖单市场，以及成员论坛与私密工单。
 
 ## 文档导航
 
-- [产品说明](PRODUCT.md)：产品目标、用户、范围与需求。
-- [产品路线图](ROADMAP.md)：面向用户结果的优先级、证据视野与推进顺序。
-- [架构说明](ARCHITECTURE.md)：当前系统结构、边界与技术决策。
-- [变更日志](CHANGELOG.md)：面向版本与使用者的重要变化。
-- [Agent 协作说明](AGENTS.md)：所有 Agent 在本仓库中的工作规则。
-- [安全策略](SECURITY.md)：漏洞报告方式与安全基线。
-- [架构决策记录](docs/adr/README.md)：需要长期保留的架构决策及其背景。
+- [产品说明](PRODUCT.md)：产品定位、范围与规则。
+- [产品路线图](ROADMAP.md)：接下来交付的结果与顺序。
+- [架构说明](ARCHITECTURE.md)：系统结构、模块边界与不变量。
+- [安全策略](SECURITY.md)：漏洞报告方式与安全边界。
+- [变更日志](CHANGELOG.md)：各版本的重要变化。
+- [Agent 开发指南](AGENTS.md)：任务流程、分支、验证、迁移与发版规则。
+- [架构决策记录](docs/adr/README.md)：长期技术决策及其原因。
+- [运维手册](docs/runbooks/)：部署、发布、备份恢复与故障处理。
 
-开始工作前，应先阅读 `AGENTS.md`，再根据任务阅读并维护相关文档。
-
-## 任务管理
-
-开发任务通过 GitHub Issue 管理：小任务使用单个 Feature Issue，大任务使用 Epic Issue 拆分多个 Feature Issue。每个 Issue 的最新 Spec、Plan、Tasks 和 Acceptance 都维护在 body 中。具体工作方式见 `AGENTS.md`。
-
-## 产品研发方式
-
-项目采用“人类定向、AI 执行”的持续产品研发模型：
-
-- 人类从用户视角负责目标用户、核心问题、产品方向、关键取舍和发布判断。
-- AI 负责研究、假设整理、工程实现、测试、文档、发布准备与反馈归纳。
-- 工作按方向与结果、发现、直接开发、验收、发布形成闭环。
-- 任务区分 Ready 与 Done，不设用户验证环节（见 ADR-0022）。
-- 高不确定产品能力先用发现或原型 Feature 降低风险，再进入小批量交付；纯技术或已知小改动保持单个 Feature 的轻量流程。
-
-完整职责、检查点、拆分和证据规则见 `AGENTS.md`；稳定产品事实维护在 `PRODUCT.md`，结果优先级与推进顺序维护在 `ROADMAP.md`，界面以现有组件和样式为基础持续迭代。
-
-## 直接开发
-
-MVP 已完成，后续需求明确后直接基于现有代码实施，无需独立设计阶段、OpenPencil、设计源文件或预览。保留 Issue、独立 worktree、聚焦验证与 PR 验收流程；界面变化通过实际运行结果验收。
-
-现有界面沿用了第三方设计分析中的部分规则，其 MIT 许可保存在 [第三方许可](licenses/airtable-design-analysis-MIT.txt)。该许可仅用于来源归属，不构成开发前置设计规范。
-
-## 当前工程组成
+## 技术栈
 
 - 前端：React 19、TypeScript、Vite、React Router 与 TanStack Query。
-- 后端：Go HTTP 服务；当前实现受邀账户与会话、零和账本核心、模型目录与条件价格档、平台设置、审计与用户积分接口。
-- 数据库：PostgreSQL 18，使用 Goose 管理嵌入式 SQL 迁移。
-- 本地工具链：mise。
-- 容器运行：Docker Compose，前端由 Nginx 提供静态资源并代理 `/api` 与外部模型 API 请求，迁移完成后再启动后端。
+- 后端：Go `net/http`、pgx 与 sqlc。
+- 数据库：PostgreSQL 18，Goose 嵌入式编号迁移。
+- 契约：`backend/api/openapi.yaml`（OpenAPI 3.1）是前后端唯一契约，前端类型由它生成。
+- 工具与运行：mise 固定工具版本；Docker Compose 运行数据库、迁移、后端，以及由 Nginx 提供的前端。
 
-产品已按 [Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170) 原地重写为「API 市场 + 积分 C2C 市场」（v0.7.0）。`backend/api/openapi.yaml` 是前后端唯一契约；产品事实见 `PRODUCT.md`，系统结构见 `ARCHITECTURE.md`。
-
-模型目录四类基准价每项允许 `0～100000` 积分/百万 token，最多九位小数；渠道倍率允许 `0～1000` 倍。
+现有界面沿用了第三方设计分析中的部分规则，其 MIT 许可见 [第三方许可](licenses/airtable-design-analysis-MIT.txt)。
 
 ## 环境要求
 
@@ -70,7 +45,7 @@ mise run install
 mise run dev-database
 ```
 
-迁移由基线 `0001_baseline.sql` 与后续编号脚本组成（ADR-0024、ADR-0026）。`0002_forum.sql` 新增论坛表；Goose 记录已执行版本，新空库依次执行，现有 v0.9.1 数据库只追加论坛迁移，保留原有数据。更早版本涉及的基线调整与升级前置要求见[发布手册](docs/runbooks/release.md)，不要通过删除生产数据卷处理升级。
+迁移为 Goose 嵌入式编号脚本，已发布的迁移只追加（见 `AGENTS.md`）。升级既有环境的注意事项见[发布手册](docs/runbooks/release.md)，不要通过删除生产数据卷处理升级。
 
 首次运行时，启动后端与前端后访问 `/initialize`，在网页上创建唯一的初始管理员。
 
