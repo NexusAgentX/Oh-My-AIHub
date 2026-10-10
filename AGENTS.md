@@ -70,7 +70,7 @@
 
 - 不提交凭据、令牌、私钥或真实用户数据。新增依赖前确认必要性及维护、安全与体积成本。
 - 改动聚焦当前任务，不夹带无关重构。未发布的中间态可以直接简化或破坏性重构，不加无依据的兼容层；数据库迁移按上节执行。
-- 合并前确认验收有证据、相关文档已同步、必需检查通过；`main` 已前进时在任务 worktree 内同步并重新验证。
+- `main` 受规则集保护：只能通过 PR 合并，且 `gates`、`integration` 两项检查必须通过。合并前确认验收有证据、相关文档已同步；`main` 已前进时在任务 worktree 内同步并重新验证。
 - 验收通过后 Agent 主动合并并删除远端任务分支；有 Issue 时核对正文后关闭，并同步 Epic。
 - 合并后清理：`mise run task-finish <slug>`（`scripts/task-finish.sh`）。它确认 PR 已合并、分支提交已进入 `origin/main`、worktree 干净（仅允许依赖与构建缓存被忽略），再停止该 worktree 的 Compose 容器、删除其 worktree 与本地、远端分支，快进主工作区并确认 `main...origin/main` 为 `0/0`。证据不足时停止，不强制删除，不动其他任务；`--dry-run` 只预览，加 `--volumes` 才删除 Docker 卷。合并 PR 用 merge commit，squash 或 rebase 会让脚本因证据不足而停止。
 

@@ -1,8 +1,6 @@
 # 部署 Runbook
 
-适用范围：首版受邀小圈子实例的单机部署。内容由 Feature #22 交付并随实现演进。
-
-> 重写中（[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)）：Feature #171 已删除 `/admin/ops` 运营台与巡检历史；管理员概览与实时账本核对由 Feature G 重建，本手册中相关步骤在此之前不可用，由 Feature F 统一改写。
+适用范围：受邀小圈子实例的单机部署。
 
 ## 前置条件
 
@@ -16,24 +14,24 @@
 ## 首次部署
 
 1. `git clone` 并检出目标发布提交。
-2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id（具体要求见 `compose.yaml` 顶部注释与 `ARCHITECTURE.md`）。
+2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id（具体要求见 `README.md` 的“Docker Compose 运行”）。
 3. `mise install && mise run install`。
-4. `mise run up` 启动安全栈；首次启动会自动执行迁移、凭据可解密自检和一次跨模块巡检（结果进入运营总览的巡检历史）。
+4. `mise run up` 启动安全栈：一次性 migration 容器先执行迁移，后端启动时校验两组密钥环格式与出站配置。
 5. 浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员。
 6. 管理员登录后完成首次改密，再按需创建受邀账户。
 
 ## 发布检查
 
 - 本地门禁：`mise run check-release`（前端测试与构建、后端 vet 与 race、Compose 配置）。
-- CI：PR 与 main 推送自动执行同一组门禁（`.github/workflows/ci.yml`）。
-- 部署后烟测：`GET /api/health` 返回 ok；管理员打开 `/admin/ops` 确认“账本已核对”且巡检历史最新记录全部正常。
+- CI：PR 与 main 推送自动执行 `gates`（同一组门禁及生成代码一致性检查）与 `integration`（PostgreSQL 集成测试与迁移检查），见 `.github/workflows/ci.yml`。
+- 部署后烟测：`GET /api/health` 返回 ok；管理员打开 `/admin/points` 确认五项核对全部通过。
 
 ## 升级流程
 
 1. 在新版本上完成 `mise run check-release`。
 2. 执行一次数据库备份（见备份恢复 Runbook）。
 3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。
-4. 升级后烟测同上；若巡检出现硬异常，按故障处理 Runbook 处置并保留现场。
+4. 升级后烟测同上；核对未通过时按故障处理 Runbook 处置并保留现场。
 
 ## 生产部署（ai.isok.dev）
 
