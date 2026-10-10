@@ -133,18 +133,10 @@ type channelTestResponseJSON struct {
 	Channel channelJSON             `json:"channel"`
 }
 
-// channelOwnerJSON is the OpenAPI AccountRef schema of an administrator's channel owner. It is
-// not named accountRefJSON because observe.go still uses that name for its map-based helper.
-type channelOwnerJSON struct {
-	ID          string `json:"id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-}
-
 // adminChannelJSON is the OpenAPI AdminChannel schema: a Channel plus its owner.
 type adminChannelJSON struct {
 	channelJSON
-	Owner channelOwnerJSON `json:"owner"`
+	Owner accountRefJSON `json:"owner"`
 }
 
 // adminChannelEnvelopeJSON is the OpenAPI AdminChannelEnvelope schema.
@@ -233,7 +225,7 @@ func (a *app) newChannelJSON(item channel.Channel, models map[string]catalog.Mod
 func (a *app) newAdminChannelJSON(item channel.Channel, models map[string]catalog.Model, now time.Time) adminChannelJSON {
 	return adminChannelJSON{
 		channelJSON: a.newChannelJSON(item, models, now),
-		Owner:       channelOwnerJSON{ID: item.Owner.ID, Username: item.Owner.Username, DisplayName: item.Owner.DisplayName},
+		Owner:       accountRefJSON{ID: item.Owner.ID, Username: item.Owner.Username, DisplayName: item.Owner.DisplayName},
 	}
 }
 

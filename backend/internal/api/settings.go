@@ -99,18 +99,10 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, settingsEnvelopeJSON{Settings: newSettingsJSON(updated)})
 }
 
-// auditActorJSON is the AccountRef shape of an audit entry's actor. It is not named
-// accountRefJSON because observe.go still uses that name for its map-based helper.
-type auditActorJSON struct {
-	ID          string `json:"id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-}
-
 // auditEntryJSON is the OpenAPI AuditEntry schema.
 type auditEntryJSON struct {
 	ID         string          `json:"id"`
-	Actor      *auditActorJSON `json:"actor"`
+	Actor      *accountRefJSON `json:"actor"`
 	Action     string          `json:"action"`
 	TargetType string          `json:"target_type"`
 	TargetID   string          `json:"target_id"`
@@ -125,10 +117,10 @@ type auditPageJSON struct {
 	NextCursor *string          `json:"next_cursor"`
 }
 
-func auditEntryResponse(entry audit.Entry) auditEntryJSON {
-	var actor *auditActorJSON
+func newAuditEntryJSON(entry audit.Entry) auditEntryJSON {
+	var actor *accountRefJSON
 	if entry.Actor != nil {
-		actor = &auditActorJSON{ID: entry.Actor.ID, Username: entry.Actor.Username, DisplayName: entry.Actor.DisplayName}
+		actor = &accountRefJSON{ID: entry.Actor.ID, Username: entry.Actor.Username, DisplayName: entry.Actor.DisplayName}
 	}
 	detail := json.RawMessage(entry.Detail)
 	if len(detail) == 0 {
@@ -173,7 +165,7 @@ func (a *app) listAdminAudit(w http.ResponseWriter, r *http.Request) {
 	items := make([]auditEntryJSON, 0, len(entries))
 	cursor := ""
 	for _, entry := range entries {
-		items = append(items, auditEntryResponse(entry))
+		items = append(items, newAuditEntryJSON(entry))
 		cursor = strconv.FormatInt(entry.ID, 10)
 	}
 	writeJSON(w, http.StatusOK, auditPageJSON{Items: items, NextCursor: nextCursor(hasMore, cursor)})

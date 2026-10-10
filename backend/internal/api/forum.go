@@ -7,7 +7,150 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"time"
 )
+
+// forumAuthorJSON is the OpenAPI ForumAuthor schema.
+type forumAuthorJSON struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+}
+
+// forumBoardJSON is the OpenAPI ForumBoard schema.
+type forumBoardJSON struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	SortOrder   int32     `json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// forumBoardListJSON is the OpenAPI ForumBoardList schema.
+type forumBoardListJSON struct {
+	Items []forumBoardJSON `json:"items"`
+}
+
+// forumAttachmentJSON is the OpenAPI ForumAttachment schema.
+type forumAttachmentJSON struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Size      int64  `json:"size"`
+	URL       string `json:"url"`
+	Inline    bool   `json:"inline"`
+}
+
+// forumTopicJSON is the OpenAPI ForumTopic schema.
+type forumTopicJSON struct {
+	ID          string                `json:"id"`
+	Kind        string                `json:"kind"`
+	BoardID     *string               `json:"board_id"`
+	Title       string                `json:"title"`
+	Body        string                `json:"body"`
+	Author      forumAuthorJSON       `json:"author"`
+	Status      *string               `json:"status"`
+	CreatedAt   time.Time             `json:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at"`
+	Attachments []forumAttachmentJSON `json:"attachments"`
+	ReplyCount  int64                 `json:"reply_count"`
+}
+
+// forumReplyJSON is the OpenAPI ForumReply schema.
+type forumReplyJSON struct {
+	ID          string                `json:"id"`
+	TopicID     string                `json:"topic_id"`
+	Body        string                `json:"body"`
+	Author      forumAuthorJSON       `json:"author"`
+	CreatedAt   time.Time             `json:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at"`
+	Attachments []forumAttachmentJSON `json:"attachments"`
+}
+
+// forumTopicPageJSON is the OpenAPI ForumTopicPage schema.
+type forumTopicPageJSON struct {
+	Items []forumTopicJSON `json:"items"`
+	Total int64            `json:"total"`
+	Page  int32            `json:"page"`
+	Limit int32            `json:"limit"`
+}
+
+// forumReplyPageJSON is the OpenAPI ForumReplyPage schema.
+type forumReplyPageJSON struct {
+	Items []forumReplyJSON `json:"items"`
+	Total int64            `json:"total"`
+	Page  int32            `json:"page"`
+	Limit int32            `json:"limit"`
+}
+
+func newForumBoardJSON(board forum.Board) forumBoardJSON {
+	return forumBoardJSON{ID: board.ID, Name: board.Name, Description: board.Description, SortOrder: board.SortOrder, CreatedAt: board.CreatedAt}
+}
+
+func newForumBoardListJSON(boards []forum.Board) forumBoardListJSON {
+	items := make([]forumBoardJSON, 0, len(boards))
+	for _, board := range boards {
+		items = append(items, newForumBoardJSON(board))
+	}
+	return forumBoardListJSON{Items: items}
+}
+
+func newForumAttachmentJSON(attachment forum.Attachment) forumAttachmentJSON {
+	return forumAttachmentJSON{
+		ID: attachment.ID, Name: attachment.Name, MediaType: attachment.MediaType, Size: attachment.Size, URL: attachment.URL, Inline: attachment.Inline,
+	}
+}
+
+func newForumAttachmentsJSON(attachments []forum.Attachment) []forumAttachmentJSON {
+	items := make([]forumAttachmentJSON, 0, len(attachments))
+	for _, attachment := range attachments {
+		items = append(items, newForumAttachmentJSON(attachment))
+	}
+	return items
+}
+
+func newForumTopicJSON(topic forum.Topic) forumTopicJSON {
+	return forumTopicJSON{
+		ID:          topic.ID,
+		Kind:        topic.Kind,
+		BoardID:     topic.BoardID,
+		Title:       topic.Title,
+		Body:        topic.Body,
+		Author:      forumAuthorJSON{ID: topic.Author.ID, DisplayName: topic.Author.DisplayName},
+		Status:      topic.Status,
+		CreatedAt:   topic.CreatedAt,
+		UpdatedAt:   topic.UpdatedAt,
+		Attachments: newForumAttachmentsJSON(topic.Attachments),
+		ReplyCount:  topic.ReplyCount,
+	}
+}
+
+func newForumReplyJSON(reply forum.Reply) forumReplyJSON {
+	return forumReplyJSON{
+		ID:          reply.ID,
+		TopicID:     reply.TopicID,
+		Body:        reply.Body,
+		Author:      forumAuthorJSON{ID: reply.Author.ID, DisplayName: reply.Author.DisplayName},
+		CreatedAt:   reply.CreatedAt,
+		UpdatedAt:   reply.UpdatedAt,
+		Attachments: newForumAttachmentsJSON(reply.Attachments),
+	}
+}
+
+func newForumTopicPageJSON(page forum.Page[forum.Topic]) forumTopicPageJSON {
+	items := make([]forumTopicJSON, 0, len(page.Items))
+	for _, topic := range page.Items {
+		items = append(items, newForumTopicJSON(topic))
+	}
+	return forumTopicPageJSON{Items: items, Total: page.Total, Page: page.Page, Limit: page.Limit}
+}
+
+func newForumReplyPageJSON(page forum.Page[forum.Reply]) forumReplyPageJSON {
+	items := make([]forumReplyJSON, 0, len(page.Items))
+	for _, reply := range page.Items {
+		items = append(items, newForumReplyJSON(reply))
+	}
+	return forumReplyPageJSON{Items: items, Total: page.Total, Page: page.Page, Limit: page.Limit}
+}
 
 func (a *app) registerForumRoutes(r *router) {
 	r.implement("239", "GET /api/forum/boards", accessReady, a.forumBoards)
@@ -47,16 +190,23 @@ func writeForumError(w http.ResponseWriter, err error) {
 		writeDomainError(w, err)
 	}
 }
-func forumJSON(w http.ResponseWriter, status int, v any, err error) {
+
+// writeForum writes the response form of a forum call's result, or the error the call failed with.
+func writeForum[T, J any](w http.ResponseWriter, status int, value T, err error, convert func(T) J) {
 	if err != nil {
 		writeForumError(w, err)
 		return
 	}
-	if status == 204 {
-		w.WriteHeader(status)
+	writeJSON(w, status, convert(value))
+}
+
+// writeForumDeleted answers a successful delete with 204, or with the error the call failed with.
+func writeForumDeleted(w http.ResponseWriter, err error) {
+	if err != nil {
+		writeForumError(w, err)
 		return
 	}
-	writeJSON(w, status, v)
+	w.WriteHeader(204)
 }
 func forumFilter(r *http.Request) (forum.Filter, error) {
 	limit, ok := pageLimit(r)
@@ -82,7 +232,7 @@ func forumFilter(r *http.Request) (forum.Filter, error) {
 }
 func (a *app) forumBoards(w http.ResponseWriter, r *http.Request) {
 	v, e := a.forum.Boards(r.Context())
-	forumJSON(w, 200, map[string]any{"items": v}, e)
+	writeForum(w, 200, v, e, newForumBoardListJSON)
 }
 func (a *app) forumSaveBoard(w http.ResponseWriter, r *http.Request) {
 	var in forum.BoardInput
@@ -95,10 +245,10 @@ func (a *app) forumSaveBoard(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		status = 201
 	}
-	forumJSON(w, status, v, e)
+	writeForum(w, status, v, e, newForumBoardJSON)
 }
 func (a *app) forumDeleteBoard(w http.ResponseWriter, r *http.Request) {
-	forumJSON(w, 204, nil, a.forum.DeleteBoard(r.Context(), forumActor(r), r.PathValue("id")))
+	writeForumDeleted(w, a.forum.DeleteBoard(r.Context(), forumActor(r), r.PathValue("id")))
 }
 func (a *app) forumTopics(w http.ResponseWriter, r *http.Request) {
 	f, e := forumFilter(r)
@@ -107,11 +257,11 @@ func (a *app) forumTopics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.Topics(r.Context(), forumActor(r), f)
-	forumJSON(w, 200, v, e)
+	writeForum(w, 200, v, e, newForumTopicPageJSON)
 }
 func (a *app) forumTopic(w http.ResponseWriter, r *http.Request) {
 	v, e := a.forum.Topic(r.Context(), forumActor(r), r.PathValue("id"))
-	forumJSON(w, 200, v, e)
+	writeForum(w, 200, v, e, newForumTopicJSON)
 }
 func (a *app) forumCreateTopic(w http.ResponseWriter, r *http.Request) {
 	var in forum.TopicInput
@@ -120,7 +270,7 @@ func (a *app) forumCreateTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.CreateTopic(r.Context(), forumActor(r), in)
-	forumJSON(w, 201, v, e)
+	writeForum(w, 201, v, e, newForumTopicJSON)
 }
 func (a *app) forumEditTopic(w http.ResponseWriter, r *http.Request) {
 	var in forum.TopicEdit
@@ -129,10 +279,10 @@ func (a *app) forumEditTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.EditTopic(r.Context(), forumActor(r), r.PathValue("id"), in)
-	forumJSON(w, 200, v, e)
+	writeForum(w, 200, v, e, newForumTopicJSON)
 }
 func (a *app) forumDeleteTopic(w http.ResponseWriter, r *http.Request) {
-	forumJSON(w, 204, nil, a.forum.DeleteTopic(r.Context(), forumActor(r), r.PathValue("id")))
+	writeForumDeleted(w, a.forum.DeleteTopic(r.Context(), forumActor(r), r.PathValue("id")))
 }
 func (a *app) forumSetStatus(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -143,7 +293,7 @@ func (a *app) forumSetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.SetStatus(r.Context(), forumActor(r), r.PathValue("id"), in.Status)
-	forumJSON(w, 200, v, e)
+	writeForum(w, 200, v, e, newForumTopicJSON)
 }
 func (a *app) forumReplies(w http.ResponseWriter, r *http.Request) {
 	f, e := forumFilter(r)
@@ -152,7 +302,7 @@ func (a *app) forumReplies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.Replies(r.Context(), forumActor(r), r.PathValue("id"), f)
-	forumJSON(w, 200, v, e)
+	writeForum(w, 200, v, e, newForumReplyPageJSON)
 }
 func (a *app) forumSaveReply(w http.ResponseWriter, r *http.Request) {
 	var in forum.ContentInput
@@ -165,10 +315,10 @@ func (a *app) forumSaveReply(w http.ResponseWriter, r *http.Request) {
 		topicID, id, status = id, "", 201
 	}
 	v, e := a.forum.SaveReply(r.Context(), forumActor(r), topicID, id, in)
-	forumJSON(w, status, v, e)
+	writeForum(w, status, v, e, newForumReplyJSON)
 }
 func (a *app) forumDeleteReply(w http.ResponseWriter, r *http.Request) {
-	forumJSON(w, 204, nil, a.forum.DeleteReply(r.Context(), forumActor(r), r.PathValue("id")))
+	writeForumDeleted(w, a.forum.DeleteReply(r.Context(), forumActor(r), r.PathValue("id")))
 }
 func (a *app) forumUpload(w http.ResponseWriter, r *http.Request) {
 	if !a.forumUploads.take(forumActor(r).ID) {
@@ -208,7 +358,7 @@ func (a *app) forumUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := a.forum.Upload(r.Context(), forumActor(r), name, data)
-	forumJSON(w, 201, v, e)
+	writeForum(w, 201, v, e, newForumAttachmentJSON)
 }
 func (a *app) forumAttachment(w http.ResponseWriter, r *http.Request) {
 	f, err := a.forum.Attachment(r.Context(), forumActor(r), r.PathValue("id"))

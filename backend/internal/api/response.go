@@ -164,8 +164,9 @@ func nextCursor(hasMore bool, cursor string) *string {
 	return &cursor
 }
 
-// pageJSON is the cursor page shared by the C2COrderPage, C2CMyOrderPage, C2CTradePage and
-// AdminChannelPage schemas: items plus a next_cursor that is null on the last page.
+// pageJSON is the cursor page shared by the C2COrderPage, C2CMyOrderPage, C2CTradePage,
+// AdminChannelPage, ChannelCallPage and LedgerTransactionPage schemas: items plus a next_cursor
+// that is null on the last page.
 type pageJSON[T any] struct {
 	Items      []T     `json:"items"`
 	NextCursor *string `json:"next_cursor"`

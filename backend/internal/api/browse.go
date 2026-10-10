@@ -85,45 +85,6 @@ type modelDetailJSON struct {
 	Routing    routingPreferenceJSON `json:"routing"`
 }
 
-// tokenUsageJSON is the OpenAPI Usage schema. It is not named usageJSON because observe.go still
-// uses that name for its map-based helper.
-type tokenUsageJSON struct {
-	InputTokens      int64 `json:"input_tokens"`
-	OutputTokens     int64 `json:"output_tokens"`
-	CacheWriteTokens int64 `json:"cache_write_tokens"`
-	CacheReadTokens  int64 `json:"cache_read_tokens"`
-}
-
-// callChannelRefJSON is the OpenAPI ChannelRef schema. It is not named channelRefJSON because
-// observe.go still uses that name for its map-based helper.
-type callChannelRefJSON struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// recentCallJSON is the OpenAPI CallSummary schema as built from the gateway's home page rows. It
-// is not named callSummaryJSON because observe.go still uses that name for its map-based helper.
-type recentCallJSON struct {
-	ID             string              `json:"id"`
-	CreatedAt      time.Time           `json:"created_at"`
-	CompletedAt    *time.Time          `json:"completed_at"`
-	ModelID        *string             `json:"model_id"`
-	RequestedModel string              `json:"requested_model"`
-	Format         channel.Format      `json:"format"`
-	Stream         bool                `json:"stream"`
-	Tag            *string             `json:"tag"`
-	APIKey         *apiKeyRefJSON      `json:"api_key"`
-	Outcome        string              `json:"outcome"`
-	Channel        *callChannelRefJSON `json:"channel"`
-	AttemptCount   int                 `json:"attempt_count"`
-	Usage          tokenUsageJSON      `json:"usage"`
-	Cost           string              `json:"cost"`
-	Fee            string              `json:"fee"`
-	Charged        string              `json:"charged"`
-	TTFTMS         *int32              `json:"ttft_ms"`
-	DurationMS     *int32              `json:"duration_ms"`
-}
-
 // defaultKeyJSON is the OpenAPI DefaultKey schema.
 type defaultKeyJSON struct {
 	ID     string `json:"id"`
@@ -152,7 +113,7 @@ type homeResponseJSON struct {
 	Channels         homeChannelsJSON  `json:"channels"`
 	DefaultKey       *defaultKeyJSON   `json:"default_key"`
 	PendingC2CTrades int64             `json:"pending_c2c_trades"`
-	RecentCalls      []recentCallJSON  `json:"recent_calls"`
+	RecentCalls      []callSummaryJSON `json:"recent_calls"`
 }
 
 func newEffectivePricesJSON(prices ledger.Prices, multiplierNano int64) effectivePricesJSON {
@@ -328,10 +289,11 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func newRecentCallJSON(call gateway.CallSummary) recentCallJSON {
-	var channelRef *callChannelRefJSON
+// newGatewayCallSummaryJSON builds the CallSummary schema from the gateway's home page rows.
+func newGatewayCallSummaryJSON(call gateway.CallSummary) callSummaryJSON {
+	var channelRef *channelRefJSON
 	if call.ChannelID != nil {
-		channelRef = &callChannelRefJSON{ID: *call.ChannelID}
+		channelRef = &channelRefJSON{ID: *call.ChannelID}
 		if call.ChannelName != nil {
 			channelRef.Name = *call.ChannelName
 		}
@@ -340,29 +302,38 @@ func newRecentCallJSON(call gateway.CallSummary) recentCallJSON {
 	if call.Booked {
 		charged = money.FromNano((call.Cost + call.Fee).Nano())
 	}
-	return recentCallJSON{
+	return callSummaryJSON{
 		ID:             call.ID,
 		CreatedAt:      call.CreatedAt,
 		CompletedAt:    call.CompletedAt,
 		ModelID:        call.ModelID,
 		RequestedModel: call.RequestedModel,
-		Format:         call.Format,
+		Format:         string(call.Format),
 		Stream:         call.Stream,
 		Tag:            call.Tag,
-		APIKey:         newApiKeyRefJSON(call.KeyID, call.KeyName),
+		APIKey:         newKeyRefJSON(call.KeyID, call.KeyName),
 		Outcome:        call.Outcome,
 		Channel:        channelRef,
 		AttemptCount:   call.AttemptCount,
-		Usage: tokenUsageJSON{
+		Usage: usageJSON{
 			InputTokens: call.Usage.InputTokens, OutputTokens: call.Usage.OutputTokens,
 			CacheWriteTokens: call.Usage.CacheWriteTokens, CacheReadTokens: call.Usage.CacheReadTokens,
 		},
 		Cost:       call.Cost.String(),
 		Fee:        call.Fee.String(),
 		Charged:    charged.String(),
-		TTFTMS:     call.TTFTMS,
-		DurationMS: call.DurationMS,
+		TTFTMS:     widenMillis(call.TTFTMS),
+		DurationMS: widenMillis(call.DurationMS),
 	}
+}
+
+// widenMillis converts the gateway's int32 milliseconds to the int the call schemas share.
+func widenMillis(value *int32) *int {
+	if value == nil {
+		return nil
+	}
+	wide := int(*value)
+	return &wide
 }
 
 func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
@@ -398,9 +369,9 @@ func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 			defaultKey = &defaultKeyJSON{ID: key.ID, Name: key.Name, Prefix: key.Prefix}
 		}
 	}
-	calls := make([]recentCallJSON, 0, len(recent))
+	calls := make([]callSummaryJSON, 0, len(recent))
 	for _, call := range recent {
-		calls = append(calls, newRecentCallJSON(call))
+		calls = append(calls, newGatewayCallSummaryJSON(call))
 	}
 	writeJSON(w, http.StatusOK, homeResponseJSON{
 		Points:           pointsSummaryJSON{Balance: points.Balance.String(), CreditLimit: points.CreditLimit.String(), Available: points.Available().String()},

@@ -61,8 +61,9 @@ func (f streamFilter) matches(record observe.CallRecord) bool {
 }
 
 // serveStream pushes live call messages as Server-Sent Events until the
-// client leaves. scope limits which calls this stream may ever see.
-func (a *app) serveStream(w http.ResponseWriter, r *http.Request, filter streamFilter, scope func(observe.CallRecord) bool, render func(observe.CallRecord) map[string]any) {
+// client leaves. scope limits which calls this stream may ever see; render
+// builds the event payload, the same call schema as the matching list endpoint.
+func serveStream[T any](a *app, w http.ResponseWriter, r *http.Request, filter streamFilter, scope func(observe.CallRecord) bool, render func(observe.CallRecord) T) {
 	if a.feed == nil {
 		writeError(w, http.StatusServiceUnavailable, "stream_unavailable", "实时流暂不可用")
 		return
@@ -122,8 +123,8 @@ func (a *app) streamMyCalls(w http.ResponseWriter, r *http.Request) {
 	}
 	filter.accountID = ""
 	me := accountFromContext(r.Context()).ID
-	a.serveStream(w, r, filter, func(record observe.CallRecord) bool { return record.Account.ID == me },
-		func(record observe.CallRecord) map[string]any { return callSummaryJSON(record.CallRow) })
+	serveStream(a, w, r, filter, func(record observe.CallRecord) bool { return record.Account.ID == me },
+		func(record observe.CallRecord) callSummaryJSON { return newCallSummaryJSON(record.CallRow) })
 }
 
 func (a *app) streamAdminCalls(w http.ResponseWriter, r *http.Request) {
@@ -132,8 +133,8 @@ func (a *app) streamAdminCalls(w http.ResponseWriter, r *http.Request) {
 		writeInvalidQuery(w)
 		return
 	}
-	a.serveStream(w, r, filter, func(observe.CallRecord) bool { return true },
-		func(record observe.CallRecord) map[string]any { return adminCallJSON(record.CallRow) })
+	serveStream(a, w, r, filter, func(observe.CallRecord) bool { return true },
+		func(record observe.CallRecord) adminCallJSON { return newAdminCallJSON(record.CallRow) })
 }
 
 func (a *app) streamChannelCalls(w http.ResponseWriter, r *http.Request) {
@@ -153,14 +154,14 @@ func (a *app) streamChannelCalls(w http.ResponseWriter, r *http.Request) {
 	}
 	// The channel owner sees model and outcome filters only.
 	filter = streamFilter{model: filter.model, outcome: filter.outcome}
-	a.serveStream(w, r, filter, func(record observe.CallRecord) bool { return touches(record, channelID) },
-		func(record observe.CallRecord) map[string]any {
+	serveStream(a, w, r, filter, func(record observe.CallRecord) bool { return touches(record, channelID) },
+		func(record observe.CallRecord) channelCallJSON {
 			row := record.CallRow
 			for _, attempt := range record.Attempts {
 				if attempt.Channel != nil && attempt.Channel.ID == channelID {
 					row.ScopeAttempts = append(row.ScopeAttempts, attempt)
 				}
 			}
-			return channelCallJSON(row, channelID)
+			return newChannelCallJSON(row, channelID)
 		})
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -39,7 +41,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"settings without extra hosts", newSettingsJSON(settings.Settings{DefaultCreditLimit: money.FromNano(money.Scale)}), map[string]any{
 			"default_credit_limit": "1", "extra_blocked_hosts": emptyList,
 		}},
-		{"audit entry without actor or detail", auditEntryResponse(audit.Entry{ID: 7}), map[string]any{
+		{"audit entry without actor or detail", newAuditEntryJSON(audit.Entry{ID: 7}), map[string]any{
 			"id": "7", "actor": nil, "detail": emptyObject,
 		}},
 		{"unconfigured routing preference", newRoutingPreferenceJSON(routing.Pref{}), map[string]any{
@@ -91,7 +93,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0)), map[string]any{
 			"context_window": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0),
 		}},
-		{"call that has not finished", newRecentCallJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
+		{"call that has not finished", newGatewayCallSummaryJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
 			"cost": "0.000000003", "charged": "0",
 		}},
@@ -117,6 +119,97 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"discovered model without a catalog match", discoveredModelJSON{ID: "x"}, map[string]any{
 			"matched_model_id": nil,
 		}},
+		{"call without key, channel or timings", newCallSummaryJSON(observe.CallRow{}), map[string]any{
+			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
+			"cost": "0", "fee": "0", "charged": "0", "usage": map[string]any{
+				"input_tokens": float64(0), "output_tokens": float64(0), "cache_write_tokens": float64(0), "cache_read_tokens": float64(0),
+			},
+		}},
+		{"unbilled call is charged nothing", newCallSummaryJSON(observe.CallRow{Cost: money.FromNano(5), Fee: money.FromNano(1)}), map[string]any{
+			"cost": "0.000000005", "fee": "0.000000001", "charged": "0",
+		}},
+		{"admin call keeps the call fields beside the account", newAdminCallJSON(observe.CallRow{Account: observe.AccountRef{ID: "a", Username: "u", DisplayName: "d"}}), map[string]any{
+			"account": map[string]any{"id": "a", "username": "u", "display_name": "d"}, "api_key": nil, "charged": "0",
+		}},
+		{"call detail without attempts or snapshot", newCallDetailJSON(observe.CallDetail{}), map[string]any{
+			"attempts": emptyList, "price_snapshot": nil, "routing_mode": nil, "routing_source": nil, "client_user_agent": nil,
+			"output_tokens_per_second": nil, "inter_token_p50_ms": nil, "inter_token_p95_ms": nil, "response_bytes": nil, "ledger_transaction_id": nil,
+		}},
+		{"call detail with an explicit null snapshot", newCallDetailJSON(observe.CallDetail{CallRecord: observe.CallRecord{PriceSnapshot: json.RawMessage("null")}}), map[string]any{
+			"price_snapshot": nil,
+		}},
+		{"attempt without channel or status", newCallAttemptJSON(observe.Attempt{EndReason: "timeout_ttft"}), map[string]any{
+			"channel": nil, "status_code": nil, "error_code": nil, "error_message": nil, "connect_ms": nil, "ttft_ms": nil,
+			"duration_ms": nil, "response_bytes": nil, "end_reason": "timeout_ttft",
+		}},
+		{"channel call that only failed elsewhere", newChannelCallJSON(observe.CallRow{Cost: money.FromNano(5)}, "c1"), map[string]any{
+			"served": false, "revenue": "0", "error": nil, "model_id": nil, "ttft_ms": nil, "duration_ms": nil,
+		}},
+		{"channel call with a failed attempt without details", newChannelCallJSON(observe.CallRow{
+			ScopeAttempts: []observe.Attempt{{EndReason: "upstream_error"}, {EndReason: "completed"}, {EndReason: "timeout_total"}},
+		}, "c1"), map[string]any{
+			"error": map[string]any{"status_code": nil, "error_code": nil, "error_message": nil},
+		}},
+		{"call summary of nothing", newCallStatsJSON(observe.CallStats{}), map[string]any{
+			"success_rate": nil, "charged": "0", "total_tokens": float64(0), "ttft_p50_ms": nil, "ttft_p95_ms": nil,
+		}},
+		{"usage report without rows", newUsageReportJSON(observe.UsageReport{}), map[string]any{
+			"view": "spend", "items": emptyList, "total": map[string]any{
+				"key": "", "label": "", "calls": float64(0), "succeeded": float64(0), "input_tokens": float64(0), "output_tokens": float64(0),
+				"cache_write_tokens": float64(0), "cache_read_tokens": float64(0), "charged": "0",
+			},
+		}},
+		{"channel statistics of an unused channel", newChannelStatsJSON(observe.ChannelReport{}), map[string]any{
+			"success_rate": nil, "ttft_p50_ms": nil, "ttft_p95_ms": nil, "output_tokens_per_second_p50": nil, "output_tokens_per_second_p95": nil,
+			"last_24h": map[string]any{"calls": float64(0), "succeeded": float64(0), "success_rate": nil},
+			"hourly":   emptyList, "status_codes": emptyList, "recent_failures": emptyList, "by_model": emptyList, "daily": emptyList, "events": emptyList,
+			"today": map[string]any{"revenue": "0", "daily_cap": nil, "progress": nil},
+		}},
+		{"administrator points of an empty ledger", newAdminPointsJSON(observe.AdminPointsReport{}), map[string]any{
+			"trend": emptyList, "risks": emptyList,
+			"concentration": map[string]any{"top5_share": nil, "top": emptyList},
+			"check":         map[string]any{"balanced": false, "total": "0", "checked_at": "0001-01-01T00:00:00Z"},
+			"checks": map[string]any{
+				"checked_at": "0001-01-01T00:00:00Z", "all_passed": false,
+				"account_balances": map[string]any{"passed": true, "mismatches": emptyList},
+				"escrow":           map[string]any{"passed": true, "escrow_balance": "0", "orders_total": "0", "difference": "0"},
+				"billing_calls":    map[string]any{"passed": true, "missing_count": float64(0), "missing": emptyList},
+				"released_trades":  map[string]any{"passed": true, "missing_count": float64(0), "missing": emptyList},
+			},
+		}},
+		{"risk without negative days", newAdminPointsJSON(observe.AdminPointsReport{Risks: []observe.Risk{{Balance: money.FromNano(-3), CreditLimit: money.FromNano(1)}}}), map[string]any{
+			"risks": []any{map[string]any{
+				"account": map[string]any{"id": "", "username": "", "display_name": ""}, "balance": "-0.000000003", "credit_limit": "0.000000001",
+				"available": "-0.000000002", "kind": "", "negative_days": nil, "last_activity_at": nil,
+			}},
+		}},
+		{"overview without calls or trades", newAdminOverviewJSON(observe.Overview{}), map[string]any{
+			"attention": emptyList,
+			"today":     map[string]any{"calls": float64(0), "succeeded": float64(0), "success_rate": nil, "spend": "0", "fee_revenue": "0"},
+			"last_24h":  map[string]any{"calls": float64(0), "succeeded": float64(0), "success_rate": nil},
+			"c2c": map[string]any{
+				"open_orders": float64(0), "awaiting_payment": float64(0), "open_disputes": float64(0), "trades_24h": float64(0), "volume_24h": "0",
+				"avg_price_fen_24h": nil,
+			},
+		}},
+		{"ledger account of a system account", newLedgerAccountRefJSON(observe.LedgerAccountRef{Kind: "system"}), map[string]any{
+			"kind": "system", "account": nil, "system_code": nil,
+		}},
+		{"transaction without related record, actor or entries", newLedgerTransactionJSON(observe.Transaction{}), map[string]any{
+			"related": nil, "actor": nil, "related_summary": nil, "entries": emptyList,
+		}},
+		{"transaction detail always has snapshot and actions", ledgerTransactionDetailJSON{
+			ledgerTransactionJSON: newLedgerTransactionJSON(observe.Transaction{}), PriceSnapshot: rawJSONOrNil(nil), RecentActions: []auditEntryJSON{},
+		}, map[string]any{"price_snapshot": nil, "recent_actions": emptyList}},
+		{"forum topic without attachments", newForumTopicJSON(forum.Topic{}), map[string]any{
+			"board_id": nil, "status": nil, "attachments": emptyList, "reply_count": float64(0), "author": map[string]any{"id": "", "display_name": ""},
+		}},
+		{"forum reply without attachments", newForumReplyJSON(forum.Reply{}), map[string]any{"attachments": emptyList}},
+		{"empty forum topic page", newForumTopicPageJSON(forum.Page[forum.Topic]{Page: 1, Limit: 20}), map[string]any{
+			"items": emptyList, "total": float64(0), "page": float64(1), "limit": float64(20),
+		}},
+		{"empty forum reply page", newForumReplyPageJSON(forum.Page[forum.Reply]{}), map[string]any{"items": emptyList}},
+		{"empty forum board list", newForumBoardListJSON(nil), map[string]any{"items": emptyList}},
 		{"empty cursor page", pageJSON[c2cOrderJSON]{Items: []c2cOrderJSON{}}, map[string]any{
 			"items": emptyList, "next_cursor": nil,
 		}},
@@ -203,5 +296,44 @@ func TestAdminChannelAddsOwnerToChannelFields(t *testing.T) {
 	if decoded["id"] != "c1" || decoded["name"] != "渠道" || len(decoded) != 12 ||
 		!reflect.DeepEqual(owner, map[string]any{"id": "o1", "username": "owner", "display_name": "车主"}) {
 		t.Fatalf("admin channel = %s", raw)
+	}
+}
+
+// 交易列表项不带详情专有的 price_snapshot 与 recent_actions；详情里两者始终存在。
+func TestLedgerTransactionListItemOmitsDetailFields(t *testing.T) {
+	item, err := json.Marshal(newLedgerTransactionJSON(observe.Transaction{PriceSnapshot: json.RawMessage("{}")}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(item, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"price_snapshot", "recent_actions"} {
+		if _, present := decoded[key]; present {
+			t.Errorf("list item has %s: %s", key, item)
+		}
+	}
+}
+
+// 调用页的 summary 必须存在（含空页），渠道调用页没有 summary。
+func TestCallPagesCarryTheirSummaryExactlyWhenTheSchemaSaysSo(t *testing.T) {
+	for name, tc := range map[string]struct {
+		page any
+		want string
+	}{
+		"my calls":    {callPageJSON{Items: []callSummaryJSON{}, Summary: newCallStatsJSON(observe.CallStats{})}, `"summary":{"calls":0,"succeeded":0,"failed":0,"success_rate":null,"charged":"0","input_tokens":0,"output_tokens":0,"total_tokens":0,"ttft_p50_ms":null,"ttft_p95_ms":null}`},
+		"admin calls": {adminCallPageJSON{Items: []adminCallJSON{}, Summary: newCallStatsJSON(observe.CallStats{})}, `"summary":{"calls":0,`},
+		"channel":     {pageJSON[channelCallJSON]{Items: []channelCallJSON{}}, `{"items":[],"next_cursor":null}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.page)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(raw), tc.want) || !strings.HasPrefix(string(raw), `{"items":[],"next_cursor":null`) {
+				t.Fatalf("page = %s, want it to contain %s", raw, tc.want)
+			}
+		})
 	}
 }

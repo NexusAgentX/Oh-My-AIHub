@@ -38,15 +38,15 @@ type Actor struct {
 	Admin bool
 }
 type Author struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"display_name"`
+	ID          string
+	DisplayName string
 }
 type Board struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	SortOrder   int32     `json:"sort_order"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string
+	Name        string
+	Description string
+	SortOrder   int32
+	CreatedAt   time.Time
 }
 type BoardInput struct {
 	Name        string `json:"name"`
@@ -54,38 +54,38 @@ type BoardInput struct {
 	SortOrder   int32  `json:"sort_order"`
 }
 type Attachment struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	MediaType string `json:"media_type"`
-	Size      int64  `json:"size"`
-	URL       string `json:"url"`
-	Inline    bool   `json:"inline"`
+	ID        string
+	Name      string
+	MediaType string
+	Size      int64
+	URL       string
+	Inline    bool
 }
 type File struct {
 	Attachment
-	Data []byte `json:"-"`
+	Data []byte
 }
 type Topic struct {
-	ID          string       `json:"id"`
-	Kind        string       `json:"kind"`
-	BoardID     *string      `json:"board_id"`
-	Title       string       `json:"title"`
-	Body        string       `json:"body"`
-	Author      Author       `json:"author"`
-	Status      *string      `json:"status"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	Attachments []Attachment `json:"attachments"`
-	ReplyCount  int64        `json:"reply_count"`
+	ID          string
+	Kind        string
+	BoardID     *string
+	Title       string
+	Body        string
+	Author      Author
+	Status      *string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Attachments []Attachment
+	ReplyCount  int64
 }
 type Reply struct {
-	ID          string       `json:"id"`
-	TopicID     string       `json:"topic_id"`
-	Body        string       `json:"body"`
-	Author      Author       `json:"author"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	Attachments []Attachment `json:"attachments"`
+	ID          string
+	TopicID     string
+	Body        string
+	Author      Author
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Attachments []Attachment
 }
 type ContentInput struct {
 	Body          string   `json:"body"`
@@ -109,10 +109,10 @@ type Filter struct {
 	Limit   int32
 }
 type Page[T any] struct {
-	Items []T   `json:"items"`
-	Total int64 `json:"total"`
-	Page  int32 `json:"page"`
-	Limit int32 `json:"limit"`
+	Items []T
+	Total int64
+	Page  int32
+	Limit int32
 }
 type Store interface {
 	Boards(context.Context) ([]Board, error)
