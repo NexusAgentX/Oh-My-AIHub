@@ -1,8 +1,8 @@
 # 依赖更新：每月一次，每个生态合并为一个分组 PR，并限制同时打开的数量。
 # Dependabot 的 PR 与其他 PR 一样需通过 CI（gates、integration）后再合并。
 #
-# 注意：golang 与 node 镜像的版本同时固定在 mise.toml、go.mod 与 Dockerfile 中，
-# 合并此类升级时需同步修改这些位置，不要只合并 Dockerfile 的变更。
+# Go 次版本、Node 大版本、@types/node 大版本与 openapi-types 的 TypeScript 大版本已在下方忽略：
+# 它们需要与 mise.toml、go.mod 等位置一起规划升级。其余 golang、node 镜像升级合并时同样要同步这些位置。
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -27,6 +27,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # 类型定义跟随运行时 Node 大版本（mise.toml），不单独升级。
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-npm:
         patterns: ["*"]
@@ -40,6 +44,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # openapi-typescript 依赖 TypeScript 5 的编译器 API，TypeScript 7 不提供，必须停在 5.x。
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       openapi-types-npm:
         patterns: ["*"]
@@ -64,6 +72,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # Go 工具链版本（含次版本）与 mise.toml、go.mod 一起升级，不单独改镜像。
+      - dependency-name: golang
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       backend-docker:
         patterns: ["*"]
@@ -76,6 +88,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # Node 大版本与 mise.toml 一起升级，不单独改镜像。
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-docker:
         patterns: ["*"]
