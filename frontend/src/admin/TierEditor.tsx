@@ -17,6 +17,19 @@ import {
 } from './modelForm'
 import type { PriceTier, PriceTierInput } from './types'
 
+/** 实际服务档位的常见取值（含协议前缀）；仍可填其他值 */
+const serviceTierPresets = [
+  { value: 'openai:default', label: 'OpenAI 标准' },
+  { value: 'openai:priority', label: 'OpenAI 优先' },
+  { value: 'openai:fast', label: 'OpenAI 快速' },
+  { value: 'openai:flex', label: 'OpenAI Flex' },
+  { value: 'anthropic:standard', label: 'Anthropic 标准' },
+  { value: 'anthropic:priority', label: 'Anthropic 优先' },
+  { value: 'gemini:STANDARD', label: 'Gemini 标准' },
+  { value: 'gemini:PRIORITY', label: 'Gemini 优先' },
+  { value: 'gemini:FLEX', label: 'Gemini Flex' },
+]
+
 export function PriceFields({
   prices,
   onChange,
@@ -95,29 +108,12 @@ function TierEditForm({
         value={form.name}
       />
       <TextField
-        list="service-tier-presets"
         label="实际服务档位（可选）"
         placeholder="例如 openai:default、anthropic:priority"
+        suggestions={serviceTierPresets}
         value={form.serviceTier ?? ''}
         onChange={(event) => set({ serviceTier: event.target.value })}
       />
-      <datalist id="service-tier-presets">
-        {[
-          ['openai:default', 'OpenAI 标准'],
-          ['openai:priority', 'OpenAI 优先'],
-          ['openai:fast', 'OpenAI 快速'],
-          ['openai:flex', 'OpenAI Flex'],
-          ['anthropic:standard', 'Anthropic 标准'],
-          ['anthropic:priority', 'Anthropic 优先'],
-          ['gemini:STANDARD', 'Gemini 标准'],
-          ['gemini:PRIORITY', 'Gemini 优先'],
-          ['gemini:FLEX', 'Gemini Flex'],
-        ].map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </datalist>
       <SelectField
         label="百炼实际思考模式（可选）"
         onChange={(event) => set({ thinkingMode: event.target.value })}

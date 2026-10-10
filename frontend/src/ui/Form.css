@@ -40,8 +40,9 @@
 .input[aria-invalid='true'] { border-color: var(--danger); }
 .input[aria-invalid='true']:focus { box-shadow: 3px 3px 0 var(--rose); }
 
-/* 下拉框去掉原生外观，箭头用两段渐变画出，颜色跟随主题 */
-.select-input {
+/* 下拉框去掉原生外观，箭头用两段渐变画出，颜色跟随主题；带建议的文本框用同一个箭头 */
+.select-input,
+.suggest-input {
   padding-right: 34px;
   appearance: none;
   background-image:
@@ -94,6 +95,47 @@
     .select-input option:disabled { color: var(--muted); cursor: not-allowed; }
   }
 }
+
+/* 带建议的文本框（替代原生 datalist）：建议列表与下拉列表同一套贴纸浮层 */
+.suggest { position: relative; display: block; min-width: 0; }
+.suggest-input { cursor: text; }
+.suggest-list {
+  position: absolute;
+  z-index: var(--z-overlay);
+  top: calc(100% + 6px);
+  right: 0; /* 与输入框右边对齐，按内容向左加宽，窄输入框里也放得下完整的模型名 */
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(360px, calc(100vw - 2 * var(--space-4)));
+  grid-template-columns: minmax(0, 1fr); /* 超过最大宽度时省略号截断，不撑出边框 */
+  max-height: min(280px, 50dvh);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: var(--sticker-border);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--canvas);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+.suggest-list--up { top: auto; bottom: calc(100% + 6px); }
+.suggest-option {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.suggest-option[aria-selected='true'] { background: var(--hover); }
+.suggest-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-label { flex: none; color: var(--muted); font-size: var(--text-sm); }
 
 .textarea-input { height: auto; min-height: 96px; padding-block: 10px; resize: vertical; }
 
