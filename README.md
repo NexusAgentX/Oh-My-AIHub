@@ -140,10 +140,14 @@ mise run down
 mise run test
 mise run check-sqlc # 修改 queries.sql 或迁移后，先 mise run generate 重新生成并提交
 mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run generate 重新生成前端 API 类型并提交
-mise run test-backend-integration
+mise run test-backend-integration # 需要 Docker；直接 go test 且未设置 TEST_DATABASE_URL 时这些测试会跳过
+mise run check-migrations # 已发布迁移（最新正式 tag）只允许新增，不得修改、删除或重命名
+mise run check-migration-upgrade # 最新正式 tag 建库后，用当前代码升级到最新迁移版本；需要 Docker
 docker compose config --quiet
 mise run check-proxy-trust # 需要已按上文启动安全栈
 ```
+
+CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运行 `./internal/postgres` 与 `./internal/database` 的数据库集成测试，并执行上述两项迁移检查。CI 设置了 `AIHUB_REQUIRE_TEST_DATABASE=1`：缺少 `TEST_DATABASE_URL` 时集成测试失败而不是跳过；本地不设置该变量时仍然跳过。迁移检查依赖完整 Git 历史与 tag（浅克隆请先 `git fetch --tags --unshallow`）。
 
 ## 目录结构
 
@@ -151,7 +155,7 @@ mise run check-proxy-trust # 需要已按上文启动安全栈
 .
 ├── backend/       Go 后端
 ├── frontend/      React 前端
-├── scripts/       数据库加密备份与隔离恢复演练脚本
+├── scripts/       数据库加密备份、隔离恢复演练与迁移检查脚本
 ├── docs/adr/      架构决策记录
 ├── docs/runbooks/ 部署、发布、备份恢复与故障处理操作手册
 ├── licenses/      第三方许可
