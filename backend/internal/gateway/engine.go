@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -36,9 +37,15 @@ const (
 	maxErrorMessage  = 4096
 	chunkSize        = 32 << 10
 	clientWriteLimit = 2 * time.Minute
-	statsTTL         = 60 * time.Second
-	settingsTTL      = 5 * time.Second
 	keyTouchEvery    = time.Minute
+
+	// How often RunRefresh re-reads platform settings and 24h channel stats.
+	// The settings interval is also how long an administrator's change can
+	// take to reach the gateway.
+	settingsRefreshInterval = 5 * time.Second
+	statsRefreshInterval    = 60 * time.Second
+	// refreshTimeout abandons a refresh query that hangs.
+	refreshTimeout = 30 * time.Second
 )
 
 var tagPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
@@ -64,13 +71,24 @@ type Engine struct {
 	Dependencies
 	spend *SpendCache
 
-	mutex         sync.Mutex
-	settingsValue settings.Settings
-	settingsAt    time.Time
-	outboundValue channel.Outbound
-	statsValue    map[string]ChannelStats
-	statsAt       time.Time
-	touched       map[string]time.Time
+	// Settings and channel stats are published as immutable snapshots by
+	// RunRefresh, so the request path reads them without locking or waiting on
+	// the database. The load mutexes only serialise loads (the very first one
+	// included); readers never take them once a snapshot exists.
+	settingsSnap atomic.Pointer[settingsSnapshot]
+	settingsLoad sync.Mutex
+	statsSnap    atomic.Pointer[map[string]ChannelStats]
+	statsLoad    sync.Mutex
+
+	mutex   sync.Mutex // guards touched
+	touched map[string]time.Time
+}
+
+// settingsSnapshot is one consistent read of the platform settings together
+// with the outbound policy derived from them. It is never modified.
+type settingsSnapshot struct {
+	value    settings.Settings
+	outbound channel.Outbound
 }
 
 func NewEngine(dependencies Dependencies) *Engine {
@@ -92,40 +110,122 @@ func NewEngine(dependencies Dependencies) *Engine {
 // Runtime exposes the in-process channel state for display.
 func (e *Engine) State() *Runtime { return e.Runtime }
 
-// Settings returns the platform settings, cached for a few seconds.
+// Settings returns the current platform settings and the outbound policy
+// derived from them. Once a snapshot exists it is a plain atomic read; the
+// background refresh (RunRefresh) keeps it current. Before the first
+// successful load (startup, or tests that never start RunRefresh) callers load
+// it once, sharing one query: concurrent callers queue on settingsLoad and
+// the first success serves them all.
 func (e *Engine) Settings(ctx context.Context) (settings.Settings, channel.Outbound, error) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	if e.outboundValue == nil || e.Now().Sub(e.settingsAt) > settingsTTL {
-		value, err := e.Dependencies.Settings.Get(ctx)
-		if err != nil {
+	snapshot := e.settingsSnap.Load()
+	if snapshot == nil {
+		var err error
+		if snapshot, err = e.loadSettings(ctx, false); err != nil {
 			return settings.Settings{}, nil, err
 		}
-		policy, err := e.Outbound.WithExtraBlockedHosts(value.ExtraBlockedHosts)
-		if err != nil {
-			return settings.Settings{}, nil, err
-		}
-		e.settingsValue, e.outboundValue, e.settingsAt = value, policy, e.Now()
 	}
-	return e.settingsValue, e.outboundValue, nil
+	return snapshot.value, snapshot.outbound, nil
 }
 
-// Stats returns the 24h channel health, cached for a minute.
-func (e *Engine) Stats(ctx context.Context) map[string]ChannelStats {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	if e.statsValue == nil || e.Now().Sub(e.statsAt) > statsTTL {
-		value, err := e.Store.ChannelStats(ctx)
-		if err != nil {
-			e.Logger.Error("gateway: channel stats failed", "error", err)
-			if e.statsValue == nil {
-				return map[string]ChannelStats{}
-			}
-			return e.statsValue
-		}
-		e.statsValue, e.statsAt = value, e.Now()
+// loadSettings reads the settings from the store and publishes a new
+// snapshot. Without force it returns the existing snapshot if another caller
+// published one while this one waited. A failure leaves the snapshot as it is.
+func (e *Engine) loadSettings(ctx context.Context, force bool) (*settingsSnapshot, error) {
+	e.settingsLoad.Lock()
+	defer e.settingsLoad.Unlock()
+	if current := e.settingsSnap.Load(); current != nil && !force {
+		return current, nil
 	}
-	return e.statsValue
+	value, err := e.Dependencies.Settings.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	policy, err := e.Outbound.WithExtraBlockedHosts(value.ExtraBlockedHosts)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := &settingsSnapshot{value: value, outbound: policy}
+	e.settingsSnap.Store(snapshot)
+	return snapshot, nil
+}
+
+// Stats returns the current 24h channel health with the same first-load rules
+// as Settings. If the first load fails it returns an empty map (ranking then
+// treats every channel as unrated) and the next caller or refresh tries again.
+func (e *Engine) Stats(ctx context.Context) map[string]ChannelStats {
+	if stats := e.statsSnap.Load(); stats != nil {
+		return *stats
+	}
+	stats, err := e.loadStats(ctx, false)
+	if err != nil {
+		e.Logger.Error("gateway: channel stats failed", "error", err)
+		return map[string]ChannelStats{}
+	}
+	return stats
+}
+
+// loadStats is loadSettings for the channel stats.
+func (e *Engine) loadStats(ctx context.Context, force bool) (map[string]ChannelStats, error) {
+	e.statsLoad.Lock()
+	defer e.statsLoad.Unlock()
+	if current := e.statsSnap.Load(); current != nil && !force {
+		return *current, nil
+	}
+	value, err := e.Store.ChannelStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if value == nil {
+		value = map[string]ChannelStats{}
+	}
+	e.statsSnap.Store(&value)
+	return value, nil
+}
+
+// RunRefresh keeps the settings and channel-stats snapshots current until ctx
+// ends: settings every few seconds so administrator changes reach the gateway
+// quickly, the heavier 24h stats once a minute. The two run independently so a
+// slow stats query never delays a settings refresh, and neither blocks
+// requests. A failed refresh is logged and the previous snapshot stays in
+// effect. The first refresh of each runs immediately.
+func (e *Engine) RunRefresh(ctx context.Context) {
+	e.runRefresh(ctx, settingsRefreshInterval, statsRefreshInterval)
+}
+
+func (e *Engine) runRefresh(ctx context.Context, settingsEvery, statsEvery time.Duration) {
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		e.refreshEvery(ctx, "settings", settingsEvery, func(ctx context.Context) error {
+			_, err := e.loadSettings(ctx, true)
+			return err
+		})
+	})
+	wg.Go(func() {
+		e.refreshEvery(ctx, "channel stats", statsEvery, func(ctx context.Context) error {
+			_, err := e.loadStats(ctx, true)
+			return err
+		})
+	})
+	wg.Wait()
+}
+
+// refreshEvery runs load now and then once per interval.
+func (e *Engine) refreshEvery(ctx context.Context, name string, interval time.Duration, load func(context.Context) error) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		attempt, cancel := context.WithTimeout(ctx, refreshTimeout)
+		err := load(attempt)
+		cancel()
+		if err != nil && ctx.Err() == nil {
+			e.Logger.Error("gateway: refresh failed, keeping previous value", "what", name, "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // Limits resolves the effective limits of a channel against the defaults.

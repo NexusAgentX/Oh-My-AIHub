@@ -117,9 +117,10 @@ func main() {
 		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: bus, Logger: logger, Runtime: runtime,
 	})
-	reaperContext, stopReaper := context.WithCancel(context.Background())
-	defer stopReaper()
-	go engine.RunReaper(reaperContext, time.Minute)
+	engineContext, stopEngine := context.WithCancel(context.Background())
+	defer stopEngine()
+	go engine.RunReaper(engineContext, time.Minute)
+	go engine.RunRefresh(engineContext)
 
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)
 	backgroundContext, stopBackground := context.WithCancel(context.Background())
