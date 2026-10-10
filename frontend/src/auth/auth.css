@@ -4,7 +4,7 @@
   min-height: 100vh;
   padding: var(--space-8) var(--space-5);
   place-items: center;
-  background: var(--soft);
+  background: var(--paper);
 }
 
 .identity-card {

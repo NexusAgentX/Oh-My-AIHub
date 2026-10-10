@@ -98,6 +98,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 ## 前端
 
 - TanStack Query 管理服务端状态，类型来自生成的 `schema.gen.ts`；`src/ui/` 基础组件与 `src/styles/tokens.css` 设计 token（ADR-0019）。
+- 主题只由 `<html data-theme>` 切换：`public/theme-init.js` 在首屏前按本机偏好设置，`src/theme/` 负责切换与跟随系统；token 为浅色与深色各给一套值，视觉规则见 `DESIGN.md`（ADR-0033）。
 - 按领域分目录：`home`、`models`、`keys`、`usage`、`channels`、`points`、`account`、`forum`、`welcome`（公开落地页）；`src/calls/` 为用户、渠道与后台共用的调用观测组件；`src/markdown/` 封装编辑与渲染。
 - `src/admin/` 是独立外壳的管理后台；管理后台与论坛按路由懒加载。账号变化时清空查询缓存。
 - 外壳：桌面左侧分组侧栏；窄屏为顶部条加底部 Tab。

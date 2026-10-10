@@ -1,6 +1,6 @@
 :root {
   color: var(--body);
-  background: var(--soft);
+  background: var(--paper);
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.55;
@@ -10,14 +10,14 @@
 
 * { box-sizing: border-box; }
 
-html { min-width: 320px; min-height: 100%; background: var(--soft); }
+html { min-width: 320px; min-height: 100%; background: var(--paper); }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   color: var(--body);
-  background: var(--soft);
+  background: var(--paper);
 }
 
 button, input, select, textarea { font: inherit; }
@@ -34,7 +34,7 @@ select:focus-visible,
 textarea:focus-visible,
 dialog:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--focus) 38%, transparent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 

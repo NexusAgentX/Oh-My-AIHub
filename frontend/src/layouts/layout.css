@@ -1,5 +1,5 @@
 /* 应用外壳：侧边栏 + 顶栏 + 内容区 + 移动端底部 Tab 栏 */
-.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: linear-gradient(to right, var(--canvas) var(--sidebar-width), var(--soft) 0); }
+.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; background: linear-gradient(to right, var(--canvas) var(--sidebar-width), var(--paper) 0); }
 
 .skip-link {
   position: absolute;
@@ -60,7 +60,7 @@
   text-decoration: none;
 }
 .nav-item .icon { color: var(--muted); }
-.nav-item:hover { background: var(--soft); text-decoration: none; }
+.nav-item:hover { background: var(--hover); text-decoration: none; }
 .nav-item-active { color: var(--ink); background: var(--selected); box-shadow: inset 3px 0 0 var(--mustard); font-weight: 600; }
 .nav-item-active:hover { background: var(--selected); }
 .nav-item-active .icon { color: var(--ink); }
@@ -85,7 +85,7 @@
   text-align: left;
 }
 .sidebar-account-button:hover,
-.sidebar-account-button[aria-expanded='true'] { background: var(--soft); }
+.sidebar-account-button[aria-expanded='true'] { background: var(--hover); }
 .sidebar-account-button > .icon { color: var(--muted); }
 
 .account-menu {
@@ -116,7 +116,7 @@
   text-align: left;
   text-decoration: none;
 }
-.account-menu-item:hover { background: var(--soft); text-decoration: none; }
+.account-menu-item:hover { background: var(--hover); text-decoration: none; }
 .account-menu-item .icon { color: var(--muted); }
 
 .avatar {
@@ -165,11 +165,11 @@
   border: 1px solid var(--hairline);
   border-radius: 10px;
   color: var(--muted);
-  background: var(--soft);
+  background: var(--sunken);
   font-size: var(--text-xs);
   white-space: nowrap;
 }
-.wallet-chip:hover { border-color: #cfd2d7; text-decoration: none; }
+.wallet-chip:hover { border-color: var(--hairline-strong); text-decoration: none; }
 .wallet-chip strong { color: var(--ink); font-size: var(--text-base); }
 .wallet-chip strong .amount-negative { color: var(--danger); }
 
@@ -207,7 +207,7 @@
 }
 .bottom-tab:hover { text-decoration: none; }
 .bottom-tab-active { color: var(--ink); font-weight: 600; }
-.bottom-tab-active .icon { color: var(--mustard); }
+.bottom-tab-active .icon { color: var(--mustard-text); }
 
 @media (min-width: 768px) {
   .wallet-chip { display: none; }
@@ -220,7 +220,7 @@
 }
 
 @media (max-width: 767px) {
-  .app-shell { display: block; background: var(--soft); }
+  .app-shell { display: block; background: var(--paper); }
   .sidebar { display: none; }
   .topbar { height: 56px; padding-inline: var(--space-4); }
   .topbar-brand { display: block; }

@@ -11,7 +11,7 @@
 .needs-action { color: var(--warning) !important; font-weight: 600; }
 
 .buy-order { padding: 0; }
-.buy-payable { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--soft); }
+.buy-payable { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--sunken); }
 .buy-payable strong { font-size: var(--text-xl); }
 .trade-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .trade-head-link { margin-left: auto; font-size: var(--text-sm); }

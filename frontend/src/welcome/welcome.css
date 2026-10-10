@@ -74,7 +74,7 @@
   padding: var(--space-5);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
-  background: var(--soft);
+  background: var(--sunken);
 }
 .welcome-values strong { display: block; margin-top: var(--space-3); }
 

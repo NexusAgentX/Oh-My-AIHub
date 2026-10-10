@@ -41,8 +41,20 @@
   text-decoration: none;
 }
 .me-link:last-child { border-bottom: 0; }
-.me-link:hover { background: var(--soft); text-decoration: none; }
+.me-link:hover { background: var(--hover); text-decoration: none; }
 .me-link > span { flex: 1; }
 .me-link > .icon:first-child { color: var(--muted); }
 .me-link > .icon:last-child { color: var(--muted); }
+.me-theme {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--canvas);
+}
 .me-signout { border: 1px solid var(--hairline); border-radius: var(--radius-lg); color: var(--danger); }

@@ -20,6 +20,7 @@
 @import '../ui/Chart.css';
 
 @import '../layouts/layout.css';
+@import '../theme/theme.css';
 @import '../calls/calls.css';
 @import '../home/home.css';
 @import '../account/account.css';

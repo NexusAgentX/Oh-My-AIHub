@@ -23,7 +23,7 @@
   background: var(--canvas);
 }
 
-.input:hover:not(:disabled) { border-color: #cfd2d7; }
+.input:hover:not(:disabled) { border-color: var(--hairline-strong); }
 
 .input:focus {
   border-color: var(--focus);
@@ -31,7 +31,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
-.input:disabled { color: var(--muted); background: var(--soft); }
+.input:disabled { color: var(--muted); background: var(--sunken); }
 .input[aria-invalid='true'] { border-color: var(--danger); }
 
 .textarea-input { height: auto; min-height: 96px; padding-block: 10px; resize: vertical; }

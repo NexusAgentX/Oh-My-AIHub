@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useSignOut } from '../layouts/AppFrame'
 import { amountSign, formatPoints } from '../money/format'
 import { usePoints } from '../points/queries'
+import { ThemeSegmented } from '../theme/ThemeSwitcher'
 import { Icon, InlineError, type IconName } from '../ui'
 
 function MeLink({ to, icon, label }: { to: string; icon: IconName; label: string }) {
@@ -15,7 +16,7 @@ function MeLink({ to, icon, label }: { to: string; icon: IconName; label: string
   )
 }
 
-/** 移动端「我的」：API Key、用量、账户设置、管理后台入口与退出。 */
+/** 移动端「我的」：API Key、用量、账户设置、管理后台入口、主题与退出。 */
 export function MePage() {
   const { account } = useAuth()
   const points = usePoints()
@@ -46,6 +47,10 @@ export function MePage() {
         <MeLink icon="settings" label="账户设置" to="/account" />
         {account.is_admin && <MeLink icon="shield" label="管理后台" to="/admin" />}
       </nav>
+      <section aria-label="主题" className="me-theme">
+        <span>主题</span>
+        <ThemeSegmented />
+      </section>
       <InlineError>{error}</InlineError>
       <button className="me-link me-signout" onClick={() => void signOut()} type="button">
         <Icon name="logout" />

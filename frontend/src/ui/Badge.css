@@ -15,10 +15,10 @@
 .badge-success { color: var(--positive); background: var(--positive-soft); }
 .badge-warning { color: var(--warning); background: var(--warning-soft); }
 .badge-danger { color: var(--danger-ink); background: var(--danger-soft); }
-.badge-info { color: var(--link-active); background: var(--info-soft); }
+.badge-info { color: var(--info); background: var(--info-soft); }
 .badge-accent { color: var(--ink); background: var(--mustard-soft); box-shadow: inset 0 0 0 1px var(--mustard-border); }
 
-.count-badge { min-width: 20px; justify-content: center; padding: 0 7px; color: var(--ink); background: var(--mustard); }
+.count-badge { min-width: 20px; justify-content: center; padding: 0 7px; color: var(--on-color); background: var(--mustard); }
 .step-badge {
   display: inline-flex;
   margin-bottom: var(--space-3);

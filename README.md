@@ -9,6 +9,7 @@ Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平
 - [产品说明](PRODUCT.md)：产品定位、范围与规则。
 - [产品路线图](ROADMAP.md)：接下来交付的结果与顺序。
 - [架构说明](ARCHITECTURE.md)：系统结构、模块边界与不变量。
+- [设计规范](DESIGN.md)：视觉风格、主题、组件与品牌规则。
 - [安全策略](SECURITY.md)：漏洞报告方式与安全边界。
 - [变更日志](CHANGELOG.md)：各版本的重要变化。
 - [Agent 开发指南](AGENTS.md)：任务流程、分支、验证、迁移与发版规则。
@@ -22,8 +23,6 @@ Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平
 - 数据库：PostgreSQL 18，Goose 嵌入式编号迁移。
 - 契约：`backend/api/openapi.yaml`（OpenAPI 3.1）是前后端唯一契约，前端类型由它生成。
 - 工具与运行：mise 固定工具版本；Docker Compose 运行数据库、迁移、后端，以及由 Nginx 提供的前端。
-
-现有界面沿用了第三方设计分析中的部分规则，其 MIT 许可见 [第三方许可](licenses/airtable-design-analysis-MIT.txt)。
 
 ## 环境要求
 
@@ -141,7 +140,6 @@ CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运�
 ├── scripts/       任务开工与收尾、数据库加密备份、隔离恢复演练与迁移检查脚本
 ├── docs/adr/      架构决策记录
 ├── docs/runbooks/ 部署、发布、备份恢复与故障处理操作手册
-├── licenses/      第三方许可
 ├── compose.yaml   容器编排配置
 └── mise.toml      工具版本与常用任务
 ```

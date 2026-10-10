@@ -17,8 +17,27 @@ body > svg:has(> defs > #vditor-icon-bold) {
 .markdown-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--hairline); border-radius: var(--radius-sm); overflow: hidden; }
 .markdown-editor-panes--split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .markdown-editor-source { min-width: 0; }
-.markdown-editor-source.vditor { border: 0; border-radius: 0; font-family: var(--font-sans); }
-.markdown-editor-source .vditor-toolbar { padding: var(--space-1) !important; background: var(--soft); display: flex; flex-wrap: wrap; }
+.markdown-editor-source.vditor {
+  /* Vditor 自带浅色取值；改用 token，随主题切换 */
+  --border-color: var(--hairline);
+  --second-color: var(--hairline-strong);
+  --panel-background-color: var(--canvas);
+  --panel-shadow: 0 0 0 1px var(--hairline);
+  --toolbar-background-color: var(--sunken);
+  --toolbar-icon-color: var(--muted);
+  --toolbar-icon-hover-color: var(--ink);
+  --textarea-background-color: var(--canvas);
+  --textarea-text-color: var(--body);
+  --count-background-color: var(--selected);
+  --resize-icon-color: var(--muted);
+  --resize-background-color: var(--sunken);
+  --resize-hover-icon-color: var(--canvas);
+  --resize-hover-background-color: var(--muted);
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-sans);
+}
+.markdown-editor-source .vditor-toolbar { padding: var(--space-1) !important; background: var(--sunken); display: flex; flex-wrap: wrap; }
 .markdown-editor-source .vditor-toolbar > div { float: none; }
 .markdown-editor-source .vditor-sv { min-height: 260px; width: 100%; padding: var(--space-3) !important; font-family: var(--font-mono); font-size: var(--text-base); background: var(--canvas); color: var(--body); }
 .markdown-editor-source .vditor-content { min-width: 0; }
@@ -32,13 +51,13 @@ body > svg:has(> defs > #vditor-icon-bold) {
 .markdown-content h1, .markdown-content h2, .markdown-content h3 { line-height: 1.4; color: var(--ink); }
 .markdown-content img { display: inline-block; max-width: 100%; height: auto; border-radius: var(--radius-xs); }
 .markdown-content a { color: var(--link); text-decoration: underline; }
-.markdown-content pre { padding: var(--space-3); background: var(--soft); border: 1px solid var(--hairline); border-radius: var(--radius-xs); overflow: auto; white-space: pre; }
+.markdown-content pre { padding: var(--space-3); background: var(--sunken); border: 1px solid var(--hairline); border-radius: var(--radius-xs); overflow: auto; white-space: pre; }
 .markdown-content code { font-family: var(--font-mono); font-size: .9em; }
-.markdown-content :not(pre) > code { background: var(--soft); padding: 0 var(--space-1); border-radius: var(--radius-xs); }
+.markdown-content :not(pre) > code { background: var(--sunken); padding: 0 var(--space-1); border-radius: var(--radius-xs); }
 .markdown-content blockquote { border-left: 3px solid var(--hairline); padding-left: var(--space-4); margin-left: 0; color: var(--muted); }
 .markdown-content table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; }
 .markdown-content th, .markdown-content td { border: 1px solid var(--hairline); padding: var(--space-2) var(--space-3); }
-.markdown-content th { background: var(--soft); }
+.markdown-content th { background: var(--sunken); }
 .markdown-content input[type=checkbox] { width: auto; margin-right: var(--space-2); }
 .markdown-content .hljs-keyword, .markdown-content .hljs-selector-tag, .markdown-content .hljs-literal { color: var(--danger); }
 .markdown-content .hljs-string, .markdown-content .hljs-attr { color: var(--positive); }

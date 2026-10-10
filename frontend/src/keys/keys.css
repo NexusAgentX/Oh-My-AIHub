@@ -15,7 +15,7 @@
   font: inherit;
   text-align: left;
 }
-.key-row-button:hover { background: var(--soft); }
+.key-row-button:hover { background: var(--hover); }
 .key-row-name { display: grid; min-width: 0; gap: 3px; }
 .key-row-name strong { overflow-wrap: anywhere; }
 .key-row-name code { color: var(--muted); font-size: var(--text-xs); }
