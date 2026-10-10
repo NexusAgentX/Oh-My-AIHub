@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/netip"
@@ -32,39 +31,40 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		fatal(logger, "DATABASE_URL is required", nil)
 	}
 	cookieSecure := true
 	if value := os.Getenv("COOKIE_SECURE"); value != "" {
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			log.Fatal("COOKIE_SECURE must be true or false")
+			fatal(logger, "COOKIE_SECURE must be true or false", err)
 		}
 		cookieSecure = parsed
 	}
 	trustedProxyCIDRs, err := parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "invalid trusted proxy configuration", err)
 	}
 	credentialKeyring, err := channel.ParseKeyring(
 		os.Getenv("UPSTREAM_CREDENTIAL_KEYRING"),
 		os.Getenv("UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "invalid upstream credential keyring", err)
 	}
 	outboundPolicy, err := channel.NewOutboundPolicy(
 		parseCommaSeparated(os.Getenv("UPSTREAM_ALLOWED_PORTS")),
 		parseCommaSeparated(os.Getenv("UPSTREAM_BLOCKED_HOSTS")),
 	)
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "invalid upstream outbound policy", err)
 	}
 
 	c2cKeyring, err := c2c.ParseKeyring(
@@ -72,20 +72,20 @@ func main() {
 		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "invalid C2C private data keyring", err)
 	}
 
 	startupContext, cancelStartup := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelStartup()
 	pool, err := database.Open(startupContext, databaseURL)
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "opening the database failed", err)
 	}
 	defer pool.Close()
 	store := postgres.New(pool)
 	identityService, err := identity.NewService(store.Identity, 24*time.Hour)
 	if err != nil {
-		log.Fatal(err)
+		fatal(logger, "creating the identity service failed", err)
 	}
 
 	catalogService := catalog.NewService(store.Catalog)
@@ -101,7 +101,6 @@ func main() {
 		}
 		return ids, nil
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	bus := gateway.NewBus()
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		bus.Publish(gateway.Event{Kind: channelEventKind(kind), At: time.Now(), ChannelID: channelID, Detail: reason})
@@ -125,7 +124,7 @@ func main() {
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)
 	backgroundContext, stopBackground := context.WithCancel(context.Background())
 	defer stopBackground()
-	go runC2CExpiry(backgroundContext, c2cService)
+	go runC2CExpiry(backgroundContext, c2cService, logger)
 	forumService := forum.NewService(store.Forum)
 	go runForumCleanup(backgroundContext, forumService, logger)
 
@@ -140,7 +139,7 @@ func main() {
 	metricsServer := newMetricsServer(os.Getenv("METRICS_ADDR"), platformMetrics.Handler())
 	go func() {
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("metrics listener stopped: %v", err)
+			logger.Error("metrics listener stopped", "error", err)
 		}
 	}()
 
@@ -178,7 +177,7 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 
-	log.Printf("backend listening on %s", server.Addr)
+	logger.Info("backend listening", "addr", server.Addr)
 	serverErrors := make(chan error, 1)
 	go func() {
 		serverErrors <- server.ListenAndServe()
@@ -189,16 +188,27 @@ func main() {
 	select {
 	case err := <-serverErrors:
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			fatal(logger, "server stopped unexpectedly", err)
 		}
 	case <-signals:
 		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancelShutdown()
 		if err := server.Shutdown(shutdownContext); err != nil {
-			log.Printf("graceful shutdown failed: %v", err)
+			logger.Error("graceful shutdown failed", "error", err)
 		}
 		_ = metricsServer.Shutdown(shutdownContext)
 	}
+}
+
+// fatal logs a startup or server failure and exits with status 1. Like log.Fatal
+// it skips deferred cleanups. A nil err logs the message alone.
+func fatal(logger *slog.Logger, message string, err error) {
+	if err != nil {
+		logger.Error(message, "error", err)
+	} else {
+		logger.Error(message)
+	}
+	os.Exit(1)
 }
 
 // newMetricsServer builds the internal Prometheus listener. METRICS_ADDR
@@ -266,11 +276,11 @@ func channelEventKind(kind string) gateway.EventKind {
 
 // runC2CExpiry cancels C2C trades whose payment deadline has passed, once a
 // minute, and returns their points to the order (or the seller).
-func runC2CExpiry(ctx context.Context, service *c2c.Service) {
+func runC2CExpiry(ctx context.Context, service *c2c.Service, logger *slog.Logger) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
-		expireOnce(ctx, service)
+		expireOnce(ctx, service, logger)
 		select {
 		case <-ctx.Done():
 			return
@@ -279,15 +289,15 @@ func runC2CExpiry(ctx context.Context, service *c2c.Service) {
 	}
 }
 
-func expireOnce(ctx context.Context, service *c2c.Service) {
+func expireOnce(ctx context.Context, service *c2c.Service, logger *slog.Logger) {
 	runContext, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cancelled, err := service.ExpireDue(runContext, 100)
 	if err != nil && ctx.Err() == nil {
-		log.Printf("c2c payment expiry failed: %v", err)
+		logger.Error("c2c payment expiry failed", "error", err)
 	}
 	if cancelled > 0 {
-		log.Printf("c2c payment expiry cancelled %d trades", cancelled)
+		logger.Info("c2c payment expiry cancelled trades", "trades", cancelled)
 	}
 }
 
