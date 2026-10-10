@@ -16,17 +16,20 @@ import (
 )
 
 func TestHealth(t *testing.T) {
+	spec := loadOpenAPI(t)
 	recorder := httptest.NewRecorder()
 	NewHandler(Dependencies{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if recorder.Code != http.StatusOK || recorder.Header().Get("Content-Type") != "application/json" || !strings.Contains(recorder.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health = %d %s", recorder.Code, recorder.Body.String())
 	}
+	spec.assertResponse(t, http.MethodGet, "/api/health", recorder)
 	failing := NewHandler(Dependencies{DatabaseReady: func(context.Context) error { return errors.New("down") }})
 	recorder = httptest.NewRecorder()
 	failing.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), `"error":"database_unavailable"`) {
 		t.Fatalf("failing health = %d %s", recorder.Code, recorder.Body.String())
 	}
+	spec.assertResponse(t, http.MethodGet, "/api/health", recorder)
 }
 
 type writeDeadlineRecorder struct {

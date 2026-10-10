@@ -309,7 +309,7 @@ func newC2CHandler(store *fakeStore, c2cStore *fakeC2CStore) http.Handler {
 	return NewHandler(Dependencies{
 		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
 		Settings: settings.NewService(store), Audit: audit.NewService(store), C2C: c2c.NewService(c2cStore, keyring), CookieSecure: true,
-		Observe: observe.NewService(fakeObserveStore{}),
+		Observe: observe.NewService(&fakeObserveStore{}),
 	})
 }
 
@@ -497,4 +497,44 @@ func TestC2CHandlers(t *testing.T) {
 		t.Fatalf("anonymous market = %d", recorder.Code)
 	}
 	_ = buyerID
+}
+
+func TestC2CReleaseAndCancel(t *testing.T) {
+	t.Parallel()
+	p := newPlatform(t)
+	seller, sellerID := p.member(t, "seller")
+	buyer, _ := p.member(t, "buyer")
+	p.c2c.balances[sellerID] = money.Amount(100 * money.Scale)
+	order := seller.expect(t, http.StatusCreated, http.MethodPost, "/api/c2c/orders", map[string]any{
+		"amount": "40", "unit_price_fen": 92, "min_per_trade": "5", "max_per_trade": "30",
+		"payment_methods": []map[string]string{{"channel": "支付宝", "account": "seller@example.com"}},
+	})["order"].(map[string]any)
+	tradesPath := "/api/c2c/orders/" + order["id"].(string) + "/trades"
+
+	// 买家在付款前取消：锁定的数量回到卖单，重复取消没有副作用。
+	cancelling := buyer.expect(t, http.StatusCreated, http.MethodPost, tradesPath, map[string]string{"amount": "10"})["trade"].(map[string]any)["id"].(string)
+	if recorder := seller.call(t, http.MethodPost, "/api/c2c/trades/"+cancelling+"/cancel", nil); recorder.Code != http.StatusForbidden {
+		t.Fatalf("seller cancels an unpaid trade = %d %s", recorder.Code, recorder.Body.String())
+	}
+	if again := buyer.expect(t, http.StatusOK, http.MethodPost, "/api/c2c/trades/"+cancelling+"/cancel", nil)["trade"].(map[string]any); again["status"] != "cancelled" {
+		t.Fatalf("cancelled again = %v", again)
+	}
+	if mine := seller.expect(t, http.StatusOK, http.MethodGet, "/api/c2c/my/orders", nil)["items"].([]any); mine[0].(map[string]any)["available"] != "40" {
+		t.Fatalf("order after cancel = %v", mine)
+	}
+
+	// 买家付款后卖家放行：重复放行同样没有副作用，已放行的交易不能再取消。
+	releasing := buyer.expect(t, http.StatusCreated, http.MethodPost, tradesPath, map[string]string{"amount": "20"})["trade"].(map[string]any)["id"].(string)
+	releasePath := "/api/c2c/trades/" + releasing + "/release"
+	buyer.expect(t, http.StatusOK, http.MethodPost, "/api/c2c/trades/"+releasing+"/paid", nil)
+	released := seller.expect(t, http.StatusOK, http.MethodPost, releasePath, nil)["trade"].(map[string]any)
+	if released["status"] != "released" || released["viewer_role"] != "seller" {
+		t.Fatalf("released = %v", released)
+	}
+	if again := seller.expect(t, http.StatusOK, http.MethodPost, releasePath, nil)["trade"].(map[string]any); again["status"] != "released" {
+		t.Fatalf("released again = %v", again)
+	}
+	if recorder := buyer.call(t, http.MethodPost, "/api/c2c/trades/"+releasing+"/cancel", nil); recorder.Code != http.StatusConflict {
+		t.Fatalf("cancel after release = %d %s", recorder.Code, recorder.Body.String())
+	}
 }

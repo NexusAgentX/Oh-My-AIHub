@@ -346,4 +346,13 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	if recorder := admin.call(t, http.MethodGet, "/api/admin/audit?cursor=abc", nil); recorder.Code != http.StatusBadRequest {
 		t.Fatalf("bad audit cursor = %d", recorder.Code)
 	}
+
+	// 删除模型后不再出现在目录里，重复删除得到 404。
+	admin.expect(t, http.StatusNoContent, http.MethodDelete, "/api/admin/models/deepseek-chat", nil)
+	if recorder := admin.call(t, http.MethodDelete, "/api/admin/models/deepseek-chat", nil); recorder.Code != http.StatusNotFound {
+		t.Fatalf("delete missing model = %d", recorder.Code)
+	}
+	if listed := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/models", nil); len(listed["items"].([]any)) != 0 {
+		t.Fatalf("models after delete = %v", listed)
+	}
 }
