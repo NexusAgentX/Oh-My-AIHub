@@ -1,6 +1,6 @@
 # ADR-0030：以可靠 token 细分与实际响应事实定价
 
-- 状态：已接受
+- 状态：已通过
 - 日期：2026-10-08
 - 决策者：维护者授权范围内的 AI 执行团队
 - 关联内容：[#190](https://github.com/NexusAgentX/Oh-My-AIHub/issues/190)、[ADR-0012](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)、[ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md)

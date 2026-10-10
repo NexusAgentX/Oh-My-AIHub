@@ -8,7 +8,7 @@
 1. 确认目标提交已合入 `main` 且 PR 门禁（`ci.yml`）通过。
 2. 把 `CHANGELOG.md`「未发布」章节收口为 `## vX.Y.Z - YYYY-MM-DD`，并保留新的空
    「未发布」章节；随最后一个 PR 合入。版本号用语义化 `vMAJOR.MINOR.PATCH`，
-   预发布加 `-rc.1` 等后缀。小改动升 PATCH，大改动升 MINOR，明确确认的大版本升级升 MAJOR；具体判定、清零及 0.x 规则见 [AGENTS.md](../../AGENTS.md#版本号递增规则)。
+   预发布加 `-rc.1` 等后缀。小改动升 PATCH，大改动升 MINOR，明确确认的大版本升级升 MAJOR；具体判定、清零及 0.x 规则见 [AGENTS.md](../../AGENTS.md#发版)。
 3. 在 main 合并提交上打 annotated tag 并推送：
 
    ```bash
