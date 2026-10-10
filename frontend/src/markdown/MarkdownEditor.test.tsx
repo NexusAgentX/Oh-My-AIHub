@@ -50,6 +50,16 @@ describe('MarkdownEditor lifecycle and upload boundary', () => {
     expect(host.querySelector('label')?.htmlFor).toBe(host.querySelector('textarea')?.id)
     expect(host.querySelector('.markdown-editor-source')?.hasAttribute('inert')).toBe(true)
   })
+  it('hides the preview by default and puts upload and preview at the end of the toolbar', async () => {
+    await act(async () => root.render(<MarkdownEditor value="**hi**" onChange={vi.fn()} upload={vi.fn()} />))
+    const items = state.instances[0].options.toolbar!.filter((item): item is IMenuItem => typeof item !== 'string')
+    expect(items.map((item) => item.name)).toEqual(['oma-upload', 'oma-preview'])
+    expect(host.querySelector('[aria-label="Markdown 预览"]')).toBeNull()
+    await act(async () => items[1].click!(new Event('click'), {} as IVditor))
+    expect(host.querySelector('[aria-label="Markdown 预览"]')?.textContent).toBe('**hi**')
+    await act(async () => items[1].click!(new Event('click'), {} as IVditor))
+    expect(host.querySelector('[aria-label="Markdown 预览"]')).toBeNull()
+  })
   it('reports pending and success, inserts escaped Markdown, and allows same-file retries', async () => {
     let complete!: (result: { url: string; name: string; isImage: boolean }) => void
     const upload = vi.fn(() => new Promise<{ url: string; name: string; isImage: boolean }>(resolve => { complete = resolve }))

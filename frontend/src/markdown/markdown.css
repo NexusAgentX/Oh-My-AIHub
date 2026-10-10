@@ -8,13 +8,7 @@ body > svg:has(> defs > #vditor-icon-bold) {
 }
 
 .markdown-editor { min-width: 0; color: var(--body); }
-.markdown-editor-actions, .markdown-editor-actions > div { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.markdown-editor-actions { justify-content: space-between; margin-bottom: var(--space-2); }
-.markdown-editor-actions label { font-weight: 600; }
-.markdown-editor-actions button { min-height: 34px; padding: 0 var(--space-3); border: var(--sticker-border); border-radius: var(--radius-pill); background: var(--canvas); box-shadow: var(--shadow-xs); color: var(--ink); cursor: pointer; font: inherit; font-size: var(--text-sm); font-weight: 700; }
-.markdown-editor-actions button:hover:not(:disabled) { background: var(--hover); }
-.markdown-editor-actions button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
-.markdown-editor-actions button:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.markdown-editor-label { display: block; margin-bottom: var(--space-2); font-weight: 600; }
 .markdown-editor button:focus-visible, .markdown-editor textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .markdown-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; border: var(--sticker-border); border-radius: var(--radius-md); transition: box-shadow var(--duration) ease; }
 .markdown-editor-panes:focus-within { box-shadow: 3px 3px 0 var(--mustard); }
@@ -42,6 +36,9 @@ body > svg:has(> defs > #vditor-icon-bold) {
 }
 .markdown-editor-source .vditor-toolbar { padding: var(--space-1) !important; background: var(--sunken); display: flex; flex-wrap: wrap; }
 .markdown-editor-source .vditor-toolbar > div { float: none; }
+/* 自定义的上传、预览按钮：图标是描边画法；预览打开时用选中底色 */
+.markdown-editor-source .vditor-toolbar [data-type^='oma-'] svg { fill: none; stroke: currentColor; stroke-width: 1.8; width: 17px; height: 17px; }
+.markdown-editor-source .vditor-toolbar [data-type='oma-preview'].vditor-menu--current { border-radius: var(--radius-sm); background: var(--selected); }
 .markdown-editor-source .vditor-sv { min-height: 260px; width: 100%; padding: var(--space-3) !important; font-family: var(--font-mono); font-size: var(--text-base); background: var(--canvas); color: var(--body); }
 .markdown-editor-source .vditor-content { min-width: 0; }
 .markdown-editor-preview { min-width: 0; max-height: 560px; overflow: auto; padding: var(--space-4); border-left: 1px solid var(--hairline); background: var(--canvas); }
@@ -66,6 +63,8 @@ body > svg:has(> defs > #vditor-icon-bold) {
 .markdown-content .hljs-string, .markdown-content .hljs-attr { color: var(--positive); }
 .markdown-content .hljs-comment { color: var(--muted); }
 .markdown-content .hljs-title, .markdown-content .hljs-number, .markdown-content .hljs-built_in { color: var(--link); }
+/* Vditor 在窄屏给每个工具按钮左右各 12px 留白，一行只放得下五个；收窄留白（可点区域是按钮本身，不变） */
+@media (max-width: 520px) { .markdown-editor-source .vditor-toolbar__item { padding: 0 3px; } }
 @media (max-width: 720px) {
   .markdown-editor-panes--split { grid-template-columns: minmax(0, 1fr); }
   .markdown-editor-preview { border-left: 0; border-top: 1px solid var(--hairline); max-height: 360px; }
