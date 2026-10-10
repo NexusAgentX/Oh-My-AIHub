@@ -67,6 +67,10 @@ go -C backend test -count=1 ./internal/postgres ./internal/database
 ''',
 ]
 
+[tasks.test-ci-scripts]
+description = "Test the CI change-scope classification and the gates aggregation (scripts/ci-changes.sh, scripts/ci-gate.sh)"
+run = "scripts/test-ci.sh"
+
 [tasks.check-migrations]
 description = "Fail when a migration from the latest release tag was modified, deleted or renamed"
 run = "scripts/check-migrations.sh"
