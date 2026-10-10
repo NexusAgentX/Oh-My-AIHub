@@ -2,6 +2,7 @@
 .model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
 .model-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-2);
   padding: var(--space-4);
@@ -14,7 +15,9 @@
 }
 .model-card:hover { text-decoration: none; transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); }
 .model-card:active { transform: translate(2px, 2px); box-shadow: none; }
-.model-card header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.model-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-2); }
+/* 时段名称最长 64 字：放不下时整枚徽标换到标题下一行，仍超宽就截断，全名在模型详情里 */
+.model-card header .badge { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .model-card header strong { color: var(--ink); font-family: var(--font-display); font-size: var(--text-md); font-weight: 800; overflow-wrap: anywhere; }
 .model-card-id { color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .model-card-meta { color: var(--muted); font-size: var(--text-sm); }
