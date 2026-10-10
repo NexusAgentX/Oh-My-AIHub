@@ -109,6 +109,8 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       })
     }).catch((cause) => { if (generation === lifetime.current) setError(cause instanceof Error ? cause.message : '编辑器加载失败，请刷新重试') })
     return () => {
+      // lifetime 是代际计数器而非 DOM ref：清理时必须读取并递增最新值，使进行中的异步回调失效。
+      // oxlint-disable-next-line react/exhaustive-deps
       ++lifetime.current
       container.removeEventListener('paste', paste, true)
       container.removeEventListener('drop', drop, true)

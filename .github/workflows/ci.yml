@@ -33,6 +33,8 @@ jobs:
         run: |
           npm --prefix frontend run generate:api
           git diff --exit-code -- frontend/src/api/schema.gen.ts
+      - name: Frontend lint
+        run: npm --prefix frontend run lint
       - name: Frontend tests
         run: npm --prefix frontend test
       - name: Frontend build
@@ -43,6 +45,8 @@ jobs:
         run: test -z "$(mise exec -- gofmt -l backend)"
       - name: Backend vet
         run: mise exec -- go -C backend vet ./...
+      - name: Backend staticcheck
+        run: mise run lint-backend
       - name: Backend tests with race detector
         run: mise exec -- go -C backend test -race ./...
       - name: Compose configuration

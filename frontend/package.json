@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lint": "oxlint",
     "test": "vitest run",
-    "test:issue-21": "vitest run src/auth/routePolicy.test.ts src/models/modelForm.test.ts src/accounts/ephemeralCredential.test.ts",
     "test:welcome": "vitest run src/welcome/WelcomePage.test.tsx",
     "build": "tsc -b && vite build",
     "generate:api": "npm --prefix tools/openapi-types ci --no-audit --no-fund --fetch-timeout=60000 && npm --prefix tools/openapi-types run generate",
@@ -27,6 +27,7 @@
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "6.1.1",
     "jsdom": "27.4.0",
+    "oxlint": "1.83.0",
     "typescript": "7.0.2",
     "vite": "8.2.2",
     "vitest": "4.1.11"

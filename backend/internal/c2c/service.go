@@ -2,7 +2,6 @@ package c2c
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -14,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -124,9 +124,9 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (MyOr
 	if _, err := TotalFen(input.Amount, input.UnitPriceFen); err != nil {
 		return MyOrder{}, err
 	}
-	id := newID()
-	if input.IdempotencyKey != "" {
-		id = derivedID("c2c-order", input.SellerID, input.IdempotencyKey)
+	id, err := newRowID("c2c-order", input.SellerID, input.IdempotencyKey)
+	if err != nil {
+		return MyOrder{}, err
 	}
 	plaintext, err := json.Marshal(methods)
 	if err != nil {
@@ -209,9 +209,9 @@ func (s *Service) CreateTrade(ctx context.Context, orderID, buyerID string, amou
 	if orderID == "" || buyerID == "" || amount <= 0 {
 		return TradeView{}, ErrInvalidInput
 	}
-	id := newID()
-	if idempotencyKey != "" {
-		id = derivedID("c2c-trade", buyerID+":"+orderID, idempotencyKey)
+	id, err := newRowID("c2c-trade", buyerID+":"+orderID, idempotencyKey)
+	if err != nil {
+		return TradeView{}, err
 	}
 	trade, err := s.store.CreateTrade(ctx, NewTrade{ID: id, OrderID: orderID, BuyerID: buyerID, Amount: amount})
 	if err != nil {
@@ -449,13 +449,13 @@ func decodeCursor(raw string, withPrice bool) (*Cursor, error) {
 	return &Cursor{Price: price, Time: time.UnixMicro(micros).UTC(), ID: parts[2]}, nil
 }
 
-// newID returns a random version-4 UUID.
-func newID() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
+// newRowID returns the ID of a row about to be created: the stable derived ID
+// when the client supplied an idempotency key, otherwise a random UUID.
+func newRowID(namespace, owner, idempotencyKey string) (string, error) {
+	if idempotencyKey != "" {
+		return derivedID(namespace, owner, idempotencyKey), nil
 	}
-	return formatUUID(b, 4)
+	return ids.NewUUID()
 }
 
 // derivedID maps a client idempotency key to a stable UUID, so a repeated
