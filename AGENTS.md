@@ -72,7 +72,8 @@
 - 改动聚焦当前任务，不夹带无关重构。未发布的中间态可以直接简化或破坏性重构，不加无依据的兼容层；数据库迁移按上节执行。
 - `main` 只能通过 PR 合并，`gates`、`integration` 必须通过。验收有证据、文档已同步后执行 `gh pr merge --auto --merge` 开启自动合并，随即继续其他工作，不轮询等待 CI；CI 失败或出现冲突时再回来修复。只有用户要求或后续工作依赖合并结果时才等待。
 - `main` 前进后，只有出现冲突或新提交改了相同文件时才在任务 worktree 内同步重验；否则照常合并，由合并后 `main` 上的 CI 兜底。
-- 合并后（可稍后集中处理）：有 Issue 时核对正文后关闭并同步 Epic；用 `mise run task-finish <type>/<slug>` 清理，它确认 PR 已合并、提交已进入 `origin/main`、worktree 干净后删除 worktree 与本地、远端分支并快进主工作区；证据不足时停止，不强制删除，`--dry-run` 只预览，`--volumes` 才删 Docker 卷。只用 merge commit 合并。
+- 合并后：有 Issue 时核对正文后关闭并同步 Epic；用 `mise run task-finish <type>/<slug>` 清理，它确认 PR 已合并、提交已进入 `origin/main`、worktree 干净后删除 worktree 与本地、远端分支并快进主工作区；证据不足时停止，不强制删除，`--dry-run` 只预览，`--volumes` 才删 Docker 卷。只用 merge commit 合并。
+- 任务完成后 Agent 自动清理：PR 已合并时立即执行上述清理；尚未合并（自动合并等待 CI）时，在后续轮次或下次进入仓库时回查并清理，不留残留 worktree 与分支，也不为此轮询等待 CI。
 
 ## 发版
 
