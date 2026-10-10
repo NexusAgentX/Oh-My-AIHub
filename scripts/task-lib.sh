@@ -16,15 +16,43 @@ warn() {
   printf '警告：%s\n' "$*" >&2
 }
 
-# 任务名只用于分支名与目录名：小写字母、数字和单个连字符，如 265-task-scripts。
-validate_slug() {
-  local slug="${1-}"
+# 任务分支按变更类型命名，类型即本仓库使用的约定式提交类型。
+TASK_TYPES="feat fix docs refactor perf test ci chore"
+
+# 校验任务名 <type>/<slug>（如 fix/251-key-layout），并设置：
+#   TASK_BRANCH  分支名，同任务名：<type>/<slug>
+#   TASK_DIR     worktree 目录名：<type>-<slug>（type 不含连字符，因此可无歧义还原）
+# slug 只用于分支名与目录名：小写字母、数字和单个连字符。
+parse_task_name() {
+  local name="${1-}" type slug t found=0 slug_ok=1
+  if [ -z "$name" ]; then
+    die "缺少任务名，须写成 <type>/<slug>（如 fix/251-key-layout）。"
+  fi
+  case "$name" in
+    */*) ;;
+    *) die "任务名“$name”无效：须写成 <type>/<slug>（如 fix/251-key-layout）；type 只能是：$TASK_TYPES。" ;;
+  esac
+  type="${name%%/*}"
+  slug="${name#*/}"
+  for t in $TASK_TYPES; do
+    if [ "$type" = "$t" ]; then
+      found=1
+    fi
+  done
+  if [ "$found" -ne 1 ]; then
+    die "任务类型“$type”无效：type 只能是 $TASK_TYPES 之一（如 fix/251-key-layout）。"
+  fi
   if [ -z "$slug" ]; then
-    die "缺少任务名。"
+    die "任务名“$name”缺少 slug（如 $type/251-key-layout）。"
   fi
-  if [ "${#slug}" -gt 60 ] || ! printf '%s' "$slug" | LC_ALL=C grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
-    die "任务名“$slug”无效：只能含小写字母、数字和单个连字符，不能以连字符开头或结尾，最长 60 个字符（如 265-task-scripts）。"
+  case "$slug" in
+    *$'\n'*) slug_ok=0 ;; # grep 按行匹配，多行 slug 须单独拒绝
+  esac
+  if [ "$slug_ok" -ne 1 ] || [ "${#slug}" -gt 60 ] || ! printf '%s' "$slug" | LC_ALL=C grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+    die "任务 slug“$slug”无效：只能含小写字母、数字和单个连字符，不能以连字符开头或结尾，最长 60 个字符（如 251-key-layout）。"
   fi
+  TASK_BRANCH="$type/$slug"
+  TASK_DIR="$type-$slug"
 }
 
 # 主工作区是 git worktree 列表的第一项；从主工作区或任何 worktree 运行结果相同。

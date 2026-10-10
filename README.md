@@ -32,7 +32,7 @@ Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平
 
 ## 本地开发
 
-每个任务使用独立的 Git worktree：`mise run task-start <slug>` 同步 `main`，并创建 `codex/<slug>` 分支与 `../Oh-My-AIHub-worktrees/<slug>`；PR 合并后用 `mise run task-finish <slug>` 清理（规则见 `AGENTS.md`）。
+每个任务使用独立的 Git worktree：`mise run task-start <type>/<slug>`（如 `fix/251-key-layout`，type 为 `feat fix docs refactor perf test ci chore` 之一）同步 `main`，并创建同名分支与 `../Oh-My-AIHub-worktrees/<type>-<slug>`；PR 合并后用 `mise run task-finish <type>/<slug>` 清理（规则见 `AGENTS.md`）。
 
 安装工具链和前端依赖：
 
