@@ -29,11 +29,11 @@ func TestCallDetailOutputSpeed(t *testing.T) {
 					CallRow:         observe.CallRow{Stream: tt.stream, DurationMS: tt.duration, TTFTMS: &first, Usage: observe.Usage{OutputTokens: 6}},
 					TokensPerSecond: &stored,
 				}}
-				result := callDetailJSON(detail)
+				result := newCallDetailJSON(detail)
 				if _, err := json.Marshal(result); err != nil {
 					t.Fatal(err)
 				}
-				speed := result["output_tokens_per_second"].(*float64)
+				speed := result.OutputTokensPerSecond
 				if tt.want == 0 {
 					if speed != nil {
 						t.Fatalf("want unavailable, got %v", *speed)

@@ -26,20 +26,19 @@ type apiKeySpendJSON struct {
 	Total string `json:"total"`
 }
 
-// apiKeyRefJSON is the OpenAPI KeyRef schema. It is not named keyRefJSON because observe.go
-// still uses that name for its map-based helper.
-type apiKeyRefJSON struct {
+// keyRefJSON is the OpenAPI KeyRef schema.
+type keyRefJSON struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// newApiKeyRefJSON references the API key a ledger entry or call belongs to: nil when the key is
+// newKeyRefJSON references the API key a ledger entry or call belongs to: nil when the key is
 // unknown (id is nil), with an empty name when only the id is known.
-func newApiKeyRefJSON(id, name *string) *apiKeyRefJSON {
+func newKeyRefJSON(id, name *string) *keyRefJSON {
 	if id == nil {
 		return nil
 	}
-	ref := apiKeyRefJSON{ID: *id}
+	ref := keyRefJSON{ID: *id}
 	if name != nil {
 		ref.Name = *name
 	}

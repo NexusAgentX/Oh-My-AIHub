@@ -301,11 +301,15 @@ func TestForumHTTPContractAndGates(t *testing.T) {
 		return rec
 	}
 	rec := call("POST", "/api/forum/boards", forum.BoardInput{Name: "公告"}, 201)
-	var b forum.Board
+	var b struct {
+		ID string `json:"id"`
+	}
 	json.Unmarshal(rec.Body.Bytes(), &b)
 	call("GET", "/api/forum/boards", nil, 200)
 	rec = call("POST", "/api/forum/topics", forum.TopicInput{Kind: "discussion", BoardID: &b.ID, Title: "公告", ContentInput: forumContent("Markdown")}, 201)
-	var topic forum.Topic
+	var topic struct {
+		ID string `json:"id"`
+	}
 	json.Unmarshal(rec.Body.Bytes(), &topic)
 	call("GET", "/api/forum/topics?kind=discussion&page=1&limit=20", nil, 200)
 	call("GET", "/api/forum/topics/"+topic.ID, nil, 200)
@@ -328,7 +332,9 @@ func TestForumHTTPContractAndGates(t *testing.T) {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
 	assertContract(t, "POST", "/api/forum/attachments", rec)
-	var att forum.Attachment
+	var att struct {
+		URL string `json:"url"`
+	}
 	json.Unmarshal(rec.Body.Bytes(), &att)
 	req = httptest.NewRequest("GET", "http://hub.example"+att.URL, nil)
 	req.AddCookie(&http.Cookie{Name: "oma_session", Value: token})

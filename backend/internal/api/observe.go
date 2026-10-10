@@ -130,121 +130,376 @@ func viewerOf(r *http.Request) observe.Viewer {
 
 // ---- JSON ----
 
-func optionalString(value *string) any {
-	if value == nil {
-		return nil
-	}
-	return *value
+// usageJSON is the OpenAPI Usage schema.
+type usageJSON struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
 }
 
-func usageJSON(usage observe.Usage) map[string]int64 {
-	return map[string]int64{
-		"input_tokens": usage.InputTokens, "output_tokens": usage.OutputTokens,
-		"cache_write_tokens": usage.CacheWriteTokens, "cache_read_tokens": usage.CacheReadTokens,
+// channelRefJSON is the OpenAPI ChannelRef schema.
+type channelRefJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// accountRefJSON is the OpenAPI AccountRef schema: an account as an administrator sees it.
+type accountRefJSON struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// callSummaryJSON is the OpenAPI CallSummary schema.
+type callSummaryJSON struct {
+	ID             string          `json:"id"`
+	CreatedAt      time.Time       `json:"created_at"`
+	CompletedAt    *time.Time      `json:"completed_at"`
+	ModelID        *string         `json:"model_id"`
+	RequestedModel string          `json:"requested_model"`
+	Format         string          `json:"format"`
+	Stream         bool            `json:"stream"`
+	Tag            *string         `json:"tag"`
+	APIKey         *keyRefJSON     `json:"api_key"`
+	Outcome        string          `json:"outcome"`
+	Channel        *channelRefJSON `json:"channel"`
+	AttemptCount   int             `json:"attempt_count"`
+	Usage          usageJSON       `json:"usage"`
+	Cost           string          `json:"cost"`
+	Fee            string          `json:"fee"`
+	Charged        string          `json:"charged"`
+	TTFTMS         *int            `json:"ttft_ms"`
+	DurationMS     *int            `json:"duration_ms"`
+}
+
+// adminCallJSON is the OpenAPI AdminCall schema: a CallSummary plus the calling account.
+type adminCallJSON struct {
+	callSummaryJSON
+	Account accountRefJSON `json:"account"`
+}
+
+// callAttemptJSON is the OpenAPI CallAttempt schema.
+type callAttemptJSON struct {
+	Channel       *channelRefJSON `json:"channel"`
+	StatusCode    *int            `json:"status_code"`
+	ErrorCode     *string         `json:"error_code"`
+	ErrorMessage  *string         `json:"error_message"`
+	ConnectMS     *int            `json:"connect_ms"`
+	TTFTMS        *int            `json:"ttft_ms"`
+	DurationMS    *int            `json:"duration_ms"`
+	ResponseBytes *int64          `json:"response_bytes"`
+	EndReason     string          `json:"end_reason"`
+}
+
+// callDetailJSON is the OpenAPI CallDetail schema: a CallSummary plus routing, attempts and speed.
+// price_snapshot is the jsonb the gateway stored with the call, passed through unchanged (null when absent).
+type callDetailJSON struct {
+	callSummaryJSON
+	RoutingMode           *string           `json:"routing_mode"`
+	RoutingSource         *string           `json:"routing_source"`
+	ClientUserAgent       *string           `json:"client_user_agent"`
+	Attempts              []callAttemptJSON `json:"attempts"`
+	PriceSnapshot         json.RawMessage   `json:"price_snapshot"`
+	OutputTokensPerSecond *float64          `json:"output_tokens_per_second"`
+	InterTokenP50MS       *int              `json:"inter_token_p50_ms"`
+	InterTokenP95MS       *int              `json:"inter_token_p95_ms"`
+	ResponseBytes         *int64            `json:"response_bytes"`
+	LedgerTransactionID   *string           `json:"ledger_transaction_id"`
+}
+
+// callDetailEnvelopeJSON is the OpenAPI CallDetailEnvelope schema.
+type callDetailEnvelopeJSON struct {
+	Call callDetailJSON `json:"call"`
+}
+
+// callStatsJSON is the OpenAPI CallStats schema.
+type callStatsJSON struct {
+	Calls        int64   `json:"calls"`
+	Succeeded    int64   `json:"succeeded"`
+	Failed       int64   `json:"failed"`
+	SuccessRate  *string `json:"success_rate"`
+	Charged      string  `json:"charged"`
+	InputTokens  int64   `json:"input_tokens"`
+	OutputTokens int64   `json:"output_tokens"`
+	TotalTokens  int64   `json:"total_tokens"`
+	TTFTP50MS    *int    `json:"ttft_p50_ms"`
+	TTFTP95MS    *int    `json:"ttft_p95_ms"`
+}
+
+// callPageJSON is the OpenAPI CallPage schema.
+type callPageJSON struct {
+	Items      []callSummaryJSON `json:"items"`
+	NextCursor *string           `json:"next_cursor"`
+	Summary    callStatsJSON     `json:"summary"`
+}
+
+// adminCallPageJSON is the OpenAPI AdminCallPage schema.
+type adminCallPageJSON struct {
+	Items      []adminCallJSON `json:"items"`
+	NextCursor *string         `json:"next_cursor"`
+	Summary    callStatsJSON   `json:"summary"`
+}
+
+// channelCallErrorJSON is the error object of the OpenAPI ChannelCall schema.
+type channelCallErrorJSON struct {
+	StatusCode   *int    `json:"status_code"`
+	ErrorCode    *string `json:"error_code"`
+	ErrorMessage *string `json:"error_message"`
+}
+
+// channelCallJSON is the OpenAPI ChannelCall schema: a call as the channel's owner sees it.
+type channelCallJSON struct {
+	ID         string                `json:"id"`
+	CreatedAt  time.Time             `json:"created_at"`
+	ModelID    *string               `json:"model_id"`
+	Format     string                `json:"format"`
+	Stream     bool                  `json:"stream"`
+	Outcome    string                `json:"outcome"`
+	Usage      usageJSON             `json:"usage"`
+	Revenue    string                `json:"revenue"`
+	Served     bool                  `json:"served"`
+	TTFTMS     *int                  `json:"ttft_ms"`
+	DurationMS *int                  `json:"duration_ms"`
+	Error      *channelCallErrorJSON `json:"error"`
+}
+
+// usageRowJSON is the OpenAPI UsageRow schema.
+type usageRowJSON struct {
+	Key              string `json:"key"`
+	Label            string `json:"label"`
+	Calls            int64  `json:"calls"`
+	Succeeded        int64  `json:"succeeded"`
+	InputTokens      int64  `json:"input_tokens"`
+	OutputTokens     int64  `json:"output_tokens"`
+	CacheWriteTokens int64  `json:"cache_write_tokens"`
+	CacheReadTokens  int64  `json:"cache_read_tokens"`
+	Charged          string `json:"charged"`
+}
+
+// usageReportJSON is the OpenAPI UsageReport schema.
+type usageReportJSON struct {
+	View    string         `json:"view"`
+	GroupBy string         `json:"group_by"`
+	From    time.Time      `json:"from"`
+	To      time.Time      `json:"to"`
+	Items   []usageRowJSON `json:"items"`
+	Total   usageRowJSON   `json:"total"`
+}
+
+// channelWindowJSON is the OpenAPI ChannelWindow schema.
+type channelWindowJSON struct {
+	Calls       int64   `json:"calls"`
+	Succeeded   int64   `json:"succeeded"`
+	SuccessRate *string `json:"success_rate"`
+}
+
+// channelFailureJSON is the OpenAPI ChannelFailure schema.
+type channelFailureJSON struct {
+	CallID       string    `json:"call_id"`
+	CreatedAt    time.Time `json:"created_at"`
+	ModelID      *string   `json:"model_id"`
+	StatusCode   *int      `json:"status_code"`
+	ErrorCode    *string   `json:"error_code"`
+	ErrorMessage *string   `json:"error_message"`
+	EndReason    string    `json:"end_reason"`
+}
+
+// channelStatsHourJSON is one hourly element of the OpenAPI ChannelStats schema.
+type channelStatsHourJSON struct {
+	Hour      time.Time `json:"hour"`
+	Calls     int64     `json:"calls"`
+	Succeeded int64     `json:"succeeded"`
+}
+
+// channelStatsStatusJSON is one status_codes element of the OpenAPI ChannelStats schema.
+type channelStatsStatusJSON struct {
+	StatusCode *int  `json:"status_code"`
+	Count      int64 `json:"count"`
+}
+
+// channelStatsTodayJSON is the today object of the OpenAPI ChannelStats schema.
+type channelStatsTodayJSON struct {
+	Revenue  string  `json:"revenue"`
+	DailyCap *string `json:"daily_cap"`
+	Progress *string `json:"progress"`
+}
+
+// channelStatsModelJSON is one by_model element of the OpenAPI ChannelStats schema.
+type channelStatsModelJSON struct {
+	ModelID   string `json:"model_id"`
+	Calls     int64  `json:"calls"`
+	Succeeded int64  `json:"succeeded"`
+	Revenue   string `json:"revenue"`
+}
+
+// channelStatsDayJSON is one daily element of the OpenAPI ChannelStats schema.
+type channelStatsDayJSON struct {
+	Date      string `json:"date"`
+	Calls     int64  `json:"calls"`
+	Succeeded int64  `json:"succeeded"`
+	Revenue   string `json:"revenue"`
+}
+
+// channelStatsJSON is the OpenAPI ChannelStats schema.
+type channelStatsJSON struct {
+	From                     time.Time                `json:"from"`
+	To                       time.Time                `json:"to"`
+	Calls                    int64                    `json:"calls"`
+	Succeeded                int64                    `json:"succeeded"`
+	SuccessRate              *string                  `json:"success_rate"`
+	Revenue                  string                   `json:"revenue"`
+	TTFTP50MS                *int                     `json:"ttft_p50_ms"`
+	TTFTP95MS                *int                     `json:"ttft_p95_ms"`
+	OutputTokensPerSecondP50 *float64                 `json:"output_tokens_per_second_p50"`
+	OutputTokensPerSecondP95 *float64                 `json:"output_tokens_per_second_p95"`
+	Last24h                  channelWindowJSON        `json:"last_24h"`
+	Last7d                   channelWindowJSON        `json:"last_7d"`
+	Hourly                   []channelStatsHourJSON   `json:"hourly"`
+	StatusCodes              []channelStatsStatusJSON `json:"status_codes"`
+	RecentFailures           []channelFailureJSON     `json:"recent_failures"`
+	Today                    channelStatsTodayJSON    `json:"today"`
+	ByModel                  []channelStatsModelJSON  `json:"by_model"`
+	Daily                    []channelStatsDayJSON    `json:"daily"`
+	Events                   []channelEventJSON       `json:"events"`
+}
+
+func newUsageJSON(usage observe.Usage) usageJSON {
+	return usageJSON{
+		InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens,
+		CacheWriteTokens: usage.CacheWriteTokens, CacheReadTokens: usage.CacheReadTokens,
 	}
 }
 
-func channelRefJSON(ref *observe.ChannelRef) any {
+func newChannelRefJSON(ref *observe.ChannelRef) *channelRefJSON {
 	if ref == nil {
 		return nil
 	}
-	return map[string]any{"id": ref.ID, "name": ref.Name}
+	return &channelRefJSON{ID: ref.ID, Name: ref.Name}
 }
 
-func keyRefJSON(ref *observe.KeyRef) any {
+func newObservedKeyRefJSON(ref *observe.KeyRef) *keyRefJSON {
 	if ref == nil {
 		return nil
 	}
-	return map[string]any{"id": ref.ID, "name": ref.Name}
+	return &keyRefJSON{ID: ref.ID, Name: ref.Name}
 }
 
-func accountRefJSON(ref observe.AccountRef) map[string]any {
-	return map[string]any{"id": ref.ID, "username": ref.Username, "display_name": ref.DisplayName}
+func newAccountRefJSON(ref observe.AccountRef) accountRefJSON {
+	return accountRefJSON{ID: ref.ID, Username: ref.Username, DisplayName: ref.DisplayName}
 }
 
-func optionalRatio(value *float64) any {
+// optionalRatio renders an optional ratio as a decimal string, or null when unset.
+func optionalRatio(value *float64) *string {
 	if value == nil {
 		return nil
 	}
-	return ratio(*value)
+	text := ratio(*value)
+	return &text
 }
 
-func callSummaryJSON(row observe.CallRow) map[string]any {
-	return map[string]any{
-		"id": row.ID, "created_at": row.CreatedAt, "completed_at": row.CompletedAt, "model_id": optionalString(row.ModelID),
-		"requested_model": row.RequestedModel, "format": row.Format, "stream": row.Stream, "tag": optionalString(row.Tag),
-		"api_key": keyRefJSON(row.Key), "outcome": row.Outcome, "channel": channelRefJSON(row.Channel), "attempt_count": row.AttemptCount,
-		"usage": usageJSON(row.Usage), "cost": row.Cost.String(), "fee": row.Fee.String(), "charged": row.Charged().String(),
-		"ttft_ms": row.TTFTMS, "duration_ms": row.DurationMS,
+func newCallSummaryJSON(row observe.CallRow) callSummaryJSON {
+	return callSummaryJSON{
+		ID:             row.ID,
+		CreatedAt:      row.CreatedAt,
+		CompletedAt:    row.CompletedAt,
+		ModelID:        row.ModelID,
+		RequestedModel: row.RequestedModel,
+		Format:         row.Format,
+		Stream:         row.Stream,
+		Tag:            row.Tag,
+		APIKey:         newObservedKeyRefJSON(row.Key),
+		Outcome:        row.Outcome,
+		Channel:        newChannelRefJSON(row.Channel),
+		AttemptCount:   row.AttemptCount,
+		Usage:          newUsageJSON(row.Usage),
+		Cost:           row.Cost.String(),
+		Fee:            row.Fee.String(),
+		Charged:        row.Charged().String(),
+		TTFTMS:         row.TTFTMS,
+		DurationMS:     row.DurationMS,
 	}
 }
 
-func adminCallJSON(row observe.CallRow) map[string]any {
-	call := callSummaryJSON(row)
-	call["account"] = accountRefJSON(row.Account)
-	return call
+func newAdminCallJSON(row observe.CallRow) adminCallJSON {
+	return adminCallJSON{callSummaryJSON: newCallSummaryJSON(row), Account: newAccountRefJSON(row.Account)}
 }
 
 // lastFailure is the most recent failed attempt among a call's scope attempts.
-func lastFailure(attempts []observe.Attempt) any {
+func lastFailure(attempts []observe.Attempt) *channelCallErrorJSON {
 	for index := len(attempts) - 1; index >= 0; index-- {
 		attempt := attempts[index]
 		if !attempt.Succeeded() {
-			return map[string]any{
-				"status_code": attempt.StatusCode, "error_code": optionalString(attempt.ErrorCode), "error_message": optionalString(attempt.ErrorMessage),
-			}
+			return &channelCallErrorJSON{StatusCode: attempt.StatusCode, ErrorCode: attempt.ErrorCode, ErrorMessage: attempt.ErrorMessage}
 		}
 	}
 	return nil
 }
 
-func channelCallJSON(row observe.CallRow, channelID string) map[string]any {
+func newChannelCallJSON(row observe.CallRow, channelID string) channelCallJSON {
 	served := row.Channel != nil && row.Channel.ID == channelID
 	revenue := money.Amount(0)
 	if served {
 		revenue = row.Revenue()
 	}
-	return map[string]any{
-		"id": row.ID, "created_at": row.CreatedAt, "model_id": optionalString(row.ModelID), "format": row.Format, "stream": row.Stream,
-		"outcome": row.Outcome, "usage": usageJSON(row.Usage), "revenue": revenue.String(), "served": served,
-		"ttft_ms": row.TTFTMS, "duration_ms": row.DurationMS, "error": lastFailure(row.ScopeAttempts),
+	return channelCallJSON{
+		ID:         row.ID,
+		CreatedAt:  row.CreatedAt,
+		ModelID:    row.ModelID,
+		Format:     row.Format,
+		Stream:     row.Stream,
+		Outcome:    row.Outcome,
+		Usage:      newUsageJSON(row.Usage),
+		Revenue:    revenue.String(),
+		Served:     served,
+		TTFTMS:     row.TTFTMS,
+		DurationMS: row.DurationMS,
+		Error:      lastFailure(row.ScopeAttempts),
 	}
 }
 
-func callStatsJSON(stats observe.CallStats) map[string]any {
-	return map[string]any{
-		"calls": stats.Calls, "succeeded": stats.Succeeded, "failed": stats.Failed, "success_rate": optionalRatio(stats.SuccessRate()),
-		"charged": stats.Charged.String(), "input_tokens": stats.InputTokens, "output_tokens": stats.OutputTokens,
-		"total_tokens": stats.TotalTokens(), "ttft_p50_ms": stats.TTFTP50MS, "ttft_p95_ms": stats.TTFTP95MS,
+func newCallStatsJSON(stats observe.CallStats) callStatsJSON {
+	return callStatsJSON{
+		Calls:        stats.Calls,
+		Succeeded:    stats.Succeeded,
+		Failed:       stats.Failed,
+		SuccessRate:  optionalRatio(stats.SuccessRate()),
+		Charged:      stats.Charged.String(),
+		InputTokens:  stats.InputTokens,
+		OutputTokens: stats.OutputTokens,
+		TotalTokens:  stats.TotalTokens(),
+		TTFTP50MS:    stats.TTFTP50MS,
+		TTFTP95MS:    stats.TTFTP95MS,
 	}
 }
 
-func attemptJSON(attempt observe.Attempt) map[string]any {
-	return map[string]any{
-		"channel": channelRefJSON(attempt.Channel), "status_code": attempt.StatusCode, "error_code": optionalString(attempt.ErrorCode),
-		"error_message": optionalString(attempt.ErrorMessage), "connect_ms": attempt.ConnectMS, "ttft_ms": attempt.TTFTMS,
-		"duration_ms": attempt.DurationMS, "response_bytes": attempt.ResponseByte, "end_reason": attempt.EndReason,
+func newCallAttemptJSON(attempt observe.Attempt) callAttemptJSON {
+	return callAttemptJSON{
+		Channel:       newChannelRefJSON(attempt.Channel),
+		StatusCode:    attempt.StatusCode,
+		ErrorCode:     attempt.ErrorCode,
+		ErrorMessage:  attempt.ErrorMessage,
+		ConnectMS:     attempt.ConnectMS,
+		TTFTMS:        attempt.TTFTMS,
+		DurationMS:    attempt.DurationMS,
+		ResponseBytes: attempt.ResponseByte,
+		EndReason:     attempt.EndReason,
 	}
 }
 
-func rawJSONOrNil(raw json.RawMessage) any {
+// rawJSONOrNil keeps stored jsonb as is and turns an absent or null value into a nil message, which encodes as null.
+func rawJSONOrNil(raw json.RawMessage) json.RawMessage {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
 	}
 	return raw
 }
 
-func callDetailJSON(detail observe.CallDetail) map[string]any {
-	call := callSummaryJSON(detail.CallRow)
-	attempts := make([]map[string]any, 0, len(detail.Attempts))
+func newCallDetailJSON(detail observe.CallDetail) callDetailJSON {
+	attempts := make([]callAttemptJSON, 0, len(detail.Attempts))
 	for _, attempt := range detail.Attempts {
-		attempts = append(attempts, attemptJSON(attempt))
+		attempts = append(attempts, newCallAttemptJSON(attempt))
 	}
-	call["routing_mode"] = optionalString(detail.RoutingMode)
-	call["routing_source"] = optionalString(detail.RoutingSource)
-	call["client_user_agent"] = optionalString(detail.ClientUserAgent)
-	call["attempts"] = attempts
-	call["price_snapshot"] = rawJSONOrNil(detail.PriceSnapshot)
 	speed := detail.TokensPerSecond
 	if !detail.Stream {
 		// Non-streaming speed is the end-to-end average, including all attempts.
@@ -254,41 +509,140 @@ func callDetailJSON(detail observe.CallDetail) map[string]any {
 			speed = &value
 		}
 	}
-	call["output_tokens_per_second"] = speed
-	call["inter_token_p50_ms"] = detail.IntervalP50MS
-	call["inter_token_p95_ms"] = detail.IntervalP95MS
-	call["response_bytes"] = detail.ResponseBytes
-	call["ledger_transaction_id"] = optionalString(detail.LedgerTxID)
-	return call
+	return callDetailJSON{
+		callSummaryJSON:       newCallSummaryJSON(detail.CallRow),
+		RoutingMode:           detail.RoutingMode,
+		RoutingSource:         detail.RoutingSource,
+		ClientUserAgent:       detail.ClientUserAgent,
+		Attempts:              attempts,
+		PriceSnapshot:         rawJSONOrNil(detail.PriceSnapshot),
+		OutputTokensPerSecond: speed,
+		InterTokenP50MS:       detail.IntervalP50MS,
+		InterTokenP95MS:       detail.IntervalP95MS,
+		ResponseBytes:         detail.ResponseBytes,
+		LedgerTransactionID:   detail.LedgerTxID,
+	}
+}
+
+func newUsageRowJSON(row observe.UsageRow) usageRowJSON {
+	return usageRowJSON{
+		Key:              row.Key,
+		Label:            row.Label,
+		Calls:            row.Calls,
+		Succeeded:        row.Succeeded,
+		InputTokens:      row.InputTokens,
+		OutputTokens:     row.OutputTokens,
+		CacheWriteTokens: row.CacheWriteTokens,
+		CacheReadTokens:  row.CacheReadTokens,
+		Charged:          row.Amount.String(),
+	}
+}
+
+func newUsageReportJSON(report observe.UsageReport) usageReportJSON {
+	items := make([]usageRowJSON, 0, len(report.Items))
+	for _, row := range report.Items {
+		items = append(items, newUsageRowJSON(row))
+	}
+	view := "spend"
+	if report.Revenue {
+		view = "revenue"
+	}
+	return usageReportJSON{View: view, GroupBy: report.GroupBy, From: report.From, To: report.To, Items: items, Total: newUsageRowJSON(report.Total)}
+}
+
+func newChannelWindowJSON(window observe.Window) channelWindowJSON {
+	return channelWindowJSON{Calls: window.Calls, Succeeded: window.Succeeded, SuccessRate: optionalRatio(window.SuccessRate)}
+}
+
+func newChannelStatsJSON(report observe.ChannelReport) channelStatsJSON {
+	hourly := make([]channelStatsHourJSON, 0, len(report.Hourly))
+	for _, bucket := range report.Hourly {
+		hourly = append(hourly, channelStatsHourJSON{Hour: bucket.At, Calls: bucket.Attempts, Succeeded: bucket.Successes})
+	}
+	statuses := make([]channelStatsStatusJSON, 0, len(report.Statuses))
+	for _, bucket := range report.Statuses {
+		statuses = append(statuses, channelStatsStatusJSON{StatusCode: bucket.StatusCode, Count: bucket.Count})
+	}
+	failures := make([]channelFailureJSON, 0, len(report.Failures))
+	for _, failure := range report.Failures {
+		failures = append(failures, channelFailureJSON{
+			CallID:       failure.CallID,
+			CreatedAt:    failure.CreatedAt,
+			ModelID:      failure.ModelID,
+			StatusCode:   failure.Attempt.StatusCode,
+			ErrorCode:    failure.Attempt.ErrorCode,
+			ErrorMessage: failure.Attempt.ErrorMessage,
+			EndReason:    failure.Attempt.EndReason,
+		})
+	}
+	models := make([]channelStatsModelJSON, 0, len(report.Models))
+	for _, bucket := range report.Models {
+		models = append(models, channelStatsModelJSON{ModelID: bucket.ModelID, Calls: bucket.Attempts, Succeeded: bucket.Successes, Revenue: bucket.Revenue.String()})
+	}
+	daily := make([]channelStatsDayJSON, 0, len(report.Daily))
+	for _, bucket := range report.Daily {
+		daily = append(daily, channelStatsDayJSON{Date: bucket.Day, Calls: bucket.Attempts, Succeeded: bucket.Successes, Revenue: bucket.Revenue.String()})
+	}
+	events := make([]channelEventJSON, 0, len(report.Events))
+	for _, event := range report.Events {
+		events = append(events, channelEventJSON{ID: itoa(event.ID), Kind: event.Kind, Reason: event.Reason, CreatedAt: event.CreatedAt})
+	}
+	return channelStatsJSON{
+		From:                     report.From,
+		To:                       report.To,
+		Calls:                    report.Window.Calls,
+		Succeeded:                report.Window.Succeeded,
+		SuccessRate:              optionalRatio(report.Window.SuccessRate),
+		Revenue:                  report.Revenue.String(),
+		TTFTP50MS:                report.TTFTP50MS,
+		TTFTP95MS:                report.TTFTP95MS,
+		OutputTokensPerSecondP50: report.SpeedP50,
+		OutputTokensPerSecondP95: report.SpeedP95,
+		Last24h:                  newChannelWindowJSON(report.Last24h),
+		Last7d:                   newChannelWindowJSON(report.Last7d),
+		Hourly:                   hourly,
+		StatusCodes:              statuses,
+		RecentFailures:           failures,
+		Today: channelStatsTodayJSON{
+			Revenue: report.TodayRevenue.String(), DailyCap: nullableAmount(report.DailyCap), Progress: optionalRatio(report.Progress),
+		},
+		ByModel: models,
+		Daily:   daily,
+		Events:  events,
+	}
+}
+
+// convertRows renders the rows of a call page with the response type of the endpoint.
+func convertRows[T any](rows []observe.CallRow, convert func(observe.CallRow) T) []T {
+	items := make([]T, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, convert(row))
+	}
+	return items
 }
 
 // ---- handlers ----
 
-func (a *app) listCallsPage(w http.ResponseWriter, r *http.Request, filter observe.CallFilter, render func(observe.CallRow) map[string]any, withStats bool) {
+// queryCalls reads one page of the calls matching the filter. It writes the error response itself
+// and reports false when the request is invalid or the query fails. A page has a summary exactly
+// when withStats is set.
+func (a *app) queryCalls(w http.ResponseWriter, r *http.Request, filter observe.CallFilter, withStats bool) (observe.CallPage, bool) {
 	limit, limitOK := pageLimit(r)
 	cursor, cursorOK := decodeCallCursor(r)
 	if !limitOK {
 		writeInvalidQuery(w)
-		return
+		return observe.CallPage{}, false
 	}
 	if !cursorOK {
 		writeBadCursor(w)
-		return
+		return observe.CallPage{}, false
 	}
 	page, err := a.observe.Calls(r.Context(), filter, cursor, limit, withStats)
 	if err != nil {
 		writeObserveError(w, err)
-		return
+		return observe.CallPage{}, false
 	}
-	items := make([]map[string]any, 0, len(page.Items))
-	for _, row := range page.Items {
-		items = append(items, render(row))
-	}
-	response := map[string]any{"items": items, "next_cursor": encodeCallCursor(page.Next)}
-	if page.Stats != nil {
-		response["summary"] = callStatsJSON(*page.Stats)
-	}
-	writeJSON(w, http.StatusOK, response)
+	return page, true
 }
 
 func (a *app) listMyCalls(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +652,13 @@ func (a *app) listMyCalls(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filter.AccountID = accountFromContext(r.Context()).ID
-	a.listCallsPage(w, r, filter, callSummaryJSON, true)
+	page, ok := a.queryCalls(w, r, filter, true)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, callPageJSON{
+		Items: convertRows(page.Items, newCallSummaryJSON), NextCursor: encodeCallCursor(page.Next), Summary: newCallStatsJSON(*page.Stats),
+	})
 }
 
 func (a *app) listAdminCalls(w http.ResponseWriter, r *http.Request) {
@@ -307,7 +667,13 @@ func (a *app) listAdminCalls(w http.ResponseWriter, r *http.Request) {
 		writeInvalidQuery(w)
 		return
 	}
-	a.listCallsPage(w, r, filter, adminCallJSON, true)
+	page, ok := a.queryCalls(w, r, filter, true)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, adminCallPageJSON{
+		Items: convertRows(page.Items, newAdminCallJSON), NextCursor: encodeCallCursor(page.Next), Summary: newCallStatsJSON(*page.Stats),
+	})
 }
 
 func (a *app) listChannelCalls(w http.ResponseWriter, r *http.Request) {
@@ -332,7 +698,12 @@ func (a *app) listChannelCalls(w http.ResponseWriter, r *http.Request) {
 		From: filter.From, To: filter.To, MinDurationMS: filter.MinDurationMS, MaxDurationMS: filter.MaxDurationMS,
 		MinTokens: filter.MinTokens, MaxTokens: filter.MaxTokens,
 	}
-	a.listCallsPage(w, r, filter, func(row observe.CallRow) map[string]any { return channelCallJSON(row, channelID) }, false)
+	page, ok := a.queryCalls(w, r, filter, false)
+	if !ok {
+		return
+	}
+	items := convertRows(page.Items, func(row observe.CallRow) channelCallJSON { return newChannelCallJSON(row, channelID) })
+	writeJSON(w, http.StatusOK, pageJSON[channelCallJSON]{Items: items, NextCursor: encodeCallCursor(page.Next)})
 }
 
 func (a *app) getCall(w http.ResponseWriter, r *http.Request) {
@@ -346,15 +717,7 @@ func (a *app) getCall(w http.ResponseWriter, r *http.Request) {
 		writeObserveError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"call": callDetailJSON(detail)})
-}
-
-func usageRowJSON(row observe.UsageRow) map[string]any {
-	return map[string]any{
-		"key": row.Key, "label": row.Label, "calls": row.Calls, "succeeded": row.Succeeded,
-		"input_tokens": row.InputTokens, "output_tokens": row.OutputTokens,
-		"cache_write_tokens": row.CacheWriteTokens, "cache_read_tokens": row.CacheReadTokens, "charged": row.Amount.String(),
-	}
+	writeJSON(w, http.StatusOK, callDetailEnvelopeJSON{Call: newCallDetailJSON(detail)})
 }
 
 func (a *app) getUsage(w http.ResponseWriter, r *http.Request) {
@@ -391,21 +754,7 @@ func (a *app) getUsage(w http.ResponseWriter, r *http.Request) {
 		writeObserveError(w, err)
 		return
 	}
-	items := make([]map[string]any, 0, len(report.Items))
-	for _, row := range report.Items {
-		items = append(items, usageRowJSON(row))
-	}
-	viewName := "spend"
-	if report.Revenue {
-		viewName = "revenue"
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"view": viewName, "group_by": report.GroupBy, "from": report.From, "to": report.To, "items": items, "total": usageRowJSON(report.Total),
-	})
-}
-
-func windowJSON(window observe.Window) map[string]any {
-	return map[string]any{"calls": window.Calls, "succeeded": window.Succeeded, "success_rate": optionalRatio(window.SuccessRate)}
+	writeJSON(w, http.StatusOK, newUsageReportJSON(report))
 }
 
 func (a *app) getChannelStats(w http.ResponseWriter, r *http.Request) {
@@ -425,48 +774,7 @@ func (a *app) getChannelStats(w http.ResponseWriter, r *http.Request) {
 		writeObserveError(w, err)
 		return
 	}
-	hourly := make([]map[string]any, 0, len(report.Hourly))
-	for _, bucket := range report.Hourly {
-		hourly = append(hourly, map[string]any{"hour": bucket.At, "calls": bucket.Attempts, "succeeded": bucket.Successes})
-	}
-	daily := make([]map[string]any, 0, len(report.Daily))
-	for _, bucket := range report.Daily {
-		daily = append(daily, map[string]any{"date": bucket.Day, "calls": bucket.Attempts, "succeeded": bucket.Successes, "revenue": bucket.Revenue.String()})
-	}
-	models := make([]map[string]any, 0, len(report.Models))
-	for _, bucket := range report.Models {
-		models = append(models, map[string]any{"model_id": bucket.ModelID, "calls": bucket.Attempts, "succeeded": bucket.Successes, "revenue": bucket.Revenue.String()})
-	}
-	statuses := make([]map[string]any, 0, len(report.Statuses))
-	for _, bucket := range report.Statuses {
-		statuses = append(statuses, map[string]any{"status_code": bucket.StatusCode, "count": bucket.Count})
-	}
-	failures := make([]map[string]any, 0, len(report.Failures))
-	for _, failure := range report.Failures {
-		failures = append(failures, map[string]any{
-			"call_id": failure.CallID, "created_at": failure.CreatedAt, "model_id": optionalString(failure.ModelID),
-			"status_code": failure.Attempt.StatusCode, "error_code": optionalString(failure.Attempt.ErrorCode),
-			"error_message": optionalString(failure.Attempt.ErrorMessage), "end_reason": failure.Attempt.EndReason,
-		})
-	}
-	events := make([]map[string]any, 0, len(report.Events))
-	for _, event := range report.Events {
-		events = append(events, map[string]any{"id": strconv.FormatInt(event.ID, 10), "kind": event.Kind, "reason": event.Reason, "created_at": event.CreatedAt})
-	}
-	var dailyCap any
-	if report.DailyCap != nil {
-		dailyCap = report.DailyCap.String()
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"from": report.From, "to": report.To, "calls": report.Window.Calls, "succeeded": report.Window.Succeeded,
-		"success_rate": optionalRatio(report.Window.SuccessRate), "revenue": report.Revenue.String(),
-		"ttft_p50_ms": report.TTFTP50MS, "ttft_p95_ms": report.TTFTP95MS,
-		"output_tokens_per_second_p50": report.SpeedP50, "output_tokens_per_second_p95": report.SpeedP95,
-		"last_24h": windowJSON(report.Last24h), "last_7d": windowJSON(report.Last7d),
-		"hourly": hourly, "status_codes": statuses, "recent_failures": failures,
-		"today":    map[string]any{"revenue": report.TodayRevenue.String(), "daily_cap": dailyCap, "progress": optionalRatio(report.Progress)},
-		"by_model": models, "daily": daily, "events": events,
-	})
+	writeJSON(w, http.StatusOK, newChannelStatsJSON(report))
 }
 
 // registerObserveRoutes 注册调用、用量与渠道统计路由（Feature G）。

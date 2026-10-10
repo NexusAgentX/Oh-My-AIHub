@@ -71,7 +71,7 @@ type pointsEntryJSON struct {
 	Related       *ledgerRelatedJSON     `json:"related"`
 	Amount        string                 `json:"amount"`
 	BalanceAfter  string                 `json:"balance_after"`
-	APIKey        *apiKeyRefJSON         `json:"api_key"`
+	APIKey        *keyRefJSON            `json:"api_key"`
 }
 
 // pointsDayFlowJSON is one by_day element of the OpenAPI PointsEntrySummary schema.
@@ -84,9 +84,9 @@ type pointsDayFlowJSON struct {
 
 // pointsKeySpendJSON is one by_key element of the OpenAPI PointsEntrySummary schema.
 type pointsKeySpendJSON struct {
-	APIKey  *apiKeyRefJSON `json:"api_key"`
-	Spend   string         `json:"spend"`
-	Entries int64          `json:"entries"`
+	APIKey  *keyRefJSON `json:"api_key"`
+	Spend   string      `json:"spend"`
+	Entries int64       `json:"entries"`
 }
 
 // pointsEntrySummaryJSON is the OpenAPI PointsEntrySummary schema.
@@ -157,7 +157,7 @@ func newPointsEntryJSON(entry ledger.EntryView) pointsEntryJSON {
 		Related:       related,
 		Amount:        entry.Amount.String(),
 		BalanceAfter:  entry.BalanceAfter.String(),
-		APIKey:        newApiKeyRefJSON(entry.APIKeyID, entry.APIKeyName),
+		APIKey:        newKeyRefJSON(entry.APIKeyID, entry.APIKeyName),
 	}
 }
 
@@ -248,9 +248,9 @@ func newPointsEntrySummaryJSON(summary observe.EntrySummary) pointsEntrySummaryJ
 	}
 	byKey := make([]pointsKeySpendJSON, 0, len(summary.ByKey))
 	for _, key := range summary.ByKey {
-		var apiKey *apiKeyRefJSON
+		var apiKey *keyRefJSON
 		if key.Key != nil {
-			apiKey = &apiKeyRefJSON{ID: key.Key.ID, Name: key.Key.Name}
+			apiKey = &keyRefJSON{ID: key.Key.ID, Name: key.Key.Name}
 		}
 		byKey = append(byKey, pointsKeySpendJSON{APIKey: apiKey, Spend: key.Spend.String(), Entries: key.Entries})
 	}
