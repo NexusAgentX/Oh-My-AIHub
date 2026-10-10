@@ -13,7 +13,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -75,7 +75,7 @@ func TestModelPageServesPreviousStatsWhileRefreshIsStuck(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine := gateway.NewEngine(gateway.Dependencies{Store: stats, Settings: settings.NewService(store), Outbound: policy})
-	identityService, err := identity.NewService(store, time.Hour)
+	identityService, err := identitytest.NewService(store, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

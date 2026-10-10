@@ -14,6 +14,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 )
@@ -92,7 +93,7 @@ func mustAmount(t *testing.T, value string) money.Amount {
 func accounts(t *testing.T, store *storepg.Store, credits ...string) (*identity.Service, identity.Account, []identity.AdminAccount) {
 	t.Helper()
 	ctx := context.Background()
-	service, err := identity.NewService(store.Identity, time.Hour)
+	service, err := identitytest.NewService(store.Identity, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

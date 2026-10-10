@@ -12,7 +12,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
@@ -298,7 +298,7 @@ func (s *fakeC2CStore) Resolve(_ context.Context, r c2c.Resolution) (c2c.Trade, 
 }
 
 func newC2CHandler(store *fakeStore, c2cStore *fakeC2CStore) http.Handler {
-	identityService, err := identity.NewService(store, time.Hour)
+	identityService, err := identitytest.NewService(store, time.Hour)
 	if err != nil {
 		panic(err)
 	}

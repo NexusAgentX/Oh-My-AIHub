@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,6 +19,9 @@ func TestHashAndVerifyPassword(t *testing.T) {
 	}
 	if VerifyPassword(hash, "not-the-password") {
 		t.Fatal("wrong password verified")
+	}
+	if got := phcParams(t, hash); got != productionPHCParams {
+		t.Fatalf("HashPassword parameters = %s, want %s", got, productionPHCParams)
 	}
 }
 
@@ -70,6 +74,87 @@ func TestVerifyPasswordRejectsUnsafePHCParameters(t *testing.T) {
 	} {
 		if VerifyPassword(encoded, "password") {
 			t.Fatalf("unsafe PHC string unexpectedly verified: %q", encoded)
+		}
+	}
+}
+
+// 生产参数写成字面量而不是引用常量，这样任何一次意外的参数改动都会让测试失败。
+const productionPHCParams = "$m=65536,t=3,p=2$"
+
+func phcParams(t *testing.T, encoded string) string {
+	t.Helper()
+	parts := strings.Split(encoded, "$")
+	if len(parts) != 6 {
+		t.Fatalf("encoded hash has %d parts, want 6: %q", len(parts), encoded)
+	}
+	return "$" + parts[3] + "$"
+}
+
+func TestDefaultServiceHashesWithProductionParameters(t *testing.T) {
+	service, err := NewService(nil, time.Hour)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	if got := phcParams(t, service.dummyHash); got != productionPHCParams {
+		t.Fatalf("default service dummy hash parameters = %s, want %s", got, productionPHCParams)
+	}
+	hash, err := service.hashPassword("A-long-enough-password")
+	if err != nil {
+		t.Fatalf("hashPassword: %v", err)
+	}
+	if got := phcParams(t, hash); got != productionPHCParams {
+		t.Fatalf("default service hash parameters = %s, want %s", got, productionPHCParams)
+	}
+}
+
+func TestServiceHonoursExplicitPasswordParameters(t *testing.T) {
+	cheap := PasswordParams{Memory: 8 * 1024, Iterations: 1, Parallelism: 1}
+	service, err := NewService(nil, time.Hour, WithPasswordParams(cheap))
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	if got := phcParams(t, service.dummyHash); got != "$m=8192,t=1,p=1$" {
+		t.Fatalf("dummy hash parameters = %s, want $m=8192,t=1,p=1$", got)
+	}
+	hash, err := service.hashPassword("A-long-enough-password")
+	if err != nil {
+		t.Fatalf("hashPassword: %v", err)
+	}
+	if got := phcParams(t, hash); got != "$m=8192,t=1,p=1$" {
+		t.Fatalf("hash parameters = %s, want $m=8192,t=1,p=1$", got)
+	}
+	if !VerifyPassword(hash, "A-long-enough-password") || VerifyPassword(hash, "not-the-password") {
+		t.Fatal("hash with explicit parameters did not verify correctly")
+	}
+}
+
+func TestNewServiceRejectsPasswordParametersOutsideVerifierLimits(t *testing.T) {
+	for name, params := range map[string]PasswordParams{
+		"memory below floor":       {Memory: 8*1024 - 1, Iterations: 3, Parallelism: 2},
+		"memory above ceiling":     {Memory: 256*1024 + 1, Iterations: 3, Parallelism: 2},
+		"zero iterations":          {Memory: 64 * 1024, Iterations: 0, Parallelism: 2},
+		"iterations above ceiling": {Memory: 64 * 1024, Iterations: 11, Parallelism: 2},
+		"zero parallelism":         {Memory: 64 * 1024, Iterations: 3, Parallelism: 0},
+		"parallelism above":        {Memory: 64 * 1024, Iterations: 3, Parallelism: 17},
+	} {
+		if _, err := NewService(nil, time.Hour, WithPasswordParams(params)); err == nil {
+			t.Fatalf("%s: NewService accepted %+v", name, params)
+		}
+	}
+}
+
+func TestVerifyPasswordLimitsAreUnchanged(t *testing.T) {
+	const tail = "$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	for _, params := range []string{
+		"m=8191,t=3,p=2",
+		"m=262145,t=3,p=2",
+		"m=65536,t=0,p=2",
+		"m=65536,t=11,p=2",
+		"m=65536,t=3,p=0",
+		"m=65536,t=3,p=17",
+	} {
+		if VerifyPassword("$argon2id$v=19$"+params+tail, "password") {
+			t.Fatalf("verifier accepted out-of-range parameters %s", params)
 		}
 	}
 }
