@@ -23,7 +23,7 @@
 ## 发布检查
 
 - 本地门禁：`mise run check-release`（前端 lint、测试与构建，后端 vet、staticcheck 与 race，Compose 配置）。
-- CI：PR 与 main 推送自动执行 `gates`（同一组门禁及生成代码一致性检查）与 `integration`（PostgreSQL 集成测试与迁移检查），见 `.github/workflows/ci.yml`。
+- CI：PR 与 main 推送自动执行 `.github/workflows/ci.yml`：按改动范围运行 `frontend`、`backend`（同一组门禁及生成代码一致性检查）、`integration`（PostgreSQL 集成测试与迁移检查）和 `images`（镜像构建与 Nginx 配置检查），由必需检查 `gates` 汇总；`main` 推送始终全量运行。
 - 部署后烟测：`GET /api/health` 返回 ok；管理员打开 `/admin/points` 确认五项核对全部通过。
 
 ## 升级流程

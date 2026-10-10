@@ -13,6 +13,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 )
 
 func TestHealth(t *testing.T) {
@@ -100,7 +101,7 @@ func (s failingLogoutStore) DeleteSession(context.Context, []byte) error {
 }
 
 func TestLogoutPreservesCookieWhenSessionRevocationFails(t *testing.T) {
-	service, err := identity.NewService(failingLogoutStore{err: errors.New("database unavailable")}, time.Hour)
+	service, err := identitytest.NewService(failingLogoutStore{err: errors.New("database unavailable")}, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +124,7 @@ func TestLogoutPreservesCookieWhenSessionRevocationFails(t *testing.T) {
 }
 
 func TestSessionLookupFailurePreservesCookieAndReturnsServerError(t *testing.T) {
-	service, err := identity.NewService(failingAuthenticationStore{err: errors.New("database unavailable")}, time.Hour)
+	service, err := identitytest.NewService(failingAuthenticationStore{err: errors.New("database unavailable")}, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

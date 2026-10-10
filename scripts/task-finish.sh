@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 收尾：确认 codex/<slug> 的 PR 已合并并进入 origin/main 后，清理本任务的
+# 收尾：确认 <type>/<slug> 的 PR 已合并并进入 origin/main 后，清理本任务的
 # worktree、本地分支和仍存在的远端分支，再把主工作区的 main 仅快进到 origin/main。
 #
 # 证据不足时停止，不会强制删除（不用 --force、branch -D），也不碰其他任务：
@@ -13,12 +13,13 @@
 # 最后确认 main...origin/main 为 0 0。
 #
 # 用法：
-#   scripts/task-finish.sh [--dry-run] [--volumes] <slug>
-#   mise run task-finish <slug> [--dry-run] [--volumes]
+#   scripts/task-finish.sh [--dry-run] [--volumes] <type>/<slug>
+#   mise run task-finish <type>/<slug> [--dry-run] [--volumes]
+# 示例：mise run task-finish fix/251-key-layout
 # 选项：
 #   --dry-run  只做检查并打印将执行的清理动作，不修改任何东西（仍会 git fetch）
 #   --volumes  同时删除该 Compose 项目的 Docker 卷（含数据库数据）；默认保留。
-#              卷按 Compose 项目名匹配（默认等于 worktree 目录名，即任务名）
+#              卷按 Compose 项目名匹配（默认等于 worktree 目录名 <type>-<slug>）
 # 注意：合并 PR 须使用 merge commit，分支提示才会成为 origin/main 的祖先；
 # squash 或 rebase 合并会因证据不足而停止。
 # 清理已完成后可重复运行（已不存在的部分会被跳过），例如补加 --volumes。
@@ -29,12 +30,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SCRIPT_DIR/task-lib.sh"
 
 usage() {
-  echo "用法：scripts/task-finish.sh [--dry-run] [--volumes] <slug>   （如 265-task-scripts）" >&2
+  echo "用法：scripts/task-finish.sh [--dry-run] [--volumes] <type>/<slug>   （如 fix/251-key-layout；type 为 $TASK_TYPES 之一）" >&2
 }
 
 dry_run=0
 remove_volumes=0
-slug=""
+task=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run) dry_run=1 ;;
@@ -48,15 +49,15 @@ for arg in "$@"; do
       die "未知选项 $arg。"
       ;;
     *)
-      if [ -n "$slug" ]; then
+      if [ -n "$task" ]; then
         usage
         die "只接受一个任务名。"
       fi
-      slug="$arg"
+      task="$arg"
       ;;
   esac
 done
-if [ -z "$slug" ]; then
+if [ -z "$task" ]; then
   usage
   exit 2
 fi
@@ -165,7 +166,7 @@ EOF_ROWS
 
 # 停止该 worktree 的 Compose 项目；--volumes 时才删除卷，否则列出保留的卷。
 cleanup_docker() {
-  local wt="$1" slug_name="$2" ids project="" volumes
+  local wt="$1" dir_name="$2" ids project="" volumes
   if ! command -v docker >/dev/null 2>&1; then
     info "未找到 docker，跳过容器清理。"
     return 0
@@ -187,8 +188,8 @@ cleanup_docker() {
     info "没有该 worktree 的 Compose 容器。"
   fi
 
-  # 卷由 Compose 项目名标记；没有容器时按默认项目名（目录名即任务名）查找。
-  volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=${project:-$slug_name}" 2>/dev/null || true)"
+  # 卷由 Compose 项目名标记；没有容器时按默认项目名（目录名 <type>-<slug>）查找。
+  volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=${project:-$dir_name}" 2>/dev/null || true)"
   if [ -z "$volumes" ]; then
     return 0
   fi
@@ -206,11 +207,11 @@ cleanup_docker() {
 }
 
 main() {
-  validate_slug "$slug"
+  parse_task_name "$task"
   resolve_main_workspace
 
-  local branch="codex/$slug"
-  local expected_path="$WORKTREES_DIR/$slug"
+  local branch="$TASK_BRANCH"
+  local expected_path="$WORKTREES_DIR/$TASK_DIR"
   if [ "$dry_run" -eq 1 ]; then
     info "[dry-run] 只检查并打印将执行的动作，不修改任何东西。"
   fi
@@ -283,7 +284,7 @@ main() {
     fast_forward_main
   fi
 
-  cleanup_docker "${worktree:-$expected_path}" "$slug"
+  cleanup_docker "${worktree:-$expected_path}" "$TASK_DIR"
 
   if [ -n "$worktree" ] && [ -d "$worktree" ]; then
     run git -C "$MAIN_WS" worktree remove "$worktree"
@@ -311,7 +312,7 @@ main() {
   if [ "$counts" != "0 0" ]; then
     die "清理后 main...origin/main 为“$counts”，不是“0 0”。请手动核对主工作区。"
   fi
-  info "任务 $slug 已清理。main...origin/main：$counts"
+  info "任务 $branch 已清理。main...origin/main：$counts"
 }
 
 main
