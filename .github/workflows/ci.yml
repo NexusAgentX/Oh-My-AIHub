@@ -18,12 +18,17 @@ concurrency:
 # 因此 gates 总是运行（if: always()），并用 scripts/ci-gate.sh 把“被跳过”与“确实不需要”对上号：
 # 任何需要运行的任务失败、被取消或被连带跳过，gates 都会失败。判定规则见 scripts/ci-changes.sh。
 # 推送到 main 时，合并提交的代码树与已同步 PR 头相同则所有任务都跳过（PR 上已验证），此时 gates 仍运行并通过；
-# 其余推送只运行本次推送带来的改动所涉及的任务。
+# 其余推送只运行本次推送带来的改动所涉及的任务。前提是推送前的 main 提交（父提交）已有成功的 ci 运行，
+# 否则（没有、进行中、失败、取消、查询出错）全量运行，这样 main 上任何绿色提交一路向前都是绿的。
 jobs:
   changes:
     name: changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read 用于查询父提交在 main 上的 ci 运行（推送到 main 时）。
+    permissions:
+      contents: read
+      actions: read
     outputs:
       frontend: ${{ steps.classify.outputs.frontend }}
       backend: ${{ steps.classify.outputs.backend }}
@@ -45,10 +50,22 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_AFTER: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           case "$EVENT_NAME" in
             pull_request) flags="$(scripts/ci-changes.sh --diff "$BASE_SHA" "$HEAD_SHA")" ;;
-            push) flags="$(scripts/ci-changes.sh --push "$PUSH_BEFORE" "$PUSH_AFTER")" ;;
+            push)
+              # 推送前的 main 提交（before）在 main 上必须已有成功的 ci 运行，才允许跳过或按范围运行（见 scripts/ci-changes.sh）。
+              # 查询失败时留下空文件，判定脚本会把它当作“父提交未验证”并全量运行（失败时关闭）。
+              parent_runs="$RUNNER_TEMP/parent-runs.json"
+              : > "$parent_runs"
+              if [ -n "${PUSH_BEFORE//0/}" ]; then
+                gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${PUSH_BEFORE}&event=push&branch=main&per_page=100" \
+                  > "$parent_runs" || : > "$parent_runs"
+              fi
+              flags="$(scripts/ci-changes.sh --push "$PUSH_BEFORE" "$PUSH_AFTER" "$parent_runs")"
+              ;;
             *) flags="$(scripts/ci-changes.sh --all)" ;;
           esac
           echo "$flags" | tee -a "$GITHUB_OUTPUT"

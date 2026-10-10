@@ -62,7 +62,8 @@ if [ "$all" = "frontend=true backend=true images=true docs_only=false" ]; then p
 # --diff：在临时仓库中验证合并基点语义、重命名与失败处理。
 tmp="$(mktemp -d)"
 ptmp="$(mktemp -d)"
-trap 'rm -rf "$tmp" "$ptmp"' EXIT
+pfile="$(mktemp)"
+trap 'rm -rf "$tmp" "$ptmp" "$pfile"' EXIT
 git_t() { git -C "$tmp" -c user.name=ci -c user.email=ci@example.invalid "$@"; }
 git_t init -q -b main
 mkdir -p "$tmp/backend/internal" "$tmp/frontend/src" "$tmp/docs"
@@ -98,6 +99,18 @@ elif [ -n "$out" ]; then
 else
   pass "--diff 无效提交时失败且无输出"
 fi
+
+# 用 jq 构造 “列出 ci.yml 工作流运行” 接口的响应，作为 ci-reuse-check.sh 的输入，也作为 --push 的父提交运行文件。
+SHA=0123456789abcdef0123456789abcdef01234567
+OTHER_SHA=fedcba9876543210fedcba9876543210fedcba98
+# run <id> <status> <conclusion|null> [sha] [event] [branch] [path]：一条工作流运行。
+run() {
+  jq -n --argjson id "$1" --arg status "$2" --argjson conclusion "$([ "$3" = null ] && echo null || echo "\"$3\"")" \
+    --arg sha "${4:-$SHA}" --arg event "${5:-push}" --arg branch "${6:-main}" --arg path "${7:-.github/workflows/ci.yml}" \
+    '{id:$id, name:"ci", path:$path, event:$event, head_branch:$branch, head_sha:$sha, status:$status, conclusion:$conclusion,
+      html_url:("https://github.com/o/r/actions/runs/" + ($id|tostring))}'
+}
+runs() { jq -n --argjson runs "$(printf '%s\n' "$@" | jq -s '.')" '{total_count: ($runs|length), workflow_runs: $runs}'; }
 
 # --push：推送到 main。在临时仓库里搭出各种历史形状，核对判定与原因。
 # main 依次是：base，已同步的 PR 合并（M1），未同步的 PR 合并（M2），未同步的文档 PR 合并（M3），
@@ -182,13 +195,17 @@ O_BEFORE="$(pgit rev-parse HEAD)"
 O_AFTER="$(pgit commit-tree "$(pgit rev-parse pr-octo^{tree})" -p "$O_BEFORE" -p pr-octo -p "$DIVERGED" -m "octopus merge")"
 pgit merge -q --ff-only "$O_AFTER" >/dev/null 2>&1
 
-# push_scope <before> <after>：输出 "frontend backend images docs_only verified_by_pr reason"。
+# push_scope <before> <after> [父提交运行的 JSON]：输出 "frontend backend images docs_only verified_by_pr reason"。
+# 不给 JSON 时，视为 before 在 main 上有一次已成功的 ci 运行；给出（含空字符串）时原样写入父提交运行文件。
 push_scope() {
-  (cd "$ptmp" && "$changes" --push "$1" "$2" 2>/dev/null | sed 's/^[a-z_]*=//' | tr '\n' ' ' | sed 's/ $//')
+  local json
+  if [ "$#" -ge 3 ]; then json="$3"; else json="$(runs "$(run 1 completed success "$1")")"; fi
+  printf '%s' "$json" > "$pfile"
+  (cd "$ptmp" && "$changes" --push "$1" "$2" "$pfile" 2>/dev/null | sed 's/^[a-z_]*=//' | tr '\n' ' ' | sed 's/ $//')
 }
-expect_push() { # <名称> <期望> <before> <after>
+expect_push() { # <名称> <期望> <before> <after> [父提交运行的 JSON]
   local name="$1" expected="$2" actual
-  actual="$(push_scope "$3" "$4")"
+  actual="$(push_scope "$3" "$4" "${@:5}")"
   if [ "$actual" = "$expected" ]; then pass "--push $name"; else fail "--push ${name}：期望 [$expected]，实际 [$actual]"; fi
 }
 
@@ -211,17 +228,46 @@ expect_push "before 与 after 相同"                        "true true true fal
 expect_push "after 不是提交"                              "true true true false false full-after-unknown"  "$M1"  "1111111111111111111111111111111111111111"
 
 # 已同步的合并：额外核对四个标志确实都是 false，而不仅仅是原因文字。
-out="$(cd "$ptmp" && "$changes" --push "$C1" "$M1" 2>/dev/null)"
+printf '%s' "$(runs "$(run 1 completed success "$C1")")" > "$pfile"
+out="$(cd "$ptmp" && "$changes" --push "$C1" "$M1" "$pfile" 2>/dev/null)"
 if [ "$out" = "$(printf 'frontend=false\nbackend=false\nimages=false\ndocs_only=false\nverified_by_pr=true\nreason=verified-by-pr')" ]; then
   pass "--push 已验证时输出完整的 key=value 行"
 else
   fail "--push 已验证时输出完整的 key=value 行：$out"
 fi
 
+# 父提交（before）必须在 main 上有已完成且成功的 ci 运行，否则无论能否跳过或缩小范围都全量运行（失败时关闭）。
+#   C1→M1 是已同步的合并（本应跳过），C3→M3 是纯文档合并（本应不运行重型任务），D1 之前的 M3→D1 是直接推送（本应按范围运行）。
+FULL="true true true false false full-parent-unverified"
+expect_push "父提交的 ci 运行成功：已同步的合并仍然跳过"  "false false false false true verified-by-pr" "$C1" "$M1" "$(runs "$(run 1 completed success "$C1")")"
+expect_push "父提交较旧的运行失败、较新的成功：视为成功"   "false false false false true verified-by-pr" "$C1" "$M1" "$(runs "$(run 1 completed failure "$C1")" "$(run 2 completed success "$C1")")"
+expect_push "父提交的运行失败：已同步的合并也全量运行"     "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed failure "$C1")")"
+expect_push "父提交的运行失败：纯文档合并也全量运行"       "$FULL" "$C3" "$M3" "$(runs "$(run 1 completed failure "$C3")")"
+expect_push "父提交的运行失败：直接推送也全量运行"         "$FULL" "$M3" "$D1" "$(runs "$(run 1 completed failure "$M3")")"
+expect_push "父提交的运行被取消"                           "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed cancelled "$C1")")"
+expect_push "父提交的运行被跳过"                           "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed skipped "$C1")")"
+expect_push "父提交的运行仍在进行"                         "$FULL" "$C3" "$M3" "$(runs "$(run 1 in_progress null "$C3")")"
+expect_push "父提交的运行在排队"                           "$FULL" "$C3" "$M3" "$(runs "$(run 1 queued null "$C3")")"
+expect_push "父提交没有任何运行"                           "$FULL" "$C1" "$M1" "$(runs)"
+expect_push "父提交只有别的提交的运行"                     "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed success "$OTHER_SHA")")"
+expect_push "父提交只有 pull_request 事件的运行"           "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed success "$C1" pull_request)")"
+expect_push "父提交只有非 main 分支的运行"                 "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed success "$C1" push feature)")"
+expect_push "父提交较新的运行失败、较旧的成功：不信任"     "$FULL" "$C1" "$M1" "$(runs "$(run 1 completed success "$C1")" "$(run 2 completed failure "$C1")")"
+expect_push "查询出错：接口返回错误对象"                   "$FULL" "$C1" "$M1" '{"message":"Not Found"}'
+expect_push "查询出错：输出为空"                           "$FULL" "$C3" "$M3" ''
+expect_push "查询出错：输出不是 JSON"                      "$FULL" "$C1" "$M1" 'gh: HTTP 502'
+# before 本身不成立时，原因优先报告 before 的问题，而不是父提交未验证。
+expect_push "before 全零时不看父提交"                      "true true true false false full-no-before" "$ZERO" "$M1" '{"message":"Not Found"}'
+# 运行文件根本不存在，也按未验证处理。
+out="$(cd "$ptmp" && "$changes" --push "$C1" "$M1" "$ptmp/no-such-file.json" 2>/dev/null | sed 's/^[a-z_]*=//' | tr '\n' ' ' | sed 's/ $//')"
+if [ "$out" = "$FULL" ]; then pass "--push 父提交运行文件不存在"; else fail "--push 父提交运行文件不存在：$out"; fi
+
 # 参数个数与选项式参数。
 status=0; (cd "$ptmp" && "$changes" --push "$M1" >/dev/null 2>&1) || status=$?
 if [ "$status" = 2 ]; then pass "--push 缺少参数时退出码 2"; else fail "--push 缺少参数：退出码 $status"; fi
-status=0; (cd "$ptmp" && "$changes" --push "--all" "$M1" >/dev/null 2>&1) || status=$?
+status=0; (cd "$ptmp" && "$changes" --push "$C1" "$M1" >/dev/null 2>&1) || status=$?
+if [ "$status" = 2 ]; then pass "--push 缺少父提交运行文件时退出码 2"; else fail "--push 缺少父提交运行文件：退出码 $status"; fi
+status=0; (cd "$ptmp" && "$changes" --push "--all" "$M1" "$pfile" >/dev/null 2>&1) || status=$?
 if [ "$status" = 2 ]; then pass "--push 拒绝选项式参数"; else fail "--push 拒绝选项式参数：退出码 $status"; fi
 
 # gate：只有“需要且成功”或“无需且被跳过”才通过。
@@ -246,18 +292,7 @@ expect_gate "changes 被取消"                    1 changes=true:cancelled fron
 expect_gate "输出为空视为失败"                  1 changes=true:success frontend=:success
 expect_gate "没有参数"                          2
 
-# ci-reuse-check.sh：发版复用。用 jq 构造 “列出工作流运行” 接口的响应。
-SHA=0123456789abcdef0123456789abcdef01234567
-OTHER_SHA=fedcba9876543210fedcba9876543210fedcba98
-# run <id> <status> <conclusion|null> [sha] [event] [branch] [path]：一条工作流运行。
-run() {
-  jq -n --argjson id "$1" --arg status "$2" --argjson conclusion "$([ "$3" = null ] && echo null || echo "\"$3\"")" \
-    --arg sha "${4:-$SHA}" --arg event "${5:-push}" --arg branch "${6:-main}" --arg path "${7:-.github/workflows/ci.yml}" \
-    '{id:$id, name:"ci", path:$path, event:$event, head_branch:$branch, head_sha:$sha, status:$status, conclusion:$conclusion,
-      html_url:("https://github.com/o/r/actions/runs/" + ($id|tostring))}'
-}
-runs() { jq -n --argjson runs "$(printf '%s\n' "$@" | jq -s '.')" '{total_count: ($runs|length), workflow_runs: $runs}'; }
-
+# ci-reuse-check.sh：发版复用与父提交校验。夹带的工作流运行 JSON 夹具定义在文件前部（--push 的测试也要用）。
 # expect_reuse <名称> <期望退出码> <期望标准输出> <JSON>
 expect_reuse() {
   local name="$1" expected="$2" want_out="$3" input="$4" status=0 out
