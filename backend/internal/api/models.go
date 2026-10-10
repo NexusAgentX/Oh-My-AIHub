@@ -206,7 +206,7 @@ type adminModelEnvelopeJSON struct {
 	Model adminModelJSON `json:"model"`
 }
 
-func pricesResponse(input, output, cacheWrite, cacheRead money.Amount, extras ...map[string]money.Amount) modelPricesJSON {
+func newModelPricesJSON(input, output, cacheWrite, cacheRead money.Amount, extras ...map[string]money.Amount) modelPricesJSON {
 	specific := map[string]string{}
 	if len(extras) > 0 {
 		for key, value := range extras[0] {
@@ -222,7 +222,7 @@ func pricesResponse(input, output, cacheWrite, cacheRead money.Amount, extras ..
 	}
 }
 
-func priceTierResponse(seq int, tier ledger.PriceTier) priceTierJSON {
+func newPriceTierJSON(seq int, tier ledger.PriceTier) priceTierJSON {
 	var weekdays []int
 	if len(tier.Weekdays) > 0 {
 		weekdays = tier.Weekdays
@@ -238,19 +238,19 @@ func priceTierResponse(seq int, tier ledger.PriceTier) priceTierJSON {
 		Weekdays:        weekdays,
 		StartMinute:     tier.StartMinute,
 		EndMinute:       tier.EndMinute,
-		Prices:          pricesResponse(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
+		Prices:          newModelPricesJSON(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
 	}
 }
 
 func newAdminModelJSON(model catalog.Model) adminModelJSON {
 	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))
 	for index, tier := range model.PriceTiers {
-		tiers = append(tiers, priceTierResponse(index+1, tier))
+		tiers = append(tiers, newPriceTierJSON(index+1, tier))
 	}
 	return adminModelJSON{
 		ID:                       model.ID,
 		DisplayName:              model.DisplayName,
-		BasePrices:               pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
+		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
 		PriceTiers:               tiers,
 		Enabled:                  model.Enabled,
 		SortOrder:                model.SortOrder,

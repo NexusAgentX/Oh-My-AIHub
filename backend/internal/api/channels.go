@@ -12,58 +12,228 @@ import (
 
 // ---- responses ----
 
-func formatTestsResponse(tests map[channel.Format]channel.FormatTest) map[string]any {
-	result := make(map[string]any, len(tests))
+// formatTestJSON is the OpenAPI FormatTest schema.
+type formatTestJSON struct {
+	OK         bool      `json:"ok"`
+	StatusCode *int      `json:"status_code"`
+	Error      *string   `json:"error"`
+	DurationMS *int      `json:"duration_ms"`
+	TestedAt   time.Time `json:"tested_at"`
+}
+
+// headerSetJSON is one set rule of the OpenAPI HeaderRules schema.
+type headerSetJSON struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// headerRulesJSON is the OpenAPI HeaderRules schema.
+type headerRulesJSON struct {
+	Set    []headerSetJSON `json:"set"`
+	Remove []string        `json:"remove"`
+}
+
+// channelAdvancedJSON is the OpenAPI ChannelAdvanced schema.
+type channelAdvancedJSON struct {
+	UserAgent        *string         `json:"user_agent"`
+	HeaderRules      headerRulesJSON `json:"header_rules"`
+	ConcurrencyLimit *int32          `json:"concurrency_limit"`
+	RPMLimit         *int32          `json:"rpm_limit"`
+	DailyRevenueCap  *string         `json:"daily_revenue_cap"`
+	TTFTTimeoutMS    *int32          `json:"ttft_timeout_ms"`
+	TotalTimeoutMS   *int32          `json:"total_timeout_ms"`
+	CooldownFailures *int32          `json:"cooldown_failures"`
+	CooldownSeconds  *int32          `json:"cooldown_seconds"`
+}
+
+// channelModelJSON is the OpenAPI ChannelModel schema.
+type channelModelJSON struct {
+	ModelID       string                    `json:"model_id"`
+	DisplayName   string                    `json:"display_name"`
+	UpstreamModel string                    `json:"upstream_model"`
+	Multiplier    string                    `json:"multiplier"`
+	Formats       []channel.Format          `json:"formats"`
+	FormatTests   map[string]formatTestJSON `json:"format_tests"`
+	Enabled       bool                      `json:"enabled"`
+	CurrentPrices effectivePricesJSON       `json:"current_prices"`
+}
+
+// channelTodayJSON is the OpenAPI ChannelToday schema.
+type channelTodayJSON struct {
+	Revenue     string  `json:"revenue"`
+	Calls       int64   `json:"calls"`
+	SuccessRate *string `json:"success_rate"`
+}
+
+// channelJSON is the OpenAPI Channel schema.
+type channelJSON struct {
+	ID              string              `json:"id"`
+	Name            string              `json:"name"`
+	BaseURL         string              `json:"base_url"`
+	Status          channel.Status      `json:"status"`
+	SuspendedReason *string             `json:"suspended_reason"`
+	CooldownUntil   *time.Time          `json:"cooldown_until"`
+	Models          []channelModelJSON  `json:"models"`
+	Advanced        channelAdvancedJSON `json:"advanced"`
+	Today           channelTodayJSON    `json:"today"`
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
+}
+
+// channelListJSON is the OpenAPI ChannelList schema.
+type channelListJSON struct {
+	Items []channelJSON `json:"items"`
+}
+
+// channelEnvelopeJSON is the OpenAPI ChannelEnvelope schema.
+type channelEnvelopeJSON struct {
+	Channel channelJSON `json:"channel"`
+}
+
+// channelEventJSON is the OpenAPI ChannelEvent schema.
+type channelEventJSON struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// channelDetailJSON is the OpenAPI ChannelDetail schema.
+type channelDetailJSON struct {
+	Channel channelJSON        `json:"channel"`
+	Events  []channelEventJSON `json:"events"`
+}
+
+// discoveredModelJSON is the OpenAPI DiscoveredModel schema.
+type discoveredModelJSON struct {
+	ID               string           `json:"id"`
+	MatchedModelID   *string          `json:"matched_model_id"`
+	SuggestedFormats []channel.Format `json:"suggested_formats"`
+}
+
+// channelDiscoverResponseJSON is the OpenAPI ChannelDiscoverResponse schema.
+type channelDiscoverResponseJSON struct {
+	BaseURL        string                `json:"base_url"`
+	UpstreamModels []discoveredModelJSON `json:"upstream_models"`
+}
+
+// channelTestResultJSON is the OpenAPI ChannelTestResult schema.
+type channelTestResultJSON struct {
+	ModelID    string         `json:"model_id"`
+	Format     channel.Format `json:"format"`
+	OK         bool           `json:"ok"`
+	StatusCode *int           `json:"status_code"`
+	Error      *string        `json:"error"`
+	DurationMS int            `json:"duration_ms"`
+}
+
+// channelTestResponseJSON is the OpenAPI ChannelTestResponse schema.
+type channelTestResponseJSON struct {
+	Results []channelTestResultJSON `json:"results"`
+	Channel channelJSON             `json:"channel"`
+}
+
+// channelOwnerJSON is the OpenAPI AccountRef schema of an administrator's channel owner. It is
+// not named accountRefJSON because observe.go still uses that name for its map-based helper.
+type channelOwnerJSON struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// adminChannelJSON is the OpenAPI AdminChannel schema: a Channel plus its owner.
+type adminChannelJSON struct {
+	channelJSON
+	Owner channelOwnerJSON `json:"owner"`
+}
+
+// adminChannelEnvelopeJSON is the OpenAPI AdminChannelEnvelope schema.
+type adminChannelEnvelopeJSON struct {
+	Channel adminChannelJSON `json:"channel"`
+}
+
+// adminChannelDetailJSON is the OpenAPI AdminChannelDetail schema.
+type adminChannelDetailJSON struct {
+	Channel adminChannelJSON   `json:"channel"`
+	Events  []channelEventJSON `json:"events"`
+}
+
+func newFormatTestsJSON(tests map[channel.Format]channel.FormatTest) map[string]formatTestJSON {
+	result := make(map[string]formatTestJSON, len(tests))
 	for format, test := range tests {
-		result[string(format)] = map[string]any{
-			"ok": test.OK, "status_code": test.StatusCode, "error": test.Error, "duration_ms": test.DurationMS, "tested_at": test.TestedAt,
+		result[string(format)] = formatTestJSON{
+			OK: test.OK, StatusCode: test.StatusCode, Error: test.Error, DurationMS: test.DurationMS, TestedAt: test.TestedAt,
 		}
 	}
 	return result
 }
 
-func advancedResponse(advanced channel.Advanced) map[string]any {
-	set := make([]map[string]string, 0, len(advanced.HeaderRules.Set))
+func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
+	set := make([]headerSetJSON, 0, len(advanced.HeaderRules.Set))
 	for _, rule := range advanced.HeaderRules.Set {
-		set = append(set, map[string]string{"name": rule.Name, "value": rule.Value})
+		set = append(set, headerSetJSON{Name: rule.Name, Value: rule.Value})
 	}
 	remove := advanced.HeaderRules.Remove
 	if remove == nil {
 		remove = []string{}
 	}
-	return map[string]any{
-		"user_agent": advanced.UserAgent, "header_rules": map[string]any{"set": set, "remove": remove},
-		"concurrency_limit": advanced.ConcurrencyLimit, "rpm_limit": advanced.RPMLimit,
-		"daily_revenue_cap": nullableAmount(advanced.DailyRevenueCap), "ttft_timeout_ms": advanced.TTFTTimeoutMS,
-		"total_timeout_ms": advanced.TotalTimeoutMS, "cooldown_failures": advanced.CooldownFailures, "cooldown_seconds": advanced.CooldownSeconds,
+	return channelAdvancedJSON{
+		UserAgent:        advanced.UserAgent,
+		HeaderRules:      headerRulesJSON{Set: set, Remove: remove},
+		ConcurrencyLimit: advanced.ConcurrencyLimit,
+		RPMLimit:         advanced.RPMLimit,
+		DailyRevenueCap:  nullableAmount(advanced.DailyRevenueCap),
+		TTFTTimeoutMS:    advanced.TTFTTimeoutMS,
+		TotalTimeoutMS:   advanced.TotalTimeoutMS,
+		CooldownFailures: advanced.CooldownFailures,
+		CooldownSeconds:  advanced.CooldownSeconds,
 	}
 }
 
-func (a *app) channelResponse(item channel.Channel, models map[string]catalog.Model, now time.Time) map[string]any {
-	items := make([]map[string]any, 0, len(item.Models))
+func (a *app) newChannelJSON(item channel.Channel, models map[string]catalog.Model, now time.Time) channelJSON {
+	items := make([]channelModelJSON, 0, len(item.Models))
 	for _, model := range item.Models {
 		known := models[model.ModelID]
 		prices, _ := currentPrices(known, now)
-		formats := model.Formats
-		items = append(items, map[string]any{
-			"model_id": model.ModelID, "display_name": known.DisplayName, "upstream_model": model.UpstreamModel,
-			"multiplier": money.FromNano(model.MultiplierNano).String(), "formats": formats,
-			"format_tests": formatTestsResponse(model.FormatTests), "enabled": model.Enabled,
-			"current_prices": scaledPrices(prices, model.MultiplierNano),
+		items = append(items, channelModelJSON{
+			ModelID:       model.ModelID,
+			DisplayName:   known.DisplayName,
+			UpstreamModel: model.UpstreamModel,
+			Multiplier:    money.FromNano(model.MultiplierNano).String(),
+			Formats:       model.Formats,
+			FormatTests:   newFormatTestsJSON(model.FormatTests),
+			Enabled:       model.Enabled,
+			CurrentPrices: newEffectivePricesJSON(prices, model.MultiplierNano),
 		})
 	}
-	var successRate, cooldownUntil any
+	var successRate *string
+	var cooldownUntil *time.Time
 	if item.Today.SuccessRate != nil {
-		successRate = ratio(*item.Today.SuccessRate)
+		rate := ratio(*item.Today.SuccessRate)
+		successRate = &rate
 	}
 	if until := a.gateway.State().CooldownUntil(item.ID, now); !until.IsZero() {
-		cooldownUntil = until
+		cooldownUntil = &until
 	}
-	return map[string]any{
-		"id": item.ID, "name": item.Name, "base_url": item.BaseURL, "status": item.Status, "suspended_reason": item.SuspendedReason,
-		"cooldown_until": cooldownUntil, "models": items, "advanced": advancedResponse(item.Advanced),
-		"today":      map[string]any{"revenue": item.Today.Revenue.String(), "calls": item.Today.Calls, "success_rate": successRate},
-		"created_at": item.CreatedAt, "updated_at": item.UpdatedAt,
+	return channelJSON{
+		ID:              item.ID,
+		Name:            item.Name,
+		BaseURL:         item.BaseURL,
+		Status:          item.Status,
+		SuspendedReason: item.SuspendedReason,
+		CooldownUntil:   cooldownUntil,
+		Models:          items,
+		Advanced:        newChannelAdvancedJSON(item.Advanced),
+		Today:           channelTodayJSON{Revenue: item.Today.Revenue.String(), Calls: item.Today.Calls, SuccessRate: successRate},
+		CreatedAt:       item.CreatedAt,
+		UpdatedAt:       item.UpdatedAt,
+	}
+}
+
+func (a *app) newAdminChannelJSON(item channel.Channel, models map[string]catalog.Model, now time.Time) adminChannelJSON {
+	return adminChannelJSON{
+		channelJSON: a.newChannelJSON(item, models, now),
+		Owner:       channelOwnerJSON{ID: item.Owner.ID, Username: item.Owner.Username, DisplayName: item.Owner.DisplayName},
 	}
 }
 
@@ -79,10 +249,10 @@ func (a *app) catalogByID(r *http.Request) (map[string]catalog.Model, error) {
 	return byID, nil
 }
 
-func eventsResponse(events []channel.Event) []map[string]any {
-	items := make([]map[string]any, 0, len(events))
+func newChannelEventsJSON(events []channel.Event) []channelEventJSON {
+	items := make([]channelEventJSON, 0, len(events))
 	for _, event := range events {
-		items = append(items, map[string]any{"id": itoa(event.ID), "kind": event.Kind, "reason": event.Reason, "created_at": event.CreatedAt})
+		items = append(items, channelEventJSON{ID: itoa(event.ID), Kind: event.Kind, Reason: event.Reason, CreatedAt: event.CreatedAt})
 	}
 	return items
 }
@@ -182,11 +352,11 @@ func (a *app) listChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	items := make([]map[string]any, 0, len(channels))
+	items := make([]channelJSON, 0, len(channels))
 	for _, item := range channels {
-		items = append(items, a.channelResponse(item, models, now))
+		items = append(items, a.newChannelJSON(item, models, now))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, channelListJSON{Items: items})
 }
 
 func (a *app) createChannel(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +394,7 @@ func (a *app) createChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"channel": a.channelResponse(created, catalogModels, time.Now())})
+	writeJSON(w, http.StatusCreated, channelEnvelopeJSON{Channel: a.newChannelJSON(created, catalogModels, time.Now())})
 }
 
 func (a *app) discoverChannel(w http.ResponseWriter, r *http.Request) {
@@ -245,11 +415,11 @@ func (a *app) discoverChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	items := make([]map[string]any, 0, len(models))
+	items := make([]discoveredModelJSON, 0, len(models))
 	for _, model := range models {
-		items = append(items, map[string]any{"id": model.ID, "matched_model_id": model.MatchedModelID, "suggested_formats": model.SuggestedFormats})
+		items = append(items, discoveredModelJSON{ID: model.ID, MatchedModelID: model.MatchedModelID, SuggestedFormats: model.SuggestedFormats})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"base_url": baseURL, "upstream_models": items})
+	writeJSON(w, http.StatusOK, channelDiscoverResponseJSON{BaseURL: baseURL, UpstreamModels: items})
 }
 
 func (a *app) getChannel(w http.ResponseWriter, r *http.Request) {
@@ -267,7 +437,7 @@ func (a *app) getChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"channel": a.channelResponse(item, models, time.Now()), "events": eventsResponse(events)})
+	writeJSON(w, http.StatusOK, channelDetailJSON{Channel: a.newChannelJSON(item, models, time.Now()), Events: newChannelEventsJSON(events)})
 }
 
 func (a *app) updateChannel(w http.ResponseWriter, r *http.Request) {
@@ -312,7 +482,7 @@ func (a *app) updateChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"channel": a.channelResponse(updated, models, time.Now())})
+	writeJSON(w, http.StatusOK, channelEnvelopeJSON{Channel: a.newChannelJSON(updated, models, time.Now())})
 }
 
 func (a *app) deleteChannel(w http.ResponseWriter, r *http.Request) {
@@ -351,11 +521,11 @@ func (a *app) testChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	results := make([]map[string]any, 0, len(outcomes))
+	results := make([]channelTestResultJSON, 0, len(outcomes))
 	for _, outcome := range outcomes {
-		results = append(results, map[string]any{
-			"model_id": outcome.ModelID, "format": outcome.Format, "ok": outcome.OK, "status_code": outcome.StatusCode,
-			"error": outcome.Error, "duration_ms": outcome.DurationMS,
+		results = append(results, channelTestResultJSON{
+			ModelID: outcome.ModelID, Format: outcome.Format, OK: outcome.OK, StatusCode: outcome.StatusCode,
+			Error: outcome.Error, DurationMS: outcome.DurationMS,
 		})
 	}
 	models, err := a.catalogByID(r)
@@ -363,16 +533,10 @@ func (a *app) testChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": results, "channel": a.channelResponse(updated, models, time.Now())})
+	writeJSON(w, http.StatusOK, channelTestResponseJSON{Results: results, Channel: a.newChannelJSON(updated, models, time.Now())})
 }
 
 // ---- administrators ----
-
-func (a *app) adminChannelResponse(item channel.Channel, models map[string]catalog.Model, now time.Time) map[string]any {
-	response := a.channelResponse(item, models, now)
-	response["owner"] = map[string]any{"id": item.Owner.ID, "username": item.Owner.Username, "display_name": item.Owner.DisplayName}
-	return response
-}
 
 func (a *app) listAdminChannels(w http.ResponseWriter, r *http.Request) {
 	limit, ok := pageLimit(r)
@@ -417,17 +581,17 @@ func (a *app) listAdminChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	items := make([]map[string]any, 0, len(channels))
+	items := make([]adminChannelJSON, 0, len(channels))
 	cursor := ""
 	for _, item := range channels {
-		items = append(items, a.adminChannelResponse(item, models, now))
+		items = append(items, a.newAdminChannelJSON(item, models, now))
 		cursor = encodeTextCursor(item.CreatedAt.UTC().Format(time.RFC3339Nano) + "|" + item.ID)
 	}
 	var next *string
 	if hasMore {
 		next = &cursor
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
+	writeJSON(w, http.StatusOK, pageJSON[adminChannelJSON]{Items: items, NextCursor: next})
 }
 
 func (a *app) getAdminChannel(w http.ResponseWriter, r *http.Request) {
@@ -445,7 +609,7 @@ func (a *app) getAdminChannel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"channel": a.adminChannelResponse(item, models, time.Now()), "events": eventsResponse(events)})
+	writeJSON(w, http.StatusOK, adminChannelDetailJSON{Channel: a.newAdminChannelJSON(item, models, time.Now()), Events: newChannelEventsJSON(events)})
 }
 
 func (a *app) moderateChannel(suspend bool) http.HandlerFunc {
@@ -478,7 +642,7 @@ func (a *app) moderateChannel(suspend bool) http.HandlerFunc {
 			writeDomainError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"channel": a.adminChannelResponse(item, models, time.Now())})
+		writeJSON(w, http.StatusOK, adminChannelEnvelopeJSON{Channel: a.newAdminChannelJSON(item, models, time.Now())})
 	}
 }
 
