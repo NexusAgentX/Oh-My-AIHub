@@ -1,30 +1,18 @@
 import { useState } from 'react'
-import { formatLabels } from '../calls'
-import { useModels } from '../models/queries'
 import { fetchKeySecret } from '../keys/queries'
 import { errorMessage } from '../api/query'
 import { useHome } from './queries'
-import { Button, ButtonLink, Card, CopyButton, CopyField, Icon, InlineError, Tabs, type TabItem } from '../ui'
-import { cherryStudioFields, curlSample, modelsByFormat, type SampleTab } from './codeSamples'
+import { Button, ButtonLink, Card, CopyButton, CopyField, Icon, InlineError } from '../ui'
 
-/** 「开始调用」：接口地址、默认 Key 与按格式的示例。 */
+/** 「开始调用」：接口地址与默认 Key。 */
 export function StartCard() {
   const home = useHome()
   const defaultKey = home.data?.default_key ?? null
   const origin = typeof window === 'undefined' ? '' : window.location.origin
   const endpoint = `${origin}/v1`
-  const models = useModels()
   const [secret, setSecret] = useState<string | null>(null)
   const [revealError, setRevealError] = useState('')
   const [revealing, setRevealing] = useState(false)
-  const available = modelsByFormat(models.data?.items ?? [])
-  const formatTabs = (Object.keys(formatLabels) as Array<keyof typeof formatLabels>).filter((format) => available[format])
-  const tabs: TabItem<SampleTab>[] = [
-    ...formatTabs.map((format) => ({ key: format as SampleTab, label: formatLabels[format] })),
-    ...(formatTabs.length > 0 ? [{ key: 'cherry' as SampleTab, label: 'Cherry Studio' }] : []),
-  ]
-  const [tab, setTab] = useState<SampleTab | null>(null)
-  const active = tab && tabs.some((item) => item.key === tab) ? tab : tabs[0]?.key
 
   const getSecret = async () => {
     if (secret) return secret
@@ -96,36 +84,6 @@ export function StartCard() {
         )}
       </div>
       <InlineError>{revealError}</InlineError>
-      {active ? (
-        <Tabs items={tabs} label="调用示例" onChange={setTab} value={active}>
-          {active === 'cherry' ? (
-            <dl className="cherry-fields">
-              {cherryStudioFields(origin, secret, available.openai_chat ?? Object.values(available)[0]).map((field) => (
-                <div key={field.label}>
-                  <dt>{field.label}</dt>
-                  <dd>
-                    <code>{field.value}</code>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <div className="code-sample">
-              <pre>
-                <code>{curlSample(active, origin, secret, available[active] ?? '')}</code>
-              </pre>
-              <div className="code-sample-copy">
-                <CopyButton
-                  value={async () => curlSample(active, origin, defaultKey ? await getSecret() : null, available[active] ?? '')}
-                  variant="quiet"
-                />
-              </div>
-            </div>
-          )}
-        </Tabs>
-      ) : (
-        models.isError && <p className="muted-copy">{errorMessage(models.error, '模型列表加载失败')}</p>
-      )}
     </Card>
   )
 }

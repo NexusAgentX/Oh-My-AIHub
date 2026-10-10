@@ -61,7 +61,7 @@
 .segmented-item:hover { color: var(--ink); }
 .segmented-item.active { color: var(--on-color); background: var(--mustard); box-shadow: inset 0 0 0 var(--stroke) var(--line); }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .tab { min-height: 44px; }
   .segmented-item { min-height: 38px; }
 }

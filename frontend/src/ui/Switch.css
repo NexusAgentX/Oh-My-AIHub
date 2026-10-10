@@ -36,6 +36,6 @@
 }
 .switch-on .switch-track { background: var(--mustard); }
 .switch-on .switch-thumb { transform: translateX(18px); }
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .switch { min-height: 44px; }
 }

@@ -128,10 +128,16 @@ input[type='checkbox']:disabled { cursor: not-allowed; opacity: 0.5; }
   .field-row-three > .field:last-child { grid-column: 1 / -1; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .field-row,
   .field-row-three { grid-template-columns: 1fr; }
   .field-row-three > .field:last-child { grid-column: auto; }
   .input { height: 44px; }
   .textarea-input { height: auto; }
+}
+
+@media (max-width: 767px) {
+  /* iOS Safari 聚焦字号小于 16px 的输入框时会放大整页；页面里收紧字号的筛选框也一并覆盖 */
+  .input,
+  .markdown-editor-source .vditor-sv { font-size: 16px !important; }
 }

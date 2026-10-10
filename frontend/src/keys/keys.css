@@ -47,7 +47,7 @@
   .key-row-budget { grid-column: 1 / -1; }
   .key-row-status { grid-row: 1; grid-column: 2; }
 }
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .alias-row { grid-template-columns: minmax(0, 1fr) auto; }
   .alias-row > span { display: none; }
   .alias-row > input:nth-of-type(2) { grid-row: 2; }

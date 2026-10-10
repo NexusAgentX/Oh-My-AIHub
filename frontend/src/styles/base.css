@@ -1,6 +1,5 @@
 :root {
   color: var(--body);
-  background: var(--paper);
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.55;
@@ -10,14 +9,21 @@
 
 * { box-sizing: border-box; }
 
-html { min-width: 320px; min-height: 100%; background: var(--paper); }
+/* 纸面：底色加点阵，铺满整个画布 */
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--paper-dot) 1.2px, transparent 1.4px);
+  background-size: 20px 20px;
+}
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--body);
-  background: var(--paper);
 }
 
 button, input, select, textarea { font: inherit; }
@@ -68,9 +74,9 @@ h2 { margin-bottom: 0; font-size: var(--text-md); font-weight: 600; }
 .muted, .muted-copy { margin: 0; color: var(--muted); }
 .muted-copy { font-size: var(--text-sm); }
 
-.route-loading { display: grid; min-height: 100vh; place-items: center; }
+.route-loading { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   h1 { font-size: var(--text-xl); }
 }
 

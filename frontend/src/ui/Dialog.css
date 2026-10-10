@@ -14,6 +14,7 @@
 .modal {
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   overflow: auto;
   border-radius: var(--radius-lg);
 }
@@ -60,7 +61,19 @@
 @keyframes drawer-in-left { from { transform: translateX(-24px); opacity: 0; } }
 @keyframes drawer-in-bottom { from { transform: translateY(24px); opacity: 0; } }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
+  /* 手机上抽屉一律从底部弹出 */
+  .drawer-right,
+  .drawer-left {
+    inset: auto 0 0;
+    width: 100vw;
+    height: auto;
+    max-height: 92dvh;
+    border-width: var(--stroke) 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation-name: drawer-in-bottom;
+  }
+  .drawer-body { padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); }
   .modal-actions { flex-direction: column-reverse; }
   .modal-actions .button { width: 100%; }
   .overlay-body { padding: var(--space-5); }

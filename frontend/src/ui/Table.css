@@ -94,7 +94,7 @@
   .mobile-data-card dd { margin: 0; color: var(--ink); font-weight: 600; text-align: right; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .toolbar { align-items: stretch; flex-direction: column; }
   .toolbar-main,
   .toolbar-end { width: 100%; }

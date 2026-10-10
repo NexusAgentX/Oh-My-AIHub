@@ -70,7 +70,7 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .button, .icon-button { min-height: 44px; }
   .button-sm { min-height: 36px; }
   .icon-button { width: 44px; height: 44px; }

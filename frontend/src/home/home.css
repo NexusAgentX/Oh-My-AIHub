@@ -1,29 +1,12 @@
-/* 首页 */
+/* 首页；手机上余额与今日数据排在“开始调用”之前 */
+.home-page { display: flex; flex-direction: column; gap: var(--space-4); }
+.home-page > .page-heading { margin-bottom: var(--space-2); }
+.home-page > .notice { margin-bottom: 0; }
 .start-card .panel-body { display: grid; gap: var(--space-4); }
 .start-card .panel-body > *,
 .tabs { min-width: 0; }
 .start-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .start-key-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: 4px; font-size: var(--text-sm); }
-.code-sample { position: relative; }
-.code-sample pre {
-  margin: 0;
-  padding: var(--space-4);
-  overflow-x: auto;
-  border-radius: var(--radius-md);
-  color: var(--code-ink);
-  background: var(--code-bg);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-.code-sample-copy { position: absolute; top: var(--space-2); right: var(--space-2); }
-.code-sample-copy .button { color: var(--code-ink); background: color-mix(in srgb, var(--code-ink) 8%, transparent); }
-.cherry-fields { display: grid; gap: 0; margin: 0; }
-.cherry-fields > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--space-3); padding: 8px 0; border-bottom: 1px solid var(--hairline); }
-.cherry-fields dt { color: var(--muted); }
-.cherry-fields dd { margin: 0; overflow-wrap: anywhere; }
-.cherry-fields code { color: var(--ink); font-family: var(--font-mono); font-size: var(--text-sm); }
-
 .home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-4); }
 .balance-body { display: grid; gap: var(--space-2); }
 .balance-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
@@ -38,7 +21,10 @@
   .home-grid,
   .start-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 760px) {
+@media (max-width: 767px) {
+  .home-page > .page-heading,
+  .home-page > .notice { order: -2; }
+  .home-page > .home-grid { order: -1; }
   .balance-value { font-size: var(--text-2xl); }
   .today-grid dd { font-size: var(--text-lg); }
 }
