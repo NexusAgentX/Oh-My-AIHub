@@ -107,22 +107,15 @@ function ModelEditor({
         onChange={(prices) => set({ prices })}
         prices={form.prices}
       />
-      <div className="field-row">
-        <TextField
-          error={errors.sortOrder}
-          hint="小的在前"
-          inputMode="numeric"
-          label="排序"
-          onChange={(event) => set({ sortOrder: event.target.value })}
-          value={form.sortOrder}
-        />
-        <Checkbox
-          checked={form.enabled}
-          className="field-checkbox"
-          label="启用"
-          onChange={(event) => set({ enabled: event.target.checked })}
-        />
-      </div>
+      <TextField
+        error={errors.sortOrder}
+        hint="小的在前"
+        inputMode="numeric"
+        label="排序"
+        onChange={(event) => set({ sortOrder: event.target.value })}
+        value={form.sortOrder}
+      />
+      <Checkbox checked={form.enabled} label="启用" onChange={(event) => set({ enabled: event.target.checked })} />
       <Collapsible changed={changedModelAdvanced(form)} title="高级设置">
         <div className="stack-form">
           <div className="field-row">
