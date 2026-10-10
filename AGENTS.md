@@ -49,6 +49,7 @@
 | 改动 | 验证 |
 | --- | --- |
 | 仅文档 | 内容、链接与 `git diff --check` |
+| 前后端代码 | `mise run lint`（CI 同样执行） |
 | Go 后端 | 受影响包，如 `go -C backend test ./internal/api`；涉及持久化加跑 `mise run test-backend-integration` |
 | 前端 | 相关测试；没有更聚焦的测试时 `npm --prefix frontend run build` |
 | OpenAPI、SQL 查询或迁移 | `mise run generate` 后提交生成结果 |
