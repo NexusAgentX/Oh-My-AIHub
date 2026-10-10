@@ -21,6 +21,13 @@ import (
 type openAPI struct {
 	document map[string]any
 	compiler *jsonschema.Compiler
+	mu       sync.Mutex // the compiler is not safe for concurrent use
+}
+
+func (s *openAPI) compile(schemaName string) (*jsonschema.Schema, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.compiler.Compile("openapi.json#/components/schemas/" + schemaName)
 }
 
 var (
@@ -117,7 +124,7 @@ func assertContract(t *testing.T, method, target string, recorder *httptest.Resp
 		}
 		schemaName = strings.TrimPrefix(content["schema"].(map[string]any)["$ref"].(string), "#/components/schemas/")
 	}
-	schema, err := document.compiler.Compile("openapi.json#/components/schemas/" + schemaName)
+	schema, err := document.compile(schemaName)
 	if err != nil {
 		t.Fatalf("compile %s: %v", schemaName, err)
 	}

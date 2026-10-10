@@ -20,17 +20,55 @@ const (
 	argonKeyLength   = 32
 )
 
+// 验证器接受的 Argon2id 参数范围，用来抵御恶意哈希造成的异常资源消耗。
+// 哈希参数的校验与 PasswordParams 的合法性检查共用这些边界。
+const (
+	minArgonMemory      = 8 * 1024
+	maxArgonMemory      = 256 * 1024
+	minArgonIterations  = 1
+	maxArgonIterations  = 10
+	minArgonParallelism = 1
+	maxArgonParallelism = 16
+)
+
+// PasswordParams 是 Argon2id 的成本参数；Memory 的单位为 KiB。
+type PasswordParams struct {
+	Memory      uint32
+	Iterations  uint32
+	Parallelism uint8
+}
+
+// DefaultPasswordParams 返回生产使用的参数（64 MiB、3 次迭代、并行度 2）。
+func DefaultPasswordParams() PasswordParams {
+	return PasswordParams{Memory: argonMemory, Iterations: argonIterations, Parallelism: argonParallelism}
+}
+
+// validate 要求参数落在验证器的接受范围内，使服务生成的哈希总能被验证。
+func (p PasswordParams) validate() error {
+	if p.Memory < minArgonMemory || p.Memory > maxArgonMemory ||
+		p.Iterations < minArgonIterations || p.Iterations > maxArgonIterations ||
+		p.Parallelism < minArgonParallelism || p.Parallelism > maxArgonParallelism {
+		return fmt.Errorf("argon2id parameters m=%d,t=%d,p=%d are outside the range the verifier accepts", p.Memory, p.Iterations, p.Parallelism)
+	}
+	return nil
+}
+
+// HashPassword 使用生产参数哈希密码。
 func HashPassword(password string) (string, error) {
+	return hashPassword(password, DefaultPasswordParams())
+}
+
+func hashPassword(password string, params PasswordParams) (string, error) {
 	salt := make([]byte, argonSaltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generate password salt: %w", err)
 	}
-	hash := argon2.IDKey([]byte(password), salt, argonIterations, argonMemory, argonParallelism, argonKeyLength)
+	hash := argon2.IDKey([]byte(password), salt, params.Iterations, params.Memory, params.Parallelism, argonKeyLength)
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
 		argon2.Version,
-		argonMemory,
-		argonIterations,
-		argonParallelism,
+		params.Memory,
+		params.Iterations,
+		params.Parallelism,
 		base64.RawStdEncoding.EncodeToString(salt),
 		base64.RawStdEncoding.EncodeToString(hash),
 	), nil
@@ -51,7 +89,7 @@ func VerifyPassword(encoded, password string) bool {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism); err != nil {
 		return false
 	}
-	if memory < 8*1024 || memory > 256*1024 || iterations < 1 || iterations > 10 || parallelism < 1 || parallelism > 16 {
+	if (PasswordParams{Memory: memory, Iterations: iterations, Parallelism: parallelism}).validate() != nil {
 		return false
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])

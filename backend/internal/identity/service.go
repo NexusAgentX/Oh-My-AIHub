@@ -20,20 +20,43 @@ type Service struct {
 	store           Store
 	now             func() time.Time
 	sessionLifetime time.Duration
+	passwordParams  PasswordParams
 	dummyHash       string
 }
 
-func NewService(store Store, sessionLifetime time.Duration) (*Service, error) {
-	dummyHash, err := HashPassword("not-a-real-user-password")
-	if err != nil {
-		return nil, err
-	}
-	return &Service{
+// Option 调整 Service 的可选行为；生产装配不传任何 Option。
+type Option func(*Service)
+
+// WithPasswordParams 让服务用指定的 Argon2id 参数哈希新密码，仅供测试降低哈希成本。
+// 参数必须落在验证器接受的范围内，否则 NewService 返回错误；验证器对已存哈希的
+// 限制不受影响。
+func WithPasswordParams(params PasswordParams) Option {
+	return func(s *Service) { s.passwordParams = params }
+}
+
+func NewService(store Store, sessionLifetime time.Duration, options ...Option) (*Service, error) {
+	s := &Service{
 		store:           store,
 		now:             time.Now,
 		sessionLifetime: sessionLifetime,
-		dummyHash:       dummyHash,
-	}, nil
+		passwordParams:  DefaultPasswordParams(),
+	}
+	for _, option := range options {
+		option(s)
+	}
+	if err := s.passwordParams.validate(); err != nil {
+		return nil, err
+	}
+	dummyHash, err := s.hashPassword("not-a-real-user-password")
+	if err != nil {
+		return nil, err
+	}
+	s.dummyHash = dummyHash
+	return s, nil
+}
+
+func (s *Service) hashPassword(password string) (string, error) {
+	return hashPassword(password, s.passwordParams)
 }
 
 func NormalizeUsername(username string) string {
@@ -98,7 +121,7 @@ func (s *Service) ChangePassword(ctx context.Context, accountID, currentPassword
 	if currentPassword == newPassword {
 		return LoginResult{}, fmt.Errorf("%w: new password must differ from current password", ErrInvalidInput)
 	}
-	newHash, err := HashPassword(newPassword)
+	newHash, err := s.hashPassword(newPassword)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -134,7 +157,7 @@ func (s *Service) AdminResetPassword(ctx context.Context, actor Account, account
 	if err != nil {
 		return CreatedAccount{}, err
 	}
-	hash, err := HashPassword(password)
+	hash, err := s.hashPassword(password)
 	if err != nil {
 		return CreatedAccount{}, err
 	}
@@ -160,7 +183,7 @@ func (s *Service) CreateInvitedAccount(ctx context.Context, actor Account, usern
 	if err != nil {
 		return CreatedAccount{}, err
 	}
-	hash, err := HashPassword(password)
+	hash, err := s.hashPassword(password)
 	if err != nil {
 		return CreatedAccount{}, err
 	}
@@ -192,7 +215,7 @@ func (s *Service) CreateBootstrapAdmin(ctx context.Context, username, displayNam
 	if err := ValidatePassword(password); err != nil {
 		return Account{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
-	hash, err := HashPassword(password)
+	hash, err := s.hashPassword(password)
 	if err != nil {
 		return Account{}, err
 	}
