@@ -14,6 +14,7 @@ import {
   QueryBoundary,
   Segmented,
   SuccessMessage,
+  SuggestInput,
   Switch,
   TextField,
 } from '../ui'
@@ -33,6 +34,7 @@ import { KeyRoutingSection } from './KeyRouting'
 function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form: KeyForm) => void }) {
   const models = useModels()
   const catalog = models.data?.items.map((model) => model.id) ?? []
+  const modelSuggestions = catalog.map((model) => ({ value: model }))
   const set = (patch: Partial<KeyForm>) => onChange({ ...form, ...patch })
   return (
     <>
@@ -94,14 +96,14 @@ function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form:
               value={row.from}
             />
             <span aria-hidden="true">→</span>
-            <input
+            <SuggestInput
               aria-label="平台模型"
-              className="input mono"
-              list="key-alias-models"
+              className="mono"
               onChange={(event) =>
                 set({ aliases: form.aliases.map((item, position) => (position === index ? { ...item, to: event.target.value } : item)) })
               }
               placeholder="平台模型"
+              suggestions={modelSuggestions}
               value={row.to}
             />
             <IconButton
@@ -111,11 +113,6 @@ function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form:
             />
           </div>
         ))}
-        <datalist id="key-alias-models">
-          {catalog.map((model) => (
-            <option key={model} value={model} />
-          ))}
-        </datalist>
         <div>
           <Button
             icon={<Icon name="plus" />}

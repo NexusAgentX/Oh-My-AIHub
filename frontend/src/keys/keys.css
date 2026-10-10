@@ -54,6 +54,6 @@
 }
 @media (max-width: 767px) {
   .alias-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .alias-row > span { display: none; }
-  .alias-row > input:nth-of-type(2) { grid-row: 2; }
+  .alias-row > span[aria-hidden='true'] { display: none; }
+  .alias-row > .suggest { grid-row: 2; }
 }

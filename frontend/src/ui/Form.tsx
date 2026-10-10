@@ -9,6 +9,7 @@ import {
 import { IconButton } from './Button'
 import { Icon } from './Icon'
 import { blurNumberInputOnWheel } from './numberInput'
+import { SuggestInput, type Suggestion } from './Suggest'
 
 type FieldMeta = {
   label: string
@@ -55,23 +56,34 @@ export function TextField({
   id,
   className,
   onWheel,
+  suggestions,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & FieldMeta) {
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'list'> & FieldMeta & {
+  /** 可选的建议值：仍可自由输入，点开或输入时显示建议列表 */
+  suggestions?: Suggestion[]
+}) {
   const generatedID = useId()
   const fieldID = id ?? generatedID
+  const shared = {
+    ...props,
+    'aria-describedby': describedBy(fieldID, { label, error, hint }),
+    'aria-invalid': Boolean(error),
+    id: fieldID,
+  }
   return (
     <FieldFrame className={className} error={error} hint={hint} id={fieldID} label={label}>
-      <input
-        {...props}
-        onWheel={(event) => {
-          blurNumberInputOnWheel(event)
-          onWheel?.(event)
-        }}
-        aria-describedby={describedBy(fieldID, { label, error, hint })}
-        aria-invalid={Boolean(error)}
-        className="input"
-        id={fieldID}
-      />
+      {suggestions ? (
+        <SuggestInput {...shared} suggestions={suggestions} />
+      ) : (
+        <input
+          {...shared}
+          onWheel={(event) => {
+            blurNumberInputOnWheel(event)
+            onWheel?.(event)
+          }}
+          className="input"
+        />
+      )}
     </FieldFrame>
   )
 }
