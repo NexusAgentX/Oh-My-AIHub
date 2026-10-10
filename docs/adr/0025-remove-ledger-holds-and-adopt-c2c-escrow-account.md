@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-10-08
 - 决策者：项目维护者与 AI 产品团队
-- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171)、[ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0011](0011-adopt-c2c-order-trade-hold-state-machine.md)、[ADR-0012](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)、[ADR-0020](0020-adopt-caller-owned-transactions-across-persistence-domains.md)
+- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171)、[ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)、[ADR-0008](archive/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0011](archive/0011-adopt-c2c-order-trade-hold-state-machine.md)、[ADR-0012](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)、[ADR-0020](0020-adopt-caller-owned-transactions-across-persistence-domains.md)
 
 ## 背景
 
@@ -69,6 +69,6 @@ v0.6.0 的账本在零和复式记账（ADR-0005）之上叠加了两类持有�
 
 ## 替代关系
 
-- 取代 [ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) 的持有、投影、命令幂等表与信用冻结部分；其不可变分录与计价取整内核仍有效（计价见 ADR-0012）。
-- 取代 [ADR-0011](0011-adopt-c2c-order-trade-hold-state-machine.md) 的父子持有部分；C2C 订单与交易状态机由 Feature C 按本 ADR 的托管账户重写。
+- 取代 [ADR-0008](archive/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md) 的持有、投影、命令幂等表与信用冻结部分；其不可变分录与计价取整内核仍有效（计价见 ADR-0012）。
+- 取代 [ADR-0011](archive/0011-adopt-c2c-order-trade-hold-state-machine.md) 的父子持有部分；C2C 订单与交易状态机由 Feature C 按本 ADR 的托管账户重写。
 - 补充 [ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)。

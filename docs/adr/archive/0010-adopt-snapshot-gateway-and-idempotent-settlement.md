@@ -1,9 +1,9 @@
 # ADR-0010：采用快照化 API 网关与幂等终结状态机
 
-- 状态：已取代（网关部分由 [ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md) 取代；“不保存可恢复明文”的 Key 约定由 [ADR-0028](0028-store-platform-api-keys-reversibly-encrypted.md) 取代）
+- 状态：已取代（网关部分由 [ADR-0027](../0027-adopt-transparent-gateway-with-post-hoc-billing.md) 取代；“不保存可恢复明文”的 Key 约定由 [ADR-0028](../0028-store-platform-api-keys-reversibly-encrypted.md) 取代）
 - 日期：2026-09-03
 - 决策者：仓库维护者
-- 关联内容：[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0009](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)
+- 关联内容：[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0009](../0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)
 
 ## 背景
 
