@@ -44,21 +44,19 @@
 
 ## 验证
 
-改哪测哪；发版才跑全量门禁。
+本地只跑与改动相关、能很快给出反馈的检查；`-race`、PostgreSQL 集成测试、镜像构建与全量门禁交给 CI，不在本地重复，只在调试 CI 失败或修改 CI 本身时复现。
 
-| 改动 | 验证 |
+| 改动 | 本地验证 |
 | --- | --- |
 | 仅文档 | 内容、链接与 `git diff --check` |
-| 前后端代码 | `mise run lint`（CI 同样执行） |
-| Go 后端 | 受影响包，如 `go -C backend test ./internal/api`；涉及持久化加跑 `mise run test-backend-integration` |
+| 前后端代码 | `mise run lint` |
+| Go 后端 | 受影响包，如 `go -C backend test ./internal/api` |
 | 前端 | 相关测试；没有更聚焦的测试时 `npm --prefix frontend run build` |
-| OpenAPI、SQL 查询或迁移 | `mise run generate` 后提交生成结果 |
-| 数据库迁移 | `mise run check-migrations` 与 `mise run check-migration-upgrade`（CI 同样执行） |
+| OpenAPI、SQL 查询或迁移 | `mise run generate` 后提交生成结果；迁移另跑 `mise run check-migrations` |
 | Compose 或部署配置 | `docker compose config --quiet` |
-| 发版 | `mise run check-release` |
 
 - 影响界面时，在实际运行的界面上验收关键状态（桌面与窄屏）。界面基于现有组件与样式，文案只保留必要的标签、状态、操作、错误与风险确认；外部图片、字体与图标保留来源和许可。
-- 如实说明没有执行的检查。区分本地验证、CI 状态与部署状态，不把“已触发”说成“已通过”或“已部署”。CI 默认不等待，除非用户要求、发版依赖或本地验证不足以覆盖风险。
+- 如实说明没有执行的检查。区分本地验证、CI 状态与部署状态，不把“已触发”说成“已通过”或“已部署”。
 
 ## 数据库迁移
 
@@ -71,14 +69,14 @@
 
 - 不提交凭据、令牌、私钥或真实用户数据。新增依赖前确认必要性及维护、安全与体积成本。
 - 改动聚焦当前任务，不夹带无关重构。未发布的中间态可以直接简化或破坏性重构，不加无依据的兼容层；数据库迁移按上节执行。
-- `main` 受规则集保护：只能通过 PR 合并，且 `gates`、`integration` 两项检查必须通过。合并前确认验收有证据、相关文档已同步；`main` 已前进时在任务 worktree 内同步并重新验证。
-- 验收通过后 Agent 主动合并并删除远端任务分支；有 Issue 时核对正文后关闭，并同步 Epic。
-- 合并后清理：`mise run task-finish <type>/<slug>`（`scripts/task-finish.sh`）。它确认 PR 已合并、分支提交已进入 `origin/main`、worktree 干净（仅允许依赖与构建缓存被忽略），再停止该 worktree 的 Compose 容器、删除其 worktree 与本地、远端分支，快进主工作区并确认 `main...origin/main` 为 `0/0`。证据不足时停止，不强制删除，不动其他任务；`--dry-run` 只预览，加 `--volumes` 才删除 Docker 卷。合并 PR 用 merge commit，squash 或 rebase 会让脚本因证据不足而停止。
+- `main` 只能通过 PR 合并，`gates`、`integration` 必须通过。验收有证据、文档已同步后执行 `gh pr merge --auto --merge` 开启自动合并，随即继续其他工作，不轮询等待 CI；CI 失败或出现冲突时再回来修复。只有用户要求或后续工作依赖合并结果时才等待。
+- `main` 前进后，只有出现冲突或新提交改了相同文件时才在任务 worktree 内同步重验；否则照常合并，由合并后 `main` 上的 CI 兜底。
+- 合并后（可稍后集中处理）：有 Issue 时核对正文后关闭并同步 Epic；用 `mise run task-finish <type>/<slug>` 清理，它确认 PR 已合并、提交已进入 `origin/main`、worktree 干净后删除 worktree 与本地、远端分支并快进主工作区；证据不足时停止，不强制删除，`--dry-run` 只预览，`--volumes` 才删 Docker 卷。只用 merge commit 合并。
 
 ## 发版
 
 - 攒批发布，紧急修复除外；不为发版单独建 Issue。是否发布到生产由人类决定。
-- 平时的 PR 不改 CHANGELOG，PR 标题与“改了什么”写清对用户、开发或部署的影响。发版时用一个 PR 根据上个正式 tag 以来合并的 PR 整理新版本章节（保留空的“未发布”），合并后对该提交打 tag，由 `release.yml` 构建并部署。操作见 `docs/runbooks/release.md`。
+- 平时的 PR 不改 CHANGELOG，PR 标题与“改了什么”写清对用户、开发或部署的影响。发版时用一个 PR 根据上个正式 tag 以来合并的 PR 整理新版本章节（保留空的“未发布”），合并后对该提交打 tag，由 `release.yml` 构建并部署；发版不在本地重复门禁，工作流复用该提交在 `main` 上的 CI 结果，缺失时才执行 `check-release`。操作见 `docs/runbooks/release.md`。
 - 版本号 `vMAJOR.MINOR.PATCH`，以最新正式 tag 为基线，按本批最高影响只递增一次：缺陷修复与小调整升 PATCH；新功能、主要流程调整或跨组件显著改进升 MINOR 并将 PATCH 归零；进入稳定版或稳定版不兼容变更升 MAJOR，须人类确认。0.x 内部破坏性调整不自动升到 1.0。预发布加 `-rc.N`。已发布 tag 不移动、不覆盖。
 
 ## ADR

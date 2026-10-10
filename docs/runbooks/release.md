@@ -19,7 +19,7 @@
    git push origin vX.Y.Z
    ```
 
-4. `release` workflow 自动执行，无需干预：`mise run check-release` 门禁 → backend/frontend
+4. `release` workflow 自动执行，无需干预：门禁（复用 `main` 上该提交的 CI 结果，缺失时执行 `mise run check-release`）→ backend/frontend
    多架构镜像构建推送 GHCR（tag + digest）→ 从 CHANGELOG 章节生成 GitHub Release →
    Deploy 作业进入 `production-hub` Environment **等待审批**。
 5. 审批上线（二选一）：
