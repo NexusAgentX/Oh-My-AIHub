@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { tokenPriceLabels } from '../models/tokenPricing'
-import { Button, Checkbox, IconButton, Icon, InlineError, TextField } from '../ui'
+import { Button, Checkbox, IconButton, Icon, InlineError, SelectField, TextField } from '../ui'
 import {
   emptyTier,
   formToTierInput,
@@ -118,14 +118,15 @@ function TierEditForm({
           </option>
         ))}
       </datalist>
-      <label>
-        百炼实际思考模式（可选）
-        <select value={form.thinkingMode ?? ''} onChange={(event) => set({ thinkingMode: event.target.value })}>
-          <option value="">不限</option>
-          <option value="qwen_thinking">已输出思考</option>
-          <option value="qwen_non_thinking">未输出思考</option>
-        </select>
-      </label>
+      <SelectField
+        label="百炼实际思考模式（可选）"
+        onChange={(event) => set({ thinkingMode: event.target.value })}
+        value={form.thinkingMode ?? ''}
+      >
+        <option value="">不限</option>
+        <option value="qwen_thinking">已输出思考</option>
+        <option value="qwen_non_thinking">未输出思考</option>
+      </SelectField>
       <p className="muted-copy">
         服务档位以响应为准；百炼条件仅适用于按实际思考输出定价的模型。未知事实不命中特定条件。
       </p>

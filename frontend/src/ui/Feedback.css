@@ -1,15 +1,18 @@
+/* 提示与内联错误：状态色块、墨线、--on-color 文字，不加投影 */
 .inline-error,
 .success-message,
 .notice {
   padding: 10px var(--space-3);
-  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--on-color);
   font-size: var(--text-base);
   line-height: 1.45;
 }
 
 .inline-error:empty { display: none; }
-.inline-error { color: var(--danger-ink); border: 1px solid var(--danger-border); background: var(--danger-soft); }
-.success-message { color: var(--positive); border: 1px solid var(--positive-border); background: var(--positive-soft); }
+.inline-error { background: var(--rose); }
+.success-message { background: var(--mint); }
 
 .notice {
   display: flex;
@@ -17,12 +20,13 @@
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
-  border: 1px solid transparent;
 }
-.notice-info { color: var(--info); border-color: var(--info-border); background: var(--info-soft); }
-.notice-warning { color: var(--warning); border-color: var(--warning-border); background: var(--warning-soft); }
-.notice-danger { color: var(--danger-ink); border-color: var(--danger-border); background: var(--danger-soft); }
-.notice-success { color: var(--positive); border-color: var(--positive-border); background: var(--positive-soft); }
+.notice :is(strong, a) { color: inherit; }
+.notice a { text-decoration: underline; }
+.notice-info { background: var(--sky); }
+.notice-warning { background: var(--mustard); }
+.notice-danger { background: var(--rose); }
+.notice-success { background: var(--mint); }
 
 .loading-state,
 .empty-state {
@@ -36,9 +40,9 @@
 }
 
 .empty-state { flex-direction: column; padding: var(--space-6) var(--space-4); text-align: center; }
-.empty-state strong { color: var(--ink); font-weight: 600; }
+.empty-state strong { color: var(--ink); font-family: var(--font-display); font-size: var(--text-md); font-weight: 800; }
 .empty-state p { max-width: 44ch; margin: 0; }
-.error-state { color: var(--danger-ink); }
+.error-state { color: var(--danger); }
 
 @media (max-width: 760px) {
   .notice { align-items: flex-start; flex-direction: column; gap: var(--space-2); }

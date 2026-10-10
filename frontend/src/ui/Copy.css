@@ -6,7 +6,7 @@
   flex: 1;
   padding: 8px var(--space-3);
   overflow: hidden;
-  border: 1px solid var(--hairline);
+  border: var(--stroke) dashed var(--hairline-strong);
   border-radius: var(--radius-md);
   color: var(--ink);
   background: var(--sunken);

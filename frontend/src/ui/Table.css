@@ -33,16 +33,16 @@
 }
 
 .data-table th {
+  border-bottom: var(--sticker-border);
   color: var(--muted);
-  background: var(--sunken);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .data-table td:first-child { min-width: 200px; }
 .data-table tbody tr:last-child td { border-bottom: 0; }
-.data-table tbody tr:hover { background: color-mix(in srgb, var(--hover) 60%, transparent); }
+.data-table tbody tr:hover { background: var(--hover); }
 .data-table td > strong,
 .data-table td > small { display: block; }
 .data-table td > small { margin-top: 3px; color: var(--muted); }
@@ -74,15 +74,17 @@
 
 @media (max-width: 960px) {
   .desktop-table-wrap { display: none; }
-  .mobile-card-list { display: grid; gap: var(--space-3); padding: var(--space-3); background: var(--paper); }
+  /* 窄屏：表格变成同一张卡片里的列表，行之间用细线，不再套贴纸 */
+  .mobile-card-list { display: grid; padding: 0 var(--space-4); }
   .mobile-data-card {
     display: grid;
-    gap: 14px;
-    padding: var(--space-4);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-md);
-    background: var(--canvas);
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+    border: 0;
+    border-top: 1px solid var(--hairline);
+    background: transparent;
   }
+  .mobile-data-card:first-child { border-top: 0; }
   .mobile-data-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
   .mobile-data-card header > div { display: grid; gap: 3px; }
   .mobile-data-card header span { color: var(--muted); font-size: var(--text-xs); }

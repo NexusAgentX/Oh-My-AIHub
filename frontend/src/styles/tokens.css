@@ -49,23 +49,12 @@
   /* 遮罩 */
   --scrim: rgb(31 28 22 / 45%);
 
-  /*
-   * 过渡期：组件贴纸化（Feature #295）后删除。
-   * 状态的柔和底色与描边、旧版浮层阴影。
-   */
-  --ink-hover: #37322a;
-  --mustard-soft: #fbf1db;
-  --mustard-border: #ecd5a0;
-  --positive-soft: #e7f3ec;
-  --positive-border: #cce5d6;
-  --warning-soft: #fbf0d9;
-  --warning-border: #ecd6a6;
-  --danger-ink: #8a1c13;
-  --danger-soft: #fcebe7;
-  --danger-border: #f3c6bf;
-  --info-soft: #eaf0f8;
-  --info-border: #cddcf0;
-  --shadow-pop: 0 18px 40px -12px rgb(31 28 22 / 28%), 0 2px 6px rgb(31 28 22 / 8%);
+  /* 浅色调底：芥末与糖果色混入卡片色，用于提示区与高亮行；上面只放正文或同色状态文字 */
+  --tint: 24%;
+  --mustard-tint: color-mix(in srgb, var(--mustard) var(--tint), var(--canvas));
+  --rose-tint: color-mix(in srgb, var(--rose) var(--tint), var(--canvas));
+  --sky-tint: color-mix(in srgb, var(--sky) var(--tint), var(--canvas));
+  --mint-tint: color-mix(in srgb, var(--mint) var(--tint), var(--canvas));
 
   /* 贴纸描边与硬投影（不模糊，按层级递增） */
   --stroke: 2px;
@@ -158,17 +147,5 @@
 
   --scrim: rgb(0 0 0 / 62%);
 
-  --ink-hover: #ffffff;
-  --mustard-soft: #2a2316;
-  --mustard-border: #4c3e21;
-  --positive-soft: #14261d;
-  --positive-border: #24402f;
-  --warning-soft: #2a2214;
-  --warning-border: #4a3c1f;
-  --danger-ink: #f5a89e;
-  --danger-soft: #2c1715;
-  --danger-border: #4f2722;
-  --info-soft: #162030;
-  --info-border: #26364f;
-  --shadow-pop: 0 24px 48px -12px rgb(0 0 0 / 70%), 0 0 0 1px rgb(255 255 255 / 5%);
+  --tint: 16%;
 }

@@ -12,19 +12,19 @@
 
 .buy-order { padding: 0; }
 .buy-payable { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--sunken); }
-.buy-payable strong { font-size: var(--text-xl); }
+.buy-payable strong { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 800; }
 .trade-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .trade-head-link { margin-left: auto; font-size: var(--text-sm); }
 .countdown { color: var(--muted); font-weight: 600; }
 .countdown-urgent { color: var(--danger); }
-.payment-info { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--mustard-border); border-radius: var(--radius-md); background: var(--mustard-soft); }
+.payment-info { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--mustard-tint); }
 .payment-amount { display: flex; gap: var(--space-6); margin: 0; }
-.payment-amount dt { color: var(--muted); font-size: var(--text-xs); }
-.payment-amount dd { margin: 0; color: var(--ink); font-size: var(--text-lg); font-weight: 700; }
+.payment-amount dt { color: var(--body); font-size: var(--text-xs); }
+.payment-amount dd { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; }
 .payment-remark { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-sm); }
 .payment-remark code { color: var(--ink); font-weight: 600; }
 .payment-methods { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.payment-methods li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--canvas); }
+.payment-methods li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); background: var(--canvas); }
 .payment-methods span { overflow-wrap: anywhere; }
 .trade-actions { display: grid; gap: var(--space-3); }
 
@@ -35,12 +35,12 @@
 .trade-facts { padding: 0; }
 .trade-timeline { display: grid; gap: var(--space-3); margin: 0; padding: 0 0 0 var(--space-4); border-left: 2px solid var(--hairline); list-style: none; }
 .trade-timeline li { position: relative; display: grid; gap: 2px; }
-.trade-timeline li::before { position: absolute; top: 6px; left: calc(-1 * var(--space-4) - 6px); width: 10px; height: 10px; border-radius: 50%; background: var(--mustard); content: ""; }
+.trade-timeline li::before { position: absolute; top: 6px; left: calc(-1 * var(--space-4) - 6px); width: 12px; height: 12px; border: 1.5px solid var(--line); border-radius: 50%; background: var(--mustard); content: ""; }
 .trade-statements { display: grid; gap: var(--space-3); margin: var(--space-4) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--hairline); }
 .trade-statements dt { color: var(--muted); font-size: var(--text-xs); }
 .trade-statements dd { margin: 2px 0 0; white-space: pre-wrap; }
 
-.recon-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--canvas); }
+.recon-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-5); padding: var(--space-3) var(--space-4); border: var(--sticker-border); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--shadow-md); }
 .recon-bar > div { display: grid; }
 .recon-bar span { color: var(--muted); font-size: var(--text-xs); }
 .recon-bar strong { font-size: var(--text-md); }

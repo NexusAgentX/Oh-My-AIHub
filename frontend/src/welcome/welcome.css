@@ -84,9 +84,9 @@
   height: 32px;
   place-items: center;
   border-radius: var(--radius-sm);
-  color: var(--ink);
-  background: var(--mustard-soft);
-  box-shadow: inset 0 0 0 1px var(--mustard-border);
+  border: 1.5px solid var(--line);
+  color: var(--on-color);
+  background: var(--mustard);
 }
 
 .welcome-boundaries {

@@ -11,10 +11,13 @@ body > svg:has(> defs > #vditor-icon-bold) {
 .markdown-editor-actions, .markdown-editor-actions > div { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .markdown-editor-actions { justify-content: space-between; margin-bottom: var(--space-2); }
 .markdown-editor-actions label { font-weight: 600; }
-.markdown-editor-actions button { padding: var(--space-2) var(--space-3); border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: var(--canvas); color: var(--body); cursor: pointer; font: inherit; }
-.markdown-editor-actions button:disabled { opacity: .5; cursor: default; }
+.markdown-editor-actions button { min-height: 34px; padding: 0 var(--space-3); border: var(--sticker-border); border-radius: var(--radius-pill); background: var(--canvas); box-shadow: var(--shadow-xs); color: var(--ink); cursor: pointer; font: inherit; font-size: var(--text-sm); font-weight: 700; }
+.markdown-editor-actions button:hover:not(:disabled) { background: var(--hover); }
+.markdown-editor-actions button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.markdown-editor-actions button:disabled { opacity: .5; cursor: default; box-shadow: none; }
 .markdown-editor button:focus-visible, .markdown-editor textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.markdown-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--hairline); border-radius: var(--radius-sm); overflow: hidden; }
+.markdown-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; border: var(--sticker-border); border-radius: var(--radius-md); transition: box-shadow var(--duration) ease; }
+.markdown-editor-panes:focus-within { box-shadow: 3px 3px 0 var(--mustard); }
 .markdown-editor-panes--split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .markdown-editor-source { min-width: 0; }
 .markdown-editor-source.vditor {
@@ -58,7 +61,7 @@ body > svg:has(> defs > #vditor-icon-bold) {
 .markdown-content table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; }
 .markdown-content th, .markdown-content td { border: 1px solid var(--hairline); padding: var(--space-2) var(--space-3); }
 .markdown-content th { background: var(--sunken); }
-.markdown-content input[type=checkbox] { width: auto; margin-right: var(--space-2); }
+.markdown-content input[type=checkbox] { margin-right: var(--space-2); vertical-align: -4px; }
 .markdown-content .hljs-keyword, .markdown-content .hljs-selector-tag, .markdown-content .hljs-literal { color: var(--danger); }
 .markdown-content .hljs-string, .markdown-content .hljs-attr { color: var(--positive); }
 .markdown-content .hljs-comment { color: var(--muted); }

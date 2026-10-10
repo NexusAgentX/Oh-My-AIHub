@@ -1,4 +1,4 @@
-.disclosure { border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--canvas); }
+.disclosure { border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); background: var(--canvas); }
 .disclosure-toggle {
   display: flex;
   width: 100%;

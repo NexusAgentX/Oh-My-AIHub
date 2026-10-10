@@ -13,7 +13,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.format-tag-ok { color: var(--positive); border-color: var(--positive-border); background: var(--positive-soft); }
+.format-tag-ok { border-color: var(--line); color: var(--on-color); background: var(--mint); }
 
 .amount-positive { color: var(--positive); }
 .amount-negative { color: var(--danger); }
@@ -25,7 +25,7 @@
 .call-outcome { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
 .call-switched { color: var(--warning); font-size: var(--text-xs); white-space: nowrap; }
 .call-outcome small { font-size: var(--text-xs); }
-.call-error { display: grid; max-width: 320px; color: var(--danger-ink); font-size: var(--text-sm); }
+.call-error { display: grid; max-width: 320px; color: var(--danger); font-size: var(--text-sm); }
 .call-error strong { color: inherit; }
 .call-error-message {
   display: -webkit-box;
@@ -52,7 +52,7 @@
 }
 .call-row-button::after { position: absolute; inset: 0; content: ""; }
 .call-row-new { animation: call-row-flash 2.4s ease; }
-@keyframes call-row-flash { from { background: var(--mustard-soft); } }
+@keyframes call-row-flash { from { background: var(--mustard-tint); } }
 .call-card-button { width: 100%; color: inherit; cursor: pointer; font: inherit; text-align: left; }
 
 .call-explorer { display: grid; gap: var(--space-3); }
@@ -68,19 +68,19 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
   background: var(--canvas);
 }
 .call-stats > div { padding: var(--space-3) var(--space-4); border-left: 1px solid var(--hairline); }
 .call-stats > div:first-child { border-left: 0; }
 .call-stats dt { color: var(--muted); font-size: var(--text-xs); }
-.call-stats dd { margin: 2px 0 0; color: var(--ink); font-size: var(--text-md); font-weight: 600; }
+.call-stats dd { margin: 2px 0 0; color: var(--ink); font-family: var(--font-display); font-size: var(--text-md); font-weight: 800; }
 
 .live-toggle { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
 .live-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--positive); }
 .live-dot::before { width: 8px; height: 8px; border-radius: 50%; background: var(--positive); content: ""; }
-.live-error { display: inline-flex; align-items: center; gap: 4px; color: var(--danger-ink); }
+.live-error { display: inline-flex; align-items: center; gap: 4px; color: var(--danger); }
 
 .call-detail { display: grid; gap: var(--space-5); }
 .call-detail-id { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
@@ -104,8 +104,8 @@
 .attempt-legend li { display: inline-flex; align-items: center; gap: 4px; }
 .attempt-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 .attempt-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.attempt { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--hairline); border-radius: var(--radius-md); }
-.attempt-failed { border-color: var(--danger-border); }
+.attempt { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); }
+.attempt-failed { border-color: var(--danger); }
 .attempt-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-sm); }
 .attempt-index { color: var(--muted); font-variant-numeric: tabular-nums; }
 .attempt-duration { margin-left: auto; color: var(--muted); }
@@ -128,7 +128,7 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
-.attempt-error-code { margin: 0; color: var(--danger-ink); font-size: var(--text-sm); }
+.attempt-error-code { margin: 0; color: var(--danger); font-size: var(--text-sm); }
 .attempt-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: 0; font-size: var(--text-sm); }
 .attempt-metrics dt { color: var(--muted); font-size: var(--text-xs); }
 .attempt-metrics dd { margin: 0; color: var(--ink); font-weight: 600; }

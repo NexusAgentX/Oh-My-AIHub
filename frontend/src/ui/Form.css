@@ -13,26 +13,45 @@
   font-weight: 600;
 }
 
+/* 输入框、下拉框与多行输入：墨线贴纸，聚焦时投出芥末硬投影 */
 .input {
   width: 100%;
   height: var(--control-height);
   padding: 0 var(--space-3);
-  border: 1px solid var(--hairline);
+  border: var(--sticker-border);
   border-radius: var(--radius-md);
   color: var(--ink);
   background: var(--canvas);
+  transition: box-shadow var(--duration) ease;
 }
 
-.input:hover:not(:disabled) { border-color: var(--hairline-strong); }
+.input::placeholder { color: var(--muted); }
 
-.input:focus {
-  border-color: var(--focus);
+.input:focus,
+.input:focus-visible {
   outline: 0;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+  box-shadow: 3px 3px 0 var(--mustard);
 }
 
-.input:disabled { color: var(--muted); background: var(--sunken); }
+.input:disabled,
+.input[readonly] { border-style: dashed; color: var(--muted); background: var(--sunken); }
+.input:disabled { cursor: not-allowed; }
 .input[aria-invalid='true'] { border-color: var(--danger); }
+.input[aria-invalid='true']:focus { box-shadow: 3px 3px 0 var(--rose); }
+
+/* 下拉框去掉原生外观，箭头用两段渐变画出，颜色跟随主题 */
+.select-input {
+  padding-right: 34px;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 19px) 50%, calc(100% - 14px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
 
 .textarea-input { height: auto; min-height: 96px; padding-block: 10px; resize: vertical; }
 
@@ -43,6 +62,34 @@
 .field-message { color: var(--muted); font-size: var(--text-xs); line-height: 1.45; }
 .field-error { color: var(--danger); }
 
+/* 复选框：墨线方框，选中填芥末并画勾 */
+input[type='checkbox'] {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  place-items: center;
+  border: var(--sticker-border);
+  border-radius: var(--radius-xs);
+  background: var(--canvas);
+  cursor: pointer;
+  appearance: none;
+}
+input[type='checkbox']::before {
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border: solid var(--on-color);
+  border-width: 0 0 2.5px 2.5px;
+  content: "";
+  transform: rotate(-45deg) scale(0);
+  transition: transform 80ms ease;
+}
+input[type='checkbox']:checked { background: var(--mustard); }
+input[type='checkbox']:checked::before { transform: rotate(-45deg) scale(1); }
+input[type='checkbox']:disabled { cursor: not-allowed; opacity: 0.5; }
+
 .checkbox-control {
   display: flex;
   min-height: var(--control-height);
@@ -51,8 +98,6 @@
   color: var(--body);
   cursor: pointer;
 }
-
-.checkbox-control input { width: 18px; height: 18px; accent-color: var(--ink); }
 
 .form-section {
   display: grid;
