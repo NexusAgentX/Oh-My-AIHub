@@ -9,24 +9,65 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# 任务关系：changes 先判定改动范围，frontend、backend、integration、images 按需并行运行，gates 汇总。
+# main 规则集的必需检查是 gates 与 integration。按改动范围跳过的任务（job 级 if）在分支保护中按成功处理，
+# 因此 gates 总是运行（if: always()），并用 scripts/ci-gate.sh 把“被跳过”与“确实不需要”对上号：
+# 任何需要运行的任务失败、被取消或被连带跳过，gates 都会失败。判定规则见 scripts/ci-changes.sh。
 jobs:
-  gates:
+  changes:
+    name: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.classify.outputs.frontend }}
+      backend: ${{ steps.classify.outputs.backend }}
+      images: ${{ steps.classify.outputs.images }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 与合并基点比较需要完整历史。
+          fetch-depth: 0
+      - name: Scope scripts self-test
+        run: scripts/test-ci.sh
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request ]; then
+            flags="$(scripts/ci-changes.sh --diff "$BASE_SHA" "$HEAD_SHA")"
+          else
+            flags="$(scripts/ci-changes.sh --all)"
+          fi
+          echo "$flags" | tee -a "$GITHUB_OUTPUT"
+          {
+            echo "### Change scope"
+            echo
+            echo "$flags" | sed -E 's/^([a-z_]+)=(.*)$/- \1: \2/'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
         with:
           install: true
-      - name: Restore npm and Go caches
+      - name: Restore npm cache
         uses: actions/cache@v6
         with:
-          path: |
-            ~/.npm
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-deps-${{ hashFiles('frontend/package-lock.json', 'backend/go.sum') }}
+          path: ~/.npm
+          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('frontend/package-lock.json', 'frontend/tools/openapi-types/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-deps-
+            ${{ runner.os }}-frontend-npm-
       - name: Install frontend dependencies
         run: npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000
       - name: API types are generated from openapi.yaml
@@ -39,6 +80,27 @@ jobs:
         run: npm --prefix frontend test
       - name: Frontend build
         run: npm --prefix frontend run build
+
+  backend:
+    name: backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          install: true
+      - name: Restore Go caches
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-backend-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-backend-go-
       - name: sqlc generated code is up to date
         run: mise exec -- sqlc -f backend/sqlc.yaml diff
       - name: Backend gofmt
@@ -49,10 +111,11 @@ jobs:
         run: mise run lint-backend
       - name: Backend tests with race detector
         run: mise exec -- go -C backend test -race ./...
-      - name: Compose configuration
-        run: docker compose config --quiet
 
   integration:
+    name: integration
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -113,3 +176,92 @@ jobs:
             echo "integration tests must run without skips" >&2
             exit 1
           fi
+
+  # 镜像构建检查：只构建不推送，仅 linux/amd64（发版时的多架构构建见 release.yml）。
+  # 把 Dockerfile、nginx 模板和依赖升级导致的问题提前到 PR，而不是等到打 tag。
+  images:
+    name: images
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # 不为每次 PR 运行上传构建记录 artifact。
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compose configuration
+        run: docker compose config --quiet
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          load: true
+          tags: oh-my-aihub-backend:ci
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,scope=backend-image,mode=max,ignore-error=true
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          load: true
+          tags: oh-my-aihub-frontend:ci
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,scope=frontend-image,mode=max,ignore-error=true
+      - name: Backend image smoke test
+        shell: bash
+        run: |
+          arch="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' oh-my-aihub-backend:ci)"
+          test "$arch" = linux/amd64
+          # 以非 root 运行，且两个二进制都在 PATH 目录中。
+          docker run --rm --entrypoint sh oh-my-aihub-backend:ci -c '
+            set -eu
+            test "$(id -u)" != 0
+            test -x /usr/local/bin/server
+            test -x /usr/local/bin/migrate'
+      - name: Frontend image nginx config renders and validates
+        shell: bash
+        run: |
+          arch="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' oh-my-aihub-frontend:ci)"
+          test "$arch" = linux/amd64
+          docker run --rm --entrypoint test oh-my-aihub-frontend:ci -f /usr/share/nginx/html/index.html
+          # 官方入口脚本在命令为 nginx 时先用环境变量渲染 /etc/nginx/templates。
+          # nginx -T 先校验配置，再打印渲染后的完整配置；backend 解析为回环地址，仅用于通过上游主机名检查。
+          docker run --rm -e TRUSTED_PROXY_CIDR=127.0.0.1/32 --add-host backend:127.0.0.1 \
+            oh-my-aihub-frontend:ci nginx -T > "$RUNNER_TEMP/nginx-rendered.txt"
+          grep -Fq 'set_real_ip_from 127.0.0.1/32;' "$RUNNER_TEMP/nginx-rendered.txt"
+          if grep -Fq '${' "$RUNNER_TEMP/nginx-rendered.txt"; then
+            echo "nginx template still contains unrendered variables" >&2
+            exit 1
+          fi
+
+  gates:
+    name: gates
+    # always()：上游失败、取消时也要运行并判定失败，而不是被连带跳过（被跳过的任务在分支保护中按成功处理）。
+    if: always()
+    needs: [changes, frontend, backend, integration, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Every needed job succeeded
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          NEED_FRONTEND: ${{ needs.changes.outputs.frontend }}
+          NEED_BACKEND: ${{ needs.changes.outputs.backend }}
+          NEED_IMAGES: ${{ needs.changes.outputs.images }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          IMAGES_RESULT: ${{ needs.images.result }}
+        run: |
+          scripts/ci-gate.sh \
+            "changes=true:$CHANGES_RESULT" \
+            "frontend=$NEED_FRONTEND:$FRONTEND_RESULT" \
+            "backend=$NEED_BACKEND:$BACKEND_RESULT" \
+            "integration=$NEED_BACKEND:$INTEGRATION_RESULT" \
+            "images=$NEED_IMAGES:$IMAGES_RESULT"

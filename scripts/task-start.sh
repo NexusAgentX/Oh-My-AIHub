@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # 开工：把主工作区的 main 快进到最新 origin/main，再从 origin/main 创建
-# 任务分支 codex/<slug> 与独立 worktree <主工作区同级>/Oh-My-AIHub-worktrees/<slug>。
+# 任务分支 <type>/<slug> 与独立 worktree
+# <主工作区同级>/Oh-My-AIHub-worktrees/<type>-<slug>。
+# type 为约定式提交类型：feat fix docs refactor perf test ci chore。
 #
 # 条件不满足时报告原因并以非零状态退出，不会 reset、stash 或强制：
-#   - 任务名无效；分支或路径已存在
+#   - 任务名或 type 无效；分支或路径已存在
 #   - 主工作区不在 main、不干净（含未跟踪文件），或 main 无法仅快进到 origin/main
 #
 # 用法：
-#   scripts/task-start.sh <slug>
-#   mise run task-start <slug>
-# 示例：mise run task-start 265-task-scripts
+#   scripts/task-start.sh <type>/<slug>
+#   mise run task-start <type>/<slug>
+# 示例：mise run task-start fix/251-key-layout
+#       （分支 fix/251-key-layout，目录 Oh-My-AIHub-worktrees/fix-251-key-layout）
 # 可在主工作区或任意 worktree 中运行。
 set -euo pipefail
 
@@ -18,16 +21,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SCRIPT_DIR/task-lib.sh"
 
 if [ "$#" -ne 1 ] || [ "${1#-}" != "$1" ]; then
-  echo "用法：scripts/task-start.sh <slug>   （如 265-task-scripts）" >&2
+  echo "用法：scripts/task-start.sh <type>/<slug>   （如 fix/251-key-layout；type 为 $TASK_TYPES 之一）" >&2
   exit 2
 fi
 
-slug="$1"
-validate_slug "$slug"
+parse_task_name "$1"
 resolve_main_workspace
 
-branch="codex/$slug"
-worktree_path="$WORKTREES_DIR/$slug"
+branch="$TASK_BRANCH"
+worktree_path="$WORKTREES_DIR/$TASK_DIR"
 
 git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "“$branch”不是合法的分支名。"
 if git -C "$MAIN_WS" show-ref --verify --quiet "refs/heads/$branch"; then

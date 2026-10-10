@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,14 +15,33 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+)
+
+// maxParallelDatabases caps how many isolated tests run at once. Every test
+// holds two pgx pools (up to 20 connections each) against one PostgreSQL
+// server whose max_connections defaults to 100, so the cap must not grow with
+// GOMAXPROCS: ten concurrent tests were observed peaking at 83 connections and
+// six at 61. Four matches the CI runner's cores, so it costs nothing there.
+const maxParallelDatabases = 4
+
+var (
+	databaseSlots = make(chan struct{}, maxParallelDatabases)
+	// database.Migrate configures goose's package-level state (base FS and
+	// dialect), so concurrent migrations would race on it.
+	migrateMu sync.Mutex
 )
 
 // isolatedDatabase migrates the baseline into a fresh schema of
 // TEST_DATABASE_URL and returns a pool bound to it. Tests skip without a
 // database, unless AIHUB_REQUIRE_TEST_DATABASE is set (CI), where a missing
 // database fails the test instead of silently skipping it.
+//
+// The calling test is marked parallel: every test owns its schema, so tests do
+// not share rows. Call it once, first thing in the test, and do not combine it
+// with t.Setenv or other process-global state.
 func isolatedDatabase(t *testing.T) (*pgxpool.Pool, *storepg.Store) {
 	t.Helper()
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
@@ -31,6 +51,9 @@ func isolatedDatabase(t *testing.T) (*pgxpool.Pool, *storepg.Store) {
 		}
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
+	t.Parallel()
+	databaseSlots <- struct{}{}
+	t.Cleanup(func() { <-databaseSlots }) // runs last: after the schema is dropped
 	ctx := context.Background()
 	basePool, err := database.Open(ctx, databaseURL)
 	if err != nil {
@@ -47,7 +70,10 @@ func isolatedDatabase(t *testing.T) (*pgxpool.Pool, *storepg.Store) {
 		}
 	})
 	schemaURL := withSearchPath(t, databaseURL, schema)
-	if err := database.Migrate(ctx, schemaURL); err != nil {
+	migrateMu.Lock()
+	err = database.Migrate(ctx, schemaURL)
+	migrateMu.Unlock()
+	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	pool, err := database.Open(ctx, schemaURL)
@@ -92,7 +118,7 @@ func mustAmount(t *testing.T, value string) money.Amount {
 func accounts(t *testing.T, store *storepg.Store, credits ...string) (*identity.Service, identity.Account, []identity.AdminAccount) {
 	t.Helper()
 	ctx := context.Background()
-	service, err := identity.NewService(store.Identity, time.Hour)
+	service, err := identitytest.NewService(store.Identity, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

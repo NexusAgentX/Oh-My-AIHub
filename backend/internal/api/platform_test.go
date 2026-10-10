@@ -18,6 +18,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
@@ -67,7 +68,7 @@ const testKeyring = "k1=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 func newPlatform(t *testing.T) *platform {
 	t.Helper()
 	store := newFakeStore()
-	identityService, err := identity.NewService(store, time.Hour)
+	identityService, err := identitytest.NewService(store, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
