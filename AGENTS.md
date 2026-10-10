@@ -49,6 +49,7 @@
 | 改动 | 验证 |
 | --- | --- |
 | 仅文档 | 内容、链接与 `git diff --check` |
+| 前后端代码 | `mise run lint`（CI 同样执行） |
 | Go 后端 | 受影响包，如 `go -C backend test ./internal/api`；涉及持久化加跑 `mise run test-backend-integration` |
 | 前端 | 相关测试；没有更聚焦的测试时 `npm --prefix frontend run build` |
 | OpenAPI、SQL 查询或迁移 | `mise run generate` 后提交生成结果 |
@@ -77,7 +78,7 @@
 ## 发版
 
 - 攒批发布，紧急修复除外；不为发版单独建 Issue。是否发布到生产由人类决定。
-- 用一个 PR 把 CHANGELOG“未发布”归入新版本章节（保留空的“未发布”），合并后对该提交打 tag，由 `release.yml` 构建并部署。操作见 `docs/runbooks/release.md`。
+- 平时的 PR 不改 CHANGELOG，PR 标题与“改了什么”写清对用户、开发或部署的影响。发版时用一个 PR 根据上个正式 tag 以来合并的 PR 整理新版本章节（保留空的“未发布”），合并后对该提交打 tag，由 `release.yml` 构建并部署。操作见 `docs/runbooks/release.md`。
 - 版本号 `vMAJOR.MINOR.PATCH`，以最新正式 tag 为基线，按本批最高影响只递增一次：缺陷修复与小调整升 PATCH；新功能、主要流程调整或跨组件显著改进升 MINOR 并将 PATCH 归零；进入稳定版或稳定版不兼容变更升 MAJOR，须人类确认。0.x 内部破坏性调整不自动升到 1.0。预发布加 `-rc.N`。已发布 tag 不移动、不覆盖。
 
 ## ADR

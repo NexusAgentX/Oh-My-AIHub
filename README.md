@@ -115,6 +115,7 @@ mise run down
 
 ```bash
 mise run test
+mise run lint # 前端 oxlint（React Hooks 与正确性规则）与后端 staticcheck；CI gates 同样执行
 mise run check-sqlc # 修改 queries.sql 或迁移后，先 mise run generate 重新生成并提交
 mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run generate 重新生成前端 API 类型并提交
 mise run test-backend-integration # 需要 Docker；直接 go test 且未设置 TEST_DATABASE_URL 时这些测试会跳过

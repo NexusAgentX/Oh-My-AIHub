@@ -194,6 +194,7 @@ function DisputeDetail({ trade }: { trade: C2CTrade }) {
         <Card title="交易">
           <DetailList
             items={[
+              /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
               ['状态', <TradeStatusBadge status={trade.status} />],
               ['买家', trade.buyer.display_name],
               ['卖家', trade.seller.display_name],
@@ -201,6 +202,7 @@ function DisputeDetail({ trade }: { trade: C2CTrade }) {
               ['单价 / 金额', `${formatFen(trade.unit_price_fen)} / ${formatFen(trade.total_fen)}`],
               ['发起方', opener(trade)],
               ['付款截止', formatDateTime(trade.payment_deadline)],
+              /* oxlint-enable react/jsx-key */
             ]}
           />
         </Card>

@@ -6,8 +6,9 @@
 ## 常规发版（vX.Y.Z）
 
 1. 确认目标提交已合入 `main` 且 PR 门禁（`ci.yml`）通过。
-2. 把 `CHANGELOG.md`「未发布」章节收口为 `## vX.Y.Z - YYYY-MM-DD`，并保留新的空
-   「未发布」章节；随最后一个 PR 合入。版本号用语义化 `vMAJOR.MINOR.PATCH`，
+2. 开一个发版 PR，在 `CHANGELOG.md` 写入 `## vX.Y.Z - YYYY-MM-DD` 章节：合并「未发布」中已有的条目，
+   并按上个正式 tag 以来合并的 PR 补齐（`git log --first-parent --merges --format='%s%n  %b' <上个 tag>..origin/main`
+   列出 PR 编号与标题），保留新的空「未发布」章节。平时的 PR 不改 CHANGELOG。版本号用语义化 `vMAJOR.MINOR.PATCH`，
    预发布加 `-rc.1` 等后缀。小改动升 PATCH，大改动升 MINOR，明确确认的大版本升级升 MAJOR；具体判定、清零及 0.x 规则见 [AGENTS.md](../../AGENTS.md#发版)。
 3. 在 main 合并提交上打 annotated tag 并推送：
 

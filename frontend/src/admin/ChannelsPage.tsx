@@ -155,6 +155,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
         <Card title="配置摘要">
           <DetailList
             items={[
+              /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
               ['状态', <ChannelStatusBadge channel={channel} />],
               ['所有者', `${channel.owner.display_name}（@${channel.owner.username}）`],
               ['Base URL', <span className="mono break">{channel.base_url}</span>],
@@ -174,6 +175,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
                   : `连续 ${orDefault(advanced.cooldown_failures)} 次 → ${orDefault(advanced.cooldown_seconds, ' 秒')}`,
               ],
               ['创建时间', formatDateTime(channel.created_at)],
+              /* oxlint-enable react/jsx-key */
             ]}
           />
         </Card>

@@ -59,7 +59,7 @@ func (e *env) adjust(p person, amount string) {
 type observed struct {
 	*env
 	consumer, sharer, flaky, outsider person
-	brokenID, goodID, flakyOnly       string
+	brokenID, goodID                  string
 	secret, keyID                     string
 	succeeded, fellBack               string
 }

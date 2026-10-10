@@ -156,9 +156,9 @@ func TestSpendCacheLoadsOncePerWindowAndAccumulates(t *testing.T) {
 	now := time.Date(2026, 3, 10, 5, 0, 0, 0, time.UTC)
 	loads := 0
 	load := func() (Spend, error) { loads++; return Spend{Today: 5, Month: 50, Total: 500}, nil }
-	spend, _ := cache.Get("k", now, load)
+	_, _ = cache.Get("k", now, load)
 	cache.Add("k", 7, now)
-	spend, _ = cache.Get("k", now, load)
+	spend, _ := cache.Get("k", now, load)
 	if loads != 1 || spend != (Spend{Today: 12, Month: 57, Total: 507}) {
 		t.Fatalf("loads=%d spend=%#v", loads, spend)
 	}
