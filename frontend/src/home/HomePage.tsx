@@ -130,7 +130,7 @@ export function HomePage() {
   const { account } = useAuth()
   if (!account) return null
   return (
-    <>
+    <div className="home-page">
       <PageHeader title={`你好，${account.display_name}`} />
       <PendingTradesBanner />
       <StartCard />
@@ -139,6 +139,6 @@ export function HomePage() {
         <TodayCard />
       </div>
       <RecentCalls />
-    </>
+    </div>
   )
 }

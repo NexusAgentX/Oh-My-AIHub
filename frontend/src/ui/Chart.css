@@ -17,6 +17,6 @@
 .bar-chart-horizontal .bar-chart-track { height: 12px; overflow: hidden; border: 1.5px solid var(--line); border-radius: var(--radius-pill); background: var(--canvas); }
 .bar-chart-horizontal .bar-chart-track > i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--mustard); }
 .bar-chart-value { color: var(--ink); font-family: var(--font-display); font-weight: 800; }
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .bar-chart-horizontal .bar-chart-item { grid-template-columns: minmax(64px, 96px) minmax(0, 1fr) auto; }
 }

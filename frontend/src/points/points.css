@@ -50,7 +50,7 @@
   .points-balance-body { grid-template-columns: 1fr; gap: var(--space-3); }
   .trade-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .method-row { grid-template-columns: minmax(0, 1fr) auto; }
   .method-row > input:nth-of-type(2) { grid-row: 2; }
   .payment-methods li { grid-template-columns: minmax(0, 1fr) auto; }

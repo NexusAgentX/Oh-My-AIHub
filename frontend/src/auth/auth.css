@@ -2,9 +2,9 @@
 .identity-page {
   display: grid;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: var(--space-8) var(--space-5);
   place-items: center;
-  background: var(--paper);
 }
 
 .identity-card {
@@ -38,7 +38,7 @@
 
 @media (max-width: 560px) {
   .identity-page { padding: 0; background: var(--canvas); }
-  .identity-card { min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+  .identity-card { min-height: 100vh; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
 }
 
 .account-grid .success-message { margin-bottom: var(--space-4); }

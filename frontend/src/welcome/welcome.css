@@ -110,7 +110,7 @@
   font-size: var(--text-xs);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .welcome-header,
   .welcome-footer,
   .welcome-main { padding-inline: var(--space-4); }

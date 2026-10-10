@@ -44,6 +44,6 @@
 .empty-state p { max-width: 44ch; margin: 0; }
 .error-state { color: var(--danger); }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .notice { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
 }
