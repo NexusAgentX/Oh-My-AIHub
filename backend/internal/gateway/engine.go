@@ -228,8 +228,8 @@ func (e *Engine) refreshEvery(ctx context.Context, name string, interval time.Du
 	}
 }
 
-// Limits resolves the effective limits of a channel against the defaults.
-func Limits2(advanced channel.Advanced, defaults settings.Settings) Limits {
+// EffectiveLimits resolves the effective limits of a channel against the defaults.
+func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limits {
 	limits := Limits{CooldownAfter: int(defaults.DefaultCooldownFailures), CooldownFor: time.Duration(defaults.DefaultCooldownSeconds) * time.Second}
 	if advanced.ConcurrencyLimit != nil {
 		limits.Concurrency = int(*advanced.ConcurrencyLimit)
@@ -474,7 +474,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	for _, candidate := range candidates {
-		if limits := Limits2(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
+		if limits := EffectiveLimits(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
 			revenue, err := e.Store.ChannelRevenue(ctx, candidate.ChannelID, started)
 			if err != nil {
 				e.Logger.Warn("gateway: channel revenue lookup failed", "error", err)
@@ -493,7 +493,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: e.Stats(ctx),
 		ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			state, _ := e.Runtime.Check(c.ChannelID, Limits2(c.Advanced, defaults), started)
+			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
 			return state == StateAvailable
 		},
 	})
@@ -508,7 +508,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	var last *upstreamFailure
 	tried := 0
 	for _, candidate := range ordered {
-		limits := Limits2(candidate.Advanced, defaults)
+		limits := EffectiveLimits(candidate.Advanced, defaults)
 		release, reserved, _ := e.Runtime.Begin(candidate.ChannelID, limits, e.Now())
 		if !reserved {
 			continue
@@ -676,8 +676,6 @@ func millis(d time.Duration) *int {
 	value := int(d.Milliseconds())
 	return &value
 }
-
-func intPointer(value int) *int { return &value }
 
 func stringPointer(value string) *string { return &value }
 
@@ -969,7 +967,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 		outcome, endReason = OutcomeClientDisconnect, EndClientDisconnected
 	case upstreamBroke:
 		outcome, endReason = OutcomeInterrupted, EndInterrupted
-		e.Runtime.Failure(candidate.ChannelID, Limits2(candidate.Advanced, defaults), e.Now(), EndInterrupted)
+		e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), EndInterrupted)
 	case !observation.Found:
 		outcome = OutcomeUnbilled
 	}

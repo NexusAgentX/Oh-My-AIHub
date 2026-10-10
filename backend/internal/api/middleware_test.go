@@ -230,6 +230,7 @@ func TestLoginClientIPOnlyUsesTrustedProxyHeader(t *testing.T) {
 func TestPasswordWorkAdmissionCapsConcurrentArgon2(t *testing.T) {
 	loginSlots := make(chan struct{}, 2)
 	accountSlots := make(chan struct{}, 2)
+	//lint:ignore SA4000 the second call deliberately takes the second slot
 	if !acquirePasswordSlot(accountSlots) || !acquirePasswordSlot(accountSlots) {
 		t.Fatal("available password work slots were rejected")
 	}
@@ -269,6 +270,7 @@ func TestAttemptLimiterCountsEveryAttemptAndExpires(t *testing.T) {
 	limiter := newLoginLimiter(2, time.Minute, 10)
 	limiter.now = func() time.Time { return now }
 
+	//lint:ignore SA4000 the second call deliberately consumes the second attempt
 	if !limiter.take("account") || !limiter.take("account") {
 		t.Fatal("attempt limiter rejected available capacity")
 	}

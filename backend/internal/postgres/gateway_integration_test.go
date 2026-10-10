@@ -1,9 +1,7 @@
 package postgres_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -370,14 +368,3 @@ func TestStaleCallsAreInterruptedWithoutCharge(t *testing.T) {
 		t.Fatalf("stale %+v fresh %+v", e.callRow(id), e.callRow(fresh))
 	}
 }
-
-func jsonOf(t *testing.T, recorder interface{ Bytes() []byte }) map[string]any {
-	t.Helper()
-	var decoded map[string]any
-	if err := json.Unmarshal(recorder.Bytes(), &decoded); err != nil {
-		t.Fatal(err)
-	}
-	return decoded
-}
-
-var _ = bytes.MinRead

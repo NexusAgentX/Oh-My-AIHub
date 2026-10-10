@@ -61,12 +61,6 @@ func writeInvalidJSON(w http.ResponseWriter) {
 	writeError(w, http.StatusBadRequest, "invalid_json", "请求格式无效")
 }
 
-// notImplemented answers every route that is in the contract but belongs to a
-// later feature of Epic #170.
-func notImplemented(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, http.StatusNotImplemented, "not_implemented", "该功能尚未实现")
-}
-
 func writeDomainError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, identity.ErrInvalidCredentials):
