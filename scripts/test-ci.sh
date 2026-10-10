@@ -38,14 +38,18 @@ expect_flags "workflow"                      "true true true false"    .github/w
 expect_flags "dependabot 配置"               "true true true false"    .github/dependabot.yml
 expect_flags "mise.toml"                     "true true true false"    mise.toml
 expect_flags "compose.yaml"                  "true true true false"    compose.yaml
-expect_flags "后端 Dockerfile"               "false true true false"   backend/Dockerfile
+expect_flags "后端 Dockerfile 只影响镜像"    "false false true false"  backend/Dockerfile
+expect_flags "前端 Dockerfile 只影响镜像"    "false false true false"  frontend/Dockerfile
+expect_flags ".dockerignore"                 "false false true false"  frontend/.dockerignore backend/.dockerignore
 expect_flags "后端 go.sum"                   "false true true false"   backend/go.sum
-expect_flags "前端 Dockerfile"               "true false true false"   frontend/Dockerfile
+expect_flags "后端 go.mod"                   "false true true false"   backend/go.mod
 expect_flags "nginx.conf"                    "true false true false"   frontend/nginx.conf
 expect_flags "前端锁文件"                    "true false true false"   frontend/package-lock.json
+expect_flags "前端 package.json"             "true false true false"   frontend/package.json
 expect_flags "前后端各改一处"                "true true false false"   frontend/src/a.ts backend/internal/b.go
 expect_flags "文档与前端混合"                "true false false false"  README.md frontend/src/a.ts
-expect_flags "文档与 Dockerfile 混合"        "false true true false"   docs/runbooks/deployment.md backend/Dockerfile
+expect_flags "文档与 Dockerfile 混合"        "false false true false"  docs/runbooks/deployment.md backend/Dockerfile
+expect_flags "Dockerfile 与后端源码混合"     "false true true false"   backend/Dockerfile backend/internal/a.go
 expect_flags "无法识别的根目录文件"          "true true true false"    .gitignore
 expect_flags "被引号转义的路径"              "true true true false"    '"backend/internal/\344\275\240.go"'
 expect_flags "空列表"                        "true true true false"    ""

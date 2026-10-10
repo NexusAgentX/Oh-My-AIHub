@@ -9,8 +9,9 @@
 #   *.md、docs/**、licenses/**                         文档：不触发任何检查
 #   .github/**、compose.yaml、mise.toml                 CI 定义与工具链：frontend + backend + images
 #   backend/api/openapi.yaml、scripts/**                前后端共享输入：frontend + backend
-#   backend 与 frontend 的 Dockerfile、.dockerignore、依赖清单与锁文件（go.mod、go.sum、package.json、
-#     package-lock.json）、frontend/nginx.conf           镜像输入：所在端 + images
+#   两端的 Dockerfile、.dockerignore                    只影响镜像：images
+#   backend/go.mod、go.sum                              backend + images（依赖会进入镜像）
+#   frontend/package.json、package-lock.json、nginx.conf  frontend + images
 #   backend/**、frontend/**                             所在端
 #   其他任何文件（含无法识别、被引号转义的路径）           保守处理：frontend + backend + images
 # 没有改动文件（空列表）同样全部运行；推送到 main（--all）始终全部运行。
@@ -41,9 +42,11 @@ classify() {
         frontend=true; backend=true; images=true ;;
       backend/api/openapi.yaml | scripts/*)
         frontend=true; backend=true ;;
-      backend/Dockerfile | backend/.dockerignore | backend/go.mod | backend/go.sum)
+      backend/Dockerfile | backend/.dockerignore | frontend/Dockerfile | frontend/.dockerignore)
+        images=true ;;
+      backend/go.mod | backend/go.sum)
         backend=true; images=true ;;
-      frontend/Dockerfile | frontend/.dockerignore | frontend/nginx.conf | frontend/package.json | frontend/package-lock.json)
+      frontend/package.json | frontend/package-lock.json | frontend/nginx.conf)
         frontend=true; images=true ;;
       backend/*)
         backend=true ;;
