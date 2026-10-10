@@ -17,7 +17,9 @@ function ModelCard({ model }: { model: CatalogModel }) {
         <strong>{model.display_name || model.id}</strong>
         {model.current_tier && <Badge tone="accent">{model.current_tier.name}</Badge>}
       </header>
-      <span className="model-card-id mono">{model.id}</span>
+      {model.display_name && model.display_name !== model.id && (
+        <span className="model-card-id mono">{model.id}</span>
+      )}
       <span className="model-card-meta">
         {[model.provider, context && `上下文 ${context}`].filter(Boolean).join(' · ')}
       </span>
