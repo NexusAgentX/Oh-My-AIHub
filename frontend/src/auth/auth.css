@@ -10,9 +10,10 @@
 .identity-card {
   width: min(440px, 100%);
   padding: clamp(24px, 6vw, 40px);
-  border: 1px solid var(--hairline);
+  border: var(--sticker-border);
   border-radius: var(--radius-lg);
   background: var(--canvas);
+  box-shadow: var(--shadow-lg);
 }
 
 .identity-brand { display: inline-block; margin-bottom: var(--space-8); }
@@ -37,7 +38,7 @@
 
 @media (max-width: 560px) {
   .identity-page { padding: 0; background: var(--canvas); }
-  .identity-card { min-height: 100vh; border: 0; border-radius: 0; }
+  .identity-card { min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
 }
 
 .account-grid .success-message { margin-bottom: var(--space-4); }

@@ -13,9 +13,10 @@
 
 .panel {
   min-width: 0;
-  border: 1px solid var(--hairline);
+  border: var(--sticker-border);
   border-radius: var(--radius-lg);
   background: var(--canvas);
+  box-shadow: var(--shadow-md);
 }
 
 .panel-body { padding: var(--space-5); }
@@ -27,11 +28,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--hairline);
+  padding: var(--space-3) var(--space-5) 0;
 }
+/* 标题下不画分隔线，内容区上边距收紧 */
+.panel-heading + .panel-body { padding-top: var(--space-3); }
+.panel-flush > .panel-heading { padding-bottom: var(--space-3); }
 
-.panel-heading h2 { color: var(--ink); }
+.panel-heading h2 { color: var(--ink); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; }
 .panel-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; font-size: var(--text-sm); }
 
 .metric-grid {
@@ -46,27 +49,26 @@
   align-content: start;
   gap: 4px;
   padding: 16px 18px;
-  border: 1px solid var(--hairline);
+  border: var(--sticker-border);
   border-radius: var(--radius-lg);
   background: var(--canvas);
+  box-shadow: var(--shadow-md);
 }
 
 .metric-card > span,
 .metric-label { color: var(--muted); font-size: var(--text-sm); }
 .metric-card > strong,
-.metric-value { margin: 2px 0; font-size: var(--text-2xl); font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.metric-value { margin: 2px 0; color: var(--ink); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metric-card > small,
 .metric-hint { color: var(--muted); font-size: var(--text-xs); }
 
-.metric-card-accent { border-color: var(--ink); background: var(--ink); }
-.metric-card-accent > span, .metric-card-accent .metric-label { color: color-mix(in srgb, var(--canvas) 80%, var(--ink)); }
-.metric-card-accent > strong, .metric-card-accent .metric-value { color: var(--canvas); }
-.metric-card-accent > small, .metric-card-accent .metric-hint { color: color-mix(in srgb, var(--canvas) 62%, var(--ink)); }
-.metric-card-warm { border-color: var(--mustard-border); background: var(--mustard-soft); }
+.metric-card-accent { background: var(--mustard); }
+.metric-card-warm { background: var(--rose); }
+:is(.metric-card-accent, .metric-card-warm) :is(span, strong, small, .metric-label, .metric-value, .metric-hint) { color: var(--on-color); }
 
-.progress { height: 6px; margin-top: var(--space-2); overflow: hidden; border-radius: var(--radius-pill); background: var(--selected); }
+.progress { height: 10px; margin-top: var(--space-2); overflow: hidden; border: 1.5px solid var(--line); border-radius: var(--radius-pill); background: var(--canvas); }
 .progress > i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--mustard); }
-.metric-card-accent .progress { background: color-mix(in srgb, var(--canvas) 22%, var(--ink)); }
+:is(.metric-card-accent, .metric-card-warm) .progress > i { background: var(--on-color); }
 
 .detail-list { margin: 0; padding: 4px var(--space-5) 0; }
 .detail-list > div {
@@ -94,6 +96,8 @@
   .metric-grid { gap: 10px; }
   .metric-card { padding: 14px; }
   .metric-card > strong, .metric-value { font-size: var(--text-xl); }
-  .panel-heading { padding: var(--space-3) var(--space-4); }
+  .panel-heading { padding: var(--space-3) var(--space-4) 0; }
+  .panel-body { padding: var(--space-4); }
+  .panel-heading + .panel-body { padding-top: var(--space-3); }
   .back-link { display: inline-flex; min-height: 44px; align-items: center; margin-bottom: 4px; }
 }

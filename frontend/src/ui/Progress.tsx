@@ -1,4 +1,4 @@
-/** 进度条：芥末黄；warn 时（如预算 ≥80%）加深。 */
+/** 进度条：芥末黄；warn 时（如预算 ≥80%）转为危险色。 */
 export function ProgressBar({
   value,
   label,

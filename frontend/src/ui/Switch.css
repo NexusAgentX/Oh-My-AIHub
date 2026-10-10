@@ -1,3 +1,4 @@
+/* 开关：墨线轨道，打开时填芥末 */
 .switch {
   display: inline-flex;
   min-height: 32px;
@@ -11,28 +12,30 @@
   font-size: var(--text-sm);
   white-space: nowrap;
 }
-.switch:disabled { cursor: not-allowed; opacity: 0.52; }
+.switch:disabled { cursor: not-allowed; opacity: 0.5; }
 .switch-track {
   position: relative;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 22px;
   flex: 0 0 auto;
+  border: var(--sticker-border);
   border-radius: var(--radius-pill);
-  background: var(--hairline-strong);
+  background: var(--sunken);
   transition: background-color var(--duration) ease;
 }
 .switch-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+  border: var(--sticker-border);
   border-radius: 50%;
   background: var(--canvas);
   transition: transform var(--duration) ease;
 }
-.switch-on .switch-track { background: var(--ink); }
-.switch-on .switch-thumb { transform: translateX(16px); }
+.switch-on .switch-track { background: var(--mustard); }
+.switch-on .switch-thumb { transform: translateX(18px); }
 @media (max-width: 760px) {
   .switch { min-height: 44px; }
 }

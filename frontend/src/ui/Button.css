@@ -1,38 +1,42 @@
+/* 按钮：胶囊贴纸，按下时贴回纸面（平移到投影位置、投影归零） */
 .button {
   display: inline-flex;
   min-height: var(--control-height);
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 0 var(--space-4);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  padding: 0 18px;
+  border: var(--sticker-border);
+  border-radius: var(--radius-pill);
   cursor: pointer;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color var(--duration) ease, border-color var(--duration) ease;
+  transition: transform 80ms ease, box-shadow 80ms ease, background-color var(--duration) ease;
 }
 
 .button:hover { text-decoration: none; }
-.button:disabled { cursor: not-allowed; opacity: 0.52; }
+.button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.button:disabled { cursor: not-allowed; opacity: 0.5; box-shadow: none; }
 .button-sm { min-height: 32px; padding: 0 var(--space-3); font-size: var(--text-sm); }
 
-.button-primary { color: var(--canvas); border-color: var(--ink); background: var(--ink); }
-.button-primary:hover:not(:disabled) { background: var(--ink-hover); }
-.button-primary:active { color: var(--canvas); }
+.button-primary,
+.button-primary:active { color: var(--on-color); background: var(--mustard); box-shadow: var(--shadow-sm); }
+.button-primary:hover:not(:disabled) { background: var(--mustard-hover); }
+.button-primary:active:not(:disabled) { transform: translate(3px, 3px); }
 
-.button-secondary { color: var(--ink); border-color: var(--hairline); background: var(--canvas); }
-.button-secondary:hover:not(:disabled),
+.button-secondary,
+.button-secondary:active { color: var(--ink); background: var(--canvas); box-shadow: var(--shadow-xs); }
+.button-secondary:hover:not(:disabled) { background: var(--hover); }
+
+.button-quiet,
+.button-quiet:active { padding: 0 var(--space-3); border-color: transparent; color: var(--body); background: transparent; }
 .button-quiet:hover:not(:disabled) { background: var(--hover); }
-.button-secondary:active { color: var(--ink); }
+.button-quiet:active:not(:disabled) { transform: none; }
 
-.button-quiet { padding: 0 var(--space-3); color: var(--body); background: transparent; }
-.button-quiet:active { color: var(--body); }
-
-.button-danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); }
-.button-danger:active { color: var(--danger); }
+.button-danger,
+.button-danger:active { color: var(--on-color); background: var(--rose); box-shadow: var(--shadow-xs); }
 
 .icon-button {
   display: inline-grid;
@@ -41,14 +45,14 @@
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   color: var(--body);
   background: transparent;
   cursor: pointer;
 }
 
-.icon-button:hover:not(:disabled) { background: var(--hover); }
-.icon-button:disabled { cursor: not-allowed; opacity: 0.52; }
+.icon-button:hover:not(:disabled) { color: var(--ink); background: var(--hover); }
+.icon-button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .icon { display: block; flex: 0 0 auto; }
 
