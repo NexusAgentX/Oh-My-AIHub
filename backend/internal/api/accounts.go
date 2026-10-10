@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -21,22 +22,63 @@ func pathAccountID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
-func adminAccountResponse(account identity.AdminAccount) map[string]any {
+// adminAccountJSON is the OpenAPI AdminAccount schema.
+type adminAccountJSON struct {
+	ID                 string          `json:"id"`
+	Username           string          `json:"username"`
+	DisplayName        string          `json:"display_name"`
+	IsAdmin            bool            `json:"is_admin"`
+	Status             identity.Status `json:"status"`
+	MustChangePassword bool            `json:"must_change_password"`
+	CreditLimit        string          `json:"credit_limit"`
+	Balance            string          `json:"balance"`
+	Available          string          `json:"available"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	PasswordChangedAt  *time.Time      `json:"password_changed_at"`
+	LastActiveAt       *time.Time      `json:"last_active_at"`
+}
+
+// adminAccountPageJSON is the OpenAPI AdminAccountPage schema.
+type adminAccountPageJSON struct {
+	Items      []adminAccountJSON `json:"items"`
+	NextCursor *string            `json:"next_cursor"`
+}
+
+// adminAccountEnvelopeJSON is the OpenAPI AdminAccountEnvelope schema.
+type adminAccountEnvelopeJSON struct {
+	Account adminAccountJSON `json:"account"`
+}
+
+// accountWithInitialPasswordJSON is the OpenAPI AccountWithInitialPassword schema.
+type accountWithInitialPasswordJSON struct {
+	Account         adminAccountJSON `json:"account"`
+	InitialPassword string           `json:"initial_password"`
+}
+
+// ledgerPostingResponseJSON is the OpenAPI LedgerPostingResponse schema.
+type ledgerPostingResponseJSON struct {
+	Account       adminAccountJSON `json:"account"`
+	TransactionID string           `json:"transaction_id"`
+	Replayed      bool             `json:"replayed"`
+}
+
+func newAdminAccountJSON(account identity.AdminAccount) adminAccountJSON {
 	points := ledger.Points{Balance: account.Balance, CreditLimit: account.CreditLimit}
-	return map[string]any{
-		"id":                   account.ID,
-		"username":             account.Username,
-		"display_name":         account.DisplayName,
-		"is_admin":             account.IsAdmin,
-		"status":               account.Status,
-		"must_change_password": account.MustChangePassword,
-		"credit_limit":         account.CreditLimit.String(),
-		"balance":              account.Balance.String(),
-		"available":            points.Available().String(),
-		"created_at":           account.CreatedAt,
-		"updated_at":           account.UpdatedAt,
-		"password_changed_at":  account.PasswordChangedAt,
-		"last_active_at":       account.LastActiveAt,
+	return adminAccountJSON{
+		ID:                 account.ID,
+		Username:           account.Username,
+		DisplayName:        account.DisplayName,
+		IsAdmin:            account.IsAdmin,
+		Status:             account.Status,
+		MustChangePassword: account.MustChangePassword,
+		CreditLimit:        account.CreditLimit.String(),
+		Balance:            account.Balance.String(),
+		Available:          points.Available().String(),
+		CreatedAt:          account.CreatedAt,
+		UpdatedAt:          account.UpdatedAt,
+		PasswordChangedAt:  account.PasswordChangedAt,
+		LastActiveAt:       account.LastActiveAt,
 	}
 }
 
@@ -65,13 +107,13 @@ func (a *app) listAdminAccounts(w http.ResponseWriter, r *http.Request) {
 	if hasMore {
 		accounts = accounts[:limit]
 	}
-	items := make([]map[string]any, 0, len(accounts))
+	items := make([]adminAccountJSON, 0, len(accounts))
 	cursor := ""
 	for _, account := range accounts {
-		items = append(items, adminAccountResponse(account))
+		items = append(items, newAdminAccountJSON(account))
 		cursor = encodeTextCursor(account.Username)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": nextCursor(hasMore, cursor)})
+	writeJSON(w, http.StatusOK, adminAccountPageJSON{Items: items, NextCursor: nextCursor(hasMore, cursor)})
 }
 
 func (a *app) createAdminAccount(w http.ResponseWriter, r *http.Request) {
@@ -104,9 +146,9 @@ func (a *app) createAdminAccount(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"account":          adminAccountResponse(created.Account),
-		"initial_password": created.InitialPassword,
+	writeJSON(w, http.StatusCreated, accountWithInitialPasswordJSON{
+		Account:         newAdminAccountJSON(created.Account),
+		InitialPassword: created.InitialPassword,
 	})
 }
 
@@ -139,7 +181,7 @@ func (a *app) updateAdminAccount(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"account": adminAccountResponse(account)})
+	writeJSON(w, http.StatusOK, adminAccountEnvelopeJSON{Account: newAdminAccountJSON(account)})
 }
 
 func (a *app) resetAdminAccountPassword(w http.ResponseWriter, r *http.Request) {
@@ -162,9 +204,9 @@ func (a *app) resetAdminAccountPassword(w http.ResponseWriter, r *http.Request) 
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"account":          adminAccountResponse(reset.Account),
-		"initial_password": reset.InitialPassword,
+	writeJSON(w, http.StatusOK, accountWithInitialPasswordJSON{
+		Account:         newAdminAccountJSON(reset.Account),
+		InitialPassword: reset.InitialPassword,
 	})
 }
 
@@ -174,10 +216,10 @@ func (a *app) writePosting(w http.ResponseWriter, r *http.Request, accountID str
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"account":        adminAccountResponse(account),
-		"transaction_id": posted.ID,
-		"replayed":       posted.Replayed,
+	writeJSON(w, http.StatusOK, ledgerPostingResponseJSON{
+		Account:       newAdminAccountJSON(account),
+		TransactionID: posted.ID,
+		Replayed:      posted.Replayed,
 	})
 }
 

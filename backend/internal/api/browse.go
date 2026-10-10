@@ -162,7 +162,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			"success_rate_24h": successRate, "ttft_p50_ms": ttft, "state": string(state), "cooldown_remaining_seconds": cooldown,
 		})
 	}
-	tiers := make([]map[string]any, 0, len(model.PriceTiers))
+	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))
 	for index, tier := range model.PriceTiers {
 		tiers = append(tiers, priceTierResponse(index+1, tier))
 	}

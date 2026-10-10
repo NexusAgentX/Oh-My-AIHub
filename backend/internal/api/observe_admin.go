@@ -230,7 +230,7 @@ func (a *app) getAdminTransaction(w http.ResponseWriter, r *http.Request) {
 	if len(actions) > 10 {
 		actions = actions[:10]
 	}
-	recent := make([]map[string]any, 0, len(actions))
+	recent := make([]auditEntryJSON, 0, len(actions))
 	for _, entry := range actions {
 		recent = append(recent, auditEntryResponse(entry))
 	}

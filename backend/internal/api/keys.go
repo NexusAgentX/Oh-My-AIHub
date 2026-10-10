@@ -10,25 +10,103 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
-func nullableAmount(value *money.Amount) any {
+// nullableAmount renders an optional amount as a decimal string, or null when unset.
+func nullableAmount(value *money.Amount) *string {
 	if value == nil {
 		return nil
 	}
-	return value.String()
+	text := value.String()
+	return &text
 }
 
-func keyResponse(key apikey.Key) map[string]any {
-	return map[string]any{
-		"id": key.ID, "name": key.Name, "prefix": key.Prefix, "status": key.Status, "is_default": key.IsDefault,
-		"expires_at": key.ExpiresAt, "allowed_models": key.AllowedModels,
-		"budget_daily": nullableAmount(key.BudgetDaily), "budget_monthly": nullableAmount(key.BudgetMonthly),
-		"budget_total": nullableAmount(key.BudgetTotal), "model_aliases": key.ModelAliases, "routed_models": key.RoutedModels,
-		"spend":        map[string]string{"today": key.Spend.Today.String(), "month": key.Spend.Month.String(), "total": key.Spend.Total.String()},
-		"last_used_at": key.LastUsedAt, "created_at": key.CreatedAt, "updated_at": key.UpdatedAt,
+// apiKeySpendJSON is the OpenAPI ApiKeySpend schema.
+type apiKeySpendJSON struct {
+	Today string `json:"today"`
+	Month string `json:"month"`
+	Total string `json:"total"`
+}
+
+// apiKeyJSON is the OpenAPI ApiKey schema.
+type apiKeyJSON struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Prefix        string            `json:"prefix"`
+	Status        apikey.Status     `json:"status"`
+	IsDefault     bool              `json:"is_default"`
+	ExpiresAt     *time.Time        `json:"expires_at"`
+	AllowedModels []string          `json:"allowed_models"`
+	BudgetDaily   *string           `json:"budget_daily"`
+	BudgetMonthly *string           `json:"budget_monthly"`
+	BudgetTotal   *string           `json:"budget_total"`
+	ModelAliases  map[string]string `json:"model_aliases"`
+	RoutedModels  []string          `json:"routed_models"`
+	Spend         apiKeySpendJSON   `json:"spend"`
+	LastUsedAt    *time.Time        `json:"last_used_at"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+}
+
+// apiKeyListJSON is the OpenAPI ApiKeyList schema.
+type apiKeyListJSON struct {
+	Items []apiKeyJSON `json:"items"`
+}
+
+// apiKeyEnvelopeJSON is the OpenAPI ApiKeyEnvelope schema.
+type apiKeyEnvelopeJSON struct {
+	Key apiKeyJSON `json:"key"`
+}
+
+// apiKeyCreatedJSON is the OpenAPI ApiKeyCreated schema.
+type apiKeyCreatedJSON struct {
+	Key    apiKeyJSON `json:"key"`
+	Secret string     `json:"secret"`
+}
+
+// apiKeyDetailJSON is the OpenAPI ApiKeyDetail schema.
+type apiKeyDetailJSON struct {
+	Key     apiKeyJSON              `json:"key"`
+	Routing []routingPreferenceJSON `json:"routing"`
+}
+
+// apiKeySecretJSON is the OpenAPI ApiKeySecret schema.
+type apiKeySecretJSON struct {
+	Secret string `json:"secret"`
+}
+
+// routingPreferenceJSON is the OpenAPI RoutingPreference schema.
+type routingPreferenceJSON struct {
+	ModelID       string         `json:"model_id"`
+	Source        routing.Source `json:"source"`
+	Mode          routing.Mode   `json:"mode"`
+	Order         []string       `json:"order"`
+	Excluded      []string       `json:"excluded"`
+	MaxAttempts   *int32         `json:"max_attempts"`
+	TTFTTimeoutMS *int32         `json:"ttft_timeout_ms"`
+	UpdatedAt     *time.Time     `json:"updated_at"`
+}
+
+func newApiKeyJSON(key apikey.Key) apiKeyJSON {
+	return apiKeyJSON{
+		ID:            key.ID,
+		Name:          key.Name,
+		Prefix:        key.Prefix,
+		Status:        key.Status,
+		IsDefault:     key.IsDefault,
+		ExpiresAt:     key.ExpiresAt,
+		AllowedModels: key.AllowedModels,
+		BudgetDaily:   nullableAmount(key.BudgetDaily),
+		BudgetMonthly: nullableAmount(key.BudgetMonthly),
+		BudgetTotal:   nullableAmount(key.BudgetTotal),
+		ModelAliases:  key.ModelAliases,
+		RoutedModels:  key.RoutedModels,
+		Spend:         apiKeySpendJSON{Today: key.Spend.Today.String(), Month: key.Spend.Month.String(), Total: key.Spend.Total.String()},
+		LastUsedAt:    key.LastUsedAt,
+		CreatedAt:     key.CreatedAt,
+		UpdatedAt:     key.UpdatedAt,
 	}
 }
 
-func routingResponse(pref routing.Pref) map[string]any {
+func routingResponse(pref routing.Pref) routingPreferenceJSON {
 	order, excluded := pref.Order, pref.Excluded
 	if order == nil {
 		order = []string{}
@@ -36,9 +114,15 @@ func routingResponse(pref routing.Pref) map[string]any {
 	if excluded == nil {
 		excluded = []string{}
 	}
-	return map[string]any{
-		"model_id": pref.ModelID, "source": pref.Source, "mode": pref.Mode, "order": order, "excluded": excluded,
-		"max_attempts": pref.MaxAttempts, "ttft_timeout_ms": pref.TTFTTimeoutMS, "updated_at": pref.UpdatedAt,
+	return routingPreferenceJSON{
+		ModelID:       pref.ModelID,
+		Source:        pref.Source,
+		Mode:          pref.Mode,
+		Order:         order,
+		Excluded:      excluded,
+		MaxAttempts:   pref.MaxAttempts,
+		TTFTTimeoutMS: pref.TTFTTimeoutMS,
+		UpdatedAt:     pref.UpdatedAt,
 	}
 }
 
@@ -71,11 +155,11 @@ func (a *app) listKeys(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	items := make([]map[string]any, 0, len(keys))
+	items := make([]apiKeyJSON, 0, len(keys))
 	for _, key := range keys {
-		items = append(items, keyResponse(key))
+		items = append(items, newApiKeyJSON(key))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, apiKeyListJSON{Items: items})
 }
 
 func (a *app) createKey(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +197,7 @@ func (a *app) createKey(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"key": keyResponse(key), "secret": secret})
+	writeJSON(w, http.StatusCreated, apiKeyCreatedJSON{Key: newApiKeyJSON(key), Secret: secret})
 }
 
 func pathUUID(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
@@ -141,11 +225,11 @@ func (a *app) getKey(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	items := make([]map[string]any, 0, len(prefs))
+	items := make([]routingPreferenceJSON, 0, len(prefs))
 	for _, pref := range prefs {
 		items = append(items, routingResponse(pref))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"key": keyResponse(key), "routing": items})
+	writeJSON(w, http.StatusOK, apiKeyDetailJSON{Key: newApiKeyJSON(key), Routing: items})
 }
 
 func (a *app) updateKey(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +278,7 @@ func (a *app) updateKey(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"key": keyResponse(key)})
+	writeJSON(w, http.StatusOK, apiKeyEnvelopeJSON{Key: newApiKeyJSON(key)})
 }
 
 func (a *app) deleteKey(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +303,7 @@ func (a *app) getKeySecret(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"secret": secret})
+	writeJSON(w, http.StatusOK, apiKeySecretJSON{Secret: secret})
 }
 
 type routingRequest struct {

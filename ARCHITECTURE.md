@@ -54,6 +54,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 - 中间件链：写超时 → 安全头 → 同源校验 → 路由；只对配置的可信代理采信转发头；路由按 `x-access` 套上会话、首次改密与管理员门禁。
 - 契约测试对照路由表与 OpenAPI，并用规范 schema 校验处理器与集成测试中的每个响应；`internal/api` 的覆盖门禁要求每个接口至少有一个经过校验的成功响应（外部模型 API 透传除外）；前端类型生成为 `frontend/src/api/schema.gen.ts`，CI 检查漂移。
+- 响应用 `internal/api` 内手写的结构体表示，与处理器同文件，按 OpenAPI schema 命名为 `<schema>JSON`（`ApiKey` → `apiKeyJSON`），不用 `map[string]any` 拼响应；规范要求存在的字段（含 `null`）不加 `omitempty`，空列表初始化为 `[]`，金额为十进制字符串；领域类型不为响应添加 json 标签。
 - 错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`；记账类写请求接受 `Idempotency-Key`。
 - 外部模型 API（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/...` 与模型列表）凭平台 API Key 认证，不走会话与同源校验。
 

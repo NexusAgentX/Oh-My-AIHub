@@ -4,28 +4,48 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
-func settingsResponse(value settings.Settings) map[string]any {
+// settingsJSON is the OpenAPI Settings schema.
+type settingsJSON struct {
+	FeeRateNano              int64     `json:"fee_rate_nano"`
+	C2CPaymentTimeoutMinutes int32     `json:"c2c_payment_timeout_minutes"`
+	DefaultCreditLimit       string    `json:"default_credit_limit"`
+	DefaultMaxAttempts       int32     `json:"default_max_attempts"`
+	DefaultTTFTTimeoutMS     int32     `json:"default_ttft_timeout_ms"`
+	DefaultTotalTimeoutMS    int32     `json:"default_total_timeout_ms"`
+	DefaultCooldownFailures  int32     `json:"default_cooldown_failures"`
+	DefaultCooldownSeconds   int32     `json:"default_cooldown_seconds"`
+	ExtraBlockedHosts        []string  `json:"extra_blocked_hosts"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+// settingsEnvelopeJSON is the OpenAPI SettingsEnvelope schema.
+type settingsEnvelopeJSON struct {
+	Settings settingsJSON `json:"settings"`
+}
+
+func newSettingsJSON(value settings.Settings) settingsJSON {
 	hosts := value.ExtraBlockedHosts
 	if hosts == nil {
 		hosts = []string{}
 	}
-	return map[string]any{
-		"fee_rate_nano":               value.FeeRateNano,
-		"c2c_payment_timeout_minutes": value.C2CPaymentTimeoutMinutes,
-		"default_credit_limit":        value.DefaultCreditLimit.String(),
-		"default_max_attempts":        value.DefaultMaxAttempts,
-		"default_ttft_timeout_ms":     value.DefaultTTFTTimeoutMS,
-		"default_total_timeout_ms":    value.DefaultTotalTimeoutMS,
-		"default_cooldown_failures":   value.DefaultCooldownFailures,
-		"default_cooldown_seconds":    value.DefaultCooldownSeconds,
-		"extra_blocked_hosts":         hosts,
-		"updated_at":                  value.UpdatedAt,
+	return settingsJSON{
+		FeeRateNano:              value.FeeRateNano,
+		C2CPaymentTimeoutMinutes: value.C2CPaymentTimeoutMinutes,
+		DefaultCreditLimit:       value.DefaultCreditLimit.String(),
+		DefaultMaxAttempts:       value.DefaultMaxAttempts,
+		DefaultTTFTTimeoutMS:     value.DefaultTTFTTimeoutMS,
+		DefaultTotalTimeoutMS:    value.DefaultTotalTimeoutMS,
+		DefaultCooldownFailures:  value.DefaultCooldownFailures,
+		DefaultCooldownSeconds:   value.DefaultCooldownSeconds,
+		ExtraBlockedHosts:        hosts,
+		UpdatedAt:                value.UpdatedAt,
 	}
 }
 
@@ -35,7 +55,7 @@ func (a *app) getAdminSettings(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"settings": settingsResponse(value)})
+	writeJSON(w, http.StatusOK, settingsEnvelopeJSON{Settings: newSettingsJSON(value)})
 }
 
 func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
@@ -76,22 +96,53 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"settings": settingsResponse(updated)})
+	writeJSON(w, http.StatusOK, settingsEnvelopeJSON{Settings: newSettingsJSON(updated)})
 }
 
-func auditEntryResponse(entry audit.Entry) map[string]any {
-	var actor any
+// auditActorJSON is the AccountRef shape of an audit entry's actor. It is not named
+// accountRefJSON because observe.go still uses that name for its map-based helper.
+type auditActorJSON struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// auditEntryJSON is the OpenAPI AuditEntry schema.
+type auditEntryJSON struct {
+	ID         string          `json:"id"`
+	Actor      *auditActorJSON `json:"actor"`
+	Action     string          `json:"action"`
+	TargetType string          `json:"target_type"`
+	TargetID   string          `json:"target_id"`
+	Reason     string          `json:"reason"`
+	Detail     json.RawMessage `json:"detail"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+// auditPageJSON is the OpenAPI AuditPage schema.
+type auditPageJSON struct {
+	Items      []auditEntryJSON `json:"items"`
+	NextCursor *string          `json:"next_cursor"`
+}
+
+func auditEntryResponse(entry audit.Entry) auditEntryJSON {
+	var actor *auditActorJSON
 	if entry.Actor != nil {
-		actor = map[string]any{"id": entry.Actor.ID, "username": entry.Actor.Username, "display_name": entry.Actor.DisplayName}
+		actor = &auditActorJSON{ID: entry.Actor.ID, Username: entry.Actor.Username, DisplayName: entry.Actor.DisplayName}
 	}
 	detail := json.RawMessage(entry.Detail)
 	if len(detail) == 0 {
 		detail = json.RawMessage("{}")
 	}
-	return map[string]any{
-		"id": strconv.FormatInt(entry.ID, 10), "actor": actor, "action": entry.Action,
-		"target_type": entry.TargetType, "target_id": entry.TargetID, "reason": entry.Reason,
-		"detail": detail, "created_at": entry.CreatedAt,
+	return auditEntryJSON{
+		ID:         strconv.FormatInt(entry.ID, 10),
+		Actor:      actor,
+		Action:     entry.Action,
+		TargetType: entry.TargetType,
+		TargetID:   entry.TargetID,
+		Reason:     entry.Reason,
+		Detail:     detail,
+		CreatedAt:  entry.CreatedAt,
 	}
 }
 
@@ -119,13 +170,13 @@ func (a *app) listAdminAudit(w http.ResponseWriter, r *http.Request) {
 	if hasMore {
 		entries = entries[:limit]
 	}
-	items := make([]map[string]any, 0, len(entries))
+	items := make([]auditEntryJSON, 0, len(entries))
 	cursor := ""
 	for _, entry := range entries {
 		items = append(items, auditEntryResponse(entry))
 		cursor = strconv.FormatInt(entry.ID, 10)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": nextCursor(hasMore, cursor)})
+	writeJSON(w, http.StatusOK, auditPageJSON{Items: items, NextCursor: nextCursor(hasMore, cursor)})
 }
 
 // registerAdminSettingsRoutes 注册平台设置与操作记录路由。
