@@ -39,7 +39,7 @@
 }
 .call-table td:first-child { min-width: 120px; }
 .call-row-selectable { position: relative; cursor: pointer; }
-.call-row-selectable:hover { background: var(--soft); }
+.call-row-selectable:hover { background: var(--hover); }
 .call-row-button {
   display: block;
   padding: 0;
@@ -109,9 +109,9 @@
 .attempt-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-sm); }
 .attempt-index { color: var(--muted); font-variant-numeric: tabular-nums; }
 .attempt-duration { margin-left: auto; color: var(--muted); }
-.attempt-bar { display: flex; height: 10px; overflow: hidden; border-radius: var(--radius-pill); background: var(--soft); }
+.attempt-bar { display: flex; height: 10px; overflow: hidden; border-radius: var(--radius-pill); background: var(--sunken); }
 .attempt-segment { display: block; height: 100%; min-width: 2px; }
-.attempt-segment-connect { background: #9aa0aa; }
+.attempt-segment-connect { background: var(--muted); }
 .attempt-segment-wait { background: var(--mustard); }
 .attempt-segment-output { background: var(--positive); }
 .attempt-segment-failed { background: var(--danger); }

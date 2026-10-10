@@ -25,7 +25,7 @@
 
 .button-secondary { color: var(--ink); border-color: var(--hairline); background: var(--canvas); }
 .button-secondary:hover:not(:disabled),
-.button-quiet:hover:not(:disabled) { background: var(--soft); }
+.button-quiet:hover:not(:disabled) { background: var(--hover); }
 .button-secondary:active { color: var(--ink); }
 
 .button-quiet { padding: 0 var(--space-3); color: var(--body); background: transparent; }
@@ -47,7 +47,7 @@
   cursor: pointer;
 }
 
-.icon-button:hover:not(:disabled) { background: var(--soft); }
+.icon-button:hover:not(:disabled) { background: var(--hover); }
 .icon-button:disabled { cursor: not-allowed; opacity: 0.52; }
 
 .icon { display: block; flex: 0 0 auto; }

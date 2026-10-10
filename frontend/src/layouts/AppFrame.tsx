@@ -4,6 +4,7 @@ import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { usePoints } from '../points/queries'
 import { amountSign, formatPoints } from '../money/format'
+import { ThemeMenuGroup } from '../theme/ThemeSwitcher'
 import { Icon } from '../ui'
 import { Brand } from './Brand'
 import {
@@ -67,7 +68,7 @@ function BalanceText() {
   )
 }
 
-/** 侧栏底部账户按钮与菜单：账户设置、管理后台（管理员）、退出。 */
+/** 侧栏底部账户按钮与菜单：账户设置、管理后台（管理员）、主题、退出。 */
 function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   const { account } = useAuth()
   const [open, setOpen] = useState(false)
@@ -109,6 +110,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
               管理后台
             </Link>
           )}
+          <ThemeMenuGroup />
           <button
             className="account-menu-item"
             onClick={() => {

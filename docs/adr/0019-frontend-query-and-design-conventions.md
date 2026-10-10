@@ -71,4 +71,4 @@ MVP 的 34 个页面各自用 `useState`/`useEffect` 手写加载、错误与重
 
 ## 替代关系
 
-无。
+决定第 2 条中的视觉约定（墨色主按钮、芥末黄只作点缀、卡片 12 / 按钮 9 圆角、不做暗色主题）由 [ADR-0033](0033-adopt-sticker-visual-language-and-dual-themes.md) 取代；token 唯一来源与只引用变量的规则及其余决定继续有效。

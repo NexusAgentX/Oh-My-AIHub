@@ -19,7 +19,7 @@
   margin-bottom: var(--space-4);
   border: 1px solid transparent;
 }
-.notice-info { color: var(--link-active); border-color: #c9dbf5; background: var(--info-soft); }
+.notice-info { color: var(--info); border-color: var(--info-border); background: var(--info-soft); }
 .notice-warning { color: var(--warning); border-color: var(--warning-border); background: var(--warning-soft); }
 .notice-danger { color: var(--danger-ink); border-color: var(--danger-border); background: var(--danger-soft); }
 .notice-success { color: var(--positive); border-color: var(--positive-border); background: var(--positive-soft); }

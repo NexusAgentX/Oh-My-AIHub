@@ -20,7 +20,7 @@
 .forum-composer fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--space-4); }
 .forum-composer .field { min-width: 0; }
 .forum-attachments { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
-.forum-attachments li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--soft); border-radius: var(--radius-sm); min-width: 0; }
+.forum-attachments li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--sunken); border-radius: var(--radius-sm); min-width: 0; }
 .forum-attachments a { overflow-wrap: anywhere; min-width: 0; }
 .forum-attachments .muted-copy { font-size: var(--text-xs); white-space: nowrap; }
 .forum-upload-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
@@ -30,7 +30,7 @@
 .forum-replies > h2 { font-size: var(--text-lg); margin: 0; }
 .forum-reply { border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: var(--space-5); }
 .forum-reply > header { display: flex; justify-content: space-between; gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--space-4); }
-.forum-ticket-controls { padding: var(--space-4); background: var(--soft); border-radius: var(--radius-lg); }
+.forum-ticket-controls { padding: var(--space-4); background: var(--sunken); border-radius: var(--radius-lg); }
 .forum-ticket-controls .inline-error { flex-basis: 100%; }
 .forum-board-list p { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
 @media (max-width: 640px) {

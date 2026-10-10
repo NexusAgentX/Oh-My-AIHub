@@ -18,7 +18,7 @@
   height: 20px;
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
-  background: #c9cdd3;
+  background: var(--hairline-strong);
   transition: background-color var(--duration) ease;
 }
 .switch-thumb {
@@ -29,7 +29,6 @@
   height: 16px;
   border-radius: 50%;
   background: var(--canvas);
-  box-shadow: var(--shadow-sm);
   transition: transform var(--duration) ease;
 }
 .switch-on .switch-track { background: var(--ink); }

@@ -1,46 +1,86 @@
 /*
- * 设计 token：前端唯一的视觉取值来源。
- * 组件与页面样式只引用这里的变量，不再写散落的颜色、圆角、字号或间距。
- * 语义约定见 docs/adr/0019-frontend-query-and-design-conventions.md。
+ * 设计 token：前端唯一的视觉取值来源，用途与规则见仓库根目录 DESIGN.md。
+ * 颜色按用途命名，每个颜色都有浅色（:root）与深色“墨夜”（[data-theme='dark']）两套值；
+ * 组件与页面只引用这里的变量，不写十六进制颜色、裸 px 圆角或阴影。
+ * data-theme 由 public/theme-init.js 在首屏前设置，之后由 src/theme/theme.ts 维护。
  */
 :root {
-  /* 颜色：墨色为主，芥末黄只作点缀（导航选中色条、强调徽标、进度条） */
-  --ink: #181d26;
-  --ink-hover: #303640;
-  --body: #333840;
-  --muted: #626872;
-  --hairline: #e3e5e8;
-  --canvas: #ffffff;
-  --soft: #f6f7f9;
-  --selected: #eceef1;
-  --link: #1b61c9;
-  --link-active: #1a3866;
-  --focus: #458fff;
-  --mustard: #d9a441;
-  --mustard-soft: #fbf3e2;
-  --mustard-border: #e8cf9b;
+  color-scheme: light;
 
-  /* 状态色：柔和底色 + 深色文字 */
-  --positive: #1f7a55;
-  --positive-soft: #e6f4ee;
-  --positive-border: #cde8db;
+  /* 纸面与表面 */
+  --paper: #fbf2dc; /* 页面底色 */
+  --paper-dot: rgb(31 28 22 / 9%); /* 纸面点阵 */
+  --canvas: #fffaf0; /* 卡片、输入框、菜单 */
+  --sunken: #f8eed8; /* 凹下去的区域：表头、行内代码、只读字段、轨道 */
+  --hover: #f6ead0; /* 可交互元素的悬停底色 */
+  --selected: #f3e4c4; /* 非贴纸的选中底色 */
+
+  /* 文字与细线 */
+  --ink: #1f1c16; /* 标题、强调文字 */
+  --body: #3b372f; /* 正文 */
+  --muted: #6f6656; /* 次要文字 */
+  --hairline: rgb(31 28 22 / 16%); /* 卡片内部分隔线 */
+  --hairline-strong: rgb(31 28 22 / 28%); /* 弱边框、悬停边框 */
+  --mustard-text: #8b5e0f; /* 纸面上的芥末色文字 */
+  --link: var(--mustard-text);
+  --link-active: #6b470a;
+  --focus: var(--mustard-text);
+
+  /* 贴纸：墨线、硬投影与色块 */
+  --line: #1f1c16; /* 贴纸墨线 */
+  --shadow-ink: #1f1c16; /* 硬投影 */
+  --on-color: #1f1c16; /* 芥末与糖果色块上的文字 */
+  --mustard: #f2c14e; /* 品牌主色：主按钮、选中项、余额 */
+  --mustard-hover: #f6cc66;
+  --rose: #ffbfd0; /* 危险、失败、支出 */
+  --sky: #a9d8f5; /* 信息、进行中 */
+  --mint: #bfe5ab; /* 正常、成功、收入 */
+
+  /* 状态文字 */
+  --positive: #1d7a52;
   --warning: #8a5a00;
-  --warning-soft: #fbf1dc;
-  --warning-border: #ecd8a8;
   --danger: #b42318;
-  --danger-ink: #8a1c13;
-  --danger-soft: #fdecea;
-  --danger-border: #f4c7c3;
-  --info-soft: #e8f0fc;
+  --info: #2457a6;
 
-  /* 暗色代码块 */
-  --code-bg: #1d222b;
-  --code-ink: #d8dbe0;
+  /* 代码块 */
+  --code-bg: #201d18;
+  --code-ink: #ebe5d8;
+
+  /* 遮罩 */
+  --scrim: rgb(31 28 22 / 45%);
+
+  /*
+   * 过渡期：组件贴纸化（Feature #295）后删除。
+   * 状态的柔和底色与描边、旧版浮层阴影。
+   */
+  --ink-hover: #37322a;
+  --mustard-soft: #fbf1db;
+  --mustard-border: #ecd5a0;
+  --positive-soft: #e7f3ec;
+  --positive-border: #cce5d6;
+  --warning-soft: #fbf0d9;
+  --warning-border: #ecd6a6;
+  --danger-ink: #8a1c13;
+  --danger-soft: #fcebe7;
+  --danger-border: #f3c6bf;
+  --info-soft: #eaf0f8;
+  --info-border: #cddcf0;
+  --shadow-pop: 0 18px 40px -12px rgb(31 28 22 / 28%), 0 2px 6px rgb(31 28 22 / 8%);
+
+  /* 贴纸描边与硬投影（不模糊，按层级递增） */
+  --stroke: 2px;
+  --sticker-border: var(--stroke) solid var(--line);
+  --shadow-xs: 2px 2px 0 var(--shadow-ink); /* 小控件、徽标 */
+  --shadow-sm: 3px 3px 0 var(--shadow-ink); /* 按钮、列表卡片 */
+  --shadow-md: 4px 4px 0 var(--shadow-ink); /* 卡片 */
+  --shadow-lg: 6px 6px 0 var(--shadow-ink); /* 浮层、悬停抬起 */
 
   /* 字体与字号 */
-  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Inter,
-    ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans CJK SC", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  /* 标题与数字；自托管 Baloo 2 与源泉圆体落地（Feature #297）前回退系统字体 */
+  --font-display: var(--font-sans);
   --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -60,17 +100,12 @@
   --space-8: 32px;
   --space-10: 40px;
 
-  /* 圆角：卡片 12，按钮与输入 9 */
+  /* 圆角：卡片 14，输入框 10，按钮与徽标为胶囊 */
   --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-md: 9px;
-  --radius-lg: 12px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
-
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px rgb(24 29 38 / 6%);
-  --shadow-pop: 0 8px 28px rgb(24 29 38 / 14%);
-  --scrim: rgb(24 29 38 / 42%);
 
   /* 布局 */
   --sidebar-width: 240px;
@@ -82,5 +117,58 @@
   --z-sidebar: 30;
   --z-overlay: 60;
 
-  --duration: 120ms;
+  --duration: 140ms;
+}
+
+/* 墨夜：墨线变浅、投影近黑、色块压暗一档，避免半夜刺眼 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #191612;
+  --paper-dot: rgb(246 232 207 / 7%);
+  --canvas: #24201a;
+  --sunken: #1e1b16;
+  --hover: #2c2720;
+  --selected: #332d24;
+
+  --ink: #efe7d6;
+  --body: #d8cfbf;
+  --muted: #a59a87;
+  --hairline: rgb(239 231 214 / 14%);
+  --hairline-strong: rgb(239 231 214 / 26%);
+  --mustard-text: #e9bb5f;
+  --link-active: #f4cf85;
+
+  --line: #e6dcc8;
+  --shadow-ink: #050403;
+  --on-color: #1a160f;
+  --mustard: #c99a3e;
+  --mustard-hover: #d6a84c;
+  --rose: #c98aa0;
+  --sky: #6c9fc2;
+  --mint: #7aab69;
+
+  --positive: #7fcf9f;
+  --warning: #e9bb5f;
+  --danger: #f08a7e;
+  --info: #93b9f0;
+
+  --code-bg: #0d0c0a;
+  --code-ink: #e2dccf;
+
+  --scrim: rgb(0 0 0 / 62%);
+
+  --ink-hover: #ffffff;
+  --mustard-soft: #2a2316;
+  --mustard-border: #4c3e21;
+  --positive-soft: #14261d;
+  --positive-border: #24402f;
+  --warning-soft: #2a2214;
+  --warning-border: #4a3c1f;
+  --danger-ink: #f5a89e;
+  --danger-soft: #2c1715;
+  --danger-border: #4f2722;
+  --info-soft: #162030;
+  --info-border: #26364f;
+  --shadow-pop: 0 24px 48px -12px rgb(0 0 0 / 70%), 0 0 0 1px rgb(255 255 255 / 5%);
 }

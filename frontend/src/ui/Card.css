@@ -59,14 +59,14 @@
 .metric-hint { color: var(--muted); font-size: var(--text-xs); }
 
 .metric-card-accent { border-color: var(--ink); background: var(--ink); }
-.metric-card-accent > span, .metric-card-accent .metric-label { color: #c9ccd2; }
+.metric-card-accent > span, .metric-card-accent .metric-label { color: color-mix(in srgb, var(--canvas) 80%, var(--ink)); }
 .metric-card-accent > strong, .metric-card-accent .metric-value { color: var(--canvas); }
-.metric-card-accent > small, .metric-card-accent .metric-hint { color: #9aa0aa; }
+.metric-card-accent > small, .metric-card-accent .metric-hint { color: color-mix(in srgb, var(--canvas) 62%, var(--ink)); }
 .metric-card-warm { border-color: var(--mustard-border); background: var(--mustard-soft); }
 
 .progress { height: 6px; margin-top: var(--space-2); overflow: hidden; border-radius: var(--radius-pill); background: var(--selected); }
 .progress > i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--mustard); }
-.metric-card-accent .progress { background: #2c3340; }
+.metric-card-accent .progress { background: color-mix(in srgb, var(--canvas) 22%, var(--ink)); }
 
 .detail-list { margin: 0; padding: 4px var(--space-5) 0; }
 .detail-list > div {

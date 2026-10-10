@@ -21,7 +21,7 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 - [ADR-0012：采用模型层多档价格与计价公式 v2](0012-adopt-tiered-model-pricing-and-pricing-formula-v2.md)
 - [ADR-0013：采用管理员代发的账户密码重置](0013-adopt-admin-initiated-password-reset.md)
 - [ADR-0017：采用 sqlc 与按领域分包的持久化分层](0017-adopt-sqlc-domain-persistence-layering.md)
-- [ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定](0019-frontend-query-and-design-conventions.md)
+- [ADR-0019：前端采用 TanStack Query 与统一设计 token / 组件约定](0019-frontend-query-and-design-conventions.md)（视觉约定已由 ADR-0033 取代）
 - [ADR-0020：跨领域原子提交由调用方持有事务](0020-adopt-caller-owned-transactions-across-persistence-domains.md)
 - [ADR-0021：以 OpenAPI 作为前后端唯一契约来源](0021-openapi-as-single-api-contract.md)
 - [ADR-0025：账本去冻结与 C2C 托管账户](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md)
@@ -31,6 +31,7 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 - [ADR-0030：以可靠 token 细分与实际响应事实定价](0030-price-reliable-token-breakdowns.md)
 - [ADR-0031：论坛附件采用受限 PostgreSQL 存储并继承内容权限](0031-store-forum-attachments-in-postgresql.md)
 - [ADR-0032：论坛采用 Vditor 源码编辑与统一 Markdown 渲染](0032-use-vditor-for-forum-markdown.md)
+- [ADR-0033：前端采用贴纸风视觉、双主题与自托管字体](0033-adopt-sticker-visual-language-and-dual-themes.md)
 
 ## 归档
 

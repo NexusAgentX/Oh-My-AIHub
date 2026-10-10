@@ -9,7 +9,7 @@
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   color: var(--ink);
-  background: var(--soft);
+  background: var(--sunken);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   text-overflow: ellipsis;

@@ -8,13 +8,13 @@
   align-items: end;
 }
 .bar-chart-vertical .bar-chart-item { display: grid; height: 100%; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; min-width: 0; }
-.bar-chart-vertical .bar-chart-track { display: flex; align-items: flex-end; overflow: hidden; border-radius: 4px 4px 0 0; background: var(--soft); }
+.bar-chart-vertical .bar-chart-track { display: flex; align-items: flex-end; overflow: hidden; border-radius: 4px 4px 0 0; background: var(--sunken); }
 .bar-chart-vertical .bar-chart-track > i { display: block; width: 100%; min-height: 1px; border-radius: 4px 4px 0 0; background: var(--ink); }
 .bar-chart-vertical .bar-chart-label { overflow: hidden; color: var(--muted); font-size: var(--text-2xs); text-align: center; text-overflow: clip; white-space: nowrap; }
 .bar-chart-horizontal { gap: var(--space-2); }
 .bar-chart-horizontal .bar-chart-item { display: grid; grid-template-columns: minmax(80px, 160px) minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; font-size: var(--text-sm); }
 .bar-chart-horizontal .bar-chart-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-chart-horizontal .bar-chart-track { height: 10px; overflow: hidden; border-radius: var(--radius-pill); background: var(--soft); }
+.bar-chart-horizontal .bar-chart-track { height: 10px; overflow: hidden; border-radius: var(--radius-pill); background: var(--sunken); }
 .bar-chart-horizontal .bar-chart-track > i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--ink); }
 .bar-chart-value { color: var(--ink); font-weight: 600; }
 @media (max-width: 760px) {

@@ -1,0 +1,27 @@
+/* 主题切换：账户菜单中的图标单选 */
+.theme-menu {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--space-1) var(--space-1) 10px;
+  border-block: 1px solid var(--hairline);
+  color: var(--body);
+}
+.theme-menu-options { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-pill); background: var(--sunken); }
+.theme-menu-option {
+  display: inline-grid;
+  width: 32px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.theme-menu-option:hover { color: var(--ink); }
+.theme-menu-option[aria-checked='true'] { color: var(--on-color); background: var(--mustard); }

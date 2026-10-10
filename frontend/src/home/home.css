@@ -17,7 +17,7 @@
   line-height: 1.6;
 }
 .code-sample-copy { position: absolute; top: var(--space-2); right: var(--space-2); }
-.code-sample-copy .button { color: var(--code-ink); background: rgb(255 255 255 / 8%); }
+.code-sample-copy .button { color: var(--code-ink); background: color-mix(in srgb, var(--code-ink) 8%, transparent); }
 .cherry-fields { display: grid; gap: 0; margin: 0; }
 .cherry-fields > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--space-3); padding: 8px 0; border-bottom: 1px solid var(--hairline); }
 .cherry-fields dt { color: var(--muted); }
