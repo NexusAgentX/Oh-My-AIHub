@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { tokenPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
@@ -111,38 +112,59 @@ const priceLabels: Array<[keyof PriceSnapshot['prices'], string]> = [
   ['cache_write', '缓存写'],
 ]
 
-/** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。 */
+const remainderNote = /^(输入|输出|缓存写|缓存读)通用余量 (\d+) tokens（无可靠细分，按本组通用价）$/
+
+/**
+ * 计价说明：后端给每个有余量的桶各写一条“通用余量”。
+ * 没有任何细分时，余量就是总用量，已在用量里显示，不再重复；有部分细分时合成一行。其余说明原样保留。
+ */
+export function pricingNotes(notes: readonly string[], hasBreakdown: boolean) {
+  const remainders: string[] = []
+  const rest = notes.filter((note) => {
+    const match = remainderNote.exec(note)
+    if (match) remainders.push(`${match[1]} ${Number(match[2]).toLocaleString('zh-CN')}`)
+    return !match
+  })
+  return hasBreakdown && remainders.length > 0 ? [...rest, `其余按通用价：${remainders.join(' · ')} tokens`] : rest
+}
+
+const thinkingModeLabels: Record<string, string> = { qwen_thinking: '已输出思考', qwen_non_thinking: '未输出思考' }
+
+/** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。没有信息的项不显示。 */
 export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
-  return (
-    <DetailList
-      items={[
-        ['价格档', snapshot.tier?.name ?? '基准价'],
-        ['实际服务档位', snapshot.detail?.service_tier || '未提供'],
-        ['请求服务档位', snapshot.detail?.requested_service_tier || '未指定'],
-        [
-          '百炼思考模式',
-          snapshot.detail?.thinking_mode === 'qwen_thinking'
-            ? '已输出思考'
-            : snapshot.detail?.thinking_mode === 'qwen_non_thinking'
-              ? '未输出思考'
-              : '未判定',
-        ],
-        ...Object.entries(snapshot.detail?.tokens ?? {}).map(([key, count]): [string, string] => [
-          tokenPriceLabels[key] || key,
-          `${count} tokens · 原单价 ${snapshot.selected_prices?.token_prices?.[key] ?? snapshot.token_prices?.[key] ?? '继承通用价'}`,
-        ]),
-        ...(snapshot.detail?.notes ?? []).map((note): [string, string] => ['计价说明', note]),
-        ['倍率', formatMultiplier(snapshot.multiplier)],
-        ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`],
-        ...priceLabels.map(([key, label]): [string, string] => [
-          `${label}现价`,
-          snapshot.selected_prices
-            ? `${snapshot.selected_prices[key]} × ${snapshot.multiplier}`
-            : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
-        ]),
-      ]}
-    />
-  )
+  const detail = snapshot.detail
+  const thinking = thinkingModeLabels[detail?.thinking_mode ?? '']
+  const notes = pricingNotes(detail?.notes ?? [], Object.keys(detail?.tokens ?? {}).length > 0)
+  const items: Array<[string, ReactNode]> = [['价格档', snapshot.tier?.name ?? '基准价']]
+  if (detail?.service_tier) items.push(['实际服务档位', detail.service_tier])
+  if (detail?.requested_service_tier) items.push(['请求服务档位', detail.requested_service_tier])
+  if (thinking) items.push(['百炼思考模式', thinking])
+  for (const [key, count] of Object.entries(detail?.tokens ?? {})) {
+    items.push([
+      tokenPriceLabels[key] || key,
+      `${count} tokens · 原单价 ${snapshot.selected_prices?.token_prices?.[key] ?? snapshot.token_prices?.[key] ?? '继承通用价'}`,
+    ])
+  }
+  if (notes.length > 0) {
+    items.push([
+      '计价说明',
+      <span className="detail-lines" key="notes">
+        {notes.map((note) => (
+          <span key={note}>{note}</span>
+        ))}
+      </span>,
+    ])
+  }
+  items.push(['倍率', formatMultiplier(snapshot.multiplier)], ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`])
+  for (const [key, label] of priceLabels) {
+    items.push([
+      `${label}现价`,
+      snapshot.selected_prices
+        ? `${snapshot.selected_prices[key]} × ${snapshot.multiplier}`
+        : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
+    ])
+  }
+  return <DetailList items={items} />
 }
 
 export function TransactionDetail({ transaction }: { transaction: LedgerTransaction }) {

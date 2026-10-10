@@ -167,11 +167,11 @@ export function CallFilterBar({
           placeholder="请求 ID"
           value={requestId}
         />
-        <Button icon={<Icon name="search" />} size="sm" type="submit" variant="secondary">
+        <Button icon={<Icon name="search" />} type="submit" variant="secondary">
           查找
         </Button>
         {value.requestId && (
-          <Button onClick={clearId} size="sm" type="button" variant="quiet">
+          <Button onClick={clearId} type="button" variant="quiet">
             清除
           </Button>
         )}

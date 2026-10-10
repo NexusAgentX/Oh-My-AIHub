@@ -44,15 +44,10 @@ function KeyRow({ apiKey, onOpen }: { apiKey: ApiKey; onOpen: () => void }) {
           </div>
         </dl>
         <span className="key-row-budget">
-          {progress ? (
-            <>
-              <span className="muted">
-                {progress.label}预算 {Math.round(progress.percent)}%
-              </span>
-              <ProgressBar label={`${progress.label}预算已用 ${Math.round(progress.percent)}%`} value={progress.percent} warn={progress.warn} />
-            </>
-          ) : (
-            <span className="muted">不限预算</span>
+          <span className="key-row-budget-label">{progress ? `${progress.label}预算` : '预算'}</span>
+          <strong className="num">{progress ? `已用 ${Math.round(progress.percent)}%` : '不限'}</strong>
+          {progress && (
+            <ProgressBar label={`${progress.label}预算已用 ${Math.round(progress.percent)}%`} value={progress.percent} warn={progress.warn} />
           )}
         </span>
         <span className="key-row-status">

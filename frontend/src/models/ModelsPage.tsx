@@ -68,7 +68,6 @@ export function ModelsPage() {
       <Toolbar>
         <SearchInput label="搜索模型" onChange={(event) => update('query', event.target.value)} placeholder="搜索模型" value={filters.query} />
         <Segmented label="按格式筛选" onChange={(value) => update('format', value)} options={formatOptions} value={filters.format} />
-        <Switch label="仅看有在线渠道" checked={filters.onlineOnly} onChange={(value) => update('onlineOnly', value)} />
       </Toolbar>
       <Disclosure title="更多筛选" changed={advancedCount}>
         <div className="model-filters">
@@ -95,7 +94,10 @@ export function ModelsPage() {
             <>
               <div className="model-filter-summary">
                 <span role="status">{invalid ? '请修正筛选条件' : `显示 ${rows.length} / ${data.items.length} 个模型`}</span>
-                <Button type="button" variant="quiet" size="sm" disabled={!active} onClick={() => setFilters({ ...defaultFilters, onlineOnly: false })}>清空筛选</Button>
+                <div className="model-filter-summary-end">
+                  <Switch label="仅看有在线渠道" checked={filters.onlineOnly} onChange={(value) => update('onlineOnly', value)} />
+                  <Button type="button" variant="quiet" size="sm" disabled={!active} onClick={() => setFilters({ ...defaultFilters, onlineOnly: false })}>清空筛选</Button>
+                </div>
               </div>
               {rows.length === 0
                 ? <EmptyState title={invalid ? '筛选条件有误' : data.items.length === 0 ? '暂无模型' : '没有匹配的模型'} />

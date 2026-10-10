@@ -31,7 +31,7 @@ export function CallDetailView({ call }: { call: CallDetail }) {
     <div className="call-detail">
       <div className="call-detail-id">
         <code className="mono">{call.id}</code>
-        <CopyButton label="复制请求 ID" value={call.id} />
+        <CopyButton iconOnly label="复制请求 ID" value={call.id} />
       </div>
       <dl className="call-detail-grid">
         <Row label="结果">

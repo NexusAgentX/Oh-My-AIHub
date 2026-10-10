@@ -87,8 +87,10 @@
 }
 
 .model-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-.model-filter-capabilities { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: 0; margin: var(--space-3) 0 0; border: 0; }
-.model-filter-capabilities legend { margin-bottom: var(--space-2); font-size: var(--text-sm); }
-.model-filter-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) 0; color: var(--muted); font-size: var(--text-sm); }
+.model-filter-capabilities { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: 0; margin: 0; border: 0; }
+.model-filter-capabilities legend { margin-bottom: var(--space-2); color: var(--body); font-size: var(--text-base); font-weight: 600; }
+/* 结果数与“仅看有在线渠道”同一行：开关决定显示多少个，放在数字旁边 */
+.model-filter-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0; color: var(--muted); font-size: var(--text-sm); }
+.model-filter-summary-end { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; color: var(--body); }
 @media (max-width: 960px) { .model-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .model-filters { grid-template-columns: minmax(0, 1fr); } }

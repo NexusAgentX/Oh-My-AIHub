@@ -34,6 +34,8 @@
 .button-quiet:active { padding: 0 var(--space-3); border-color: transparent; color: var(--body); background: transparent; }
 .button-quiet:hover:not(:disabled) { background: var(--hover); }
 .button-quiet:active:not(:disabled) { transform: none; }
+/* 行尾的安静按钮：抵消内边距与透明描边，文字与上下卡片的右边对齐 */
+:is(.panel-actions, .model-filter-summary-end) > .button-quiet:last-child { margin-right: calc(-1 * (var(--space-3) + var(--stroke))); }
 
 .button-danger,
 .button-danger:active { color: var(--on-color); background: var(--rose); box-shadow: var(--shadow-xs); }

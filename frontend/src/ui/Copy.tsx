@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button } from './Button'
+import { Button, IconButton } from './Button'
 import { Icon } from './Icon'
 
 /** 写入剪贴板；不支持 Clipboard API 时退回到选区复制。 */
@@ -35,12 +35,15 @@ export function CopyButton({
   label = '复制',
   size = 'sm',
   variant = 'secondary',
+  iconOnly = false,
   disabled,
 }: {
   value: string | (() => Promise<string>)
   label?: string
   size?: 'sm' | 'md'
   variant?: 'secondary' | 'quiet' | 'primary'
+  /** 只显示图标，label 作为无障碍名称与悬停提示；用于紧挨着被复制值的地方 */
+  iconOnly?: boolean
   disabled?: boolean
 }) {
   const [state, setState] = useCopied()
@@ -56,18 +59,23 @@ export function CopyButton({
       setBusy(false)
     }
   }
+  const text = state === 'copied' ? '已复制' : state === 'failed' ? '复制失败' : label
+  const icon = <Icon name={state === 'copied' ? 'check' : 'copy'} />
+  if (iconOnly) {
+    return <IconButton aria-live="polite" disabled={disabled || busy} icon={icon} label={text} onClick={() => void onClick()} />
+  }
   return (
     <Button
       aria-live="polite"
       disabled={disabled}
-      icon={<Icon name={state === 'copied' ? 'check' : 'copy'} />}
+      icon={icon}
       loading={busy}
       onClick={() => void onClick()}
       size={size}
       type="button"
       variant={variant}
     >
-      {state === 'copied' ? '已复制' : state === 'failed' ? '复制失败' : label}
+      {text}
     </Button>
   )
 }

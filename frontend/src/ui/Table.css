@@ -12,7 +12,8 @@
 .search-form {
   position: relative;
   display: flex;
-  width: min(320px, 100%);
+  width: 320px; /* 不用 min(320px, 100%)：百分比让工具栏按偏窄的宽度排版，搜索框后的控件提前换行 */
+  max-width: 100%;
   align-items: center;
 }
 .search-form .icon { position: absolute; left: var(--space-3); color: var(--muted); pointer-events: none; }

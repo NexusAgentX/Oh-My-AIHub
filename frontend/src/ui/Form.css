@@ -1,6 +1,7 @@
 .field {
   display: grid;
   min-width: 0;
+  align-content: start; /* 同行字段被提示文字撑高时，输入框仍与邻居对齐 */
   gap: 7px;
   color: var(--body);
   font-size: var(--text-base);
