@@ -38,9 +38,9 @@
 ## 工作树与分支
 
 - 主工作区只保持干净、与 `origin/main` 同步的 `main`。任何写仓库的任务都在独立 worktree 中完成，不在主工作区提交或切换分支。
-- 开工：`mise run task-start <slug>`（`scripts/task-start.sh`，slug 如 `265-task-scripts`）。它确认主工作区在 `main`、干净且能仅快进，同步 `origin/main`，再从它创建 `codex/<slug>` 分支与 `../Oh-My-AIHub-worktrees/<slug>` worktree 并校验起点；条件不满足时停止并报告，不用 reset、stash 或强制切换。
+- 开工：`mise run task-start <type>/<slug>`（`scripts/task-start.sh`），如 `fix/251-key-layout`；type 为 `feat fix docs refactor perf test ci chore` 之一，slug 为小写字母、数字与连字符。它确认主工作区在 `main`、干净且能仅快进，同步 `origin/main`，再从它创建同名分支与 `../Oh-My-AIHub-worktrees/<type>-<slug>` worktree 并校验起点；条件不满足时停止，不用 reset、stash 或强制切换。
 - 恢复已有任务时沿用其分支与 worktree。
-- 边界清晰、无依赖的 Feature 可由子代理并行，各自拥有独立分支、worktree 与 PR；子代理不得写主工作区或其他任务的 worktree。
+- 边界清晰、无依赖的 Feature 可由子代理并行，各有独立分支、worktree 与 PR；子代理不得写主工作区或其他任务的 worktree。
 
 ## 验证
 
@@ -73,7 +73,7 @@
 - 改动聚焦当前任务，不夹带无关重构。未发布的中间态可以直接简化或破坏性重构，不加无依据的兼容层；数据库迁移按上节执行。
 - `main` 受规则集保护：只能通过 PR 合并，且 `gates`、`integration` 两项检查必须通过。合并前确认验收有证据、相关文档已同步；`main` 已前进时在任务 worktree 内同步并重新验证。
 - 验收通过后 Agent 主动合并并删除远端任务分支；有 Issue 时核对正文后关闭，并同步 Epic。
-- 合并后清理：`mise run task-finish <slug>`（`scripts/task-finish.sh`）。它确认 PR 已合并、分支提交已进入 `origin/main`、worktree 干净（仅允许依赖与构建缓存被忽略），再停止该 worktree 的 Compose 容器、删除其 worktree 与本地、远端分支，快进主工作区并确认 `main...origin/main` 为 `0/0`。证据不足时停止，不强制删除，不动其他任务；`--dry-run` 只预览，加 `--volumes` 才删除 Docker 卷。合并 PR 用 merge commit，squash 或 rebase 会让脚本因证据不足而停止。
+- 合并后清理：`mise run task-finish <type>/<slug>`（`scripts/task-finish.sh`）。它确认 PR 已合并、分支提交已进入 `origin/main`、worktree 干净（仅允许依赖与构建缓存被忽略），再停止该 worktree 的 Compose 容器、删除其 worktree 与本地、远端分支，快进主工作区并确认 `main...origin/main` 为 `0/0`。证据不足时停止，不强制删除，不动其他任务；`--dry-run` 只预览，加 `--volumes` 才删除 Docker 卷。合并 PR 用 merge commit，squash 或 rebase 会让脚本因证据不足而停止。
 
 ## 发版
 
