@@ -35,7 +35,7 @@
   height: 100dvh;
   flex-direction: column;
   gap: 22px;
-  padding: var(--space-5) 14px;
+  padding: var(--space-5) 14px var(--space-2); /* 底部账户块贴近窗口底边 */
   overflow-y: auto;
 }
 .sidebar > .brand { padding: 0 var(--space-2); }

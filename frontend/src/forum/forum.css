@@ -1,5 +1,7 @@
 .forum-page { display: grid; gap: var(--space-5); min-width: 0; }
 .forum-tabs { display: flex; gap: var(--space-2); overflow-x: auto; padding: 2px 4px 6px 2px; scrollbar-width: none; }
+/* 桌面侧栏已有论坛与工单两个入口；手机底栏没有，只在手机上保留这组切换 */
+@media (min-width: 768px) { .forum-tabs { display: none; } }
 .forum-tabs a { display: inline-flex; min-height: 36px; flex: 0 0 auto; align-items: center; padding: 0 var(--space-4); border: var(--sticker-border); border-color: transparent; border-radius: var(--radius-pill); color: var(--muted); font-weight: 700; text-decoration: none; white-space: nowrap; }
 .forum-tabs a:hover { color: var(--ink); background: var(--hover); }
 .forum-tabs a.active { border-color: var(--line); color: var(--on-color); background: var(--mustard); box-shadow: var(--shadow-xs); }
