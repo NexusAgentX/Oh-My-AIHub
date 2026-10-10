@@ -159,7 +159,7 @@ export function BillTab() {
                 label="按天汇总"
               />
             ) : (
-              <EmptyState title="本月没有账单" />
+              <EmptyState mascot={false} title="本月没有账单" />
             )
           }
           if (mode === 'key') {
@@ -175,7 +175,7 @@ export function BillTab() {
                 orientation="horizontal"
               />
             ) : (
-              <EmptyState title="本月没有调用支出" />
+              <EmptyState mascot={false} title="本月没有调用支出" />
             )
           }
           return (

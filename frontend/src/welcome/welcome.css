@@ -51,7 +51,7 @@
   color: var(--on-color);
   background: var(--mustard);
   box-shadow: var(--shadow-md);
-  transform: rotate(-3deg);
+  transform: rotate(-2deg); /* 这一页唯一歪着的贴纸，能力卡片保持端正 */
 }
 
 .welcome-eyebrow {
@@ -60,8 +60,8 @@
   padding: 1px 12px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-pill);
-  color: var(--on-color);
-  background: var(--sky);
+  color: var(--ink);
+  background: var(--canvas);
   font-size: var(--text-sm);
   font-weight: 700;
 }
@@ -80,7 +80,7 @@
   align-items: center;
   gap: var(--space-4);
 }
-.welcome-actions .button { min-height: 48px; padding-inline: 24px; font-size: var(--text-md); }
+.welcome-actions .button { min-height: 48px; padding-inline: 24px; font-family: var(--font-display); font-size: 17px; font-weight: 800; }
 
 .welcome-invite {
   display: inline-flex;
@@ -90,7 +90,7 @@
   font-size: var(--text-sm);
 }
 
-/* 三张能力卡片：落地页上允许的微倾斜贴纸 */
+/* 三张能力卡片：端正的贴纸，图标底色按含义取 */
 .welcome-values {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -106,9 +106,6 @@
   background: var(--canvas);
   box-shadow: var(--shadow-md);
 }
-.welcome-values li:nth-child(1) { transform: rotate(-0.8deg); }
-.welcome-values li:nth-child(2) { transform: rotate(0.6deg); }
-.welcome-values li:nth-child(3) { transform: rotate(-0.4deg); }
 .welcome-values strong { display: block; margin-top: var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; }
 .welcome-values p { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 
@@ -153,5 +150,4 @@
   .welcome-hero > .mascot { display: none; }
   .welcome-values,
   .welcome-boundaries { grid-template-columns: 1fr; }
-  .welcome-values li:nth-child(n) { transform: none; }
 }

@@ -18,7 +18,7 @@ const eventLabels: Record<ChannelEvent['kind'], { label: string; tone: BadgeTone
 
 /** 健康事件列表：冷却、恢复、触发限额、被下架，带原因。 */
 export function ChannelEvents({ events }: { events: ChannelEvent[] }) {
-  if (events.length === 0) return <EmptyState title="暂无健康事件" />
+  if (events.length === 0) return <EmptyState mascot={false} title="暂无健康事件" />
   return (
     <ol className="channel-events">
       {events.map((event) => (
@@ -42,7 +42,7 @@ const hourFormat = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', hour12: f
 
 /** 失败按上游状态码分布；null 表示没有拿到响应（连接失败或超时）。 */
 export function StatusCodes({ codes }: { codes: ChannelStats['status_codes'] }) {
-  if (codes.length === 0) return <EmptyState title="没有失败" />
+  if (codes.length === 0) return <EmptyState mascot={false} title="没有失败" />
   return (
     <BarChart
       data={codes.map((row) => ({
@@ -59,7 +59,7 @@ export function StatusCodes({ codes }: { codes: ChannelStats['status_codes'] }) 
 
 /** 最近失败：时间、模型、状态码与错误码、上游原始错误。 */
 export function RecentFailures({ failures }: { failures: ChannelFailure[] }) {
-  if (failures.length === 0) return <EmptyState title="没有失败" />
+  if (failures.length === 0) return <EmptyState mascot={false} title="没有失败" />
   return (
     <ol className="channel-failures">
       {failures.map((failure, index) => (

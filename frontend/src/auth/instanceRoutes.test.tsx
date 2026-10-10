@@ -24,8 +24,10 @@ describe('instance routes', () => {
     expect(matchRoutes(appRoutes, pathname)?.at(-1)?.route.path).toBe(expectedRoute)
   })
 
-  it('未匹配路径落到落地页通配路由', () => {
-    expect(matchRoutes(appRoutes, '/not-a-page')?.at(-1)?.route.path).toBe('*')
+  it.each(['/not-a-page', '/admin/not-a-page', '/models/gpt-5/extra'])('未匹配路径 %s 落到 404 页', (pathname) => {
+    const last = matchRoutes(appRoutes, pathname)?.at(-1)?.route
+    expect(last?.path).toBe('*')
+    expect((last?.element as { type?: { name?: string } } | undefined)?.type?.name).toBe('NotFoundPage')
   })
 
   it('初始化路由独立于会话门卫，控制台路由仍受会话门卫保护', () => {

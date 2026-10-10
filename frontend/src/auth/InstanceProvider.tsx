@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Outlet } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { LoadingState } from '../ui'
+import { PageLoading } from '../ui'
 
 type InstanceState = {
   ready: boolean
@@ -51,11 +51,7 @@ export function useInstance() {
 export function RequireInitialized() {
   const { ready, initialized } = useInstance()
   if (!ready) {
-    return (
-      <main className="route-loading">
-        <LoadingState />
-      </main>
-    )
+    return <PageLoading />
   }
   if (initialized === false) return <Navigate replace to="/initialize" />
   return <Outlet />
