@@ -4,6 +4,8 @@
 
 ## 未发布
 
+- 新增 `mise run task-start` 与 `task-finish`：开工时同步 `main` 并创建任务分支和 worktree，合并后校验并清理；新增 PR 模板，以及每月分组的 Dependabot 依赖更新（Go、npm、GitHub Actions、Dockerfile）（#265）。
+
 - 网关的平台设置与渠道统计改为后台定时刷新，请求路径不再等待数据库；统计查询变慢时网关与模型页继续使用上一次的值（#261）。
 
 - 开发流程与文档减负：小改动直接提 PR、功能 Issue 改为三段式、发版攒批；AGENTS.md 与 ARCHITECTURE.md 精简为约束与不变量，早期 ADR 归档到 `docs/adr/archive/`，v0.7.0 之前的变更日志改为指向各 tag（#258）。
