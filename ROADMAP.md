@@ -4,7 +4,7 @@
 
 ## Now
 
-- 转入长期维护：CI 守住数据库与迁移、流程与文档减负、静态检查与网关缓存优化（[Epic #257](https://github.com/NexusAgentX/Oh-My-AIHub/issues/257)）。
+当前没有进行中的结果项。长期维护基线已建立（[Epic #257](https://github.com/NexusAgentX/Oh-My-AIHub/issues/257)）：CI 守住数据库、迁移与契约，流程与文档已减负。
 
 ## Next
 
