@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-10-07
 - 决策者：仓库维护者
-- 关联内容：[Feature #122](https://github.com/NexusAgentX/Oh-My-AIHub/issues/122)、[Epic #109](https://github.com/NexusAgentX/Oh-My-AIHub/issues/109)、[ADR-0017](0017-adopt-sqlc-domain-persistence-layering.md)、[ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)、[ADR-0011](0011-adopt-c2c-order-trade-hold-state-machine.md)、[ADR-0010](0010-adopt-snapshot-gateway-and-idempotent-settlement.md)
+- 关联内容：[Feature #122](https://github.com/NexusAgentX/Oh-My-AIHub/issues/122)、[Epic #109](https://github.com/NexusAgentX/Oh-My-AIHub/issues/109)、[ADR-0017](0017-adopt-sqlc-domain-persistence-layering.md)、[ADR-0005](0005-adopt-centralized-zero-sum-ledger.md)、[ADR-0011](archive/0011-adopt-c2c-order-trade-hold-state-machine.md)、[ADR-0010](archive/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)
 
 ## 背景
 

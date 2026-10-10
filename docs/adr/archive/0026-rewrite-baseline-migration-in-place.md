@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-10-08
 - 决策者：项目维护者与 AI 产品团队
-- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171)、[ADR-0006](0006-adopt-postgresql-goose-and-fixed-point-amounts.md)、[ADR-0024](0024-squash-migrations-to-single-baseline.md)
+- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #171](https://github.com/NexusAgentX/Oh-My-AIHub/issues/171)、[ADR-0006](../0006-adopt-postgresql-goose-and-fixed-point-amounts.md)、[ADR-0024](0024-squash-migrations-to-single-baseline.md)
 
 ## 背景
 

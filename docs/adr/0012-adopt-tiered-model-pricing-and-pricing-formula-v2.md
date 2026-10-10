@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-09-03
 - 决策者：仓库维护者
-- 关联内容：[Epic #68](https://github.com/NexusAgentX/Oh-My-AIHub/issues/68)、[ADR-0008](0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0010](0010-adopt-snapshot-gateway-and-idempotent-settlement.md)
+- 关联内容：[Epic #68](https://github.com/NexusAgentX/Oh-My-AIHub/issues/68)、[ADR-0008](archive/0008-adopt-immutable-ledger-holds-and-pricing-formula-v1.md)、[ADR-0010](archive/0010-adopt-snapshot-gateway-and-idempotent-settlement.md)
 
 ## 背景
 
