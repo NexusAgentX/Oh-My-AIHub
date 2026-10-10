@@ -22,13 +22,12 @@
 
 ## 发布检查
 
-- 本地门禁：`mise run check-release`（前端 lint、测试与构建，后端 vet、staticcheck 与 race，Compose 配置）。
-- CI：PR 与 main 推送自动执行 `.github/workflows/ci.yml`：按改动范围运行 `frontend`、`backend`（同一组门禁及生成代码一致性检查）、`integration`（PostgreSQL 集成测试与迁移检查）和 `images`（镜像构建与 Nginx 配置检查），由必需检查 `gates` 汇总；`main` 推送始终全量运行。
+- 门禁：PR 与推送到 `main` 时由 CI 按改动范围检查（`.github/workflows/ci.yml`）；发版工作流复用该提交在 `main` 上的 CI 结果，缺失时才执行 `mise run check-release`。不必在本地重复。
 - 部署后烟测：`GET /api/health` 返回 ok；管理员打开 `/admin/points` 确认五项核对全部通过。
 
 ## 升级流程
 
-1. 在新版本上完成 `mise run check-release`。
+1. 确认目标提交在 `main` 上的 CI 已通过。
 2. 执行一次数据库备份（见备份恢复 Runbook）。
 3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。
 4. 升级后烟测同上；核对未通过时按故障处理 Runbook 处置并保留现场。
@@ -38,7 +37,7 @@
 生产实例部署在 HK VPS，由 GitHub Actions 自动部署（`.github/workflows/release.yml`）。
 常规发版、审批上线、重跑/回滚与紧急手动部署的逐步操作见 `release.md`：
 
-1. 推送 `v*` tag（如 `v0.1.0`）后自动执行：`mise run check-release` 门禁 → backend/frontend 多架构镜像构建推送 GHCR（tag + digest 固定）→ 创建 GitHub Release。
+1. 推送 `v*` tag（如 `v0.1.0`）后自动执行：门禁（复用 `main` 上该提交的 CI 结果，缺失时执行 `mise run check-release`）→ backend/frontend 多架构镜像构建推送 GHCR（tag + digest 固定）→ 创建 GitHub Release。
 2. `production-hub` Environment 需人工审批。批准后 workflow 通过 SSH forced-command 调用 VPS 上的受限发布脚本：先做部署前加密备份，再以目标 digest 切换 Compose 镜像、`up -d`、等待健康并烟测本机与公网端点；任一步失败自动回滚到备份 Compose。
 3. 重跑或回滚：对 `release` workflow 使用 `workflow_dispatch` 并填入既有 tag，直接复用已发布镜像 digest 部署，不重新构建。
 4. 运行时事实（生产 Compose、Nginx、备份与发布脚本副本）以个人运维仓库 `remote-hosts/hk-vps/sites/oh-my-aihub/` 为准；首次部署与新环境自举使用该仓库的 `bin/deploy-oh-my-aihub`。
