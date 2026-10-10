@@ -154,9 +154,17 @@
 }
 .topbar-brand { display: none; color: inherit; }
 .topbar-brand:hover { text-decoration: none; }
-/* 顶栏左侧：详情页的“‹ 上一级”，一级页面为空（页面标题只在页面里出现一次）；右侧是主题切换 */
-.topbar-back { display: flex; min-width: 0; align-items: center; }
-.topbar-back:empty { display: none; }
+/*
+ * 顶栏左侧：详情页的“‹ 上一级”；页面标题滚出屏幕后再淡入显示标题（页面顶部时标题只出现一次）。
+ * 右侧是主题切换。
+ */
+.topbar-context { display: flex; min-width: 0; align-items: center; gap: var(--space-2); }
+.topbar-context:empty { display: none; }
+.topbar-title { display: flex; min-width: 0; align-items: center; gap: var(--space-2); color: var(--ink); font-weight: 700; white-space: nowrap; animation: topbar-title-in 160ms ease; }
+.topbar-title-sep { color: var(--hairline-strong); font-weight: 400; }
+.topbar-title-text { overflow: hidden; text-overflow: ellipsis; }
+@keyframes topbar-title-in { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .topbar-title { animation: none; } }
 .page-back {
   display: inline-flex;
   min-width: 0;
@@ -249,7 +257,7 @@
   .topbar-brand { display: block; }
   .topbar-brand .brand-copy { display: none; }
   /* 手机：详情页用“‹ 上一级”替代标志；主题切换在“我的”页 */
-  .topbar:has(.topbar-back:not(:empty)) .topbar-brand { display: none; }
+  .topbar:has(.page-back) .topbar-brand { display: none; }
   .theme-toggle { display: none; }
   .wallet-chip { margin-left: auto; }
   .session-alert { margin: var(--space-3) var(--space-4) 0; }

@@ -138,7 +138,7 @@ export function HomePage() {
   if (!account) return null
   return (
     <div className="home-page">
-      <PageHeader title={`你好，${account.display_name}`} />
+      <PageHeader title={`你好，${account.display_name}`} topbarTitle="首页" />
       <PendingTradesBanner />
       <StartCard />
       <div className="home-grid">

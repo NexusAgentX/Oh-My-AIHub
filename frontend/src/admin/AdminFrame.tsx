@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { Brand } from '../layouts/Brand'
 import { ThemeToggle } from '../theme/ThemeSwitcher'
-import { Drawer, Icon, PageBackSlot } from '../ui'
+import { Drawer, Icon, TopbarSlot } from '../ui'
 import { adminNavigation, adminTabCount, findAdminNavItem, type AdminNavItem } from './navigation'
 
 function NavItems({ items, onNavigate }: { items: AdminNavItem[]; onNavigate?: () => void }) {
@@ -75,10 +75,10 @@ export function AdminFrame() {
     return () => desktop.removeEventListener('change', close)
   }, [])
 
-  const [backSlot, setBackSlot] = useState<HTMLDivElement | null>(null)
+  const [topbarSlot, setTopbarSlot] = useState<HTMLDivElement | null>(null)
 
   return (
-    <PageBackSlot.Provider value={backSlot}>
+    <TopbarSlot.Provider value={topbarSlot}>
     <div className="app-shell admin-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
       <aside aria-label="管理后台侧边栏" className="sidebar">
@@ -91,8 +91,8 @@ export function AdminFrame() {
       <div className="workspace">
         <header className="topbar">
           <span className="topbar-brand"><Brand /></span>
-          {/* 详情页的“‹ 上一级”渲染到这里；当前栏目已在侧栏高亮、页面标题里写明，不再重复 */}
-          <div className="topbar-back" ref={setBackSlot} />
+          {/* 页面标题区把“‹ 上一级”和滚出屏幕后的标题渲染到这里；页面顶部时不重复标题 */}
+          <div className="topbar-context" ref={setTopbarSlot} />
           <ThemeToggle />
           <Link aria-label="返回产品" className="admin-topbar-back" to="/home">
             <Icon name="back" />
@@ -138,6 +138,6 @@ export function AdminFrame() {
         <AdminFooter showBackLink onNavigate={() => setMoreOpen(false)} />
       </Drawer>
     </div>
-    </PageBackSlot.Provider>
+    </TopbarSlot.Provider>
   )
 }
