@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 )
@@ -47,7 +48,7 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	a.loginLimiter.success(limitKey)
 	a.loginIPLimiter.success(ipLimitKey)
 	a.setSessionCookie(w, result.SessionToken)
-	writeJSON(w, http.StatusOK, map[string]any{"account": accountResponse(result.Account)})
+	writeJSON(w, http.StatusOK, accountEnvelopeJSON{Account: newAccountJSON(result.Account)})
 }
 
 func (a *app) logout(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +63,7 @@ func (a *app) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"account": accountResponse(accountFromContext(r.Context()))})
+	writeJSON(w, http.StatusOK, accountEnvelopeJSON{Account: newAccountJSON(accountFromContext(r.Context()))})
 }
 
 func (a *app) changePassword(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +95,7 @@ func (a *app) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.setSessionCookie(w, result.SessionToken)
-	writeJSON(w, http.StatusOK, map[string]any{"account": accountResponse(result.Account)})
+	writeJSON(w, http.StatusOK, accountEnvelopeJSON{Account: newAccountJSON(result.Account)})
 }
 
 // registerIdentityRoutes 注册认证与当前账户路由。
@@ -105,14 +106,30 @@ func (a *app) registerIdentityRoutes(r *router) {
 	r.session("POST /api/me/password", a.changePassword)
 }
 
-func accountResponse(account identity.Account) map[string]any {
-	return map[string]any{
-		"id":                   account.ID,
-		"username":             account.Username,
-		"display_name":         account.DisplayName,
-		"is_admin":             account.IsAdmin,
-		"status":               account.Status,
-		"must_change_password": account.MustChangePassword,
-		"created_at":           account.CreatedAt,
+// accountJSON is the OpenAPI Account schema.
+type accountJSON struct {
+	ID                 string          `json:"id"`
+	Username           string          `json:"username"`
+	DisplayName        string          `json:"display_name"`
+	IsAdmin            bool            `json:"is_admin"`
+	Status             identity.Status `json:"status"`
+	MustChangePassword bool            `json:"must_change_password"`
+	CreatedAt          time.Time       `json:"created_at"`
+}
+
+// accountEnvelopeJSON is the OpenAPI AccountEnvelope schema.
+type accountEnvelopeJSON struct {
+	Account accountJSON `json:"account"`
+}
+
+func newAccountJSON(account identity.Account) accountJSON {
+	return accountJSON{
+		ID:                 account.ID,
+		Username:           account.Username,
+		DisplayName:        account.DisplayName,
+		IsAdmin:            account.IsAdmin,
+		Status:             account.Status,
+		MustChangePassword: account.MustChangePassword,
+		CreatedAt:          account.CreatedAt,
 	}
 }

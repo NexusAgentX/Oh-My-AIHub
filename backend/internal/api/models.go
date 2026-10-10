@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -151,48 +152,118 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 	return patch, nil
 }
 
-func pricesResponse(input, output, cacheWrite, cacheRead money.Amount, extras ...map[string]money.Amount) map[string]any {
+// modelPricesJSON is the OpenAPI ModelPrices schema.
+type modelPricesJSON struct {
+	Input       string            `json:"input"`
+	Output      string            `json:"output"`
+	TokenPrices map[string]string `json:"token_prices"`
+	CacheWrite  string            `json:"cache_write"`
+	CacheRead   string            `json:"cache_read"`
+}
+
+// priceTierJSON is the OpenAPI PriceTier schema.
+type priceTierJSON struct {
+	Seq             int             `json:"seq"`
+	ServiceTier     string          `json:"service_tier"`
+	ThinkingMode    string          `json:"thinking_mode"`
+	Name            string          `json:"name"`
+	MinPromptTokens *int64          `json:"min_prompt_tokens"`
+	MaxPromptTokens *int64          `json:"max_prompt_tokens"`
+	Timezone        string          `json:"timezone"`
+	Weekdays        []int           `json:"weekdays"`
+	StartMinute     *int16          `json:"start_minute_of_day"`
+	EndMinute       *int16          `json:"end_minute_of_day"`
+	Prices          modelPricesJSON `json:"prices"`
+}
+
+// adminModelJSON is the OpenAPI AdminModel schema.
+type adminModelJSON struct {
+	ID                       string          `json:"id"`
+	DisplayName              string          `json:"display_name"`
+	BasePrices               modelPricesJSON `json:"base_prices"`
+	PriceTiers               []priceTierJSON `json:"price_tiers"`
+	Enabled                  bool            `json:"enabled"`
+	SortOrder                int32           `json:"sort_order"`
+	Provider                 string          `json:"provider"`
+	ContextWindow            *int64          `json:"context_window"`
+	InputModalities          []string        `json:"input_modalities"`
+	OutputModalities         []string        `json:"output_modalities"`
+	SupportsTools            bool            `json:"supports_tools"`
+	SupportsStructuredOutput bool            `json:"supports_structured_output"`
+	SupportsVision           bool            `json:"supports_vision"`
+	ParameterInfo            string          `json:"parameter_info"`
+	CreatedAt                time.Time       `json:"created_at"`
+	UpdatedAt                time.Time       `json:"updated_at"`
+}
+
+// adminModelListJSON is the OpenAPI AdminModelList schema.
+type adminModelListJSON struct {
+	Items []adminModelJSON `json:"items"`
+}
+
+// adminModelEnvelopeJSON is the OpenAPI AdminModelEnvelope schema.
+type adminModelEnvelopeJSON struct {
+	Model adminModelJSON `json:"model"`
+}
+
+func pricesResponse(input, output, cacheWrite, cacheRead money.Amount, extras ...map[string]money.Amount) modelPricesJSON {
 	specific := map[string]string{}
 	if len(extras) > 0 {
 		for key, value := range extras[0] {
 			specific[key] = value.String()
 		}
 	}
-	return map[string]any{
-		"token_prices": specific,
-		"input":        input.String(), "output": output.String(),
-		"cache_write": cacheWrite.String(), "cache_read": cacheRead.String(),
+	return modelPricesJSON{
+		Input:       input.String(),
+		Output:      output.String(),
+		TokenPrices: specific,
+		CacheWrite:  cacheWrite.String(),
+		CacheRead:   cacheRead.String(),
 	}
 }
 
-func priceTierResponse(seq int, tier ledger.PriceTier) map[string]any {
-	var weekdays any
+func priceTierResponse(seq int, tier ledger.PriceTier) priceTierJSON {
+	var weekdays []int
 	if len(tier.Weekdays) > 0 {
 		weekdays = tier.Weekdays
 	}
-	return map[string]any{
-		"service_tier": tier.ServiceTier, "thinking_mode": tier.ThinkingMode,
-		"seq": seq, "name": tier.Name, "timezone": tier.Timezone,
-		"min_prompt_tokens": tier.MinPromptTokens, "max_prompt_tokens": tier.MaxPromptTokens,
-		"weekdays": weekdays, "start_minute_of_day": tier.StartMinute, "end_minute_of_day": tier.EndMinute,
-		"prices": pricesResponse(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
+	return priceTierJSON{
+		Seq:             seq,
+		ServiceTier:     tier.ServiceTier,
+		ThinkingMode:    tier.ThinkingMode,
+		Name:            tier.Name,
+		MinPromptTokens: tier.MinPromptTokens,
+		MaxPromptTokens: tier.MaxPromptTokens,
+		Timezone:        tier.Timezone,
+		Weekdays:        weekdays,
+		StartMinute:     tier.StartMinute,
+		EndMinute:       tier.EndMinute,
+		Prices:          pricesResponse(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
 	}
 }
 
-func adminModelResponse(model catalog.Model) map[string]any {
-	tiers := make([]map[string]any, 0, len(model.PriceTiers))
+func newAdminModelJSON(model catalog.Model) adminModelJSON {
+	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))
 	for index, tier := range model.PriceTiers {
 		tiers = append(tiers, priceTierResponse(index+1, tier))
 	}
-	return map[string]any{
-		"id": model.ID, "display_name": model.DisplayName,
-		"base_prices": pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
-		"price_tiers": tiers, "enabled": model.Enabled, "sort_order": model.SortOrder,
-		"provider": model.Provider, "context_window": model.ContextWindow,
-		"input_modalities": model.InputModalities, "output_modalities": model.OutputModalities,
-		"supports_tools": model.SupportsTools, "supports_structured_output": model.SupportsStructuredOutput,
-		"supports_vision": model.SupportsVision, "parameter_info": model.ParameterInfo,
-		"created_at": model.CreatedAt, "updated_at": model.UpdatedAt,
+	return adminModelJSON{
+		ID:                       model.ID,
+		DisplayName:              model.DisplayName,
+		BasePrices:               pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
+		PriceTiers:               tiers,
+		Enabled:                  model.Enabled,
+		SortOrder:                model.SortOrder,
+		Provider:                 model.Provider,
+		ContextWindow:            model.ContextWindow,
+		InputModalities:          model.InputModalities,
+		OutputModalities:         model.OutputModalities,
+		SupportsTools:            model.SupportsTools,
+		SupportsStructuredOutput: model.SupportsStructuredOutput,
+		SupportsVision:           model.SupportsVision,
+		ParameterInfo:            model.ParameterInfo,
+		CreatedAt:                model.CreatedAt,
+		UpdatedAt:                model.UpdatedAt,
 	}
 }
 
@@ -202,11 +273,11 @@ func (a *app) listAdminModels(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	items := make([]map[string]any, 0, len(models))
+	items := make([]adminModelJSON, 0, len(models))
 	for _, model := range models {
-		items = append(items, adminModelResponse(model))
+		items = append(items, newAdminModelJSON(model))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, adminModelListJSON{Items: items})
 }
 
 func (a *app) createAdminModel(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +301,7 @@ func (a *app) createAdminModel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"model": adminModelResponse(created)})
+	writeJSON(w, http.StatusCreated, adminModelEnvelopeJSON{Model: newAdminModelJSON(created)})
 }
 
 func (a *app) updateAdminModel(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +324,7 @@ func (a *app) updateAdminModel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"model": adminModelResponse(updated)})
+	writeJSON(w, http.StatusOK, adminModelEnvelopeJSON{Model: newAdminModelJSON(updated)})
 }
 
 func (a *app) deleteAdminModel(w http.ResponseWriter, r *http.Request) {

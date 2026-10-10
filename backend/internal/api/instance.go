@@ -9,13 +9,24 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 )
 
+// instanceStateJSON is the OpenAPI InstanceState schema.
+type instanceStateJSON struct {
+	Initialized bool `json:"initialized"`
+}
+
+// healthJSON is the OpenAPI Health schema.
+type healthJSON struct {
+	Service string `json:"service"`
+	Status  string `json:"status"`
+}
+
 func (a *app) instanceState(w http.ResponseWriter, r *http.Request) {
 	initialized, err := a.identity.HasAdministrator(r.Context())
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"initialized": initialized})
+	writeJSON(w, http.StatusOK, instanceStateJSON{Initialized: initialized})
 }
 
 func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +64,7 @@ func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.setSessionCookie(w, result.SessionToken)
-	writeJSON(w, http.StatusCreated, map[string]any{"account": accountResponse(result.Account)})
+	writeJSON(w, http.StatusCreated, accountEnvelopeJSON{Account: newAccountJSON(result.Account)})
 }
 
 // registerInstanceRoutes 注册实例与健康检查路由。
@@ -72,8 +83,5 @@ func (a *app) health(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]string{
-		"service": "oh-my-aihub-backend",
-		"status":  "ok",
-	})
+	writeJSON(w, http.StatusOK, healthJSON{Service: "oh-my-aihub-backend", Status: "ok"})
 }
