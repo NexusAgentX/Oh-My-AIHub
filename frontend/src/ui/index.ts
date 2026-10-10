@@ -11,6 +11,7 @@ export {
   type ButtonVariant,
 } from './Button'
 export { Card, Metric, MetricGrid, PageHeader, type MetricTone } from './Card'
+export { PageBackLink, PageBackSlot, type PageBack } from './PageBack'
 export { ConfirmDialog, Dialog, Drawer } from './Dialog'
 export { BarChart, Sparkline, type BarDatum } from './Chart'
 export { CopyButton, CopyField, copyText } from './Copy'

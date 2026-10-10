@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { ButtonLink, EmptyState, PageHeader, QueryBoundary, SelectField, TextField } from '../ui'
 import { ContentComposer } from './ContentComposer'
@@ -13,7 +13,7 @@ function NewTopic({ kind }: { kind: Kind }) {
   const { account } = useAuth()
   if (kind === 'ticket') return <TopicForm key="new-ticket" kind={kind} boards={[]} />
   return <QueryBoundary query={boards}>{(data) => data.items.length ? <TopicForm key="new-discussion" kind={kind} boards={data.items} /> : <>
-    <PageHeader title="发表帖子" back={<Link to="/forum">返回论坛</Link>} />
+    <PageHeader title="发表帖子" back={{ to: '/forum', label: '论坛' }} />
     <EmptyState title="暂时没有板块" description={account?.is_admin ? '先创建一个板块' : '请等待管理员创建板块'} action={account?.is_admin ? <ButtonLink to="/forum/boards">管理板块</ButtonLink> : undefined} />
   </>}</QueryBoundary>
 }
@@ -38,7 +38,7 @@ function TopicForm({ kind, topic, boards }: { kind: Kind; topic?: Topic; boards:
   const back = topic ? '/forum/topics/' + topic.id : kind === 'ticket' ? '/forum/tickets' : '/forum'
   return <div className="forum-page">
     <PageHeader title={(topic ? '编辑' : kind === 'ticket' ? '提交' : '发表') + (kind === 'ticket' ? '工单' : '帖子')}
-      description={kind === 'ticket' ? '仅你和管理员可见' : undefined} back={<Link to={back}>返回</Link>} />
+      description={kind === 'ticket' ? '仅你和管理员可见' : undefined} back={{ to: back, label: topic ? (kind === 'ticket' ? '工单' : '帖子') : kind === 'ticket' ? '工单' : '论坛' }} />
     <ContentComposer key={topic?.id || 'new-' + kind} initialBody={topic?.body} initialAttachments={topic?.attachments} submitLabel={topic ? '保存修改' : kind === 'ticket' ? '提交工单' : '发表帖子'}
       onCancel={() => navigate(back)} validate={() => titleError(title) || (!topic && kind === 'discussion' && !board ? '请选择板块' : '')}
       onSave={async (body, attachment_ids) => {

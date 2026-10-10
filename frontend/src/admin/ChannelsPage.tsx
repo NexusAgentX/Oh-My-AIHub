@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -139,11 +139,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
             </Button>
           </>
         }
-        back={
-          <Link className="back-link" to="/admin/channels">
-            ← 渠道
-          </Link>
-        }
+        back={{ to: '/admin/channels', label: '渠道' }}
         title={channel.name}
       />
       {suspended && channel.suspended_reason && (
@@ -282,11 +278,7 @@ export function ChannelDetailPage() {
   return (
     <>
       <PageHeader
-        back={
-          <Link className="back-link" to="/admin/channels">
-            ← 渠道
-          </Link>
-        }
+        back={{ to: '/admin/channels', label: '渠道' }}
         title="渠道详情"
       />
       <Card>

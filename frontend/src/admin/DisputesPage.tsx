@@ -183,11 +183,7 @@ function DisputeDetail({ trade }: { trade: C2CTrade }) {
             </>
           )
         }
-        back={
-          <Link className="back-link" to="/admin/disputes">
-            ← 申诉
-          </Link>
-        }
+        back={{ to: '/admin/disputes', label: '申诉' }}
         title={`交易 ${shortID(trade.id)}`}
       />
       <div className="admin-two-column">
@@ -263,11 +259,7 @@ export function DisputeDetailPage() {
   return (
     <>
       <PageHeader
-        back={
-          <Link className="back-link" to="/admin/disputes">
-            ← 申诉
-          </Link>
-        }
+        back={{ to: '/admin/disputes', label: '申诉' }}
         title="申诉详情"
       />
       <Card>

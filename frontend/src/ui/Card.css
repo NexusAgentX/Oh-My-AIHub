@@ -84,7 +84,6 @@
 .detail-list dd { margin: 0; color: var(--ink); font-size: var(--text-base); font-weight: 600; text-align: right; }
 .detail-lines { display: grid; gap: 2px; }
 
-.back-link { display: inline-block; margin-bottom: var(--space-2); color: var(--muted); font-size: var(--text-sm); text-decoration: none; }
 
 @media (max-width: 1180px) {
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -100,5 +99,4 @@
   .panel-heading { padding: var(--space-3) var(--space-4) 0; }
   .panel-body { padding: var(--space-4); }
   .panel-heading + .panel-body { padding-top: var(--space-3); }
-  .back-link { display: inline-flex; min-height: 44px; align-items: center; margin-bottom: 4px; }
 }

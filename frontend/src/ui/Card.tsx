@@ -1,4 +1,5 @@
 import type { ElementType, ReactNode } from 'react'
+import { PageBackLink, type PageBack } from './PageBack'
 
 /**
  * 卡片：白底、12px 圆角、细边框。
@@ -38,7 +39,7 @@ export function Card({
   )
 }
 
-/** 页面标题区：标题、一句说明、右侧主要操作。返回链接放 back。 */
+/** 页面标题区：标题、一句说明、右侧主要操作。详情页用 back 指明上一级，显示在顶栏左侧。 */
 export function PageHeader({
   title,
   description,
@@ -48,12 +49,12 @@ export function PageHeader({
   title: ReactNode
   description?: ReactNode
   actions?: ReactNode
-  back?: ReactNode
+  back?: PageBack
 }) {
   return (
     <header className="page-heading">
       <div className="page-heading-copy">
-        {back}
+        {back && <PageBackLink back={back} />}
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>

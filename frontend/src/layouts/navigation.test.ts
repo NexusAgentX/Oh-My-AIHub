@@ -4,7 +4,6 @@ import {
   findNavItem,
   flattenNavigation,
   mobileTabs,
-  pageTitle,
   productNavigation,
 } from './navigation'
 
@@ -44,11 +43,5 @@ describe('navigation', () => {
     expect(findMobileTab(mobileTabs, '/forum/tickets')?.label).toBe('我的')
     expect(findMobileTab(mobileTabs, '/channels/abc')?.label).toBe('渠道')
     expect(findMobileTab(mobileTabs, '/points/trades/1')?.label).toBe('积分')
-  })
-
-  it('derives page titles', () => {
-    expect(pageTitle('/keys')).toBe('API Key')
-    expect(pageTitle('/account')).toBe('账户设置')
-    expect(pageTitle('/me')).toBe('我的')
   })
 })

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { Channel, ChannelDetail, ChannelCall } from '../api/types'
 import { CallExplorer, FormatTags, channelCallColumns, outcomeLabels, outcomeOptions } from '../calls'
@@ -211,11 +211,7 @@ function ChannelWizard() {
   return (
     <>
       <PageHeader
-        back={
-          <Link className="back-link" to="/channels">
-            ← 我的渠道
-          </Link>
-        }
+        back={{ to: '/channels', label: '我的渠道' }}
         title="添加渠道"
       />
       <Stepper current={step} />
@@ -443,11 +439,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
   return (
     <>
       <PageHeader
-        back={
-          <Link className="back-link" to="/channels">
-            ← 我的渠道
-          </Link>
-        }
+        back={{ to: '/channels', label: '我的渠道' }}
         title={channel.name}
       />
       {channel.status === 'suspended' && (

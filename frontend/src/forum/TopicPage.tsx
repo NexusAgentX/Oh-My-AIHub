@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
 import { MarkdownContent } from '../markdown'
@@ -28,7 +28,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
   const tickets = topic.kind === 'ticket'
   const back = tickets ? '/forum/tickets' : '/forum' + (topic.board_id ? '?board=' + topic.board_id : '')
   return <div className="forum-page forum-detail">
-    <PageHeader title={topic.title} back={<Link to={back}>{tickets ? '返回工单' : '返回论坛'}</Link>}
+    <PageHeader title={topic.title} back={{ to: back, label: tickets ? '工单' : '论坛' }}
       actions={canEdit && <><ButtonLink to={'/forum/topics/' + topic.id + '/edit'}>编辑</ButtonLink><Button type="button" variant="quiet" onClick={() => { remove.reset(); setDeleting(true) }}>删除</Button></>} />
     <div className="forum-meta">
       <strong>{topic.author.display_name}</strong>
