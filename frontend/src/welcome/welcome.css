@@ -1,9 +1,9 @@
-/* 公开落地页：桌面一屏内容，移动端自然滚动 */
+/* 公开落地页：桌面一屏内容，移动端自然滚动；纸面点阵来自 html 背景 */
 .welcome {
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-height: 100vh;
-  background: var(--canvas);
+  min-height: 100dvh;
 }
 
 .welcome-header,
@@ -29,20 +29,50 @@
   padding-block: var(--space-6);
 }
 
+.welcome-hero { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
+.welcome-hero-copy { min-width: 0; }
+.welcome-hero > .mascot { margin-right: var(--space-8); }
+
+/* 标题组合：“Oh-My-”加一张倾斜的芥末标签“AIHub”，只用在落地页 */
+.welcome-lockup {
+  margin: 0 0 var(--space-5);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(40px, 6.4vw, 72px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.welcome-lockup span {
+  display: inline-block;
+  margin-left: 0.12em;
+  padding: 0 0.22em;
+  border: 3px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--on-color);
+  background: var(--mustard);
+  box-shadow: var(--shadow-md);
+  transform: rotate(-3deg);
+}
+
 .welcome-eyebrow {
+  display: inline-flex;
   margin-bottom: var(--space-3);
-  color: var(--warning);
+  padding: 1px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--on-color);
+  background: var(--sky);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .welcome-hero h1 {
-  max-width: 16ch;
+  max-width: 18ch;
   margin-bottom: var(--space-6);
-  font-size: clamp(30px, 5vw, 48px);
-  line-height: 1.2;
+  font-size: clamp(26px, 3.4vw, 38px);
+  line-height: 1.25;
+  text-wrap: balance;
 }
-
 
 .welcome-actions {
   display: flex;
@@ -50,6 +80,7 @@
   align-items: center;
   gap: var(--space-4);
 }
+.welcome-actions .button { min-height: 48px; padding-inline: 24px; font-size: var(--text-md); }
 
 .welcome-invite {
   display: inline-flex;
@@ -59,48 +90,53 @@
   font-size: var(--text-sm);
 }
 
+/* 三张能力卡片：落地页上允许的微倾斜贴纸 */
 .welcome-values {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
   margin: 0;
   padding: 0;
-  gap: var(--space-4);
   list-style: none;
 }
-.welcome-values { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-.welcome-values p { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
-
 .welcome-values li {
   padding: var(--space-5);
-  border: 1px solid var(--hairline);
+  border: var(--sticker-border);
   border-radius: var(--radius-lg);
-  background: var(--sunken);
+  background: var(--canvas);
+  box-shadow: var(--shadow-md);
 }
-.welcome-values strong { display: block; margin-top: var(--space-3); }
+.welcome-values li:nth-child(1) { transform: rotate(-0.8deg); }
+.welcome-values li:nth-child(2) { transform: rotate(0.6deg); }
+.welcome-values li:nth-child(3) { transform: rotate(-0.4deg); }
+.welcome-values strong { display: block; margin-top: var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; }
+.welcome-values p { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 
 .welcome-value-icon {
   display: inline-grid;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--line);
+  border: var(--sticker-border);
+  border-radius: var(--radius-md);
   color: var(--on-color);
-  background: var(--mustard);
 }
+.welcome-value-sky { background: var(--sky); }
+.welcome-value-mint { background: var(--mint); }
+.welcome-value-mustard { background: var(--mustard); }
 
 .welcome-boundaries {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
+  border: 1.5px dashed var(--hairline-strong);
   border-radius: var(--radius-lg);
-  color: var(--code-ink);
-  background: var(--code-bg);
+  color: var(--body);
   font-size: var(--text-sm);
 }
 .welcome-boundaries p { margin: 0; }
-.welcome-boundaries strong { margin-right: var(--space-2); color: var(--mustard); }
+.welcome-boundaries strong { margin-right: var(--space-2); color: var(--ink); }
 
 .welcome-footer {
   display: flex;
@@ -114,6 +150,8 @@
   .welcome-header,
   .welcome-footer,
   .welcome-main { padding-inline: var(--space-4); }
+  .welcome-hero > .mascot { display: none; }
   .welcome-values,
   .welcome-boundaries { grid-template-columns: 1fr; }
+  .welcome-values li:nth-child(n) { transform: none; }
 }

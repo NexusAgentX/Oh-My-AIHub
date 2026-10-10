@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
-  <rect width="28" height="28" rx="8" fill="#181d26" />
-  <rect x="9" y="9" width="10" height="10" rx="3" fill="#d9a441" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .shadow { fill: #1f1c16; }
+    .outline { stroke: #1f1c16; }
+    @media (prefers-color-scheme: dark) {
+      .shadow { fill: #050403; }
+      .outline { stroke: #e6dcc8; }
+    }
+  </style>
+  <path class="shadow" transform="translate(5 5)" d="M18 4H40L54 18V40A14 14 0 0 1 40 54H18A14 14 0 0 1 4 40V18A14 14 0 0 1 18 4Z"/>
+  <path class="outline" fill="#f2c14e" stroke-width="4" stroke-linejoin="round" d="M18 4H40L54 18V40A14 14 0 0 1 40 54H18A14 14 0 0 1 4 40V18A14 14 0 0 1 18 4Z"/>
+  <circle cx="26" cy="31" r="9" fill="none" stroke="#1f1c16" stroke-width="5.5"/>
+  <path class="outline" d="M40 4V14A4 4 0 0 0 44 18H54Z" fill="#fffaf0" stroke-width="4" stroke-linejoin="round"/>
 </svg>

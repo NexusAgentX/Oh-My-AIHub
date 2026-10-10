@@ -35,6 +35,7 @@ export {
   TextField,
 } from './Form'
 export { Icon, iconNames, type IconName } from './Icon'
+export { Mascot } from './Mascot'
 export { QueryBoundary } from './QueryBoundary'
 export { DataTable, Toolbar, type Column } from './Table'
 export { Segmented, Tabs, type TabItem } from './Tabs'

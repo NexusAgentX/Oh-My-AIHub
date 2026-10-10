@@ -12,7 +12,7 @@
 
 .inline-error:empty { display: none; }
 .inline-error { background: var(--rose); }
-.success-message { background: var(--mint); }
+.success-message { display: flex; align-items: center; gap: var(--space-2); background: var(--mint); }
 
 .notice {
   display: flex;
@@ -40,6 +40,7 @@
 }
 
 .empty-state { flex-direction: column; padding: var(--space-6) var(--space-4); text-align: center; }
+.empty-state .mascot { margin-bottom: var(--space-1); }
 .empty-state strong { color: var(--ink); font-family: var(--font-display); font-size: var(--text-md); font-weight: 800; }
 .empty-state p { max-width: 44ch; margin: 0; }
 .error-state { color: var(--danger); }
