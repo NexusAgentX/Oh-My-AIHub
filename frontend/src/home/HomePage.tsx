@@ -5,7 +5,7 @@ import type { CallSummary } from '../api/types'
 import { amountSign, formatPoints } from '../money/format'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { usePoints } from '../points/queries'
-import { ButtonLink, Card, EmptyState, Icon, Notice, PageHeader, QueryBoundary } from '../ui'
+import { ButtonLink, Card, EmptyState, Icon, Notice, PageHeader, QueryBoundary, Sparkline } from '../ui'
 import { useHome } from './queries'
 import { StartCard } from './StartCard'
 
@@ -22,15 +22,21 @@ function BalanceCard() {
   return (
     <Card className="home-balance" title="余额">
       <QueryBoundary errorFallback="余额加载失败" query={points}>
-        {(data) => (
+        {(data) => {
+          const trend = data.trend?.map((point) => Number(point.balance)) ?? []
+          return (
           <div className="balance-body">
             <strong className={`balance-value num ${amountSign(data.balance) < 0 ? 'amount-negative' : ''}`}>
               {formatPoints(data.balance, { digits: 2 })}
               <small>积分</small>
             </strong>
-            <span className="muted-copy">
-              还能透支 <span className="num">{formatPoints(overdraftRemaining(data.available, data.credit_limit), { digits: 2 })}</span>
+            <span className="balance-meta">
+              <span className="muted-copy">
+                还能透支 <span className="num">{formatPoints(overdraftRemaining(data.available, data.credit_limit), { digits: 2 })}</span>
+              </span>
+              {trend.length > 1 && <span className="muted-copy">30 天走势</span>}
             </span>
+            <Sparkline height={36} label="30 天余额走势" values={trend} width={300} />
             <div className="balance-actions">
               <ButtonLink size="sm" to="/points?tab=buy" variant="primary">
                 买积分
@@ -40,7 +46,8 @@ function BalanceCard() {
               </ButtonLink>
             </div>
           </div>
-        )}
+          )
+        }}
       </QueryBoundary>
     </Card>
   )

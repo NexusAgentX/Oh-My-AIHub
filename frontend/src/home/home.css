@@ -5,17 +5,26 @@
 .start-card .panel-body { display: grid; gap: var(--space-4); }
 .start-card .panel-body > *,
 .tabs { min-width: 0; }
-.start-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+/* 左栏与下方余额卡同宽，“默认 Key”与“今天”落在同一条竖线上（卡片内边距 + 墨线补回卡片外宽） */
+.start-grid { display: grid; grid-template-columns: calc((100% + 2 * (var(--space-5) + var(--stroke)) - var(--space-4)) / 2.4) minmax(0, 1fr); gap: var(--space-4); }
 .start-key-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: 4px; font-size: var(--text-sm); }
-/* 余额卡通常比今日卡矮，与它垂直居中对齐 */
-.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: center; gap: var(--space-4); }
+/* 余额卡与今日卡等高、上下边对齐；余额卡按钮贴底，与糖果块底边齐平 */
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-4); }
+.home-balance { display: flex; flex-direction: column; }
+.home-balance > .panel-body { display: flex; flex: 1; flex-direction: column; }
+.home-balance .balance-body { flex: 1; grid-template-rows: auto auto auto 1fr; }
+.home-balance .balance-actions { align-self: end; }
+/* 透支额度与“30 天走势”同一行，走势线铺满卡宽 */
+.balance-meta { display: flex; justify-content: space-between; gap: var(--space-3); }
+.home-balance .sparkline { width: 100%; color: var(--on-color); }
 
-/* 余额卡（首页与积分页共用）：芥末贴纸，桌面上整页唯一微倾斜的一张；卡内文字一律 --on-color */
+/* 余额卡（首页与积分页共用）：芥末贴纸，端正不倾斜；卡内文字一律 --on-color */
 .home-balance,
-.points-balance { background: var(--mustard); transform: rotate(-0.4deg); }
+.points-balance { background: var(--mustard); }
 :is(.home-balance, .points-balance) :is(.panel-heading h2, .balance-value, .balance-value small, .muted-copy, .amount-negative) { color: var(--on-color); }
+/* 主按钮反转为墨色底，不加投影：墨色投影会和按钮糊成一块 */
 :is(.home-balance, .points-balance) .button-primary,
-:is(.home-balance, .points-balance) .button-primary:active { color: var(--mustard); background: var(--on-color); }
+:is(.home-balance, .points-balance) .button-primary:active { color: var(--mustard); background: var(--on-color); box-shadow: none; }
 :is(.home-balance, .points-balance) .button-primary:hover:not(:disabled) { color: var(--mustard-hover); background: var(--on-color); }
 .balance-body { display: grid; gap: var(--space-2); }
 .balance-value { font-family: var(--font-display); font-size: 52px; font-weight: 800; line-height: 1; }
@@ -42,8 +51,6 @@
   .home-page > .page-heading,
   .home-page > .notice { order: -2; }
   .home-page > .home-grid { order: -1; }
-  .home-balance,
-  .points-balance { transform: none; }
   .balance-value { font-size: 42px; }
   .today-grid dd,
   .today-grid dd.amount-positive { font-size: var(--text-xl); }

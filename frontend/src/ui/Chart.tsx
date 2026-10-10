@@ -22,8 +22,8 @@ export function Sparkline({
     .map((value, index) => `${(index * step).toFixed(1)},${(height - 3 - ((value - min) / span) * (height - 6)).toFixed(1)}`)
     .join(' ')
   return (
-    <svg aria-label={label} className="sparkline" height={height} role="img" viewBox={`0 0 ${width} ${height}`} width={width}>
-      <polyline fill="none" points={points} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    <svg aria-label={label} className="sparkline" height={height} preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`} width={width}>
+      <polyline fill="none" points={points} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }
