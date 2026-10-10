@@ -26,6 +26,26 @@ type apiKeySpendJSON struct {
 	Total string `json:"total"`
 }
 
+// apiKeyRefJSON is the OpenAPI KeyRef schema. It is not named keyRefJSON because observe.go
+// still uses that name for its map-based helper.
+type apiKeyRefJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// newApiKeyRefJSON references the API key a ledger entry or call belongs to: nil when the key is
+// unknown (id is nil), with an empty name when only the id is known.
+func newApiKeyRefJSON(id, name *string) *apiKeyRefJSON {
+	if id == nil {
+		return nil
+	}
+	ref := apiKeyRefJSON{ID: *id}
+	if name != nil {
+		ref.Name = *name
+	}
+	return &ref
+}
+
 // apiKeyJSON is the OpenAPI ApiKey schema.
 type apiKeyJSON struct {
 	ID            string            `json:"id"`
@@ -106,7 +126,7 @@ func newApiKeyJSON(key apikey.Key) apiKeyJSON {
 	}
 }
 
-func routingResponse(pref routing.Pref) routingPreferenceJSON {
+func newRoutingPreferenceJSON(pref routing.Pref) routingPreferenceJSON {
 	order, excluded := pref.Order, pref.Excluded
 	if order == nil {
 		order = []string{}
@@ -227,7 +247,7 @@ func (a *app) getKey(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]routingPreferenceJSON, 0, len(prefs))
 	for _, pref := range prefs {
-		items = append(items, routingResponse(pref))
+		items = append(items, newRoutingPreferenceJSON(pref))
 	}
 	writeJSON(w, http.StatusOK, apiKeyDetailJSON{Key: newApiKeyJSON(key), Routing: items})
 }
@@ -340,7 +360,7 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, routingResponse(saved))
+	writeJSON(w, http.StatusOK, newRoutingPreferenceJSON(saved))
 }
 
 func (a *app) setRouting(w http.ResponseWriter, r *http.Request) {

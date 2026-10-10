@@ -12,6 +12,96 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
 
+// pointsTrendPointJSON is one element of the OpenAPI Points schema's trend.
+type pointsTrendPointJSON struct {
+	Date    string `json:"date"`
+	Balance string `json:"balance"`
+	Income  string `json:"income"`
+	Spend   string `json:"spend"`
+}
+
+// pointsPeriodJSON is the OpenAPI PointsPeriod schema.
+type pointsPeriodJSON struct {
+	From           time.Time `json:"from"`
+	To             time.Time `json:"to"`
+	OpeningBalance string    `json:"opening_balance"`
+	ClosingBalance string    `json:"closing_balance"`
+	Income         string    `json:"income"`
+	Spend          string    `json:"spend"`
+	CallSpend      string    `json:"call_spend"`
+	ChannelIncome  string    `json:"channel_income"`
+	C2CBuy         string    `json:"c2c_buy"`
+	C2CSell        string    `json:"c2c_sell"`
+	C2CReturn      string    `json:"c2c_return"`
+	Adjustments    string    `json:"adjustments"`
+	WriteOffs      string    `json:"write_offs"`
+	Difference     string    `json:"difference"`
+}
+
+// pointsSummaryJSON is the OpenAPI PointsSummary schema.
+type pointsSummaryJSON struct {
+	Balance     string `json:"balance"`
+	CreditLimit string `json:"credit_limit"`
+	Available   string `json:"available"`
+}
+
+// pointsJSON is the OpenAPI Points schema.
+type pointsJSON struct {
+	Balance     string                 `json:"balance"`
+	CreditLimit string                 `json:"credit_limit"`
+	Available   string                 `json:"available"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	Trend       []pointsTrendPointJSON `json:"trend"`
+	Period      pointsPeriodJSON       `json:"period"`
+}
+
+// ledgerRelatedJSON is the OpenAPI LedgerRelated schema.
+type ledgerRelatedJSON struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// pointsEntryJSON is the OpenAPI PointsEntry schema.
+type pointsEntryJSON struct {
+	ID            string                 `json:"id"`
+	TransactionID string                 `json:"transaction_id"`
+	CreatedAt     time.Time              `json:"created_at"`
+	Type          ledger.TransactionType `json:"type"`
+	Reason        string                 `json:"reason"`
+	Related       *ledgerRelatedJSON     `json:"related"`
+	Amount        string                 `json:"amount"`
+	BalanceAfter  string                 `json:"balance_after"`
+	APIKey        *apiKeyRefJSON         `json:"api_key"`
+}
+
+// pointsDayFlowJSON is one by_day element of the OpenAPI PointsEntrySummary schema.
+type pointsDayFlowJSON struct {
+	Date   string `json:"date"`
+	Income string `json:"income"`
+	Spend  string `json:"spend"`
+	Net    string `json:"net"`
+}
+
+// pointsKeySpendJSON is one by_key element of the OpenAPI PointsEntrySummary schema.
+type pointsKeySpendJSON struct {
+	APIKey  *apiKeyRefJSON `json:"api_key"`
+	Spend   string         `json:"spend"`
+	Entries int64          `json:"entries"`
+}
+
+// pointsEntrySummaryJSON is the OpenAPI PointsEntrySummary schema.
+type pointsEntrySummaryJSON struct {
+	ByDay []pointsDayFlowJSON  `json:"by_day"`
+	ByKey []pointsKeySpendJSON `json:"by_key"`
+}
+
+// pointsEntryPageJSON is the OpenAPI PointsEntryPage schema; summary is only present when grouped.
+type pointsEntryPageJSON struct {
+	Items      []pointsEntryJSON       `json:"items"`
+	NextCursor *string                 `json:"next_cursor"`
+	Summary    *pointsEntrySummaryJSON `json:"summary,omitempty"`
+}
+
 func (a *app) getPoints(w http.ResponseWriter, r *http.Request) {
 	from, fromOK := parseTimeParam(r, "from")
 	to, toOK := parseTimeParam(r, "to")
@@ -30,43 +120,44 @@ func (a *app) getPoints(w http.ResponseWriter, r *http.Request) {
 		writeObserveError(w, err)
 		return
 	}
-	trend := make([]map[string]any, 0, len(report.Trend))
+	trend := make([]pointsTrendPointJSON, 0, len(report.Trend))
 	for _, point := range report.Trend {
-		trend = append(trend, map[string]any{"date": point.Day, "balance": point.Balance.String(), "income": point.Income.String(), "spend": point.Spend.String()})
+		trend = append(trend, pointsTrendPointJSON{
+			Date: point.Day, Balance: point.Balance.String(), Income: point.Income.String(), Spend: point.Spend.String(),
+		})
 	}
 	period := report.Period
-	writeJSON(w, http.StatusOK, map[string]any{
-		"balance":      points.Balance.String(),
-		"credit_limit": points.CreditLimit.String(),
-		"available":    points.Available().String(),
-		"updated_at":   points.UpdatedAt,
-		"trend":        trend,
-		"period": map[string]any{
-			"from": period.From, "to": period.To, "opening_balance": period.Opening.String(), "closing_balance": period.Closing.String(),
-			"income": period.Income.String(), "spend": period.Spend.String(), "call_spend": period.CallSpend.String(),
-			"channel_income": period.ChannelIncome.String(), "c2c_buy": period.C2CBuy.String(), "c2c_sell": period.C2CSell.String(),
-			"c2c_return": period.C2CReturn.String(), "adjustments": period.Adjustments.String(), "write_offs": period.WriteOffs.String(),
-			"difference": period.Difference.String(),
+	writeJSON(w, http.StatusOK, pointsJSON{
+		Balance:     points.Balance.String(),
+		CreditLimit: points.CreditLimit.String(),
+		Available:   points.Available().String(),
+		UpdatedAt:   points.UpdatedAt,
+		Trend:       trend,
+		Period: pointsPeriodJSON{
+			From: period.From, To: period.To, OpeningBalance: period.Opening.String(), ClosingBalance: period.Closing.String(),
+			Income: period.Income.String(), Spend: period.Spend.String(), CallSpend: period.CallSpend.String(),
+			ChannelIncome: period.ChannelIncome.String(), C2CBuy: period.C2CBuy.String(), C2CSell: period.C2CSell.String(),
+			C2CReturn: period.C2CReturn.String(), Adjustments: period.Adjustments.String(), WriteOffs: period.WriteOffs.String(),
+			Difference: period.Difference.String(),
 		},
 	})
 }
 
-func pointsEntryResponse(entry ledger.EntryView) map[string]any {
-	var related, apiKey any
+func newPointsEntryJSON(entry ledger.EntryView) pointsEntryJSON {
+	var related *ledgerRelatedJSON
 	if entry.RelatedType != "" {
-		related = map[string]any{"type": entry.RelatedType, "id": entry.RelatedID}
+		related = &ledgerRelatedJSON{Type: entry.RelatedType, ID: entry.RelatedID}
 	}
-	if entry.APIKeyID != nil {
-		name := ""
-		if entry.APIKeyName != nil {
-			name = *entry.APIKeyName
-		}
-		apiKey = map[string]any{"id": *entry.APIKeyID, "name": name}
-	}
-	return map[string]any{
-		"id": strconv.FormatInt(entry.ID, 10), "transaction_id": entry.TransactionID, "created_at": entry.CreatedAt,
-		"type": entry.Type, "reason": entry.Reason, "related": related,
-		"amount": entry.Amount.String(), "balance_after": entry.BalanceAfter.String(), "api_key": apiKey,
+	return pointsEntryJSON{
+		ID:            strconv.FormatInt(entry.ID, 10),
+		TransactionID: entry.TransactionID,
+		CreatedAt:     entry.CreatedAt,
+		Type:          entry.Type,
+		Reason:        entry.Reason,
+		Related:       related,
+		Amount:        entry.Amount.String(),
+		BalanceAfter:  entry.BalanceAfter.String(),
+		APIKey:        newApiKeyRefJSON(entry.APIKeyID, entry.APIKeyName),
 	}
 }
 
@@ -129,13 +220,13 @@ func (a *app) listPointsEntries(w http.ResponseWriter, r *http.Request) {
 	if hasMore {
 		entries = entries[:limit]
 	}
-	items := make([]map[string]any, 0, len(entries))
+	items := make([]pointsEntryJSON, 0, len(entries))
 	cursor := ""
 	for _, entry := range entries {
-		items = append(items, pointsEntryResponse(entry))
+		items = append(items, newPointsEntryJSON(entry))
 		cursor = strconv.FormatInt(entry.ID, 10)
 	}
-	response := map[string]any{"items": items, "next_cursor": nextCursor(hasMore, cursor)}
+	response := pointsEntryPageJSON{Items: items, NextCursor: nextCursor(hasMore, cursor)}
 	if group != "" {
 		summary, err := a.observe.EntriesSummary(r.Context(), observe.EntryFilter{
 			AccountID: accountFromContext(r.Context()).ID, Type: query.Get("type"), APIKeyID: keyID, From: from, To: to,
@@ -144,21 +235,26 @@ func (a *app) listPointsEntries(w http.ResponseWriter, r *http.Request) {
 			writeObserveError(w, err)
 			return
 		}
-		response["summary"] = entrySummaryJSON(summary)
+		converted := newPointsEntrySummaryJSON(summary)
+		response.Summary = &converted
 	}
 	writeJSON(w, http.StatusOK, response)
 }
 
-func entrySummaryJSON(summary observe.EntrySummary) map[string]any {
-	byDay := make([]map[string]any, 0, len(summary.ByDay))
+func newPointsEntrySummaryJSON(summary observe.EntrySummary) pointsEntrySummaryJSON {
+	byDay := make([]pointsDayFlowJSON, 0, len(summary.ByDay))
 	for _, day := range summary.ByDay {
-		byDay = append(byDay, map[string]any{"date": day.Day, "income": day.Income.String(), "spend": day.Spend.String(), "net": day.Net.String()})
+		byDay = append(byDay, pointsDayFlowJSON{Date: day.Day, Income: day.Income.String(), Spend: day.Spend.String(), Net: day.Net.String()})
 	}
-	byKey := make([]map[string]any, 0, len(summary.ByKey))
+	byKey := make([]pointsKeySpendJSON, 0, len(summary.ByKey))
 	for _, key := range summary.ByKey {
-		byKey = append(byKey, map[string]any{"api_key": keyRefJSON(key.Key), "spend": key.Spend.String(), "entries": key.Entries})
+		var apiKey *apiKeyRefJSON
+		if key.Key != nil {
+			apiKey = &apiKeyRefJSON{ID: key.Key.ID, Name: key.Key.Name}
+		}
+		byKey = append(byKey, pointsKeySpendJSON{APIKey: apiKey, Spend: key.Spend.String(), Entries: key.Entries})
 	}
-	return map[string]any{"by_day": byDay, "by_key": byKey}
+	return pointsEntrySummaryJSON{ByDay: byDay, ByKey: byKey}
 }
 
 // csvTypeLabel names an entry the way the user's statement shows it.

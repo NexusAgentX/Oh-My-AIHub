@@ -23,20 +23,153 @@ func currentPrices(model catalog.Model, now time.Time) (ledger.Prices, int) {
 	return ledger.SelectPriceTier(model.BasePrices(), model.PriceTiers, 0, now)
 }
 
-func scaledPrices(prices ledger.Prices, multiplierNano int64) map[string]string {
-	return map[string]string{
-		"input":       ledger.ScalePrice(prices.InputPerMillion, multiplierNano).String(),
-		"output":      ledger.ScalePrice(prices.OutputPerMillion, multiplierNano).String(),
-		"cache_write": ledger.ScalePrice(prices.CacheWritePerMillion, multiplierNano).String(),
-		"cache_read":  ledger.ScalePrice(prices.CacheReadPerMillion, multiplierNano).String(),
+// tierRefJSON is the OpenAPI TierRef schema.
+type tierRefJSON struct {
+	Seq  int    `json:"seq"`
+	Name string `json:"name"`
+}
+
+// effectivePricesJSON is the OpenAPI EffectivePrices schema.
+type effectivePricesJSON struct {
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+	CacheWrite string `json:"cache_write"`
+	CacheRead  string `json:"cache_read"`
+}
+
+// catalogModelJSON is the OpenAPI CatalogModel schema.
+type catalogModelJSON struct {
+	ID                       string               `json:"id"`
+	DisplayName              string               `json:"display_name"`
+	Provider                 string               `json:"provider"`
+	ContextWindow            *int64               `json:"context_window"`
+	InputModalities          []string             `json:"input_modalities"`
+	OutputModalities         []string             `json:"output_modalities"`
+	SupportsTools            bool                 `json:"supports_tools"`
+	SupportsStructuredOutput bool                 `json:"supports_structured_output"`
+	SupportsVision           bool                 `json:"supports_vision"`
+	ParameterInfo            string               `json:"parameter_info"`
+	BasePrices               modelPricesJSON      `json:"base_prices"`
+	CurrentTier              *tierRefJSON         `json:"current_tier"`
+	LowestPrices             *effectivePricesJSON `json:"lowest_prices"`
+	Formats                  []channel.Format     `json:"formats"`
+	OnlineChannels           int                  `json:"online_channels"`
+}
+
+// catalogModelListJSON is the OpenAPI CatalogModelList schema.
+type catalogModelListJSON struct {
+	Items []catalogModelJSON `json:"items"`
+}
+
+// modelChannelJSON is the OpenAPI ModelChannel schema.
+type modelChannelJSON struct {
+	ID                       string              `json:"id"`
+	Name                     string              `json:"name"`
+	Owner                    partyJSON           `json:"owner"`
+	IsMine                   bool                `json:"is_mine"`
+	Formats                  []channel.Format    `json:"formats"`
+	Multiplier               string              `json:"multiplier"`
+	CurrentPrices            effectivePricesJSON `json:"current_prices"`
+	SuccessRate24h           *string             `json:"success_rate_24h"`
+	TTFTP50MS                *int64              `json:"ttft_p50_ms"`
+	State                    string              `json:"state"`
+	CooldownRemainingSeconds *int64              `json:"cooldown_remaining_seconds"`
+	DailyCapRemaining        *string             `json:"daily_cap_remaining"`
+}
+
+// modelDetailJSON is the OpenAPI ModelDetail schema.
+type modelDetailJSON struct {
+	Model      catalogModelJSON      `json:"model"`
+	PriceTiers []priceTierJSON       `json:"price_tiers"`
+	Channels   []modelChannelJSON    `json:"channels"`
+	Routing    routingPreferenceJSON `json:"routing"`
+}
+
+// tokenUsageJSON is the OpenAPI Usage schema. It is not named usageJSON because observe.go still
+// uses that name for its map-based helper.
+type tokenUsageJSON struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+}
+
+// callChannelRefJSON is the OpenAPI ChannelRef schema. It is not named channelRefJSON because
+// observe.go still uses that name for its map-based helper.
+type callChannelRefJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// recentCallJSON is the OpenAPI CallSummary schema as built from the gateway's home page rows. It
+// is not named callSummaryJSON because observe.go still uses that name for its map-based helper.
+type recentCallJSON struct {
+	ID             string              `json:"id"`
+	CreatedAt      time.Time           `json:"created_at"`
+	CompletedAt    *time.Time          `json:"completed_at"`
+	ModelID        *string             `json:"model_id"`
+	RequestedModel string              `json:"requested_model"`
+	Format         channel.Format      `json:"format"`
+	Stream         bool                `json:"stream"`
+	Tag            *string             `json:"tag"`
+	APIKey         *apiKeyRefJSON      `json:"api_key"`
+	Outcome        string              `json:"outcome"`
+	Channel        *callChannelRefJSON `json:"channel"`
+	AttemptCount   int                 `json:"attempt_count"`
+	Usage          tokenUsageJSON      `json:"usage"`
+	Cost           string              `json:"cost"`
+	Fee            string              `json:"fee"`
+	Charged        string              `json:"charged"`
+	TTFTMS         *int32              `json:"ttft_ms"`
+	DurationMS     *int32              `json:"duration_ms"`
+}
+
+// defaultKeyJSON is the OpenAPI DefaultKey schema.
+type defaultKeyJSON struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Prefix string `json:"prefix"`
+}
+
+// homeTodayJSON is the today object of the OpenAPI HomeResponse schema.
+type homeTodayJSON struct {
+	Spend          string `json:"spend"`
+	Calls          int64  `json:"calls"`
+	SucceededCalls int64  `json:"succeeded_calls"`
+}
+
+// homeChannelsJSON is the channels object of the OpenAPI HomeResponse schema.
+type homeChannelsJSON struct {
+	TodayRevenue string `json:"today_revenue"`
+	Online       int64  `json:"online"`
+	Total        int64  `json:"total"`
+}
+
+// homeResponseJSON is the OpenAPI HomeResponse schema.
+type homeResponseJSON struct {
+	Points           pointsSummaryJSON `json:"points"`
+	Today            homeTodayJSON     `json:"today"`
+	Channels         homeChannelsJSON  `json:"channels"`
+	DefaultKey       *defaultKeyJSON   `json:"default_key"`
+	PendingC2CTrades int64             `json:"pending_c2c_trades"`
+	RecentCalls      []recentCallJSON  `json:"recent_calls"`
+}
+
+func newEffectivePricesJSON(prices ledger.Prices, multiplierNano int64) effectivePricesJSON {
+	return effectivePricesJSON{
+		Input:      ledger.ScalePrice(prices.InputPerMillion, multiplierNano).String(),
+		Output:     ledger.ScalePrice(prices.OutputPerMillion, multiplierNano).String(),
+		CacheWrite: ledger.ScalePrice(prices.CacheWritePerMillion, multiplierNano).String(),
+		CacheRead:  ledger.ScalePrice(prices.CacheReadPerMillion, multiplierNano).String(),
 	}
 }
 
-func catalogModelResponse(model catalog.Model, online []gateway.OnlineChannel, now time.Time) map[string]any {
+func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, now time.Time) catalogModelJSON {
 	prices, tierSeq := currentPrices(model, now)
-	var tier, lowest any
+	var tier *tierRefJSON
+	var lowest *effectivePricesJSON
 	if tierSeq > 0 {
-		tier = map[string]any{"seq": tierSeq, "name": model.PriceTiers[tierSeq-1].Name}
+		tier = &tierRefJSON{Seq: tierSeq, Name: model.PriceTiers[tierSeq-1].Name}
 	}
 	formats := []channel.Format{}
 	var cheapest int64 = -1
@@ -51,7 +184,8 @@ func catalogModelResponse(model catalog.Model, online []gateway.OnlineChannel, n
 		}
 	}
 	if cheapest >= 0 {
-		lowest = scaledPrices(prices, cheapest)
+		scaled := newEffectivePricesJSON(prices, cheapest)
+		lowest = &scaled
 	}
 	ordered := make([]channel.Format, 0, len(formats))
 	for _, format := range channel.Formats {
@@ -59,13 +193,22 @@ func catalogModelResponse(model catalog.Model, online []gateway.OnlineChannel, n
 			ordered = append(ordered, format)
 		}
 	}
-	return map[string]any{
-		"id": model.ID, "display_name": model.DisplayName, "provider": model.Provider, "context_window": model.ContextWindow,
-		"input_modalities": model.InputModalities, "output_modalities": model.OutputModalities,
-		"supports_tools": model.SupportsTools, "supports_structured_output": model.SupportsStructuredOutput,
-		"supports_vision": model.SupportsVision, "parameter_info": model.ParameterInfo,
-		"base_prices":  pricesResponse(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
-		"current_tier": tier, "lowest_prices": lowest, "formats": ordered, "online_channels": len(online),
+	return catalogModelJSON{
+		ID:                       model.ID,
+		DisplayName:              model.DisplayName,
+		Provider:                 model.Provider,
+		ContextWindow:            model.ContextWindow,
+		InputModalities:          model.InputModalities,
+		OutputModalities:         model.OutputModalities,
+		SupportsTools:            model.SupportsTools,
+		SupportsStructuredOutput: model.SupportsStructuredOutput,
+		SupportsVision:           model.SupportsVision,
+		ParameterInfo:            model.ParameterInfo,
+		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
+		CurrentTier:              tier,
+		LowestPrices:             lowest,
+		Formats:                  ordered,
+		OnlineChannels:           len(online),
 	}
 }
 
@@ -90,11 +233,11 @@ func (a *app) listModels(w http.ResponseWriter, r *http.Request) {
 	}
 	grouped := groupByModel(online)
 	now := time.Now()
-	items := make([]map[string]any, 0, len(models))
+	items := make([]catalogModelJSON, 0, len(models))
 	for _, model := range models {
-		items = append(items, catalogModelResponse(model, grouped[model.ID], now))
+		items = append(items, newCatalogModelJSON(model, grouped[model.ID], now))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, catalogModelListJSON{Items: items})
 }
 
 func ratio(value float64) string { return strconv.FormatFloat(value, 'f', 6, 64) }
@@ -130,20 +273,23 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			mine = append(mine, entry)
 		}
 	}
-	channels := make([]map[string]any, 0, len(mine))
+	channels := make([]modelChannelJSON, 0, len(mine))
 	for _, entry := range mine {
 		state, remaining := a.gateway.State().Describe(entry.ChannelID, gateway.EffectiveLimits(entry.Advanced, defaults), now)
-		var successRate, ttft, cooldown any
+		var successRate, capRemaining *string
+		var ttft, cooldown *int64
 		if health, ok := stats[entry.ChannelID]; ok && health.Attempts > 0 {
-			successRate = ratio(health.SuccessRate())
+			rate := ratio(health.SuccessRate())
+			successRate = &rate
 			if health.TTFTP50MS != nil {
-				ttft = int64(*health.TTFTP50MS)
+				value := int64(*health.TTFTP50MS)
+				ttft = &value
 			}
 		}
 		if state == gateway.StateCooldown {
-			cooldown = int64(remaining.Seconds()) + 1
+			seconds := int64(remaining.Seconds()) + 1
+			cooldown = &seconds
 		}
-		var capRemaining any
 		if cap := entry.Advanced.DailyRevenueCap; cap != nil && *cap > 0 {
 			revenue, err := a.browse.ChannelRevenue(ctx, entry.ChannelID, localtime.DayStart(now))
 			if err != nil {
@@ -151,60 +297,71 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			remaining := 1 - float64(revenue.Nano())/float64(cap.Nano())
-			capRemaining = ratio(math.Min(1, math.Max(0, remaining)))
+			left := ratio(math.Min(1, math.Max(0, remaining)))
+			capRemaining = &left
 		}
-		channels = append(channels, map[string]any{
-			"id": entry.ChannelID, "name": entry.ChannelName, "daily_cap_remaining": capRemaining,
-			"owner":   map[string]any{"id": entry.OwnerID, "display_name": entry.OwnerName},
-			"is_mine": entry.OwnerID == accountID, "formats": entry.Formats,
-			"multiplier":       money.FromNano(entry.MultiplierNano).String(),
-			"current_prices":   scaledPrices(prices, entry.MultiplierNano),
-			"success_rate_24h": successRate, "ttft_p50_ms": ttft, "state": string(state), "cooldown_remaining_seconds": cooldown,
+		channels = append(channels, modelChannelJSON{
+			ID:                       entry.ChannelID,
+			Name:                     entry.ChannelName,
+			Owner:                    partyJSON{ID: entry.OwnerID, DisplayName: entry.OwnerName},
+			IsMine:                   entry.OwnerID == accountID,
+			Formats:                  entry.Formats,
+			Multiplier:               money.FromNano(entry.MultiplierNano).String(),
+			CurrentPrices:            newEffectivePricesJSON(prices, entry.MultiplierNano),
+			SuccessRate24h:           successRate,
+			TTFTP50MS:                ttft,
+			State:                    string(state),
+			CooldownRemainingSeconds: cooldown,
+			DailyCapRemaining:        capRemaining,
 		})
 	}
 	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))
 	for index, tier := range model.PriceTiers {
-		tiers = append(tiers, priceTierResponse(index+1, tier))
+		tiers = append(tiers, newPriceTierJSON(index+1, tier))
 	}
 	pref, err := a.routing.Get(ctx, accountID, "", model.ID)
 	if err != nil {
 		pref = routing.Default(model.ID)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"model": catalogModelResponse(model, mine, now), "price_tiers": tiers, "channels": channels, "routing": routingResponse(pref),
+	writeJSON(w, http.StatusOK, modelDetailJSON{
+		Model: newCatalogModelJSON(model, mine, now), PriceTiers: tiers, Channels: channels, Routing: newRoutingPreferenceJSON(pref),
 	})
 }
 
-func callSummaryResponse(call gateway.CallSummary) map[string]any {
-	var apiKey, channelRef any
-	if call.KeyID != nil {
-		name := ""
-		if call.KeyName != nil {
-			name = *call.KeyName
-		}
-		apiKey = map[string]any{"id": *call.KeyID, "name": name}
-	}
+func newRecentCallJSON(call gateway.CallSummary) recentCallJSON {
+	var channelRef *callChannelRefJSON
 	if call.ChannelID != nil {
-		name := ""
+		channelRef = &callChannelRefJSON{ID: *call.ChannelID}
 		if call.ChannelName != nil {
-			name = *call.ChannelName
+			channelRef.Name = *call.ChannelName
 		}
-		channelRef = map[string]any{"id": *call.ChannelID, "name": name}
 	}
 	charged := money.Amount(0)
 	if call.Booked {
 		charged = money.FromNano((call.Cost + call.Fee).Nano())
 	}
-	return map[string]any{
-		"id": call.ID, "created_at": call.CreatedAt, "completed_at": call.CompletedAt, "model_id": call.ModelID, "attempt_count": call.AttemptCount,
-		"requested_model": call.RequestedModel, "format": call.Format, "stream": call.Stream, "tag": call.Tag,
-		"api_key": apiKey, "outcome": call.Outcome, "channel": channelRef,
-		"usage": map[string]int64{
-			"input_tokens": call.Usage.InputTokens, "output_tokens": call.Usage.OutputTokens,
-			"cache_write_tokens": call.Usage.CacheWriteTokens, "cache_read_tokens": call.Usage.CacheReadTokens,
+	return recentCallJSON{
+		ID:             call.ID,
+		CreatedAt:      call.CreatedAt,
+		CompletedAt:    call.CompletedAt,
+		ModelID:        call.ModelID,
+		RequestedModel: call.RequestedModel,
+		Format:         call.Format,
+		Stream:         call.Stream,
+		Tag:            call.Tag,
+		APIKey:         newApiKeyRefJSON(call.KeyID, call.KeyName),
+		Outcome:        call.Outcome,
+		Channel:        channelRef,
+		AttemptCount:   call.AttemptCount,
+		Usage: tokenUsageJSON{
+			InputTokens: call.Usage.InputTokens, OutputTokens: call.Usage.OutputTokens,
+			CacheWriteTokens: call.Usage.CacheWriteTokens, CacheReadTokens: call.Usage.CacheReadTokens,
 		},
-		"cost": call.Cost.String(), "fee": call.Fee.String(), "charged": charged.String(),
-		"ttft_ms": call.TTFTMS, "duration_ms": call.DurationMS,
+		Cost:       call.Cost.String(),
+		Fee:        call.Fee.String(),
+		Charged:    charged.String(),
+		TTFTMS:     call.TTFTMS,
+		DurationMS: call.DurationMS,
 	}
 }
 
@@ -235,23 +392,23 @@ func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	var defaultKey any
+	var defaultKey *defaultKeyJSON
 	for _, key := range keys {
 		if key.IsDefault {
-			defaultKey = map[string]any{"id": key.ID, "name": key.Name, "prefix": key.Prefix}
+			defaultKey = &defaultKeyJSON{ID: key.ID, Name: key.Name, Prefix: key.Prefix}
 		}
 	}
-	calls := make([]map[string]any, 0, len(recent))
+	calls := make([]recentCallJSON, 0, len(recent))
 	for _, call := range recent {
-		calls = append(calls, callSummaryResponse(call))
+		calls = append(calls, newRecentCallJSON(call))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"points": map[string]string{"balance": points.Balance.String(), "credit_limit": points.CreditLimit.String(), "available": points.Available().String()},
-		"today":  map[string]any{"spend": stats.TodaySpend.String(), "calls": stats.TodayCalls, "succeeded_calls": stats.TodaySucceeded},
-		"channels": map[string]any{
-			"today_revenue": stats.RevenueToday.String(), "online": stats.ChannelsOnline, "total": stats.ChannelsTotal,
-		},
-		"default_key": defaultKey, "pending_c2c_trades": stats.PendingTrades, "recent_calls": calls,
+	writeJSON(w, http.StatusOK, homeResponseJSON{
+		Points:           pointsSummaryJSON{Balance: points.Balance.String(), CreditLimit: points.CreditLimit.String(), Available: points.Available().String()},
+		Today:            homeTodayJSON{Spend: stats.TodaySpend.String(), Calls: stats.TodayCalls, SucceededCalls: stats.TodaySucceeded},
+		Channels:         homeChannelsJSON{TodayRevenue: stats.RevenueToday.String(), Online: stats.ChannelsOnline, Total: stats.ChannelsTotal},
+		DefaultKey:       defaultKey,
+		PendingC2CTrades: stats.PendingTrades,
+		RecentCalls:      calls,
 	})
 }
 

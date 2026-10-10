@@ -3,73 +3,181 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-func partyResponse(p c2c.Party) map[string]any {
-	return map[string]any{"id": p.ID, "display_name": p.DisplayName}
+// partyJSON is the OpenAPI Party schema.
+type partyJSON struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
 }
 
-func methodsResponse(methods []c2c.PaymentMethod) []map[string]string {
-	items := make([]map[string]string, 0, len(methods))
+// paymentMethodJSON is the OpenAPI PaymentMethod schema.
+type paymentMethodJSON struct {
+	Channel string `json:"channel"`
+	Account string `json:"account"`
+}
+
+// c2cOrderJSON is the OpenAPI C2COrder schema.
+type c2cOrderJSON struct {
+	ID              string    `json:"id"`
+	Seller          partyJSON `json:"seller"`
+	Available       string    `json:"available"`
+	MinPerTrade     string    `json:"min_per_trade"`
+	MaxPerTrade     *string   `json:"max_per_trade"`
+	UnitPriceFen    int64     `json:"unit_price_fen"`
+	PaymentChannels []string  `json:"payment_channels"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// c2cMyOrderJSON is the OpenAPI C2CMyOrder schema.
+type c2cMyOrderJSON struct {
+	ID             string              `json:"id"`
+	Total          string              `json:"total"`
+	Available      string              `json:"available"`
+	InTrade        string              `json:"in_trade"`
+	Sold           string              `json:"sold"`
+	Closed         string              `json:"closed"`
+	UnitPriceFen   int64               `json:"unit_price_fen"`
+	MinPerTrade    string              `json:"min_per_trade"`
+	MaxPerTrade    *string             `json:"max_per_trade"`
+	PaymentMethods []paymentMethodJSON `json:"payment_methods"`
+	Status         c2c.OrderStatus     `json:"status"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
+	ClosedAt       *time.Time          `json:"closed_at"`
+}
+
+// c2cMyOrderEnvelopeJSON is the OpenAPI C2CMyOrderEnvelope schema.
+type c2cMyOrderEnvelopeJSON struct {
+	Order c2cMyOrderJSON `json:"order"`
+}
+
+// c2cTradeJSON is the OpenAPI C2CTrade schema.
+type c2cTradeJSON struct {
+	ID               string              `json:"id"`
+	OrderID          string              `json:"order_id"`
+	ViewerRole       string              `json:"viewer_role"`
+	Buyer            partyJSON           `json:"buyer"`
+	Seller           partyJSON           `json:"seller"`
+	Amount           string              `json:"amount"`
+	UnitPriceFen     int64               `json:"unit_price_fen"`
+	TotalFen         int64               `json:"total_fen"`
+	Status           c2c.TradeStatus     `json:"status"`
+	PaymentDeadline  time.Time           `json:"payment_deadline"`
+	PaymentMethods   []paymentMethodJSON `json:"payment_methods"`
+	BuyerNote        *string             `json:"buyer_note"`
+	DisputeOpenedBy  *string             `json:"dispute_opened_by"`
+	BuyerStatement   *string             `json:"buyer_statement"`
+	SellerStatement  *string             `json:"seller_statement"`
+	ResolutionReason *string             `json:"resolution_reason"`
+	CreatedAt        time.Time           `json:"created_at"`
+	PaidAt           *time.Time          `json:"paid_at"`
+	ReleasedAt       *time.Time          `json:"released_at"`
+	CancelledAt      *time.Time          `json:"cancelled_at"`
+	DisputedAt       *time.Time          `json:"disputed_at"`
+	ResolvedAt       *time.Time          `json:"resolved_at"`
+}
+
+// c2cTradeEnvelopeJSON is the OpenAPI C2CTradeEnvelope schema.
+type c2cTradeEnvelopeJSON struct {
+	Trade c2cTradeJSON `json:"trade"`
+}
+
+func newPartyJSON(p c2c.Party) partyJSON {
+	return partyJSON{ID: p.ID, DisplayName: p.DisplayName}
+}
+
+func newPaymentMethodsJSON(methods []c2c.PaymentMethod) []paymentMethodJSON {
+	items := make([]paymentMethodJSON, 0, len(methods))
 	for _, method := range methods {
-		items = append(items, map[string]string{"channel": method.Channel, "account": method.Account})
+		items = append(items, paymentMethodJSON{Channel: method.Channel, Account: method.Account})
 	}
 	return items
 }
 
-func marketOrderResponse(order c2c.MarketOrder) map[string]any {
+func newC2cOrderJSON(order c2c.MarketOrder) c2cOrderJSON {
 	channels := order.Channels
 	if channels == nil {
 		channels = []string{}
 	}
-	return map[string]any{
-		"id": order.ID, "seller": partyResponse(order.Seller), "available": order.Available.String(),
-		"min_per_trade": order.MinPerTrade.String(), "max_per_trade": nullableAmount(order.MaxPerTrade),
-		"unit_price_fen": order.UnitPriceFen, "payment_channels": channels, "created_at": order.CreatedAt,
+	return c2cOrderJSON{
+		ID:              order.ID,
+		Seller:          newPartyJSON(order.Seller),
+		Available:       order.Available.String(),
+		MinPerTrade:     order.MinPerTrade.String(),
+		MaxPerTrade:     nullableAmount(order.MaxPerTrade),
+		UnitPriceFen:    order.UnitPriceFen,
+		PaymentChannels: channels,
+		CreatedAt:       order.CreatedAt,
 	}
 }
 
-func myOrderResponse(order c2c.MyOrder) map[string]any {
-	return map[string]any{
-		"id": order.ID, "total": order.Total.String(), "available": order.Available.String(), "in_trade": order.InTrade.String(),
-		"sold": order.Sold.String(), "closed": order.Closed.String(), "unit_price_fen": order.UnitPriceFen,
-		"min_per_trade": order.MinPerTrade.String(), "max_per_trade": nullableAmount(order.MaxPerTrade),
-		"payment_methods": methodsResponse(order.PaymentMethods), "status": order.Status,
-		"created_at": order.CreatedAt, "updated_at": order.UpdatedAt, "closed_at": order.ClosedAt,
+func newC2cMyOrderJSON(order c2c.MyOrder) c2cMyOrderJSON {
+	return c2cMyOrderJSON{
+		ID:             order.ID,
+		Total:          order.Total.String(),
+		Available:      order.Available.String(),
+		InTrade:        order.InTrade.String(),
+		Sold:           order.Sold.String(),
+		Closed:         order.Closed.String(),
+		UnitPriceFen:   order.UnitPriceFen,
+		MinPerTrade:    order.MinPerTrade.String(),
+		MaxPerTrade:    nullableAmount(order.MaxPerTrade),
+		PaymentMethods: newPaymentMethodsJSON(order.PaymentMethods),
+		Status:         order.Status,
+		CreatedAt:      order.CreatedAt,
+		UpdatedAt:      order.UpdatedAt,
+		ClosedAt:       order.ClosedAt,
 	}
 }
 
-func tradeResponse(view c2c.TradeView) map[string]any {
-	return map[string]any{
-		"id": view.ID, "order_id": view.OrderID, "viewer_role": view.ViewerRole,
-		"buyer": partyResponse(view.Buyer), "seller": partyResponse(view.Seller),
-		"amount": view.Amount.String(), "unit_price_fen": view.UnitPriceFen, "total_fen": view.TotalFen,
-		"status": view.Status, "payment_deadline": view.PaymentDeadline, "payment_methods": methodsResponse(view.PaymentMethods),
-		"buyer_note": view.BuyerNote, "dispute_opened_by": view.DisputeOpenedBy, "buyer_statement": view.BuyerStatement,
-		"seller_statement": view.SellerStatement, "resolution_reason": view.ResolutionReason, "created_at": view.CreatedAt,
-		"paid_at": view.PaidAt, "released_at": view.ReleasedAt, "cancelled_at": view.CancelledAt,
-		"disputed_at": view.DisputedAt, "resolved_at": view.ResolvedAt,
+func newC2cTradeJSON(view c2c.TradeView) c2cTradeJSON {
+	return c2cTradeJSON{
+		ID:               view.ID,
+		OrderID:          view.OrderID,
+		ViewerRole:       view.ViewerRole,
+		Buyer:            newPartyJSON(view.Buyer),
+		Seller:           newPartyJSON(view.Seller),
+		Amount:           view.Amount.String(),
+		UnitPriceFen:     view.UnitPriceFen,
+		TotalFen:         view.TotalFen,
+		Status:           view.Status,
+		PaymentDeadline:  view.PaymentDeadline,
+		PaymentMethods:   newPaymentMethodsJSON(view.PaymentMethods),
+		BuyerNote:        view.BuyerNote,
+		DisputeOpenedBy:  view.DisputeOpenedBy,
+		BuyerStatement:   view.BuyerStatement,
+		SellerStatement:  view.SellerStatement,
+		ResolutionReason: view.ResolutionReason,
+		CreatedAt:        view.CreatedAt,
+		PaidAt:           view.PaidAt,
+		ReleasedAt:       view.ReleasedAt,
+		CancelledAt:      view.CancelledAt,
+		DisputedAt:       view.DisputedAt,
+		ResolvedAt:       view.ResolvedAt,
 	}
 }
 
 func writeTrade(w http.ResponseWriter, status int, view c2c.TradeView) {
-	writeJSON(w, status, map[string]any{"trade": tradeResponse(view)})
+	writeJSON(w, status, c2cTradeEnvelopeJSON{Trade: newC2cTradeJSON(view)})
 }
 
-func writePage[T any](w http.ResponseWriter, page c2c.Page[T], item func(T) map[string]any) {
-	items := make([]map[string]any, 0, len(page.Items))
+// writePage converts one cursor page of domain values into its response page.
+func writePage[T, J any](w http.ResponseWriter, page c2c.Page[T], convert func(T) J) {
+	items := make([]J, 0, len(page.Items))
 	for _, entry := range page.Items {
-		items = append(items, item(entry))
+		items = append(items, convert(entry))
 	}
 	var next *string
 	if page.Next != "" {
 		next = &page.Next
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
+	writeJSON(w, http.StatusOK, pageJSON[J]{Items: items, NextCursor: next})
 }
 
 func clientIdempotencyKey(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -103,7 +211,7 @@ func (a *app) listC2COrders(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writePage(w, page, marketOrderResponse)
+	writePage(w, page, newC2cOrderJSON)
 }
 
 func (a *app) createC2COrder(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +260,7 @@ func (a *app) createC2COrder(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"order": myOrderResponse(order)})
+	writeJSON(w, http.StatusCreated, c2cMyOrderEnvelopeJSON{Order: newC2cMyOrderJSON(order)})
 }
 
 func (a *app) listMyC2COrders(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +275,7 @@ func (a *app) listMyC2COrders(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writePage(w, page, myOrderResponse)
+	writePage(w, page, newC2cMyOrderJSON)
 }
 
 func (a *app) closeC2COrder(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +288,7 @@ func (a *app) closeC2COrder(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"order": myOrderResponse(order)})
+	writeJSON(w, http.StatusOK, c2cMyOrderEnvelopeJSON{Order: newC2cMyOrderJSON(order)})
 }
 
 func (a *app) createC2CTrade(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +337,7 @@ func (a *app) listMyC2CTrades(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writePage(w, page, tradeResponse)
+	writePage(w, page, newC2cTradeJSON)
 }
 
 func (a *app) viewer(r *http.Request) c2c.Viewer {
@@ -341,7 +449,7 @@ func (a *app) listAdminDisputes(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writePage(w, page, tradeResponse)
+	writePage(w, page, newC2cTradeJSON)
 }
 
 func (a *app) resolveAdminC2CTrade(w http.ResponseWriter, r *http.Request) {
