@@ -78,10 +78,3 @@ export function findNavItem(groups: NavGroup[], pathname: string) {
 export function findMobileTab(tabs: MobileTab[], pathname: string) {
   return tabs.find((tab) => [tab.to, ...(tab.also ?? [])].some((prefix) => matchesPrefix(pathname, prefix)))
 }
-
-/** 页面标题（移动端顶栏不显示，桌面顶栏面包屑用）。 */
-export function pageTitle(pathname: string) {
-  if (matchesPrefix(pathname, '/me')) return '我的'
-  if (matchesPrefix(pathname, '/account')) return '账户设置'
-  return findNavItem(productNavigation, pathname)?.label ?? ''
-}

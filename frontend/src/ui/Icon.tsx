@@ -78,6 +78,7 @@ const paths = {
     </>
   ),
   'arrow-left': <path d="m15 18-6-6 6-6" />,
+  'chevron-left': <path d="m15 6-6 6 6 6" />,
   'chevron-right': <path d="m9 6 6 6-6 6" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
   'arrow-up': <path d="M12 19V5m-6 6 6-6 6 6" />,

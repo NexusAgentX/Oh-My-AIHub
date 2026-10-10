@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { C2CTrade } from '../api/types'
 import { formatFen, formatPoints } from '../money/format'
 import { formatDateTime } from '../money/time'
@@ -23,11 +23,7 @@ function TradeDetail({ trade }: { trade: C2CTrade }) {
   return (
     <>
       <PageHeader
-        back={
-          <Link className="back-link" to="/points?tab=trades">
-            ← 我的交易
-          </Link>
-        }
+        back={{ to: '/points?tab=trades', label: '我的交易' }}
         title={trade.viewer_role === 'buyer' ? '买入积分' : '卖出积分'}
       />
       <div className="trade-layout">

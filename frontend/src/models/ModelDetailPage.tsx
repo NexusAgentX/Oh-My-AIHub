@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { ModelDetail } from '../api/types'
 import { FormatTags } from '../calls'
@@ -115,11 +115,7 @@ export function ModelDetailPage() {
         return (
           <>
             <PageHeader
-              back={
-                <Link className="back-link" to="/models">
-                  ← 模型
-                </Link>
-              }
+              back={{ to: '/models', label: '模型' }}
               title={detail.model.display_name || detail.model.id}
             />
             <div className="model-summary">

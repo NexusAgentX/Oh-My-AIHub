@@ -34,6 +34,9 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/* 跟在主题切换后面；手机上主题切换隐藏，回到靠右 */
+.theme-toggle + .admin-topbar-back { margin-left: var(--space-2); }
+@media (max-width: 767px) { .theme-toggle + .admin-topbar-back { margin-left: auto; } }
 .admin-topbar-back:hover { background: var(--hover); text-decoration: none; }
 .admin-topbar-back:active { color: var(--ink); transform: translate(2px, 2px); box-shadow: none; }
 

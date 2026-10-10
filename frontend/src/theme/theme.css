@@ -1,27 +1,35 @@
-/* 主题切换：账户菜单中的图标单选 */
-.theme-menu {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: var(--space-1) 0;
-  padding: var(--space-1) var(--space-1) var(--space-1) 10px;
-  border-block: 1px solid var(--hairline);
-  color: var(--body);
+/* 主题切换：顶栏右上角的图标按钮与下拉菜单 */
+.theme-toggle { position: relative; }
+.theme-toggle > .icon-button[aria-expanded='true'] { color: var(--ink); background: var(--hover); }
+.theme-popover {
+  position: absolute;
+  z-index: var(--z-overlay);
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 156px;
+  padding: var(--space-1);
+  border: var(--sticker-border);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  box-shadow: var(--shadow-md);
 }
-.theme-menu-options { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-pill); background: var(--sunken); }
-.theme-menu-option {
-  display: inline-grid;
-  width: 32px;
-  height: 28px;
-  place-items: center;
-  padding: 0;
+.theme-popover-item {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-pill);
-  color: var(--muted);
+  border-radius: var(--radius-sm);
+  color: var(--body);
   background: transparent;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
-.theme-menu-option:hover { color: var(--ink); }
-.theme-menu-option[aria-checked='true'] { color: var(--on-color); background: var(--mustard); }
+.theme-popover-item:hover { background: var(--hover); }
+.theme-popover-item .icon { color: var(--muted); }
+.theme-popover-item > span { flex: 1; }
+.theme-popover-item[aria-checked='true'] { color: var(--ink); font-weight: 700; background: var(--selected); }
+.theme-popover-item[aria-checked='true'] .icon:last-child { color: var(--mustard-text); }

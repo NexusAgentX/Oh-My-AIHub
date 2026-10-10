@@ -4,14 +4,13 @@ import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { usePoints } from '../points/queries'
 import { amountSign, formatPoints } from '../money/format'
-import { ThemeMenuGroup } from '../theme/ThemeSwitcher'
-import { Icon } from '../ui'
+import { ThemeToggle } from '../theme/ThemeSwitcher'
+import { Icon, PageBackSlot } from '../ui'
 import { Brand } from './Brand'
 import {
   findMobileTab,
   findNavItem,
   mobileTabs,
-  pageTitle,
   type MobileTab,
   type NavGroup,
 } from './navigation'
@@ -68,7 +67,7 @@ function BalanceText() {
   )
 }
 
-/** 侧栏底部账户按钮与菜单：账户设置、管理后台（管理员）、主题、退出。 */
+/** 侧栏底部账户按钮与菜单：账户设置、管理后台（管理员）、退出。主题切换在顶栏右上角。 */
 function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   const { account } = useAuth()
   const [open, setOpen] = useState(false)
@@ -110,7 +109,6 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
               管理后台
             </Link>
           )}
-          <ThemeMenuGroup />
           <button
             className="account-menu-item"
             onClick={() => {
@@ -176,6 +174,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   const location = useLocation()
   const alertReference = useRef<HTMLDivElement>(null)
   const mainReference = useRef<HTMLElement>(null)
+  const [backSlot, setBackSlot] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (signOutError) alertReference.current?.focus()
@@ -191,6 +190,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
   }, [location.pathname])
 
   return (
+    <PageBackSlot.Provider value={backSlot}>
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
         跳到主要内容
@@ -209,7 +209,9 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
           <Link aria-label="首页" className="topbar-brand" to="/home">
             <Brand />
           </Link>
-          <span className="topbar-crumb">{pageTitle(location.pathname)}</span>
+          {/* 详情页的“‹ 上一级”渲染到这里（PageHeader 的 back）；一级页面留空，不重复页面标题 */}
+          <div className="topbar-back" ref={setBackSlot} />
+          <ThemeToggle />
           <Link className="wallet-chip" to="/points">
             <span>余额</span>
             <strong>
@@ -228,5 +230,6 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
       </div>
       <BottomTabs pathname={location.pathname} tabs={mobileTabs} />
     </div>
+    </PageBackSlot.Provider>
   )
 }

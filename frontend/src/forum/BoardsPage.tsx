@@ -15,7 +15,7 @@ export function BoardsPage() {
   const [deleting, setDeleting] = useState<Board | null>(null)
   if (!account?.is_admin) return <EmptyState title="没有管理权限" />
   return <div className="forum-page">
-    <PageHeader title="管理板块" back={<Link to="/forum">返回论坛</Link>} actions={<Button onClick={() => setEditing('new')}>新增板块</Button>} />
+    <PageHeader title="管理板块" back={{ to: '/forum', label: '论坛' }} actions={<Button onClick={() => setEditing('new')}>新增板块</Button>} />
     <QueryBoundary query={boards}>{(data) => !data.items.length ? <EmptyState title="还没有板块" /> : <ul className="forum-board-list">
       {data.items.map((board) => <li key={board.id}>
         <div><Link to={'/forum?board=' + board.id}><strong>{board.name}</strong></Link><p className="muted-copy">{board.description}</p></div>

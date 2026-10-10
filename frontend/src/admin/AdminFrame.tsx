@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { Brand } from '../layouts/Brand'
-import { Drawer, Icon } from '../ui'
+import { ThemeToggle } from '../theme/ThemeSwitcher'
+import { Drawer, Icon, PageBackSlot } from '../ui'
 import { adminNavigation, adminTabCount, findAdminNavItem, type AdminNavItem } from './navigation'
 
 function NavItems({ items, onNavigate }: { items: AdminNavItem[]; onNavigate?: () => void }) {
@@ -74,7 +75,10 @@ export function AdminFrame() {
     return () => desktop.removeEventListener('change', close)
   }, [])
 
+  const [backSlot, setBackSlot] = useState<HTMLDivElement | null>(null)
+
   return (
+    <PageBackSlot.Provider value={backSlot}>
     <div className="app-shell admin-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
       <aside aria-label="管理后台侧边栏" className="sidebar">
@@ -87,7 +91,9 @@ export function AdminFrame() {
       <div className="workspace">
         <header className="topbar">
           <span className="topbar-brand"><Brand /></span>
-          <span className="topbar-crumb">管理后台{current ? ` · ${current.label}` : ''}</span>
+          {/* 详情页的“‹ 上一级”渲染到这里；当前栏目已在侧栏高亮、页面标题里写明，不再重复 */}
+          <div className="topbar-back" ref={setBackSlot} />
+          <ThemeToggle />
           <Link aria-label="返回产品" className="admin-topbar-back" to="/home">
             <Icon name="back" />
             <span>返回产品</span>
@@ -132,5 +138,6 @@ export function AdminFrame() {
         <AdminFooter showBackLink onNavigate={() => setMoreOpen(false)} />
       </Drawer>
     </div>
+    </PageBackSlot.Provider>
   )
 }
