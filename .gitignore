@@ -1,6 +1,6 @@
 .DS_Store
 .mise.local.toml
-frontend/node_modules/
+node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
@@ -11,4 +11,3 @@ backend/bin/
 backups/
 *.dump.aes
 *.manifest.json
-frontend/tools/openapi-types/node_modules/
