@@ -4,11 +4,11 @@ node = "24.20.0"
 sqlc = "1.31.1"
 
 [tasks.task-start]
-description = "Start a task: fast-forward main, then create codex/<slug> and its worktree from origin/main (usage: mise run task-start <slug>)"
+description = "Start a task: fast-forward main, then create branch <type>/<slug> and its worktree from origin/main (usage: mise run task-start <type>/<slug>, type: feat fix docs refactor perf test ci chore)"
 run = "scripts/task-start.sh"
 
 [tasks.task-finish]
-description = "Finish a merged task: remove its worktree and branches, then sync main (usage: mise run task-finish <slug> [--dry-run] [--volumes])"
+description = "Finish a merged task: remove its worktree and branches, then sync main (usage: mise run task-finish <type>/<slug> [--dry-run] [--volumes])"
 run = "scripts/task-finish.sh"
 
 [tasks.install]
@@ -66,6 +66,10 @@ TEST_DATABASE_URL="postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub
 go -C backend test -count=1 ./internal/postgres ./internal/database
 ''',
 ]
+
+[tasks.test-ci-scripts]
+description = "Test the CI change-scope classification and the gates aggregation (scripts/ci-changes.sh, scripts/ci-gate.sh)"
+run = "scripts/test-ci.sh"
 
 [tasks.check-migrations]
 description = "Fail when a migration from the latest release tag was modified, deleted or renamed"
