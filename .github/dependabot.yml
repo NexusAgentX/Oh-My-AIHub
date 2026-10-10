@@ -1,0 +1,81 @@
+# 依赖更新：每月一次，每个生态合并为一个分组 PR，并限制同时打开的数量。
+# Dependabot 的 PR 与其他 PR 一样需通过 CI（gates、integration）后再合并。
+#
+# 注意：golang 与 node 镜像的版本同时固定在 mise.toml、go.mod 与 Dockerfile 中，
+# 合并此类升级时需同步修改这些位置，不要只合并 Dockerfile 的变更。
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    # package.json 使用精确版本：升级时改写为新的精确版本，而不是放宽为范围。
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      frontend-npm:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend/tools/openapi-types
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      openapi-types-npm:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      backend-docker:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      frontend-docker:
+        patterns: ["*"]

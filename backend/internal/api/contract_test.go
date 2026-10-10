@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -27,15 +28,23 @@ type openAPISpec struct {
 	schemaKeys []string
 }
 
-func loadOpenAPI(t *testing.T) *openAPISpec {
-	t.Helper()
+func readOpenAPIDocument() (map[string]any, error) {
 	raw, err := os.ReadFile(openAPIPath)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	var document map[string]any
 	if err := yaml.Unmarshal(raw, &document); err != nil {
-		t.Fatalf("openapi.yaml 不是合法 YAML: %v", err)
+		return nil, fmt.Errorf("openapi.yaml 不是合法 YAML: %w", err)
+	}
+	return document, nil
+}
+
+func loadOpenAPI(t *testing.T) *openAPISpec {
+	t.Helper()
+	document, err := readOpenAPIDocument()
+	if err != nil {
+		t.Fatal(err)
 	}
 	if document["openapi"] != "3.1.0" {
 		t.Fatalf("openapi = %v，契约须为 OpenAPI 3.1.0", document["openapi"])
@@ -137,7 +146,9 @@ func (spec *openAPISpec) find(method, path string) (specOperation, bool) {
 	return best, bestLiterals >= 0
 }
 
-// assertResponse 校验真实响应：状态码必须在规范中登记，JSON 响应体必须符合对应 schema。
+// assertResponse 校验真实响应：状态码必须在规范中登记，JSON 响应体必须符合对应 schema，
+// 非 JSON 响应（CSV、SSE、文件）的媒体类型必须在规范中登记。
+// 校验通过的 2xx 响应会计入覆盖登记（见 TestMain），任何校验失败都会终止当前测试。
 func (spec *openAPISpec) assertResponse(t *testing.T, method, path string, recorder *httptest.ResponseRecorder) {
 	t.Helper()
 	operation, ok := spec.find(method, strings.SplitN(path, "?", 2)[0])
@@ -149,6 +160,14 @@ func (spec *openAPISpec) assertResponse(t *testing.T, method, path string, recor
 	if !ok {
 		t.Fatalf("%s %s 返回未登记的状态码 %d: %s", method, path, recorder.Code, recorder.Body.String())
 	}
+	spec.assertDeclaredBody(t, method, path, declared, recorder)
+	if recorder.Code >= 200 && recorder.Code < 300 {
+		validatedSuccess.record(operation.method + " " + operation.path)
+	}
+}
+
+func (spec *openAPISpec) assertDeclaredBody(t *testing.T, method, path string, declared map[string]any, recorder *httptest.ResponseRecorder) {
+	t.Helper()
 	if recorder.Code == http.StatusNoContent {
 		return
 	}
@@ -159,13 +178,20 @@ func (spec *openAPISpec) assertResponse(t *testing.T, method, path string, recor
 		spec.assertSchema(t, "ErrorResponse", recorder.Body.Bytes())
 		return
 	}
-	if strings.HasPrefix(recorder.Header().Get("Content-Type"), "text/csv") {
-		if declared["content"].(map[string]any)["text/csv"] == nil {
-			t.Fatalf("%s %s 返回 CSV，但规范未登记 text/csv", method, path)
+	content, _ := declared["content"].(map[string]any)
+	mediaType, _, _ := strings.Cut(recorder.Header().Get("Content-Type"), ";")
+	mediaType = strings.TrimSpace(mediaType)
+	if mediaType != "" && mediaType != "application/json" {
+		if content[mediaType] == nil {
+			t.Fatalf("%s %s 返回 %s，但规范未登记该媒体类型", method, path, mediaType)
 		}
 		return
 	}
-	schemaRef := declared["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)["$ref"].(string)
+	media, _ := content["application/json"].(map[string]any)
+	if media == nil {
+		t.Fatalf("%s %s 返回 %d JSON，但规范未登记 application/json 响应体", method, path, recorder.Code)
+	}
+	schemaRef := media["schema"].(map[string]any)["$ref"].(string)
 	spec.assertSchema(t, strings.TrimPrefix(schemaRef, "#/components/schemas/"), recorder.Body.Bytes())
 }
 

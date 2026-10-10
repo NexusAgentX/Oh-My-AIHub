@@ -32,6 +32,8 @@ Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平
 
 ## 本地开发
 
+每个任务使用独立的 Git worktree：`mise run task-start <slug>` 同步 `main`，并创建 `codex/<slug>` 分支与 `../Oh-My-AIHub-worktrees/<slug>`；PR 合并后用 `mise run task-finish <slug>` 清理（规则见 `AGENTS.md`）。
+
 安装工具链和前端依赖：
 
 ```bash
@@ -113,6 +115,7 @@ mise run down
 
 ```bash
 mise run test
+mise run lint # 前端 oxlint（React Hooks 与正确性规则）与后端 staticcheck；CI gates 同样执行
 mise run check-sqlc # 修改 queries.sql 或迁移后，先 mise run generate 重新生成并提交
 mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run generate 重新生成前端 API 类型并提交
 mise run test-backend-integration # 需要 Docker；直接 go test 且未设置 TEST_DATABASE_URL 时这些测试会跳过
@@ -130,7 +133,7 @@ CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运�
 .
 ├── backend/       Go 后端
 ├── frontend/      React 前端
-├── scripts/       数据库加密备份、隔离恢复演练与迁移检查脚本
+├── scripts/       任务开工与收尾、数据库加密备份、隔离恢复演练与迁移检查脚本
 ├── docs/adr/      架构决策记录
 ├── docs/runbooks/ 部署、发布、备份恢复与故障处理操作手册
 ├── licenses/      第三方许可

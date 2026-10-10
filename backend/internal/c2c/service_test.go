@@ -191,8 +191,14 @@ func TestDerivedIDIsStableAndScoped(t *testing.T) {
 	if a != derivedID("ns", "owner", "key") || a == derivedID("ns", "other", "key") || a == derivedID("ns", "owner", "key2") || a == derivedID("ns2", "owner", "key") {
 		t.Fatal("derived IDs are not stable and scoped")
 	}
-	if len(a) != 36 || len(newID()) != 36 || newID() == newID() {
-		t.Fatalf("bad UUIDs: %s", a)
+	random, errRandom := newRowID("ns", "owner", "")
+	other, errOther := newRowID("ns", "owner", "")
+	derived, errDerived := newRowID("ns", "owner", "key")
+	if errRandom != nil || errOther != nil || errDerived != nil {
+		t.Fatalf("newRowID errors: %v %v %v", errRandom, errOther, errDerived)
+	}
+	if len(a) != 36 || len(random) != 36 || random == other || derived != a {
+		t.Fatalf("bad UUIDs: derived %s random %s %s", a, random, other)
 	}
 }
 

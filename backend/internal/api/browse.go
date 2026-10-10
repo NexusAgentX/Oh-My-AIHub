@@ -132,7 +132,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	}
 	channels := make([]map[string]any, 0, len(mine))
 	for _, entry := range mine {
-		state, remaining := a.gateway.State().Describe(entry.ChannelID, gateway.Limits2(entry.Advanced, defaults), now)
+		state, remaining := a.gateway.State().Describe(entry.ChannelID, gateway.EffectiveLimits(entry.Advanced, defaults), now)
 		var successRate, ttft, cooldown any
 		if health, ok := stats[entry.ChannelID]; ok && health.Attempts > 0 {
 			successRate = ratio(health.SuccessRate())

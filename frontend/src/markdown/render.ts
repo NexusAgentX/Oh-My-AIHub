@@ -13,6 +13,7 @@ export function isAttachmentURL(url: string) {
 
 export function uploadMarkdown(file: MarkdownUpload) {
   if (!isAttachmentURL(file.url)) throw new Error('上传结果不是有效的站内附件地址')
+  // oxlint-disable-next-line no-control-regex -- 有意把文件名中的控制字符替换为空格
   const name = file.name.replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').replace(/[\\`*_[\]<>!]/g, '\\$&')
   return `${file.isImage ? '!' : ''}[${name}](${file.url})`
 }

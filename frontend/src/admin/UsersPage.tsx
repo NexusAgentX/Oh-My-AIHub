@@ -243,6 +243,7 @@ function UserDrawerBody({
     <div className="drawer-sections">
       <DetailList
         items={[
+          /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
           ['用户名', <span className="mono">@{account.username}</span>],
           ['余额', <Balance value={account.balance} />],
           ['还能透支', <span className="num">{formatPoints(account.available)}</span>],
@@ -250,6 +251,7 @@ function UserDrawerBody({
           ['最近活跃', account.last_active_at ? formatDateTime(account.last_active_at) : '从未'],
           ['创建时间', formatDateTime(account.created_at)],
           ['密码修改', account.must_change_password ? '等待首次改密' : formatDateTime(account.password_changed_at)],
+          /* oxlint-enable react/jsx-key */
         ]}
       />
       <div className="drawer-links">

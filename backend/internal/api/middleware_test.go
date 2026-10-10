@@ -16,17 +16,20 @@ import (
 )
 
 func TestHealth(t *testing.T) {
+	spec := loadOpenAPI(t)
 	recorder := httptest.NewRecorder()
 	NewHandler(Dependencies{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if recorder.Code != http.StatusOK || recorder.Header().Get("Content-Type") != "application/json" || !strings.Contains(recorder.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health = %d %s", recorder.Code, recorder.Body.String())
 	}
+	spec.assertResponse(t, http.MethodGet, "/api/health", recorder)
 	failing := NewHandler(Dependencies{DatabaseReady: func(context.Context) error { return errors.New("down") }})
 	recorder = httptest.NewRecorder()
 	failing.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), `"error":"database_unavailable"`) {
 		t.Fatalf("failing health = %d %s", recorder.Code, recorder.Body.String())
 	}
+	spec.assertResponse(t, http.MethodGet, "/api/health", recorder)
 }
 
 type writeDeadlineRecorder struct {
@@ -227,6 +230,7 @@ func TestLoginClientIPOnlyUsesTrustedProxyHeader(t *testing.T) {
 func TestPasswordWorkAdmissionCapsConcurrentArgon2(t *testing.T) {
 	loginSlots := make(chan struct{}, 2)
 	accountSlots := make(chan struct{}, 2)
+	//lint:ignore SA4000 the second call deliberately takes the second slot
 	if !acquirePasswordSlot(accountSlots) || !acquirePasswordSlot(accountSlots) {
 		t.Fatal("available password work slots were rejected")
 	}
@@ -266,6 +270,7 @@ func TestAttemptLimiterCountsEveryAttemptAndExpires(t *testing.T) {
 	limiter := newLoginLimiter(2, time.Minute, 10)
 	limiter.now = func() time.Time { return now }
 
+	//lint:ignore SA4000 the second call deliberately consumes the second attempt
 	if !limiter.take("account") || !limiter.take("account") {
 		t.Fatal("attempt limiter rejected available capacity")
 	}

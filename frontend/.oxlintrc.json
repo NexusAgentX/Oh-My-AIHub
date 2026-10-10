@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // 只检查正确性：correctness 类规则加上 Hooks 规则；不启用 style、pedantic 等风格类规则。
+  // 选用 oxlint 而非 ESLint：应用使用 TypeScript 7，它不提供 typescript-eslint 依赖的编译器 API；
+  // oxlint 是单一二进制依赖，自带 react-hooks 规则，不需要 TypeScript 编译器 API。
+  "plugins": ["react", "typescript", "oxc", "unicorn"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    // 以下三条来自 React Compiler 的规则集。项目不使用 React Compiler，
+    // 现有写法（渲染期读取 Date.now、用 ref 保存最新 props、在 effect 中同步重置状态）
+    // 是有意为之，改写会带来行为风险，因此关闭。
+    "react/purity": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off"
+  },
+  "ignorePatterns": ["dist", "src/api/schema.gen.ts", "tools"]
+}

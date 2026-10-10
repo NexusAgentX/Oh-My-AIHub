@@ -3,6 +3,14 @@ go = "1.27.0"
 node = "24.20.0"
 sqlc = "1.31.1"
 
+[tasks.task-start]
+description = "Start a task: fast-forward main, then create codex/<slug> and its worktree from origin/main (usage: mise run task-start <slug>)"
+run = "scripts/task-start.sh"
+
+[tasks.task-finish]
+description = "Finish a merged task: remove its worktree and branches, then sync main (usage: mise run task-finish <slug> [--dry-run] [--volumes])"
+run = "scripts/task-finish.sh"
+
 [tasks.install]
 description = "Install frontend dependencies"
 run = "npm --prefix frontend ci"
@@ -76,6 +84,17 @@ scripts/check-migration-upgrade.sh
 ''',
 ]
 
+[tasks.lint-backend]
+description = "Run staticcheck on the backend (pinned; built with the project Go toolchain)"
+run = "go -C backend run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./..."
+
+[tasks.lint]
+description = "Run the frontend lint (oxlint) and backend staticcheck"
+run = [
+  "npm --prefix frontend run lint",
+  { task = "lint-backend" },
+]
+
 [tasks.test]
 description = "Run frontend and backend tests and build checks"
 run = [
@@ -88,9 +107,11 @@ run = [
 description = "Run every gate required for a release candidate"
 run = [
   "npm --prefix frontend ci --prefer-offline --no-audit --no-fund --fetch-timeout=60000",
+  "npm --prefix frontend run lint",
   "npm --prefix frontend test",
   "npm --prefix frontend run build",
   "go -C backend vet ./...",
+  { task = "lint-backend" },
   "go -C backend test -race ./...",
   "docker compose config --quiet",
 ]

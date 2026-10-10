@@ -153,6 +153,7 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
     <div className="drawer-sections">
       <DetailList
         items={[
+          /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
           ['类型', <TransactionTypeLabel type={transaction.type} />],
           ['时间', formatDateTime(transaction.created_at)],
           [
@@ -165,6 +166,7 @@ export function TransactionDetail({ transaction }: { transaction: LedgerTransact
           ['经办人', transaction.actor?.display_name ?? '系统'],
           ['原因', transaction.reason || '—'],
           ['交易号', <span className="mono">{shortID(transaction.id)}</span>],
+          /* oxlint-enable react/jsx-key */
         ]}
       />
       <div>
