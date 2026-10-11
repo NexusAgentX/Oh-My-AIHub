@@ -118,6 +118,47 @@ func (q *Queries) InsertUserLedgerAccount(ctx context.Context, accountID *string
 	return err
 }
 
+const listPoints = `-- name: ListPoints :many
+SELECT l.account_id, l.balance_nano, a.credit_limit_nano, l.updated_at
+FROM ledger_accounts l
+JOIN accounts a ON a.id = l.account_id
+WHERE l.account_id = ANY($1::uuid[])
+`
+
+type ListPointsRow struct {
+	AccountID       *string
+	BalanceNano     money.Amount
+	CreditLimitNano money.Amount
+	UpdatedAt       time.Time
+}
+
+// The balances and credit limits of several users at once: the gateway's
+// balance cache loads and refreshes its entries with it.
+func (q *Queries) ListPoints(ctx context.Context, accountIds []string) ([]ListPointsRow, error) {
+	rows, err := q.db.Query(ctx, listPoints, accountIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPointsRow
+	for rows.Next() {
+		var i ListPointsRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.BalanceNano,
+			&i.CreditLimitNano,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionEntries = `-- name: ListTransactionEntries :many
 SELECT e.ledger_account_id, l.account_id, l.system_code, e.amount_nano, e.balance_after_nano
 FROM ledger_entries e

@@ -11,20 +11,43 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 )
 
 // Store implements ledger.Store: user reads and administrator postings that
 // own their transaction.
 type Store struct {
-	pool *pgxpool.Pool
-	q    *Queries
+	pool  *pgxpool.Pool
+	q     *Queries
+	books *Books
 }
 
-func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool)} }
+// NewStore builds the store. books are the Books its postings report to; nil
+// means nobody listens.
+func NewStore(pool *pgxpool.Pool, books *Books) *Store {
+	if books == nil {
+		books = NewBooks()
+	}
+	return &Store{pool: pool, q: New(pool), books: books}
+}
 
 func (s *Store) Points(ctx context.Context, accountID string) (ledger.Points, error) {
 	return points(ctx, s.pool, accountID)
+}
+
+// ListPoints returns the balance and credit limit of each of the given users
+// that exists; unknown ids are missing from the result.
+func (s *Store) ListPoints(ctx context.Context, accountIDs []string) (map[string]ledger.Points, error) {
+	rows, err := s.q.ListPoints(ctx, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+	points := make(map[string]ledger.Points, len(rows))
+	for _, row := range rows {
+		if row.AccountID != nil {
+			points[*row.AccountID] = ledger.Points{Balance: row.BalanceNano, CreditLimit: row.CreditLimitNano, UpdatedAt: row.UpdatedAt}
+		}
+	}
+	return points, nil
 }
 
 func (s *Store) ListEntries(ctx context.Context, filter ledger.EntryFilter) ([]ledger.EntryView, error) {
@@ -68,7 +91,7 @@ func existing(ctx context.Context, q *Queries, key string, want ledger.Transacti
 
 func (s *Store) Adjust(ctx context.Context, adjustment ledger.Adjustment) (ledger.Posted, error) {
 	var posted ledger.Posted
-	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err := s.books.InTx(ctx, s.pool, func(tx Tx) error {
 		var err error
 		posted, err = Post(ctx, tx, ledger.Transaction{
 			Type: ledger.TypeAdminAdjust, IdempotencyKey: adjustment.IdempotencyKey,
@@ -93,7 +116,7 @@ func (s *Store) Adjust(ctx context.Context, adjustment ledger.Adjustment) (ledge
 
 func (s *Store) WriteOff(ctx context.Context, writeOff ledger.WriteOff) (ledger.Posted, error) {
 	var posted ledger.Posted
-	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err := s.books.InTx(ctx, s.pool, func(tx Tx) error {
 		q := s.q.WithTx(tx)
 		previous, found, err := existing(ctx, q, writeOff.IdempotencyKey, ledger.TypeBadDebtWriteOff, writeOff.AccountID)
 		if err != nil || found {

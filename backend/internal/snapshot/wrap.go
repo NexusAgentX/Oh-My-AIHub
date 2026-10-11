@@ -203,8 +203,8 @@ var identityStoreWrites = map[string]Domain{
 }
 
 // The remaining methods change sessions, passwords and new accounts, which
-// no snapshot holds: a new account has no keys and no channels yet, and the
-// first key it asks for goes through the key store.
+// no snapshot holds: a new account has no keys, no channels and no cached
+// balance yet, and the first key it asks for goes through the key store.
 var identityStoreOthers = []string{
 	"FindAccountByUsername", "FindAccountByID", "FindAccountBySession", "CreateSession", "DeleteSession",
 	"ReplacePasswordAndSessions", "CreateAccount", "CreateBootstrapAdmin", "HasAdministrator", "ListAccounts",
@@ -212,7 +212,8 @@ var identityStoreOthers = []string{
 }
 
 // Identity wraps the store behind the identity service: disabling or
-// re-enabling an account takes effect for the gateway before the call returns.
+// re-enabling an account, and a new credit limit, take effect for the gateway
+// before the call returns.
 func (c *Cache) Identity(raw identity.Store) identity.Store { return identityStore{Store: raw, c: c} }
 
 type identityStore struct {
@@ -224,6 +225,8 @@ func (s identityStore) UpdateAccount(ctx context.Context, actorID, accountID str
 	updated, err := s.Store.UpdateAccount(ctx, actorID, accountID, update)
 	if err == nil {
 		s.c.Invalidate(ctx, identityStoreWrites["UpdateAccount"])
+		// The credit limit is part of the cached balance entry.
+		s.c.InvalidateBalances(accountID)
 	}
 	return updated, err
 }

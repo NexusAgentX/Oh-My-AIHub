@@ -271,7 +271,10 @@ func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
 	}
 }
 
-// After warm-up, a request reads nothing the snapshots hold from the database.
+// After warm-up, a request reads nothing the snapshots hold from the database,
+// and not the balance either (G8.2): the check before a request is let through
+// is answered from memory, so what is left before the upstream is opening the
+// call.
 func TestGatewayRequestsDoNotReadSnapshotDataFromTheDatabase(t *testing.T) {
 	pool, _ := isolatedDatabase(t)
 	counter := gatewaybench.NewQueryCounter()
@@ -307,6 +310,7 @@ func TestGatewayRequestsDoNotReadSnapshotDataFromTheDatabase(t *testing.T) {
 	for _, name := range []string{
 		"LookupKey", "GetModel", "ListModels", "ListTiers", "ListCandidates", "ListAllCandidates", "ListAllKeys", "ListAllRoutePrefs",
 		"ListRoutePrefs", "ListRoutePrefChannels", "CustomModelOnline", "ListOnlineModels", "ResponseChannel",
+		"GetPoints", "ListPoints",
 	} {
 		if statements[name] != 0 {
 			t.Errorf("%d requests ran %d x %s: the snapshots should have answered", requests, statements[name], name)
