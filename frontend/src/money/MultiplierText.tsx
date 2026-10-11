@@ -25,7 +25,7 @@ export function MultiplierText({
   return (
     <span className="multiplier-text" title={`实际倍率 ${effective} = 设置倍率 ${multiplier} ÷ 美元汇率`}>
       <span>{shortMultiplier(effective)}</span>
-      <small>设置 {formatMultiplier(multiplier)} · 汇率优惠</small>
+      <small>{formatMultiplier(multiplier)}</small>
     </span>
   )
 }

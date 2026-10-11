@@ -36,14 +36,21 @@ function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: F
 function FXDiscountTip({ rate }: { rate: string }) {
   return (
     <InfoTip label="什么是汇率优惠">
-      <span>这是美元计价的模型，平台价 = 官方美元价 × 汇率 {rate}。</span>
       <span>
-        <strong>开启</strong>：上游 1 元能充 1 美元额度时开启，倍率直接填上游的分组倍率（如 0.13），按「美元价 × 倍率」扣积分。
+        <strong>问：什么时候开启？</strong>
+        <br />
+        答：上游 1 元能充 1 美元额度时开启，倍率直接填上游的分组倍率（如 0.13），按「美元价 × 倍率」扣积分。
       </span>
       <span>
-        <strong>不开启</strong>：上游按实际汇率充值（约 {rate} 元充 1 美元）时，倍率填上游分组倍率即可。
+        <strong>问：什么时候不开启？</strong>
+        <br />
+        答：上游按实际汇率充值（约 {rate} 元充 1 美元）时不开启，倍率同样填上游的分组倍率。
       </span>
-      <span className="muted">两种情况都要求上游按官方美元价计费。</span>
+      <span>
+        <strong>问：有什么前提？</strong>
+        <br />
+        答：上游要按官方美元价计费。
+      </span>
     </InfoTip>
   )
 }
