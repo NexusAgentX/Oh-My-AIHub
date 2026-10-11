@@ -554,9 +554,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			release()
 			e.finishExpired(w, call)
 			return
-		case result.response != nil && result.passthrough:
+		case result.passthrough != nil:
 			e.Runtime.Success(candidate.ChannelID) // an answering upstream is healthy
-			e.forwardPassthrough(w, call, result)
+			e.forwardPassthrough(w, call, result.passthrough)
 			release()
 			return
 		case result.response != nil:
@@ -700,12 +700,28 @@ func (e *Engine) log(call *callState, outcome string, status, duration int, usag
 
 // ---- one attempt ----
 
+// upstreamFailure is a complete upstream error answer, kept so that it can be
+// handed to the client unchanged.
 type upstreamFailure struct {
 	status int
 	header http.Header
 	body   []byte
 }
 
+// write answers the client with the upstream status, headers and body as they
+// came.
+func (f *upstreamFailure) write(w http.ResponseWriter, requestID string) {
+	for name, values := range f.header {
+		w.Header()[name] = values
+	}
+	w.Header().Set("X-AIHub-Request-Id", requestID)
+	w.WriteHeader(f.status)
+	_, _ = w.Write(f.body)
+}
+
+// attemptResult is the outcome of one attempt: a live response to stream back,
+// a failure to fall back from, a passthrough (an upstream 4xx that is the
+// request's own fault and ends the call unchanged), or a departed client.
 type attemptResult struct {
 	record   Attempt
 	response *http.Response
@@ -724,7 +740,7 @@ type attemptResult struct {
 	ttft        time.Duration
 	secret      string
 	failure     *upstreamFailure
-	passthrough bool
+	passthrough *upstreamFailure
 	clientGone  bool
 	// expired means the call ran out of its time limit during this attempt,
 	// before any answer reached the client.
@@ -965,18 +981,24 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		// like a non-streaming answer is.
 		arm(total, errTotal)
 	}
-	if !fallbackStatus(status) {
-		// The request itself is at fault: hand the upstream answer back as is.
-		result.response, result.passthrough = response, true
-		result.record.EndReason = EndClientError
-		result.record.DurationMS = millis(e.Now().Sub(result.started))
-		return result
-	}
 	payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 	response.Body.Close()
 	cancel(nil)
-	result.failure = &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
+	answer := &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
 	code := "upstream_" + http.StatusText(status)
+	if !fallbackStatus(status) {
+		// Any other 4xx is taken to be the request's own fault and goes back
+		// as is, unless it says the model is missing: the model name sent
+		// was the channel's own, so that is the channel's fault.
+		if !ModelUnavailable(payload) {
+			result.passthrough = answer
+			result.record.EndReason = EndClientError
+			result.record.DurationMS = millis(e.Now().Sub(result.started))
+			return result
+		}
+		code = ErrorCodeModelUnavailable
+	}
+	result.failure = answer
 	if pause, limited := RateLimitCooldown(status, response.Header, e.Now(), limits); limited {
 		// The upstream said when to come back: rest the channel for that long
 		// right away rather than counting towards the failure threshold.
@@ -1015,35 +1037,22 @@ func (e *Engine) finishUpstreamFailure(w http.ResponseWriter, call *callState, l
 		WriteError(w, call.dialect, http.StatusBadGateway, "upstream_unavailable", "所有渠道均不可用", call.id)
 		return
 	}
-	for name, values := range last.header {
-		w.Header()[name] = values
-	}
-	w.Header().Set("X-AIHub-Request-Id", call.id)
-	w.WriteHeader(last.status)
-	_, _ = w.Write(last.body)
+	last.write(w, call.id)
 }
 
 // forwardPassthrough returns an upstream 4xx unchanged, unbilled.
-func (e *Engine) forwardPassthrough(w http.ResponseWriter, call *callState, result attemptResult) {
-	response := result.response
-	defer response.Body.Close()
-	defer result.cancel(nil)
-	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
-		w.Header()[name] = values
-	}
-	w.Header().Set("X-AIHub-Request-Id", call.id)
-	w.WriteHeader(response.StatusCode)
-	written, _ := io.Copy(w, io.LimitReader(response.Body, maxFailureBody))
+func (e *Engine) forwardPassthrough(w http.ResponseWriter, call *callState, answer *upstreamFailure) {
+	answer.write(w, call.id)
 	duration := int(e.Now().Sub(call.started).Milliseconds())
 	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeUpstreamFailed, ModelID: call.modelID, ChannelID: call.lastChannelID,
-		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration, ResponseBytes: written,
+		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration, ResponseBytes: int64(len(answer.body)),
 	})
 	if err != nil {
 		e.Logger.Error("gateway: finishing passthrough call failed", "request_id", call.id, "error", err)
 	}
-	e.log(call, OutcomeUpstreamFailed, response.StatusCode, duration, ledger.Usage{}, 0, 0)
-	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, ChannelID: call.lastChannelID, Model: call.modelID, Format: string(call.format), Outcome: OutcomeUpstreamFailed, StatusCode: response.StatusCode, DurationMS: duration})
+	e.log(call, OutcomeUpstreamFailed, answer.status, duration, ledger.Usage{}, 0, 0)
+	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, ChannelID: call.lastChannelID, Model: call.modelID, Format: string(call.format), Outcome: OutcomeUpstreamFailed, StatusCode: answer.status, DurationMS: duration})
 }
 
 // interruption is why the upstream answer stopped after output had begun.
