@@ -331,6 +331,13 @@ type AttemptHistoryRow struct {
 	Counted      int64
 	Successes    int64
 	ClientErrors int64
+	// BeforeEditAttempts (Counted plus ClientErrors) and BeforeEditClientErrors
+	// are the part of the row that belongs to calls started before the channel
+	// was last edited. They stay in the success rate and the first-token time
+	// but not in the 4xx anomaly rule, which starts afresh after an edit (see
+	// StatsBook.ResetAnomalyStats). Zero, the default, leaves everything in.
+	BeforeEditAttempts     int64
+	BeforeEditClientErrors int64
 }
 
 // Load adds attempts that ended before this process began counting. Buckets
@@ -355,14 +362,29 @@ func (b *StatsBook) Load(rows []AttemptHistoryRow, now time.Time) {
 			}
 			window.add(row.Bucket, row.Counted, row.Successes, ttftBin, ttftCount)
 		}
-		if row.ModelID != "" {
+		if total := row.Counted + row.ClientErrors - row.BeforeEditAttempts; row.ModelID != "" && total > 0 {
 			key := pairKey{row.ModelID, row.ChannelID}
 			pair := b.pairs[key]
 			if pair == nil {
 				pair = &pairWindow{}
 				b.pairs[key] = pair
 			}
-			pair.add(row.Bucket, row.Counted+row.ClientErrors, row.ClientErrors)
+			pair.add(row.Bucket, total, max(row.ClientErrors-row.BeforeEditClientErrors, 0))
+		}
+	}
+}
+
+// ResetAnomalyStats forgets what the 4xx anomaly rule has counted for a channel
+// on every model, so the rule judges the channel afresh from its next attempts.
+// The channel's own window (attempts, successes, first-token times) is not
+// touched: it says how the channel performs, not whether its configuration is
+// wrong. The engine calls it when the channel has been edited (Engine.ChannelEdited).
+func (b *StatsBook) ResetAnomalyStats(channelID string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	for key := range b.pairs {
+		if key.channel == channelID {
+			delete(b.pairs, key)
 		}
 	}
 }

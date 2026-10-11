@@ -96,6 +96,8 @@ Key、目录模型、渠道候选索引（含各格式下在线的模型和自�
 
 渠道统计（`gateway.StatsBook`，ADR-0040 的延伸，绑定单实例）：每个渠道一个 288 格的环形窗口，每格 5 分钟，记尝试数、成功数和首字时间对数直方图（约 9% 宽的区间，读出时取区间中点，误差不超过 4.6%）；每个“渠道 × 模型”另有一个窗口，记尝试数与 4xx（`client_error`）数。每次尝试结束时在 `Serve` 循环（没有可回写的响应时）或 `streamBack`（有响应时，在结局确定之后）累加一次；整格过期，窗口读出时顺便清掉过期的格并丢掉空窗口。累加不查库，`client_disconnected` 不计，`client_error` 只进“渠道 × 模型”窗口，首字只收流式调用的 `completed` 尝试。网关读到的是不可变快照（`statsSnapshot`，原子指针读取），`RunRefresh` 每 5 秒从窗口重新发布，同时判定 4xx 异常（阈值是 `stats.go` 里的常量），新出现的异常经 `Runtime.Announce` 发 `anomalous_client_errors` 渠道事件。启动时 `Engine.LoadStats` 读一次数据库（`AttemptHistory`，按渠道、模型、5 分钟、首字区间聚合，分箱边界由 `gateway.TTFTBinEdges` 传给 SQL，内存与数据库按同一张表分箱）作为窗口的起点，读不到则带着空窗口启动，已有的异常视为已通知；此后统计不再查库。重启时仍在途的调用，其尝试不在窗口里。
 
+渠道编辑后清零 4xx 异常统计（Epic #360 的 G4b 的延伸）：渠道的 4xx 来自它当时的配置，编辑之后不再是证据，而被排到最后的渠道很少再被调用，不清零就要等 24 小时。`snapshot` 对 `channel.Store` 的包装里，更新、软删除、应用探测结果的 `SaveTests`（`apply` 为真）、下架与恢复这几类写（`channelStoreEdits`；`Create` 是唯一不算的写，守护测试要求每个写方法归入两者之一）在成功并重建快照之后调用 `Cache.OnChannelEdited` 注册的钩子，服务器与测试环境把它接到 `Engine.ChannelEdited`：它清掉该渠道在所有模型上的“渠道 × 模型”窗口（`StatsBook.ResetAnomalyStats`）与“已通知”记录，并立即重新发布统计快照，所以写操作返回后的下一次排序已经不再降级它。渠道自己的窗口（成功率、首字）、冷却与限额不动。重启时的下界取自 `channels.updated_at`：`AttemptHistory` 把每组里“调用开始于该时刻之前”的尝试数另列（`before_edit_*`），`StatsBook.Load` 把它们留在成功率与首字里，但不计入 4xx 异常窗口。所以每条会让钩子运行的写都必须同时更新 `updated_at`（渠道存储的各条写路径本来就更新；应用探测结果只改渠道模型，另有 `TouchChannel`）。在途调用跨过编辑时刻的差异：内存按尝试结束时刻计，重启按调用开始时刻判。
+
 冷却由连续失败阈值触发；上游 429 带 `Retry-After` 或 `retry-after-ms` 时不等阈值，`gateway.RateLimitCooldown` 解析并限定时长后由 `Runtime.CooldownFor` 直接冷却整个渠道，事件原因为 `rate_limited`（规则见 PRODUCT.md「自动冷却」）。
 
 ## 数据与不变量

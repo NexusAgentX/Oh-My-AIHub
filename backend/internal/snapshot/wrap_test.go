@@ -189,6 +189,96 @@ func TestEnsureDefaultInvalidatesOnlyWhenItCreatedTheKey(t *testing.T) {
 	}
 }
 
+// A write to the channel store is either an edit of an existing channel, which
+// makes the gateway forget the channel's 4xx answers, or the creation of a new
+// one; a method added to the store has to be decided on, like in the test above.
+func TestEveryChannelWriteIsDecidedOnForTheAnomalyStats(t *testing.T) {
+	decided := append(slices.Clone(channelStoreEdits), channelStoreNotEdits...)
+	sort.Strings(decided)
+	writes := writeNames(channelStoreWrites)
+	sort.Strings(writes)
+	if !slices.Equal(decided, writes) {
+		t.Fatalf("channelStoreEdits and channelStoreNotEdits together are %v, the channel store's writes are %v", decided, writes)
+	}
+}
+
+// Editing a channel calls the hook with its ID once the write has succeeded and
+// the snapshots are rebuilt; creating one, failing, a probe that only records
+// its results, and reads never do.
+func TestChannelEditsReachTheEditHook(t *testing.T) {
+	ctx := context.Background()
+	newHooked := func(fail error) (channel.Store, *Cache, *[]string) {
+		cache := newTestCache(&fakeLoader{})
+		var edited []string
+		cache.OnChannelEdited(func(id string) {
+			if stale := staleDomains(cache) & DomainFleet; stale != 0 {
+				t.Errorf("the hook ran for %s before the fleet was rebuilt", id)
+			}
+			edited = append(edited, id)
+		})
+		return cache.Channels(stubChannels{fail: fail}), cache, &edited
+	}
+
+	store, _, edited := newHooked(nil)
+	if _, err := store.Update(ctx, "u", channel.Update{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SoftDelete(ctx, "d"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveTests(ctx, "s", nil, time.Time{}, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Suspend(ctx, "admin", "p", "reason"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Unsuspend(ctx, "admin", "q", "reason"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"u", "d", "s", "p", "q"}; !slices.Equal(*edited, want) {
+		t.Fatalf("edited channels = %v, want %v", *edited, want)
+	}
+
+	// Not edits.
+	store, _, edited = newHooked(nil)
+	if _, err := store.Create(ctx, channel.NewChannel{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveTests(ctx, "s", nil, time.Time{}, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(*edited) != 0 {
+		t.Fatalf("hook ran for %v", *edited)
+	}
+
+	// A write that failed changed nothing.
+	failing := errors.New("rolled back")
+	store, _, edited = newHooked(failing)
+	_, _ = store.Update(ctx, "u", channel.Update{})
+	_ = store.SoftDelete(ctx, "d")
+	_, _ = store.SaveTests(ctx, "s", nil, time.Time{}, true)
+	_, _ = store.Suspend(ctx, "admin", "p", "reason")
+	_, _ = store.Unsuspend(ctx, "admin", "q", "reason")
+	if len(*edited) != 0 {
+		t.Fatalf("hook ran for %v after failed writes", *edited)
+	}
+
+	// No hook registered is fine, and a second registration replaces the first.
+	bare := newTestCache(&fakeLoader{})
+	if _, err := bare.Channels(stubChannels{}).Update(ctx, "u", channel.Update{}); err != nil {
+		t.Fatal(err)
+	}
+	var first, second int
+	bare.OnChannelEdited(func(string) { first++ })
+	bare.OnChannelEdited(func(string) { second++ })
+	if _, err := bare.Channels(stubChannels{}).Update(ctx, "u", channel.Update{}); err != nil {
+		t.Fatal(err)
+	}
+	if first != 0 || second != 1 {
+		t.Fatalf("hooks called %d and %d times, want 0 and 1", first, second)
+	}
+}
+
 // The stubs implement only the writes: a wrapper passes every other method
 // straight through to the store it wraps, so it cannot invalidate on them.
 type stubKeys struct {

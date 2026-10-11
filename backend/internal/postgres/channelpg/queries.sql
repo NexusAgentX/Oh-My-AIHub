@@ -113,6 +113,12 @@ SELECT id, kind, reason, created_at FROM channel_events WHERE channel_id = $1 OR
 -- name: SetChannelModelTests :exec
 UPDATE channel_models SET format_tests = $3, formats = $4 WHERE channel_id = $1 AND model_id = $2;
 
+-- Marks the channel as edited without changing a field of it: applying the probe
+-- results rewrites the formats of its models. The gateway counts the 4xx
+-- answers of a channel only from calls started after this time (AttemptHistory).
+-- name: TouchChannel :exec
+UPDATE channels SET updated_at = now() WHERE id = $1;
+
 -- name: SuspendChannel :exec
 UPDATE channels SET status = 'suspended', suspended_reason = $2, updated_at = now() WHERE id = $1;
 
