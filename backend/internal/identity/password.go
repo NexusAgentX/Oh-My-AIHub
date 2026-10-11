@@ -104,12 +104,27 @@ func VerifyPassword(encoded, password string) bool {
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
+// ValidatePassword 要求 8–128 字节，且至少各含一个 ASCII 大写字母、小写字母和数字；不要求特殊字符。
 func ValidatePassword(password string) error {
-	if len(password) < 12 {
-		return errors.New("password must contain at least 12 characters")
+	if len(password) < 8 {
+		return errors.New("password must contain at least 8 characters")
 	}
 	if len(password) > 128 {
 		return errors.New("password must contain at most 128 characters")
+	}
+	var upper, lower, digit bool
+	for _, r := range password {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			upper = true
+		case r >= 'a' && r <= 'z':
+			lower = true
+		case r >= '0' && r <= '9':
+			digit = true
+		}
+	}
+	if !upper || !lower || !digit {
+		return errors.New("password must contain an uppercase letter, a lowercase letter and a digit")
 	}
 	return nil
 }

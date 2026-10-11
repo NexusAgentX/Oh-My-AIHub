@@ -781,6 +781,30 @@ paths:
               schema: {$ref: '#/components/schemas/AccountEnvelope'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+    patch:
+      operationId: updateMe
+      tags: [auth]
+      summary: 修改显示名
+      description: 当前账户修改自己的显示名（去首尾空白后 1-64 字符），写审计。
+      x-access: ready
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateMeRequest'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /api/me/password:
     post:
       operationId: changePassword
@@ -3207,8 +3231,15 @@ components:
         password: {type: string, maxLength: 128}
       required: [username, password]
       additionalProperties: false
+    UpdateMeRequest:
+      type: object
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 64}
+      required: [display_name]
+      additionalProperties: false
     ChangePasswordRequest:
       type: object
+      description: new_password 为 8-128 个字符，至少各含一个大写字母、小写字母和数字。
       properties:
         current_password: {type: string, maxLength: 128}
         new_password: {type: string, maxLength: 128}

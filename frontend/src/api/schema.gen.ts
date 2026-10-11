@@ -272,7 +272,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * 修改显示名
+         * @description 当前账户修改自己的显示名（去首尾空白后 1-64 字符），写审计。
+         */
+        patch: operations["updateMe"];
         trace?: never;
     };
     "/api/me/password": {
@@ -1635,6 +1639,10 @@ export interface components {
             username: string;
             password: string;
         };
+        UpdateMeRequest: {
+            display_name: string;
+        };
+        /** @description new_password 为 8-128 个字符，至少各含一个大写字母、小写字母和数字。 */
         ChangePasswordRequest: {
             current_password: string;
             new_password: string;
@@ -3823,6 +3831,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    updateMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMeRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     changePassword: {
