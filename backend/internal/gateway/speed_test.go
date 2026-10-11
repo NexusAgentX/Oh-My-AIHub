@@ -52,8 +52,9 @@ func TestResponseOutputSpeed(t *testing.T) {
 			response := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(""))}
 			call := &callState{started: start, stream: tt.stream, format: channel.FormatOpenAIResponses, attempts: []Attempt{{}}}
 			recorder := httptest.NewRecorder()
-			engine.streamBack(recorder, httptest.NewRequest(http.MethodPost, "/v1/responses", nil), call, catalog.Model{}, Candidate{}, attemptResult{
-				response: response, first: []byte(body), firstErr: io.EOF, cancel: func(error) {}, started: start.Add(time.Duration(tt.attemptStart) * time.Millisecond), ttft: time.Duration(tt.ttft) * time.Millisecond,
+			engine.streamBack(recorder, call, catalog.Model{}, Candidate{}, attemptResult{
+				response: response, first: []byte(body), firstErr: io.EOF, cancel: func(error) {}, upstream: context.Background(),
+				watch: watchClient(context.Background(), func(error) {}, drainWindow), started: start.Add(time.Duration(tt.attemptStart) * time.Millisecond), ttft: time.Duration(tt.ttft) * time.Millisecond,
 			}, settings.Settings{})
 			if recorder.Body.String() != body || store.finish.Usage.OutputTokens != 6 {
 				t.Fatalf("response or usage changed: %s, %+v", recorder.Body.String(), store.finish)

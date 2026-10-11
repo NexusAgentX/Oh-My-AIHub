@@ -799,6 +799,83 @@ func TestObserveOverviewFlagsAFailingChannel(t *testing.T) {
 	}
 }
 
+// Feature #348: a consumer whose successful calls often cannot be billed is
+// named in "needs attention" with the channel behind most of them.
+func TestObserveOverviewFlagsConsumersWithUnbilledCalls(t *testing.T) {
+	e := newEnv(t)
+	sharer := e.member("sharer", "0")
+	heavy := e.member("heavy", "0")
+	normal := e.member("normal", "0")
+	small := e.member("small", "0")
+	stale := e.member("stale", "0")
+	alpha := e.createChannel(sharer, channelSpec{name: "alpha-relay", upstream: okUpstream(t)})
+	beta := e.createChannel(sharer, channelSpec{name: "beta-relay", upstream: okUpstream(t)})
+	seed := func(p person, outcome, channelID string, count int, age string) {
+		e.t.Helper()
+		e.breakLedger(`INSERT INTO calls (account_id, requested_model, model_id, format, outcome, final_channel_id, created_at, completed_at)
+			SELECT $1, 'gpt-test', 'gpt-test', 'openai_chat', $2, $3, now() - $5::interval, now() - $5::interval FROM generate_series(1, $4)`,
+			p.id, outcome, channelID, count, age)
+	}
+	// heavy: 22 successes in 24 hours, 10 of them unbilled, 8 through alpha and 2 through beta.
+	seed(heavy, "succeeded_unbilled", alpha, 8, "1 hour")
+	seed(heavy, "succeeded_unbilled", beta, 2, "2 hours")
+	seed(heavy, "succeeded", alpha, 12, "3 hours")
+	// normal: plenty of calls and a few unbilled ones, far below 20%.
+	seed(normal, "succeeded", alpha, 38, "1 hour")
+	seed(normal, "succeeded_unbilled", alpha, 2, "1 hour")
+	// small: all unbilled but only 10 successes, too few for a share; failures do not count as successes.
+	seed(small, "succeeded_unbilled", beta, 10, "1 hour")
+	seed(small, "upstream_failed", beta, 30, "1 hour")
+	// stale: 25 unbilled calls, but 30 hours ago.
+	seed(stale, "succeeded_unbilled", beta, 25, "30 hours")
+
+	var siteWide, consumers []map[string]any
+	for _, item := range asList(t, e.get(e.admin, "/api/admin/overview")["attention"]) {
+		entry := asMap(t, item)
+		switch entry["kind"] {
+		case "unbilled_usage":
+			siteWide = append(siteWide, entry)
+		case "unbilled_consumer":
+			consumers = append(consumers, entry)
+		}
+	}
+	// The site-wide item is unchanged: 10 + 2 + 10 unbilled calls within 24 hours.
+	if len(siteWide) != 1 || siteWide[0]["count"] != float64(22) || siteWide[0]["link"] != "/admin/calls?outcome=succeeded_unbilled" {
+		t.Fatalf("site-wide item = %v", siteWide)
+	}
+	if len(consumers) != 1 {
+		t.Fatalf("consumer items = %v", consumers)
+	}
+	item := consumers[0]
+	if item["severity"] != "warning" || item["count"] != float64(10) ||
+		item["title"] != "账户「heavy」24 小时内 22 次成功调用中 10 次未计费（45%），多数经渠道「alpha-relay」" ||
+		item["link"] != "/admin/calls?account_id="+heavy.id+"&outcome=succeeded_unbilled" {
+		t.Fatalf("consumer item = %v", item)
+	}
+
+	// The link lands on the admin call list filtered by that account and outcome.
+	page := e.get(e.admin, "/api/admin/calls?account_id="+heavy.id+"&outcome=succeeded_unbilled")
+	if len(asList(t, page["items"])) != 10 {
+		t.Fatalf("filtered calls = %v", page)
+	}
+	if recorder := e.api(heavy, http.MethodGet, "/api/admin/overview", nil); recorder.Code != http.StatusForbidden {
+		t.Fatalf("member overview = %d", recorder.Code)
+	}
+
+	// A second account over the threshold is listed after the first, most unbilled calls first.
+	seed(normal, "succeeded_unbilled", beta, 15, "1 hour")
+	consumers = nil
+	for _, item := range asList(t, e.get(e.admin, "/api/admin/overview")["attention"]) {
+		if entry := asMap(t, item); entry["kind"] == "unbilled_consumer" {
+			consumers = append(consumers, entry)
+		}
+	}
+	if len(consumers) != 2 || consumers[0]["count"] != float64(17) || consumers[1]["count"] != float64(10) ||
+		!strings.Contains(consumers[0]["title"].(string), "账户「normal」24 小时内 55 次成功调用中 17 次未计费（31%），多数经渠道「beta-relay」") {
+		t.Fatalf("consumer items = %v", consumers)
+	}
+}
+
 func TestObserveScrubsRawErrorsAfterThirtyDays(t *testing.T) {
 	o := newObserved(t)
 	// Age the fell-back call; the freshly made one must keep its error text.

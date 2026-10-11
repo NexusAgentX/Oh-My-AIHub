@@ -231,6 +231,33 @@ GROUP BY ch.id, ch.name
 HAVING count(*) >= 20 AND count(*) FILTER (WHERE att->>'end_reason' = 'completed') * 10 < count(*) * 8
 ORDER BY ch.name;
 
+-- name: UnbilledConsumers :many
+-- 窗口内成功调用不少于 min_succeeded 且含未计费的消费者账号，附其未计费最多的渠道。
+-- 未计费占比的阈值与条数上限由 observe 服务判定，这里只做不改变结果的预筛。
+WITH per_account AS (
+  SELECT c.account_id,
+         count(*)::bigint AS succeeded,
+         count(*) FILTER (WHERE c.outcome = 'succeeded_unbilled')::bigint AS unbilled
+  FROM calls c
+  WHERE c.created_at >= sqlc.arg(since)::timestamptz AND c.outcome IN ('succeeded', 'succeeded_unbilled')
+  GROUP BY c.account_id
+  HAVING count(*) >= sqlc.arg(min_succeeded)::bigint AND count(*) FILTER (WHERE c.outcome = 'succeeded_unbilled') > 0
+)
+SELECT a.id, a.username, a.display_name, p.succeeded, p.unbilled,
+       top.channel_id, coalesce(top.channel_name, '')::text AS channel_name, coalesce(top.channel_unbilled, 0)::bigint AS channel_unbilled
+FROM per_account p
+JOIN accounts a ON a.id = p.account_id
+LEFT JOIN LATERAL (
+  SELECT c.final_channel_id AS channel_id, ch.name AS channel_name, count(*)::bigint AS channel_unbilled
+  FROM calls c
+  JOIN channels ch ON ch.id = c.final_channel_id
+  WHERE c.account_id = p.account_id AND c.created_at >= sqlc.arg(since)::timestamptz AND c.outcome = 'succeeded_unbilled'
+  GROUP BY c.final_channel_id, ch.name
+  ORDER BY count(*) DESC, ch.name, c.final_channel_id
+  LIMIT 1
+) top ON true
+ORDER BY p.unbilled DESC, a.id;
+
 -- name: C2COverview :one
 SELECT (SELECT count(*) FROM c2c_orders WHERE status = 'open' AND available_nano > 0)::bigint AS open_orders,
        (SELECT count(*) FROM c2c_trades WHERE status = 'awaiting_payment')::bigint AS awaiting_payment,

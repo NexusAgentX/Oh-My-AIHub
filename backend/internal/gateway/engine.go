@@ -73,6 +73,9 @@ type Dependencies struct {
 	// CallTimeLimit is the longest one call may run, every attempt included.
 	// Zero means the production value, callTimeLimit; tests shorten it.
 	CallTimeLimit time.Duration
+	// DrainWindow is how long an answer is still read after its client has
+	// left. Zero means the production value, drainWindow.
+	DrainWindow time.Duration
 }
 
 // Engine serves the gateway endpoints.
@@ -116,6 +119,9 @@ func NewEngine(dependencies Dependencies) *Engine {
 	}
 	if dependencies.CallTimeLimit <= 0 {
 		dependencies.CallTimeLimit = callTimeLimit
+	}
+	if dependencies.DrainWindow <= 0 {
+		dependencies.DrainWindow = drainWindow
 	}
 	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}}
 }
@@ -348,8 +354,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	started := e.Now()
 	// One limit for the whole call, every attempt included (ADR-0035 rule 5).
 	// It bounds the upstream exchanges only; settling the call runs on its own
-	// context, so a call that hit the limit is still closed and billed.
-	callCtx, stopCall := context.WithTimeoutCause(ctx, e.CallTimeLimit, errCallDeadline)
+	// context, so a call that hit the limit is still closed and billed. It does
+	// not end when the client leaves: each attempt follows the client itself
+	// (clientWatch), because an answer already under way is read to its end.
+	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
 	key, location, ok := e.authenticate(w, r)
 	if !ok {
@@ -564,7 +572,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		case result.response != nil:
 			e.Runtime.Success(candidate.ChannelID)
-			e.streamBack(w, r, call, candidate.PricingModel(model), candidate, result, defaults)
+			e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
 			release()
 			return
 		}
@@ -717,6 +725,8 @@ type attemptResult struct {
 	// upstream is the context of the exchange; its cause says what cut it short.
 	upstream context.Context
 	cancel   context.CancelCauseFunc
+	// watch follows the client: see clientWatch.
+	watch *clientWatch
 	// idle is the idle-timeout clock of a stream after its first byte, and
 	// idleAfter its length: streamBack restarts it whenever data arrives.
 	idle        *time.Timer
@@ -808,6 +818,9 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		result.record.DurationMS = millis(e.Now().Sub(result.started))
 		return result
 	}
+	if r.Context().Err() != nil {
+		return abandoned()
+	}
 	if errors.Is(context.Cause(ctx), errCallDeadline) {
 		return expired(nil)
 	}
@@ -847,6 +860,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 
 	attemptCtx, cancelCause := context.WithCancelCause(ctx)
+	watch := watchClient(r.Context(), cancelCause, e.DrainWindow)
 	// arm cancels the attempt with the given cause once d has passed, unless the
 	// timer is stopped first. A non-positive d arms nothing. The timers are only
 	// touched on this goroutine; their callbacks use cancelCause alone.
@@ -860,12 +874,13 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		return timer
 	}
 	cancel := func(cause error) {
+		watch.stop()
 		cancelCause(cause)
 		for _, timer := range timers {
 			timer.Stop()
 		}
 	}
-	result.upstream, result.cancel = attemptCtx, cancel
+	result.upstream, result.cancel, result.watch = attemptCtx, cancel, watch
 	// Only a stream promises an early first byte; a non-streaming completion
 	// answers when generation ends and is bounded by the total timeout alone,
 	// which here runs from the request to the last byte.
@@ -1070,12 +1085,25 @@ func interruptionOf(cause error) *interruption {
 }
 
 // streamBack writes the upstream answer to the client chunk by chunk while the
-// observer reads usage, then settles the call.
-func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callState, model catalog.Model, candidate Candidate, result attemptResult, defaults settings.Settings) {
+// observer reads usage, then settles the call. A client that leaves once the
+// writing has begun does not stop the reading (ADR-0035 rule 6): the rest of
+// the answer goes to the observer alone until it ends, the drain window is
+// over, or an idle or call time limit hits, so the usage at its end is billed.
+func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalog.Model, candidate Candidate, result attemptResult, defaults settings.Settings) {
 	response := result.response
 	defer response.Body.Close()
 	defer result.cancel(nil)
 
+	watch := result.watch
+	if !watch.commit() {
+		// The client left between the first byte and the first write: nothing
+		// was delivered and the attempt has been cancelled, so nothing is billed.
+		record := &call.attempts[len(call.attempts)-1]
+		record.EndReason = EndClientDisconnected
+		record.DurationMS = millis(e.Now().Sub(result.started))
+		e.finishAbandoned(call, candidate.ChannelID)
+		return
+	}
 	controller := http.NewResponseController(w)
 	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 		w.Header()[name] = values
@@ -1090,40 +1118,49 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 		observer.qwenObserved = true
 	}
 	var written int64
-	clientGone := false
-	emit := func(chunk []byte) bool {
+	// undelivered is set when a part of the answer did not reach the client.
+	undelivered := false
+	deliver := func(chunk []byte) {
 		if len(chunk) == 0 {
-			return true
+			return
+		}
+		// The observer sees every byte the upstream sends, wanted by the client
+		// or not: that is what makes the usage at the end billable.
+		observer.Write(chunk, e.Now())
+		if watch.isGone() {
+			undelivered = true
+			return
 		}
 		_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
 		if _, err := w.Write(chunk); err != nil {
-			clientGone = true
-			return false
+			undelivered = true
+			watch.left() // a client that cannot be written to has left
+			return
 		}
 		_ = controller.Flush()
 		written += int64(len(chunk))
-		observer.Write(chunk, e.Now())
-		return true
 	}
-	finished := emit(result.first)
+	deliver(result.first)
 	readErr := result.firstErr
 	buffer := make([]byte, chunkSize)
-	for finished && readErr == nil {
+	for readErr == nil {
 		var n int
 		n, readErr = response.Body.Read(buffer)
 		if n > 0 && result.idle != nil {
 			result.idle.Reset(result.idleAfter) // data arrived: the stream is not idle
 		}
-		finished = emit(buffer[:n])
+		deliver(buffer[:n])
 	}
+	// Whether the answer ran to its end, and whether the client was gone while
+	// it did. A client that closes its side after receiving everything, before
+	// the upstream has closed its own, is not a disconnect.
+	ended := errors.Is(readErr, io.EOF)
+	left := watch.isGone()
 	var stopped *interruption
-	if finished && readErr != nil && !errors.Is(readErr, io.EOF) {
-		if r.Context().Err() != nil {
-			clientGone = true
-		} else {
-			stopped = interruptionOf(context.Cause(result.upstream))
-		}
+	if !ended && !left {
+		stopped = interruptionOf(context.Cause(result.upstream))
 	}
+	clientGone := undelivered || (left && !ended)
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
@@ -1134,6 +1171,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 	endReason := EndCompleted
 	switch {
 	case clientGone:
+		// Whatever stopped the reading after the client left is no fault of the
+		// channel, and neither is the client's leaving.
 		outcome, endReason = OutcomeClientDisconnect, EndClientDisconnected
 	case stopped != nil:
 		outcome, endReason = OutcomeInterrupted, EndInterrupted

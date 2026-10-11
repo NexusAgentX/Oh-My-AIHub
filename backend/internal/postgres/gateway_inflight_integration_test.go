@@ -8,8 +8,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 )
 
 // setInflightLimit changes the per-account in-flight cap the way an
@@ -239,4 +242,110 @@ func TestGatewayInflightLimitDefaultsToTwentyAndIsAuditedWhenChanged(t *testing.
 	if recorder := e.api(e.admin, http.MethodPut, "/api/admin/settings", current); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("limit above 1000 = %d", recorder.Code)
 	}
+}
+
+// A client that hangs up after the answer began does not free its slot: the
+// gateway reads on (ADR-0035 rule 6) and the slot is given back only when the
+// call has been booked. Both ways the reading ends are covered: the upstream
+// finishes inside the drain window, and the drain window runs out.
+func TestGatewayKeepsTheInflightSlotWhileItReadsOnAfterTheClientLeftUntilTheCallIsBooked(t *testing.T) {
+	e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 2 * time.Second })
+	e.setInflightLimit(1)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	var streams atomic.Int32
+	finishFirst := make(chan struct{})
+	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		if !strings.Contains(string(body), `"stream":true`) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, chatBody)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, chatFrame)
+		w.(http.Flusher).Flush()
+		if streams.Add(1) == 1 {
+			select { // the first answer ends, usage included, once the test says so
+			case <-finishFirst:
+				_, _ = io.WriteString(w, chatUsageTail[len(chatFrame):])
+			case <-r.Context().Done():
+			}
+			return
+		}
+		<-r.Context().Done() // the second never ends: only the drain window stops it
+	})
+	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
+	_, secret := e.defaultKey(consumer)
+	server := e.liveGateway()
+	chat := func() *httptest.ResponseRecorder {
+		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	}
+	assertRefused := func(when string) {
+		t.Helper()
+		refused := chat()
+		if refused.Code != http.StatusTooManyRequests || !strings.Contains(refused.Body.String(), `"too_many_inflight_calls"`) {
+			t.Fatalf("call %s = %d %s", when, refused.Code, refused.Body.String())
+		}
+	}
+	assertAdmittedSoon := func(when string) {
+		t.Helper()
+		// The slot is released right after the booking, so allow a moment for
+		// Serve to return.
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			recorder := chat()
+			if recorder.Code == http.StatusOK {
+				return
+			}
+			if recorder.Code != http.StatusTooManyRequests || time.Now().After(deadline) {
+				t.Fatalf("call %s = %d %s", when, recorder.Code, recorder.Body.String())
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	inProgress := func(callID string) bool {
+		t.Helper()
+		var outcome string
+		if err := e.pool.QueryRow(context.Background(), `SELECT outcome FROM calls WHERE id = $1`, callID).Scan(&outcome); err != nil {
+			t.Fatal(err)
+		}
+		return outcome == "in_progress"
+	}
+
+	// 1. The upstream ends, usage included, while the gateway reads on.
+	first := e.openStream(server, secret, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, nil)
+	first.event()
+	left := time.Now()
+	first.hangUp()
+	time.Sleep(300 * time.Millisecond)
+	if !inProgress(first.requestID()) {
+		t.Fatal("setup: the call must still be reading on")
+	}
+	assertRefused("while the gateway reads on after the client left")
+	if !inProgress(first.requestID()) {
+		t.Fatal("setup: the call was booked before the upstream finished")
+	}
+	close(finishFirst)
+	e.waitFinished(first.requestID(), left)
+	if row := e.callRow(first.requestID()); row.Outcome != "client_disconnected" || row.CostNano == 0 || !row.HasLedgerTx {
+		t.Fatalf("drained call = %+v: its usage must be billed", row)
+	}
+	assertAdmittedSoon("after the drained call was booked")
+
+	// 2. The drain window runs out.
+	second := e.openStream(server, secret, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, nil)
+	second.event()
+	left = time.Now()
+	second.hangUp()
+	time.Sleep(300 * time.Millisecond)
+	assertRefused("before the drain window is over")
+	if !inProgress(second.requestID()) {
+		t.Fatal("setup: the call was booked inside the drain window")
+	}
+	e.waitFinished(second.requestID(), left)
+	if row := e.callRow(second.requestID()); row.Outcome != "client_disconnected" || row.CostNano != 0 {
+		t.Fatalf("call whose window ran out = %+v", row)
+	}
+	assertAdmittedSoon("after the drain window was over")
+	e.assertZeroSum()
 }
