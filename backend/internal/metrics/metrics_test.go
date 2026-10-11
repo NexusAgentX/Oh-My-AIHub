@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
@@ -67,5 +68,28 @@ func TestAdminAdjustmentsGaugeCanBeNegative(t *testing.T) {
 	body := scrape(t, m)
 	if !strings.Contains(body, "aihub_points_admin_adjustments -5\n") || !strings.Contains(body, "aihub_points_platform_revenue 0\n") {
 		t.Fatalf("metrics:\n%s", body)
+	}
+}
+
+// The outbound pool counters are plain counters without user or key labels; the
+// only label is the lookup result.
+func TestEgressCountersAreExposedWithoutIdentityLabels(t *testing.T) {
+	m := New(nil)
+	stats := channel.EgressStats{NewConnections: 3, ReusedConnections: 97, DNSHits: 99, DNSMisses: 1}
+	m.SetEgress(func() channel.EgressStats { return stats })
+	body := scrape(t, m)
+	for _, want := range []string{
+		"aihub_upstream_connections_new_total 3\n",
+		"aihub_upstream_connections_reused_total 97\n",
+		`aihub_upstream_dns_lookups_total{result="hit"} 99` + "\n",
+		`aihub_upstream_dns_lookups_total{result="miss"} 1` + "\n",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics lack %q\n%s", want, body)
+		}
+	}
+	stats.NewConnections = 4
+	if !strings.Contains(scrape(t, m), "aihub_upstream_connections_new_total 4\n") {
+		t.Error("the counter does not follow the pool")
 	}
 }

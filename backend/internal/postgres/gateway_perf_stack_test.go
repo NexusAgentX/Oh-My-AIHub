@@ -33,8 +33,8 @@ import (
 // docs/runbooks/gateway-baseline.md.
 //
 // The gateway reaches its upstreams through the production OutboundPolicy,
-// not through a stand-in: the same host name checks, the same DNS validation,
-// the same per-attempt transport. Two things have to differ from production
+// not through a stand-in: the same host name checks, the same DNS validation
+// and cache, the same pooled transport. Two things have to differ from production
 // for it to reach a server on this machine, and both are the seams the policy
 // keeps for its own tests: the resolver (NewOutboundPolicyWithResolver) answers
 // with public-looking addresses, and the policy's dialer and trusted roots

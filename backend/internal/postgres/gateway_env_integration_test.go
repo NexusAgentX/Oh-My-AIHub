@@ -78,6 +78,10 @@ func (o testOutbound) GatewayClient(_ context.Context, _ string) (*http.Client, 
 	return o.clientWith(0), nil
 }
 
+func (o testOutbound) FreshClient(_ context.Context, _ string) (*http.Client, error) {
+	return o.clientWith(0), nil
+}
+
 func (o testOutbound) WithExtraBlockedHosts([]string) (channel.Outbound, error) { return o, nil }
 
 // slowCloseConn closes slowly. The gateway's transport cancels an attempt by

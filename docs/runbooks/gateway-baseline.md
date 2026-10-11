@@ -31,7 +31,7 @@
 
 出站策略拒绝回环地址并要求 HTTPS，基线没有绕开它：
 
-- 网关用的是生产的 `channel.OutboundPolicy`：同样的主机名规范化、DNS 校验、地址检查和每次尝试的传输层。
+- 网关用的是生产的 `channel.OutboundPolicy`：同样的主机名规范化、DNS 校验与缓存、地址检查和钉住地址的连接池（G7 之后；之前是每次尝试新建传输层）。
 - 解析器用 `NewOutboundPolicyWithResolver` 注入，对每个渠道主机名返回一个看起来是公网的地址。
 - 策略的拨号函数与可信根证书（`dialContext`、`testRootCAs`，包内私有、本来只给 `channel` 包自己的测试用）由测试文件通过反射设置，把“钉住的公网地址”接到本机的模拟上游，并信任基线自己签发的测试 CA。字段改名时测试会明确报错。
 - 产品里没有任何开关、设置或环境变量能做同样的事；这些代码只存在于带 build tag 的测试文件，不进入服务器二进制。
@@ -65,7 +65,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
 | `-perf.consumers` / `-perf.channels` | 100 / 3 | 消费者账号数（各有两把 Key，其中一把带预算）与同价渠道数 |
 | `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或并发场景的 500 个 worker。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
-| `-perf.dns` | 0 | 假 DNS 解析器的延迟，用来看每次尝试重新解析的代价 |
+| `-perf.dns` | 0 | 假 DNS 解析器的延迟。G7 之前用来看每次尝试重新解析的代价；DNS 缓存之后每个主机每 60 秒才解析一次，它只影响刷新的那一次 |
 | `-perf.synccommit` | on | 设为 `off` 时网关的数据库连接不等提交落盘，用来区分“存储慢”和“网关慢” |
 | `-perf.sweepstep` | 10s | 扫描中每一级的测量窗口 |
 | `-perf.quiet` | 0 | 大于 0 时，每次运行前等 1 分钟负载均值降到这个数以下（最多等 3 分钟）。机器上有别的任务时用，比如 `-perf.quiet=9` |
@@ -122,7 +122,7 @@ go -C backend tool pprof -sample_index=alloc_space -top -cum -nodecount=40 \
 
 ## 局限
 
-- 网络是回环：到上游没有往返延迟，所以连接池与 DNS 缓存（G7）省下的往返时间在这里只表现为 CPU、握手次数和 DNS 查询次数；用 `-perf.dns` 可以看 DNS 延迟的线性影响。
+- 网络是回环：到上游没有往返延迟，所以连接池与 DNS 缓存（G7）省下的往返时间在这里只表现为 CPU、握手次数和 DNS 查询次数。DNS 缓存生效后每个主机每 60 秒才解析一次，`-perf.dns` 只影响刷新的那一次；要看每次尝试重新解析的代价，对照 G7 之前的 `main`。模拟上游同时提供 HTTP/2 与 HTTP/1.1，G7 之后网关与它之间走 HTTP/2。
 - 数据库在本机 Docker 里，往返与提交落盘的速度和生产不同；结果适合同一台机器上做前后对比，绝对值只作数量级参考。
 - 数据库表从空开始，每次运行前都会 `ANALYZE`（相当于有 autovacuum 的生产库），不模拟已有几百万条调用的大表。
 - 压测程序、模拟上游与网关在同一进程、同一批核上，CPU 不是网关独占；用 pprof 的 `component` 标签区分。

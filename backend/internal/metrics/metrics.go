@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
@@ -104,6 +105,34 @@ func (m *Metrics) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{}))
 	return mux
+}
+
+// SetEgress exposes the counters of the gateway's pooled outbound connections
+// and DNS cache. They carry no labels beyond the lookup result.
+func (m *Metrics) SetEgress(source func() channel.EgressStats) {
+	m.registry.MustRegister(&egressCollector{source: source})
+}
+
+var (
+	descConnectionsNew    = prometheus.NewDesc("aihub_upstream_connections_new_total", "Outbound connections the gateway opened to upstreams.", nil, nil)
+	descConnectionsReused = prometheus.NewDesc("aihub_upstream_connections_reused_total", "Upstream requests sent on a connection that was already open.", nil, nil)
+	descDNSLookups        = prometheus.NewDesc("aihub_upstream_dns_lookups_total", "Upstream host lookups of the gateway, by result: hit (answered from the 60 second cache) or miss (resolved or joined a resolution in progress). The hit rate is hit / (hit + miss).", []string{"result"}, nil)
+)
+
+type egressCollector struct{ source func() channel.EgressStats }
+
+func (c *egressCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- descConnectionsNew
+	ch <- descConnectionsReused
+	ch <- descDNSLookups
+}
+
+func (c *egressCollector) Collect(ch chan<- prometheus.Metric) {
+	stats := c.source()
+	ch <- prometheus.MustNewConstMetric(descConnectionsNew, prometheus.CounterValue, float64(stats.NewConnections))
+	ch <- prometheus.MustNewConstMetric(descConnectionsReused, prometheus.CounterValue, float64(stats.ReusedConnections))
+	ch <- prometheus.MustNewConstMetric(descDNSLookups, prometheus.CounterValue, float64(stats.DNSHits), "hit")
+	ch <- prometheus.MustNewConstMetric(descDNSLookups, prometheus.CounterValue, float64(stats.DNSMisses), "miss")
 }
 
 // Registry exposes the registry for tests.

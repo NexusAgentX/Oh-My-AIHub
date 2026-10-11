@@ -171,6 +171,7 @@ func main() {
 	feed := observe.NewFeed(observeService, bus, logger)
 	platformMetrics := metrics.New(func(channelID string, now time.Time) bool { return !runtime.CooldownUntil(channelID, now).IsZero() })
 	feed.AddObserver(platformMetrics)
+	platformMetrics.SetEgress(outboundPolicy.EgressStats)
 	go feed.Run(backgroundContext)
 	go platformMetrics.Run(backgroundContext, observeService, time.Minute, logger)
 	go refreshMetricModels(backgroundContext, platformMetrics, modelIDs, logger)
