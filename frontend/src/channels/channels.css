@@ -27,7 +27,7 @@
 .model-rows-head,
 .model-row {
   display: grid;
-  grid-template-columns: 36px minmax(180px, 1.4fr) minmax(220px, 1.6fr) 80px minmax(110px, 0.8fr) 110px;
+  grid-template-columns: 36px minmax(180px, 1.4fr) minmax(220px, 1.6fr) 120px minmax(110px, 0.8fr) 110px;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-2) var(--space-3);
@@ -38,7 +38,13 @@
 .model-row-sell { display: grid; width: 32px; height: 32px; place-items: center; }
 .model-row-names { display: grid; gap: 4px; }
 .model-row-names .input { height: 34px; font-size: var(--text-sm); }
-.model-row-multiplier { height: 34px; font-size: var(--text-sm); }
+.model-row-multiplier { display: grid; gap: 6px; justify-items: start; }
+.multiplier-input { position: relative; display: block; width: 100%; }
+.multiplier-input > span { position: absolute; top: 50%; left: 10px; color: var(--muted); font-size: var(--text-sm); transform: translateY(-50%); pointer-events: none; }
+.multiplier-input > .input { width: 100%; height: 34px; padding-left: 24px; font-size: var(--text-sm); }
+.model-row-fx { display: inline-flex; align-items: center; gap: 2px; }
+.model-row-price { display: grid; gap: 2px; }
+.model-row-price > small { color: var(--muted); font-size: var(--text-xs); }
 .model-row-price { color: var(--ink); font-size: var(--text-sm); }
 .format-toggles { display: flex; flex-wrap: wrap; gap: 4px; }
 .format-toggle {
@@ -101,7 +107,7 @@
   .model-row > .model-row-multiplier,
   .model-row > .model-row-price { grid-column: 2 / 3; }
   .model-row > .model-row-actions { grid-column: 2 / 4; }
-  .model-row-multiplier { max-width: 120px; }
+  .model-row-multiplier { max-width: 200px; }
 }
 @media (max-width: 767px) {
   .header-rule { grid-template-columns: auto minmax(0, 1fr) auto; }

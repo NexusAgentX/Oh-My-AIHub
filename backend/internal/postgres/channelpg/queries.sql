@@ -6,8 +6,8 @@ INSERT INTO channels (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
 
 -- name: InsertChannelModel :exec
-INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7);
+INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
 -- name: DeleteChannelModels :exec
 DELETE FROM channel_models WHERE channel_id = $1;
@@ -52,7 +52,7 @@ ORDER BY c.created_at DESC, c.id DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount
 FROM channel_models cm
 WHERE cm.channel_id = ANY(sqlc.arg(channel_ids)::uuid[])
 ORDER BY cm.channel_id, cm.model_id;

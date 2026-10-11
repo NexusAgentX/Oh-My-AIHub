@@ -23,7 +23,7 @@ SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
@@ -89,7 +89,7 @@ ORDER BY cm.model_id;
 
 -- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.cooldown_failures, c.cooldown_seconds
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id

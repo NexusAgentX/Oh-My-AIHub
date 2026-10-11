@@ -30,6 +30,7 @@ type Model struct {
 	ParameterInfo                 string
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
+	PriceCurrency                 string
 }
 
 type ModelPriceTier struct {

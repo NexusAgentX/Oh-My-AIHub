@@ -85,10 +85,12 @@ function TierEditForm({
   initial,
   onSave,
   onCancel,
+  unit,
 }: {
   initial: TierForm
   onSave: (tier: PriceTierInput) => void
   onCancel: () => void
+  unit: string
 }) {
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<TierErrors>({})
@@ -213,7 +215,7 @@ function TierEditForm({
       <InlineError>{errors.condition}</InlineError>
       <PriceFields
         error={errors.prices}
-        legend="本档单价（积分/百万 token）"
+        legend={`本档单价（${unit}）`}
         onChange={(prices) => set({ prices })}
         prices={form.prices}
       />
@@ -237,10 +239,13 @@ export function TierEditor({
   tiers,
   onChange,
   basePrices,
+  unit = '积分/百万 token',
 }: {
   tiers: PriceTierInput[]
   onChange: (tiers: PriceTierInput[]) => void
   basePrices: PricesForm
+  /** 单价单位，随模型币种变化 */
+  unit?: string
 }) {
   const [editing, setEditing] = useState<number | 'new' | null>(null)
   if (editing !== null) {
@@ -250,6 +255,7 @@ export function TierEditor({
       <TierEditForm
         initial={initial}
         onCancel={() => setEditing(null)}
+        unit={unit}
         onSave={(tier) => {
           onChange(editing === 'new' ? [...tiers, tier] : tiers.map((item, index) => (index === editing ? tier : item)))
           setEditing(null)

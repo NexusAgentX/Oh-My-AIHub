@@ -90,14 +90,14 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"points summary of calls without a key", newPointsEntrySummaryJSON(observe.EntrySummary{ByKey: []observe.KeySpend{{Spend: money.FromNano(money.Scale), Entries: 2}}}), map[string]any{
 			"by_key": []any{map[string]any{"api_key": nil, "spend": "1", "entries": float64(2)}},
 		}},
-		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0)), map[string]any{
-			"context_window": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0),
+		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0), 0), map[string]any{
+			"context_window": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0), "usd_cny_rate": nil,
 		}},
 		{"call that has not finished", newGatewayCallSummaryJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
 			"cost": "0.000000003", "charged": "0",
 		}},
-		{"channel without models or overrides", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(channel.Channel{}, nil, time.Unix(0, 0)), map[string]any{
+		{"channel without models or overrides", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(channel.Channel{}, catalogView{}, time.Unix(0, 0)), map[string]any{
 			"suspended_reason": nil, "cooldown_until": nil, "models": emptyList,
 			"advanced": map[string]any{
 				"user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
@@ -106,10 +106,11 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"today": map[string]any{"revenue": "0", "calls": float64(0), "success_rate": nil},
 		}},
 		{"channel model without recorded format tests", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(
-			channel.Channel{Models: []channel.Model{{ModelID: "m", Formats: []channel.Format{channel.FormatGemini}}}}, nil, time.Unix(0, 0),
+			channel.Channel{Models: []channel.Model{{ModelID: "m", Formats: []channel.Format{channel.FormatGemini}}}}, catalogView{}, time.Unix(0, 0),
 		), map[string]any{
 			"models": []any{map[string]any{
-				"model_id": "m", "display_name": "", "upstream_model": "", "multiplier": "0", "formats": []any{"gemini"}, "format_tests": emptyObject,
+				"model_id": "m", "display_name": "", "upstream_model": "", "price_currency": "CNY", "multiplier": "0", "fx_discount": false,
+				"effective_multiplier": "0", "formats": []any{"gemini"}, "format_tests": emptyObject,
 				"enabled": false, "current_prices": map[string]any{"input": "0", "output": "0", "cache_write": "0", "cache_read": "0"},
 			}},
 		}},
@@ -284,7 +285,7 @@ func TestWritePageKeepsEmptyItemsAndCursor(t *testing.T) {
 func TestAdminChannelAddsOwnerToChannelFields(t *testing.T) {
 	a := &app{gateway: gateway.NewEngine(gateway.Dependencies{})}
 	item := channel.Channel{ID: "c1", Name: "渠道", Owner: channel.Owner{ID: "o1", Username: "owner", DisplayName: "车主"}}
-	raw, err := json.Marshal(a.newAdminChannelJSON(item, nil, time.Unix(0, 0)))
+	raw, err := json.Marshal(a.newAdminChannelJSON(item, catalogView{}, time.Unix(0, 0)))
 	if err != nil {
 		t.Fatal(err)
 	}

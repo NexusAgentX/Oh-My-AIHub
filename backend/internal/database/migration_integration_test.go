@@ -87,7 +87,8 @@ COMMIT;`)
  'ledger_accounts', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_accounts a),
  'ledger_transactions', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
  'ledger_entries', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
- 'settings', (SELECT jsonb_agg(to_jsonb(a)) FROM settings a))::text`).Scan(&value)
+ 'settings', (SELECT jsonb_agg(to_jsonb(a) - ARRAY['usd_cny_rate_nano', 'usd_cny_rate_source', 'usd_cny_rate_updated_at',
+   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error']) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,6 +102,13 @@ COMMIT;`)
 		if after := snapshot(); after != before {
 			t.Fatal("upgrade changed existing account, ledger or settings data")
 		}
+	}
+	// 0003 adds the exchange rate with a manual 6.8 default and keeps every
+	// existing model a CNY (points) model.
+	var rate int64
+	var source string
+	if err := db.QueryRowContext(ctx, `SELECT usd_cny_rate_nano, usd_cny_rate_source FROM settings`).Scan(&rate, &source); err != nil || rate != 6_800_000_000 || source != "manual" {
+		t.Fatalf("exchange rate after upgrade = %d %q %v", rate, source, err)
 	}
 	var tables, versions int
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables

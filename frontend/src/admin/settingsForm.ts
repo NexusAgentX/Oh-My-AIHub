@@ -14,6 +14,11 @@ export type SettingsForm = {
   defaultCooldownSeconds: string
   /** 每行一个主机 */
   extraBlockedHosts: string
+  /** 1 美元兑多少元（= 积分） */
+  usdCnyRate: string
+  fxAutoSync: boolean
+  /** HH:MM，Asia/Shanghai */
+  fxSyncTime: string
 }
 
 /** 平台出厂默认值（baseline seed），用于「高级设置 · 已改 N 项」。 */
@@ -25,7 +30,17 @@ const factoryAdvanced = {
   defaultCooldownFailures: '3',
   defaultCooldownSeconds: '300',
   extraBlockedHosts: '',
-} satisfies Partial<SettingsForm>
+} satisfies Partial<Record<keyof SettingsForm, string>>
+
+/** 当日分钟数 ↔ HH:MM。 */
+export function minuteToTime(minute: number) {
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+}
+
+function timeToMinute(value: string) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim())
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
 
 export function settingsToForm(settings: Settings): SettingsForm {
   return {
@@ -38,12 +53,15 @@ export function settingsToForm(settings: Settings): SettingsForm {
     defaultCooldownFailures: String(settings.default_cooldown_failures),
     defaultCooldownSeconds: String(settings.default_cooldown_seconds),
     extraBlockedHosts: settings.extra_blocked_hosts.join('\n'),
+    usdCnyRate: settings.usd_cny_rate,
+    fxAutoSync: settings.fx_auto_sync,
+    fxSyncTime: minuteToTime(settings.fx_sync_minute),
   }
 }
 
 export function changedAdvancedCount(form: SettingsForm) {
   return (Object.keys(factoryAdvanced) as Array<keyof typeof factoryAdvanced>).filter(
-    (key) => form[key].trim() !== factoryAdvanced[key],
+    (key) => String(form[key]).trim() !== factoryAdvanced[key],
   ).length
 }
 
@@ -85,6 +103,12 @@ export function formToSettings(
     ),
   ]
   if (hosts.length > 100) errors.extraBlockedHosts = '最多 100 个主机'
+  const rate = form.usdCnyRate.trim()
+  if (!/^\d{1,3}(\.\d{1,9})?$/.test(rate) || Number(rate) < 0.01 || Number(rate) > 100) {
+    errors.usdCnyRate = '0.01～100，最多 9 位小数'
+  }
+  const syncMinute = timeToMinute(form.fxSyncTime)
+  if (syncMinute === null) errors.fxSyncTime = '格式为 HH:MM'
   if (Object.keys(errors).length > 0) return { errors }
   return {
     body: {
@@ -97,6 +121,9 @@ export function formToSettings(
       default_cooldown_failures: failures!,
       default_cooldown_seconds: cooldown!,
       extra_blocked_hosts: hosts,
+      usd_cny_rate: rate,
+      fx_auto_sync: form.fxAutoSync,
+      fx_sync_minute: syncMinute!,
     },
   }
 }

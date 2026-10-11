@@ -18,6 +18,8 @@ export type ModelRow = {
   upstream: string
   formats: Format[]
   multiplier: string
+  /** 汇率优惠：只对美元模型生效，按「美元价 × 倍率」扣积分 */
+  fxDiscount: boolean
   /** 每种格式最近一次测试是否通过 */
   passed: Partial<Record<Format, boolean>>
   errors?: Partial<Record<Format, string>>
@@ -66,6 +68,7 @@ export function rowsFromDiscover(models: DiscoveredModel[]): ModelRow[] {
     upstream: model.id,
     formats: model.suggested_formats,
     multiplier: '1',
+    fxDiscount: false,
     passed: {},
   }))
 }
@@ -78,6 +81,7 @@ export function rowsFromChannel(channel: Channel): ModelRow[] {
     upstream: model.upstream_model,
     formats: model.formats,
     multiplier: model.multiplier,
+    fxDiscount: model.fx_discount,
     errors: Object.fromEntries(Object.entries(model.format_tests).filter(([, test]) => !test.ok).map(([format, test]) => [format, test.error || '测试未通过'])),
     passed: Object.fromEntries(Object.entries(model.format_tests).map(([format, test]) => [format, test.ok])),
   }))
@@ -114,6 +118,7 @@ export function modelsInput(rows: ModelRow[]): ChannelModelInput[] {
       model_id: row.modelId,
       upstream_model: row.upstream.trim() || row.modelId,
       multiplier: row.multiplier.trim() || '1',
+      fx_discount: row.fxDiscount,
       formats: row.formats,
       enabled: row.sell,
     }))

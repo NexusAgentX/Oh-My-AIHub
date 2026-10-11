@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
@@ -27,14 +28,19 @@ type RankInput struct {
 	Available func(Candidate) bool
 }
 
-// price orders candidates by what they charge: the channel multiplier applied
-// to the model's current tier price (identical for every candidate of one
-// model, so the multiplier alone orders them). Channels of the caller cost 0.
+// price orders candidates by what they charge: the channel multiplier and
+// currency conversion applied to the model's current tier price (identical for
+// every candidate of one model, so multiplier × rate alone orders them).
+// Channels of the caller cost 0.
 func price(candidate Candidate, consumerID string) float64 {
 	if candidate.OwnerID == consumerID {
 		return 0
 	}
-	return float64(candidate.MultiplierNano)
+	rate := candidate.RateNano
+	if rate == 0 {
+		rate = ledger.UnitRate
+	}
+	return float64(candidate.MultiplierNano) * float64(rate)
 }
 
 func medianOf(values []float64) (float64, bool) {

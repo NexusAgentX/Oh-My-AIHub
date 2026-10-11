@@ -16,9 +16,10 @@ describe('channel wizard', () => {
     ])
     expect(validateRows(rows)).toBe('')
     expect(modelsInput(rows)).toEqual([
-      { model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', formats: ['openai_chat', 'openai_responses'], enabled: true },
-      { model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', formats: ['anthropic'], enabled: true },
+      { model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', fx_discount: false, formats: ['openai_chat', 'openai_responses'], enabled: true },
+      { model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', fx_discount: false, formats: ['anthropic'], enabled: true },
     ])
+    expect(modelsInput([{ ...rows[0], multiplier: '0.13', fxDiscount: true }])[0]).toMatchObject({ multiplier: '0.13', fx_discount: true })
   })
 
   it('corrects formats from test results and marks passes', () => {

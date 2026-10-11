@@ -21,7 +21,7 @@ func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
 }
 
 const getModel = `-- name: GetModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency FROM models WHERE id = $1
 `
 
 func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
@@ -47,6 +47,7 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 		&i.ParameterInfo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PriceCurrency,
 	)
 	return i, err
 }
@@ -57,9 +58,9 @@ INSERT INTO models (
     input_price_nano_per_million, output_price_nano_per_million,
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
-    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices, price_currency
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency
 `
 
 type InsertModelParams struct {
@@ -80,6 +81,7 @@ type InsertModelParams struct {
 	SupportsVision                bool
 	ParameterInfo                 string
 	TokenPrices                   []byte
+	PriceCurrency                 string
 }
 
 func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model, error) {
@@ -101,6 +103,7 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		arg.SupportsVision,
 		arg.ParameterInfo,
 		arg.TokenPrices,
+		arg.PriceCurrency,
 	)
 	var i Model
 	err := row.Scan(
@@ -123,6 +126,7 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		&i.ParameterInfo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PriceCurrency,
 	)
 	return i, err
 }
@@ -178,7 +182,7 @@ func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
 }
 
 const listModels = `-- name: ListModels :many
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency FROM models
 WHERE enabled OR $1::boolean
 ORDER BY sort_order, id
 `
@@ -212,6 +216,7 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 			&i.ParameterInfo,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PriceCurrency,
 		); err != nil {
 			return nil, err
 		}
@@ -267,7 +272,7 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 }
 
 const lockModel = `-- name: LockModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at FROM models WHERE id = $1 FOR UPDATE
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency FROM models WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
@@ -293,8 +298,25 @@ func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
 		&i.ParameterInfo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PriceCurrency,
 	)
 	return i, err
+}
+
+const setChannelFXDiscount = `-- name: SetChannelFXDiscount :exec
+UPDATE channel_models SET fx_discount = $2 WHERE model_id = $1
+`
+
+type SetChannelFXDiscountParams struct {
+	ModelID    string
+	FxDiscount bool
+}
+
+// A currency switch resets the FX discount of every channel offering the model
+// to "on" for USD: a model whose figures were dollars all along keeps its prices.
+func (q *Queries) SetChannelFXDiscount(ctx context.Context, arg SetChannelFXDiscountParams) error {
+	_, err := q.db.Exec(ctx, setChannelFXDiscount, arg.ModelID, arg.FxDiscount)
+	return err
 }
 
 const updateModel = `-- name: UpdateModel :one
@@ -314,10 +336,11 @@ UPDATE models SET
     supports_structured_output = $14,
     supports_vision = $15,
     parameter_info = $16,
- token_prices = $17,
+    token_prices = $17,
+    price_currency = $18,
     updated_at = now()
 WHERE id = $1
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency
 `
 
 type UpdateModelParams struct {
@@ -338,6 +361,7 @@ type UpdateModelParams struct {
 	SupportsVision                bool
 	ParameterInfo                 string
 	TokenPrices                   []byte
+	PriceCurrency                 string
 }
 
 func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model, error) {
@@ -359,6 +383,7 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		arg.SupportsVision,
 		arg.ParameterInfo,
 		arg.TokenPrices,
+		arg.PriceCurrency,
 	)
 	var i Model
 	err := row.Scan(
@@ -381,6 +406,7 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		&i.ParameterInfo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PriceCurrency,
 	)
 	return i, err
 }

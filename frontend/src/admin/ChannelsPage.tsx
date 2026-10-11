@@ -15,6 +15,7 @@ import {
   type Column,
 } from '../ui'
 import { ChannelStatsPanel } from '../channels/ChannelStatsPanel'
+import { MultiplierText } from '../money/MultiplierText'
 import { ConfirmActionDialog, DetailList, LoadMore } from './components'
 import { formatCount, formatDateTime, formatPoints, formatRatio } from './format'
 import { useAdminChannel, useAdminChannels, useChannelSuspension } from './queries'
@@ -215,7 +216,18 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
                 </span>
               ),
             },
-            { key: 'multiplier', header: '倍率', numeric: true, cell: (model) => `×${model.multiplier}` },
+            {
+              key: 'multiplier',
+              header: '倍率',
+              numeric: true,
+              cell: (model) => (
+                <MultiplierText
+                  effective={model.effective_multiplier}
+                  fxDiscount={model.fx_discount}
+                  multiplier={model.multiplier}
+                />
+              ),
+            },
             {
               key: 'prices',
               header: '现价 输入/输出',

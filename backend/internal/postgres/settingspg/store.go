@@ -3,11 +3,13 @@ package settingspg
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -35,6 +37,13 @@ func toSettings(row Setting) settings.Settings {
 		DefaultCooldownFailures:  row.DefaultCooldownFailures,
 		DefaultCooldownSeconds:   row.DefaultCooldownSeconds,
 		ExtraBlockedHosts:        hosts,
+		USDCNYRateNano:           row.UsdCnyRateNano,
+		FXAutoSync:               row.FxAutoSync,
+		FXSyncMinute:             row.FxSyncMinute,
+		USDCNYRateSource:         row.UsdCnyRateSource,
+		USDCNYRateUpdatedAt:      row.UsdCnyRateUpdatedAt,
+		FXSyncAttemptedAt:        row.FxSyncAttemptedAt,
+		FXSyncError:              row.FxSyncError,
 		UpdatedAt:                row.UpdatedAt,
 	}
 }
@@ -71,6 +80,9 @@ func (s *Store) UpdateSettings(ctx context.Context, actorID string, value settin
 			DefaultCooldownFailures:  value.DefaultCooldownFailures,
 			DefaultCooldownSeconds:   value.DefaultCooldownSeconds,
 			ExtraBlockedHosts:        value.ExtraBlockedHosts,
+			FxAutoSync:               value.FXAutoSync,
+			FxSyncMinute:             value.FXSyncMinute,
+			UsdCnyRateNano:           value.USDCNYRateNano,
 		})
 		if err != nil {
 			return err
@@ -95,5 +107,43 @@ func auditView(value settings.Settings) map[string]any {
 		"default_cooldown_failures":   value.DefaultCooldownFailures,
 		"default_cooldown_seconds":    value.DefaultCooldownSeconds,
 		"extra_blocked_hosts":         value.ExtraBlockedHosts,
+		"usd_cny_rate":                money.FromNano(value.USDCNYRateNano).String(),
+		"fx_auto_sync":                value.FXAutoSync,
+		"fx_sync_minute":              value.FXSyncMinute,
 	}
+}
+
+func (s *Store) SaveSyncedRate(ctx context.Context, actorID string, rateNano int64, at time.Time) (settings.Settings, error) {
+	var updated settings.Settings
+	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		before, err := q.LockSettings(ctx)
+		if err != nil {
+			return err
+		}
+		row, err := q.SaveSyncedRate(ctx, SaveSyncedRateParams{UsdCnyRateNano: rateNano, At: at})
+		if err != nil {
+			return err
+		}
+		updated = toSettings(row)
+		if before.UsdCnyRateNano == rateNano && actorID == "" {
+			return nil
+		}
+		return auditpg.Record(ctx, tx, auditpg.Event{
+			ActorID: actorID, Action: audit.ActionExchangeRateSynced, TargetType: "settings", TargetID: "platform",
+			Detail: map[string]any{
+				"before": money.FromNano(before.UsdCnyRateNano).String(), "after": money.FromNano(rateNano).String(),
+				"source": settings.FrankfurterURL,
+			},
+		})
+	})
+	return updated, err
+}
+
+func (s *Store) SaveSyncFailure(ctx context.Context, message string, at time.Time) (settings.Settings, error) {
+	row, err := s.q.SaveSyncFailure(ctx, SaveSyncFailureParams{At: at, Message: message})
+	if err != nil {
+		return settings.Settings{}, err
+	}
+	return toSettings(row), nil
 }

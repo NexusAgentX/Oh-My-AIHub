@@ -266,9 +266,25 @@ export function toggleWeekday(form: TierForm, weekday: number, checked: boolean)
 // ---------------------------------------------------------------------------
 // 模型表单
 
+/** 价格单位文字，如「积分/百万 token」「美元/百万 token」。 */
+export function priceUnit(currency: PriceCurrency) {
+  return currency === 'USD' ? '美元/百万 token' : '积分/百万 token'
+}
+
+/** 美元价 × 汇率 → 积分价（展示用，保留至多 6 位小数）。 */
+export function usdToPoints(price: string, rate: string) {
+  const value = Number(price) * Number(rate)
+  if (!Number.isFinite(value)) return ''
+  return String(Number(value.toFixed(6)))
+}
+
+export type PriceCurrency = AdminModel['price_currency']
+
 export type ModelForm = {
   id: string
   displayName: string
+  /** 基准价、细分价与价格档的币种：CNY 即积分，USD 按平台汇率换算 */
+  currency: PriceCurrency
   prices: PricesForm
   enabled: boolean
   sortOrder: string
@@ -289,6 +305,7 @@ export function emptyModelForm(): ModelForm {
   return {
     id: '',
     displayName: '',
+    currency: 'CNY',
     prices: { ...zeroPrices },
     enabled: true,
     sortOrder: '0',
@@ -324,6 +341,7 @@ export function modelToForm(model: AdminModel): ModelForm {
   return {
     id: model.id,
     displayName: model.display_name,
+    currency: model.price_currency,
     prices: { ...model.base_prices },
     enabled: model.enabled,
     sortOrder: String(model.sort_order),
@@ -383,6 +401,7 @@ export function validateModelForm(form: ModelForm, creating: boolean): ModelErro
 function modelFields(form: ModelForm) {
   return {
     display_name: form.displayName.trim(),
+    price_currency: form.currency,
     base_prices: trimPrices(form.prices),
     price_tiers: form.tiers,
     enabled: form.enabled,

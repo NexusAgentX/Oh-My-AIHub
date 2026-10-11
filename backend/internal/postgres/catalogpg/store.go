@@ -27,7 +27,7 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool
 
 func toModel(row Model, tiers []ModelPriceTier) catalog.Model {
 	model := catalog.Model{
-		ID: row.ID, DisplayName: row.DisplayName, TokenPrices: decodePrices(row.TokenPrices),
+		ID: row.ID, DisplayName: row.DisplayName, PriceCurrency: row.PriceCurrency, TokenPrices: decodePrices(row.TokenPrices),
 		InputPrice: row.InputPriceNanoPerMillion, OutputPrice: row.OutputPriceNanoPerMillion,
 		CacheWritePrice: row.CacheWritePriceNanoPerMillion, CacheReadPrice: row.CacheReadPriceNanoPerMillion,
 		Enabled: row.Enabled, SortOrder: row.SortOrder, Provider: row.Provider, ContextWindow: row.ContextWindow,
@@ -127,7 +127,7 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
 		row, err := q.InsertModel(ctx, InsertModelParams{
-			ID: model.ID, DisplayName: model.DisplayName, TokenPrices: encodePrices(model.TokenPrices),
+			ID: model.ID, DisplayName: model.DisplayName, PriceCurrency: model.PriceCurrency, TokenPrices: encodePrices(model.TokenPrices),
 			InputPriceNanoPerMillion: model.InputPrice, OutputPriceNanoPerMillion: model.OutputPrice,
 			CacheWritePriceNanoPerMillion: model.CacheWritePrice, CacheReadPriceNanoPerMillion: model.CacheReadPrice,
 			Enabled: model.Enabled, SortOrder: model.SortOrder, Provider: model.Provider, ContextWindow: model.ContextWindow,
@@ -172,7 +172,7 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 			return err
 		}
 		saved, err := q.UpdateModel(ctx, UpdateModelParams{
-			ID: id, DisplayName: next.DisplayName, TokenPrices: encodePrices(next.TokenPrices),
+			ID: id, DisplayName: next.DisplayName, PriceCurrency: next.PriceCurrency, TokenPrices: encodePrices(next.TokenPrices),
 			InputPriceNanoPerMillion: next.InputPrice, OutputPriceNanoPerMillion: next.OutputPrice,
 			CacheWritePriceNanoPerMillion: next.CacheWritePrice, CacheReadPriceNanoPerMillion: next.CacheReadPrice,
 			Enabled: next.Enabled, SortOrder: next.SortOrder, Provider: next.Provider, ContextWindow: next.ContextWindow,
@@ -185,6 +185,11 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 		}
 		if err := replaceTiers(ctx, q, id, next.PriceTiers); err != nil {
 			return err
+		}
+		if next.PriceCurrency != current.PriceCurrency {
+			if err := q.SetChannelFXDiscount(ctx, SetChannelFXDiscountParams{ModelID: id, FxDiscount: next.PriceCurrency == ledger.CurrencyUSD}); err != nil {
+				return err
+			}
 		}
 		models, err := withTiers(ctx, q, []Model{saved})
 		if err != nil {
@@ -245,7 +250,7 @@ func auditView(model catalog.Model) map[string]any {
 		})
 	}
 	return map[string]any{
-		"display_name": model.DisplayName, "enabled": model.Enabled,
+		"display_name": model.DisplayName, "enabled": model.Enabled, "price_currency": model.PriceCurrency,
 		"input_price": model.InputPrice.String(), "output_price": model.OutputPrice.String(),
 		"token_prices":      model.TokenPrices,
 		"cache_write_price": model.CacheWritePrice.String(), "cache_read_price": model.CacheReadPrice.String(),

@@ -1,6 +1,7 @@
 import { PriceSnapshotView } from '../admin/transactions'
 import type { CallDetail } from '../api/types'
-import { formatMs, formatMultiplier, formatPoints, formatTokens } from '../money/format'
+import { formatMs, formatPoints, formatTokens } from '../money/format'
+import { MultiplierText } from '../money/MultiplierText'
 import { formatDateTime } from '../money/time'
 import { CopyButton, Drawer, QueryBoundary } from '../ui'
 import { AttemptTimeline } from './AttemptTimeline'
@@ -55,7 +56,21 @@ export function CallDetailView({ call }: { call: CallDetail }) {
           {call.routing_source === 'key' && <small className="muted"> · Key 单独设置</small>}
         </Row>
         <Row label="价格档">
-          {snapshot ? `${snapshot.tier?.name ?? '基准价'} · ${formatMultiplier(snapshot.multiplier)}` : '—'}
+          {snapshot ? (
+            <>
+              {snapshot.tier?.name ?? '基准价'} ·{' '}
+              <MultiplierText
+                effective={snapshot.effective_multiplier}
+                fxDiscount={snapshot.fx_discount}
+                multiplier={snapshot.multiplier}
+              />
+              {snapshot.currency === 'USD' && snapshot.usd_cny_rate && (
+                <small className="muted"> · 美元模型，汇率 {snapshot.usd_cny_rate}</small>
+              )}
+            </>
+          ) : (
+            '—'
+          )}
         </Row>
         <Row label="费用">
           <span className="num">

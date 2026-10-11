@@ -49,6 +49,8 @@ type catalogModelJSON struct {
 	SupportsStructuredOutput bool                 `json:"supports_structured_output"`
 	SupportsVision           bool                 `json:"supports_vision"`
 	ParameterInfo            string               `json:"parameter_info"`
+	PriceCurrency            string               `json:"price_currency"`
+	USDCNYRate               *string              `json:"usd_cny_rate"`
 	BasePrices               modelPricesJSON      `json:"base_prices"`
 	CurrentTier              *tierRefJSON         `json:"current_tier"`
 	LowestPrices             *effectivePricesJSON `json:"lowest_prices"`
@@ -69,6 +71,8 @@ type modelChannelJSON struct {
 	IsMine                   bool                `json:"is_mine"`
 	Formats                  []channel.Format    `json:"formats"`
 	Multiplier               string              `json:"multiplier"`
+	FXDiscount               bool                `json:"fx_discount"`
+	EffectiveMultiplier      string              `json:"effective_multiplier"`
 	CurrentPrices            effectivePricesJSON `json:"current_prices"`
 	SuccessRate24h           *string             `json:"success_rate_24h"`
 	TTFTP50MS                *int64              `json:"ttft_p50_ms"`
@@ -116,27 +120,52 @@ type homeResponseJSON struct {
 	RecentCalls      []callSummaryJSON `json:"recent_calls"`
 }
 
-func newEffectivePricesJSON(prices ledger.Prices, multiplierNano int64) effectivePricesJSON {
+// newEffectivePricesJSON converts prices in the model's currency into the
+// points a channel charges: multiplier × rate (ledger.ChannelRate).
+func newEffectivePricesJSON(prices ledger.Prices, multiplierNano, rateNano int64) effectivePricesJSON {
 	return effectivePricesJSON{
-		Input:      ledger.ScalePrice(prices.InputPerMillion, multiplierNano).String(),
-		Output:     ledger.ScalePrice(prices.OutputPerMillion, multiplierNano).String(),
-		CacheWrite: ledger.ScalePrice(prices.CacheWritePerMillion, multiplierNano).String(),
-		CacheRead:  ledger.ScalePrice(prices.CacheReadPerMillion, multiplierNano).String(),
+		Input:      ledger.ScalePriceAt(prices.InputPerMillion, multiplierNano, rateNano).String(),
+		Output:     ledger.ScalePriceAt(prices.OutputPerMillion, multiplierNano, rateNano).String(),
+		CacheWrite: ledger.ScalePriceAt(prices.CacheWritePerMillion, multiplierNano, rateNano).String(),
+		CacheRead:  ledger.ScalePriceAt(prices.CacheReadPerMillion, multiplierNano, rateNano).String(),
 	}
 }
 
-func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, now time.Time) catalogModelJSON {
+// channelPricing is how one channel prices one model at the current rate:
+// the conversion rate its multiplier applies with and the multiplier it
+// effectively applies to the model's point price.
+type channelPricing struct {
+	RateNano      int64
+	EffectiveNano int64
+	FXDiscount    bool
+}
+
+func newChannelPricing(model catalog.Model, multiplierNano int64, fxDiscount bool, usdRateNano int64) channelPricing {
+	rate := ledger.ChannelRate(model.PriceCurrency, fxDiscount, usdRateNano)
+	return channelPricing{
+		RateNano:      rate,
+		EffectiveNano: ledger.EffectiveMultiplier(multiplierNano, rate, model.Rate(usdRateNano)),
+		FXDiscount:    model.PriceCurrency == ledger.CurrencyUSD && fxDiscount,
+	}
+}
+
+// newCatalogModelJSON shows every price in points: USD base prices are
+// converted at usdRateNano.
+func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, now time.Time, usdRateNano int64) catalogModelJSON {
 	prices, tierSeq := currentPrices(model, now)
+	points := model.InPoints(usdRateNano)
 	var tier *tierRefJSON
 	var lowest *effectivePricesJSON
 	if tierSeq > 0 {
 		tier = &tierRefJSON{Seq: tierSeq, Name: model.PriceTiers[tierSeq-1].Name}
 	}
 	formats := []channel.Format{}
-	var cheapest int64 = -1
-	for _, entry := range online {
-		if cheapest < 0 || entry.MultiplierNano < cheapest {
-			cheapest = entry.MultiplierNano
+	var cheapest *gateway.OnlineChannel
+	var cheapestPricing channelPricing
+	for index, entry := range online {
+		pricing := newChannelPricing(model, entry.MultiplierNano, entry.FXDiscount, usdRateNano)
+		if cheapest == nil || float64(entry.MultiplierNano)*float64(pricing.RateNano) < float64(cheapest.MultiplierNano)*float64(cheapestPricing.RateNano) {
+			cheapest, cheapestPricing = &online[index], pricing
 		}
 		for _, format := range entry.Formats {
 			if !slices.Contains(formats, format) {
@@ -144,9 +173,14 @@ func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, no
 			}
 		}
 	}
-	if cheapest >= 0 {
-		scaled := newEffectivePricesJSON(prices, cheapest)
+	if cheapest != nil {
+		scaled := newEffectivePricesJSON(prices, cheapest.MultiplierNano, cheapestPricing.RateNano)
 		lowest = &scaled
+	}
+	var usdRate *string
+	if model.PriceCurrency == ledger.CurrencyUSD {
+		rate := money.FromNano(usdRateNano).String()
+		usdRate = &rate
 	}
 	ordered := make([]channel.Format, 0, len(formats))
 	for _, format := range channel.Formats {
@@ -165,7 +199,9 @@ func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, no
 		SupportsStructuredOutput: model.SupportsStructuredOutput,
 		SupportsVision:           model.SupportsVision,
 		ParameterInfo:            model.ParameterInfo,
-		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
+		PriceCurrency:            model.PriceCurrency,
+		USDCNYRate:               usdRate,
+		BasePrices:               newModelPricesJSON(points.InputPrice, points.OutputPrice, points.CacheWritePrice, points.CacheReadPrice, points.TokenPrices),
 		CurrentTier:              tier,
 		LowestPrices:             lowest,
 		Formats:                  ordered,
@@ -192,11 +228,16 @@ func (a *app) listModels(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	defaults, _, err := a.gateway.Settings(r.Context())
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
 	grouped := groupByModel(online)
 	now := time.Now()
 	items := make([]catalogModelJSON, 0, len(models))
 	for _, model := range models {
-		items = append(items, newCatalogModelJSON(model, grouped[model.ID], now))
+		items = append(items, newCatalogModelJSON(model, grouped[model.ID], now, defaults.USDCNYRateNano))
 	}
 	writeJSON(w, http.StatusOK, catalogModelListJSON{Items: items})
 }
@@ -261,6 +302,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			left := ratio(math.Min(1, math.Max(0, remaining)))
 			capRemaining = &left
 		}
+		pricing := newChannelPricing(model, entry.MultiplierNano, entry.FXDiscount, defaults.USDCNYRateNano)
 		channels = append(channels, modelChannelJSON{
 			ID:                       entry.ChannelID,
 			Name:                     entry.ChannelName,
@@ -268,7 +310,9 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			IsMine:                   entry.OwnerID == accountID,
 			Formats:                  entry.Formats,
 			Multiplier:               money.FromNano(entry.MultiplierNano).String(),
-			CurrentPrices:            newEffectivePricesJSON(prices, entry.MultiplierNano),
+			FXDiscount:               pricing.FXDiscount,
+			EffectiveMultiplier:      money.FromNano(pricing.EffectiveNano).String(),
+			CurrentPrices:            newEffectivePricesJSON(prices, entry.MultiplierNano, pricing.RateNano),
 			SuccessRate24h:           successRate,
 			TTFTP50MS:                ttft,
 			State:                    string(state),
@@ -277,7 +321,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))
-	for index, tier := range model.PriceTiers {
+	for index, tier := range model.InPoints(defaults.USDCNYRateNano).PriceTiers {
 		tiers = append(tiers, newPriceTierJSON(index+1, tier))
 	}
 	pref, err := a.routing.Get(ctx, accountID, "", model.ID)
@@ -285,7 +329,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		pref = routing.Default(model.ID)
 	}
 	writeJSON(w, http.StatusOK, modelDetailJSON{
-		Model: newCatalogModelJSON(model, mine, now), PriceTiers: tiers, Channels: channels, Routing: newRoutingPreferenceJSON(pref),
+		Model: newCatalogModelJSON(model, mine, now, defaults.USDCNYRateNano), PriceTiers: tiers, Channels: channels, Routing: newRoutingPreferenceJSON(pref),
 	})
 }
 

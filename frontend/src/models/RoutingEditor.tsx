@@ -1,7 +1,8 @@
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
-import { formatMs, formatMultiplier, formatPoints, formatRatio } from '../money/format'
+import { formatMs, formatPoints, formatRatio } from '../money/format'
+import { MultiplierText } from '../money/MultiplierText'
 import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
   advancedChanged,
@@ -127,7 +128,13 @@ export function RoutingEditor({
                 <dl className="routing-metrics">
                   <div>
                     <dt>倍率</dt>
-                    <dd>{formatMultiplier(channel.multiplier)}</dd>
+                    <dd>
+                      <MultiplierText
+                        effective={channel.effective_multiplier}
+                        fxDiscount={channel.fx_discount}
+                        multiplier={channel.multiplier}
+                      />
+                    </dd>
                   </div>
                   <div>
                     <dt>现价 入/出</dt>

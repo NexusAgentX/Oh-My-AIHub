@@ -38,21 +38,52 @@ export function currentPrices(detail: Pick<ModelDetail, 'model' | 'price_tiers'>
   return tier ? { name: tier.name, prices: tier.prices } : { name: '基准价', prices: detail.model.base_prices }
 }
 
+const scale = 1_000_000_000n
+
+function toNano(value: string) {
+  const match = /^(\d+)(?:\.(\d{1,9}))?$/.exec(value.trim())
+  if (!match) return null
+  return BigInt(match[1]) * scale + BigInt((match[2] ?? '').padEnd(9, '0'))
+}
+
+function fromNano(value: bigint) {
+  const whole = value / scale
+  const fraction = (value % scale).toString().padStart(9, '0').replace(/0+$/, '')
+  return fraction ? `${whole}.${fraction}` : `${whole}`
+}
+
 /** 价格 × 倍率（字符串十进制，最多 9 位小数，向上取整到 nano）。 */
 export function multiplyPrice(price: string, multiplier: string) {
-  const toNano = (value: string) => {
-    const match = /^(\d+)(?:\.(\d{1,9}))?$/.exec(value.trim())
-    if (!match) return null
-    return BigInt(match[1]) * 1_000_000_000n + BigInt((match[2] ?? '').padEnd(9, '0'))
-  }
   const a = toNano(price)
   const b = toNano(multiplier)
   if (a === null || b === null) return null
-  const scale = 1_000_000_000n
-  const product = (a * b + scale - 1n) / scale
-  const whole = product / scale
-  const fraction = (product % scale).toString().padStart(9, '0').replace(/0+$/, '')
-  return fraction ? `${whole}.${fraction}` : `${whole}`
+  return fromNano((a * b + scale - 1n) / scale)
+}
+
+/**
+ * 渠道现价预览：积分价 × 倍率，勾选「汇率优惠」的美元模型再 ÷ 汇率（四舍五入到 nano），
+ * 等于「美元价 × 倍率」。
+ */
+export function channelPrice(price: string, multiplier: string, fxDiscount: boolean, usdCnyRate: string | null | undefined) {
+  if (!fxDiscount || !usdCnyRate) return multiplyPrice(price, multiplier)
+  const p = toNano(price)
+  const m = toNano(multiplier)
+  const rate = toNano(usdCnyRate)
+  if (p === null || m === null || rate === null || rate === 0n) return null
+  return fromNano((p * m + rate / 2n) / rate)
+}
+
+/**
+ * 实际倍率：渠道对模型积分价实际乘上的倍率。美元模型勾选「汇率优惠」时按
+ * 「美元价 × 倍率」扣积分，相当于积分价 × 倍率 ÷ 汇率；其余等于填写的倍率。
+ * 与后端 ledger.EffectiveMultiplier 一致，截断到 9 位小数。
+ */
+export function effectiveMultiplier(multiplier: string, fxDiscount: boolean, usdCnyRate: string | null | undefined) {
+  if (!fxDiscount || !usdCnyRate) return multiplier
+  const m = toNano(multiplier)
+  const rate = toNano(usdCnyRate)
+  if (m === null || rate === null || rate === 0n) return null
+  return fromNano((m * scale) / rate)
 }
 
 export function contextText(tokens: number | null) {

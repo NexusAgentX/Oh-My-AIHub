@@ -283,7 +283,7 @@ const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
@@ -316,6 +316,7 @@ type ListCandidatesRow struct {
 	CooldownSeconds     *int32
 	UpstreamModel       string
 	MultiplierNano      int64
+	FxDiscount          bool
 }
 
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
@@ -346,6 +347,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.CooldownSeconds,
 			&i.UpstreamModel,
 			&i.MultiplierNano,
+			&i.FxDiscount,
 		); err != nil {
 			return nil, err
 		}
@@ -359,7 +361,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.cooldown_failures, c.cooldown_seconds
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
@@ -376,6 +378,7 @@ type ListOnlineChannelModelsRow struct {
 	OwnerName           string
 	Formats             []string
 	MultiplierNano      int64
+	FxDiscount          bool
 	ConcurrencyLimit    *int32
 	RpmLimit            *int32
 	DailyRevenueCapNano *money.Amount
@@ -400,6 +403,7 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 			&i.OwnerName,
 			&i.Formats,
 			&i.MultiplierNano,
+			&i.FxDiscount,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
 			&i.DailyRevenueCapNano,

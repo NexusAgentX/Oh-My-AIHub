@@ -22,4 +22,11 @@ type Setting struct {
 	DefaultCooldownSeconds   int32
 	ExtraBlockedHosts        []string
 	UpdatedAt                time.Time
+	UsdCnyRateNano           int64
+	UsdCnyRateSource         string
+	UsdCnyRateUpdatedAt      time.Time
+	FxAutoSync               bool
+	FxSyncMinute             int32
+	FxSyncAttemptedAt        *time.Time
+	FxSyncError              *string
 }

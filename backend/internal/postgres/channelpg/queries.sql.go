@@ -223,8 +223,8 @@ func (q *Queries) InsertChannelEvent(ctx context.Context, arg InsertChannelEvent
 }
 
 const insertChannelModel = `-- name: InsertChannelModel :exec
-INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type InsertChannelModelParams struct {
@@ -235,6 +235,7 @@ type InsertChannelModelParams struct {
 	Formats        []string
 	FormatTests    []byte
 	Enabled        bool
+	FxDiscount     bool
 }
 
 func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModelParams) error {
@@ -246,6 +247,7 @@ func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModel
 		arg.Formats,
 		arg.FormatTests,
 		arg.Enabled,
+		arg.FxDiscount,
 	)
 	return err
 }
@@ -388,7 +390,7 @@ func (q *Queries) ListChannelEvents(ctx context.Context, arg ListChannelEventsPa
 }
 
 const listModelsOfChannels = `-- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount
 FROM channel_models cm
 WHERE cm.channel_id = ANY($1::uuid[])
 ORDER BY cm.channel_id, cm.model_id
@@ -411,6 +413,7 @@ func (q *Queries) ListModelsOfChannels(ctx context.Context, channelIds []string)
 			&i.Formats,
 			&i.FormatTests,
 			&i.Enabled,
+			&i.FxDiscount,
 		); err != nil {
 			return nil, err
 		}

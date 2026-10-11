@@ -76,9 +76,12 @@ type Model struct {
 	ModelID        string
 	UpstreamModel  string
 	MultiplierNano int64
-	Formats        []Format
-	FormatTests    map[Format]FormatTest
-	Enabled        bool
+	// FXDiscount sells a USD model at "USD price × multiplier" points without
+	// the exchange rate (ledger.ChannelRate); CNY models ignore it.
+	FXDiscount  bool
+	Formats     []Format
+	FormatTests map[Format]FormatTest
+	Enabled     bool
 }
 
 type Owner struct {
