@@ -286,6 +286,10 @@ type callState struct {
 	lastChannelID        string
 	thinkingRequested    *bool
 	requestedServiceTier string
+	// usageInjected is set when the gateway turned include_usage on for an
+	// OpenAI Chat stream whose client had not: the usage-only frame that the
+	// upstream then adds is not for the client (see usageFrameFilter).
+	usageInjected bool
 }
 
 // ---- authentication ----
@@ -866,7 +870,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		if call.format == channel.FormatOpenAIChat && call.stream {
 			_, rescanned, scanErr := ScanRequest(upstreamBody)
 			if scanErr == nil {
-				upstreamBody = EnsureIncludeUsage(upstreamBody, rescanned)
+				upstreamBody, call.usageInjected = EnsureIncludeUsage(upstreamBody, rescanned)
 			}
 		}
 	}
@@ -1129,13 +1133,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	var written int64
 	// undelivered is set when a part of the answer did not reach the client.
 	undelivered := false
-	deliver := func(chunk []byte) {
+	send := func(chunk []byte) {
 		if len(chunk) == 0 {
 			return
 		}
-		// The observer sees every byte the upstream sends, wanted by the client
-		// or not: that is what makes the usage at the end billable.
-		observer.Write(chunk, e.Now())
 		if watch.isGone() {
 			undelivered = true
 			return
@@ -1149,6 +1150,25 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		_ = controller.Flush()
 		written += int64(len(chunk))
 	}
+	// When the gateway turned include_usage on for a client that had not asked
+	// for it, the usage-only frame the upstream adds is kept from the client
+	// (ADR-0035 rule 6); everything else reaches it unchanged.
+	var strip *usageFrameFilter
+	if call.usageInjected && call.format == channel.FormatOpenAIChat && call.stream && observer.sse {
+		strip = &usageFrameFilter{}
+	}
+	deliver := func(chunk []byte) {
+		if len(chunk) == 0 {
+			return
+		}
+		// The observer sees every byte the upstream sends, wanted by the client
+		// or not: that is what makes the usage at the end billable.
+		observer.Write(chunk, e.Now())
+		if strip != nil {
+			chunk = strip.Filter(chunk)
+		}
+		send(chunk)
+	}
 	deliver(result.first)
 	readErr := result.firstErr
 	buffer := make([]byte, chunkSize)
@@ -1159,6 +1179,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			result.idle.Reset(result.idleAfter) // data arrived: the stream is not idle
 		}
 		deliver(buffer[:n])
+	}
+	if strip != nil {
+		send(strip.Flush()) // what was held back for an event that never ended
 	}
 	// Whether the answer ran to its end, and whether the client was gone while
 	// it did. A client that closes its side after receiving everything, before

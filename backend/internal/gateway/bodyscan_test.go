@@ -56,24 +56,30 @@ func TestReplaceModelEscapesAndReplacesDuplicates(t *testing.T) {
 }
 
 func TestEnsureIncludeUsage(t *testing.T) {
-	cases := []struct{ in, out string }{
-		{`{"model":"m","stream":true}`, `{"model":"m","stream":true,"stream_options":{"include_usage":true}}`},
-		{`{"model":"m","stream":true }`, `{"model":"m","stream":true,"stream_options":{"include_usage":true} }`},
-		{`{"stream_options":{"include_usage":true},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`},
-		{`{"stream_options":{"include_usage":false},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`},
-		{`{"stream_options":{},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`},
-		{`{"stream_options":{"other":1},"a":1}`, `{"stream_options":{"include_usage":true,"other":1},"a":1}`},
-		{`{"stream_options":null}`, `{"stream_options":{"include_usage":true}}`},
-		{`{}`, `{"stream_options":{"include_usage":true}}`},
+	cases := []struct {
+		in, out string
+		changed bool
+	}{
+		{`{"model":"m","stream":true}`, `{"model":"m","stream":true,"stream_options":{"include_usage":true}}`, true},
+		{`{"model":"m","stream":true }`, `{"model":"m","stream":true,"stream_options":{"include_usage":true} }`, true},
+		{`{"stream_options":{"include_usage":true},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`, false},
+		{`{"stream_options":{"include_usage": true },"a":1}`, `{"stream_options":{"include_usage": true },"a":1}`, false},
+		{`{"stream_options":{"include_usage":false},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`, true},
+		{`{"stream_options":{"include_usage":true,"include_usage":false},"a":1}`, `{"stream_options":{"include_usage":true,"include_usage":true},"a":1}`, true},
+		{`{"stream_options":{"include_usage":false,"include_usage":true},"a":1}`, `{"stream_options":{"include_usage":false,"include_usage":true},"a":1}`, false},
+		{`{"stream_options":{},"a":1}`, `{"stream_options":{"include_usage":true},"a":1}`, true},
+		{`{"stream_options":{"other":1},"a":1}`, `{"stream_options":{"include_usage":true,"other":1},"a":1}`, true},
+		{`{"stream_options":null}`, `{"stream_options":{"include_usage":true}}`, true},
+		{`{}`, `{"stream_options":{"include_usage":true}}`, true},
 	}
 	for _, tc := range cases {
 		_, scan, err := ScanRequest([]byte(tc.in))
 		if err != nil {
 			t.Fatal(err)
 		}
-		got := EnsureIncludeUsage([]byte(tc.in), scan)
-		if string(got) != tc.out {
-			t.Fatalf("in  %s\ngot %s\nwant %s", tc.in, got, tc.out)
+		got, changed := EnsureIncludeUsage([]byte(tc.in), scan)
+		if string(got) != tc.out || changed != tc.changed {
+			t.Fatalf("in  %s\ngot %s (changed %v)\nwant %s (changed %v)", tc.in, got, changed, tc.out, tc.changed)
 		}
 		if !json.Valid(got) {
 			t.Fatalf("result is not valid JSON: %s", got)
@@ -120,7 +126,10 @@ func FuzzScanAndSplice(f *testing.F) {
 		if _, ok := generic["model"]; ok && string(after["model"]) != `"REPLACED"` {
 			t.Fatalf("model not replaced: %q -> %q", body, replaced)
 		}
-		injected := EnsureIncludeUsage(body, scan)
+		injected, changed := EnsureIncludeUsage(body, scan)
+		if changed == bytes.Equal(injected, body) {
+			t.Fatalf("changed = %v but the body %q became %q", changed, body, injected)
+		}
 		var withUsage map[string]json.RawMessage
 		if err := json.Unmarshal(injected, &withUsage); err != nil {
 			t.Fatalf("injection broke JSON: %q -> %q", body, injected)
