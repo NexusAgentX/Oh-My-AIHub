@@ -229,12 +229,22 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 	return result, nil
 }
 
+// callTimeLimit is the longest one call may run, from its start to its end and
+// every attempt and fallback included (ADR-0035 rule 5). RunReaper's horizon
+// is derived from it: change one and the other follows.
+const callTimeLimit = 60 * time.Minute
+
+// reaperMargin is the slack RunReaper allows beyond callTimeLimit before it
+// treats a call that is still in progress as lost.
+const reaperMargin = time.Minute
+
 // RunReaper marks calls that have been in progress longer than any call can
 // legitimately run as interrupted, without charging them (a crash in the
-// middle of a stream loses that charge by design). It returns when ctx ends.
+// middle of a stream loses that charge by design). A live call is cut off by
+// the call time limit, so only a call whose process died outlives
+// callTimeLimit + reaperMargin. It returns when ctx ends.
 func (e *Engine) RunReaper(ctx context.Context, interval time.Duration) {
-	// The longest per-channel total timeout is one hour; allow a minute more.
-	const horizon = time.Hour + time.Minute
+	horizon := e.CallTimeLimit + reaperMargin
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {

@@ -368,7 +368,11 @@ func (s *Service) probeOnce(ctx context.Context, policy Outbound, channel Channe
 		return outcome
 	}
 	started := time.Now()
-	client, err := policy.GatewayClient(ctx, channel.BaseURL, testTimeout)
+	// The gateway client has no deadline of its own; the whole test, including
+	// reading the streamed answer, is bounded by the context.
+	ctx, cancel := context.WithTimeout(ctx, testTimeout)
+	defer cancel()
+	client, err := policy.GatewayClient(ctx, channel.BaseURL)
 	if err != nil {
 		return fail(nil, "出站校验未通过", started)
 	}

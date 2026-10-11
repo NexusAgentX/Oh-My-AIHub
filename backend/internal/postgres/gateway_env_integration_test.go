@@ -71,8 +71,10 @@ func (o testOutbound) Client(_ context.Context, _ string, total time.Duration) (
 	return o.clientWith(total), nil
 }
 
-func (o testOutbound) GatewayClient(_ context.Context, _ string, total time.Duration) (*http.Client, error) {
-	return o.clientWith(total), nil
+// GatewayClient has no deadline of its own, like the production client: the
+// gateway bounds every exchange through the request context.
+func (o testOutbound) GatewayClient(_ context.Context, _ string) (*http.Client, error) {
+	return o.clientWith(0), nil
 }
 
 func (o testOutbound) WithExtraBlockedHosts([]string) (channel.Outbound, error) { return o, nil }
@@ -172,7 +174,11 @@ const (
 	priceOutput = "20"
 )
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { return newEnvWith(t, nil) }
+
+// newEnvWith is newEnv with a chance to adjust the gateway's dependencies,
+// for example to shorten the call time limit.
+func newEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 	t.Helper()
 	pool, store := isolatedDatabase(t)
 	ctx := context.Background()
@@ -219,10 +225,14 @@ func newEnv(t *testing.T) *env {
 	})
 	bus := gateway.NewBus()
 	e.runtime = runtime
-	e.engine = gateway.NewEngine(gateway.Dependencies{
+	dependencies := gateway.Dependencies{
 		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
 		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: bus,
-	})
+	}
+	if configure != nil {
+		configure(&dependencies)
+	}
+	e.engine = gateway.NewEngine(dependencies)
 	e.observe = observe.NewService(store.Observe)
 	e.feed = observe.NewFeed(e.observe, bus, logger)
 	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })

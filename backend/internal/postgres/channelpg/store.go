@@ -399,6 +399,23 @@ func (s *Store) Credential(ctx context.Context, id string) (channel.EncryptedCre
 	return channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext}, nil
 }
 
+// CredentialsAfter pages the sealed upstream keys of every undeleted channel in
+// id order (an empty afterID starts at the first) for the startup keyring check.
+func (s *Store) CredentialsAfter(ctx context.Context, afterID string, limit int) ([]channel.StoredCredential, error) {
+	rows, err := s.q.ListChannelCredentials(ctx, ListChannelCredentialsParams{AfterID: pgkit.After(afterID), RowLimit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	stored := make([]channel.StoredCredential, 0, len(rows))
+	for _, row := range rows {
+		stored = append(stored, channel.StoredCredential{
+			RecordID: row.ID,
+			Sealed:   channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
+		})
+	}
+	return stored, nil
+}
+
 func (s *Store) Events(ctx context.Context, id string, limit int) ([]channel.Event, error) {
 	rows, err := s.q.ListChannelEvents(ctx, ListChannelEventsParams{ChannelID: id, RowLimit: int32(limit)})
 	if err != nil {

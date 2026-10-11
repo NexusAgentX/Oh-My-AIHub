@@ -298,6 +298,52 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) ([]KeySpendR
 	return items, nil
 }
 
+const listKeyCredentials = `-- name: ListKeyCredentials :many
+SELECT id, key_ciphertext, key_nonce, key_key_id FROM api_keys
+WHERE deleted_at IS NULL AND ($1::uuid IS NULL OR id > $1)
+ORDER BY id
+LIMIT $2
+`
+
+type ListKeyCredentialsParams struct {
+	AfterID  *string
+	RowLimit int32
+}
+
+type ListKeyCredentialsRow struct {
+	ID            string
+	KeyCiphertext []byte
+	KeyNonce      []byte
+	KeyKeyID      string
+}
+
+// Sealed platform keys of every undeleted API key, whatever its status, paged
+// by id for the startup keyring check.
+func (q *Queries) ListKeyCredentials(ctx context.Context, arg ListKeyCredentialsParams) ([]ListKeyCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, listKeyCredentials, arg.AfterID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListKeyCredentialsRow
+	for rows.Next() {
+		var i ListKeyCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.KeyCiphertext,
+			&i.KeyNonce,
+			&i.KeyKeyID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOwnerKeys = `-- name: ListOwnerKeys :many
 SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at FROM api_keys WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at, id
 `
