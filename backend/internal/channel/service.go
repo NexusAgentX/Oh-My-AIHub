@@ -219,14 +219,23 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, in UpdateInput
 		}
 		update.Models = &models
 	}
-	return s.Store.Update(ctx, id, update)
+	updated, err := s.Store.Update(ctx, id, update)
+	if err == nil && update.Credential != nil {
+		// The old key is gone from the database; do not keep its plaintext.
+		s.Keyring.ForgetCredential(id)
+	}
+	return updated, err
 }
 
 func (s *Service) Delete(ctx context.Context, ownerID, id string) error {
 	if _, err := s.owned(ctx, ownerID, id); err != nil {
 		return err
 	}
-	return s.Store.SoftDelete(ctx, id)
+	if err := s.Store.SoftDelete(ctx, id); err != nil {
+		return err
+	}
+	s.Keyring.ForgetCredential(id)
+	return nil
 }
 
 func (s *Service) AdminList(ctx context.Context, filter AdminFilter) ([]Channel, error) {

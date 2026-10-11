@@ -845,7 +845,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		return expired(nil)
 	}
 
-	secret, err := e.Keyring.Decrypt(candidate.ChannelID, candidate.Credential)
+	secret, err := e.Keyring.OpenCredential(candidate.ChannelID, candidate.Credential)
 	if err != nil {
 		e.Logger.Error("gateway: channel credential unavailable", "channel_id", candidate.ChannelID, "error", err)
 		return fail(EndConnectError, "credential_unavailable", "渠道凭据不可用", nil)
