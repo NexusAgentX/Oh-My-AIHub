@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -78,6 +79,47 @@ func (o testOutbound) GatewayClient(_ context.Context, _ string) (*http.Client, 
 }
 
 func (o testOutbound) WithExtraBlockedHosts([]string) (channel.Outbound, error) { return o, nil }
+
+// slowCloseConn closes slowly. The gateway's transport cancels an attempt by
+// closing its connection, and closing a TLS connection first sends the peer
+// close_notify and only then closes the socket. A peer that is waiting for
+// that (a stalled upstream handler waits for its request to be cancelled)
+// finishes its chunked body at once, and the transport's reader, still blocked
+// on the open socket, gets those last bytes and a clean io.EOF instead of an
+// error. On a loaded machine that window opens by itself now and then; this
+// connection holds it open on purpose, so the tests that cancel an attempt can
+// rely on it being there.
+type slowCloseConn struct{ net.Conn }
+
+func (c slowCloseConn) Close() error {
+	time.Sleep(100 * time.Millisecond)
+	return c.Conn.Close()
+}
+
+// slowCloseOutbound makes the gateway reach its upstreams over slowCloseConn.
+func slowCloseOutbound(d *gateway.Dependencies) {
+	transport := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: testRoots},
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			return slowCloseConn{conn}, nil
+		},
+	}
+	d.Outbound = testOutbound{client: &http.Client{Transport: transport}}
+}
+
+// withDependencies applies several adjustments to the gateway's dependencies.
+func withDependencies(adjust ...func(*gateway.Dependencies)) func(*gateway.Dependencies) {
+	return func(d *gateway.Dependencies) {
+		for _, apply := range adjust {
+			apply(d)
+		}
+	}
+}
 
 // ---- fake upstream relays ----
 
