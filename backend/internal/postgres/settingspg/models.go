@@ -29,4 +29,5 @@ type Setting struct {
 	FxSyncMinute             int32
 	FxSyncAttemptedAt        *time.Time
 	FxSyncError              *string
+	AccountMaxInflightCalls  int32
 }

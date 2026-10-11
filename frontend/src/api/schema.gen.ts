@@ -1598,7 +1598,7 @@ export interface components {
          * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
          * @enum {string}
          */
-        CallOutcome: "rejected_balance" | "rejected_budget" | "rejected_key" | "rejected_model" | "rejected_format" | "rejected_no_channel" | "upstream_failed" | "interrupted" | "client_disconnected" | "succeeded" | "succeeded_unbilled" | "in_progress";
+        CallOutcome: "rejected_balance" | "rejected_budget" | "rejected_key" | "rejected_model" | "rejected_format" | "rejected_no_channel" | "rejected_inflight" | "upstream_failed" | "interrupted" | "client_disconnected" | "succeeded" | "succeeded_unbilled" | "in_progress";
         /** @enum {string} */
         AccountStatus: "active" | "disabled";
         /**
@@ -2712,6 +2712,8 @@ export interface components {
             default_total_timeout_ms: number;
             default_cooldown_failures: number;
             default_cooldown_seconds: number;
+            /** @description 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。 */
+            account_max_inflight_calls: number;
             /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
             extra_blocked_hosts: string[];
             usd_cny_rate: components["schemas"]["ExchangeRate"];
@@ -2741,6 +2743,8 @@ export interface components {
             default_total_timeout_ms: number;
             default_cooldown_failures: number;
             default_cooldown_seconds: number;
+            /** @description 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。 */
+            account_max_inflight_calls: number;
             /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
             extra_blocked_hosts: string[];
             /** @description 改变数值即记为手动汇率；开启自动同步后会在下次同步时被覆盖。 */

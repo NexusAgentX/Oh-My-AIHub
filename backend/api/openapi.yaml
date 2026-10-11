@@ -3187,7 +3187,7 @@ components:
     RoutingMode: {type: string, enum: [cheapest, reliable, fastest, manual], description: 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。}
     CallOutcome:
       type: string
-      enum: [rejected_balance, rejected_budget, rejected_key, rejected_model, rejected_format, rejected_no_channel, upstream_failed, interrupted, client_disconnected, succeeded, succeeded_unbilled, in_progress]
+      enum: [rejected_balance, rejected_budget, rejected_key, rejected_model, rejected_format, rejected_no_channel, rejected_inflight, upstream_failed, interrupted, client_disconnected, succeeded, succeeded_unbilled, in_progress]
       description: 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
     AccountStatus: {type: string, enum: [active, disabled]}
     ChannelStatus: {type: string, enum: [listed, unlisted, suspended], description: 上架、下架（所有者）、强制下架（管理员）。}
@@ -4772,6 +4772,7 @@ components:
         default_total_timeout_ms: {type: integer, minimum: 1000, maximum: 3600000}
         default_cooldown_failures: {type: integer, minimum: 1, maximum: 100}
         default_cooldown_seconds: {type: integer, minimum: 10, maximum: 86400}
+        account_max_inflight_calls: {type: integer, minimum: 0, maximum: 1000, description: 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。}
         extra_blocked_hosts:
           type: array
           items: {type: string}
@@ -4785,7 +4786,7 @@ components:
         fx_sync_attempted_at: {$ref: '#/components/schemas/NullableTimestamp'}
         fx_sync_error: {type: [string, 'null'], description: 最近一次同步失败的原因；成功后清空。}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute, usd_cny_rate_source, usd_cny_rate_updated_at, fx_sync_attempted_at, fx_sync_error, updated_at]
+      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, account_max_inflight_calls, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute, usd_cny_rate_source, usd_cny_rate_updated_at, fx_sync_attempted_at, fx_sync_error, updated_at]
       additionalProperties: false
     SettingsUpdateRequest:
       type: object
@@ -4799,6 +4800,7 @@ components:
         default_total_timeout_ms: {type: integer, minimum: 1000, maximum: 3600000}
         default_cooldown_failures: {type: integer, minimum: 1, maximum: 100}
         default_cooldown_seconds: {type: integer, minimum: 10, maximum: 86400}
+        account_max_inflight_calls: {type: integer, minimum: 0, maximum: 1000, description: 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。}
         extra_blocked_hosts:
           type: array
           items: {type: string}
@@ -4810,7 +4812,7 @@ components:
           description: 改变数值即记为手动汇率；开启自动同步后会在下次同步时被覆盖。
         fx_auto_sync: {type: boolean}
         fx_sync_minute: {type: integer, minimum: 0, maximum: 1439}
-      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute]
+      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, account_max_inflight_calls, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute]
       additionalProperties: false
     SettingsEnvelope:
       type: object

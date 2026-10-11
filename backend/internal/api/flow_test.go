@@ -326,24 +326,41 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	}
 
 	current := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/settings", nil)["settings"].(map[string]any)
-	if current["fee_rate_nano"] != float64(1_000_000) || current["c2c_payment_timeout_minutes"] != float64(30) {
+	if current["fee_rate_nano"] != float64(1_000_000) || current["c2c_payment_timeout_minutes"] != float64(30) || current["account_max_inflight_calls"] != float64(20) {
 		t.Fatalf("settings = %v", current)
 	}
 	update := map[string]any{
 		"fee_rate_nano": 2_000_000, "c2c_payment_timeout_minutes": 15, "default_credit_limit": "20",
 		"default_max_attempts": 2, "default_ttft_timeout_ms": 20000, "default_total_timeout_ms": 300000,
-		"default_cooldown_failures": 5, "default_cooldown_seconds": 60, "extra_blocked_hosts": []string{"Evil.Example"},
+		"default_cooldown_failures": 5, "default_cooldown_seconds": 60, "account_max_inflight_calls": 0, "extra_blocked_hosts": []string{"Evil.Example"},
 		"usd_cny_rate": "7.25", "fx_auto_sync": true, "fx_sync_minute": 600,
 	}
 	saved := admin.expect(t, http.StatusOK, http.MethodPut, "/api/admin/settings", update)["settings"].(map[string]any)
 	if saved["default_credit_limit"] != "20" || saved["extra_blocked_hosts"].([]any)[0] != "evil.example" ||
-		saved["usd_cny_rate"] != "7.25" || saved["usd_cny_rate_source"] != "manual" || saved["fx_auto_sync"] != true || saved["fx_sync_minute"] != float64(600) {
+		saved["usd_cny_rate"] != "7.25" || saved["usd_cny_rate_source"] != "manual" || saved["fx_auto_sync"] != true || saved["fx_sync_minute"] != float64(600) ||
+		saved["account_max_inflight_calls"] != float64(0) {
 		t.Fatalf("saved settings = %v", saved)
 	}
 	update["default_total_timeout_ms"] = 1000
 	if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid settings = %d", recorder.Code)
 	}
+	update["default_total_timeout_ms"] = 300000
+	for _, limit := range []int{-1, 1001} {
+		update["account_max_inflight_calls"] = limit
+		if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("in-flight cap %d = %d", limit, recorder.Code)
+		}
+	}
+	update["account_max_inflight_calls"] = 1000
+	if saved := admin.expect(t, http.StatusOK, http.MethodPut, "/api/admin/settings", update)["settings"].(map[string]any); saved["account_max_inflight_calls"] != float64(1000) {
+		t.Fatalf("in-flight cap 1000 = %v", saved)
+	}
+	delete(update, "account_max_inflight_calls")
+	if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("settings without the in-flight cap = %d", recorder.Code)
+	}
+	update["account_max_inflight_calls"] = 20
 	delete(update, "fee_rate_nano")
 	if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("partial settings = %d", recorder.Code)

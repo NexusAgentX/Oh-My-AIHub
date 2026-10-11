@@ -12,6 +12,8 @@ export type SettingsForm = {
   defaultTotalSeconds: string
   defaultCooldownFailures: string
   defaultCooldownSeconds: string
+  /** 每个账号同时在途的调用数上限；0 表示不限 */
+  accountMaxInflightCalls: string
   /** 每行一个主机 */
   extraBlockedHosts: string
   /** 1 美元兑多少元（= 积分） */
@@ -29,6 +31,7 @@ const factoryAdvanced = {
   defaultTotalSeconds: '600',
   defaultCooldownFailures: '3',
   defaultCooldownSeconds: '300',
+  accountMaxInflightCalls: '20',
   extraBlockedHosts: '',
 } satisfies Partial<Record<keyof SettingsForm, string>>
 
@@ -52,6 +55,7 @@ export function settingsToForm(settings: Settings): SettingsForm {
     defaultTotalSeconds: String(settings.default_total_timeout_ms / 1000),
     defaultCooldownFailures: String(settings.default_cooldown_failures),
     defaultCooldownSeconds: String(settings.default_cooldown_seconds),
+    accountMaxInflightCalls: String(settings.account_max_inflight_calls),
     extraBlockedHosts: settings.extra_blocked_hosts.join('\n'),
     usdCnyRate: settings.usd_cny_rate,
     fxAutoSync: settings.fx_auto_sync,
@@ -94,6 +98,8 @@ export function formToSettings(
   if (failures === null) errors.defaultCooldownFailures = '1～100 次'
   const cooldown = integerIn(form.defaultCooldownSeconds, 10, 86400)
   if (cooldown === null) errors.defaultCooldownSeconds = '10～86400 秒'
+  const inflight = integerIn(form.accountMaxInflightCalls, 0, 1000)
+  if (inflight === null) errors.accountMaxInflightCalls = '0～1000，0 表示不限'
   const hosts = [
     ...new Set(
       form.extraBlockedHosts
@@ -120,6 +126,7 @@ export function formToSettings(
       default_total_timeout_ms: total! * 1000,
       default_cooldown_failures: failures!,
       default_cooldown_seconds: cooldown!,
+      account_max_inflight_calls: inflight!,
       extra_blocked_hosts: hosts,
       usd_cny_rate: rate,
       fx_auto_sync: form.fxAutoSync,

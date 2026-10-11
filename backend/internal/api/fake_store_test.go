@@ -52,7 +52,7 @@ func newFakeStore() *fakeStore {
 		models:   map[string]catalog.Model{},
 		settings: settings.Settings{
 			FeeRateNano: 1_000_000, C2CPaymentTimeoutMinutes: 30, DefaultMaxAttempts: 3, DefaultTTFTTimeoutMS: 30000,
-			DefaultTotalTimeoutMS: 600000, DefaultCooldownFailures: 3, DefaultCooldownSeconds: 300, ExtraBlockedHosts: []string{},
+			DefaultTotalTimeoutMS: 600000, DefaultCooldownFailures: 3, DefaultCooldownSeconds: 300, AccountMaxInflightCalls: 20, ExtraBlockedHosts: []string{},
 			USDCNYRateNano: 6_800_000_000, FXSyncMinute: 570, USDCNYRateSource: settings.RateSourceManual,
 		},
 	}

@@ -1,7 +1,7 @@
 // Package settings holds the single-row platform settings: fee rate, C2C
 // payment timeout, default credit limit, the USD/CNY exchange rate of USD
-// models and the gateway defaults that channels and routes inherit when they
-// leave an advanced field empty.
+// models, the per-account cap on calls in flight and the gateway defaults that
+// channels and routes inherit when they leave an advanced field empty.
 package settings
 
 import (
@@ -17,6 +17,10 @@ var ErrInvalidInput = errors.New("invalid settings")
 
 // MaxExtraBlockedHosts bounds the administrator-managed egress block list.
 const MaxExtraBlockedHosts = 100
+
+// MaxAccountInflightCalls is the largest allowed per-account in-flight cap, as
+// in the database.
+const MaxAccountInflightCalls = 1000
 
 // Bounds of the USD/CNY rate (nano units, 1e9 = 1), as in the database.
 const (
@@ -39,7 +43,10 @@ type Settings struct {
 	DefaultTotalTimeoutMS    int32
 	DefaultCooldownFailures  int32
 	DefaultCooldownSeconds   int32
-	ExtraBlockedHosts        []string
+	// AccountMaxInflightCalls is how many gateway calls one account may have
+	// in flight at once (ADR-0035 rule 2); 0 means unlimited.
+	AccountMaxInflightCalls int32
+	ExtraBlockedHosts       []string
 	// USDCNYRateNano converts USD model prices into points (1e9 = 1 CNY per USD).
 	USDCNYRateNano int64
 	// FXAutoSync fetches the rate once a day after FXSyncMinute (minute of the
@@ -121,6 +128,7 @@ func Validate(value Settings) error {
 		value.DefaultTotalTimeoutMS < value.DefaultTTFTTimeoutMS,
 		value.DefaultCooldownFailures < 1 || value.DefaultCooldownFailures > 100,
 		value.DefaultCooldownSeconds < 10 || value.DefaultCooldownSeconds > 86400,
+		value.AccountMaxInflightCalls < 0 || value.AccountMaxInflightCalls > MaxAccountInflightCalls,
 		value.USDCNYRateNano < MinUSDCNYRateNano || value.USDCNYRateNano > MaxUSDCNYRateNano,
 		value.FXSyncMinute < 0 || value.FXSyncMinute > 1439,
 		len(value.ExtraBlockedHosts) > MaxExtraBlockedHosts:

@@ -21,6 +21,7 @@ type settingsJSON struct {
 	DefaultTotalTimeoutMS    int32      `json:"default_total_timeout_ms"`
 	DefaultCooldownFailures  int32      `json:"default_cooldown_failures"`
 	DefaultCooldownSeconds   int32      `json:"default_cooldown_seconds"`
+	AccountMaxInflightCalls  int32      `json:"account_max_inflight_calls"`
 	ExtraBlockedHosts        []string   `json:"extra_blocked_hosts"`
 	USDCNYRate               string     `json:"usd_cny_rate"`
 	FXAutoSync               bool       `json:"fx_auto_sync"`
@@ -51,6 +52,7 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 		DefaultTotalTimeoutMS:    value.DefaultTotalTimeoutMS,
 		DefaultCooldownFailures:  value.DefaultCooldownFailures,
 		DefaultCooldownSeconds:   value.DefaultCooldownSeconds,
+		AccountMaxInflightCalls:  value.AccountMaxInflightCalls,
 		ExtraBlockedHosts:        hosts,
 		USDCNYRate:               money.FromNano(value.USDCNYRateNano).String(),
 		FXAutoSync:               value.FXAutoSync,
@@ -82,6 +84,7 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultTotalTimeoutMS    *int32    `json:"default_total_timeout_ms"`
 		DefaultCooldownFailures  *int32    `json:"default_cooldown_failures"`
 		DefaultCooldownSeconds   *int32    `json:"default_cooldown_seconds"`
+		AccountMaxInflightCalls  *int32    `json:"account_max_inflight_calls"`
 		ExtraBlockedHosts        *[]string `json:"extra_blocked_hosts"`
 		USDCNYRate               *string   `json:"usd_cny_rate"`
 		FXAutoSync               *bool     `json:"fx_auto_sync"`
@@ -93,7 +96,8 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.FeeRateNano == nil || request.C2CPaymentTimeoutMinutes == nil || request.DefaultCreditLimit == nil ||
 		request.DefaultMaxAttempts == nil || request.DefaultTTFTTimeoutMS == nil || request.DefaultTotalTimeoutMS == nil ||
-		request.DefaultCooldownFailures == nil || request.DefaultCooldownSeconds == nil || request.ExtraBlockedHosts == nil ||
+		request.DefaultCooldownFailures == nil || request.DefaultCooldownSeconds == nil || request.AccountMaxInflightCalls == nil ||
+		request.ExtraBlockedHosts == nil ||
 		request.USDCNYRate == nil || request.FXAutoSync == nil || request.FXSyncMinute == nil {
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请提交全部设置项")
 		return
@@ -113,8 +117,8 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultCreditLimit: creditLimit, DefaultMaxAttempts: *request.DefaultMaxAttempts,
 		DefaultTTFTTimeoutMS: *request.DefaultTTFTTimeoutMS, DefaultTotalTimeoutMS: *request.DefaultTotalTimeoutMS,
 		DefaultCooldownFailures: *request.DefaultCooldownFailures, DefaultCooldownSeconds: *request.DefaultCooldownSeconds,
-		ExtraBlockedHosts: *request.ExtraBlockedHosts,
-		USDCNYRateNano:    rate.Nano(), FXAutoSync: *request.FXAutoSync, FXSyncMinute: *request.FXSyncMinute,
+		AccountMaxInflightCalls: *request.AccountMaxInflightCalls, ExtraBlockedHosts: *request.ExtraBlockedHosts,
+		USDCNYRateNano: rate.Nano(), FXAutoSync: *request.FXAutoSync, FXSyncMinute: *request.FXSyncMinute,
 	})
 	if err != nil {
 		writeDomainError(w, err)
