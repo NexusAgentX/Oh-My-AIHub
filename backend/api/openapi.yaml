@@ -3637,7 +3637,8 @@ components:
           type: array
           items: {$ref: '#/components/schemas/Format'}
         online_channels: {type: integer}
-      required: [id, display_name, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels]
+        custom: {type: boolean, description: 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。}
+      required: [id, display_name, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels, custom]
       additionalProperties: false
     CatalogModelList:
       type: object
@@ -3915,7 +3916,23 @@ components:
           description: 键为格式。
         enabled: {type: boolean}
         current_prices: {$ref: '#/components/schemas/EffectivePrices'}
-      required: [model_id, display_name, upstream_model, price_currency, multiplier, fx_discount, effective_multiplier, formats, format_tests, enabled, current_prices]
+        custom_prices:
+          anyOf:
+          - {$ref: '#/components/schemas/CustomPrices'}
+          - {type: 'null'}
+          description: 自定义模型（不在模型目录中）的四个积分价；官方模型为 null。
+        pending_multiplier: {type: boolean, description: 原自定义模型已加入模型目录，停用中；渠道主设置倍率并启用后恢复。}
+      required: [model_id, display_name, upstream_model, price_currency, multiplier, fx_discount, effective_multiplier, formats, format_tests, enabled, current_prices, custom_prices, pending_multiplier]
+      additionalProperties: false
+    CustomPrices:
+      type: object
+      description: 自定义模型的四个基准价（积分/百万 token），按此价格直接计费，不乘倍率、不乘汇率、无条件价格档。
+      properties:
+        input: {$ref: '#/components/schemas/Price'}
+        output: {$ref: '#/components/schemas/Price'}
+        cache_write: {$ref: '#/components/schemas/Price'}
+        cache_read: {$ref: '#/components/schemas/Price'}
+      required: [input, output, cache_write, cache_read]
       additionalProperties: false
     ChannelModelInput:
       type: object
@@ -3929,6 +3946,10 @@ components:
           items: {$ref: '#/components/schemas/Format'}
           minItems: 1
         enabled: {type: boolean}
+        custom_prices:
+          allOf:
+          - {$ref: '#/components/schemas/CustomPrices'}
+          description: 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。
       required: [model_id, formats]
       additionalProperties: false
     ChannelToday:
@@ -3981,7 +4002,7 @@ components:
         id: {type: string}
         kind:
           type: string
-          enum: [cooldown_started, cooldown_ended, limit_reached, suspended, unsuspended, listed, unlisted, test_failed]
+          enum: [cooldown_started, cooldown_ended, limit_reached, suspended, unsuspended, listed, unlisted, test_failed, model_pending_multiplier]
         reason: {type: string}
         created_at: {$ref: '#/components/schemas/Timestamp'}
       required: [id, kind, reason, created_at]

@@ -80,7 +80,13 @@ func toChannel(row GetChannelRow) channel.Channel {
 func toModel(row ChannelModel) channel.Model {
 	model := channel.Model{
 		ModelID: row.ModelID, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
-		Enabled: row.Enabled, FormatTests: map[channel.Format]channel.FormatTest{},
+		Enabled: row.Enabled, FormatTests: map[channel.Format]channel.FormatTest{}, PendingMultiplier: row.PendingMultiplier,
+	}
+	if row.IsCustom {
+		model.Custom = &channel.CustomPrices{
+			Input: deref(row.CustomInputPriceNanoPerMillion), Output: deref(row.CustomOutputPriceNanoPerMillion),
+			CacheWrite: deref(row.CustomCacheWritePriceNanoPerMillion), CacheRead: deref(row.CustomCacheReadPriceNanoPerMillion),
+		}
 	}
 	for _, format := range row.Formats {
 		model.Formats = append(model.Formats, channel.Format(format))
@@ -92,6 +98,13 @@ func toModel(row ChannelModel) channel.Model {
 		}
 	}
 	return model
+}
+
+func deref(amount *money.Amount) money.Amount {
+	if amount == nil {
+		return 0
+	}
+	return *amount
 }
 
 func formatStrings(formats []channel.Format) []string {
@@ -173,11 +186,43 @@ func insertModels(ctx context.Context, q *Queries, channelID string, models []ch
 		if err != nil {
 			return err
 		}
-		if err := q.InsertChannelModel(ctx, InsertChannelModelParams{
+		params := InsertChannelModelParams{
 			ChannelID: channelID, ModelID: model.ModelID, UpstreamModel: model.UpstreamModel, MultiplierNano: model.MultiplierNano,
 			Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
-		}); err != nil {
+			PendingMultiplier: model.PendingMultiplier,
+		}
+		if prices := model.Custom; prices != nil {
+			params.IsCustom = true
+			params.CustomInputPriceNanoPerMillion, params.CustomOutputPriceNanoPerMillion = &prices.Input, &prices.Output
+			params.CustomCacheWritePriceNanoPerMillion, params.CustomCacheReadPriceNanoPerMillion = &prices.CacheWrite, &prices.CacheRead
+		}
+		if err := q.InsertChannelModel(ctx, params); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// lockCustomNames takes the model name lock of every custom model (in name
+// order) and rejects names the catalog gained after the service checked them.
+func lockCustomNames(ctx context.Context, q *Queries, models []channel.Model) error {
+	var names []string
+	for _, model := range models {
+		if model.Custom != nil {
+			names = append(names, model.ModelID)
+		}
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		if err := q.LockModelName(ctx, name); err != nil {
+			return err
+		}
+		exists, err := q.CatalogModelExists(ctx, name)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return channel.ErrModelNameTaken
 		}
 	}
 	return nil
@@ -199,6 +244,9 @@ func (s *Store) Create(ctx context.Context, in channel.NewChannel) (channel.Chan
 			TtftTimeoutMs: in.Advanced.TTFTTimeoutMS, TotalTimeoutMs: in.Advanced.TotalTimeoutMS,
 			CooldownFailures: in.Advanced.CooldownFailures, CooldownSeconds: in.Advanced.CooldownSeconds,
 		}); err != nil {
+			return err
+		}
+		if err := lockCustomNames(ctx, q, in.Models); err != nil {
 			return err
 		}
 		if err := insertModels(ctx, q, in.ID, in.Models, nil); err != nil {
@@ -305,6 +353,9 @@ func (s *Store) Update(ctx context.Context, id string, update channel.Update) (c
 			}
 		}
 		if update.Models != nil {
+			if err := lockCustomNames(ctx, q, *update.Models); err != nil {
+				return err
+			}
 			existing, err := q.ListModelsOfChannels(ctx, []string{id})
 			if err != nil {
 				return err
@@ -477,4 +528,10 @@ func (s *Store) moderate(ctx context.Context, actorID, id, reason string, suspen
 		return err
 	})
 	return updated, err
+}
+
+// CustomModelNames lists the custom model names of the channels that are not
+// deleted (ADR-0034).
+func (s *Store) CustomModelNames(ctx context.Context) ([]string, error) {
+	return s.q.ListCustomModelNames(ctx)
 }

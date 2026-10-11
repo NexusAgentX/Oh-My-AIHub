@@ -12,6 +12,17 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
+const catalogModelExists = `-- name: CatalogModelExists :one
+SELECT EXISTS (SELECT 1 FROM models WHERE id = $1)
+`
+
+func (q *Queries) CatalogModelExists(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, catalogModelExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const channelTodayStats = `-- name: ChannelTodayStats :many
 SELECT final_channel_id AS channel_id,
        count(*)::bigint AS calls,
@@ -223,19 +234,28 @@ func (q *Queries) InsertChannelEvent(ctx context.Context, arg InsertChannelEvent
 }
 
 const insertChannelModel = `-- name: InsertChannelModel :exec
-INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO channel_models (
+    channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount,
+    is_custom, custom_input_price_nano_per_million, custom_output_price_nano_per_million,
+    custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 `
 
 type InsertChannelModelParams struct {
-	ChannelID      string
-	ModelID        string
-	UpstreamModel  string
-	MultiplierNano int64
-	Formats        []string
-	FormatTests    []byte
-	Enabled        bool
-	FxDiscount     bool
+	ChannelID                           string
+	ModelID                             string
+	UpstreamModel                       string
+	MultiplierNano                      int64
+	Formats                             []string
+	FormatTests                         []byte
+	Enabled                             bool
+	FxDiscount                          bool
+	IsCustom                            bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
+	PendingMultiplier                   bool
 }
 
 func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModelParams) error {
@@ -248,6 +268,12 @@ func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModel
 		arg.FormatTests,
 		arg.Enabled,
 		arg.FxDiscount,
+		arg.IsCustom,
+		arg.CustomInputPriceNanoPerMillion,
+		arg.CustomOutputPriceNanoPerMillion,
+		arg.CustomCacheWritePriceNanoPerMillion,
+		arg.CustomCacheReadPriceNanoPerMillion,
+		arg.PendingMultiplier,
 	)
 	return err
 }
@@ -389,8 +415,39 @@ func (q *Queries) ListChannelEvents(ctx context.Context, arg ListChannelEventsPa
 	return items, nil
 }
 
+const listCustomModelNames = `-- name: ListCustomModelNames :many
+SELECT DISTINCT cm.model_id
+FROM channel_models cm
+JOIN channels c ON c.id = cm.channel_id
+WHERE cm.is_custom AND c.deleted_at IS NULL
+ORDER BY cm.model_id
+`
+
+func (q *Queries) ListCustomModelNames(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listCustomModelNames)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var model_id string
+		if err := rows.Scan(&model_id); err != nil {
+			return nil, err
+		}
+		items = append(items, model_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listModelsOfChannels = `-- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million, cm.pending_multiplier,
+       cm.catalog_model_id
 FROM channel_models cm
 WHERE cm.channel_id = ANY($1::uuid[])
 ORDER BY cm.channel_id, cm.model_id
@@ -414,6 +471,13 @@ func (q *Queries) ListModelsOfChannels(ctx context.Context, channelIds []string)
 			&i.FormatTests,
 			&i.Enabled,
 			&i.FxDiscount,
+			&i.IsCustom,
+			&i.CustomInputPriceNanoPerMillion,
+			&i.CustomOutputPriceNanoPerMillion,
+			&i.CustomCacheWritePriceNanoPerMillion,
+			&i.CustomCacheReadPriceNanoPerMillion,
+			&i.PendingMultiplier,
+			&i.CatalogModelID,
 		); err != nil {
 			return nil, err
 		}
@@ -496,6 +560,17 @@ func (q *Queries) ListOwnerChannels(ctx context.Context, ownerID string) ([]List
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockModelName = `-- name: LockModelName :exec
+SELECT pg_advisory_xact_lock(hashtextextended('model_name:' || $1::text, 0))
+`
+
+// Serializes custom model names against catalog creation (catalogpg.CreateModel
+// takes the same lock) so a name is never both custom and official.
+func (q *Queries) LockModelName(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, lockModelName, modelID)
+	return err
 }
 
 const setChannelModelTests = `-- name: SetChannelModelTests :exec

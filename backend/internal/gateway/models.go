@@ -63,14 +63,22 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth) ([]listedMode
 		return nil, err
 	}
 	onlineSet := map[string]bool{}
-	for _, id := range online {
-		onlineSet[id] = true
-	}
 	display := map[string]string{}
 	var result []listedModel
+	allowed := func(id string) bool { return len(key.AllowedModels) == 0 || containsString(key.AllowedModels, id) }
+	for _, model := range online {
+		onlineSet[model.ID] = true
+		if model.Custom {
+			// Custom models (ADR-0034) are listed under their own name.
+			display[model.ID] = model.ID
+			if allowed(model.ID) {
+				result = append(result, listedModel{id: model.ID, display: model.ID})
+			}
+		}
+	}
 	for _, model := range catalogModels {
 		display[model.ID] = model.DisplayName
-		if !onlineSet[model.ID] || (len(key.AllowedModels) > 0 && !containsString(key.AllowedModels, model.ID)) {
+		if !onlineSet[model.ID] || !allowed(model.ID) {
 			continue
 		}
 		result = append(result, listedModel{id: model.ID, display: model.DisplayName})

@@ -414,6 +414,19 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	model, err := e.Catalog.Get(ctx, call.modelID)
+	if errors.Is(err, catalog.ErrNotFound) {
+		// A name outside the catalog may be a channel's custom model
+		// (ADR-0034); each candidate then carries its own prices.
+		custom, customErr := e.Store.CustomModelOnline(ctx, call.modelID)
+		if customErr != nil {
+			e.internalError(w, call, customErr)
+			return
+		}
+		if custom {
+			model = catalog.Model{ID: call.modelID, DisplayName: call.modelID, PriceCurrency: ledger.CurrencyCNY, Enabled: true}
+			err = nil
+		}
+	}
 	if errors.Is(err, catalog.ErrNotFound) || (err == nil && !model.Enabled) {
 		e.finishRejected(w, call, OutcomeRejectedModel, http.StatusNotFound, "model_not_found", "模型不存在或未启用")
 		return
@@ -474,7 +487,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	for index := range candidates {
-		candidates[index].RateNano = ledger.ChannelRate(model.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
+		pricing := candidates[index].PricingModel(model)
+		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
 	}
 	for _, candidate := range candidates {
 		if limits := EffectiveLimits(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
@@ -533,7 +547,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		case result.response != nil:
 			e.Runtime.Success(candidate.ChannelID)
-			e.streamBack(w, r, call, model, candidate, result, defaults)
+			e.streamBack(w, r, call, candidate.PricingModel(model), candidate, result, defaults)
 			release()
 			return
 		}
@@ -1068,6 +1082,7 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 		"fx_discount":          model.PriceCurrency == ledger.CurrencyUSD && candidate.FXDiscount,
 		"effective_multiplier": money.FromNano(ledger.EffectiveMultiplier(multiplierNano, candidate.RateNano, model.Rate(usdRateNano))).String(),
 		"fee_rate_nano":        feeRateNano,
+		"custom":               candidate.Custom != nil,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),

@@ -23,11 +23,13 @@ SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND sqlc.arg(format)::text = ANY(cm.formats)
+WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id;
 
@@ -80,21 +82,34 @@ UPDATE calls SET outcome = 'interrupted', completed_at = now()
 WHERE outcome = 'in_progress' AND created_at < $1;
 
 -- name: ListOnlineModels :many
-SELECT DISTINCT cm.model_id
+SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+GROUP BY cm.model_id
 ORDER BY cm.model_id;
+
+-- name: CustomModelOnline :one
+SELECT EXISTS (
+    SELECT 1
+    FROM channel_models cm
+    JOIN channels c ON c.id = cm.channel_id
+    JOIN accounts a ON a.id = c.owner_id
+    WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
+      AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+);
 
 -- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
        cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.cooldown_failures, c.cooldown_seconds
+       c.cooldown_failures, c.cooldown_seconds,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
 -- name: HomeToday :one

@@ -77,6 +77,24 @@ func (q *Queries) ChannelStats24h(ctx context.Context) ([]ChannelStats24hRow, er
 	return items, nil
 }
 
+const customModelOnline = `-- name: CustomModelOnline :one
+SELECT EXISTS (
+    SELECT 1
+    FROM channel_models cm
+    JOIN channels c ON c.id = cm.channel_id
+    JOIN accounts a ON a.id = c.owner_id
+    WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
+      AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+)
+`
+
+func (q *Queries) CustomModelOnline(ctx context.Context, modelID string) (bool, error) {
+	row := q.db.QueryRow(ctx, customModelOnline, modelID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const finishCall = `-- name: FinishCall :execrows
 UPDATE calls SET
     outcome = $1, model_id = $2, final_channel_id = $3,
@@ -283,11 +301,13 @@ const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND $2::text = ANY(cm.formats)
+WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(cm.formats)
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id
 `
@@ -298,25 +318,30 @@ type ListCandidatesParams struct {
 }
 
 type ListCandidatesRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	BaseUrl             string
-	ApiKeyCiphertext    []byte
-	ApiKeyNonce         []byte
-	ApiKeyKeyID         string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	TotalTimeoutMs      *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	UpstreamModel       string
-	MultiplierNano      int64
-	FxDiscount          bool
+	ID                                  string
+	OwnerID                             string
+	Name                                string
+	BaseUrl                             string
+	ApiKeyCiphertext                    []byte
+	ApiKeyNonce                         []byte
+	ApiKeyKeyID                         string
+	UserAgent                           *string
+	HeaderRules                         []byte
+	ConcurrencyLimit                    *int32
+	RpmLimit                            *int32
+	DailyRevenueCapNano                 *money.Amount
+	TtftTimeoutMs                       *int32
+	TotalTimeoutMs                      *int32
+	CooldownFailures                    *int32
+	CooldownSeconds                     *int32
+	UpstreamModel                       string
+	MultiplierNano                      int64
+	FxDiscount                          bool
+	IsCustom                            bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
 }
 
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
@@ -348,6 +373,11 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.UpstreamModel,
 			&i.MultiplierNano,
 			&i.FxDiscount,
+			&i.IsCustom,
+			&i.CustomInputPriceNanoPerMillion,
+			&i.CustomOutputPriceNanoPerMillion,
+			&i.CustomCacheWritePriceNanoPerMillion,
+			&i.CustomCacheReadPriceNanoPerMillion,
 		); err != nil {
 			return nil, err
 		}
@@ -362,28 +392,35 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
        cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.cooldown_failures, c.cooldown_seconds
+       c.cooldown_failures, c.cooldown_seconds,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id
 `
 
 type ListOnlineChannelModelsRow struct {
-	ModelID             string
-	ChannelID           string
-	ChannelName         string
-	OwnerID             string
-	OwnerName           string
-	Formats             []string
-	MultiplierNano      int64
-	FxDiscount          bool
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
+	ModelID                             string
+	ChannelID                           string
+	ChannelName                         string
+	OwnerID                             string
+	OwnerName                           string
+	Formats                             []string
+	MultiplierNano                      int64
+	FxDiscount                          bool
+	ConcurrencyLimit                    *int32
+	RpmLimit                            *int32
+	DailyRevenueCapNano                 *money.Amount
+	CooldownFailures                    *int32
+	CooldownSeconds                     *int32
+	IsCustom                            bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
 }
 
 func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChannelModelsRow, error) {
@@ -409,6 +446,11 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 			&i.DailyRevenueCapNano,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
+			&i.IsCustom,
+			&i.CustomInputPriceNanoPerMillion,
+			&i.CustomOutputPriceNanoPerMillion,
+			&i.CustomCacheWritePriceNanoPerMillion,
+			&i.CustomCacheReadPriceNanoPerMillion,
 		); err != nil {
 			return nil, err
 		}
@@ -421,27 +463,33 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 }
 
 const listOnlineModels = `-- name: ListOnlineModels :many
-SELECT DISTINCT cm.model_id
+SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+GROUP BY cm.model_id
 ORDER BY cm.model_id
 `
 
-func (q *Queries) ListOnlineModels(ctx context.Context) ([]string, error) {
+type ListOnlineModelsRow struct {
+	ModelID string
+	Custom  bool
+}
+
+func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, error) {
 	rows, err := q.db.Query(ctx, listOnlineModels)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []ListOnlineModelsRow
 	for rows.Next() {
-		var model_id string
-		if err := rows.Scan(&model_id); err != nil {
+		var i ListOnlineModelsRow
+		if err := rows.Scan(&i.ModelID, &i.Custom); err != nil {
 			return nil, err
 		}
-		items = append(items, model_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

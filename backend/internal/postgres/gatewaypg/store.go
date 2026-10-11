@@ -99,6 +99,8 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 			ChannelID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseURL: row.BaseUrl, UpstreamModel: row.UpstreamModel,
 			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount, Advanced: advanced,
 			Credential: channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
+			Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
+				row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
 		})
 	}
 	return candidates, nil
@@ -218,8 +220,33 @@ func (s *Store) RecordChannelEvent(ctx context.Context, channelID, kind, reason 
 	return channelpg.RecordEvent(ctx, s.pool, channelID, kind, reason)
 }
 
-func (s *Store) OnlineModels(ctx context.Context) ([]string, error) {
-	return s.q.ListOnlineModels(ctx)
+func customPrices(custom bool, input, output, cacheWrite, cacheRead *money.Amount) *channel.CustomPrices {
+	if !custom {
+		return nil
+	}
+	value := func(amount *money.Amount) money.Amount {
+		if amount == nil {
+			return 0
+		}
+		return *amount
+	}
+	return &channel.CustomPrices{Input: value(input), Output: value(output), CacheWrite: value(cacheWrite), CacheRead: value(cacheRead)}
+}
+
+func (s *Store) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, error) {
+	rows, err := s.q.ListOnlineModels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]gateway.OnlineModel, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, gateway.OnlineModel{ID: row.ModelID, Custom: row.Custom})
+	}
+	return result, nil
+}
+
+func (s *Store) CustomModelOnline(ctx context.Context, modelID string) (bool, error) {
+	return s.q.CustomModelOnline(ctx, modelID)
 }
 
 func (s *Store) OnlineChannels(ctx context.Context) ([]gateway.OnlineChannel, error) {
@@ -236,6 +263,8 @@ func (s *Store) OnlineChannels(ctx context.Context) ([]gateway.OnlineChannel, er
 				ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
 				CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
 			},
+			Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
+				row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
 		}
 		for _, format := range row.Formats {
 			online.Formats = append(online.Formats, channel.Format(format))
