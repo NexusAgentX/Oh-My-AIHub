@@ -53,6 +53,8 @@ const endReasonLabels: Record<string, string> = {
   timeout_total: '总超时',
   client_disconnected: '客户端断开',
   connect_error: '连接失败',
+  client_error: '请求错误',
+  interrupted: '中断',
 }
 
 export function endReasonLabel(reason: string) {
