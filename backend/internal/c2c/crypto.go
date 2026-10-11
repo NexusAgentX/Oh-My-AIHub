@@ -88,6 +88,14 @@ func (k *Keyring) Decrypt(recordID, purpose string, encrypted EncryptedValue) ([
 	return plaintext, nil
 }
 
+// VerifyPaymentMethods decrypts one order's sealed payment methods with the
+// same purpose and record binding as the service and discards the plaintext.
+// The startup keyring check uses it to prove the order can still be opened.
+func (k *Keyring) VerifyPaymentMethods(stored StoredMethods) error {
+	_, err := k.Decrypt(stored.OrderID, paymentMethodsPurpose, stored.Sealed)
+	return err
+}
+
 func newAEAD(key []byte) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {

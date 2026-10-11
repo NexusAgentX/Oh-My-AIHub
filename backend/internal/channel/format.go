@@ -31,6 +31,14 @@ type EncryptedCredential struct {
 	Ciphertext []byte
 }
 
+// StoredCredential is a sealed credential together with the ID of the record
+// it is bound to (a channel or a platform API key), as the startup keyring
+// check reads it back from the database.
+type StoredCredential struct {
+	RecordID string
+	Sealed   EncryptedCredential
+}
+
 func validCredential(value string) bool {
 	if value == "" || len([]byte(value)) > 8192 {
 		return false
