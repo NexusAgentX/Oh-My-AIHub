@@ -4741,7 +4741,7 @@ components:
       minProperties: 1
     AdjustRequest:
       type: object
-      description: amount 非零：正数加、负数减，对手方为平台收入账户。
+      description: amount 非零：正数加、负数减，对手方为平台账户（系统账户 platform_revenue）。
       properties:
         amount: {$ref: '#/components/schemas/Amount'}
         reason: {type: string, minLength: 1, maxLength: 500}
@@ -4970,20 +4970,22 @@ components:
       additionalProperties: false
     AdminPointsBalances:
       type: object
-      description: user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_revenue 为平台收入；bad_debt 为已核销坏账。
+      description: user_positive + user_negative + c2c_escrow + platform_account + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_account 为平台账户（系统账户 platform_revenue）的余额，等于 platform_revenue − admin_adjustments，只用于核对等式；bad_debt 为已核销坏账。
       properties:
         user_positive: {$ref: '#/components/schemas/Amount'}
         user_negative: {$ref: '#/components/schemas/Amount'}
         credit_issued: {$ref: '#/components/schemas/Amount'}
         c2c_escrow: {$ref: '#/components/schemas/Amount'}
-        platform_revenue: {$ref: '#/components/schemas/Amount'}
+        platform_revenue: {$ref: '#/components/schemas/Amount', description: 平台收入：累计手续费，即 api_call 交易中记入平台账户的分录之和，不含管理员调账。}
+        admin_adjustments: {$ref: '#/components/schemas/Amount', description: 管理员调账净额：admin_adjust 交易对用户账户的净额合计，正数表示平台向用户发放，负数表示扣回。}
+        platform_account: {$ref: '#/components/schemas/Amount', description: 平台账户余额（系统账户 platform_revenue），等于平台收入减去管理员调账净额；负数表示发放超过手续费收入。}
         bad_debt: {$ref: '#/components/schemas/Amount'}
         total: {$ref: '#/components/schemas/Amount'}
         total_credit_limit: {$ref: '#/components/schemas/Amount', description: 总信用额度：全部用户信用额度合计。}
         bad_debt_writeoffs: {type: integer, description: 已核销坏账笔数。}
         escrow_orders: {type: integer, description: 托管中的卖单数（available 或 in_trade 大于 0）。}
         escrow_trades_in_progress: {type: integer, description: 托管中进行中的交易笔数（待付款、已付款、申诉中）。}
-      required: [user_positive, user_negative, credit_issued, c2c_escrow, platform_revenue, bad_debt, total, total_credit_limit, bad_debt_writeoffs, escrow_orders, escrow_trades_in_progress]
+      required: [user_positive, user_negative, credit_issued, c2c_escrow, platform_revenue, admin_adjustments, platform_account, bad_debt, total, total_credit_limit, bad_debt_writeoffs, escrow_orders, escrow_trades_in_progress]
       additionalProperties: false
     AdminPointsRisk:
       type: object
@@ -5010,14 +5012,15 @@ components:
               date: {$ref: '#/components/schemas/Date'}
               circulation: {$ref: '#/components/schemas/Amount', description: 当日期末流通积分（用户正余额合计）。}
               credit_issued: {$ref: '#/components/schemas/Amount', description: 当日期末信用发行（用户负余额合计的绝对值）。}
-              platform_revenue: {$ref: '#/components/schemas/Amount'}
+              platform_revenue: {$ref: '#/components/schemas/Amount', description: 截至当日期末的累计手续费（平台收入）。}
+              admin_adjustments: {$ref: '#/components/schemas/Amount', description: 截至当日期末的管理员调账净额累计（正数表示平台向用户发放）。}
               bad_debt: {$ref: '#/components/schemas/Amount'}
               c2c_escrow: {$ref: '#/components/schemas/Amount'}
               api_volume: {$ref: '#/components/schemas/Amount', description: 当日 API 结算量（调用费用 + 手续费）。}
               api_fee: {$ref: '#/components/schemas/Amount', description: 当日 API 手续费收入。}
               c2c_volume: {$ref: '#/components/schemas/Amount', description: 当日 C2C 成交积分数量（放行或判给买家）。}
               c2c_avg_price_fen: {type: [number, 'null'], description: 当日 C2C 成交均价（分/积分，按数量加权）；无成交为 null。}
-            required: [date, circulation, credit_issued, platform_revenue, bad_debt, c2c_escrow, api_volume, api_fee, c2c_volume, c2c_avg_price_fen]
+            required: [date, circulation, credit_issued, platform_revenue, admin_adjustments, bad_debt, c2c_escrow, api_volume, api_fee, c2c_volume, c2c_avg_price_fen]
             additionalProperties: false
         risks:
           type: array

@@ -6,10 +6,11 @@ export type EquationTerm = { label: string; value: string; note?: string }
 
 /**
  * 天平等式：每个账户按余额符号归边，左侧是负余额（取绝对值），右侧是正余额，两侧相等即账本合计为 0。
- * 用户拆成信用发行（负）与流通（正）；坏账恒在左、托管恒在右；平台收入为负（调账净支出）时移到左侧。
+ * 用户拆成信用发行（负）与流通（正）；坏账恒在左、托管恒在右；平台账户（余额 = 手续费收入 − 调账净额）
+ * 为负（调账发放超过手续费）时移到左侧。这里是账户余额的核对视图，不是平台收入。
  */
 export function ledgerEquation(balances: AdminPointsBalances) {
-  const revenue = parseNanoPoints(balances.platform_revenue)
+  const account = parseNanoPoints(balances.platform_account)
   const left: EquationTerm[] = [
     { label: '信用发行', value: absolute(balances.user_negative) },
     { label: '坏账', value: absolute(balances.bad_debt) },
@@ -18,8 +19,8 @@ export function ledgerEquation(balances: AdminPointsBalances) {
     { label: '流通积分', value: balances.user_positive },
     { label: 'C2C 托管', value: balances.c2c_escrow },
   ]
-  if (revenue < 0n) left.push({ label: '平台收入', value: absolute(balances.platform_revenue), note: '净支出' })
-  else right.push({ label: '平台收入', value: balances.platform_revenue })
+  if (account < 0n) left.push({ label: '平台账户', value: absolute(balances.platform_account), note: '净支出' })
+  else right.push({ label: '平台账户', value: balances.platform_account })
   return { left, right, total: balances.total, balanced: parseNanoPoints(balances.total) === 0n }
 }
 

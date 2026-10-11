@@ -361,20 +361,30 @@ type LedgerAccountRef struct {
 }
 
 type Balances struct {
-	UserPositive, UserNegative, Escrow, PlatformRevenue, BadDebt, Total money.Amount
-	TotalCreditLimit                                                    money.Amount
-	WriteOffs, EscrowOrders, EscrowTradesInProgress                     int64
+	UserPositive, UserNegative, Escrow, PlatformAccount, BadDebt, Total money.Amount
+	// PlatformRevenue is the cumulative platform fee: the entries api_call
+	// transactions book to the platform account. Administrator adjustments
+	// use the same account as counterparty, so they are not part of it.
+	PlatformRevenue money.Amount
+	// AdminAdjustments is the net of admin_adjust transactions on user
+	// accounts; positive means the platform issued points to users.
+	AdminAdjustments                                money.Amount
+	TotalCreditLimit                                money.Amount
+	WriteOffs, EscrowOrders, EscrowTradesInProgress int64
 }
 
 // CreditIssued is the absolute value of the users' negative balances.
 func (b Balances) CreditIssued() money.Amount { return money.FromNano(-b.UserNegative.Nano()) }
 
+// DayStat is one day of the global trend. PlatformRevenue and AdminAdjustments
+// are cumulative to the end of the day, like the balances beside them.
 type DayStat struct {
-	Day                              string
-	Circulation, CreditIssued        money.Amount
-	PlatformRevenue, BadDebt, Escrow money.Amount
-	APIVolume, APIFee, C2CVolume     money.Amount
-	C2CAvgPriceFen                   *float64
+	Day                               string
+	Circulation, CreditIssued         money.Amount
+	PlatformRevenue, AdminAdjustments money.Amount
+	BadDebt, Escrow                   money.Amount
+	APIVolume, APIFee, C2CVolume      money.Amount
+	C2CAvgPriceFen                    *float64
 }
 
 type Risk struct {

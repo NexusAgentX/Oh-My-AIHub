@@ -51,6 +51,10 @@ type TrendInputs struct {
 		Volume   money.Amount
 		TotalFen int64
 	}
+	// OpeningFee and OpeningAdjustments are the cumulative platform fee and
+	// admin adjustment net before the window; AdjustmentDaily maps day -> net.
+	OpeningFee, OpeningAdjustments money.Amount
+	AdjustmentDaily                map[string]money.Amount
 }
 
 // OverviewInputs are the call and C2C windows of the overview.
@@ -531,10 +535,14 @@ func buildTrend(inputs TrendInputs, first, now time.Time) []DayStat {
 		balances[account.ID] = account.Balance
 	}
 	stats := make([]DayStat, 0)
+	revenue, adjustments := inputs.OpeningFee, inputs.OpeningAdjustments
 	for day := first; !day.After(now); day = day.AddDate(0, 0, 1) {
 		key := day.In(localtime.Zone).Format("2006-01-02")
 		var stat DayStat
 		stat.Day = key
+		revenue += inputs.APIDaily[key].Fee
+		adjustments += inputs.AdjustmentDaily[key]
+		stat.PlatformRevenue, stat.AdminAdjustments = revenue, adjustments
 		for _, account := range inputs.Accounts {
 			balance := balances[account.ID] + inputs.Nets[account.ID][key]
 			balances[account.ID] = balance
@@ -545,8 +553,6 @@ func buildTrend(inputs TrendInputs, first, now time.Time) []DayStat {
 				stat.CreditIssued += -balance
 			case account.SystemCode == "c2c_escrow":
 				stat.Escrow = balance
-			case account.SystemCode == "platform_revenue":
-				stat.PlatformRevenue = balance
 			case account.SystemCode == "bad_debt":
 				stat.BadDebt = balance
 			}

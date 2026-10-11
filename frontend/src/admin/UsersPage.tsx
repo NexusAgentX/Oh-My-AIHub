@@ -295,8 +295,8 @@ function UserDrawerBody({
           <p>
             给 <strong>{account.display_name}</strong> {normalizedAmount.startsWith('-') ? '扣减' : '增加'}{' '}
             <strong className="num">{normalizedAmount.replace(/^-/, '')}</strong> 积分，同时
-            {normalizedAmount.startsWith('-') ? '增加' : '减少'}「平台收入账户」余额{' '}
-            <strong className="num">{normalizedAmount.replace(/^-/, '')}</strong> 积分。
+            {normalizedAmount.startsWith('-') ? '增加' : '减少'}「平台账户」余额{' '}
+            <strong className="num">{normalizedAmount.replace(/^-/, '')}</strong> 积分。调账单独列示，不计入平台收入。
           </p>
         }
         title="调账"
@@ -307,7 +307,7 @@ function UserDrawerBody({
         }
       >
         <TextField
-          hint="正数增加用户积分，等额减少「平台收入账户」余额；负数扣减用户积分，等额增加该账户余额。"
+          hint="正数增加用户积分，等额减少「平台账户」余额；负数扣减用户积分，等额增加该账户余额。调账单独列示，不计入平台收入。"
           inputMode="decimal"
           label="金额（积分）"
           onChange={(event) => setAmount(event.target.value)}

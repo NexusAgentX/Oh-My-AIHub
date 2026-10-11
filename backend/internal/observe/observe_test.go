@@ -236,6 +236,8 @@ func TestBuildTrendAccumulatesBalancesPerDay(t *testing.T) {
 			Volume   money.Amount
 			TotalFen int64
 		}{"2026-10-08": {amount(2_000_000_000), 184}},
+		OpeningFee: amount(5), OpeningAdjustments: amount(20),
+		AdjustmentDaily: map[string]money.Amount{"2026-10-06": amount(10), "2026-10-08": amount(-4)},
 	}
 	trend := buildTrend(inputs, first, now)
 	if len(trend) != 3 {
@@ -250,6 +252,12 @@ func TestBuildTrendAccumulatesBalancesPerDay(t *testing.T) {
 	}
 	if day3.Circulation != 0 || day3.CreditIssued != amount(30) || day3.C2CVolume != amount(2_000_000_000) || day3.C2CAvgPriceFen == nil || *day3.C2CAvgPriceFen != 92 {
 		t.Fatalf("day3 = %+v", day3)
+	}
+	// Revenue (fees) and administrator adjustments are cumulative from their openings and never mix.
+	for index, want := range []struct{ revenue, adjustments money.Amount }{{amount(5), amount(30)}, {amount(8), amount(30)}, {amount(8), amount(26)}} {
+		if trend[index].PlatformRevenue != want.revenue || trend[index].AdminAdjustments != want.adjustments {
+			t.Fatalf("day %d revenue %v adjustments %v, want %v %v", index+1, trend[index].PlatformRevenue, trend[index].AdminAdjustments, want.revenue, want.adjustments)
+		}
 	}
 }
 

@@ -70,11 +70,11 @@ function EquationSide({ terms }: { terms: EquationTerm[] }) {
   ))
 }
 
-function Figures({ points }: { points: AdminPoints }) {
+export function Figures({ points }: { points: AdminPoints }) {
   const { balances } = points
   return (
     <>
-      <section aria-label="积分全局" className="metric-grid metric-grid-five">
+      <section aria-label="积分全局" className="metric-grid metric-grid-six">
         <Metric label="流通积分" tone="accent" value={formatPoints(balances.user_positive)} hint="用户正余额合计" />
         <Metric
           label="信用发行"
@@ -86,7 +86,8 @@ function Figures({ points }: { points: AdminPoints }) {
           value={formatPoints(balances.c2c_escrow)}
           hint={`卖单 ${balances.escrow_orders} · 交易中 ${balances.escrow_trades_in_progress}`}
         />
-        <Metric label="平台收入" value={formatPoints(balances.platform_revenue)} />
+        <Metric label="平台收入" value={formatPoints(balances.platform_revenue)} hint="累计手续费" />
+        <Metric label="管理员调账净额" value={formatPoints(balances.admin_adjustments)} hint="发放减去扣回" />
         <Metric label="坏账" value={formatPoints(balances.bad_debt)} hint={`已核销 ${balances.bad_debt_writeoffs} 笔`} />
       </section>
       <LedgerEquation balances={balances} />
@@ -97,10 +98,11 @@ function Figures({ points }: { points: AdminPoints }) {
 type TrendPoint = AdminPoints['trend'][number]
 type TrendSeries = { key: string; label: string; color: string; value: (point: TrendPoint) => number | null }
 
-const amount = (key: 'circulation' | 'credit_issued' | 'c2c_escrow' | 'platform_revenue' | 'bad_debt' | 'api_volume' | 'api_fee' | 'c2c_volume') =>
-  (point: TrendPoint) => Number(point[key])
+const amount = (
+  key: 'circulation' | 'credit_issued' | 'c2c_escrow' | 'platform_revenue' | 'admin_adjustments' | 'bad_debt' | 'api_volume' | 'api_fee' | 'c2c_volume',
+) => (point: TrendPoint) => Number(point[key])
 
-export const trendGroups: Record<'balances' | 'income' | 'api' | 'c2c' | 'price', { label: string; series: TrendSeries[] }> = {
+export const trendGroups: Record<'balances' | 'income' | 'adjustments' | 'api' | 'c2c' | 'price', { label: string; series: TrendSeries[] }> = {
   balances: {
     label: '流通与信用',
     series: [
@@ -115,6 +117,11 @@ export const trendGroups: Record<'balances' | 'income' | 'api' | 'c2c' | 'price'
       { key: 'platform_revenue', label: '平台收入', color: 'var(--positive)', value: amount('platform_revenue') },
       { key: 'bad_debt', label: '坏账', color: 'var(--danger)', value: amount('bad_debt') },
     ],
+  },
+  // 调账数额常远大于手续费，单独成组，免得压扁平台收入的走势。
+  adjustments: {
+    label: '管理员调账净额',
+    series: [{ key: 'admin_adjustments', label: '管理员调账净额', color: 'var(--mustard)', value: amount('admin_adjustments') }],
   },
   api: {
     label: 'API 结算',

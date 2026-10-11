@@ -64,7 +64,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 1. **认证与开调用**：按 Key 摘要查找；认出 Key 后每次请求写一行 `calls`（先 `in_progress`），响应带 `X-AIHub-Request-Id`。
 2. **模型与额度**：别名 → Key 可用范围 → 启用的目录模型；余额与 Key 预算只检查、不预留、不冻结。
 3. **选渠道**：候选为格式匹配的上架渠道，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
-4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（`EnsureIncludeUsage` 同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。
+4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（`EnsureIncludeUsage` 同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容，状态码、响应头与字节与上游一致。
    超时全部是请求 context 上的计时器，出站客户端自己不设 `Timeout`（ADR-0035 规则 5，出站连接因此可以跨请求复用）：非流式是整次请求的总超时（`timeout_total`，尚未写出字节，可回退）；流式在首字节前是首字超时，之后是相邻两次读到数据的间隔（空闲超时，每次读到数据重置）；整个调用另有从开始算起的上限 `callTimeLimit`（60 分钟，含全部尝试）。兜底任务的 61 分钟时限由它加 1 分钟余量得出，两处常量互相注释，改一处要同步另一处。
 5. **回写与记账**：响应原样逐块回写，旁路读取用量；结束时在一个事务内关闭调用并过账，价格快照随调用保存，历史不按现价重算。首字节之后的中断不再回退：空闲超时、总超时与读取错误记尝试 `interrupted`（`error_code` 为 `timeout_idle`、`timeout_total`、`read_error`）并计渠道失败；调用上限到期记 `interrupted` / `call_deadline`，不计渠道失败；两者都按已读到的用量结算。调用上限在首字节之前到期时，网关自己返回 504 `call_deadline`，不再尝试后面的候选。
    客户端中途断开：开始回写之前（等响应、回退中）断开，立即取消上游，不收费；开始回写之后断开，网关停止写客户端、继续读上游，读到的字节只喂给旁路解析器（`clientWatch`），直到上游结束、读满 `drainWindow`（10 秒）、触发空闲超时或调用上限，再取消上游并按读到的用量结算，调用 `client_disconnected`。续读期间渠道并发槽位照常占用，上游出错与客户端断开都不计渠道失败，`response_bytes` 只算写给客户端的字节。客户端收完最后一帧就挂断、上游随后正常结束的调用不算断开，仍是 `succeeded`。
@@ -77,7 +77,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 ## 数据与不变量
 
 - **单位**：金额为 `bigint` 纳积分（1 积分 = 1e9），人民币为整数分，费率为纳比率，时间为 `timestamptz`（ADR-0006）。美元模型的价格以纳美元存储，汇率 `settings.usd_cny_rate_nano` 为纳单位；计费在用量总额上一次性乘倍率与换算率（`ledger.ChannelRate`：开汇率优惠为 1，否则为汇率）并向上取整，便宜优先排序比较「倍率 × 换算率」。
-- **账本**（ADR-0005、ADR-0025）：`ledgerpg.Post` 是唯一过账路径；幂等键唯一，重复提交返回原交易；按账本账户 id 升序加行锁；提交时由延迟约束触发器要求每笔交易至少两条分录且合计为 0；交易与分录不可修改、删除。系统账户为 `platform_revenue`、`c2c_escrow`、`bad_debt`。调用自己的渠道不产生账本交易（同一账户不能在一笔交易中出现两次），费用仍记在调用上，核对与补记排除这类调用。
+- **账本**（ADR-0005、ADR-0025）：`ledgerpg.Post` 是唯一过账路径；幂等键唯一，重复提交返回原交易；按账本账户 id 升序加行锁；提交时由延迟约束触发器要求每笔交易至少两条分录且合计为 0；交易与分录不可修改、删除。系统账户为 `platform_revenue`、`c2c_escrow`、`bad_debt`；`platform_revenue` 既收手续费，也是管理员调账的对手方，所以它的余额不等于平台收入（口径见 `PRODUCT.md`）。调用自己的渠道不产生账本交易（同一账户不能在一笔交易中出现两次），费用仍记在调用上，核对与补记排除这类调用。
 - **C2C 托管**：卖单满足 `total = available + in_trade + sold + closed`（数据库 CHECK），`c2c_escrow` 余额恒等于全部卖单 `available + in_trade` 之和；加锁顺序为订单 → 交易 → 账本账户；状态转换幂等。
 
 | 动作 | 过账 | 数量变化 |
@@ -94,6 +94,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 ## 可观测性
 
 - 一切观测现算自 `calls`、`ledger_*`、`c2c_*`，不存快照或历史表；需要一致状态的查询在同一 `REPEATABLE READ` 只读事务内完成。
+- 平台收入与调账净额也现算自分录：前者是 `api_call` 交易记入 `platform_revenue` 的分录之和，后者是 `admin_adjust` 交易对用户账户的净额；管理员积分页与指标 `aihub_points_platform_revenue`、`aihub_points_admin_adjustments` 用这两个口径，账户余额只用于天平等式。
 - 五项核对：全部余额合计为 0；每个账户余额等于分录合计；托管余额等于卖单 `available + in_trade`；每个应计费的成功调用都已记账；每笔放行交易都已记账。管理员可对漏记调用补记或作废，与正常记账使用同一幂等键。
 - `observe.Feed` 订阅网关事件总线，向 SSE 订阅者与 Prometheus 扇出；慢订阅者丢消息而不阻塞网关。指标不带用户或 Key 标签，端口只在内网。
 

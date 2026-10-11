@@ -2687,7 +2687,7 @@ export interface components {
             credit_limit?: components["schemas"]["Amount"];
             is_admin?: boolean;
         };
-        /** @description amount 非零：正数加、负数减，对手方为平台收入账户。 */
+        /** @description amount 非零：正数加、负数减，对手方为平台账户（系统账户 platform_revenue）。 */
         AdjustRequest: {
             amount: components["schemas"]["Amount"];
             reason: string;
@@ -2852,13 +2852,18 @@ export interface components {
                 success_rate: components["schemas"]["Ratio"] | null;
             };
         };
-        /** @description user_positive + user_negative + c2c_escrow + platform_revenue + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_revenue 为平台收入；bad_debt 为已核销坏账。 */
+        /** @description user_positive + user_negative + c2c_escrow + platform_account + bad_debt = total，正常为 "0"。user_positive（流通积分）为用户正余额合计；user_negative 为用户负余额合计（≤ 0）；credit_issued（信用发行）为 user_negative 的绝对值，即已占用的信用；c2c_escrow 为 C2C 托管账户余额；platform_account 为平台账户（系统账户 platform_revenue）的余额，等于 platform_revenue − admin_adjustments，只用于核对等式；bad_debt 为已核销坏账。 */
         AdminPointsBalances: {
             user_positive: components["schemas"]["Amount"];
             user_negative: components["schemas"]["Amount"];
             credit_issued: components["schemas"]["Amount"];
             c2c_escrow: components["schemas"]["Amount"];
+            /** @description 平台收入：累计手续费，即 api_call 交易中记入平台账户的分录之和，不含管理员调账。 */
             platform_revenue: components["schemas"]["Amount"];
+            /** @description 管理员调账净额：admin_adjust 交易对用户账户的净额合计，正数表示平台向用户发放，负数表示扣回。 */
+            admin_adjustments: components["schemas"]["Amount"];
+            /** @description 平台账户余额（系统账户 platform_revenue），等于平台收入减去管理员调账净额；负数表示发放超过手续费收入。 */
+            platform_account: components["schemas"]["Amount"];
             bad_debt: components["schemas"]["Amount"];
             total: components["schemas"]["Amount"];
             /** @description 总信用额度：全部用户信用额度合计。 */
@@ -2894,7 +2899,10 @@ export interface components {
                 circulation: components["schemas"]["Amount"];
                 /** @description 当日期末信用发行（用户负余额合计的绝对值）。 */
                 credit_issued: components["schemas"]["Amount"];
+                /** @description 截至当日期末的累计手续费（平台收入）。 */
                 platform_revenue: components["schemas"]["Amount"];
+                /** @description 截至当日期末的管理员调账净额累计（正数表示平台向用户发放）。 */
+                admin_adjustments: components["schemas"]["Amount"];
                 bad_debt: components["schemas"]["Amount"];
                 c2c_escrow: components["schemas"]["Amount"];
                 /** @description 当日 API 结算量（调用费用 + 手续费）。 */
