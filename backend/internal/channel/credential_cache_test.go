@@ -374,3 +374,66 @@ func TestReplacingAChannelKeyDropsTheOldOne(t *testing.T) {
 		t.Fatal("a failed update dropped the key")
 	}
 }
+
+// ---- what a gateway attempt pays for the key ----
+
+func benchmarkKey(b *testing.B) (*Keyring, EncryptedCredential) {
+	b.Helper()
+	keyring, err := ParseKeyring("k1="+encodedKey(1), "k1")
+	if err != nil {
+		b.Fatal(err)
+	}
+	sealed, err := keyring.Encrypt(cacheChannelA, credentialVersion, cacheSecret)
+	if err != nil {
+		b.Fatal(err)
+	}
+	return keyring, sealed
+}
+
+// BenchmarkDecrypt is what every attempt paid before the key was cached.
+func BenchmarkDecrypt(b *testing.B) {
+	keyring, sealed := benchmarkKey(b)
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := keyring.Decrypt(cacheChannelA, sealed); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkOpenCredential is an attempt on a channel whose key is cached.
+func BenchmarkOpenCredential(b *testing.B) {
+	keyring, sealed := benchmarkKey(b)
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := keyring.OpenCredential(cacheChannelA, sealed); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDecryptParallel(b *testing.B) {
+	keyring, sealed := benchmarkKey(b)
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := keyring.Decrypt(cacheChannelA, sealed); err != nil {
+				b.Error(err)
+				return
+			}
+		}
+	})
+}
+
+func BenchmarkOpenCredentialParallel(b *testing.B) {
+	keyring, sealed := benchmarkKey(b)
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := keyring.OpenCredential(cacheChannelA, sealed); err != nil {
+				b.Error(err)
+				return
+			}
+		}
+	})
+}
