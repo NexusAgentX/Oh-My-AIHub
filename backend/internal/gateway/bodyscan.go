@@ -258,8 +258,10 @@ func ReplaceModel(body []byte, scan objectScan, model string) []byte {
 }
 
 // EnsureIncludeUsage makes an OpenAI Chat streaming request report usage by
-// setting stream_options.include_usage to true, again by splicing bytes.
-func EnsureIncludeUsage(body []byte, scan objectScan) []byte {
+// setting stream_options.include_usage to true, again by splicing bytes. It
+// also reports whether it had to: false means the client had asked for usage
+// itself, so the upstream's usage frame is one the client expects.
+func EnsureIncludeUsage(body []byte, scan objectScan) ([]byte, bool) {
 	const flag = `"include_usage":true`
 	member, ok := scan.last("stream_options")
 	if !ok {
@@ -267,26 +269,26 @@ func EnsureIncludeUsage(body []byte, scan objectScan) []byte {
 		if len(scan.entries) == 0 {
 			insertion = `"stream_options":{` + flag + `}`
 		}
-		return applySplices(body, []splice{{start: scan.lastEnd, end: scan.lastEnd, value: []byte(insertion)}})
+		return applySplices(body, []splice{{start: scan.lastEnd, end: scan.lastEnd, value: []byte(insertion)}}), true
 	}
 	inner, err := scanObject(body, member.start)
 	if err != nil || inner.open != member.start {
 		// null or a non-object value: replace the value wholesale.
-		return applySplices(body, []splice{{start: member.start, end: member.end, value: []byte(`{` + flag + `}`)}})
+		return applySplices(body, []splice{{start: member.start, end: member.end, value: []byte(`{` + flag + `}`)}}), true
 	}
 	if existing, found := inner.last("include_usage"); found {
 		if string(body[existing.start:existing.end]) == "true" {
-			return body
+			return body, false
 		}
 		var splices []splice
 		for _, duplicate := range inner.all("include_usage") {
 			splices = append(splices, splice{start: duplicate.start, end: duplicate.end, value: []byte("true")})
 		}
-		return applySplices(body, splices)
+		return applySplices(body, splices), true
 	}
 	insertion := flag
 	if len(inner.entries) > 0 {
 		insertion += ","
 	}
-	return applySplices(body, []splice{{start: inner.open + 1, end: inner.open + 1, value: []byte(insertion)}})
+	return applySplices(body, []splice{{start: inner.open + 1, end: inner.open + 1, value: []byte(insertion)}}), true
 }

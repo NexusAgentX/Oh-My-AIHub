@@ -32,6 +32,9 @@ func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) 
 	_, secret := e.defaultKey(consumer)
 
 	// Whitespace, key order, escapes and numbers must reach the upstream untouched.
+	// The one exception on the way back is the usage-only frame of the chat
+	// stream, which the gateway asked for and the client did not (see
+	// gateway_usage_frame_integration_test.go).
 	chat := `{ "messages":[{"role":"user","content":"café \"model\": 1"}],  "temperature": 0.70, "model" : "gpt-test" }`
 	chatStream := `{"model":"gpt-test","stream":true,"messages":[{"role":"user","content":"hi"}]}`
 	responses := `{"input" : "hi","model":"gpt-test","max_output_tokens":16}`
@@ -41,7 +44,7 @@ func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) 
 		headers                                                       map[string]string
 	}{
 		{"chat", "/v1/chat/completions", chat, strings.Replace(chat, `"gpt-test"`, `"gpt-up"`, 1), chatBody, "application/json", nil},
-		{"chat stream", "/v1/chat/completions", chatStream, `{"model":"gpt-up","stream":true,"messages":[{"role":"user","content":"hi"}],"stream_options":{"include_usage":true}}`, chatStreamBody, "text/event-stream", nil},
+		{"chat stream", "/v1/chat/completions", chatStream, `{"model":"gpt-up","stream":true,"messages":[{"role":"user","content":"hi"}],"stream_options":{"include_usage":true}}`, chatStreamBodyWithoutUsageFrame, "text/event-stream", nil},
 		{"responses", "/v1/responses", responses, strings.Replace(responses, `"gpt-test"`, `"gpt-up"`, 1), responsesBody, "application/json", nil},
 		{"anthropic", "/v1/messages", anthropic, strings.Replace(anthropic, `"gpt-test"`, `"gpt-up"`, 1), anthropicBody, "application/json",
 			map[string]string{"anthropic-version": "2023-06-01"}},

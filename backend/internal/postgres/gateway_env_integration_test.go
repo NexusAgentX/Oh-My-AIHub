@@ -485,6 +485,9 @@ const (
 	noUsageBody    = `{"id":"c9","choices":[{"message":{"content":"hi"}}]}`
 	chatStreamBody = "data: {\"choices\":[{\"delta\":{\"content\":\"h\"}}],\"usage\":null}\n\n" +
 		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":500}}\n\ndata: [DONE]\n\n"
+	// What a client that did not ask for usage receives of chatStreamBody: the
+	// gateway turned include_usage on for it and keeps the usage-only frame back.
+	chatStreamBodyWithoutUsageFrame = "data: {\"choices\":[{\"delta\":{\"content\":\"h\"}}],\"usage\":null}\n\ndata: [DONE]\n\n"
 )
 
 // okUpstream answers every inference request with the body fitting its path.
