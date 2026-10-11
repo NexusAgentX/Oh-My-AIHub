@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 )
 
@@ -462,8 +463,11 @@ func (w *brokenWriter) Write(p []byte) (int, error) {
 	return w.ResponseRecorder.Write(p)
 }
 
-func TestGatewayMarksAbandonedAndBrokenStreamsWithoutChargingUnreadUsage(t *testing.T) {
-	e := newEnv(t)
+// A client that stops accepting data does not stop the gateway reading: the
+// usage frame that comes in the end is still billed (see the live-server tests
+// in gateway_drain_integration_test.go for a real hang-up).
+func TestGatewayBillsAnAbandonedStreamForTheUsageItStillReceives(t *testing.T) {
+	e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = time.Second })
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	twoFrames := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -482,8 +486,11 @@ func TestGatewayMarksAbandonedAndBrokenStreamsWithoutChargingUnreadUsage(t *test
 	writer := &brokenWriter{ResponseRecorder: httptest.NewRecorder(), okWrites: 1}
 	e.handler.ServeHTTP(writer, request)
 	row := e.callRow(writer.Header().Get("X-AIHub-Request-Id"))
-	if row.Outcome != "client_disconnected" || row.HasLedgerTx || e.balance(consumer) != "0" {
+	if row.Outcome != "client_disconnected" || row.Input != 1000 || row.Output != 500 || !row.HasLedgerTx || e.balance(consumer) != "-"+expectedCharge {
 		t.Fatalf("abandoned stream = %+v, balance %s", row, e.balance(consumer))
+	}
+	if writer.Body.String() != "data: {\"choices\":[{\"delta\":{\"content\":\"a\"}}]}\n\n" || row.ResponseBytes != int64(writer.Body.Len()) {
+		t.Fatalf("client got %q, response bytes %d", writer.Body.String(), row.ResponseBytes)
 	}
 
 	// An upstream that dies after writing some output is an interruption.
