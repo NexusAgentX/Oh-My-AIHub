@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 // The gateway never re-serializes a request body. It scans the JSON text of
@@ -38,17 +39,21 @@ func skipSpace(text []byte, i int) int {
 }
 
 // skipString returns the index after the string that starts at text[i]=='"'.
+// It looks for the closing quote and for escapes with IndexByte, which moves
+// over the long text of a prompt at memory speed.
 func skipString(text []byte, i int) (int, error) {
 	i++
 	for i < len(text) {
-		switch text[i] {
-		case '\\':
-			i += 2
-		case '"':
-			return i + 1, nil
-		default:
-			i++
+		quote := bytes.IndexByte(text[i:], '"')
+		if quote < 0 {
+			return 0, errMalformedJSON
 		}
+		end := i + quote
+		escape := bytes.IndexByte(text[i:end], '\\')
+		if escape < 0 {
+			return end + 1, nil
+		}
+		i += escape + 2 // the backslash and the character it escapes
 	}
 	return 0, errMalformedJSON
 }
@@ -105,57 +110,87 @@ func decodeKey(raw []byte) (string, bool) {
 	return key, true
 }
 
-// scanObject indexes the members of the JSON object starting at text[start]
-// (after optional whitespace).
-func scanObject(text []byte, start int) (objectScan, error) {
+// objectBounds locates an object within the scanned text.
+type objectBounds struct {
+	// open is the index of '{', close the index of the matching '}', and
+	// lastEnd the end of the last value (or open+1 for an empty object).
+	open, close, lastEnd int
+}
+
+// walkObject calls visit for each member of the JSON object starting at
+// text[start] (after optional whitespace), in order, with the member's decoded
+// key and the byte range [valueStart, valueEnd) of its value. It allocates
+// nothing for keys without escapes, whose bytes are text itself: visit must
+// not keep key beyond its call, and must not change text.
+func walkObject(text []byte, start int, visit func(key []byte, valueStart, valueEnd int)) (objectBounds, error) {
 	i := skipSpace(text, start)
 	if i >= len(text) || text[i] != '{' {
-		return objectScan{}, errMalformedJSON
+		return objectBounds{}, errMalformedJSON
 	}
-	scan := objectScan{open: i}
+	bounds := objectBounds{open: i}
 	i = skipSpace(text, i+1)
-	scan.lastEnd = scan.open + 1
+	bounds.lastEnd = bounds.open + 1
 	if i < len(text) && text[i] == '}' {
-		scan.close = i
-		return scan, nil
+		bounds.close = i
+		return bounds, nil
 	}
 	for {
 		if i >= len(text) || text[i] != '"' {
-			return objectScan{}, errMalformedJSON
+			return objectBounds{}, errMalformedJSON
 		}
 		keyEnd, err := skipString(text, i)
 		if err != nil {
-			return objectScan{}, err
+			return objectBounds{}, err
 		}
-		key, ok := decodeKey(text[i:keyEnd])
-		if !ok {
-			return objectScan{}, errMalformedJSON
+		key := text[i+1 : keyEnd-1]
+		if bytes.IndexByte(key, '\\') >= 0 {
+			decoded, ok := decodeKey(text[i:keyEnd])
+			if !ok {
+				return objectBounds{}, errMalformedJSON
+			}
+			key = []byte(decoded)
 		}
 		i = skipSpace(text, keyEnd)
 		if i >= len(text) || text[i] != ':' {
-			return objectScan{}, errMalformedJSON
+			return objectBounds{}, errMalformedJSON
 		}
 		valueStart := skipSpace(text, i+1)
 		valueEnd, err := skipValue(text, valueStart)
 		if err != nil {
-			return objectScan{}, err
+			return objectBounds{}, err
 		}
-		scan.entries = append(scan.entries, entry{key: key, start: valueStart, end: valueEnd})
-		scan.lastEnd = valueEnd
+		visit(key, valueStart, valueEnd)
+		bounds.lastEnd = valueEnd
 		i = skipSpace(text, valueEnd)
 		if i >= len(text) {
-			return objectScan{}, errMalformedJSON
+			return objectBounds{}, errMalformedJSON
 		}
 		switch text[i] {
 		case ',':
 			i = skipSpace(text, i+1)
 		case '}':
-			scan.close = i
-			return scan, nil
+			bounds.close = i
+			return bounds, nil
 		default:
-			return objectScan{}, errMalformedJSON
+			return objectBounds{}, errMalformedJSON
 		}
 	}
+}
+
+// scanObject indexes the members of the JSON object starting at text[start]
+// (after optional whitespace).
+func scanObject(text []byte, start int) (objectScan, error) {
+	var entries []entry
+	bounds, err := walkObject(text, start, func(key []byte, valueStart, valueEnd int) {
+		if entries == nil {
+			entries = make([]entry, 0, 8)
+		}
+		entries = append(entries, entry{key: string(key), start: valueStart, end: valueEnd})
+	})
+	if err != nil {
+		return objectScan{}, err
+	}
+	return objectScan{entries: entries, open: bounds.open, close: bounds.close, lastEnd: bounds.lastEnd}, nil
 }
 
 // last returns the final member with the given key, matching how common JSON
@@ -185,6 +220,12 @@ type RequestFacts struct {
 	HasModel           bool
 	Stream             bool
 	PreviousResponseID string
+	// EnableThinking and ServiceTier are the two members that pick a price
+	// (ADR-0030). They hold exactly what decoding the body with encoding/json
+	// into struct{ EnableThinking *bool; ServiceTier string } would leave in
+	// them, mismatched types and duplicate or differently cased keys included.
+	EnableThinking *bool
+	ServiceTier    string
 }
 
 // ScanRequest reads the facts and returns the scan for later splicing. Only the
@@ -210,10 +251,86 @@ func ScanRequest(body []byte) (RequestFacts, objectScan, error) {
 			facts.PreviousResponseID = id
 		}
 	}
+	facts.EnableThinking, facts.ServiceTier = scan.pricingFields(body)
 	return facts, scan, nil
 }
 
+// pricingFields reads the top-level enable_thinking and service_tier the way
+//
+//	json.Unmarshal(body, &struct {
+//		EnableThinking *bool  `json:"enable_thinking"`
+//		ServiceTier    string `json:"service_tier"`
+//	}{})
+//
+// does, without decoding the rest of the body (which can be megabytes). The
+// rules it follows are encoding/json's:
+//
+//   - keys match without regard to case, and every matching member counts, in
+//     order, so a later one overrides an earlier one;
+//   - enable_thinking: true and false set it, null clears it, and a value of any
+//     other type allocates it as false unless an earlier member already set it;
+//   - service_tier: a string sets it, anything else (null included) leaves it;
+//   - a body that is not valid JSON as a whole (the scan is more lenient than
+//     encoding/json) yields nothing.
+//
+// Validity is only checked when a member matches, so a body without them costs
+// nothing beyond the scan.
+func (s objectScan) pricingFields(body []byte) (thinking *bool, tier string) {
+	const thinkingKey, tierKey = "enable_thinking", "service_tier"
+	checked := false
+	for _, member := range s.entries {
+		isThinking := strings.EqualFold(member.key, thinkingKey)
+		if !isThinking && !strings.EqualFold(member.key, tierKey) {
+			continue
+		}
+		if !checked {
+			if !json.Valid(body) {
+				return nil, ""
+			}
+			checked = true
+		}
+		value := body[member.start:member.end]
+		switch {
+		case isThinking && string(value) == "null":
+			thinking = nil
+		case isThinking && string(value) == "true":
+			flag := true
+			thinking = &flag
+		case isThinking && string(value) == "false":
+			flag := false
+			thinking = &flag
+		case isThinking:
+			if thinking == nil {
+				flag := false
+				thinking = &flag
+			}
+		case value[0] == '"':
+			var text string
+			if json.Unmarshal(value, &text) == nil {
+				tier = text
+			}
+		}
+	}
+	return thinking, tier
+}
+
+// encodeString returns the JSON text of value, as encoding/json writes it
+// with HTML escaping off.
 func encodeString(value string) []byte {
+	plain := true
+	for i := 0; i < len(value); i++ {
+		if c := value[i]; c < 0x20 || c >= 0x7f || c == '"' || c == '\\' {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		// The names of models: printable ASCII is written as it is.
+		encoded := make([]byte, 0, len(value)+2)
+		encoded = append(encoded, '"')
+		encoded = append(encoded, value...)
+		return append(encoded, '"')
+	}
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
@@ -236,7 +353,11 @@ func applySplices(body []byte, splices []splice) []byte {
 			splices[j], splices[j-1] = splices[j-1], splices[j]
 		}
 	}
-	out := make([]byte, 0, len(body)+64)
+	size := len(body)
+	for _, item := range splices {
+		size += len(item.value) - (item.end - item.start)
+	}
+	out := make([]byte, 0, size)
 	cursor := 0
 	for _, item := range splices {
 		out = append(out, body[cursor:item.start]...)
@@ -246,22 +367,36 @@ func applySplices(body []byte, splices []splice) []byte {
 	return append(out, body[cursor:]...)
 }
 
+// modelSplices are the edits that set the value of every top-level "model"
+// member to model. A member that already holds exactly that text is left out:
+// replacing it would change no byte.
+func modelSplices(body []byte, scan objectScan, model string) []splice {
+	var splices []splice
+	var encoded []byte
+	for _, member := range scan.entries {
+		if member.key != "model" {
+			continue
+		}
+		if encoded == nil {
+			encoded = encodeString(model)
+		}
+		if bytes.Equal(body[member.start:member.end], encoded) {
+			continue
+		}
+		splices = append(splices, splice{start: member.start, end: member.end, value: encoded})
+	}
+	return splices
+}
+
 // ReplaceModel returns body with the value of every top-level "model" member
 // set to model. All other bytes are untouched.
 func ReplaceModel(body []byte, scan objectScan, model string) []byte {
-	encoded := encodeString(model)
-	var splices []splice
-	for _, member := range scan.all("model") {
-		splices = append(splices, splice{start: member.start, end: member.end, value: encoded})
-	}
-	return applySplices(body, splices)
+	return applySplices(body, modelSplices(body, scan, model))
 }
 
-// EnsureIncludeUsage makes an OpenAI Chat streaming request report usage by
-// setting stream_options.include_usage to true, again by splicing bytes. It
-// also reports whether it had to: false means the client had asked for usage
-// itself, so the upstream's usage frame is one the client expects.
-func EnsureIncludeUsage(body []byte, scan objectScan) ([]byte, bool) {
+// includeUsageSplices are the edits that make stream_options.include_usage
+// true, and whether any are needed.
+func includeUsageSplices(body []byte, scan objectScan) ([]splice, bool) {
 	const flag = `"include_usage":true`
 	member, ok := scan.last("stream_options")
 	if !ok {
@@ -269,26 +404,51 @@ func EnsureIncludeUsage(body []byte, scan objectScan) ([]byte, bool) {
 		if len(scan.entries) == 0 {
 			insertion = `"stream_options":{` + flag + `}`
 		}
-		return applySplices(body, []splice{{start: scan.lastEnd, end: scan.lastEnd, value: []byte(insertion)}}), true
+		return []splice{{start: scan.lastEnd, end: scan.lastEnd, value: []byte(insertion)}}, true
 	}
 	inner, err := scanObject(body, member.start)
 	if err != nil || inner.open != member.start {
 		// null or a non-object value: replace the value wholesale.
-		return applySplices(body, []splice{{start: member.start, end: member.end, value: []byte(`{` + flag + `}`)}}), true
+		return []splice{{start: member.start, end: member.end, value: []byte(`{` + flag + `}`)}}, true
 	}
 	if existing, found := inner.last("include_usage"); found {
 		if string(body[existing.start:existing.end]) == "true" {
-			return body, false
+			return nil, false
 		}
 		var splices []splice
 		for _, duplicate := range inner.all("include_usage") {
 			splices = append(splices, splice{start: duplicate.start, end: duplicate.end, value: []byte("true")})
 		}
-		return applySplices(body, splices), true
+		return splices, true
 	}
 	insertion := flag
 	if len(inner.entries) > 0 {
 		insertion += ","
 	}
-	return applySplices(body, []splice{{start: inner.open + 1, end: inner.open + 1, value: []byte(insertion)}}), true
+	return []splice{{start: inner.open + 1, end: inner.open + 1, value: []byte(insertion)}}, true
+}
+
+// EnsureIncludeUsage makes an OpenAI Chat streaming request report usage by
+// setting stream_options.include_usage to true, again by splicing bytes. It
+// also reports whether it had to: false means the client had asked for usage
+// itself, so the upstream's usage frame is one the client expects.
+func EnsureIncludeUsage(body []byte, scan objectScan) ([]byte, bool) {
+	splices, changed := includeUsageSplices(body, scan)
+	return applySplices(body, splices), changed
+}
+
+// UpstreamBody is the request body sent to a channel: the client's body with
+// the top-level model set to the channel's name for it and, for an OpenAI Chat
+// stream (ensureUsage), include_usage turned on. scan is the scan of body. The
+// edits are all found in the one scan and made in one copy, so the result is
+// the same bytes as ReplaceModel followed by EnsureIncludeUsage. When nothing
+// changes it is body itself; usageInjected reports an include_usage edit.
+func UpstreamBody(body []byte, scan objectScan, model string, ensureUsage bool) (upstream []byte, usageInjected bool) {
+	splices := modelSplices(body, scan, model)
+	if ensureUsage {
+		var usage []splice
+		usage, usageInjected = includeUsageSplices(body, scan)
+		splices = append(splices, usage...)
+	}
+	return applySplices(body, splices), usageInjected
 }

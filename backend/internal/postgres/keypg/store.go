@@ -438,3 +438,34 @@ func (s *Routes) Resolve(ctx context.Context, accountID, keyID, modelID string) 
 	}
 	return pref, err
 }
+
+// LoadPrefs reads every stored preference with its scope, for the routing
+// snapshot (internal/snapshot). Each record equals what Get returns for its
+// scope and model, so Resolve over the records gives the same answer as the
+// Resolve above.
+func (s *Routes) LoadPrefs(ctx context.Context) ([]routing.Scoped, error) {
+	rows, err := s.q.ListAllRoutePrefs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scoped := make([]routing.Scoped, 0, len(rows))
+	for _, row := range rows {
+		keyID, source := "", routing.SourceAccount
+		if row.ApiKeyID != nil {
+			keyID, source = *row.ApiKeyID, routing.SourceKey
+		}
+		updated := row.UpdatedAt
+		pref := routing.Pref{
+			ModelID: row.ModelID, Source: source, Mode: routing.Mode(row.Mode), Order: []string{}, Excluded: []string{},
+			MaxAttempts: row.MaxAttempts, TTFTTimeoutMS: row.TtftTimeoutMs, UpdatedAt: &updated,
+		}
+		for index, channelID := range row.ChannelIds {
+			pref.Order = append(pref.Order, channelID)
+			if row.ExcludedFlags[index] {
+				pref.Excluded = append(pref.Excluded, channelID)
+			}
+		}
+		scoped = append(scoped, routing.Scoped{AccountID: row.AccountID, KeyID: keyID, Pref: pref})
+	}
+	return scoped, nil
+}

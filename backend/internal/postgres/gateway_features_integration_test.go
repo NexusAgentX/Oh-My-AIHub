@@ -346,8 +346,7 @@ func TestGatewayPricesWithTheTierMatchingTheRealRequest(t *testing.T) {
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	minimum := int64(900)
-	catalogService := catalog.NewService(e.store.Catalog)
-	if _, err := catalogService.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &[]ledger.PriceTier{
+	if _, err := e.catalog.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &[]ledger.PriceTier{
 		{Name: "long", MinPromptTokens: &minimum, InputPrice: mustAmount(t, "40"), OutputPrice: mustAmount(t, "20")},
 	}}); err != nil {
 		t.Fatal(err)
@@ -438,9 +437,7 @@ func TestGatewayRejectsBadKeysAndDisabledAccounts(t *testing.T) {
 		t.Fatalf("expired key = %d", code)
 	}
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"expires_at": nil})
-	if _, err := e.pool.Exec(context.Background(), `UPDATE accounts SET status = 'disabled' WHERE id = $1`, consumer.id); err != nil {
-		t.Fatal(err)
-	}
+	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/accounts/"+consumer.id, map[string]any{"status": "disabled"})
 	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusForbidden {
 		t.Fatalf("disabled account = %d", code)
 	}

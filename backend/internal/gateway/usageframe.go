@@ -120,14 +120,20 @@ func isUsageOnlyEvent(event []byte) bool {
 // is an empty array and whose "usage" is a non-empty object.
 func isUsageOnlyFrame(payload []byte) bool {
 	// A cheap look at the top-level members first: nearly every frame of a
-	// stream has choices, and is turned away here without being decoded.
-	scan, err := scanObject(payload, 0)
-	if err != nil {
+	// stream has choices, and is turned away here without being decoded or
+	// allocating anything.
+	var choices, usage span
+	if _, err := walkObject(payload, 0, func(key []byte, start, end int) {
+		switch string(key) {
+		case "choices":
+			choices = span{start, end, true}
+		case "usage":
+			usage = span{start, end, true}
+		}
+	}); err != nil {
 		return false
 	}
-	choices, hasChoices := scan.last("choices")
-	usage, hasUsage := scan.last("usage")
-	if !hasChoices || !hasUsage || !isEmptyContainer(payload[choices.start:choices.end], '[', ']') {
+	if !choices.found || !usage.found || !isEmptyContainer(payload[choices.start:choices.end], '[', ']') {
 		return false
 	}
 	if payload[usage.start] != '{' || isEmptyContainer(payload[usage.start:usage.end], '{', '}') {
@@ -144,6 +150,12 @@ func isUsageOnlyFrame(payload []byte) bool {
 		return false
 	}
 	return json.Unmarshal(members["usage"], &usageMembers) == nil && len(usageMembers) > 0
+}
+
+// span is the byte range of one member's value, if the member was seen.
+type span struct {
+	start, end int
+	found      bool
 }
 
 // isEmptyContainer reports whether value is open, optional whitespace, close.

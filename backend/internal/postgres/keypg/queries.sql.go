@@ -298,6 +298,61 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) ([]KeySpendR
 	return items, nil
 }
 
+const listAllRoutePrefs = `-- name: ListAllRoutePrefs :many
+SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.updated_at,
+       coalesce(array_agg(rpc.channel_id ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::uuid[] AS channel_ids,
+       coalesce(array_agg(rpc.excluded ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::boolean[] AS excluded_flags
+FROM route_prefs rp
+LEFT JOIN route_pref_channels rpc ON rpc.route_pref_id = rp.id
+GROUP BY rp.id
+ORDER BY rp.account_id, rp.api_key_id NULLS FIRST, rp.model_id
+`
+
+type ListAllRoutePrefsRow struct {
+	AccountID     string
+	ApiKeyID      *string
+	ModelID       string
+	Mode          string
+	MaxAttempts   *int32
+	TtftTimeoutMs *int32
+	UpdatedAt     time.Time
+	ChannelIds    []string
+	ExcludedFlags []bool
+}
+
+// Every stored routing preference with its channels in position order, for the
+// routing snapshot (ADR-0040). One statement, so the preferences and their
+// channel lists are read together.
+func (q *Queries) ListAllRoutePrefs(ctx context.Context) ([]ListAllRoutePrefsRow, error) {
+	rows, err := q.db.Query(ctx, listAllRoutePrefs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllRoutePrefsRow
+	for rows.Next() {
+		var i ListAllRoutePrefsRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.ApiKeyID,
+			&i.ModelID,
+			&i.Mode,
+			&i.MaxAttempts,
+			&i.TtftTimeoutMs,
+			&i.UpdatedAt,
+			&i.ChannelIds,
+			&i.ExcludedFlags,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listKeyCredentials = `-- name: ListKeyCredentials :many
 SELECT id, key_ciphertext, key_nonce, key_key_id FROM api_keys
 WHERE deleted_at IS NULL AND ($1::uuid IS NULL OR id > $1)

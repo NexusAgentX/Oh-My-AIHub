@@ -54,7 +54,7 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 func postInTx(t *testing.T, pool *pgxpool.Pool, transaction ledger.Transaction) (ledger.Posted, error) {
 	t.Helper()
 	var posted ledger.Posted
-	err := pgkit.InTx(context.Background(), pool, func(tx pgx.Tx) error {
+	err := ledgerpg.NewBooks().InTx(context.Background(), pool, func(tx ledgerpg.Tx) error {
 		var err error
 		posted, err = ledgerpg.Post(context.Background(), tx, transaction)
 		return err

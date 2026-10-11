@@ -1,7 +1,9 @@
 // Package ledgerpg is the PostgreSQL persistence of the zero-sum ledger
 // (ADR-0025). Post books one balanced transaction inside a transaction owned
 // by the caller (ADR-0020), so business rows and ledger entries commit
-// atomically.
+// atomically. The caller begins that transaction with Books.InTx, which is
+// how the process hears what every posting did once the transaction has ended
+// (the gateway's balance cache, ADR-0040, follows the ledger that way).
 package ledgerpg
 
 import (
@@ -18,8 +20,10 @@ import (
 // repeated idempotency key returns the stored transaction with Replayed set
 // and books nothing), locks the involved ledger accounts in id order, updates
 // their balances and writes one entry per line with its balance after. The
-// database checks at commit that the entries sum to zero.
-func Post(ctx context.Context, tx pgx.Tx, t ledger.Transaction) (ledger.Posted, error) {
+// database checks at commit that the entries sum to zero. The observers of the
+// Books that began tx are told of the changes to user accounts, and later how
+// the transaction ended; a replayed posting books nothing and tells nothing.
+func Post(ctx context.Context, tx Tx, t ledger.Transaction) (ledger.Posted, error) {
 	if err := t.Validate(); err != nil {
 		return ledger.Posted{}, err
 	}
@@ -78,7 +82,19 @@ func Post(ctx context.Context, tx pgx.Tx, t ledger.Transaction) (ledger.Posted, 
 		}
 		posted.Entries = append(posted.Entries, ledger.PostedEntry{LedgerAccountID: target.id, Account: line.Account, Amount: line.Amount, BalanceAfter: after})
 	}
+	tx.posted(t.Type, userChanges(t.Entries))
 	return posted, nil
+}
+
+// userChanges is what the lines do to user accounts.
+func userChanges(lines []ledger.Line) []ledger.Change {
+	changes := make([]ledger.Change, 0, len(lines))
+	for _, line := range lines {
+		if line.Account.UserID != "" {
+			changes = append(changes, ledger.Change{AccountID: line.Account.UserID, Amount: line.Amount})
+		}
+	}
+	return changes
 }
 
 func replay(ctx context.Context, q *Queries, t ledger.Transaction) (ledger.Posted, error) {

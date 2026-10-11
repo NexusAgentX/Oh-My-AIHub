@@ -4,20 +4,102 @@ import (
 	"encoding/json"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"strconv"
 	"strings"
 )
 
-func object(raw json.RawMessage) map[string]json.RawMessage {
-	var value map[string]json.RawMessage
-	_ = json.Unmarshal(raw, &value)
-	return value
+// jsonMember is one member of a JSON object read in place: key is the decoded
+// name, value the member's JSON text. Both alias the text that was read.
+type jsonMember struct{ key, value []byte }
+
+// jsonObject is the members of a JSON object in the order they were written,
+// found without copying or decoding any value. It answers what a
+// map[string]json.RawMessage decoded from the same text would: get and has see
+// the last member of a name.
+type jsonObject []jsonMember
+
+// objectOf reads the members of the JSON object in raw, which must be valid
+// JSON. Anything that is not an object (null, a string, nothing at all) has no
+// members, as when decoding it into a map. The members are laid out in the
+// observer's scratch space, which absorbDetails empties before it starts, so a
+// frame costs no allocation once the space has grown to its size.
+func (o *Observer) objectOf(raw []byte) jsonObject {
+	if at := skipSpace(raw, 0); at >= len(raw) || raw[at] != '{' {
+		return nil
+	}
+	first := len(o.members)
+	if _, err := walkObject(raw, 0, func(key []byte, start, end int) {
+		o.members = append(o.members, jsonMember{key: key, value: raw[start:end]})
+	}); err != nil {
+		o.members = o.members[:first]
+		return nil
+	}
+	return o.members[first:len(o.members):len(o.members)]
 }
-func count(raw json.RawMessage) (int64, bool) {
-	var value int64
-	err := json.Unmarshal(raw, &value)
-	return value, len(raw) > 0 && string(raw) != "null" && err == nil
+
+// eachElement calls visit with the JSON text of each element of the array in
+// raw, which must be valid JSON; anything that is not an array has none.
+func eachElement(raw []byte, visit func(element []byte)) {
+	at := skipSpace(raw, 0)
+	if at >= len(raw) || raw[at] != '[' {
+		return
+	}
+	at = skipSpace(raw, at+1)
+	for at < len(raw) && raw[at] != ']' {
+		end, err := skipValue(raw, at)
+		if err != nil {
+			return
+		}
+		visit(raw[at:end])
+		at = skipSpace(raw, end)
+		if at < len(raw) && raw[at] == ',' {
+			at = skipSpace(raw, at+1)
+		}
+	}
 }
-func textValue(raw json.RawMessage) string {
+
+// get returns the value of the last member with the name, or nil if there is none.
+func (o jsonObject) get(name string) []byte {
+	for index := len(o) - 1; index >= 0; index-- {
+		if string(o[index].key) == name {
+			return o[index].value
+		}
+	}
+	return nil
+}
+
+func (o jsonObject) has(name string) bool { return o.get(name) != nil }
+
+// count reads a JSON integer: the second result is false for anything else
+// (null, a string, a fraction, a number too big).
+func count(raw []byte) (int64, bool) {
+	if len(raw) == 0 || (raw[0] != '-' && (raw[0] < '0' || raw[0] > '9')) {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(string(raw), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
+}
+
+// textValue reads a JSON string; anything else reads as "".
+func textValue(raw []byte) string {
+	if len(raw) == 0 || raw[0] != '"' {
+		return "" // absent, null, a number, an object: decoding any of them into a string leaves it empty
+	}
+	if len(raw) >= 2 && raw[len(raw)-1] == '"' {
+		plain := true
+		for _, c := range raw[1 : len(raw)-1] {
+			if c == '\\' || c < 0x20 || c >= 0x80 {
+				plain = false
+				break
+			}
+		}
+		if plain {
+			return string(raw[1 : len(raw)-1])
+		}
+	}
 	var value string
 	_ = json.Unmarshal(raw, &value)
 	return value
@@ -49,11 +131,14 @@ func (o *Observer) setBucket(prefix string, values map[string]int64, total int64
 	}
 }
 func modalityCounts(raw json.RawMessage) (map[string]int64, bool) {
+	if len(raw) == 0 {
+		return nil, false
+	}
 	var items []struct {
 		Modality   string `json:"modality"`
 		TokenCount *int64 `json:"tokenCount"`
 	}
-	if len(raw) == 0 || json.Unmarshal(raw, &items) != nil {
+	if json.Unmarshal(raw, &items) != nil {
 		return nil, false
 	}
 	result := map[string]int64{}
@@ -71,13 +156,24 @@ func modalityCounts(raw json.RawMessage) (map[string]int64, bool) {
 }
 
 // absorbDetails runs for every event, including reasoning/service events without usage.
-func (o *Observer) absorbDetails(raw []byte) {
+// keys are the member names scanFrameKeys found in raw: an event with none of
+// the members below changes nothing here, and is not decoded.
+func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 	if o.detail.Tokens == nil {
 		o.detail.Tokens = map[string]int64{}
 	}
-	value := object(raw)
-	if nested := value["response"]; len(nested) > 0 {
-		value = object(nested)
+	if keys&detailKeys == 0 {
+		return
+	}
+	// The members are read in place. Text that is not valid JSON as a whole has
+	// none, as when decoding it into a map: encoding/json would fail on it.
+	o.members = o.members[:0]
+	var value jsonObject
+	if json.Valid(raw) {
+		value = o.objectOf(raw)
+	}
+	if nested := value.get("response"); len(nested) > 0 {
+		value = o.objectOf(nested)
 	}
 	prefix := "openai:"
 	if o.format == channel.FormatAnthropic {
@@ -86,43 +182,43 @@ func (o *Observer) absorbDetails(raw []byte) {
 	if o.format == channel.FormatGemini {
 		prefix = "gemini:"
 	}
-	if tier := textValue(value["service_tier"]); tier != "" {
+	if tier := textValue(value.get("service_tier")); tier != "" {
 		o.setServiceTier(prefix + tier)
 	}
-	if o.format == channel.FormatOpenAIChat {
-		var choices []map[string]json.RawMessage
-		_ = json.Unmarshal(value["choices"], &choices)
-		for _, choice := range choices {
-			for _, field := range []string{"delta", "message"} {
-				part := object(choice[field])
-				if raw, ok := part["reasoning_content"]; ok {
+	if o.format == channel.FormatOpenAIChat && keys&keyReasoning != 0 {
+		// A reasoning_content member in the delta (or message) of any choice
+		// marks a model that thinks; there is no need to keep what it says.
+		eachElement(value.get("choices"), func(choice []byte) {
+			choiceMembers := o.objectOf(choice)
+			for _, field := range [...]string{"delta", "message"} {
+				if raw := o.objectOf(choiceMembers.get(field)).get("reasoning_content"); raw != nil {
 					o.qwenObserved = true
 					if textValue(raw) != "" {
 						o.detail.ThinkingMode = "qwen_thinking"
 					}
 				}
 			}
-		}
+		})
 	}
-	if nested := value["message"]; len(nested) > 0 {
-		value = object(nested)
+	if nested := value.get("message"); len(nested) > 0 {
+		value = o.objectOf(nested)
 	}
-	usage := object(value["usage"])
-	if tier := textValue(usage["service_tier"]); tier != "" {
+	usage := o.objectOf(value.get("usage"))
+	if tier := textValue(usage.get("service_tier")); tier != "" {
 		o.setServiceTier(prefix + tier)
 	}
 	switch o.format {
 	case channel.FormatAnthropic:
 		// Speed is a separate response fact: later tier-only frames must not
 		// erase it. An explicit non-fast speed replaces an earlier fast fact.
-		if speed, present := usage["speed"]; present {
+		if speed := usage.get("speed"); speed != nil {
 			o.anthropicSpeed = textValue(speed)
 		}
 		o.detail.ServiceTier = o.anthropicTier
 		if o.anthropicSpeed == "fast" {
 			o.detail.ServiceTier = "anthropic:fast"
 		}
-		if _, changed := usage["cache_creation_input_tokens"]; changed {
+		if usage.has("cache_creation_input_tokens") {
 			old := map[string]int64{}
 			for key, n := range o.detail.Tokens {
 				if strings.HasPrefix(key, "cache_write_") {
@@ -131,13 +227,13 @@ func (o *Observer) absorbDetails(raw []byte) {
 			}
 			o.setBucket("cache_write_", old, o.usage.CacheWriteTokens)
 		}
-		if raw, ok := usage["cache_creation"]; ok {
+		if raw := usage.get("cache_creation"); raw != nil {
 			o.setBucket("cache_write_", nil, o.usage.CacheWriteTokens)
-			details := object(raw)
+			details := o.objectOf(raw)
 			values := map[string]int64{}
 			valid := true
 			for key, field := range map[string]string{"cache_write_5m": "ephemeral_5m_input_tokens", "cache_write_1h": "ephemeral_1h_input_tokens"} {
-				n, ok := count(details[field])
+				n, ok := count(details.get(field))
 				if ok {
 					values[key] = n
 				} else {
@@ -160,13 +256,13 @@ func (o *Observer) absorbDetails(raw []byte) {
 		if o.format == channel.FormatOpenAIResponses {
 			inField, outField = "input_tokens_details", "output_tokens_details"
 		}
-		inputs, outputs := object(usage[inField]), object(usage[outField])
+		inputs, outputs := o.objectOf(usage.get(inField)), o.objectOf(usage.get(outField))
 		inValues, outValues := map[string]int64{}, map[string]int64{}
 		for _, mod := range []string{"text", "image", "audio", "video"} {
-			if n, ok := count(inputs[mod+"_tokens"]); ok {
+			if n, ok := count(inputs.get(mod + "_tokens")); ok {
 				inValues["input_"+mod] = n
 			}
-			if n, ok := count(outputs[mod+"_tokens"]); ok {
+			if n, ok := count(outputs.get(mod + "_tokens")); ok {
 				outValues["output_"+mod] = n
 			}
 		}
@@ -182,19 +278,19 @@ func (o *Observer) absorbDetails(raw []byte) {
 			o.setBucket("output_", outValues, o.usage.OutputTokens)
 		}
 	case channel.FormatGemini:
-		usage = object(value["usageMetadata"])
+		usage = o.objectOf(value.get("usageMetadata"))
 		if len(usage) == 0 {
 			return
 		}
 		o.setBucket("input_", nil, o.usage.InputTokens)
 		o.setBucket("cache_read_", nil, o.usage.CacheReadTokens)
 		o.setBucket("output_", nil, o.usage.OutputTokens)
-		if tier := textValue(usage["serviceTier"]); tier != "" {
+		if tier := textValue(usage.get("serviceTier")); tier != "" {
 			o.setServiceTier(prefix + tier)
 		}
-		prompt, pok := modalityCounts(usage["promptTokensDetails"])
-		cached, cok := modalityCounts(usage["cacheTokensDetails"])
-		if o.usage.CacheReadTokens == 0 && len(usage["cacheTokensDetails"]) == 0 {
+		prompt, pok := modalityCounts(usage.get("promptTokensDetails"))
+		cached, cok := modalityCounts(usage.get("cacheTokensDetails"))
+		if o.usage.CacheReadTokens == 0 && len(usage.get("cacheTokensDetails")) == 0 {
 			cached = map[string]int64{}
 			cok = true
 		}
@@ -230,15 +326,15 @@ func (o *Observer) absorbDetails(raw []byte) {
 		} else if pok {
 			o.note("缓存模态未细分，使用通用输入及缓存价")
 		}
-		if outputs, ok := modalityCounts(usage["candidatesTokensDetails"]); ok {
+		if outputs, ok := modalityCounts(usage.get("candidatesTokensDetails")); ok {
 			values := map[string]int64{}
 			for key, n := range outputs {
 				values["output_"+key] = n
 			}
-			candidates, _ := count(usage["candidatesTokenCount"])
+			candidates, _ := count(usage.get("candidatesTokenCount"))
 			o.setBucket("output_", values, candidates)
 		}
-		if n, ok := count(usage["toolUsePromptTokenCount"]); ok && n > 0 {
+		if n, ok := count(usage.get("toolUsePromptTokenCount")); ok && n > 0 {
 			o.detail.ToolPromptTokens = n
 			o.note("工具提示token已观察，独立计价语义未覆盖")
 		}

@@ -40,6 +40,14 @@ FROM ledger_accounts l
 JOIN accounts a ON a.id = l.account_id
 WHERE l.account_id = $1;
 
+-- The balances and credit limits of several users at once: the gateway's
+-- balance cache loads and refreshes its entries with it.
+-- name: ListPoints :many
+SELECT l.account_id, l.balance_nano, a.credit_limit_nano, l.updated_at
+FROM ledger_accounts l
+JOIN accounts a ON a.id = l.account_id
+WHERE l.account_id = ANY(sqlc.arg(account_ids)::uuid[]);
+
 -- name: ListUserEntries :many
 SELECT e.id, e.transaction_id, t.type, t.reason, t.related_type, t.related_id,
        e.amount_nano, e.balance_after_nano, c.api_key_id, k.name AS api_key_name, e.created_at
