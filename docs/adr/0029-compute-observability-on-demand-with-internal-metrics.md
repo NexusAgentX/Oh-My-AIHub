@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-10-08
 - 决策者：项目维护者与 AI 产品团队
-- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176)、[ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md)、[ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md)
+- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #176](https://github.com/NexusAgentX/Oh-My-AIHub/issues/176)、[ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md)、[ADR-0027](archive/0027-adopt-transparent-gateway-with-post-hoc-billing.md)
 
 ## 背景
 

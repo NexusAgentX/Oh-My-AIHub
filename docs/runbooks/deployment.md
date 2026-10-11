@@ -17,8 +17,8 @@
 2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id（具体要求见 `README.md` 的“Docker Compose 运行”）。
 3. `mise install && mise run install`。
 4. `mise run up` 启动安全栈：一次性 migration 容器先执行迁移，后端启动时校验两组密钥环格式与出站配置。
-5. 浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员。
-6. 管理员登录后完成首次改密，再按需创建受邀账户。
+5. 启动后立即用浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员（ADR-0037）。密码由你自设，创建成功即登录，无需首次改密。若页面显示实例已初始化而管理员不是你创建的，视为部署失败：停止服务，按故障处理 Runbook 排查。
+6. 按需创建受邀账户。
 
 ## 发布检查
 

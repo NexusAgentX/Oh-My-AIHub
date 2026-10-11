@@ -3,7 +3,7 @@
 - 状态：已通过
 - 日期：2026-10-08
 - 决策者：项目维护者与 AI 产品团队
-- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172)、[ADR-0009](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)、[ADR-0027](0027-adopt-transparent-gateway-with-post-hoc-billing.md)
+- 关联内容：[Epic #170](https://github.com/NexusAgentX/Oh-My-AIHub/issues/170)、[Feature #172](https://github.com/NexusAgentX/Oh-My-AIHub/issues/172)、[ADR-0009](archive/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)、[ADR-0027](archive/0027-adopt-transparent-gateway-with-post-hoc-billing.md)
 
 ## 背景
 
@@ -57,4 +57,4 @@ v0.6.0 的平台 API Key 只保存哈希，完整 Key 仅在创建时显示一�
 
 ## 替代关系
 
-补充 [ADR-0009](0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md) 与 [ADR-0007](0007-adopt-invited-identity-and-server-sessions.md) 的安全边界；取代 [ADR-0010](archive/0010-adopt-snapshot-gateway-and-idempotent-settlement.md) 中“平台 API Key 不保存可恢复明文”的约定。
+补充 [ADR-0009](archive/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)（已由 [ADR-0036](0036-adopt-credential-startup-check-and-pinned-egress-pool.md) 取代，密钥环规则见 ADR-0036）与 [ADR-0007](0007-adopt-invited-identity-and-server-sessions.md) 的安全边界；取代 [ADR-0010](archive/0010-adopt-snapshot-gateway-and-idempotent-settlement.md) 中“平台 API Key 不保存可恢复明文”的约定。

@@ -1,4 +1,4 @@
-// Package gateway is the transparent API gateway (ADR-0027): it authenticates
+// Package gateway is the transparent API gateway (ADR-0035): it authenticates
 // the caller, picks channels, forwards the request almost byte for byte,
 // streams the response back unchanged while reading usage on the side, and
 // books the charge after the call has ended.
