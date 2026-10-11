@@ -276,6 +276,19 @@ func (s *Service) UpdateAccount(ctx context.Context, actor Account, accountID st
 	return s.store.UpdateAccount(ctx, actor.ID, accountID, update)
 }
 
+// UpdateOwnDisplayName lets any account change its own display name; the change is audited like an administrator edit.
+func (s *Service) UpdateOwnDisplayName(ctx context.Context, actor Account, displayName string) (Account, error) {
+	trimmed := strings.TrimSpace(displayName)
+	if !validDisplayName(trimmed) {
+		return Account{}, ErrInvalidInput
+	}
+	updated, err := s.store.UpdateAccount(ctx, actor.ID, actor.ID, AccountUpdate{DisplayName: &trimmed})
+	if err != nil {
+		return Account{}, err
+	}
+	return updated.Account, nil
+}
+
 func validDisplayName(value string) bool {
 	length := len([]rune(value))
 	return length >= 1 && length <= 64

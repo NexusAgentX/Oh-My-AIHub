@@ -158,3 +158,21 @@ func TestVerifyPasswordLimitsAreUnchanged(t *testing.T) {
 		}
 	}
 }
+
+func TestValidatePasswordRequiresMixedCaseAndDigit(t *testing.T) {
+	for password, ok := range map[string]bool{
+		"Abcdef12":                      true,
+		"Abcdefg1":                      true,
+		"Abcdef1":                       false, // 7 字符
+		"abcdefg1":                      false,
+		"ABCDEFG1":                      false,
+		"Abcdefgh":                      false,
+		"密码密码Ab1":                       true,
+		"A1" + strings.Repeat("a", 126): true,
+		"A1" + strings.Repeat("a", 127): false,
+	} {
+		if err := ValidatePassword(password); (err == nil) != ok {
+			t.Fatalf("ValidatePassword(%q) = %v, want ok=%v", password, err, ok)
+		}
+	}
+}

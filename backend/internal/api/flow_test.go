@@ -154,7 +154,27 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("admin route for member = %d", recorder.Code)
 	}
 	wang.expect(t, http.StatusOK, http.MethodGet, "/api/me", nil)
-	wang.expect(t, http.StatusOK, http.MethodPost, "/api/me/password", map[string]string{"current_password": initialPassword, "new_password": "Wang-password-2026"})
+	if recorder := wang.call(t, http.MethodPatch, "/api/me", map[string]string{"display_name": "王"}); recorder.Code != http.StatusForbidden || errorCode(t, recorder) != "password_change_required" {
+		t.Fatalf("display name before password change = %d %s", recorder.Code, recorder.Body.String())
+	}
+	// 密码至少 8 位，须含大写、小写与数字，不要求特殊字符。
+	for _, weak := range []string{"Wang201", "wang-password-2026", "WANG-PASSWORD-2026", "Wang-password"} {
+		if recorder := wang.call(t, http.MethodPost, "/api/me/password", map[string]string{"current_password": initialPassword, "new_password": weak}); recorder.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("weak password %q = %d %s", weak, recorder.Code, recorder.Body.String())
+		}
+	}
+	wang.expect(t, http.StatusOK, http.MethodPost, "/api/me/password", map[string]string{"current_password": initialPassword, "new_password": "Wang2026"})
+
+	// 用户可以自己修改显示名。
+	renamed := wang.expect(t, http.StatusOK, http.MethodPatch, "/api/me", map[string]string{"display_name": "  老王  "})["account"].(map[string]any)
+	if renamed["display_name"] != "老王" {
+		t.Fatalf("renamed account = %v", renamed)
+	}
+	for _, invalid := range []any{map[string]string{"display_name": "   "}, map[string]string{}} {
+		if recorder := wang.call(t, http.MethodPatch, "/api/me", invalid); recorder.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("invalid display name %v = %d %s", invalid, recorder.Code, recorder.Body.String())
+		}
+	}
 	if recorder := wang.call(t, http.MethodGet, "/api/admin/accounts", nil); recorder.Code != http.StatusForbidden || errorCode(t, recorder) != "administrator_required" {
 		t.Fatalf("admin route for ready member = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -231,13 +251,13 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("disabled session = %d", recorder.Code)
 	}
 	login := &client{spec: spec, handler: handler}
-	if recorder := login.call(t, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang-password-2026"}); recorder.Code != http.StatusUnauthorized {
+	if recorder := login.call(t, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang2026"}); recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("disabled login = %d", recorder.Code)
 	}
 	admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/accounts/"+memberID, map[string]any{"status": "active"})
 
 	// 重置密码：返回新初始密码，旧会话失效，不能重置自己。
-	login.expect(t, http.StatusOK, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang-password-2026"})
+	login.expect(t, http.StatusOK, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang2026"})
 	reset := admin.expect(t, http.StatusOK, http.MethodPost, "/api/admin/accounts/"+memberID+"/reset-password", nil)
 	if reset["initial_password"] == "" || reset["account"].(map[string]any)["must_change_password"] != true {
 		t.Fatalf("reset = %v", reset)
