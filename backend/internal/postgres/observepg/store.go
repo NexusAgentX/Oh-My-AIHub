@@ -705,6 +705,22 @@ func overviewInputs(ctx context.Context, q *Queries, now time.Time) (observe.Ove
 	for _, row := range failing {
 		inputs.Failing = append(inputs.Failing, observe.FailingChannel{ID: row.ID, Name: row.Name, Attempts: row.Attempts, Successes: row.Successes})
 	}
+	unbilled, err := q.UnbilledConsumers(ctx, UnbilledConsumersParams{
+		Since: now.Add(-observe.UnbilledConsumerWindow), MinSucceeded: observe.UnbilledConsumerMinSucceeded,
+	})
+	if err != nil {
+		return inputs, err
+	}
+	for _, row := range unbilled {
+		consumer := observe.UnbilledConsumer{
+			Account:   observe.AccountRef{ID: row.ID, Username: row.Username, DisplayName: row.DisplayName},
+			Succeeded: row.Succeeded, Unbilled: row.Unbilled,
+		}
+		if row.ChannelID != nil {
+			consumer.TopChannel = &observe.UnbilledChannel{ID: *row.ChannelID, Name: row.ChannelName, Unbilled: row.ChannelUnbilled}
+		}
+		inputs.UnbilledConsumers = append(inputs.UnbilledConsumers, consumer)
+	}
 	counts, err := q.C2COverview(ctx)
 	if err != nil {
 		return inputs, err
