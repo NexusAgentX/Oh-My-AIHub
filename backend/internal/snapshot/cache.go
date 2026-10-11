@@ -129,7 +129,9 @@ func (c *Cache) Load(ctx context.Context) error {
 	if err := c.run(ctx, domainAll, true); err != nil {
 		return err
 	}
-	c.logger.Info("snapshots loaded")
+	keys, models, fleet, routes := c.keys.cur.Load(), c.models.cur.Load(), c.fleet.cur.Load(), c.routes.cur.Load()
+	c.logger.Info("snapshots loaded", "keys", len(keys.value), "models", len(models.value.all),
+		"candidate_lists", len(fleet.value.candidates), "online_models", len(fleet.value.online), "route_prefs", len(routes.value))
 	return nil
 }
 
