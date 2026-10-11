@@ -64,7 +64,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 1. **认证与开调用**：按 Key 摘要在 Key 快照里查找，查不到即无效，不回落数据库；认出 Key 后每次请求写一行 `calls`（先 `in_progress`），响应带 `X-AIHub-Request-Id`。
 2. **模型与额度**：别名 → Key 可用范围 → 启用的目录模型（目录快照）；余额（`余额 > −信用额度`，来自进程内余额缓存）与 Key 预算只检查、不预留、不冻结。检查通过后账号占一个在途名额（`gateway.Inflight`，进程内按账号计数，上限取自平台设置 `account_max_inflight_calls`，0 为不限）；超限以 429 `too_many_inflight_calls` 拒绝并记 `rejected_inflight`，不访问上游、不收费。名额由 `defer` 在 `Serve` 返回时释放，错误与 panic 路径同样；客户端断开后的续读与记账都在 `Serve` 内同步完成，所以续读期间名额仍被占用，记账后才归还。以后若有在 `Serve` 返回之后才结束的工作，释放要跟着移到它结束的地方。
-3. **选渠道**：候选来自候选快照，为格式匹配的上架渠道，路由偏好来自路由快照，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
+3. **选渠道**：候选来自候选快照，为格式匹配的上架渠道，路由偏好来自路由快照，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；稳定与快速模式用的渠道统计来自进程内滚动窗口（见下），快速模式用的首字中位数只统计流式调用；在某个模型上 4xx 异常的渠道（`gateway.detectAnomalies`）排到最后但不排除。
 4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（请求体只扫描一次：`ScanRequest` 同时取出 `model`、`stream`、`previous_response_id` 与计价成员 `enable_thinking`、`service_tier`，后者的结果与 `encoding/json` 整体解码一致；`UpstreamBody` 在这次扫描的基础上找出换 `model` 与补 `include_usage` 的全部改动、一次拼接，没有改动时直接用客户端的字节；它同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容。
    写出前，所有上游非 2xx 应答（请求自身的 4xx 透传与最后一个失败应答）都经过 `newUpstreamFailure`：本次尝试所用渠道的 Key 在响应头值与响应体里被替换为 `[redacted]`（ADR-0041，匹配在 `secretguard.Redact`：原样、百分号编码与任意 JSON 转义写法；日志与存储的错误文本由同一逻辑换成 `***`）。Key 没有出现时状态码、响应头与字节与上游一致；出现时 `Content-Length` 改为实际长度，担保旧字节的摘要头去掉。读错误体时多读 Key 最长编码长度（`secretguard.MaxEncodedLen`）的余量，替换后再截到 1MB，跨过上限的 Key 不会留下开头；传输层没有解码的编码体（`Content-Encoding` 非 identity）无法检查，不写正文。2xx 响应（含流式）不处理，见 ADR-0041 决定 7。
    超时全部是请求 context 上的计时器，出站客户端自己不设 `Timeout`（ADR-0035 规则 5，出站连接因此可以跨请求复用）：非流式是整次请求的总超时（`timeout_total`，尚未写出字节，可回退）；流式在首字节前是首字超时，之后是相邻两次读到数据的间隔（空闲超时，每次读到数据重置）；整个调用另有从开始算起的上限 `callTimeLimit`（60 分钟，含全部尝试）。兜底任务的 61 分钟时限由它加 1 分钟余量得出，两处常量互相注释，改一处要同步另一处。
@@ -74,7 +74,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
    客户端中途断开：开始回写之前（等响应、回退中）断开，立即取消上游，不收费；开始回写之后断开，网关停止写客户端、继续读上游，读到的字节只喂给旁路解析器（`clientWatch`），直到上游结束、读满 `drainWindow`（10 秒）、触发空闲超时或调用上限，再取消上游并按读到的用量结算，调用 `client_disconnected`。续读期间渠道并发槽位照常占用，上游出错与客户端断开都不计渠道失败，`response_bytes` 只算写给客户端的字节。客户端收完最后一帧就挂断、上游随后正常结束的调用不算断开，仍是 `succeeded`。
    替客户端开启了 `include_usage`（`usageInjected`）的 OpenAI Chat 流式响应，经 `usageFrameFilter` 去掉上游多发的那一帧：按空行（`\n\n`、`\r\n\r\n` 或混用）切分事件，只有“单个 `data:` 行、JSON 对象、`choices` 为空数组、`usage` 为非空对象”的事件被丢弃，其余字节（注释行、`data: [DONE]`、`usage` 在非空 `choices` 帧里的响应）逐字原样写出；未完整的事件先暂存，到边界再处理，流结束时剩余字节原样写出；单个事件超过 64 KiB 不再暂存。旁路解析器读取的仍是上游的全部原始字节，所以计费不变；`response_bytes` 只算写给客户端的字节。客户端自己开了 `include_usage`、非 SSE 响应和其他三种格式都不过滤。
 
-并发、RPM、冷却、限流、账号在途计数和 Argon2 工作槽是进程内状态，当前按单实例部署设计。
+并发、RPM、冷却、限流、账号在途计数、渠道统计和 Argon2 工作槽是进程内状态，当前按单实例部署设计。
 
 Key、目录模型、渠道候选索引（含各格式下在线的模型和自定义模型是否在线）、路由偏好来自进程内快照（`internal/snapshot`，ADR-0040）；请求在访问上游之前只剩开调用记录（带预算时还有已缓存的 Key 已用额）。快照与余额缓存是 `gateway.Store`、`routing.Store` 与 `gateway.Models` 之后的缓存层，引擎不感知它。
 
@@ -93,6 +93,8 @@ Key、目录模型、渠道候选索引（含各格式下在线的模型和自�
 - 新增会过账的路径必须用 `Books.InTx`（`Post` 的参数类型保证）；新增改信用额度的写路径要在 `snapshot/wrap.go` 的身份包装里失效对应账号。
 
 渠道上游 Key 的明文缓存（ADR-0036 决定 8）：每次尝试通过 `Keyring.OpenCredential` 取 Key，同一份密文只解密一次，明文留在进程内存里。缓存归密钥环所有，每个渠道一条，只对解出它的那份密文（版本、key id、nonce、密文都相同）作答，所以渠道换 Key 或换用新密钥后旧条目自然失效；渠道服务在更新 Key、删除渠道写库成功后立即调用 `ForgetCredential` 清掉该渠道的条目。大小受渠道数约束，不需要淘汰；解密失败不缓存。平台 API Key、渠道探测和启动校验仍直接用 `Decrypt`，不进缓存。
+
+渠道统计（`gateway.StatsBook`，ADR-0040 的延伸，绑定单实例）：每个渠道一个 288 格的环形窗口，每格 5 分钟，记尝试数、成功数和首字时间对数直方图（约 9% 宽的区间，读出时取区间中点，误差不超过 4.6%）；每个“渠道 × 模型”另有一个窗口，记尝试数与 4xx（`client_error`）数。每次尝试结束时在 `Serve` 循环（没有可回写的响应时）或 `streamBack`（有响应时，在结局确定之后）累加一次；整格过期，窗口读出时顺便清掉过期的格并丢掉空窗口。累加不查库，`client_disconnected` 不计，`client_error` 只进“渠道 × 模型”窗口，首字只收流式调用的 `completed` 尝试。网关读到的是不可变快照（`statsSnapshot`，原子指针读取），`RunRefresh` 每 5 秒从窗口重新发布，同时判定 4xx 异常（阈值是 `stats.go` 里的常量），新出现的异常经 `Runtime.Announce` 发 `anomalous_client_errors` 渠道事件。启动时 `Engine.LoadStats` 读一次数据库（`AttemptHistory`，按渠道、模型、5 分钟、首字区间聚合，分箱边界由 `gateway.TTFTBinEdges` 传给 SQL，内存与数据库按同一张表分箱）作为窗口的起点，读不到则带着空窗口启动，已有的异常视为已通知；此后统计不再查库。重启时仍在途的调用，其尝试不在窗口里。
 
 冷却由连续失败阈值触发；上游 429 带 `Retry-After` 或 `retry-after-ms` 时不等阈值，`gateway.RateLimitCooldown` 解析并限定时长后由 `Runtime.CooldownFor` 直接冷却整个渠道，事件原因为 `rate_limited`（规则见 PRODUCT.md「自动冷却」）。
 

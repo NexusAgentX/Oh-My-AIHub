@@ -50,6 +50,7 @@ const eventLabels: Record<ChannelEvent['kind'], string> = {
   unlisted: '下架',
   test_failed: '测试失败',
   model_pending_multiplier: '待设倍率',
+  anomalous_client_errors: '4xx 异常',
 }
 
 const columns: Column<AdminChannel>[] = [

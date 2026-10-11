@@ -154,6 +154,15 @@ func main() {
 	})
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
+	// The channel statistics are counted in memory from here on; the database is
+	// asked once for the window they start from. Without it the gateway starts
+	// with every channel unrated, which ranks by price alone until it has seen
+	// traffic.
+	statsContext, cancelStats := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	if err := engine.LoadStats(statsContext); err != nil {
+		logger.Error("loading the channel statistics failed, starting without them", "error", err)
+	}
+	cancelStats()
 	go engine.RunReaper(engineContext, time.Minute)
 	go engine.RunRefresh(engineContext)
 	go cached.Cache.Run(engineContext)
@@ -311,6 +320,8 @@ func channelEventKind(kind string) gateway.EventKind {
 		return gateway.EventChannelCooldown
 	case channel.EventCooldownEnded:
 		return gateway.EventChannelRecover
+	case channel.EventAnomalousClientErrors:
+		return gateway.EventChannelAnomaly
 	}
 	return gateway.EventChannelLimit
 }

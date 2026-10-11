@@ -105,6 +105,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	if len(list) != 1 || list[0].(map[string]any)["online_channels"] != float64(1) || list[0].(map[string]any)["lowest_prices"] == nil {
 		t.Fatalf("models = %v", list)
 	}
+	seedChannelHealth(p.stats, channelID, "deepseek-chat")
 	for viewer, wantMine := range map[*client]bool{alice: true, bob: false} {
 		page := viewer.expect(t, http.StatusOK, http.MethodGet, "/api/models/deepseek-chat", nil)
 		offered := page["channels"].([]any)

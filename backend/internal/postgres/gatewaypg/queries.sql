@@ -63,24 +63,33 @@ WHERE cm.enabled AND NOT cm.pending_multiplier
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
--- Health of channels over the last 24 hours, from the attempts of every call.
--- Attempts the client abandoned or that were rejected as the request's own fault
--- say nothing about the channel and are left out. The first-token median counts
--- streaming calls only: a non-streaming call's first byte is the whole answer,
--- which would rank a channel by how long its answers are instead of how fast it
--- starts.
--- name: ChannelStats24h :many
+-- The attempts of calls started in the window the engine keeps channel statistics
+-- for, grouped for Engine.LoadStats, which runs once at startup: from then on the
+-- statistics are counted in memory and nothing runs this periodically.
+-- A row is one channel on one model in one five-minute bucket of the call's start
+-- and, for completed attempts of streaming calls, one first-token bin (bin edges
+-- are passed in, so database and engine bin identically; -1 for the rest).
+-- Attempts the client abandoned (client_disconnected) are left out. A client_error
+-- (an upstream 4xx that is the request's own fault) says nothing about the
+-- channel's health, so it is not "counted", but it is kept per model for the 4xx
+-- anomaly rule. The first-token figure counts streaming calls only: a
+-- non-streaming call's first byte is the whole answer, which would rank a
+-- channel by how long its answers are instead of how fast it starts.
+-- name: AttemptHistory :many
 SELECT (att->'channel'->>'id')::uuid AS channel_id,
-       count(*)::bigint AS attempts,
+       coalesce(c.model_id, '')::text AS model_id,
+       floor(extract(epoch FROM c.created_at) / 300)::bigint AS bucket,
+       coalesce(CASE WHEN c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL
+                THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
+       count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
-       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
-            FILTER (WHERE c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
-WHERE c.created_at >= now() - interval '24 hours'
+WHERE c.created_at >= sqlc.arg(since)::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
-  AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
-GROUP BY 1;
+  AND att->>'end_reason' <> 'client_disconnected'
+GROUP BY 1, 2, 3, 4;
 
 -- name: ResponseChannel :one
 SELECT final_channel_id FROM calls

@@ -316,21 +316,17 @@ func (b *fakeBrowse) ChannelRevenue(context.Context, string, time.Time) (money.A
 	return b.revenue, nil
 }
 
-// fakeGatewayStore backs only what the model pages read from the gateway engine.
-type fakeGatewayStore struct {
-	gateway.Store
-	channels *fakeChannelStore
-}
-
-func (s fakeGatewayStore) ChannelStats(context.Context) (map[string]gateway.ChannelStats, error) {
-	s.channels.mu.Lock()
-	defer s.channels.mu.Unlock()
-	median := 420.0
-	stats := map[string]gateway.ChannelStats{}
-	for _, item := range s.channels.channels {
-		stats[item.ID] = gateway.ChannelStats{Attempts: 10, Successes: 9, TTFTP50MS: &median}
+// seedChannelHealth gives a channel the statistics the model pages report:
+// ten attempts of which nine completed, all of streaming calls with a first
+// token after 420 ms. The median is read off a histogram, so the pages show the
+// middle of the 395–430 ms bin it falls into, 412.5 ms.
+func seedChannelHealth(book *gateway.StatsBook, channelID, modelID string) {
+	at := time.Now()
+	first := 420
+	for range 9 {
+		book.Record(channelID, modelID, true, gateway.Attempt{EndReason: gateway.EndCompleted, TTFTMS: &first}, at)
 	}
-	return stats, nil
+	book.Record(channelID, modelID, true, gateway.Attempt{EndReason: gateway.EndUpstreamError}, at)
 }
 
 // ---- a loopback stand-in for the pinned egress policy ----

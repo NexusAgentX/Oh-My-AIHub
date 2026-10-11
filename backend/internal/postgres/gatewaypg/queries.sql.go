@@ -12,6 +12,78 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
+const attemptHistory = `-- name: AttemptHistory :many
+SELECT (att->'channel'->>'id')::uuid AS channel_id,
+       coalesce(c.model_id, '')::text AS model_id,
+       floor(extract(epoch FROM c.created_at) / 300)::bigint AS bucket,
+       coalesce(CASE WHEN c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL
+                THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, $1::int[]) - 1 END, -1)::int AS ttft_bin,
+       count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
+       count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors
+FROM calls c
+CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
+WHERE c.created_at >= $2::timestamptz
+  AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
+  AND att->>'end_reason' <> 'client_disconnected'
+GROUP BY 1, 2, 3, 4
+`
+
+type AttemptHistoryParams struct {
+	Edges []int32
+	Since time.Time
+}
+
+type AttemptHistoryRow struct {
+	ChannelID    string
+	ModelID      string
+	Bucket       int64
+	TtftBin      int32
+	Counted      int64
+	Successes    int64
+	ClientErrors int64
+}
+
+// The attempts of calls started in the window the engine keeps channel statistics
+// for, grouped for Engine.LoadStats, which runs once at startup: from then on the
+// statistics are counted in memory and nothing runs this periodically.
+// A row is one channel on one model in one five-minute bucket of the call's start
+// and, for completed attempts of streaming calls, one first-token bin (bin edges
+// are passed in, so database and engine bin identically; -1 for the rest).
+// Attempts the client abandoned (client_disconnected) are left out. A client_error
+// (an upstream 4xx that is the request's own fault) says nothing about the
+// channel's health, so it is not "counted", but it is kept per model for the 4xx
+// anomaly rule. The first-token figure counts streaming calls only: a
+// non-streaming call's first byte is the whole answer, which would rank a
+// channel by how long its answers are instead of how fast it starts.
+func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) ([]AttemptHistoryRow, error) {
+	rows, err := q.db.Query(ctx, attemptHistory, arg.Edges, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AttemptHistoryRow
+	for rows.Next() {
+		var i AttemptHistoryRow
+		if err := rows.Scan(
+			&i.ChannelID,
+			&i.ModelID,
+			&i.Bucket,
+			&i.TtftBin,
+			&i.Counted,
+			&i.Successes,
+			&i.ClientErrors,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const channelRevenue = `-- name: ChannelRevenue :one
 SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $1 AND created_at >= $2
 `
@@ -26,58 +98,6 @@ func (q *Queries) ChannelRevenue(ctx context.Context, arg ChannelRevenueParams) 
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const channelStats24h = `-- name: ChannelStats24h :many
-SELECT (att->'channel'->>'id')::uuid AS channel_id,
-       count(*)::bigint AS attempts,
-       count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
-       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
-            FILTER (WHERE c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
-FROM calls c
-CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
-WHERE c.created_at >= now() - interval '24 hours'
-  AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
-  AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
-GROUP BY 1
-`
-
-type ChannelStats24hRow struct {
-	ChannelID string
-	Attempts  int64
-	Successes int64
-	TtftP50Ms float64
-}
-
-// Health of channels over the last 24 hours, from the attempts of every call.
-// Attempts the client abandoned or that were rejected as the request's own fault
-// say nothing about the channel and are left out. The first-token median counts
-// streaming calls only: a non-streaming call's first byte is the whole answer,
-// which would rank a channel by how long its answers are instead of how fast it
-// starts.
-func (q *Queries) ChannelStats24h(ctx context.Context) ([]ChannelStats24hRow, error) {
-	rows, err := q.db.Query(ctx, channelStats24h)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ChannelStats24hRow
-	for rows.Next() {
-		var i ChannelStats24hRow
-		if err := rows.Scan(
-			&i.ChannelID,
-			&i.Attempts,
-			&i.Successes,
-			&i.TtftP50Ms,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const customModelOnline = `-- name: CustomModelOnline :one

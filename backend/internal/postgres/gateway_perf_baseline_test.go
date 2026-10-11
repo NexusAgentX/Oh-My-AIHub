@@ -725,18 +725,19 @@ func (s *perfStack) environment(started time.Time, before, after databaseProbe) 
 }
 
 // writeDatabaseNotes reports how big the calls table grew, and how long the
-// minute-by-minute channel stats query takes on it.
+// startup read of the channel statistics window takes on it. (Before the
+// statistics were counted in memory this was the once-a-minute ChannelStats24h.)
 func (s *perfStack) writeDatabaseNotes(report *strings.Builder) {
 	var calls int64
 	if err := s.pool.QueryRow(context.Background(), `SELECT count(*) FROM calls`).Scan(&calls); err != nil {
 		return
 	}
 	started := time.Now()
-	_, err := s.e.store.Gateway.ChannelStats(context.Background())
+	_, err := s.e.store.Gateway.AttemptHistory(context.Background(), time.Now().Add(-24*time.Hour))
 	elapsed := time.Since(started)
 	fmt.Fprintf(report, "\n## Database\n\n- `calls` holds %d rows at the end of the run.\n", calls)
 	if err == nil {
-		fmt.Fprintf(report, "- `ChannelStats24h` (run once a minute by the engine) takes %s over them.\n", elapsed.Round(time.Millisecond))
+		fmt.Fprintf(report, "- `AttemptHistory` (the engine's one read of the statistics window, at startup; nothing runs it periodically) takes %s over them.\n", elapsed.Round(time.Millisecond))
 	}
 	rows, err := s.pool.Query(context.Background(), `
 		SELECT relname, seq_scan, seq_tup_read, coalesce(idx_scan, 0), n_live_tup

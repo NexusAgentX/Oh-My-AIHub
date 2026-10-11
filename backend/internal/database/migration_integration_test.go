@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -122,6 +123,12 @@ COMMIT;`)
 	if _, err := db.ExecContext(ctx, `INSERT INTO calls (account_id, format, outcome) VALUES
  ('11111111-1111-4111-8111-111111111111', 'openai_chat', 'rejected_inflight')`); err != nil {
 		t.Fatalf("recording a rejected_inflight call: %v", err)
+	}
+	// 0007 lets a channel event record a 4xx anomaly.
+	var eventKinds string
+	if err := db.QueryRowContext(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'channel_events_kind_check'`).Scan(&eventKinds); err != nil ||
+		!strings.Contains(eventKinds, "anomalous_client_errors") || !strings.Contains(eventKinds, "model_pending_multiplier") {
+		t.Fatalf("channel event kinds after upgrade = %q %v", eventKinds, err)
 	}
 	var tables, versions int
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables

@@ -79,7 +79,9 @@ func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
 	return c.Custom.Model(model.ID)
 }
 
-// ChannelStats is the 24h health of a channel computed from call attempts.
+// ChannelStats is the 24h health of a channel computed from call attempts. The
+// first-token median is read off a histogram (see StatsBook) and is within 4.6%
+// of the exact median.
 type ChannelStats struct {
 	Attempts  int64
 	Successes int64
@@ -186,7 +188,10 @@ type Store interface {
 	KeySpend(ctx context.Context, keyID string, now time.Time) (Spend, error)
 	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 	Candidates(ctx context.Context, modelID string, format channel.Format) ([]Candidate, error)
-	ChannelStats(ctx context.Context) (map[string]ChannelStats, error)
+	// AttemptHistory reports the attempts of calls started at or after since,
+	// grouped as AttemptHistoryRow says, for the statistics window to start
+	// from (Engine.LoadStats). It is read once at startup.
+	AttemptHistory(ctx context.Context, since time.Time) ([]AttemptHistoryRow, error)
 	ResponseChannel(ctx context.Context, accountID, responseID string) (string, error)
 	InsertCall(ctx context.Context, call CallInsert) (string, error)
 	FinishCall(ctx context.Context, finish CallFinish) (FinishResult, error)

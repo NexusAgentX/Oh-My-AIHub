@@ -56,6 +56,11 @@ func NewRuntime(notify func(channelID, kind, reason string)) *Runtime {
 	return &Runtime{channels: map[string]*channelRuntime{}, notify: notify}
 }
 
+// Announce sends a channel event that does not come from the state kept here
+// (the 4xx anomaly rule, see detectAnomalies) the same way the cooldown and
+// limit events go. It must not be called with any lock that notify may need.
+func (r *Runtime) Announce(id, kind, reason string) { r.notify(id, kind, reason) }
+
 func (r *Runtime) state(id string) *channelRuntime {
 	state, ok := r.channels[id]
 	if !ok {
