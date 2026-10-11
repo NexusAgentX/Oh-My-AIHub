@@ -292,15 +292,20 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 		if finish.Bill.Fee > 0 {
 			entries = append(entries, ledger.Line{Account: ledger.System(ledger.SystemPlatformRevenue), Amount: finish.Bill.Fee})
 		}
+		// The call row learns of its transaction before the ledger accounts are
+		// locked: the platform_revenue row is locked by every settlement until it
+		// commits, so only what needs the balances is done while it is held.
 		posted, err := ledgerpg.Post(ctx, tx, ledger.Transaction{
 			Type: ledger.TypeAPICall, IdempotencyKey: "call:" + finish.ID, Related: &ledger.Related{Type: "call", ID: finish.ID},
 			Entries: entries,
-		})
+		}, ledgerpg.BeforeLock(func(ctx context.Context, transactionID string) error {
+			return q.SetCallLedgerTx(ctx, SetCallLedgerTxParams{ID: finish.ID, LedgerTxID: &transactionID})
+		}))
 		if err != nil {
 			return err
 		}
 		result.TxID = posted.ID
-		return q.SetCallLedgerTx(ctx, SetCallLedgerTxParams{ID: finish.ID, LedgerTxID: &posted.ID})
+		return nil
 	})
 	return result, err
 }
