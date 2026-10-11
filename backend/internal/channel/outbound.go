@@ -431,7 +431,7 @@ func ApplyAuthentication(request *http.Request, format Format, credential string
 	}
 }
 
-// Outbound is the pinned egress boundary (ADR-0009) as the channel service and
+// Outbound is the pinned egress boundary (ADR-0036) as the channel service and
 // the gateway use it. OutboundPolicy implements it; tests substitute a fake
 // that reaches loopback servers.
 type Outbound interface {

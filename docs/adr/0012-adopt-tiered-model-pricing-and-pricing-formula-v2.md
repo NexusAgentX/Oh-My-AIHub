@@ -74,3 +74,8 @@
 ## 替代关系
 
 无；本 ADR 扩展而非取代 ADR-0008（计价公式 v1 对存量调用继续有效）。
+
+部分被取代（2026-10-11 补注）：
+
+- v0.7.0 重写（[ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md)、ADR-0027，现为 [ADR-0035](0035-adopt-transparent-gateway-v2.md)）删除了以下内容：调用级快照表 `api_call_candidates` 与 `api_call_price_tiers`、`BeginCall`/`FinalizeCall`、`formula_version`、预授权上界。价格快照改为随调用保存在 `calls` 中；计价公式 v1 与存量 v1 调用已不存在。
+- 选档口径（谓词、首个命中生效、整单按档）以及加权和与分别向上取整的内核继续有效。[ADR-0030](0030-price-reliable-token-breakdowns.md) 扩展了计价维度，[ADR-0038](0038-price-usd-models-with-platform-exchange-rate.md) 扩展了计价币种。

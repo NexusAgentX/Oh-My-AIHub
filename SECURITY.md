@@ -40,7 +40,7 @@
 
 ## 已实现的身份与目录安全边界
 
-- 账户只能由管理员创建；实例尚无管理员时，首个管理员通过 `/initialize` 网页（`POST /api/instance/initialize`）创建，实例初始化后该接口返回 409；初始密码与重置密码由密码学安全随机源生成，只在创建或重置成功的响应中展示一次，数据库和后续查询不保存或回显明文。
+- 账户只能由管理员创建；实例尚无管理员时，首个管理员通过 `/initialize` 网页（`POST /api/instance/initialize`）创建，实例初始化后该接口返回 409（[ADR-0037](docs/adr/0037-initialize-first-admin-via-web.md)：部署后应立即初始化，避免他人抢先）；初始密码与重置密码由密码学安全随机源生成，只在创建或重置成功的响应中展示一次，数据库和后续查询不保存或回显明文。
 - 密码使用 Argon2id 哈希，当前参数为 64 MiB 内存、3 次迭代、并行度 2；验证器限制可接受参数、Salt 和摘要长度，避免恶意哈希导致异常资源消耗或崩溃。生产装配（`cmd/server`）始终使用该参数；仅测试通过 `identity/identitytest` 显式选用验证器下限（8 MiB、1 次迭代、并行度 1）以缩短 `-race` 下的耗时，`identity.NewService` 拒绝落在验证器接受范围之外的参数，验证器限制本身不因此放宽。
 - 首次登录必须改密；改密验证当前密码、拒绝复用，并在同一数据库事务中提升密码版本、撤销全部旧会话、保存新哈希和创建唯一新会话。
 - 管理员可为其他账户重置密码：按密码版本乐观并发控制，在同一数据库事务中提升密码版本、写入新哈希、标记必须改密并撤销目标账户全部会话，不为目标创建新会话，并记录操作者审计；重置不允许作用于发起者自身，发起者改密仍必须验证当前密码。具体见 [ADR-0013](docs/adr/0013-adopt-admin-initiated-password-reset.md)。
@@ -63,11 +63,11 @@
 ## 已实现的渠道与网关安全边界
 
 - 上游 Key 以版本化 AES-256-GCM 加密保存（AAD 绑定渠道 ID、版本与密钥 ID），任何读取接口都不回显；测试与发现的错误文本会先抹掉上游 Key。渠道的 Base URL、Key 与请求头规则只对所有者与管理员可见，模型详情里的公开渠道信息不含这些字段。
-- 所有出站请求（发现、格式测试、网关转发）走固定出站策略：只允许 HTTPS 与白名单端口、每次访问重新解析 DNS 并拒绝受保护地址、固定连接地址、禁止环境代理与重定向、`api.openai.com` 永久禁用、叠加管理员维护的 `settings.extra_blocked_hosts`（[ADR-0009](docs/adr/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)）。发现与测试对每个账号限流（每分钟 10 次）。美元汇率同步是唯一不经该策略的出站请求：固定 GET `https://api.frankfurter.dev/v1/latest`，不携带任何凭据或用户数据，响应限 64 KiB，只接受 1～50 且与当前相差不超过 20% 的汇率。
+- 所有出站请求（发现、格式测试、网关转发）走固定出站策略：只允许 HTTPS 与白名单端口、每次访问重新解析 DNS 并拒绝受保护地址、固定连接地址、禁止环境代理与重定向、`api.openai.com` 永久禁用、叠加管理员维护的 `settings.extra_blocked_hosts`（[ADR-0036](docs/adr/0036-adopt-credential-startup-check-and-pinned-egress-pool.md)）。发现与测试对每个账号限流（每分钟 10 次）。美元汇率同步是唯一不经该策略的出站请求：固定 GET `https://api.frankfurter.dev/v1/latest`，不携带任何凭据或用户数据，响应限 64 KiB，只接受 1～50 且与当前相差不超过 20% 的汇率。
 - 渠道请求头规则不能设置或删除 `Host`、`Content-Length`、hop-by-hop 头、`Authorization`、`x-api-key`、`x-goog-api-key`、`Cookie`、`Accept-Encoding`。网关转发时丢弃客户端的 Cookie、`X-AIHub-Tag` 与 `X-Forwarded-*`/`Forwarded`/`Via`，不向上游泄露站内会话与客户端地址。
 - 平台 API Key 以 SHA-256 查找、以上游凭据密钥环可逆加密保存，使用户可以再次复制（[ADR-0028](docs/adr/0028-store-platform-api-keys-reversibly-encrypted.md)）：完整 Key 只返回给所有者，每次读取明文写入审计 `api_key.reveal`；列表与详情只含前缀；持有密钥环与数据库的人可以解出全部平台 Key，与上游 Key 的威胁模型一致。
 - 网关不持久化请求或响应正文，不记录客户端 IP；每个请求一行结构化日志，只含请求 ID、账号、Key 前缀、模型、格式、渠道、结果、状态码、耗时、token 与费用。上游原始错误（调用尝试里的 `error_message`）最多 4KB，后台任务每天把 30 天前的原始错误文本置空（保留状态码与错误码）。
-- 不预扣费意味着并发请求可能让单个账号透支超过信用额度若干次请求的费用，已接受（[ADR-0027](docs/adr/0027-adopt-transparent-gateway-with-post-hoc-billing.md)）。
+- 不预扣费意味着并发请求可能让单个账号透支超过信用额度若干次请求的费用，已接受（[ADR-0035](docs/adr/0035-adopt-transparent-gateway-v2.md)）。
 
 ## 已实现的观测与指标安全边界
 
