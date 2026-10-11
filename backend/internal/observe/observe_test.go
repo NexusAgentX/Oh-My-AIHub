@@ -2,6 +2,7 @@ package observe
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -55,6 +56,108 @@ func TestUnbilledAbnormalThresholds(t *testing.T) {
 		if got := unbilledAbnormal(tc.window); got != tc.want {
 			t.Errorf("%+v = %v, want %v", tc.window, got, tc.want)
 		}
+	}
+}
+
+func unbilledUser(id, name string, succeeded, unbilled int64, channel *UnbilledChannel) UnbilledConsumer {
+	return UnbilledConsumer{Account: AccountRef{ID: id, DisplayName: name}, Succeeded: succeeded, Unbilled: unbilled, TopChannel: channel}
+}
+
+func TestUnbilledConsumerThresholds(t *testing.T) {
+	cases := []struct {
+		consumer UnbilledConsumer
+		want     bool
+	}{
+		{unbilledUser("a", "a", 19, 19, nil), false},    // too few successes for a share
+		{unbilledUser("a", "a", 20, 3, nil), false},     // 15%
+		{unbilledUser("a", "a", 20, 4, nil), true},      // exactly 20% of exactly 20 successes
+		{unbilledUser("a", "a", 100, 19, nil), false},   // just under 20%
+		{unbilledUser("a", "a", 100, 20, nil), true},    // exactly 20%
+		{unbilledUser("a", "a", 21, 4, nil), false},     // 19.05%
+		{unbilledUser("a", "a", 21, 5, nil), true},      // 23.8%
+		{unbilledUser("a", "a", 20, 20, nil), true},     // everything unbilled
+		{unbilledUser("a", "a", 5000, 999, nil), false}, // a few hundred unbilled calls are still under 20% of a busy account
+	}
+	for _, tc := range cases {
+		if got := unbilledConsumerAbnormal(tc.consumer); got != tc.want {
+			t.Errorf("%d/%d = %v, want %v", tc.consumer.Unbilled, tc.consumer.Succeeded, got, tc.want)
+		}
+	}
+}
+
+func TestUnbilledConsumerItemsNameShareChannelAndLink(t *testing.T) {
+	items := unbilledConsumerItems([]UnbilledConsumer{
+		unbilledUser("u-1", "小王", 40, 10, &UnbilledChannel{ID: "c-1", Name: "甲", Unbilled: 6}),
+		unbilledUser("u-2", "老陈", 30, 9, &UnbilledChannel{ID: "c-2", Name: "乙", Unbilled: 4}),
+		unbilledUser("u-3", "阿花", 20, 4, nil),
+	})
+	if len(items) != 3 {
+		t.Fatalf("items = %+v", items)
+	}
+	if items[0].Kind != AttentionUnbilledUser || items[0].Severity != "warning" || items[0].Count != 10 ||
+		items[0].Title != "账户「小王」24 小时内 40 次成功调用中 10 次未计费（25%），多数经渠道「甲」" ||
+		items[0].Link != "/admin/calls?account_id=u-1&outcome=succeeded_unbilled" {
+		t.Fatalf("first = %+v", items[0])
+	}
+	// The top channel served fewer than half of the unbilled calls.
+	if items[1].Title != "账户「老陈」24 小时内 30 次成功调用中 9 次未计费（30%），最多经渠道「乙」" {
+		t.Fatalf("second = %+v", items[1])
+	}
+	// Without a known channel the sentence stops at the share.
+	if items[2].Title != "账户「阿花」24 小时内 20 次成功调用中 4 次未计费（20%）" || items[2].Count != 4 {
+		t.Fatalf("third = %+v", items[2])
+	}
+}
+
+func TestUnbilledConsumerItemsSortAndCapAtFive(t *testing.T) {
+	var consumers []UnbilledConsumer
+	// Seven flagged accounts with 10..16 unbilled calls out of 40, plus noise below the thresholds.
+	for index := 0; index < 7; index++ {
+		consumers = append(consumers, unbilledUser(fmt.Sprintf("u-%d", index), fmt.Sprintf("账户%d", index), 40, int64(10+index), nil))
+	}
+	consumers = append(consumers, unbilledUser("quiet", "安静", 10, 10, nil), unbilledUser("low", "占比低", 400, 60, nil))
+	// A tie in unbilled calls is broken by account ID so the list does not flicker.
+	consumers = append(consumers, unbilledUser("a-tie", "并列", 40, 16, nil))
+	items := unbilledConsumerItems(consumers)
+	if len(items) != UnbilledConsumerMaxItems {
+		t.Fatalf("%d items, want %d", len(items), UnbilledConsumerMaxItems)
+	}
+	var counts []int
+	var links []string
+	for _, item := range items {
+		counts = append(counts, item.Count)
+		links = append(links, item.Link)
+	}
+	wantCounts := []int{16, 16, 15, 14, 13}
+	for index := range wantCounts {
+		if counts[index] != wantCounts[index] {
+			t.Fatalf("counts = %v, want %v", counts, wantCounts)
+		}
+	}
+	if links[0] != "/admin/calls?account_id=a-tie&outcome=succeeded_unbilled" || links[1] != "/admin/calls?account_id=u-6&outcome=succeeded_unbilled" {
+		t.Fatalf("links = %v", links)
+	}
+	if none := unbilledConsumerItems(nil); len(none) != 0 {
+		t.Fatalf("no consumers gave %+v", none)
+	}
+}
+
+func TestAttentionKeepsTheSiteWideUnbilledItemAndAddsConsumers(t *testing.T) {
+	data := OverviewData{
+		Checks:            Checks{ZeroSumOK: true},
+		Last24h:           CallWindow{Succeeded: 100, Unbilled: 30},
+		UnbilledConsumers: []UnbilledConsumer{unbilledUser("u-1", "小王", 40, 30, &UnbilledChannel{ID: "c-1", Name: "甲", Unbilled: 30})},
+	}
+	items := attention(data)
+	if len(items) != 2 || items[0].Kind != AttentionUnbilled || items[1].Kind != AttentionUnbilledUser {
+		t.Fatalf("items = %+v", items)
+	}
+	// An account over the threshold is listed even when the site-wide rule is quiet.
+	data.Last24h = CallWindow{Succeeded: 2000, Unbilled: 8}
+	data.UnbilledConsumers = []UnbilledConsumer{unbilledUser("u-1", "小王", 40, 8, nil)}
+	items = attention(data)
+	if len(items) != 1 || items[0].Kind != AttentionUnbilledUser {
+		t.Fatalf("items = %+v", items)
 	}
 }
 

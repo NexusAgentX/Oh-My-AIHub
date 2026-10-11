@@ -380,8 +380,8 @@ func (o testOutbound) Client(_ context.Context, _ string, timeout time.Duration)
 	return o.client(timeout), nil
 }
 
-func (o testOutbound) GatewayClient(_ context.Context, _ string, timeout time.Duration) (*http.Client, error) {
-	return o.client(timeout), nil
+func (o testOutbound) GatewayClient(_ context.Context, _ string) (*http.Client, error) {
+	return o.client(0), nil
 }
 
 func (o testOutbound) WithExtraBlockedHosts(hosts []string) (channel.Outbound, error) {

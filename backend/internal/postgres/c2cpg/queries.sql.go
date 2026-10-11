@@ -419,6 +419,53 @@ func (q *Queries) ListMarketOrders(ctx context.Context, arg ListMarketOrdersPara
 	return items, nil
 }
 
+const listOrderMethods = `-- name: ListOrderMethods :many
+SELECT id, payment_methods_ciphertext, payment_methods_nonce, payment_methods_key_id FROM c2c_orders
+WHERE ($1::uuid IS NULL OR id > $1)
+ORDER BY id
+LIMIT $2
+`
+
+type ListOrderMethodsParams struct {
+	AfterID  *string
+	RowLimit int32
+}
+
+type ListOrderMethodsRow struct {
+	ID                       string
+	PaymentMethodsCiphertext []byte
+	PaymentMethodsNonce      []byte
+	PaymentMethodsKeyID      string
+}
+
+// Sealed payment methods of every order, whatever its status: sellers list
+// closed and filled orders, and sellers and administrators open the trades of
+// finished orders. Paged by id for the startup keyring check.
+func (q *Queries) ListOrderMethods(ctx context.Context, arg ListOrderMethodsParams) ([]ListOrderMethodsRow, error) {
+	rows, err := q.db.Query(ctx, listOrderMethods, arg.AfterID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrderMethodsRow
+	for rows.Next() {
+		var i ListOrderMethodsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaymentMethodsCiphertext,
+			&i.PaymentMethodsNonce,
+			&i.PaymentMethodsKeyID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSellerOrders = `-- name: ListSellerOrders :many
 SELECT o.id, o.seller_id, o.total_nano, o.available_nano, o.in_trade_nano, o.sold_nano, o.closed_nano, o.unit_price_fen, o.min_per_trade_nano, o.max_per_trade_nano, o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id, o.status, o.created_at, o.updated_at, o.closed_at, a.display_name AS seller_name
 FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id

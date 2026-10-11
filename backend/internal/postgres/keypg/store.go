@@ -269,6 +269,24 @@ func (s *Store) Credential(ctx context.Context, ownerID, id string) (channel.Enc
 	return channel.EncryptedCredential{Version: 1, KeyID: row.KeyKeyID, Nonce: row.KeyNonce, Ciphertext: row.KeyCiphertext}, nil
 }
 
+// CredentialsAfter pages the sealed platform keys of every undeleted API key,
+// enabled or not, in id order (an empty afterID starts at the first) for the
+// startup keyring check.
+func (s *Store) CredentialsAfter(ctx context.Context, afterID string, limit int) ([]channel.StoredCredential, error) {
+	rows, err := s.q.ListKeyCredentials(ctx, ListKeyCredentialsParams{AfterID: pgkit.After(afterID), RowLimit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	stored := make([]channel.StoredCredential, 0, len(rows))
+	for _, row := range rows {
+		stored = append(stored, channel.StoredCredential{
+			RecordID: row.ID,
+			Sealed:   channel.EncryptedCredential{Version: 1, KeyID: row.KeyKeyID, Nonce: row.KeyNonce, Ciphertext: row.KeyCiphertext},
+		})
+	}
+	return stored, nil
+}
+
 func (s *Store) RecordReveal(ctx context.Context, ownerID, id string) error {
 	return auditpg.Record(ctx, s.pool, auditpg.Event{ActorID: ownerID, Action: audit.ActionAPIKeyReveal, TargetType: "api_key", TargetID: id})
 }

@@ -42,6 +42,13 @@ type EncryptedValue struct {
 	Ciphertext []byte
 }
 
+// StoredMethods is the sealed payment methods of one order, as the startup
+// keyring check reads them back from the database.
+type StoredMethods struct {
+	OrderID string
+	Sealed  EncryptedValue
+}
+
 type OrderStatus string
 
 const (
