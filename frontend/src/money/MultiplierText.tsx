@@ -1,7 +1,7 @@
 import { formatMultiplier } from './format'
 
 /** 实际倍率最多显示 4 位小数，完整值放在 title 里。 */
-function shortMultiplier(value: string) {
+export function shortMultiplier(value: string) {
   const number = Number(value)
   if (!Number.isFinite(number)) return value
   const rounded = Number(number.toFixed(4))
@@ -23,9 +23,9 @@ export function MultiplierText({
 }) {
   if (!fxDiscount || !effective) return <>{formatMultiplier(multiplier)}</>
   return (
-    <span title={`实际倍率 ${effective} = 设置倍率 ${multiplier} ÷ 美元汇率`}>
-      {shortMultiplier(effective)}
-      <small className="muted"> · 设置 {formatMultiplier(multiplier)}，汇率优惠</small>
+    <span className="multiplier-text" title={`实际倍率 ${effective} = 设置倍率 ${multiplier} ÷ 美元汇率`}>
+      <span>{shortMultiplier(effective)}</span>
+      <small>设置 {formatMultiplier(multiplier)} · 汇率优惠</small>
     </span>
   )
 }

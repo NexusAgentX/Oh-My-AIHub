@@ -115,7 +115,7 @@ function ModelEditor({
           label="计价币种"
           onChange={(currency) => set({ currency })}
           options={[
-            { key: 'CNY', label: '人民币（= 积分）' },
+            { key: 'CNY', label: '人民币' },
             { key: 'USD', label: '美元' },
           ]}
           value={form.currency}

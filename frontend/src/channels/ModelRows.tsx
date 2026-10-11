@@ -1,9 +1,10 @@
 import type { Format } from '../api/types'
 import { formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
+import { shortMultiplier } from '../money/MultiplierText'
 import { useModelDetails, useModels } from '../models/queries'
 import { channelPrice, currentPrices, effectiveMultiplier } from '../models/pricing'
-import { Button, Icon, IconButton, Notice } from '../ui'
+import { Button, Icon, IconButton, InfoTip } from '../ui'
 import type { ModelRow } from './channelForm'
 
 /** 四个可切换的格式标签；测试通过的显示绿色 ✓。 */
@@ -28,6 +29,22 @@ function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: F
         )
       })}
     </span>
+  )
+}
+
+/** 「汇率优惠」的说明：什么时候该开、开了怎么算。 */
+function FXDiscountTip({ rate }: { rate: string }) {
+  return (
+    <InfoTip label="什么是汇率优惠">
+      <span>这是美元计价的模型，平台价 = 官方美元价 × 汇率 {rate}。</span>
+      <span>
+        <strong>开启</strong>：上游 1 元能充 1 美元额度时开启，倍率直接填上游的分组倍率（如 0.13），按「美元价 × 倍率」扣积分。
+      </span>
+      <span>
+        <strong>不开启</strong>：上游按实际汇率充值（约 {rate} 元充 1 美元）时，倍率填上游分组倍率即可。
+      </span>
+      <span className="muted">两种情况都要求上游按官方美元价计费。</span>
+    </InfoTip>
   )
 }
 
@@ -57,19 +74,12 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
     const output = channelPrice(prices.output, multiplier, row.fxDiscount, usdRate(row))
     return input && output ? `${formatPoints(input, { digits: 2 })} / ${formatPoints(output, { digits: 2 })}` : '—'
   }
-  const rate = rows.map(usdRate).find(Boolean)
   const update = (key: string, patch: Partial<ModelRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)))
   const options = catalog.data?.items.map((model) => model.id) ?? []
 
   if (rows.length === 0) return <p className="muted-copy">没有模型</p>
   return (
-    <>
-    {rate && (
-      <Notice tone="info">
-        带「自动计算汇率优惠」的是美元模型，积分价 = 官方美元价 × {rate}。上游 1 元充 1 美元额度且按官方美元价计费：填上游分组倍率并勾选；上游按实际汇率充值：只填倍率，不勾选。
-      </Notice>
-    )}
     <ul className="model-rows" aria-label="模型">
       <li aria-hidden="true" className="model-rows-head">
         <span>卖</span>
@@ -118,28 +128,36 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
             ))}
           </div>
           <div className="model-row-multiplier">
-            <input
-              aria-label="倍率"
-              className="input num"
-              inputMode="decimal"
-              onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
-              value={row.multiplier}
-            />
+            <span className="multiplier-input">
+              <span aria-hidden="true">×</span>
+              <input
+                aria-label="倍率"
+                className="input num"
+                inputMode="decimal"
+                onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
+                value={row.multiplier}
+              />
+            </span>
             {usdRate(row) && (
-              <label className="model-row-fx">
-                <input
-                  checked={row.fxDiscount}
-                  onChange={(event) => update(row.key, { fxDiscount: event.target.checked })}
-                  type="checkbox"
-                />
-                <span>自动计算汇率优惠</span>
-              </label>
-            )}
-            {usdRate(row) && row.fxDiscount && (
-              <small className="model-row-effective num">实际倍率 {effectiveOf(row) ?? '—'}</small>
+              <span className="model-row-fx">
+                <button
+                  aria-pressed={row.fxDiscount}
+                  className={`format-toggle ${row.fxDiscount ? 'format-toggle-on' : ''}`}
+                  onClick={() => update(row.key, { fxDiscount: !row.fxDiscount })}
+                  title="自动计算汇率优惠"
+                  type="button"
+                >
+                  {row.fxDiscount && <Icon name="check" size={12} />}
+                  汇率优惠
+                </button>
+                <FXDiscountTip rate={usdRate(row)!} />
+              </span>
             )}
           </div>
-          <span className="model-row-price num">{priceOf(row)}</span>
+          <span className="model-row-price num">
+            {priceOf(row)}
+            {usdRate(row) && row.fxDiscount && <small title={effectiveOf(row) ?? undefined}>实际倍率 {shortMultiplier(effectiveOf(row) ?? '—')}</small>}
+          </span>
           <div className="model-row-actions">
             <Button aria-label={`测试 ${row.modelId || row.upstream} 的格式`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">测试</Button>
             <IconButton icon={<Icon name="x" />} label="移除" onClick={() => onChange(rows.filter((item) => item.key !== row.key))} />
@@ -147,6 +165,5 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
         </li>
       ))}
     </ul>
-    </>
   )
 }

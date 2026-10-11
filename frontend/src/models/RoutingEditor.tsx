@@ -127,7 +127,7 @@ export function RoutingEditor({
                 </div>
                 <dl className="routing-metrics">
                   <div>
-                    <dt>{channel.fx_discount ? '实际倍率' : '倍率'}</dt>
+                    <dt>倍率</dt>
                     <dd>
                       <MultiplierText
                         effective={channel.effective_multiplier}

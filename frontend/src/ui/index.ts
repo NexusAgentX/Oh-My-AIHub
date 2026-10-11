@@ -37,6 +37,7 @@ export {
   TextField,
 } from './Form'
 export { Icon, iconNames, type IconName } from './Icon'
+export { InfoTip } from './InfoTip'
 export { SuggestInput, type Suggestion } from './Suggest'
 export { Mascot } from './Mascot'
 export { QueryBoundary } from './QueryBoundary'
