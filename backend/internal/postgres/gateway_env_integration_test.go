@@ -192,6 +192,7 @@ type env struct {
 	feed    *observe.Feed
 	metrics *metrics.Metrics
 	runtime *gateway.Runtime
+	keyring *channel.Keyring
 }
 
 type syncBuffer struct {
@@ -268,7 +269,7 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	outbound := testOutbound{client: &http.Client{Transport: testTransport}}
-	e := &env{t: t, pool: pool, store: store, logs: logs, service: service, people: map[string]person{}}
+	e := &env{t: t, pool: pool, store: store, logs: logs, service: service, people: map[string]person{}, keyring: keyring}
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		_ = store.Gateway.RecordChannelEvent(context.Background(), channelID, kind, reason)
 	})

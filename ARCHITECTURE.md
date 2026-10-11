@@ -73,6 +73,8 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 并发、RPM、冷却、限流、账号在途计数和 Argon2 工作槽是进程内状态，当前按单实例部署设计。
 
+渠道上游 Key 的明文缓存（ADR-0036 决定 8）：每次尝试通过 `Keyring.OpenCredential` 取 Key，同一份密文只解密一次，明文留在进程内存里。缓存归密钥环所有，每个渠道一条，只对读出它时的那份密文（版本、key id、nonce、密文都相同）作答，所以渠道换 Key 或换用新密钥后旧条目自然失效；渠道服务在更新 Key、删除渠道写库成功后立即调用 `ForgetCredential` 清掉该渠道的条目。大小受渠道数约束，不需要淘汰；解密失败不缓存。平台 API Key、渠道探测和启动校验仍直接用 `Decrypt`，不进缓存。
+
 冷却由连续失败阈值触发；上游 429 带 `Retry-After` 或 `retry-after-ms` 时不等阈值，`gateway.RateLimitCooldown` 解析并限定时长后由 `Runtime.CooldownFor` 直接冷却整个渠道，事件原因为 `rate_limited`（规则见 PRODUCT.md「自动冷却」）。
 
 ## 数据与不变量

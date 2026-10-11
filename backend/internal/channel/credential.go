@@ -16,6 +16,8 @@ import (
 type Keyring struct {
 	activeKeyID string
 	keys        map[string][]byte
+	// opened holds the plaintext of channel keys opened through OpenCredential.
+	opened openedCredentials
 }
 
 func ParseKeyring(encoded, activeKeyID string) (*Keyring, error) {
