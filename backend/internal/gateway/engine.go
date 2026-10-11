@@ -713,13 +713,19 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, ttft time.Duration) attemptResult {
 	ctx := r.Context()
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}}}
-	fail := func(endReason, code, message string, status *int) attemptResult {
+	// closeFailed writes the failure into the attempt record; fail also counts
+	// it against the channel.
+	closeFailed := func(endReason, code, message string, status *int) attemptResult {
 		result.record.EndReason, result.record.ErrorCode = endReason, stringPointer(code)
 		if message != "" {
 			result.record.ErrorMessage = stringPointer(limitMessage(scrub(message, result.secret)))
 		}
 		result.record.StatusCode = status
 		result.record.DurationMS = millis(e.Now().Sub(result.started))
+		return result
+	}
+	fail := func(endReason, code, message string, status *int) attemptResult {
+		closeFailed(endReason, code, message, status)
 		e.Runtime.Failure(candidate.ChannelID, limits, e.Now(), endReason)
 		return result
 	}
@@ -855,7 +861,15 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 	response.Body.Close()
 	cancel(nil)
 	result.failure = &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
-	return fail(EndUpstreamError, "upstream_"+http.StatusText(status), string(payload), &status)
+	code := "upstream_" + http.StatusText(status)
+	if pause, limited := RateLimitCooldown(status, response.Header, e.Now(), limits); limited {
+		// The upstream said when to come back: rest the channel for that long
+		// right away rather than counting towards the failure threshold.
+		closeFailed(EndUpstreamError, code, string(payload), &status)
+		e.Runtime.CooldownFor(candidate.ChannelID, pause, e.Now(), CooldownRateLimited)
+		return result
+	}
+	return fail(EndUpstreamError, code, string(payload), &status)
 }
 
 func isTimeout(err error) bool {
