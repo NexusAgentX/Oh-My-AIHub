@@ -68,6 +68,8 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 并发、RPM、冷却、限流和 Argon2 工作槽是进程内状态，当前按单实例部署设计。
 
+冷却由连续失败阈值触发；上游 429 带 `Retry-After` 或 `retry-after-ms` 时不等阈值，`gateway.RateLimitCooldown` 解析并限定时长后由 `Runtime.CooldownFor` 直接冷却整个渠道，事件原因为 `rate_limited`（规则见 PRODUCT.md「自动冷却」）。
+
 ## 数据与不变量
 
 - **单位**：金额为 `bigint` 纳积分（1 积分 = 1e9），人民币为整数分，费率为纳比率，时间为 `timestamptz`（ADR-0006）。美元模型的价格以纳美元存储，汇率 `settings.usd_cny_rate_nano` 为纳单位；计费在用量总额上一次性乘倍率与换算率（`ledger.ChannelRate`：开汇率优惠为 1，否则为汇率）并向上取整，便宜优先排序比较「倍率 × 换算率」。
