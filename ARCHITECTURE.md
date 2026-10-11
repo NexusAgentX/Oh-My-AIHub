@@ -50,7 +50,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
 | `keyringcheck` | 启动时逐条解密仍可能被读取的密文（未删除渠道与平台 API Key、全部 C2C 卖单），缺失或损坏的密钥拒绝启动；读取接口由各 `<domain>pg` 实现 |
 | `forum` | 板块、主题、回复、工单与附件校验（ADR-0031） |
-| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据泄露检测 |
+| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据检测与抹除 |
 
 ## API 约定
 
@@ -58,14 +58,15 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 - 契约测试对照路由表与 OpenAPI，并用规范 schema 校验处理器与集成测试中的每个响应；`internal/api` 的覆盖门禁要求每个接口至少有一个经过校验的成功响应（外部模型 API 透传除外）；前端类型生成为 `frontend/src/api/schema.gen.ts`，CI 检查漂移。
 - 响应用 `internal/api` 内手写的结构体表示，与处理器同文件，按 OpenAPI schema 命名为 `<schema>JSON`（`ApiKey` → `apiKeyJSON`），不用 `map[string]any` 拼响应；规范要求存在的字段（含 `null`）不加 `omitempty`，空列表初始化为 `[]`，金额为十进制字符串；领域类型不为响应添加 json 标签（只有持久化 jsonb 与请求解码用的类型保留）。网关存下的价格快照与审计 `detail` 是已存储的 jsonb，以 `json.RawMessage` 原样透传，是唯一不逐字段定义的响应内容；实时流（SSE）事件载荷与对应列表项使用同一组类型。
 - 平台接口的错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`；记账类写请求接受 `Idempotency-Key`。
-- 外部模型 API（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/...` 与模型列表）凭平台 API Key 认证，不走会话与同源校验。网关自己产生的错误按客户端协议返回官方 SDK 能解析的格式（`internal/gateway/errors.go`：`/v1beta/` 为 Gemini 的 AIP-193，`/v1/messages` 或带 `anthropic-version` 为 Anthropic，其余为 OpenAI），状态码不随协议变化，平台错误码保留在 OpenAI 的 `code`、Gemini 的 `ErrorInfo.reason` 里；上游错误原样透传。
+- 外部模型 API（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/...` 与模型列表）凭平台 API Key 认证，不走会话与同源校验。网关自己产生的错误按客户端协议返回官方 SDK 能解析的格式（`internal/gateway/errors.go`：`/v1beta/` 为 Gemini 的 AIP-193，`/v1/messages` 或带 `anthropic-version` 为 Anthropic，其余为 OpenAI），状态码不随协议变化，平台错误码保留在 OpenAI 的 `code`、Gemini 的 `ErrorInfo.reason` 里；上游错误透传，其中出现的渠道上游 Key 被抹掉（见「网关一次请求」第 4 步）。
 
 ## 网关一次请求
 
 1. **认证与开调用**：按 Key 摘要在 Key 快照里查找，查不到即无效，不回落数据库；认出 Key 后每次请求写一行 `calls`（先 `in_progress`），响应带 `X-AIHub-Request-Id`。
 2. **模型与额度**：别名 → Key 可用范围 → 启用的目录模型（目录快照）；余额（`余额 > −信用额度`，来自进程内余额缓存）与 Key 预算只检查、不预留、不冻结。检查通过后账号占一个在途名额（`gateway.Inflight`，进程内按账号计数，上限取自平台设置 `account_max_inflight_calls`，0 为不限）；超限以 429 `too_many_inflight_calls` 拒绝并记 `rejected_inflight`，不访问上游、不收费。名额由 `defer` 在 `Serve` 返回时释放，错误与 panic 路径同样；客户端断开后的续读与记账都在 `Serve` 内同步完成，所以续读期间名额仍被占用，记账后才归还。以后若有在 `Serve` 返回之后才结束的工作，释放要跟着移到它结束的地方。
 3. **选渠道**：候选来自候选快照，为格式匹配的上架渠道，路由偏好来自路由快照，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
-4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（`EnsureIncludeUsage` 同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容，状态码、响应头与字节与上游一致。
+4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（`EnsureIncludeUsage` 同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容。
+   写出前，所有上游非 2xx 应答（请求自身的 4xx 透传与最后一个失败应答）都经过 `newUpstreamFailure`：本次尝试所用渠道的 Key 在响应头值与响应体里被替换为 `[redacted]`（ADR-0041，匹配在 `secretguard.Redact`：原样、百分号编码与任意 JSON 转义写法；日志与存储的错误文本由同一逻辑换成 `***`）。Key 没有出现时状态码、响应头与字节与上游一致；出现时 `Content-Length` 改为实际长度，担保旧字节的摘要头去掉。读错误体时多读 Key 最长编码长度（`secretguard.MaxEncodedLen`）的余量，替换后再截到 1MB，跨过上限的 Key 不会留下开头；传输层没有解码的编码体（`Content-Encoding` 非 identity）无法检查，不写正文。2xx 响应（含流式）不处理，见 ADR-0041 决定 7。
    超时全部是请求 context 上的计时器，出站客户端自己不设 `Timeout`（ADR-0035 规则 5，出站连接因此可以跨请求复用）：非流式是整次请求的总超时（`timeout_total`，尚未写出字节，可回退）；流式在首字节前是首字超时，之后是相邻两次读到数据的间隔（空闲超时，每次读到数据重置）；整个调用另有从开始算起的上限 `callTimeLimit`（60 分钟，含全部尝试）。兜底任务的 61 分钟时限由它加 1 分钟余量得出，两处常量互相注释，改一处要同步另一处。
 5. **回写与记账**：响应原样逐块回写，旁路读取用量；结束时在一个事务内关闭调用并过账，价格快照随调用保存，历史不按现价重算。首字节之后的中断不再回退：空闲超时、总超时与读取错误记尝试 `interrupted`（`error_code` 为 `timeout_idle`、`timeout_total`、`read_error`）并计渠道失败；调用上限到期记 `interrupted` / `call_deadline`，不计渠道失败；两者都按已读到的用量结算。调用上限在首字节之前到期时，网关自己返回 504 `call_deadline`，不再尝试后面的候选。
    读到 `io.EOF` 只有在这次尝试没被取消时才算回答正常结束（`answerEnded`）。取消（调用上限、空闲或续读超时）会让传输层关闭连接，而关闭 TLS 连接先发 close_notify，对端（例如一直等着被取消的上游）可以抢在套接字真正关闭前发完分块响应体的结尾，阻塞在读上的一方会拿到最后几个字节和干净的 EOF 而不是错误；这种 EOF 按取消原因处理，不当成完成。
