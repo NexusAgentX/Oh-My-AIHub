@@ -4193,6 +4193,7 @@ components:
           - {type: 'null'}
           description: 美元模型计费时使用的汇率；人民币模型为 null。
         fx_discount: {type: boolean}
+        custom: {type: boolean, description: 渠道自定义模型按渠道自定价格计费；旧快照无此字段。}
         effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
         fee_rate_nano: {type: integer}
         prices: {$ref: '#/components/schemas/EffectivePrices'}
