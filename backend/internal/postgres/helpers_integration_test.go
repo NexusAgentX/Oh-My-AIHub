@@ -117,8 +117,15 @@ func mustAmount(t *testing.T, value string) money.Amount {
 // accounts creates a bootstrap administrator and ready members with the given credit limits.
 func accounts(t *testing.T, store *storepg.Store, credits ...string) (*identity.Service, identity.Account, []identity.AdminAccount) {
 	t.Helper()
+	return accountsOn(t, store.Identity, credits...)
+}
+
+// accountsOn is accounts on the given identity store, for the tests that run
+// the gateway on the cached stores.
+func accountsOn(t *testing.T, store identity.Store, credits ...string) (*identity.Service, identity.Account, []identity.AdminAccount) {
+	t.Helper()
 	ctx := context.Background()
-	service, err := identitytest.NewService(store.Identity, time.Hour)
+	service, err := identitytest.NewService(store, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

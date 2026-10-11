@@ -137,3 +137,5 @@ ADR-0027 确立了网关的形态：透明转发、不预扣、请求结束后�
 ## 替代关系
 
 取代 [ADR-0027](archive/0027-adopt-transparent-gateway-with-post-hoc-billing.md)。相对 ADR-0027 的变化见各规则中标为“新增”的条目，以及规则 9 的时限依据；其余规则沿用。
+
+规则 4、6 的“上游错误原样返回”已由 [ADR-0041](0041-redact-channel-key-in-upstream-errors.md) 部分取代：上游错误响应的响应体与响应头值里出现的渠道上游 Key 会被替换为 `[redacted]`，其余仍原样返回；成功响应不受影响。

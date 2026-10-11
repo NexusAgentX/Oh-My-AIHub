@@ -16,13 +16,13 @@
 | 组成 | 位置 | 职责 |
 | --- | --- | --- |
 | 前端 | `frontend/` | React 单页应用；`nginx.conf` 提供静态资源并反向代理 |
-| 后端 | `backend/cmd/server` | 组装依赖、启动时校验密钥环与出站配置并解密全部存量密文、运行后台任务 |
+| 后端 | `backend/cmd/server` | 组装依赖、启动时校验密钥环与出站配置并解密全部存量密文、加载网关快照、运行后台任务 |
 | 迁移 | `backend/cmd/migrate`、`backend/internal/database/migrations/` | Goose 嵌入式编号迁移，已发布迁移只追加 |
 | API 契约 | `backend/api/openapi.yaml` | OpenAPI 3.1，前后端唯一契约（ADR-0021） |
 | 编排与工具 | `compose.yaml`、`mise.toml` | 数据库、一次性迁移、后端、前端；工具版本与常用任务 |
 | 运维 | `scripts/`、`docs/runbooks/` | 加密备份与恢复演练；部署、发布、事故处理 |
 
-后台任务均在 `cmd/server` 内运行：网关超时调用清理、C2C 付款超时与美元汇率自动同步检查（每分钟，到点每天同步一次）、指标刷新（每分钟）、论坛未绑定附件清理（每小时）、上游原始错误文本清理（每天）。系统按单实例部署，运行时状态放在进程内（ADR-0039）。
+后台任务均在 `cmd/server` 内运行：网关超时调用清理、网关快照全量重建（每 60 秒，ADR-0040）、C2C 付款超时与美元汇率自动同步检查（每分钟，到点每天同步一次）、指标刷新（每分钟）、论坛未绑定附件清理（每小时）、上游原始错误文本清理（每天）。系统按单实例部署，运行时状态放在进程内（ADR-0039）。
 
 ## 后端分层
 
@@ -45,11 +45,12 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `channel` | 渠道与渠道模型、上游 Key 加密、模型发现与格式测试、上游凭据密钥环与固定出站策略（ADR-0036） |
 | `apikey`、`routing` | 平台 API Key（ADR-0028）；按用户按模型的路由偏好，账号级与 Key 级 |
 | `gateway` | 透明网关（ADR-0035）：请求体扫描与 `model` 替换、旁路用量解析、候选排序、进程内渠道状态、事件总线 |
+| `snapshot` | 网关热路径只读数据的进程内快照（Key、目录模型、渠道候选、路由偏好）与写路径包装：写事务提交后同步重建，另每 60 秒全量重建（ADR-0040） |
 | `observe`、`metrics` | 现算观测、对账核对与补记、SSE 推送；Prometheus 指标（ADR-0029） |
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
 | `keyringcheck` | 启动时逐条解密仍可能被读取的密文（未删除渠道与平台 API Key、全部 C2C 卖单），缺失或损坏的密钥拒绝启动；读取接口由各 `<domain>pg` 实现 |
 | `forum` | 板块、主题、回复、工单与附件校验（ADR-0031） |
-| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据泄露检测 |
+| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据检测与抹除 |
 
 ## API 约定
 
@@ -57,14 +58,15 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 - 契约测试对照路由表与 OpenAPI，并用规范 schema 校验处理器与集成测试中的每个响应；`internal/api` 的覆盖门禁要求每个接口至少有一个经过校验的成功响应（外部模型 API 透传除外）；前端类型生成为 `frontend/src/api/schema.gen.ts`，CI 检查漂移。
 - 响应用 `internal/api` 内手写的结构体表示，与处理器同文件，按 OpenAPI schema 命名为 `<schema>JSON`（`ApiKey` → `apiKeyJSON`），不用 `map[string]any` 拼响应；规范要求存在的字段（含 `null`）不加 `omitempty`，空列表初始化为 `[]`，金额为十进制字符串；领域类型不为响应添加 json 标签（只有持久化 jsonb 与请求解码用的类型保留）。网关存下的价格快照与审计 `detail` 是已存储的 jsonb，以 `json.RawMessage` 原样透传，是唯一不逐字段定义的响应内容；实时流（SSE）事件载荷与对应列表项使用同一组类型。
 - 平台接口的错误统一为 `{"error": "<code>", "message": "<中文>"}`；列表统一游标分页（`cursor`、`limit` → `items`、`next_cursor`）；响应带 `Cache-Control: no-store`；记账类写请求接受 `Idempotency-Key`。
-- 外部模型 API（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/...` 与模型列表）凭平台 API Key 认证，不走会话与同源校验。网关自己产生的错误按客户端协议返回官方 SDK 能解析的格式（`internal/gateway/errors.go`：`/v1beta/` 为 Gemini 的 AIP-193，`/v1/messages` 或带 `anthropic-version` 为 Anthropic，其余为 OpenAI），状态码不随协议变化，平台错误码保留在 OpenAI 的 `code`、Gemini 的 `ErrorInfo.reason` 里；上游错误原样透传。
+- 外部模型 API（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1beta/models/...` 与模型列表）凭平台 API Key 认证，不走会话与同源校验。网关自己产生的错误按客户端协议返回官方 SDK 能解析的格式（`internal/gateway/errors.go`：`/v1beta/` 为 Gemini 的 AIP-193，`/v1/messages` 或带 `anthropic-version` 为 Anthropic，其余为 OpenAI），状态码不随协议变化，平台错误码保留在 OpenAI 的 `code`、Gemini 的 `ErrorInfo.reason` 里；上游错误透传，其中出现的渠道上游 Key 被抹掉（见「网关一次请求」第 4 步）。
 
 ## 网关一次请求
 
-1. **认证与开调用**：按 Key 摘要查找；认出 Key 后每次请求写一行 `calls`（先 `in_progress`），响应带 `X-AIHub-Request-Id`。
-2. **模型与额度**：别名 → Key 可用范围 → 启用的目录模型；余额与 Key 预算只检查、不预留、不冻结。检查通过后账号占一个在途名额（`gateway.Inflight`，进程内按账号计数，上限取自平台设置 `account_max_inflight_calls`，0 为不限）；超限以 429 `too_many_inflight_calls` 拒绝并记 `rejected_inflight`，不访问上游、不收费。名额由 `defer` 在 `Serve` 返回时释放，错误与 panic 路径同样；客户端断开后的续读与记账都在 `Serve` 内同步完成，所以续读期间名额仍被占用，记账后才归还。以后若有在 `Serve` 返回之后才结束的工作，释放要跟着移到它结束的地方。
-3. **选渠道**：候选为格式匹配的上架渠道，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
-4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（请求体只扫描一次：`ScanRequest` 同时取出 `model`、`stream`、`previous_response_id` 与计价成员 `enable_thinking`、`service_tier`，后者的结果与 `encoding/json` 整体解码一致；`UpstreamBody` 在这次扫描的基础上找出换 `model` 与补 `include_usage` 的全部改动、一次拼接，没有改动时直接用客户端的字节；它同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容，状态码、响应头与字节与上游一致。
+1. **认证与开调用**：按 Key 摘要在 Key 快照里查找，查不到即无效，不回落数据库；认出 Key 后每次请求写一行 `calls`（先 `in_progress`），响应带 `X-AIHub-Request-Id`。
+2. **模型与额度**：别名 → Key 可用范围 → 启用的目录模型（目录快照）；余额与 Key 预算只检查、不预留、不冻结。检查通过后账号占一个在途名额（`gateway.Inflight`，进程内按账号计数，上限取自平台设置 `account_max_inflight_calls`，0 为不限）；超限以 429 `too_many_inflight_calls` 拒绝并记 `rejected_inflight`，不访问上游、不收费。名额由 `defer` 在 `Serve` 返回时释放，错误与 panic 路径同样；客户端断开后的续读与记账都在 `Serve` 内同步完成，所以续读期间名额仍被占用，记账后才归还。以后若有在 `Serve` 返回之后才结束的工作，释放要跟着移到它结束的地方。
+3. **选渠道**：候选来自候选快照，为格式匹配的上架渠道，路由偏好来自路由快照，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
+4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（请求体只扫描一次：`ScanRequest` 同时取出 `model`、`stream`、`previous_response_id` 与计价成员 `enable_thinking`、`service_tier`，后者的结果与 `encoding/json` 整体解码一致；`UpstreamBody` 在这次扫描的基础上找出换 `model` 与补 `include_usage` 的全部改动、一次拼接，没有改动时直接用客户端的字节；它同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容。
+   写出前，所有上游非 2xx 应答（请求自身的 4xx 透传与最后一个失败应答）都经过 `newUpstreamFailure`：本次尝试所用渠道的 Key 在响应头值与响应体里被替换为 `[redacted]`（ADR-0041，匹配在 `secretguard.Redact`：原样、百分号编码与任意 JSON 转义写法；日志与存储的错误文本由同一逻辑换成 `***`）。Key 没有出现时状态码、响应头与字节与上游一致；出现时 `Content-Length` 改为实际长度，担保旧字节的摘要头去掉。读错误体时多读 Key 最长编码长度（`secretguard.MaxEncodedLen`）的余量，替换后再截到 1MB，跨过上限的 Key 不会留下开头；传输层没有解码的编码体（`Content-Encoding` 非 identity）无法检查，不写正文。2xx 响应（含流式）不处理，见 ADR-0041 决定 7。
    超时全部是请求 context 上的计时器，出站客户端自己不设 `Timeout`（ADR-0035 规则 5，出站连接因此可以跨请求复用）：非流式是整次请求的总超时（`timeout_total`，尚未写出字节，可回退）；流式在首字节前是首字超时，之后是相邻两次读到数据的间隔（空闲超时，每次读到数据重置）；整个调用另有从开始算起的上限 `callTimeLimit`（60 分钟，含全部尝试）。兜底任务的 61 分钟时限由它加 1 分钟余量得出，两处常量互相注释，改一处要同步另一处。
 5. **回写与记账**：响应原样逐块回写（读缓冲区取自池，首块与后续读共用一块），旁路读取用量：旁路解析器先看每个事件的成员名（`scanFrameKeys`，不分配内存），没有用量、细分、服务档位或思考标记成员的事件不解码，所以绝大多数只带几个字的事件不产生分配；有这些成员的事件按原有规则解析，结果与逐帧完整解码一致（`legacy_observer_test.go` 保留原实现，对拍测试与模糊测试逐事件比较）；结束时在一个事务内关闭调用并过账，价格快照随调用保存，历史不按现价重算。首字节之后的中断不再回退：空闲超时、总超时与读取错误记尝试 `interrupted`（`error_code` 为 `timeout_idle`、`timeout_total`、`read_error`）并计渠道失败；调用上限到期记 `interrupted` / `call_deadline`，不计渠道失败；两者都按已读到的用量结算。调用上限在首字节之前到期时，网关自己返回 504 `call_deadline`，不再尝试后面的候选。
    读到 `io.EOF` 只有在这次尝试没被取消时才算回答正常结束（`answerEnded`）。取消（调用上限、空闲或续读超时）会让传输层关闭连接，而关闭 TLS 连接先发 close_notify，对端（例如一直等着被取消的上游）可以抢在套接字真正关闭前发完分块响应体的结尾，阻塞在读上的一方会拿到最后几个字节和干净的 EOF 而不是错误；这种 EOF 按取消原因处理，不当成完成。
@@ -72,6 +74,15 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
    替客户端开启了 `include_usage`（`usageInjected`）的 OpenAI Chat 流式响应，经 `usageFrameFilter` 去掉上游多发的那一帧：按空行（`\n\n`、`\r\n\r\n` 或混用）切分事件，只有“单个 `data:` 行、JSON 对象、`choices` 为空数组、`usage` 为非空对象”的事件被丢弃，其余字节（注释行、`data: [DONE]`、`usage` 在非空 `choices` 帧里的响应）逐字原样写出；未完整的事件先暂存，到边界再处理，流结束时剩余字节原样写出；单个事件超过 64 KiB 不再暂存。旁路解析器读取的仍是上游的全部原始字节，所以计费不变；`response_bytes` 只算写给客户端的字节。客户端自己开了 `include_usage`、非 SSE 响应和其他三种格式都不过滤。
 
 并发、RPM、冷却、限流、账号在途计数和 Argon2 工作槽是进程内状态，当前按单实例部署设计。
+
+Key、目录模型、渠道候选索引（含各格式下在线的模型和自定义模型是否在线）、路由偏好来自进程内快照（`internal/snapshot`，ADR-0040）；请求在访问上游之前只剩开调用记录和读余额（带预算时还有已缓存的 Key 已用额）。快照是 `gateway.Store`、`routing.Store` 与 `gateway.Models` 之后的缓存层，引擎不感知它。
+
+- 失效：会写这些数据的服务（Key、渠道、目录、身份、路由）必须建立在 `postgres.Cached` 提供的包装 Store 上。包装在事务提交成功之后重建受影响的快照，重建完成才返回，所以后台操作一返回，下一个请求就按新数据处理；停用或删除 Key、停用账号、下架或删除渠道（含管理员强制下架）也走这条路，没有例外。快照记录自己已计入的变更数，比最近一次变更旧的快照不被使用，重建失败则请求失败（失败关闭）。
+- 兜底：启动加载一次（读不到就拒绝启动），之后每 60 秒全量重建；不经后台的改动（手工 SQL、迁移）最长 60 秒后可见。
+- 新增会写这些表的 Store 方法，要在 `internal/snapshot/wrap.go` 的清单里归类并接上钩子；守护测试 `TestEveryStoreMethodIsClassified` 在接口有方法而清单没有时失败。
+- 查不到的 Key 直接拒绝，不查库。快照里的值被所有请求共享、只读；`Candidates` 返回副本，因为引擎要给候选设置汇率。
+- Responses 粘性用小 LRU（最近的 response_id → 渠道），由调用结算写入，未命中再查库。美元汇率不在快照里，请求时从设置快照取（5 秒内）。
+- 绑定单实例（ADR-0039）：多副本时一个副本的写入无法使另一个副本的快照失效。
 
 渠道上游 Key 的明文缓存（ADR-0036 决定 8）：每次尝试通过 `Keyring.OpenCredential` 取 Key，同一份密文只解密一次，明文留在进程内存里。缓存归密钥环所有，每个渠道一条，只对解出它的那份密文（版本、key id、nonce、密文都相同）作答，所以渠道换 Key 或换用新密钥后旧条目自然失效；渠道服务在更新 Key、删除渠道写库成功后立即调用 `ForgetCredential` 清掉该渠道的条目。大小受渠道数约束，不需要淘汰；解密失败不缓存。平台 API Key、渠道探测和启动校验仍直接用 `Decrypt`，不进缓存。
 

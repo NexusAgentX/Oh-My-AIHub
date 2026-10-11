@@ -16,6 +16,7 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -61,7 +63,7 @@ var (
 // Dependencies wires the gateway.
 type Dependencies struct {
 	Store    Store
-	Catalog  *catalog.Service
+	Catalog  Models
 	Settings *settings.Service
 	Routing  routing.Store
 	Keyring  *channel.Keyring
@@ -732,6 +734,50 @@ func (f *upstreamFailure) write(w http.ResponseWriter, requestID string) {
 	_, _ = w.Write(f.body)
 }
 
+// redactedCredential stands in for the channel's upstream key wherever an
+// upstream error echoed it (ADR-0041).
+const redactedCredential = "[redacted]"
+
+// newUpstreamFailure keeps an upstream error answer to hand to the client: the
+// status, headers and body as they came, except that the key this attempt used
+// is replaced by redactedCredential in header values and body, because an
+// upstream may echo the credential it was given, and the caller is not the
+// channel's owner (ADR-0036 rule 1, ADR-0041). An answer that does not hold the
+// key is passed on byte for byte. payload may hold up to MaxEncodedLen of the
+// key beyond maxFailureBody: it is cut after the redaction, so that a key
+// straddling the limit does not leave its beginning in the answer.
+func newUpstreamFailure(response *http.Response, payload []byte, secret string) *upstreamFailure {
+	header := ClientResponseHeaders(response.Header, response.Uncompressed)
+	for _, values := range header {
+		for index, value := range values {
+			values[index], _ = secretguard.RedactString(value, secret, redactedCredential)
+		}
+	}
+	body := payload
+	if encoding := strings.TrimSpace(header.Get("Content-Encoding")); encoding != "" && !strings.EqualFold(encoding, "identity") {
+		// The transport left this body encoded, so the key cannot be looked for
+		// in it. It is not passed on; status and the other headers are.
+		body = nil
+		header.Del("Content-Encoding")
+	} else {
+		body, _ = secretguard.Redact(body, secret, redactedCredential)
+	}
+	if len(body) > maxFailureBody {
+		body = body[:maxFailureBody]
+	}
+	if !bytes.Equal(body, payload) {
+		// The body is no longer what the upstream sent: what vouches for those
+		// bytes no longer does.
+		for _, name := range []string{"Content-Md5", "Digest", "Content-Digest", "Repr-Digest"} {
+			header.Del(name)
+		}
+	}
+	if length := header.Get("Content-Length"); length != "" && length != strconv.Itoa(len(body)) {
+		header.Set("Content-Length", strconv.Itoa(len(body)))
+	}
+	return &upstreamFailure{status: response.StatusCode, header: header, body: body}
+}
+
 // attemptResult is the outcome of one attempt: a live response to stream back,
 // a failure to fall back from, a passthrough (an upstream 4xx that is the
 // request's own fault and ends the call unchanged), or a departed client.
@@ -770,12 +816,11 @@ func millis(d time.Duration) *int {
 
 func stringPointer(value string) *string { return &value }
 
-// scrub removes the upstream credential from text that may echo it.
+// scrub removes the upstream credential from text that may echo it, for the
+// error text that is logged and stored. (What goes back to the client is
+// newUpstreamFailure's: it keeps invalid UTF-8, this does not.)
 func scrub(text, secret string) string {
-	if secret != "" {
-		text = strings.ReplaceAll(text, secret, "***")
-		text = strings.ReplaceAll(text, url.QueryEscape(secret), "***")
-	}
+	text, _ = secretguard.RedactString(text, secret, "***")
 	return strings.ToValidUTF8(text, "")
 }
 
@@ -996,7 +1041,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		// like a non-streaming answer is.
 		arm(total, errTotal)
 	}
-	payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
+	payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody+int64(secretguard.MaxEncodedLen(secret))))
 	response.Body.Close()
 	cause := context.Cause(attemptCtx)
 	cancel(nil)
@@ -1005,7 +1050,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		// came in is cut short and says nothing about the channel.
 		return expired(&status)
 	}
-	answer := &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
+	answer := newUpstreamFailure(response, payload, secret)
 	code := "upstream_" + http.StatusText(status)
 	if !fallbackStatus(status) {
 		// Any other 4xx is taken to be the request's own fault and goes back

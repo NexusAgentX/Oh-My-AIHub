@@ -229,6 +229,7 @@ func newPerfStack(t *testing.T, channels, consumers int, dnsDelay time.Duration)
 		t.Cleanup(stop)
 		go s.e.engine.RunRefresh(background)
 		go s.e.engine.RunReaper(background, time.Minute)
+		go s.e.cached.Cache.Run(background)
 
 		listener, listenErr := net.Listen("tcp", "127.0.0.1:0")
 		if listenErr != nil {
