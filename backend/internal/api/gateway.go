@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 )
 
-func unsupportedEndpoint(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, http.StatusNotFound, "unsupported_endpoint", "不支持的接口")
+func unsupportedEndpoint(w http.ResponseWriter, r *http.Request) {
+	gateway.WriteError(w, gateway.DialectOf(r), http.StatusNotFound, "unsupported_endpoint", "不支持的接口", "")
 }
 
 // serveGemini splits "{model}:generateContent" / "{model}:streamGenerateContent".

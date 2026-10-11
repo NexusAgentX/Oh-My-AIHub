@@ -133,6 +133,14 @@ export const api = {
   logout() {
     return request<void>('/api/auth/logout', { method: 'POST' })
   },
+  async updateDisplayName(displayName: string) {
+    return (
+      await request<ResponseBody<'updateMe'>>('/api/me', {
+        method: 'PATCH',
+        body: jsonBody<'updateMe'>({ display_name: displayName }),
+      })
+    ).account
+  },
   async changePassword(currentPassword: string, newPassword: string) {
     return (
       await request<ResponseBody<'changePassword'>>('/api/me/password', {

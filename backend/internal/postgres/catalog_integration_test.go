@@ -18,16 +18,16 @@ func TestCatalogAndSettingsPersistWithAudit(t *testing.T) {
 	start, end := int16(540), int16(720)
 	minimum := int64(200_000)
 	window := 128000
-	contextWindow := int64(window)
+	contextWindow, maxOutput := int64(window), int64(8192)
 	created, err := service.Create(ctx, admin.ID, catalog.Model{
-		ID: "deepseek-chat", DisplayName: "DeepSeek Chat", Enabled: true, ContextWindow: &contextWindow,
+		ID: "deepseek-chat", DisplayName: "DeepSeek Chat", Enabled: true, ContextWindow: &contextWindow, MaxOutputTokens: &maxOutput,
 		InputPrice: mustAmount(t, "1.5"), OutputPrice: mustAmount(t, "4.5"),
 		PriceTiers: []ledger.PriceTier{
 			{Name: "长上下文", MinPromptTokens: &minimum, InputPrice: mustAmount(t, "2")},
 			{Name: "高峰", Timezone: "Asia/Shanghai", Weekdays: []int{5, 1}, StartMinute: &start, EndMinute: &end, InputPrice: mustAmount(t, "3")},
 		},
 	})
-	if err != nil || len(created.PriceTiers) != 2 || created.PriceTiers[1].Weekdays[0] != 1 || created.InputModalities[0] != "text" {
+	if err != nil || len(created.PriceTiers) != 2 || created.MaxOutputTokens == nil || *created.MaxOutputTokens != maxOutput || created.PriceTiers[1].Weekdays[0] != 1 || created.InputModalities[0] != "text" {
 		t.Fatalf("created = %+v, %v", created, err)
 	}
 	if _, err := service.Create(ctx, admin.ID, created); !errors.Is(err, catalog.ErrConflict) {

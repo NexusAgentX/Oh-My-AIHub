@@ -781,6 +781,30 @@ paths:
               schema: {$ref: '#/components/schemas/AccountEnvelope'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+    patch:
+      operationId: updateMe
+      tags: [auth]
+      summary: 修改显示名
+      description: 当前账户修改自己的显示名（去首尾空白后 1-64 字符），写审计。
+      x-access: ready
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateMeRequest'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /api/me/password:
     post:
       operationId: changePassword
@@ -3207,8 +3231,15 @@ components:
         password: {type: string, maxLength: 128}
       required: [username, password]
       additionalProperties: false
+    UpdateMeRequest:
+      type: object
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 64}
+      required: [display_name]
+      additionalProperties: false
     ChangePasswordRequest:
       type: object
+      description: new_password 为 8-128 个字符，至少各含一个大写字母、小写字母和数字。
       properties:
         current_password: {type: string, maxLength: 128}
         new_password: {type: string, maxLength: 128}
@@ -3508,6 +3539,7 @@ components:
         sort_order: {type: integer}
         provider: {type: string}
         context_window: {type: [integer, 'null']}
+        max_output_tokens: {type: [integer, 'null']}
         input_modalities:
           type: array
           items: {type: string}
@@ -3520,7 +3552,7 @@ components:
         parameter_info: {type: string}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, display_name, price_currency, base_prices, price_tiers, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at]
+      required: [id, display_name, price_currency, base_prices, price_tiers, enabled, sort_order, provider, context_window, max_output_tokens, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at]
       additionalProperties: false
     AdminModelList:
       type: object
@@ -3554,6 +3586,7 @@ components:
         sort_order: {type: integer}
         provider: {type: string}
         context_window: {type: [integer, 'null'], minimum: 1}
+        max_output_tokens: {type: [integer, 'null'], minimum: 1}
         input_modalities:
           type: array
           items: {type: string}
@@ -3584,6 +3617,7 @@ components:
         sort_order: {type: integer}
         provider: {type: string}
         context_window: {type: [integer, 'null'], minimum: 1}
+        max_output_tokens: {type: [integer, 'null'], minimum: 1}
         input_modalities:
           type: array
           items: {type: string}
@@ -3605,6 +3639,7 @@ components:
         display_name: {type: string}
         provider: {type: string}
         context_window: {type: [integer, 'null']}
+        max_output_tokens: {type: [integer, 'null']}
         input_modalities:
           type: array
           items: {type: string}
@@ -3638,7 +3673,7 @@ components:
           items: {$ref: '#/components/schemas/Format'}
         online_channels: {type: integer}
         custom: {type: boolean, description: 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。}
-      required: [id, display_name, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels, custom]
+      required: [id, display_name, provider, context_window, max_output_tokens, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels, custom]
       additionalProperties: false
     CatalogModelList:
       type: object

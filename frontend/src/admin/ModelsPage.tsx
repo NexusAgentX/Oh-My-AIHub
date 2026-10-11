@@ -151,14 +151,21 @@ function ModelEditor({
       <Checkbox checked={form.enabled} label="启用" onChange={(event) => set({ enabled: event.target.checked })} />
       <Collapsible changed={changedModelAdvanced(form)} title="高级设置">
         <div className="stack-form">
+          <TextField label="提供方" onChange={(event) => set({ provider: event.target.value })} value={form.provider} />
           <div className="field-row">
-            <TextField label="提供方" onChange={(event) => set({ provider: event.target.value })} value={form.provider} />
             <TextField
               error={errors.contextWindow}
               inputMode="numeric"
               label="上下文窗口（token）"
               onChange={(event) => set({ contextWindow: event.target.value })}
               value={form.contextWindow}
+            />
+            <TextField
+              error={errors.maxOutputTokens}
+              inputMode="numeric"
+              label="最大输出（token）"
+              onChange={(event) => set({ maxOutputTokens: event.target.value })}
+              value={form.maxOutputTokens}
             />
           </div>
           <ModalityPicker

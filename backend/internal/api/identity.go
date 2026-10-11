@@ -98,11 +98,28 @@ func (a *app) changePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, accountEnvelopeJSON{Account: newAccountJSON(result.Account)})
 }
 
+func (a *app) updateMe(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeInvalidJSON(w)
+		return
+	}
+	account, err := a.identity.UpdateOwnDisplayName(r.Context(), accountFromContext(r.Context()), request.DisplayName)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, accountEnvelopeJSON{Account: newAccountJSON(account)})
+}
+
 // registerIdentityRoutes 注册认证与当前账户路由。
 func (a *app) registerIdentityRoutes(r *router) {
 	r.public("POST /api/auth/login", a.login)
 	r.public("POST /api/auth/logout", a.logout)
 	r.session("GET /api/me", a.me)
+	r.ready("PATCH /api/me", a.updateMe)
 	r.session("POST /api/me/password", a.changePassword)
 }
 

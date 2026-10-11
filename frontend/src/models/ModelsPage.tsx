@@ -11,6 +11,7 @@ import { capabilities, contextFilterError, defaultFilters, filterModels, priceFi
 
 function ModelCard({ model }: { model: CatalogModel }) {
   const context = contextText(model.context_window)
+  const output = contextText(model.max_output_tokens)
   return (
     <Link className="model-card" to={`/models/${encodeURIComponent(model.id)}`}>
       <header>
@@ -22,7 +23,7 @@ function ModelCard({ model }: { model: CatalogModel }) {
         <span className="model-card-id mono">{model.id}</span>
       )}
       <span className="model-card-meta">
-        {[model.provider, context && `上下文 ${context}`].filter(Boolean).join(' · ')}
+        {[model.provider, context && `上下文 ${context}`, output && `输出 ${output}`].filter(Boolean).join(' · ')}
       </span>
       <span className="model-card-caps">
         {model.supports_tools && <Badge>工具</Badge>}

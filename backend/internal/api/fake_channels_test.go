@@ -392,8 +392,9 @@ func (o testOutbound) WithExtraBlockedHosts(hosts []string) (channel.Outbound, e
 	return testOutbound{Outbound: inner, target: o.target}, nil
 }
 
-// newFakeUpstream is a relay that lists two models and streams a completed
-// OpenAI chat answer, which is all discovery and the format test ask for.
+// newFakeUpstream is a relay that lists two OpenAI models, pages two
+// Anthropic and two Gemini models, and streams a completed OpenAI chat answer,
+// which is all discovery and the format test ask for.
 func newFakeUpstream(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -402,6 +403,20 @@ func newFakeUpstream(t *testing.T) *httptest.Server {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/models" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer "):
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"data":[{"id":"deepseek-chat"},{"id":"some-unlisted-model"}]}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/models" && r.Header.Get("x-api-key") != "" && r.URL.Query().Get("limit") == "1000":
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Query().Get("after_id") == "relay-anthropic-1" {
+				_, _ = io.WriteString(w, `{"data":[{"type":"model","id":"relay-anthropic-2"}],"has_more":false,"first_id":"relay-anthropic-2","last_id":"relay-anthropic-2"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"data":[{"type":"model","id":"relay-anthropic-1"}],"has_more":true,"first_id":"relay-anthropic-1","last_id":"relay-anthropic-1"}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1beta/models" && r.URL.Query().Get("key") != "" && r.URL.Query().Get("pageSize") == "1000":
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Query().Get("pageToken") == "page-2" {
+				_, _ = io.WriteString(w, `{"models":[{"name":"models/relay-gemini-2"}]}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"models":[{"name":"models/relay-gemini-1"}],"nextPageToken":"page-2"}`)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/chat/completions":
 			w.Header().Set("Content-Type", "text/event-stream")
 			_, _ = fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\ndata: [DONE]\n\n")

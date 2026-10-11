@@ -16,10 +16,13 @@ describe('credentialsRules', () => {
   })
 
   it.each([
-    ['short', passwordRuleText],
-    ['twelve-chars!', null],
-    ['x'.repeat(129), passwordRuleText],
-  ])('password length %d -> %j', (password, expected) => {
+    ['Short1a', passwordRuleText],
+    ['Abcdef12', null],
+    ['abcdef12', passwordRuleText],
+    ['ABCDEF12', passwordRuleText],
+    ['Abcdefgh', passwordRuleText],
+    ['A1' + 'a'.repeat(127), passwordRuleText],
+  ])('password %j -> %j', (password, expected) => {
     expect(passwordProblem(password)).toBe(expected)
   })
 })

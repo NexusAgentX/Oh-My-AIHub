@@ -31,6 +31,7 @@ type Model struct {
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
 	PriceCurrency                 string
+	MaxOutputTokens               *int64
 }
 
 type ModelPriceTier struct {

@@ -260,6 +260,7 @@ type callState struct {
 	modelID              string
 	tag                  string
 	userAgent            string
+	dialect              Dialect
 	mode                 routing.Mode
 	source               routing.Source
 	attempts             []Attempt
@@ -290,17 +291,17 @@ func extractKey(r *http.Request) (secret string, location authLocation, found bo
 func (e *Engine) authenticate(w http.ResponseWriter, r *http.Request) (KeyAuth, authLocation, bool) {
 	secret, location, found := extractKey(r)
 	if !found {
-		writeGatewayError(w, http.StatusUnauthorized, "invalid_api_key", "缺少有效的 API Key", "")
+		WriteError(w, DialectOf(r), http.StatusUnauthorized, "invalid_api_key", "缺少有效的 API Key", "")
 		return KeyAuth{}, 0, false
 	}
 	key, err := e.Store.LookupKey(r.Context(), apikey.Hash(secret))
 	if errors.Is(err, ErrKeyNotFound) {
-		writeGatewayError(w, http.StatusUnauthorized, "invalid_api_key", "API Key 无效", "")
+		WriteError(w, DialectOf(r), http.StatusUnauthorized, "invalid_api_key", "API Key 无效", "")
 		return KeyAuth{}, 0, false
 	}
 	if err != nil {
 		e.Logger.Error("gateway: key lookup failed", "error", err)
-		writeGatewayError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
+		WriteError(w, DialectOf(r), http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
 		return KeyAuth{}, 0, false
 	}
 	return key, location, true
@@ -325,17 +326,6 @@ func (e *Engine) touchKey(ctx context.Context, keyID string) {
 	}
 }
 
-func writeGatewayError(w http.ResponseWriter, status int, code, message, requestID string) {
-	body := map[string]string{"error": code, "message": message}
-	if requestID != "" {
-		body["request_id"] = requestID
-		w.Header().Set("X-AIHub-Request-Id", requestID)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
-}
-
 // ---- inference ----
 
 // Serve handles one inference request of the given format. pathModel is the
@@ -347,7 +337,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if !ok {
 		return
 	}
-	call := &callState{started: started, key: key, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512)}
+	call := &callState{started: started, key: key, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
 
 	if !key.AccountActive || !keyUsable(key, started) {
 		status, code, message := http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期"
@@ -397,7 +387,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	})
 	if err != nil {
 		e.Logger.Error("gateway: opening call failed", "error", err)
-		writeGatewayError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
+		WriteError(w, call.dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
 		return
 	}
 	call.id = id
@@ -590,7 +580,7 @@ func truncate(value string, limit int) string {
 func (e *Engine) internalError(w http.ResponseWriter, call *callState, err error) {
 	e.Logger.Error("gateway: request failed", "request_id", call.id, "error", err)
 	if call.id == "" {
-		writeGatewayError(w, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
+		WriteError(w, call.dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
 		return
 	}
 	e.finishRejected(w, call, OutcomeUpstreamFailed, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作")
@@ -604,13 +594,13 @@ func (e *Engine) reject(w http.ResponseWriter, call *callState, outcome string, 
 	})
 	if err != nil {
 		e.Logger.Error("gateway: recording rejected call failed", "error", err)
-		writeGatewayError(w, status, code, message, "")
+		WriteError(w, call.dialect, status, code, message, "")
 		return
 	}
 	call.id = id
 	e.log(call, outcome, status, 0, ledger.Usage{}, 0, 0)
 	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, Model: call.requested, Format: string(call.format), Outcome: outcome, StatusCode: status})
-	writeGatewayError(w, status, code, message, id)
+	WriteError(w, call.dialect, status, code, message, id)
 }
 
 // finishRejected closes an already opened call without a channel.
@@ -625,7 +615,7 @@ func (e *Engine) finishRejected(w http.ResponseWriter, call *callState, outcome 
 	}
 	e.log(call, outcome, status, duration, ledger.Usage{}, 0, 0)
 	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, Model: call.modelID, Format: string(call.format), Outcome: outcome, StatusCode: status, DurationMS: duration})
-	writeGatewayError(w, status, code, message, call.id)
+	WriteError(w, call.dialect, status, code, message, call.id)
 }
 
 // finishAbandoned closes a call whose client left before any output.
@@ -888,7 +878,7 @@ func (e *Engine) finishUpstreamFailure(w http.ResponseWriter, call *callState, l
 	e.log(call, OutcomeUpstreamFailed, status, duration, ledger.Usage{}, 0, 0)
 	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, ChannelID: call.lastChannelID, Model: call.modelID, Format: string(call.format), Outcome: OutcomeUpstreamFailed, StatusCode: status, DurationMS: duration})
 	if last == nil {
-		writeGatewayError(w, http.StatusBadGateway, "upstream_unavailable", "所有渠道均不可用", call.id)
+		WriteError(w, call.dialect, http.StatusBadGateway, "upstream_unavailable", "所有渠道均不可用", call.id)
 		return
 	}
 	for name, values := range last.header {

@@ -268,7 +268,7 @@ func TestGatewayChecksBalanceAndKeyBudgetWithoutReserving(t *testing.T) {
 		t.Fatalf("overdrawing call = %d, balance %s", second.Code, e.balance(consumer))
 	}
 	third := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
-	if third.Code != http.StatusPaymentRequired || !strings.Contains(third.Body.String(), `"insufficient_balance"`) || !strings.Contains(third.Body.String(), `"request_id"`) {
+	if third.Code != http.StatusPaymentRequired || !strings.Contains(third.Body.String(), `"insufficient_balance"`) || third.Header().Get("X-AIHub-Request-Id") == "" {
 		t.Fatalf("refused call = %d %s", third.Code, third.Body.String())
 	}
 	if row := e.callRow(third.Header().Get("X-AIHub-Request-Id")); row.Outcome != "rejected_balance" {

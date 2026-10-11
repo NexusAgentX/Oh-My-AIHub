@@ -48,7 +48,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"order": emptyList, "excluded": emptyList, "max_attempts": nil, "ttft_timeout_ms": nil, "updated_at": nil,
 		}},
 		{"model without tiers or prices", newAdminModelJSON(catalog.Model{}), map[string]any{
-			"price_tiers": emptyList, "context_window": nil,
+			"price_tiers": emptyList, "context_window": nil, "max_output_tokens": nil,
 			"base_prices": map[string]any{
 				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject,
 			},
@@ -91,7 +91,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"by_key": []any{map[string]any{"api_key": nil, "spend": "1", "entries": float64(2)}},
 		}},
 		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0), 0), map[string]any{
-			"context_window": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0), "usd_cny_rate": nil,
+			"context_window": nil, "max_output_tokens": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0), "usd_cny_rate": nil,
 		}},
 		{"call that has not finished", newGatewayCallSummaryJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,

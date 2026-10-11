@@ -21,6 +21,15 @@ export function useChangePasswordMutation() {
   })
 }
 
+/** 修改自己的显示名，成功后同步会话中的账户。 */
+export function useUpdateDisplayNameMutation() {
+  const { synchronizeAccount } = useAuth()
+  return useMutation({
+    mutationFn: (displayName: string) => api.updateDisplayName(displayName),
+    onSuccess: (account) => synchronizeAccount(account),
+  })
+}
+
 /** 初始化实例并刷新实例与会话状态，返回应进入的账户。 */
 export function useInitializeInstanceMutation() {
   const { refresh } = useInstance()
