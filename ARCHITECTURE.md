@@ -50,7 +50,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
 | `keyringcheck` | 启动时逐条解密仍可能被读取的密文（未删除渠道与平台 API Key、全部 C2C 卖单），缺失或损坏的密钥拒绝启动；读取接口由各 `<domain>pg` 实现 |
 | `forum` | 板块、主题、回复、工单与附件校验（ADR-0031） |
-| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据检测与抹除 |
+| `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据精确匹配与抹除（ADR-0041） |
 
 ## API 约定
 
