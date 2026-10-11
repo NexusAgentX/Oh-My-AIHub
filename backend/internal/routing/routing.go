@@ -91,6 +91,15 @@ func Validate(p Pref) (Pref, error) {
 	return p, nil
 }
 
+// Scoped is a stored preference with the scope it applies to: KeyID empty is
+// the account-level setting, otherwise the override of that key. It is one row
+// of the routing snapshot (ADR-0040).
+type Scoped struct {
+	AccountID string
+	KeyID     string
+	Pref      Pref
+}
+
 // Store persists preferences. keyID empty addresses the account-level setting.
 type Store interface {
 	Set(ctx context.Context, accountID, keyID string, pref Pref) (Pref, error)

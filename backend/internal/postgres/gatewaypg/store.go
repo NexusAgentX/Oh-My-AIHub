@@ -40,14 +40,56 @@ func (s *Store) LookupKey(ctx context.Context, hash []byte) (gateway.KeyAuth, er
 	if err != nil {
 		return gateway.KeyAuth{}, err
 	}
+	return keyAuth(lookupColumns(row)), nil
+}
+
+// keyColumns are the columns LookupKey and ListAllKeys have in common.
+type keyColumns struct {
+	ID, OwnerID, Name, Prefix, Status string
+	ExpiresAt                         *time.Time
+	AllowedModels                     []string
+	BudgetDaily, BudgetMonthly        *money.Amount
+	BudgetTotal                       *money.Amount
+	ModelAliases                      []byte
+	AccountStatus                     string
+}
+
+func lookupColumns(row LookupKeyRow) keyColumns {
+	return keyColumns{
+		ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Status: row.Status, ExpiresAt: row.ExpiresAt,
+		AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDailyNano, BudgetMonthly: row.BudgetMonthlyNano,
+		BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
+	}
+}
+
+func keyAuth(row keyColumns) gateway.KeyAuth {
 	aliases := map[string]string{}
 	_ = json.Unmarshal(row.ModelAliases, &aliases)
 	return gateway.KeyAuth{
 		KeyID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Enabled: row.Status == "enabled",
-		ExpiresAt: row.ExpiresAt, AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDailyNano,
-		BudgetMonthly: row.BudgetMonthlyNano, BudgetTotal: row.BudgetTotalNano, Aliases: aliases,
+		ExpiresAt: row.ExpiresAt, AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDaily,
+		BudgetMonthly: row.BudgetMonthly, BudgetTotal: row.BudgetTotal, Aliases: aliases,
 		AccountActive: row.AccountStatus == "active",
-	}, nil
+	}
+}
+
+// LoadKeys reads every undeleted key with the digest it is found by, for the
+// key snapshot (internal/snapshot): each record equals what LookupKey returns
+// for that digest.
+func (s *Store) LoadKeys(ctx context.Context) ([]gateway.KeyRecord, error) {
+	rows, err := s.q.ListAllKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]gateway.KeyRecord, 0, len(rows))
+	for _, row := range rows {
+		records = append(records, gateway.KeyRecord{Hash: row.KeyHash, Auth: keyAuth(keyColumns{
+			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Status: row.Status, ExpiresAt: row.ExpiresAt,
+			AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDailyNano, BudgetMonthly: row.BudgetMonthlyNano,
+			BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
+		})})
+	}
+	return records, nil
 }
 
 func (s *Store) TouchKey(ctx context.Context, keyID string, at time.Time) error {
@@ -78,32 +120,85 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 	}
 	candidates := make([]gateway.Candidate, 0, len(rows))
 	for _, row := range rows {
-		var rules struct {
-			Set []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"set"`
-			Remove []string `json:"remove"`
-		}
-		_ = json.Unmarshal(row.HeaderRules, &rules)
-		advanced := channel.Advanced{
-			UserAgent: row.UserAgent, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit,
-			DailyRevenueCap: row.DailyRevenueCapNano, TTFTTimeoutMS: row.TtftTimeoutMs, TotalTimeoutMS: row.TotalTimeoutMs,
-			CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
-			HeaderRules: channel.HeaderRules{Remove: rules.Remove},
-		}
-		for _, rule := range rules.Set {
-			advanced.HeaderRules.Set = append(advanced.HeaderRules.Set, channel.HeaderSet{Name: rule.Name, Value: rule.Value})
-		}
-		candidates = append(candidates, gateway.Candidate{
-			ChannelID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseURL: row.BaseUrl, UpstreamModel: row.UpstreamModel,
-			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount, Advanced: advanced,
-			Credential: channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
-			Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
-				row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
-		})
+		candidates = append(candidates, candidate(candidateColumns(row)))
 	}
 	return candidates, nil
+}
+
+// candidateColumns are the columns ListCandidates and ListAllCandidates have
+// in common.
+type candidateColumns struct {
+	ID, OwnerID, Name, BaseUrl          string
+	ApiKeyCiphertext, ApiKeyNonce       []byte
+	ApiKeyKeyID                         string
+	UserAgent                           *string
+	HeaderRules                         []byte
+	ConcurrencyLimit, RpmLimit          *int32
+	DailyRevenueCapNano                 *money.Amount
+	TtftTimeoutMs, TotalTimeoutMs       *int32
+	CooldownFailures, CooldownSeconds   *int32
+	UpstreamModel                       string
+	MultiplierNano                      int64
+	FxDiscount, IsCustom                bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
+}
+
+func candidate(row candidateColumns) gateway.Candidate {
+	var rules struct {
+		Set []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"set"`
+		Remove []string `json:"remove"`
+	}
+	_ = json.Unmarshal(row.HeaderRules, &rules)
+	advanced := channel.Advanced{
+		UserAgent: row.UserAgent, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit,
+		DailyRevenueCap: row.DailyRevenueCapNano, TTFTTimeoutMS: row.TtftTimeoutMs, TotalTimeoutMS: row.TotalTimeoutMs,
+		CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
+		HeaderRules: channel.HeaderRules{Remove: rules.Remove},
+	}
+	for _, rule := range rules.Set {
+		advanced.HeaderRules.Set = append(advanced.HeaderRules.Set, channel.HeaderSet{Name: rule.Name, Value: rule.Value})
+	}
+	return gateway.Candidate{
+		ChannelID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseURL: row.BaseUrl, UpstreamModel: row.UpstreamModel,
+		MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount, Advanced: advanced,
+		Credential: channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
+		Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
+			row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
+	}
+}
+
+// LoadCandidates reads every channel model Candidates can offer, for the
+// candidate snapshot (internal/snapshot). Filtering the records by model and
+// format gives what Candidates returns for that pair, in the same order.
+func (s *Store) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
+	rows, err := s.q.ListAllCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]gateway.CandidateRecord, 0, len(rows))
+	for _, row := range rows {
+		formats := make([]channel.Format, 0, len(row.Formats))
+		for _, format := range row.Formats {
+			formats = append(formats, channel.Format(format))
+		}
+		records = append(records, gateway.CandidateRecord{ModelID: row.ModelID, Formats: formats, Candidate: candidate(candidateColumns{
+			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseUrl: row.BaseUrl, ApiKeyCiphertext: row.ApiKeyCiphertext,
+			ApiKeyNonce: row.ApiKeyNonce, ApiKeyKeyID: row.ApiKeyKeyID, UserAgent: row.UserAgent, HeaderRules: row.HeaderRules,
+			ConcurrencyLimit: row.ConcurrencyLimit, RpmLimit: row.RpmLimit, DailyRevenueCapNano: row.DailyRevenueCapNano,
+			TtftTimeoutMs: row.TtftTimeoutMs, TotalTimeoutMs: row.TotalTimeoutMs, CooldownFailures: row.CooldownFailures,
+			CooldownSeconds: row.CooldownSeconds, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano,
+			FxDiscount: row.FxDiscount, IsCustom: row.IsCustom,
+			CustomInputPriceNanoPerMillion: row.CustomInputPriceNanoPerMillion, CustomOutputPriceNanoPerMillion: row.CustomOutputPriceNanoPerMillion,
+			CustomCacheWritePriceNanoPerMillion: row.CustomCacheWritePriceNanoPerMillion, CustomCacheReadPriceNanoPerMillion: row.CustomCacheReadPriceNanoPerMillion,
+		})})
+	}
+	return records, nil
 }
 
 func (s *Store) ChannelStats(ctx context.Context) (map[string]gateway.ChannelStats, error) {

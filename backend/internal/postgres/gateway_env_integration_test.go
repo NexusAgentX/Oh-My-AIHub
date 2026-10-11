@@ -179,9 +179,14 @@ type person struct {
 }
 
 type env struct {
-	t       *testing.T
-	pool    *pgxpool.Pool
-	store   *storepg.Store
+	t     *testing.T
+	pool  *pgxpool.Pool
+	store *storepg.Store
+	// cached is what the gateway and the services run on (ADR-0040); a test
+	// that changes cached data goes through the env's services, or through
+	// cached.Cache.Invalidate after writing SQL itself.
+	cached  *storepg.Cached
+	catalog *catalog.Service
 	handler http.Handler
 	engine  *gateway.Engine
 	admin   person
@@ -231,7 +236,12 @@ func newEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure func(*gateway.Dependencies)) *env {
 	t.Helper()
 	ctx := context.Background()
-	service, admin, _ := accounts(t, store)
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewJSONHandler(logs, nil))
+	// Like the server, run the gateway on the cached stores and build every
+	// service that writes the cached data on them (ADR-0040).
+	cached := store.Cached(logger)
+	service, admin, _ := accountsOn(t, cached.Identity)
 
 	secret := make([]byte, 32)
 	_, _ = rand.Read(secret)
@@ -239,7 +249,7 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogService := catalog.NewService(store.Catalog)
+	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
 	for _, id := range []string{"gpt-test", "claude-test", "gemini-test"} {
 		if _, err := catalogService.Create(ctx, admin.ID, catalog.Model{
@@ -265,17 +275,15 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	if err != nil {
 		t.Fatal(err)
 	}
-	logs := &syncBuffer{}
-	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	outbound := testOutbound{client: &http.Client{Transport: testTransport}}
-	e := &env{t: t, pool: pool, store: store, logs: logs, service: service, people: map[string]person{}}
+	e := &env{t: t, pool: pool, store: store, cached: cached, catalog: catalogService, logs: logs, service: service, people: map[string]person{}}
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		_ = store.Gateway.RecordChannelEvent(context.Background(), channelID, kind, reason)
 	})
 	bus := gateway.NewBus()
 	e.runtime = runtime
 	dependencies := gateway.Dependencies{
-		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
+		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: bus,
 	}
 	if configure != nil {
@@ -292,15 +300,15 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	go e.feed.Run(feedContext)
 	e.handler = api.NewHandler(api.Dependencies{
 		Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,
-		Audit: audit.NewService(store.Audit), Keys: apikey.NewService(store.Keys, keyring, modelIDs),
+		Audit: audit.NewService(store.Audit), Keys: apikey.NewService(cached.Keys, keyring, modelIDs),
 		Channels: channel.NewService(channel.Dependencies{
-			Store: store.Channels, Keyring: keyring, Outbound: outbound, KnownModels: modelIDs,
+			Store: cached.Channels, Keyring: keyring, Outbound: outbound, KnownModels: modelIDs,
 			BlockedHosts: func(ctx context.Context) ([]string, error) {
 				value, err := settingsService.Get(ctx)
 				return value.ExtraBlockedHosts, err
 			},
 		}),
-		Routing: store.Routes, Gateway: e.engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
+		Routing: cached.Routing, Gateway: e.engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
 	})
 	e.admin = e.login(admin.Username, "Founder-password-2026", admin.ID, false)
 	return e
