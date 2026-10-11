@@ -33,7 +33,7 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
        count(*)::bigint AS attempts,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
        coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
-            FILTER (WHERE att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
+            FILTER (WHERE c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
 WHERE c.created_at >= now() - interval '24 hours'
@@ -51,7 +51,10 @@ type ChannelStats24hRow struct {
 
 // Health of channels over the last 24 hours, from the attempts of every call.
 // Attempts the client abandoned or that were rejected as the request's own fault
-// say nothing about the channel and are left out.
+// say nothing about the channel and are left out. The first-token median counts
+// streaming calls only: a non-streaming call's first byte is the whole answer,
+// which would rank a channel by how long its answers are instead of how fast it
+// starts.
 func (q *Queries) ChannelStats24h(ctx context.Context) ([]ChannelStats24hRow, error) {
 	rows, err := q.db.Query(ctx, channelStats24h)
 	if err != nil {
@@ -463,8 +466,9 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 }
 
 const listOnlineModels = `-- name: ListOnlineModels :many
-SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom
+SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
 FROM channel_models cm
+CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
@@ -475,8 +479,11 @@ ORDER BY cm.model_id
 type ListOnlineModelsRow struct {
 	ModelID string
 	Custom  bool
+	Formats []string
 }
 
+// Models that ListCandidates could serve in at least one format, with those
+// formats; the static conditions are the same, runtime state is not considered.
 func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, error) {
 	rows, err := q.db.Query(ctx, listOnlineModels)
 	if err != nil {
@@ -486,7 +493,7 @@ func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, 
 	var items []ListOnlineModelsRow
 	for rows.Next() {
 		var i ListOnlineModelsRow
-		if err := rows.Scan(&i.ModelID, &i.Custom); err != nil {
+		if err := rows.Scan(&i.ModelID, &i.Custom, &i.Formats); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

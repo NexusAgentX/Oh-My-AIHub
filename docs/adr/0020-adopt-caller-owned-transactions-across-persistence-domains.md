@@ -66,3 +66,8 @@ C2C 与网关需要让账本记账、积分持有和各自的业务行在同一�
 ## 替代关系
 
 补充 ADR-0017 第 3 条关于跨领域事务“再设计”的部分，不取代 ADR-0017。
+
+部分被取代（2026-10-11 补注）：
+
+- 决定第 1、2、5 条描述的账本接口随 [ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md) 删除，包括 `ledgerpg.NewTx`、`ledger.NewService`、`Store.WithTransaction`、持有事件与 `postgres.LedgerTransaction` 过渡类型。现行接口是在调用方事务中执行的 `ledgerpg.Post(ctx, tx, …)`。
+- 以下原则继续有效：调用方开启事务并决定隔离级别与提交时机；账本从不开启、提交或回滚事务；按账本账户 id 升序加锁；只有业务领域导入 `ledgerpg`，反向不允许。

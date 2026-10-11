@@ -803,7 +803,7 @@ func (s *Store) Repair(ctx context.Context, repair observe.Repair) (observe.Repa
 			return err
 		}
 		billable := call.Outcome == "succeeded" || call.Outcome == "interrupted" || call.Outcome == "client_disconnected"
-		// Own-channel calls never produce a ledger transaction (ADR-0027): there is nothing to repair.
+		// Own-channel calls never produce a ledger transaction (ADR-0035): there is nothing to repair.
 		own := call.ChannelOwnerID == nil || *call.ChannelOwnerID == call.AccountID
 		if call.LedgerTxID != nil || !billable || own || call.CostNano.Nano()+call.FeeNano.Nano() <= 0 {
 			return observe.ErrNotRepairable

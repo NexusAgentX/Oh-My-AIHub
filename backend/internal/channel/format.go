@@ -1,5 +1,5 @@
 // Package channel holds the upstream relay boundary. Feature A keeps only the
-// versioned credential keyring (ADR-0009) and the pinned outbound policy;
+// versioned credential keyring (ADR-0036) and the pinned outbound policy;
 // Feature B builds channels, discovery and format tests on top of them.
 package channel
 

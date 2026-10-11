@@ -349,7 +349,8 @@ func (p *OutboundPolicy) ClientForProxy(ctx context.Context, normalizedBaseURL s
 // dial, TLS and redirect rules as every other outbound call, but without a
 // response-header deadline, because a non-streaming completion legitimately
 // sends its first byte only when generation ends. The caller enforces the
-// first-byte timeout itself; totalTimeout bounds the whole exchange.
+// first-byte timeout itself, and only for streaming requests; totalTimeout
+// bounds the whole exchange, which is the only limit on a non-streaming one.
 func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
 	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, 0)
 }
@@ -431,7 +432,7 @@ func ApplyAuthentication(request *http.Request, format Format, credential string
 	}
 }
 
-// Outbound is the pinned egress boundary (ADR-0009) as the channel service and
+// Outbound is the pinned egress boundary (ADR-0036) as the channel service and
 // the gateway use it. OutboundPolicy implements it; tests substitute a fake
 // that reaches loopback servers.
 type Outbound interface {

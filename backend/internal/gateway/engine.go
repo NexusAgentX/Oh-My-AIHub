@@ -1,4 +1,4 @@
-// Package gateway is the transparent API gateway (ADR-0027): it authenticates
+// Package gateway is the transparent API gateway (ADR-0035): it authenticates
 // the caller, picks channels, forwards the request almost byte for byte,
 // streams the response back unchanged while reading usage on the side, and
 // books the charge after the call has ended.
@@ -504,9 +504,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return state == StateAvailable
 		},
 	})
-	if len(ordered) > maxAttempts {
-		ordered = ordered[:maxAttempts]
-	}
 	if len(ordered) == 0 {
 		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "no_channel_available", "当前没有可用的渠道")
 		return
@@ -514,12 +511,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 
 	var last *upstreamFailure
 	tried := 0
-	for _, candidate := range ordered {
-		limits := EffectiveLimits(candidate.Advanced, defaults)
-		release, reserved, _ := e.Runtime.Begin(candidate.ChannelID, limits, e.Now())
-		if !reserved {
-			continue
-		}
+	// maxAttempts counts attempts actually made: a candidate whose slot was
+	// taken since ranking is skipped and the next one fills in.
+	for slot := range e.reservations(ordered, maxAttempts, defaults) {
+		candidate, limits, release := slot.candidate, slot.limits, slot.release
 		tried++
 		call.lastChannelID = candidate.ChannelID
 		result := e.attempt(r, call, candidate, limits, defaults, policy, body, scan, location, ttftTimeout)
@@ -718,13 +713,19 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, ttft time.Duration) attemptResult {
 	ctx := r.Context()
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}}}
-	fail := func(endReason, code, message string, status *int) attemptResult {
+	// closeFailed writes the failure into the attempt record; fail also counts
+	// it against the channel.
+	closeFailed := func(endReason, code, message string, status *int) attemptResult {
 		result.record.EndReason, result.record.ErrorCode = endReason, stringPointer(code)
 		if message != "" {
 			result.record.ErrorMessage = stringPointer(limitMessage(scrub(message, result.secret)))
 		}
 		result.record.StatusCode = status
 		result.record.DurationMS = millis(e.Now().Sub(result.started))
+		return result
+	}
+	fail := func(endReason, code, message string, status *int) attemptResult {
+		closeFailed(endReason, code, message, status)
 		e.Runtime.Failure(candidate.ChannelID, limits, e.Now(), endReason)
 		return result
 	}
@@ -765,12 +766,22 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 
 	attemptCtx, cancel := context.WithCancelCause(ctx)
 	result.cancel = cancel
-	timer := time.AfterFunc(ttft, func() { cancel(errTTFT) })
+	// Only a stream promises an early first byte; a non-streaming completion
+	// answers when generation ends and is bounded by the total timeout alone.
+	var timer *time.Timer
+	if call.stream {
+		timer = time.AfterFunc(ttft, func() { cancel(errTTFT) })
+	}
+	stopTimer := func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}
 	var connected time.Time
 	trace := &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected = e.Now() }}
 	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
 	if err != nil {
-		timer.Stop()
+		stopTimer()
 		cancel(nil)
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
 	}
@@ -779,7 +790,7 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 
 	response, err := client.Do(request)
 	if err != nil {
-		timer.Stop()
+		stopTimer()
 		cause := context.Cause(attemptCtx)
 		cancel(nil)
 		cancelled := ctx.Err() != nil
@@ -815,7 +826,7 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 			n, readErr = response.Body.Read(chunk)
 		}
 		if readErr != nil && !errors.Is(readErr, io.EOF) && n == 0 {
-			timer.Stop()
+			stopTimer()
 			cause := context.Cause(attemptCtx)
 			response.Body.Close()
 			cancel(nil)
@@ -831,14 +842,14 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 				return fail(EndInterrupted, "read_error", "读取上游响应失败", &status)
 			}
 		}
-		timer.Stop()
+		stopTimer()
 		result.ttft = e.Now().Sub(result.started)
 		result.record.TTFTMS = millis(result.ttft)
 		result.response, result.first, result.firstErr = response, chunk[:n], readErr
 		return result
 	}
 
-	timer.Stop()
+	stopTimer()
 	if !fallbackStatus(status) {
 		// The request itself is at fault: hand the upstream answer back as is.
 		result.response, result.passthrough = response, true
@@ -850,7 +861,15 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 	response.Body.Close()
 	cancel(nil)
 	result.failure = &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
-	return fail(EndUpstreamError, "upstream_"+http.StatusText(status), string(payload), &status)
+	code := "upstream_" + http.StatusText(status)
+	if pause, limited := RateLimitCooldown(status, response.Header, e.Now(), limits); limited {
+		// The upstream said when to come back: rest the channel for that long
+		// right away rather than counting towards the failure threshold.
+		closeFailed(EndUpstreamError, code, string(payload), &status)
+		e.Runtime.CooldownFor(candidate.ChannelID, pause, e.Now(), CooldownRateLimited)
+		return result
+	}
+	return fail(EndUpstreamError, code, string(payload), &status)
 }
 
 func isTimeout(err error) bool {

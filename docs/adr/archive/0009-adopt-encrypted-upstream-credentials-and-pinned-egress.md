@@ -1,9 +1,9 @@
 # ADR-0009：采用版本化凭据加密与固定出站网络边界
 
-- 状态：已通过
+- 状态：已取代（由 [ADR-0036](../0036-adopt-credential-startup-check-and-pinned-egress-pool.md) 取代）
 - 日期：2026-09-02
 - 决策者：仓库维护者
-- 关联内容：[Feature #19](https://github.com/NexusAgentX/Oh-My-AIHub/issues/19)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)、[ADR-0006](0006-adopt-postgresql-goose-and-fixed-point-amounts.md)
+- 关联内容：[Feature #19](https://github.com/NexusAgentX/Oh-My-AIHub/issues/19)、[Feature #20](https://github.com/NexusAgentX/Oh-My-AIHub/issues/20)、[ADR-0006](../0006-adopt-postgresql-goose-and-fixed-point-amounts.md)
 
 ## 背景
 

@@ -1,6 +1,6 @@
 -- Feature G：调用、用量、渠道统计与积分观测的只读查询。
 -- 所有“成功”都指 outcome IN ('succeeded', 'succeeded_unbilled')；“实际扣除”只计已有账本交易的调用
--- （自己的渠道调用不产生账本交易，见 ADR-0027）。
+-- （自己的渠道调用不产生账本交易，见 ADR-0035）。
 
 -- name: ListCalls :many
 SELECT c.id, c.created_at, c.completed_at, c.account_id, a.username AS account_username, a.display_name AS account_display_name,

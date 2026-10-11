@@ -143,6 +143,78 @@ func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
 	}
 }
 
+// A non-streaming call's first byte is the finished answer, so its "first
+// token" time is the whole generation. Only streaming calls may feed the
+// first-token median that the fast routing mode ranks by; success counts keep
+// every call.
+func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	const generation = 250 * time.Millisecond
+	// Streams at once, but needs a while to produce a whole answer.
+	slowAnswer := func() *upstream {
+		return newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+			if strings.Contains(string(body), `"stream":true`) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				_, _ = io.WriteString(w, chatStreamBody)
+				return
+			}
+			time.Sleep(generation)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, chatBody)
+		})
+	}
+	mixed := e.createChannel(sharer, channelSpec{name: "mixed", upstream: slowAnswer(), model: "gpt-test"})
+	plain := e.createChannel(sharer, channelSpec{name: "plain", upstream: slowAnswer(), model: "claude-test"})
+	_, secret := e.defaultKey(consumer)
+
+	firstAttemptTTFT := func(recorder *httptest.ResponseRecorder) int {
+		t.Helper()
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("call = %d %s", recorder.Code, recorder.Body.String())
+		}
+		var ttft int
+		err := e.pool.QueryRow(context.Background(), `SELECT (attempts->0->>'ttft_ms')::int FROM calls WHERE id = $1`,
+			recorder.Header().Get("X-AIHub-Request-Id")).Scan(&ttft)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ttft
+	}
+	send := func(body string) int {
+		t.Helper()
+		return firstAttemptTTFT(e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(body), nil))
+	}
+	streamTTFT := send(`{"model":"gpt-test","stream":true}`)
+	for range 2 {
+		if ttft := send(`{"model":"gpt-test"}`); ttft < int(generation.Milliseconds()) {
+			t.Fatalf("non-streaming first byte after %d ms, want at least the %s generation", ttft, generation)
+		}
+	}
+	send(`{"model":"claude-test"}`)
+
+	stats, err := e.store.Gateway.ChannelStats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := stats[mixed]
+	if got.Attempts != 3 || got.Successes != 3 {
+		t.Fatalf("mixed channel attempts = %d, successes = %d", got.Attempts, got.Successes)
+	}
+	// The only streaming sample is the median; the two slow answers must not move it.
+	if got.TTFTP50MS == nil {
+		t.Fatalf("mixed channel has no first-token median, want the streaming call's %d ms", streamTTFT)
+	}
+	if *got.TTFTP50MS != float64(streamTTFT) {
+		t.Fatalf("mixed channel first-token median = %v ms, want the streaming call's %d ms", *got.TTFTP50MS, streamTTFT)
+	}
+	// A channel that has only served non-streaming calls has no first-token figure at all.
+	if got := stats[plain]; got.Attempts != 1 || got.Successes != 1 || got.TTFTP50MS != nil {
+		t.Fatalf("plain channel stats = %+v", got)
+	}
+}
+
 func TestGatewayEnforcesRPMDailyRevenueAndConcurrencyLimits(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "1000")
@@ -219,7 +291,7 @@ func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
 	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true}`), nil)
 	if recorder.Code != http.StatusOK || time.Since(started) < time.Second {
 		t.Fatalf("call = %d after %s", recorder.Code, time.Since(started))
 	}
@@ -227,6 +299,44 @@ func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
 	err := e.pool.QueryRow(context.Background(), `SELECT attempts->0->>'end_reason' FROM calls WHERE id = $1`, recorder.Header().Get("X-AIHub-Request-Id")).Scan(&endReason)
 	if err != nil || endReason != "timeout_ttft" {
 		t.Fatalf("first attempt end reason = %q, %v", endReason, err)
+	}
+}
+
+// A non-streaming completion sends its first byte only when generation ends,
+// so the first-byte timeout does not apply: only the total timeout does.
+func TestGatewayFirstByteTimeoutDoesNotApplyToNonStreamingRequests(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	slow := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		select {
+		case <-time.After(1500 * time.Millisecond):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, chatBody)
+		case <-r.Context().Done():
+		}
+	})
+	fast := okUpstream(t)
+	e.createChannel(sharer, channelSpec{name: "slow", upstream: slow, multiplier: "1", advanced: map[string]any{"ttft_timeout_ms": 1000}})
+	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
+	_, secret := e.defaultKey(consumer)
+	started := time.Now()
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	if recorder.Code != http.StatusOK || time.Since(started) < 1500*time.Millisecond {
+		t.Fatalf("call = %d after %s", recorder.Code, time.Since(started))
+	}
+	if len(slow.inference()) != 1 || len(fast.inference()) != 0 {
+		t.Fatalf("attempts: slow %d, fast %d", len(slow.inference()), len(fast.inference()))
+	}
+	var attempts int
+	var endReason string
+	err := e.pool.QueryRow(context.Background(), `SELECT jsonb_array_length(attempts), attempts->0->>'end_reason' FROM calls WHERE id = $1`,
+		recorder.Header().Get("X-AIHub-Request-Id")).Scan(&attempts, &endReason)
+	if err != nil || attempts != 1 || endReason != "completed" {
+		t.Fatalf("attempts = %d, first end reason = %q, %v", attempts, endReason, err)
+	}
+	if row := e.callRow(recorder.Header().Get("X-AIHub-Request-Id")); row.Outcome != "succeeded" {
+		t.Fatalf("outcome = %q", row.Outcome)
 	}
 }
 
