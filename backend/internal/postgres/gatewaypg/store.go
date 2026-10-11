@@ -19,17 +19,22 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 )
 
 type Store struct {
 	pool   *pgxpool.Pool
 	q      *Queries
 	ledger *ledgerpg.Store
+	books  *ledgerpg.Books
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool, q: New(pool), ledger: ledgerpg.NewStore(pool)}
+// NewStore builds the store; the ledger posting that ends a billed call
+// reports to books (nil means nobody listens).
+func NewStore(pool *pgxpool.Pool, books *ledgerpg.Books) *Store {
+	if books == nil {
+		books = ledgerpg.NewBooks()
+	}
+	return &Store{pool: pool, q: New(pool), ledger: ledgerpg.NewStore(pool, books), books: books}
 }
 
 func (s *Store) LookupKey(ctx context.Context, hash []byte) (gateway.KeyAuth, error) {
@@ -259,7 +264,7 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	duration := int32(finish.DurationMS)
 	bytesRead := finish.ResponseBytes
 	var result gateway.FinishResult
-	err = pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := New(tx)
 		affected, err := q.FinishCall(ctx, FinishCallParams{
 			ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),

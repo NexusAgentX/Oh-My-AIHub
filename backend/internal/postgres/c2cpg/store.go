@@ -24,16 +24,24 @@ import (
 )
 
 type Store struct {
-	pool *pgxpool.Pool
-	q    *Queries
+	pool  *pgxpool.Pool
+	q     *Queries
+	books *ledgerpg.Books
 }
 
 var _ c2c.Store = (*Store)(nil)
 
-func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool)} }
+// NewStore builds the store; the postings of its transitions report to books
+// (nil means nobody listens).
+func NewStore(pool *pgxpool.Pool, books *ledgerpg.Books) *Store {
+	if books == nil {
+		books = ledgerpg.NewBooks()
+	}
+	return &Store{pool: pool, q: New(pool), books: books}
+}
 
-func (s *Store) inTx(ctx context.Context, fn func(q *Queries, tx pgx.Tx) error) error {
-	return pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx), tx) })
+func (s *Store) inTx(ctx context.Context, fn func(q *Queries, tx ledgerpg.Tx) error) error {
+	return s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error { return fn(s.q.WithTx(tx), tx) })
 }
 
 func notFound(err error) error {
@@ -85,7 +93,7 @@ func cursorArgs(after *c2c.Cursor) (has bool, price int64, at time.Time, id stri
 
 func (s *Store) CreateOrder(ctx context.Context, n c2c.NewOrder) (c2c.Order, error) {
 	var result c2c.Order
-	err := s.inTx(ctx, func(q *Queries, tx pgx.Tx) error {
+	err := s.inTx(ctx, func(q *Queries, tx ledgerpg.Tx) error {
 		if existing, err := q.GetOrder(ctx, n.ID); err == nil {
 			if existing.C2cOrder.SellerID != n.SellerID {
 				return c2c.ErrNotFound
@@ -170,7 +178,7 @@ func (s *Store) ListSellerOrders(ctx context.Context, sellerID string, status c2
 
 func (s *Store) CloseOrder(ctx context.Context, orderID, sellerID string) (c2c.Order, error) {
 	var result c2c.Order
-	err := s.inTx(ctx, func(q *Queries, tx pgx.Tx) error {
+	err := s.inTx(ctx, func(q *Queries, tx ledgerpg.Tx) error {
 		locked, err := q.LockOrder(ctx, orderID)
 		if err != nil {
 			return notFound(err)
@@ -208,7 +216,7 @@ func saveOrder(ctx context.Context, q *Queries, o c2c.Order) error {
 }
 
 // postReturn books escrow -> seller.
-func postReturn(ctx context.Context, tx pgx.Tx, key, relatedType, relatedID, sellerID string, amount money.Amount, reason string) (string, error) {
+func postReturn(ctx context.Context, tx ledgerpg.Tx, key, relatedType, relatedID, sellerID string, amount money.Amount, reason string) (string, error) {
 	posted, err := ledgerpg.Post(ctx, tx, ledger.Transaction{
 		Type: ledger.TypeC2CReturn, IdempotencyKey: key, Related: &ledger.Related{Type: relatedType, ID: relatedID},
 		ActorID: sellerID, Reason: reason,
@@ -224,7 +232,7 @@ func postReturn(ctx context.Context, tx pgx.Tx, key, relatedType, relatedID, sel
 
 func (s *Store) CreateTrade(ctx context.Context, n c2c.NewTrade) (c2c.Trade, error) {
 	var result c2c.Trade
-	err := s.inTx(ctx, func(q *Queries, tx pgx.Tx) error {
+	err := s.inTx(ctx, func(q *Queries, tx ledgerpg.Tx) error {
 		locked, err := q.LockOrder(ctx, n.OrderID)
 		if err != nil {
 			return notFound(err)
@@ -360,9 +368,9 @@ func lockedTrade(ctx context.Context, q *Queries, tradeID string) (c2c.Order, c2
 	return orderOf(orderRow(lockedOrder)), tradeOf(row), nil
 }
 
-func (s *Store) transition(ctx context.Context, tradeID string, apply func(q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade) (done bool, err error)) (c2c.Trade, error) {
+func (s *Store) transition(ctx context.Context, tradeID string, apply func(q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade) (done bool, err error)) (c2c.Trade, error) {
 	var result c2c.Trade
-	err := s.inTx(ctx, func(q *Queries, tx pgx.Tx) error {
+	err := s.inTx(ctx, func(q *Queries, tx ledgerpg.Tx) error {
 		order, trade, err := lockedTrade(ctx, q, tradeID)
 		if err != nil {
 			return err
@@ -383,7 +391,7 @@ func (s *Store) transition(ctx context.Context, tradeID string, apply func(q *Qu
 }
 
 func (s *Store) MarkPaid(ctx context.Context, tradeID, buyerID, note string) (c2c.Trade, error) {
-	return s.transition(ctx, tradeID, func(q *Queries, _ pgx.Tx, _ c2c.Order, trade c2c.Trade) (bool, error) {
+	return s.transition(ctx, tradeID, func(q *Queries, _ ledgerpg.Tx, _ c2c.Order, trade c2c.Trade) (bool, error) {
 		noop, err := trade.CheckPaid(buyerID, time.Now())
 		if err != nil || noop {
 			return false, err
@@ -397,7 +405,7 @@ func (s *Store) MarkPaid(ctx context.Context, tradeID, buyerID, note string) (c2
 }
 
 func (s *Store) Release(ctx context.Context, tradeID, sellerID string) (c2c.Trade, error) {
-	return s.transition(ctx, tradeID, func(q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
+	return s.transition(ctx, tradeID, func(q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
 		noop, err := trade.CheckRelease(sellerID)
 		if err != nil || noop {
 			return false, err
@@ -407,7 +415,7 @@ func (s *Store) Release(ctx context.Context, tradeID, sellerID string) (c2c.Trad
 }
 
 func (s *Store) Cancel(ctx context.Context, tradeID, actorID string) (c2c.Trade, error) {
-	return s.transition(ctx, tradeID, func(q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
+	return s.transition(ctx, tradeID, func(q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
 		noop, err := trade.CheckCancel(actorID, time.Now())
 		if err != nil || noop {
 			return false, err
@@ -417,7 +425,7 @@ func (s *Store) Cancel(ctx context.Context, tradeID, actorID string) (c2c.Trade,
 }
 
 func (s *Store) Dispute(ctx context.Context, tradeID, actorID, statement string) (c2c.Trade, error) {
-	return s.transition(ctx, tradeID, func(q *Queries, _ pgx.Tx, _ c2c.Order, trade c2c.Trade) (bool, error) {
+	return s.transition(ctx, tradeID, func(q *Queries, _ ledgerpg.Tx, _ c2c.Order, trade c2c.Trade) (bool, error) {
 		if err := trade.CheckDispute(actorID); err != nil {
 			return false, err
 		}
@@ -428,7 +436,7 @@ func (s *Store) Dispute(ctx context.Context, tradeID, actorID, statement string)
 }
 
 func (s *Store) Resolve(ctx context.Context, r c2c.Resolution) (c2c.Trade, error) {
-	return s.transition(ctx, r.TradeID, func(q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
+	return s.transition(ctx, r.TradeID, func(q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade) (bool, error) {
 		noop, err := trade.CheckResolve(r.ToBuyer)
 		if err != nil || noop {
 			return false, err
@@ -451,7 +459,7 @@ func (s *Store) Resolve(ctx context.Context, r c2c.Resolution) (c2c.Trade, error
 }
 
 // settle hands the escrowed points of a trade to the buyer.
-func settle(ctx context.Context, q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade, status c2c.TradeStatus, resolvedBy, reason, ledgerReason string) error {
+func settle(ctx context.Context, q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade, status c2c.TradeStatus, resolvedBy, reason, ledgerReason string) error {
 	posted, err := ledgerpg.Post(ctx, tx, ledger.Transaction{
 		Type: ledger.TypeC2CRelease, IdempotencyKey: "c2c:trade:" + trade.ID + ":release",
 		Related: &ledger.Related{Type: "c2c_trade", ID: trade.ID}, ActorID: actorOr(resolvedBy, trade.Seller.ID), Reason: ledgerReason,
@@ -471,7 +479,7 @@ func settle(ctx context.Context, q *Queries, tx pgx.Tx, order c2c.Order, trade c
 
 // unlock puts the points of a trade back: into the order while it is open,
 // otherwise straight back to the seller.
-func unlock(ctx context.Context, q *Queries, tx pgx.Tx, order c2c.Order, trade c2c.Trade, status c2c.TradeStatus, resolvedBy, reason, ledgerReason string) error {
+func unlock(ctx context.Context, q *Queries, tx ledgerpg.Tx, order c2c.Order, trade c2c.Trade, status c2c.TradeStatus, resolvedBy, reason, ledgerReason string) error {
 	updated, refund := order.Unlock(trade.Amount)
 	var ledgerTx *string
 	if refund {

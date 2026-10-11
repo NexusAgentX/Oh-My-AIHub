@@ -7,12 +7,14 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
 // Gateway returns the store the engine reads through: key lookup, candidates,
-// the online models and the Responses stickiness come from memory, everything
-// else (opening and closing calls, balances, spend, stats) goes to raw.
+// the online models, the Responses stickiness and the balances come from
+// memory, everything else (opening and closing calls, spend, stats) goes to
+// raw.
 //
 // A key the snapshot does not know is unknown: there is no fallback to the
 // database. The snapshot holds every key, so a missing one does not exist;
@@ -48,6 +50,13 @@ func (s gatewayStore) Candidates(ctx context.Context, modelID string, format cha
 	candidates := make([]gateway.Candidate, len(list))
 	copy(candidates, list)
 	return candidates, nil
+}
+
+// Points is the balance and credit limit for the check before a request is let
+// through. It comes from the balance cache (balances.go), which the ledger's
+// bookings keep current; the engine never learns the difference.
+func (s gatewayStore) Points(ctx context.Context, accountID string) (ledger.Points, error) {
+	return s.c.balances.get(ctx, accountID)
 }
 
 func (s gatewayStore) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, error) {
@@ -91,14 +100,15 @@ func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish)
 }
 
 // What each method of gateway.Store does here. The first list is answered from
-// the snapshots; the others go to the database store and change nothing the
-// snapshots hold (TouchKey only stamps last_used_at, RecordChannelEvent only
-// appends to the event log). TestEveryStoreMethodIsClassified keeps both lists
-// complete.
+// the snapshots and the balance cache; the others go to the database store and
+// change nothing they hold (TouchKey only stamps last_used_at,
+// RecordChannelEvent only appends to the event log, FinishCall's posting
+// reaches the balance cache through the ledger's Books).
+// TestEveryStoreMethodIsClassified keeps both lists complete.
 var (
-	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "CustomModelOnline", "ResponseChannel"}
+	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "CustomModelOnline", "ResponseChannel", "Points"}
 	gatewayStoreOthers   = []string{
-		"TouchKey", "Points", "KeySpend", "ChannelRevenue", "AttemptHistory", "InsertCall", "FinishCall",
+		"TouchKey", "KeySpend", "ChannelRevenue", "AttemptHistory", "InsertCall", "FinishCall",
 		"SweepStaleCalls", "RecordChannelEvent",
 	}
 )

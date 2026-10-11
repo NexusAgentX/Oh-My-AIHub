@@ -1,6 +1,7 @@
 // Package snapshot keeps the data the gateway reads on every request in
 // process memory (ADR-0040): the platform keys, the model catalog, the
-// candidate channels of each model and format, and the routing preferences.
+// candidate channels of each model and format, the routing preferences, and
+// the balance and credit limit of the accounts that call it.
 //
 // The backend is the only process that writes this data (ADR-0039), so it
 // knows when it changes. Each write path calls Invalidate after its
@@ -12,6 +13,13 @@
 // the administrator's or owner's request is answered. Everything is also
 // rebuilt once a minute, which bounds how long a change made behind the
 // process's back (manual SQL, a migration) stays unseen.
+//
+// The balances are not a snapshot but a per-account cache with the same
+// discipline (balances.go): a gateway settlement is added to the cached
+// balance when its transaction commits, any other posting or a change of a
+// credit limit drops the account's entry after the commit, and the entries
+// are reloaded every minute. They follow the ledger through the Books of the
+// persistence layer, so every posting is seen, not only the hooked ones.
 //
 // The Cache is a layer behind the interfaces the engine already uses
 // (gateway.Store, routing.Store, gateway.Models); the wrappers for the stores
@@ -28,6 +36,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
@@ -50,6 +59,9 @@ type Loader interface {
 	// LoadModels returns the whole catalog, disabled models included, in
 	// display order.
 	LoadModels(ctx context.Context) ([]catalog.Model, error)
+	// LoadPoints returns the balance and credit limit of each of the given
+	// accounts that exists.
+	LoadPoints(ctx context.Context, accountIDs []string) (map[string]ledger.Points, error)
 }
 
 // Config wires a Cache.
@@ -87,6 +99,8 @@ type Cache struct {
 	fleet  *cell[fleetSet]
 	routes *cell[routeSet]
 	sticky *responseLRU
+
+	balances *balanceBook
 }
 
 // New builds a Cache. Nothing is loaded yet: the first read of a snapshot
@@ -118,7 +132,8 @@ func New(config Config) *Cache {
 			prefs, err := loader.LoadRoutePrefs(ctx)
 			return buildRoutes(prefs), err
 		}),
-		sticky: newResponseLRU(stickyCapacity),
+		sticky:   newResponseLRU(stickyCapacity),
+		balances: newBalanceBook(loader.LoadPoints),
 	}
 }
 
@@ -138,7 +153,8 @@ func (c *Cache) Load(ctx context.Context) error {
 // Run rebuilds everything once per interval until ctx ends: the safety net
 // under the invalidation calls. A failed rebuild is logged and the previous
 // snapshot stays in use; reads of a snapshot that a counted change has
-// outdated do not use it and retry on their own.
+// outdated do not use it and retry on their own. The balance entries are
+// reloaded in the same round.
 func (c *Cache) Run(ctx context.Context) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
@@ -151,8 +167,26 @@ func (c *Cache) Run(ctx context.Context) {
 		if err := c.run(ctx, domainAll, true); err != nil && ctx.Err() == nil {
 			c.logger.Error("snapshots: periodic rebuild failed, keeping the previous snapshots", "error", err)
 		}
+		if err := c.refreshBalances(ctx); err != nil && ctx.Err() == nil {
+			c.logger.Error("snapshots: periodic reload of the balances failed, keeping the previous ones", "error", err)
+		}
 	}
 }
+
+func (c *Cache) refreshBalances(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, loadTimeout)
+	defer cancel()
+	return c.balances.refresh(ctx)
+}
+
+// Balances is the observer that keeps the cached balances behind the ledger:
+// subscribe it to the Books of the persistence layer, which then reports
+// every posting.
+func (c *Cache) Balances() ledger.Observer { return c.balances }
+
+// InvalidateBalances drops the cached balance and credit limit of accounts. A
+// write that changes a credit limit calls it after its transaction committed.
+func (c *Cache) InvalidateBalances(accountIDs ...string) { c.balances.invalidate(accountIDs...) }
 
 // Invalidate counts a committed change to the given snapshots and rebuilds
 // them before it returns. It is the call every write path makes after its

@@ -16,6 +16,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
@@ -27,6 +28,7 @@ type fakeLoader struct {
 	candidates []gateway.CandidateRecord
 	prefs      []routing.Scoped
 	models     []catalog.Model
+	points     map[string]ledger.Points
 	err        error
 	loads      int
 }
@@ -78,6 +80,21 @@ func (l *fakeLoader) LoadModels(context.Context) ([]catalog.Model, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return slices.Clone(l.models), nil
+}
+
+func (l *fakeLoader) LoadPoints(_ context.Context, accountIDs []string) (map[string]ledger.Points, error) {
+	if err := l.read(); err != nil {
+		return nil, err
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	points := make(map[string]ledger.Points, len(accountIDs))
+	for _, id := range accountIDs {
+		if value, found := l.points[id]; found {
+			points[id] = value
+		}
+	}
+	return points, nil
 }
 
 func newTestCache(loader *fakeLoader) *Cache {
