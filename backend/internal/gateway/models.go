@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 )
 
 // unknownRelease stands in for a model's release time, which the catalog does
@@ -20,8 +21,9 @@ var unknownRelease = time.Unix(0, 0).UTC()
 // ListModels answers GET /v1/models (Anthropic shape when the request carries
 // anthropic-version, as Anthropic clients always do; OpenAI shape otherwise)
 // and GET /v1beta/models (Gemini shape): the models the calling key may use
-// that have at least one listed channel. Aliases of such models are listed
-// too, since that is the name the client sends.
+// that have at least one listed channel serving the endpoint's formats (see
+// listFormats). Aliases of such models are listed too, since that is the name
+// the client sends.
 func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool) {
 	ctx := r.Context()
 	dialect := DialectOf(r)
@@ -37,7 +39,7 @@ func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool)
 		WriteError(w, dialect, http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期", "")
 		return
 	}
-	names, err := e.availableModels(ctx, key)
+	names, err := e.availableModels(ctx, key, listFormats(dialect, gemini))
 	if err != nil {
 		e.Logger.Error("gateway: listing models failed", "error", err)
 		WriteError(w, dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
@@ -59,6 +61,19 @@ func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	writeJSONBody(w, body)
+}
+
+// listFormats are the formats a model list is for: a model is listed when a
+// channel serves any of them. The OpenAI shape lists models reachable through
+// either OpenAI format; the other shapes list their own.
+func listFormats(dialect Dialect, gemini bool) []channel.Format {
+	switch {
+	case gemini:
+		return []channel.Format{channel.FormatGemini}
+	case dialect == DialectAnthropic:
+		return []channel.Format{channel.FormatAnthropic}
+	}
+	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}
 }
 
 // openAIModelList is OpenAI's unpaged {"object":"list","data":[Model]}.
@@ -169,7 +184,9 @@ type listedModel struct {
 	model catalog.Model
 }
 
-func (e *Engine) availableModels(ctx context.Context, key KeyAuth) ([]listedModel, error) {
+// availableModels are the names the key may send that a channel serves in one
+// of formats. An alias follows the model it points to.
+func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []channel.Format) ([]listedModel, error) {
 	catalogModels, err := e.Catalog.List(ctx, false)
 	if err != nil {
 		return nil, err
@@ -183,6 +200,9 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth) ([]listedMode
 	var result []listedModel
 	allowed := func(id string) bool { return len(key.AllowedModels) == 0 || containsString(key.AllowedModels, id) }
 	for _, model := range online {
+		if !slices.ContainsFunc(model.Formats, func(format channel.Format) bool { return slices.Contains(formats, format) }) {
+			continue
+		}
 		onlineSet[model.ID] = true
 		if model.Custom {
 			// Custom models (ADR-0034) are listed under their own name only.
