@@ -303,7 +303,41 @@ type perfRun struct {
 	Upstream       gatewaybench.UpstreamStats
 	// StatementMS is the mean duration of each statement, as the client saw it.
 	StatementMS map[string]float64 `json:"statement_mean_ms"`
-	LoadAverage string             `json:"load_average_before"`
+	// LockHold is how long the settlement's ledger row locks stayed taken.
+	LockHold    holdSummary `json:"ledger_lock_hold"`
+	LoadAverage string      `json:"load_average_before"`
+}
+
+// holdSummary is the JSON form of gatewaybench.HoldStats: the time from the
+// answer to LockLedgerAccounts until the answer to the commit, and what the
+// transaction did in between, per hold.
+type holdSummary struct {
+	Holds        int64                      `json:"holds"`
+	MeanMS       float64                    `json:"mean_ms"`
+	P50MS        float64                    `json:"p50_ms"`
+	P99MS        float64                    `json:"p99_ms"`
+	MaxMS        float64                    `json:"max_ms"`
+	Statements   float64                    `json:"statements_per_hold"`
+	StepsPerHold map[string]holdStepSummary `json:"steps_per_hold"`
+}
+
+type holdStepSummary struct {
+	Count       float64 `json:"statements"`
+	RoundTripMS float64 `json:"round_trip_ms"`
+	ClientGapMS float64 `json:"client_gap_ms"`
+}
+
+func summarizeHold(h gatewaybench.HoldStats) holdSummary {
+	out := holdSummary{Holds: h.Count, MeanMS: millis(h.Mean()), P50MS: millis(h.Percentile(50)), P99MS: millis(h.Percentile(99)),
+		Statements: h.Statements(), StepsPerHold: map[string]holdStepSummary{}}
+	for _, sample := range h.Samples {
+		out.MaxMS = max(out.MaxMS, millis(sample))
+	}
+	for name, step := range h.Steps {
+		n := float64(max(h.Count, 1))
+		out.StepsPerHold[name] = holdStepSummary{Count: float64(step.Count) / n, RoundTripMS: millis(step.Duration) / n, ClientGapMS: millis(step.Gap) / n}
+	}
+	return out
 }
 
 // runSummary is the JSON form of a Result.
@@ -348,7 +382,7 @@ func (s *perfStack) run(plan gatewaybench.Plan, client *http.Client) perfRun {
 	time.Sleep(time.Second) // let the previous run's stragglers finish
 	var out perfRun
 	out.LoadAverage = loadAverage()
-	timingsBefore := s.counter.Timings()
+	timingsBefore, holdsBefore := s.counter.Timings(), s.counter.Holds()
 	before := readProc()
 	poolBefore, upstreamBefore := s.pool.Stat(), s.upstream.Stats()
 	dialsBefore, acceptedBefore, lookupsBefore := s.dials.Load(), s.server.Accepted(), s.resolver.lookups.Load()
@@ -374,6 +408,7 @@ func (s *perfStack) run(plan gatewaybench.Plan, client *http.Client) perfRun {
 		StickyChecked: upstreamAfter.StickyChecked - upstreamBefore.StickyChecked, StickyMisses: upstreamAfter.StickyMisses - upstreamBefore.StickyMisses,
 	}
 	out.Summary = summarize(out.Result)
+	out.LockHold = summarizeHold(gatewaybench.HoldsSince(s.counter.Holds(), holdsBefore))
 	out.StatementMS = map[string]float64{}
 	for name, now := range s.counter.Timings() {
 		before := timingsBefore[name]
@@ -867,6 +902,38 @@ func writeScenarioTables(w *strings.Builder, reports []scenarioReport) {
 		}
 		fmt.Fprint(w, "\n")
 	}
+	fmt.Fprint(w, "\n## Settlement lock hold\n\n")
+	fmt.Fprint(w, "How long a settlement keeps the ledger account rows locked (the `platform_revenue` row is the hot one): from the answer to `LockLedgerAccounts` until the answer to the commit, as the client sees it (the server's figure is about one round trip shorter). Gateway run, warm-up included. The queue for the lock is `LockLedgerAccounts` in the table above; every settlement waits for the holds of those ahead of it.\n\n")
+	fmt.Fprint(w, "| scenario | holds | mean ms | p50 ms | p99 ms | max ms | statements per hold |\n|---|---|---|---|---|---|---|\n")
+	for _, r := range reports {
+		h := r.Gateway.LockHold
+		fmt.Fprintf(w, "| %s | %d | %.2f | %.2f | %.2f | %.1f | %.1f |\n", rowName(r), h.Holds, h.MeanMS, h.P50MS, h.P99MS, h.MaxMS, h.Statements)
+	}
+	fmt.Fprint(w, "\n")
+	for _, r := range reports {
+		if r.Repeat > 1 || len(r.Gateway.LockHold.StepsPerHold) == 0 {
+			continue
+		}
+		h := r.Gateway.LockHold
+		fmt.Fprintf(w, "**%s** — what one hold is made of (means per hold; the client time is the pause before the statement: encoding, scheduling, the Go code between two statements)\n\n", r.Name)
+		names := make([]string, 0, len(h.StepsPerHold))
+		for name := range h.StepsPerHold {
+			names = append(names, name)
+		}
+		sort.Slice(names, func(i, j int) bool {
+			a, b := h.StepsPerHold[names[i]], h.StepsPerHold[names[j]]
+			if a.RoundTripMS+a.ClientGapMS != b.RoundTripMS+b.ClientGapMS {
+				return a.RoundTripMS+a.ClientGapMS > b.RoundTripMS+b.ClientGapMS
+			}
+			return names[i] < names[j]
+		})
+		fmt.Fprint(w, "| statement | per hold | round trips ms | client time ms | total ms |\n|---|---|---|---|---|\n")
+		for _, name := range names {
+			step := h.StepsPerHold[name]
+			fmt.Fprintf(w, "| %s | %.2f | %.3f | %.3f | %.3f |\n", name, step.Count, step.RoundTripMS, step.ClientGapMS, step.RoundTripMS+step.ClientGapMS)
+		}
+		fmt.Fprint(w, "\n")
+	}
 	for _, r := range reports {
 		if r.Scenario.sticky && r.Repeat == 1 {
 			u := r.Gateway.Upstream
@@ -879,15 +946,15 @@ func writeSweepTable(w *strings.Builder, name string, best float64, steps []swee
 	fmt.Fprintf(w, "\n## Sweep: %s\n\n", name)
 	fmt.Fprintf(w, "Highest rate that held: **%.0f requests/s**. A step holds when no arrival is dropped, the error rate is at most %.1f%%, at least %.0f%% of the rate completes, and ttft p99 stays within %s of the upstream's own.\n\n",
 		best, 100*sustainErrorRate, 100*sustainAchieved, sustainTTFTMargin)
-	fmt.Fprint(w, "| rate | completed/s | failed | dropped | ttft p50 | ttft p99 | peak in flight | CPU ms/req | DB waited | LockLedgerAccounts ms | commit ms | held | why not |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	fmt.Fprint(w, "| rate | completed/s | failed | dropped | ttft p50 | ttft p99 | peak in flight | CPU ms/req | DB waited | LockLedgerAccounts ms | lock hold ms | commit ms | held | why not |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, step := range steps {
 		r := step.Run
 		waited := 0.0
 		if r.PoolAcquires > 0 {
 			waited = 100 * float64(r.PoolWaited) / float64(r.PoolAcquires)
 		}
-		fmt.Fprintf(w, "| %.0f | %.0f | %d | %d | %s | %s | %d | %.2f | %.0f%% | %.1f | %.1f | %v | %s |\n", step.QPS, r.Result.Throughput(), r.Result.Failed(), r.Result.Dropped,
+		fmt.Fprintf(w, "| %.0f | %.0f | %d | %d | %s | %s | %d | %.2f | %.0f%% | %.1f | %.2f | %.1f | %v | %s |\n", step.QPS, r.Result.Throughput(), r.Result.Failed(), r.Result.Dropped,
 			ms(r.Result.TTFT.Percentile(50)), ms(r.Result.TTFT.Percentile(99)), r.Result.PeakInFlight, millis(r.CPUPerRequest), waited,
-			r.StatementMS["LockLedgerAccounts"], r.StatementMS["(commit)"], step.Pass, step.Why)
+			r.StatementMS["LockLedgerAccounts"], r.LockHold.MeanMS, r.StatementMS["(commit)"], step.Pass, step.Why)
 	}
 }

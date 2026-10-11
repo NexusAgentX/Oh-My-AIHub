@@ -24,6 +24,7 @@ type QueryCounter struct {
 	counts     map[string]int64
 	background map[string]int64
 	timings    map[string]*Timing
+	holds      holdTracker
 }
 
 // Timing is how long the statements of one name took as the client saw it:
@@ -91,13 +92,15 @@ func (c *QueryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pg
 }
 
 // TraceQueryEnd implements pgx.QueryTracer.
-func (c *QueryCounter) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryEndData) {
+func (c *QueryCounter) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, _ pgx.TraceQueryEndData) {
 	begun, ok := ctx.Value(startedKey{}).(started)
 	if !ok || begun.background {
 		return
 	}
-	elapsed := time.Since(begun.at)
+	now := time.Now()
+	elapsed := now.Sub(begun.at)
 	c.mu.Lock()
+	c.holds.end(conn, begun.name, begun.at, now)
 	timing := c.timings[begun.name]
 	if timing == nil {
 		timing = &Timing{}

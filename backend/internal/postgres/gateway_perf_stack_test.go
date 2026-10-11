@@ -181,6 +181,9 @@ func withLabel(component string, f func()) {
 func newPerfStack(t *testing.T, channels, consumers int, dnsDelay time.Duration) *perfStack {
 	t.Helper()
 	s := &perfStack{t: t, counter: gatewaybench.NewQueryCounter(), channelCount: channels, startLoad: loadAverage()}
+	// The settlement's row locks: how long they stay taken is what limits the
+	// rate at which requests can be billed (Epic #360, G8.7).
+	s.counter.WatchHold("LockLedgerAccounts")
 	s.resolver = &perfResolver{ips: map[string]net.IP{}, delay: dnsDelay}
 	for i := range channels {
 		host := fmt.Sprintf("up-%d.perf.test", i)
