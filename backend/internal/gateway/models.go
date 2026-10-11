@@ -3,12 +3,16 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"slices"
 	"sort"
+	"strconv"
 	"time"
 )
 
-// ListModels answers GET /v1/models (OpenAI shape) and GET /v1beta/models
-// (Gemini shape): the models the calling key may use that have at least one
+// ListModels answers GET /v1/models (Anthropic shape when the request carries
+// anthropic-version, as Anthropic clients always do; OpenAI shape otherwise)
+// and GET /v1beta/models (Gemini shape): the models the calling key may use that have at least one
 // listed channel. Aliases of such models are listed too, since that is the
 // name the client sends.
 func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool) {
@@ -43,12 +47,57 @@ func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool)
 		writeJSONBody(w, map[string]any{"models": models})
 		return
 	}
+	created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	if r.Header.Get("anthropic-version") != "" {
+		writeJSONBody(w, anthropicModelPage(names, r.URL.Query(), created))
+		return
+	}
 	data := make([]map[string]any, 0, len(names))
-	created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
 	for _, name := range names {
-		data = append(data, map[string]any{"id": name.id, "object": "model", "created": created, "owned_by": "oh-my-aihub"})
+		data = append(data, map[string]any{"id": name.id, "object": "model", "created": created.Unix(), "owned_by": "oh-my-aihub"})
 	}
 	writeJSONBody(w, map[string]any{"object": "list", "data": data})
+}
+
+// anthropicModelPage pages the sorted list the way Anthropic does: limit
+// (default 20, 1–1000) items after after_id or before before_id. An unknown
+// cursor yields an empty page.
+func anthropicModelPage(names []listedModel, query url.Values, created time.Time) map[string]any {
+	limit := 20
+	if value, err := strconv.Atoi(query.Get("limit")); err == nil {
+		limit = min(max(value, 1), 1000)
+	}
+	index := func(id string) int {
+		return slices.IndexFunc(names, func(name listedModel) bool { return name.id == id })
+	}
+	var start, end int
+	if before := query.Get("before_id"); before != "" {
+		end = max(index(before), 0)
+		start = max(end-limit, 0)
+	} else {
+		if after := query.Get("after_id"); after != "" {
+			if found := index(after); found >= 0 {
+				start = found + 1
+			} else {
+				start = len(names)
+			}
+		}
+		end = min(start+limit, len(names))
+	}
+	page := names[start:end]
+	data := make([]map[string]any, 0, len(page))
+	for _, name := range page {
+		data = append(data, map[string]any{"type": "model", "id": name.id, "display_name": name.display, "created_at": created.Format(time.RFC3339)})
+	}
+	var firstID, lastID any
+	if len(page) > 0 {
+		firstID, lastID = page[0].id, page[len(page)-1].id
+	}
+	hasMore := end < len(names)
+	if query.Get("before_id") != "" {
+		hasMore = start > 0
+	}
+	return map[string]any{"data": data, "has_more": hasMore, "first_id": firstID, "last_id": lastID}
 }
 
 type listedModel struct{ id, display string }

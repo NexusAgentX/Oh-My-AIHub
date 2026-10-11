@@ -55,8 +55,13 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	// 发现上游模型、读取与修改。
 	discovered := alice.expect(t, http.StatusOK, http.MethodPost, "/api/channels/discover", map[string]string{"base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001"})
 	models := discovered["upstream_models"].([]any)
-	if discovered["base_url"] != "https://relay.example" || len(models) != 2 || models[0].(map[string]any)["matched_model_id"] != "deepseek-chat" {
+	if discovered["base_url"] != "https://relay.example" || len(models) != 6 || models[0].(map[string]any)["matched_model_id"] != "deepseek-chat" {
 		t.Fatalf("discovered = %v", discovered)
+	}
+	for index, want := range []string{"deepseek-chat", "relay-anthropic-1", "relay-anthropic-2", "relay-gemini-1", "relay-gemini-2", "some-unlisted-model"} {
+		if got := models[index].(map[string]any)["id"]; got != want {
+			t.Fatalf("discovered[%d] = %v, want %s (pages must be followed)", index, got, want)
+		}
 	}
 	if listed := alice.expect(t, http.StatusOK, http.MethodGet, "/api/channels", nil); len(listed["items"].([]any)) != 1 {
 		t.Fatalf("channels = %v", listed)

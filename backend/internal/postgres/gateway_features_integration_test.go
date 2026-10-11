@@ -292,6 +292,10 @@ func TestGatewayAppliesKeyAliasesAndAllowedModels(t *testing.T) {
 	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), `"id":"gpt-test"`) || !strings.Contains(list.Body.String(), `"id":"gpt-4o"`) || strings.Contains(list.Body.String(), "claude-test") {
 		t.Fatalf("models = %d %s", list.Code, list.Body.String())
 	}
+	anthropic := e.call("", http.MethodGet, "/v1/models?limit=1", nil, map[string]string{"x-api-key": secret, "anthropic-version": "2023-06-01"})
+	if anthropic.Code != http.StatusOK || !strings.Contains(anthropic.Body.String(), `"type":"model"`) || !strings.Contains(anthropic.Body.String(), `"has_more":true`) {
+		t.Fatalf("anthropic models = %d %s", anthropic.Code, anthropic.Body.String())
+	}
 	gemini := e.call("", http.MethodGet, "/v1beta/models?key="+secret, nil, nil)
 	if gemini.Code != http.StatusOK || !strings.Contains(gemini.Body.String(), `"name":"models/gpt-test"`) {
 		t.Fatalf("gemini models = %d %s", gemini.Code, gemini.Body.String())
