@@ -292,7 +292,7 @@ func (b *fakeBrowse) OnlineChannels(context.Context) ([]gateway.OnlineChannel, e
 			if model.Enabled {
 				online = append(online, gateway.OnlineChannel{
 					ModelID: model.ModelID, ChannelID: item.ID, ChannelName: item.Name, OwnerID: item.Owner.ID, OwnerName: item.Owner.DisplayName,
-					Formats: model.Formats, MultiplierNano: model.MultiplierNano, Advanced: item.Advanced,
+					Formats: model.Formats, MultiplierNano: model.MultiplierNano, FXDiscount: model.FXDiscount, Advanced: item.Advanced,
 				})
 			}
 		}

@@ -79,7 +79,7 @@ func toChannel(row GetChannelRow) channel.Channel {
 
 func toModel(row ChannelModel) channel.Model {
 	model := channel.Model{
-		ModelID: row.ModelID, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano,
+		ModelID: row.ModelID, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
 		Enabled: row.Enabled, FormatTests: map[channel.Format]channel.FormatTest{},
 	}
 	for _, format := range row.Formats {
@@ -175,7 +175,7 @@ func insertModels(ctx context.Context, q *Queries, channelID string, models []ch
 		}
 		if err := q.InsertChannelModel(ctx, InsertChannelModelParams{
 			ChannelID: channelID, ModelID: model.ModelID, UpstreamModel: model.UpstreamModel, MultiplierNano: model.MultiplierNano,
-			Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled,
+			Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
 		}); err != nil {
 			return err
 		}

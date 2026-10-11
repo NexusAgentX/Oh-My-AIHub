@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { tokenPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
-import { formatMultiplier } from '../money/format'
+import { MultiplierText } from '../money/MultiplierText'
 import { Badge, QueryBoundary, type BadgeTone } from '../ui'
 import { DetailList } from './components'
 import { feeRateToPercent, formatDateTime, formatPoints, isNegative, shortID } from './format'
@@ -82,6 +82,7 @@ export const auditActionLabels: Record<string, string> = {
   'model.updated': '修改模型',
   'model.deleted': '删除模型',
   'settings.updated': '修改平台设置',
+  'settings.exchange_rate_synced': '同步美元汇率',
 }
 
 export function auditActionLabel(entry: Pick<AuditEntry, 'action'>) {
@@ -155,12 +156,32 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
       </span>,
     ])
   }
-  items.push(['倍率', formatMultiplier(snapshot.multiplier)], ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`])
+  const usd = snapshot.currency === 'USD'
+  if (usd) items.push(['计价币种', `美元，汇率 ${snapshot.usd_cny_rate ?? '—'}`])
+  items.push(
+    [
+      '倍率',
+      <MultiplierText
+        effective={snapshot.effective_multiplier}
+        fxDiscount={snapshot.fx_discount}
+        key="multiplier"
+        multiplier={snapshot.multiplier}
+      />,
+    ],
+    ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`],
+  )
   for (const [key, label] of priceLabels) {
+    const selected = snapshot.selected_prices?.[key]
+    let formula = `${selected} × ${snapshot.multiplier}`
+    if (usd) {
+      formula = snapshot.fx_discount
+        ? `$${selected} × ${snapshot.multiplier}（汇率优惠）= ${formatPoints(snapshot.prices[key])}`
+        : `$${selected} × ${snapshot.usd_cny_rate} × ${snapshot.multiplier} = ${formatPoints(snapshot.prices[key])}`
+    }
     items.push([
       `${label}现价`,
-      snapshot.selected_prices
-        ? `${snapshot.selected_prices[key]} × ${snapshot.multiplier}`
+      selected !== undefined
+        ? formula
         : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
     ])
   }

@@ -10,8 +10,10 @@ import {
   Drawer,
   Icon,
   InlineError,
+  Notice,
   PageHeader,
   QueryBoundary,
+  Segmented,
   TextareaField,
   TextField,
   type Column,
@@ -24,11 +26,14 @@ import {
   formToUpdateRequest,
   modalityOptions,
   modelToForm,
+  priceUnit,
+  usdToPoints,
   validateModelForm,
+  type PriceCurrency,
   type ModelErrors,
   type ModelForm,
 } from './modelForm'
-import { useAdminModels, useDeleteModel, useSaveModel } from './queries'
+import { useAdminModels, useAdminSettings, useDeleteModel, useSaveModel } from './queries'
 import { PriceFields, TierEditor } from './TierEditor'
 import type { AdminModel } from './types'
 
@@ -70,7 +75,10 @@ function ModelEditor({
   const [form, setForm] = useState<ModelForm>(() => (model ? modelToForm(model) : emptyModelForm()))
   const [errors, setErrors] = useState<ModelErrors>({})
   const save = useSaveModel()
+  const settings = useAdminSettings()
+  const rate = settings.data?.settings.usd_cny_rate
   const set = (patch: Partial<ModelForm>) => setForm((current) => ({ ...current, ...patch }))
+  const currencySwitched = !creating && model.price_currency !== form.currency
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -101,12 +109,37 @@ function ModelEditor({
         onChange={(event) => set({ displayName: event.target.value })}
         value={form.displayName}
       />
+      <div className="field">
+        <span className="field-label">计价币种</span>
+        <Segmented<PriceCurrency>
+          label="计价币种"
+          onChange={(currency) => set({ currency })}
+          options={[
+            { key: 'CNY', label: '人民币（= 积分）' },
+            { key: 'USD', label: '美元' },
+          ]}
+          value={form.currency}
+        />
+      </div>
       <PriceFields
         error={errors.prices}
-        legend="基准价（积分/百万 token）"
+        legend={`基准价（${priceUnit(form.currency)}）`}
         onChange={(prices) => set({ prices })}
         prices={form.prices}
       />
+      {form.currency === 'USD' && rate && (
+        <p className="muted-copy">
+          按官方美元价填写。当前 1 美元 = {rate} 积分，用户看到的价格为输入{' '}
+          {usdToPoints(form.prices.input, rate)}、输出 {usdToPoints(form.prices.output, rate)} 积分/百万 token。
+        </p>
+      )}
+      {currencySwitched && (
+        <Notice tone="info">
+          {form.currency === 'USD'
+            ? '保存后，已上架此模型的渠道会自动开启「汇率优惠」，按原数值计费、价格不变；渠道主可再调整。'
+            : '保存后，渠道的「汇率优惠」会自动关闭，基准价直接按积分计费。'}
+        </Notice>
+      )}
       <TextField
         error={errors.sortOrder}
         hint="小的在前"
@@ -159,7 +192,12 @@ function ModelEditor({
         </div>
       </Collapsible>
       <Collapsible badge={form.tiers.length > 0 ? `${form.tiers.length} 档` : undefined} defaultOpen={form.tiers.length > 0} title="条件价格档">
-        <TierEditor basePrices={form.prices} onChange={(tiers) => set({ tiers })} tiers={form.tiers} />
+        <TierEditor
+          basePrices={form.prices}
+          onChange={(tiers) => set({ tiers })}
+          tiers={form.tiers}
+          unit={priceUnit(form.currency)}
+        />
         <InlineError>{errors.tiers}</InlineError>
       </Collapsible>
       <InlineError>{save.isError ? errorMessage(save.error, '保存失败，请重试') : ''}</InlineError>
@@ -171,6 +209,10 @@ function ModelEditor({
       </div>
     </form>
   )
+}
+
+function basePrice(model: AdminModel, key: 'input' | 'output' | 'cache_read' | 'cache_write') {
+  return model.price_currency === 'USD' ? `$${model.base_prices[key]}` : model.base_prices[key]
 }
 
 const columns: Column<AdminModel>[] = [
@@ -190,10 +232,15 @@ const columns: Column<AdminModel>[] = [
     header: '状态',
     cell: (model) => <Badge tone={model.enabled ? 'success' : 'neutral'}>{model.enabled ? '启用' : '停用'}</Badge>,
   },
-  { key: 'input', header: '输入', numeric: true, cell: (model) => model.base_prices.input },
-  { key: 'output', header: '输出', numeric: true, cell: (model) => model.base_prices.output },
-  { key: 'cache_read', header: '缓存读', numeric: true, cell: (model) => model.base_prices.cache_read },
-  { key: 'cache_write', header: '缓存写', numeric: true, cell: (model) => model.base_prices.cache_write },
+  {
+    key: 'currency',
+    header: '币种',
+    cell: (model) => (model.price_currency === 'USD' ? <Badge tone="info">美元</Badge> : '积分'),
+  },
+  { key: 'input', header: '输入', numeric: true, cell: (model) => basePrice(model, 'input') },
+  { key: 'output', header: '输出', numeric: true, cell: (model) => basePrice(model, 'output') },
+  { key: 'cache_read', header: '缓存读', numeric: true, cell: (model) => basePrice(model, 'cache_read') },
+  { key: 'cache_write', header: '缓存写', numeric: true, cell: (model) => basePrice(model, 'cache_write') },
   {
     key: 'tiers',
     header: '价格档',

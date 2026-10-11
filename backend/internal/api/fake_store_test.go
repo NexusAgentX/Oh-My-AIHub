@@ -53,6 +53,7 @@ func newFakeStore() *fakeStore {
 		settings: settings.Settings{
 			FeeRateNano: 1_000_000, C2CPaymentTimeoutMinutes: 30, DefaultMaxAttempts: 3, DefaultTTFTTimeoutMS: 30000,
 			DefaultTotalTimeoutMS: 600000, DefaultCooldownFailures: 3, DefaultCooldownSeconds: 300, ExtraBlockedHosts: []string{},
+			USDCNYRateNano: 6_800_000_000, FXSyncMinute: 570, USDCNYRateSource: settings.RateSourceManual,
 		},
 	}
 }
@@ -427,8 +428,33 @@ func (s *fakeStore) UpdateSettings(_ context.Context, actorID string, value sett
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	value.UpdatedAt = s.clock
+	value.USDCNYRateSource, value.USDCNYRateUpdatedAt = s.settings.USDCNYRateSource, s.settings.USDCNYRateUpdatedAt
+	if value.USDCNYRateNano != s.settings.USDCNYRateNano {
+		value.USDCNYRateSource, value.USDCNYRateUpdatedAt = settings.RateSourceManual, s.clock
+	}
+	value.FXSyncAttemptedAt, value.FXSyncError = s.settings.FXSyncAttemptedAt, s.settings.FXSyncError
 	s.settings = value
 	s.record(actorID, audit.ActionSettingsUpdated, "settings", "platform", "")
+	return value, nil
+}
+
+func (s *fakeStore) SaveSyncedRate(_ context.Context, actorID string, rateNano int64, at time.Time) (settings.Settings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.USDCNYRateNano, s.settings.USDCNYRateSource, s.settings.USDCNYRateUpdatedAt = rateNano, settings.RateSourceAuto, at
+	s.settings.FXSyncAttemptedAt, s.settings.FXSyncError = &at, nil
+	s.record(actorID, audit.ActionExchangeRateSynced, "settings", "platform", "")
+	value := s.settings
+	value.UpdatedAt = s.clock
+	return value, nil
+}
+
+func (s *fakeStore) SaveSyncFailure(_ context.Context, message string, at time.Time) (settings.Settings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.FXSyncAttemptedAt, s.settings.FXSyncError = &at, &message
+	value := s.settings
+	value.UpdatedAt = s.clock
 	return value, nil
 }
 

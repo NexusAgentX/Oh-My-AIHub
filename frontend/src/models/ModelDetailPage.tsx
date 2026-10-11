@@ -41,6 +41,7 @@ function PriceDetails({ detail }: { detail: ModelDetail }) {
     <Disclosure title="价格详情">
       <p className="muted-copy">
         积分 / 百万 token。细分价未设置时继承本组通用价；缺少可靠明细时按通用价结算。工具、容器、存储附加费未覆盖。
+        {detail.model.usd_cny_rate && ` 美元定价模型，按 1 美元 = ${detail.model.usd_cny_rate} 积分换算。`}
       </p>
       <dl className="price-rules">
         <div>

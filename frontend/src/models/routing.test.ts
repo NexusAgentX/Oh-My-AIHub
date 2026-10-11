@@ -19,6 +19,8 @@ const channel = (id: string): ModelChannel => ({
   is_mine: false,
   formats: ['openai_chat'],
   multiplier: '1',
+  fx_discount: false,
+  effective_multiplier: '1',
   current_prices: { input: '1', output: '2', cache_read: '0', cache_write: '0' },
   success_rate_24h: null,
   ttft_p50_ms: null,

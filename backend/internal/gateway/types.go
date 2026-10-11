@@ -56,8 +56,13 @@ type Candidate struct {
 	BaseURL        string
 	UpstreamModel  string
 	MultiplierNano int64
-	Advanced       channel.Advanced
-	Credential     channel.EncryptedCredential
+	FXDiscount     bool
+	// RateNano converts the model's prices into points for this channel
+	// (ledger.ChannelRate); the engine sets it from the settings snapshot
+	// before ranking so ranking and billing use the same rate.
+	RateNano   int64
+	Advanced   channel.Advanced
+	Credential channel.EncryptedCredential
 }
 
 // ChannelStats is the 24h health of a channel computed from call attempts.
@@ -189,6 +194,7 @@ type OnlineChannel struct {
 	OwnerName      string
 	Formats        []channel.Format
 	MultiplierNano int64
+	FXDiscount     bool
 	Advanced       channel.Advanced
 }
 

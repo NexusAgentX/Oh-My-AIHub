@@ -67,7 +67,7 @@ function Stepper({ current }: { current: number }) {
 }
 
 function emptyRow(): ModelRow {
-  return { key: rowKey(), sell: true, modelId: '', upstream: '', formats: ['openai_chat'], multiplier: '1', passed: {} }
+  return { key: rowKey(), sell: true, modelId: '', upstream: '', formats: ['openai_chat'], multiplier: '1', fxDiscount: false, passed: {} }
 }
 
 /** 选模型区：读取结果提示、测试格式、手动添加与表格。 */

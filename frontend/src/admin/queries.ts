@@ -195,6 +195,10 @@ export function useUpdateSettings() {
   return useAdminMutation((body: RequestBody<'updateAdminSettings'>) => adminApi.updateSettings(body))
 }
 
+export function useSyncExchangeRate() {
+  return useAdminMutation(() => adminApi.syncExchangeRate())
+}
+
 export function useChannelSuspension() {
   return useAdminMutation((input: { id: string; suspend: boolean; reason: string }) =>
     input.suspend

@@ -2,8 +2,8 @@ import type { Format } from '../api/types'
 import { formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
 import { useModelDetails, useModels } from '../models/queries'
-import { currentPrices, multiplyPrice } from '../models/pricing'
-import { Button, Icon, IconButton } from '../ui'
+import { channelPrice, currentPrices, effectiveMultiplier } from '../models/pricing'
+import { Button, Icon, IconButton, Notice } from '../ui'
 import type { ModelRow } from './channelForm'
 
 /** 四个可切换的格式标签；测试通过的显示绿色 ✓。 */
@@ -42,20 +42,34 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
   const catalog = useModels()
   const ids = [...new Set(rows.filter((row) => row.modelId).map((row) => row.modelId))]
   const details = useModelDetails(ids)
+  const usdRate = (row: ModelRow) => {
+    const model = catalog.data?.items.find((item) => item.id === row.modelId)
+    return model?.price_currency === 'USD' ? model.usd_cny_rate : null
+  }
+  /** 实际倍率：勾选汇率优惠的美元模型为「倍率 ÷ 汇率」。 */
+  const effectiveOf = (row: ModelRow) => effectiveMultiplier(row.multiplier || '1', row.fxDiscount, usdRate(row))
   const priceOf = (row: ModelRow) => {
     const detail = details[ids.indexOf(row.modelId)]?.data
     if (!detail) return '—'
     const prices = currentPrices(detail).prices
-    const input = multiplyPrice(prices.input, row.multiplier || '1')
-    const output = multiplyPrice(prices.output, row.multiplier || '1')
+    const multiplier = row.multiplier || '1'
+    const input = channelPrice(prices.input, multiplier, row.fxDiscount, usdRate(row))
+    const output = channelPrice(prices.output, multiplier, row.fxDiscount, usdRate(row))
     return input && output ? `${formatPoints(input, { digits: 2 })} / ${formatPoints(output, { digits: 2 })}` : '—'
   }
+  const rate = rows.map(usdRate).find(Boolean)
   const update = (key: string, patch: Partial<ModelRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)))
   const options = catalog.data?.items.map((model) => model.id) ?? []
 
   if (rows.length === 0) return <p className="muted-copy">没有模型</p>
   return (
+    <>
+    {rate && (
+      <Notice tone="info">
+        带「自动计算汇率优惠」的是美元模型，积分价 = 官方美元价 × {rate}。上游 1 元充 1 美元额度且按官方美元价计费：填上游分组倍率并勾选；上游按实际汇率充值：只填倍率，不勾选。
+      </Notice>
+    )}
     <ul className="model-rows" aria-label="模型">
       <li aria-hidden="true" className="model-rows-head">
         <span>卖</span>
@@ -103,13 +117,28 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
               <p className="model-format-error" key={format}>{formatLabels[format]}：{row.errors?.[format] || '测试未通过'}</p>
             ))}
           </div>
-          <input
-            aria-label="倍率"
-            className="input model-row-multiplier num"
-            inputMode="decimal"
-            onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
-            value={row.multiplier}
-          />
+          <div className="model-row-multiplier">
+            <input
+              aria-label="倍率"
+              className="input num"
+              inputMode="decimal"
+              onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
+              value={row.multiplier}
+            />
+            {usdRate(row) && (
+              <label className="model-row-fx">
+                <input
+                  checked={row.fxDiscount}
+                  onChange={(event) => update(row.key, { fxDiscount: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>自动计算汇率优惠</span>
+              </label>
+            )}
+            {usdRate(row) && row.fxDiscount && (
+              <small className="model-row-effective num">实际倍率 {effectiveOf(row) ?? '—'}</small>
+            )}
+          </div>
           <span className="model-row-price num">{priceOf(row)}</span>
           <div className="model-row-actions">
             <Button aria-label={`测试 ${row.modelId || row.upstream} 的格式`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">测试</Button>
@@ -118,5 +147,6 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
         </li>
       ))}
     </ul>
+    </>
   )
 }

@@ -12,4 +12,5 @@ type ChannelModel struct {
 	Formats        []string
 	FormatTests    []byte
 	Enabled        bool
+	FxDiscount     bool
 }

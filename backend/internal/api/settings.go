@@ -13,16 +13,23 @@ import (
 
 // settingsJSON is the OpenAPI Settings schema.
 type settingsJSON struct {
-	FeeRateNano              int64     `json:"fee_rate_nano"`
-	C2CPaymentTimeoutMinutes int32     `json:"c2c_payment_timeout_minutes"`
-	DefaultCreditLimit       string    `json:"default_credit_limit"`
-	DefaultMaxAttempts       int32     `json:"default_max_attempts"`
-	DefaultTTFTTimeoutMS     int32     `json:"default_ttft_timeout_ms"`
-	DefaultTotalTimeoutMS    int32     `json:"default_total_timeout_ms"`
-	DefaultCooldownFailures  int32     `json:"default_cooldown_failures"`
-	DefaultCooldownSeconds   int32     `json:"default_cooldown_seconds"`
-	ExtraBlockedHosts        []string  `json:"extra_blocked_hosts"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	FeeRateNano              int64      `json:"fee_rate_nano"`
+	C2CPaymentTimeoutMinutes int32      `json:"c2c_payment_timeout_minutes"`
+	DefaultCreditLimit       string     `json:"default_credit_limit"`
+	DefaultMaxAttempts       int32      `json:"default_max_attempts"`
+	DefaultTTFTTimeoutMS     int32      `json:"default_ttft_timeout_ms"`
+	DefaultTotalTimeoutMS    int32      `json:"default_total_timeout_ms"`
+	DefaultCooldownFailures  int32      `json:"default_cooldown_failures"`
+	DefaultCooldownSeconds   int32      `json:"default_cooldown_seconds"`
+	ExtraBlockedHosts        []string   `json:"extra_blocked_hosts"`
+	USDCNYRate               string     `json:"usd_cny_rate"`
+	FXAutoSync               bool       `json:"fx_auto_sync"`
+	FXSyncMinute             int32      `json:"fx_sync_minute"`
+	USDCNYRateSource         string     `json:"usd_cny_rate_source"`
+	USDCNYRateUpdatedAt      time.Time  `json:"usd_cny_rate_updated_at"`
+	FXSyncAttemptedAt        *time.Time `json:"fx_sync_attempted_at"`
+	FXSyncError              *string    `json:"fx_sync_error"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
 // settingsEnvelopeJSON is the OpenAPI SettingsEnvelope schema.
@@ -45,6 +52,13 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 		DefaultCooldownFailures:  value.DefaultCooldownFailures,
 		DefaultCooldownSeconds:   value.DefaultCooldownSeconds,
 		ExtraBlockedHosts:        hosts,
+		USDCNYRate:               money.FromNano(value.USDCNYRateNano).String(),
+		FXAutoSync:               value.FXAutoSync,
+		FXSyncMinute:             value.FXSyncMinute,
+		USDCNYRateSource:         value.USDCNYRateSource,
+		USDCNYRateUpdatedAt:      value.USDCNYRateUpdatedAt,
+		FXSyncAttemptedAt:        value.FXSyncAttemptedAt,
+		FXSyncError:              value.FXSyncError,
 		UpdatedAt:                value.UpdatedAt,
 	}
 }
@@ -69,6 +83,9 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultCooldownFailures  *int32    `json:"default_cooldown_failures"`
 		DefaultCooldownSeconds   *int32    `json:"default_cooldown_seconds"`
 		ExtraBlockedHosts        *[]string `json:"extra_blocked_hosts"`
+		USDCNYRate               *string   `json:"usd_cny_rate"`
+		FXAutoSync               *bool     `json:"fx_auto_sync"`
+		FXSyncMinute             *int32    `json:"fx_sync_minute"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
 		writeInvalidJSON(w)
@@ -76,7 +93,8 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.FeeRateNano == nil || request.C2CPaymentTimeoutMinutes == nil || request.DefaultCreditLimit == nil ||
 		request.DefaultMaxAttempts == nil || request.DefaultTTFTTimeoutMS == nil || request.DefaultTotalTimeoutMS == nil ||
-		request.DefaultCooldownFailures == nil || request.DefaultCooldownSeconds == nil || request.ExtraBlockedHosts == nil {
+		request.DefaultCooldownFailures == nil || request.DefaultCooldownSeconds == nil || request.ExtraBlockedHosts == nil ||
+		request.USDCNYRate == nil || request.FXAutoSync == nil || request.FXSyncMinute == nil {
 		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请提交全部设置项")
 		return
 	}
@@ -85,14 +103,39 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	rate, err := money.Parse(*request.USDCNYRate)
+	if err != nil {
+		writeDomainError(w, settings.ErrInvalidInput)
+		return
+	}
 	updated, err := a.settings.Update(r.Context(), accountFromContext(r.Context()).ID, settings.Settings{
 		FeeRateNano: *request.FeeRateNano, C2CPaymentTimeoutMinutes: *request.C2CPaymentTimeoutMinutes,
 		DefaultCreditLimit: creditLimit, DefaultMaxAttempts: *request.DefaultMaxAttempts,
 		DefaultTTFTTimeoutMS: *request.DefaultTTFTTimeoutMS, DefaultTotalTimeoutMS: *request.DefaultTotalTimeoutMS,
 		DefaultCooldownFailures: *request.DefaultCooldownFailures, DefaultCooldownSeconds: *request.DefaultCooldownSeconds,
 		ExtraBlockedHosts: *request.ExtraBlockedHosts,
+		USDCNYRateNano:    rate.Nano(), FXAutoSync: *request.FXAutoSync, FXSyncMinute: *request.FXSyncMinute,
 	})
 	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, settingsEnvelopeJSON{Settings: newSettingsJSON(updated)})
+}
+
+// syncExchangeRate fetches the USD/CNY rate now. A failed fetch is stored as
+// the sync error and reported as 502 with the reason.
+func (a *app) syncExchangeRate(w http.ResponseWriter, r *http.Request) {
+	if a.rateSync == nil {
+		writeError(w, http.StatusServiceUnavailable, "exchange_rate_unavailable", "未配置汇率同步")
+		return
+	}
+	updated, err := a.rateSync.Sync(r.Context(), accountFromContext(r.Context()).ID)
+	if err != nil {
+		if r.Context().Err() == nil {
+			writeError(w, http.StatusBadGateway, "exchange_rate_sync_failed", "汇率同步失败："+err.Error())
+			return
+		}
 		writeDomainError(w, err)
 		return
 	}
@@ -175,5 +218,6 @@ func (a *app) listAdminAudit(w http.ResponseWriter, r *http.Request) {
 func (a *app) registerAdminSettingsRoutes(r *router) {
 	r.admin("GET /api/admin/settings", a.getAdminSettings)
 	r.admin("PUT /api/admin/settings", a.updateAdminSettings)
+	r.admin("POST /api/admin/settings/exchange-rate/sync", a.syncExchangeRate)
 	r.admin("GET /api/admin/audit", a.listAdminAudit)
 }

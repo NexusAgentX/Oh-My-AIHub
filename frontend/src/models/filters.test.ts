@@ -5,7 +5,7 @@ import { contextFilterError, defaultFilters, filterModels, priceFilterError } fr
 const model: CatalogModel = {
   id: 'gpt-demo', display_name: 'Demo Model', provider: 'OpenAI', context_window: 128000,
   input_modalities: [], output_modalities: [], supports_tools: true, supports_structured_output: true,
-  supports_vision: false, parameter_info: '', current_tier: null,
+  supports_vision: false, parameter_info: '', current_tier: null, price_currency: 'CNY', usd_cny_rate: null,
   base_prices: { input: '1', output: '2', cache_read: '0', cache_write: '0' },
   lowest_prices: { input: '0.123456789', output: '2', cache_read: '0', cache_write: '0' },
   formats: ['openai_chat'], online_channels: 2,

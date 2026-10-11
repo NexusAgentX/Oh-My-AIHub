@@ -127,6 +127,8 @@ func main() {
 	go runC2CExpiry(backgroundContext, c2cService, logger)
 	forumService := forum.NewService(store.Forum)
 	go runForumCleanup(backgroundContext, forumService, logger)
+	rateSyncer := settings.NewRateSyncer(store.Settings, settings.NewFrankfurterSource())
+	go runExchangeRateSync(backgroundContext, rateSyncer, logger)
 
 	observeService := observe.NewService(store.Observe)
 	feed := observe.NewFeed(observeService, bus, logger)
@@ -151,6 +153,7 @@ func main() {
 			Catalog:  catalogService,
 			Ledger:   ledger.NewService(store.Ledger),
 			Settings: settingsService,
+			RateSync: rateSyncer,
 			Audit:    audit.NewService(store.Audit),
 			Keys:     apikey.NewService(store.Keys, credentialKeyring, modelIDs),
 			Channels: channel.NewService(channel.Dependencies{
@@ -272,6 +275,28 @@ func channelEventKind(kind string) gateway.EventKind {
 		return gateway.EventChannelRecover
 	}
 	return gateway.EventChannelLimit
+}
+
+// runExchangeRateSync checks once a minute whether the daily automatic
+// USD/CNY sync is due and runs it; failures are kept on the settings row.
+func runExchangeRateSync(ctx context.Context, syncer *settings.RateSyncer, logger *slog.Logger) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		runContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+		ran, err := syncer.SyncIfDue(runContext)
+		cancel()
+		if err != nil && ctx.Err() == nil {
+			logger.Error("exchange rate sync failed", "error", err)
+		} else if ran {
+			logger.Info("exchange rate synced")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // runC2CExpiry cancels C2C trades whose payment deadline has passed, once a

@@ -2015,6 +2015,26 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /api/admin/settings/exchange-rate/sync:
+    post:
+      operationId: syncAdminExchangeRate
+      tags: [admin-settings]
+      summary: 立即同步美元兑人民币汇率
+      description: 从欧洲央行参考汇率（Frankfurter）读取 USD/CNY 并保存为自动汇率；不在 1～50 之间或与当前汇率相差超过 20% 时拒绝，失败原因记在 fx_sync_error。
+      x-access: admin
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SettingsEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '502': {$ref: '#/components/responses/BadGateway'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /api/admin/audit:
     get:
       operationId: listAdminAudit
@@ -3129,6 +3149,9 @@ components:
     NullableAmount: {type: [string, 'null'], pattern: '^-?[0-9]+(\.[0-9]{1,9})?$', description: 可空的积分金额十进制字符串。}
     Price: {type: string, pattern: '^(0|[1-9][0-9]{0,5})(\.[0-9]{1,9})?$', description: 单价（积分/百万 token）的十进制字符串，0～100000，最多 9 位小数。}
     Multiplier: {type: string, pattern: '^(0|[1-9][0-9]{0,3})(\.[0-9]{1,9})?$', description: 渠道倍率的十进制字符串，0～1000，最多 9 位小数，默认 "1"。}
+    PriceCurrency: {type: string, enum: [CNY, USD], description: 模型基准价的币种。CNY 的基准价即积分价（1 积分 ≈ 1 元）；USD 的基准价为美元，展示与计费时乘以平台美元汇率换算为积分。}
+    ExchangeRate: {type: string, pattern: '^(0|[1-9][0-9]{0,2})(\.[0-9]{1,9})?$', description: 1 美元兑人民币的十进制字符串，0.01～100，最多 9 位小数。}
+    EffectiveMultiplier: {type: string, pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$', description: 实际倍率：渠道对模型积分价实际乘上的倍率。开启汇率优惠的美元模型为「倍率 ÷ 汇率」，其余等于倍率。}
     Ratio: {type: string, pattern: '^(0|1)(\.[0-9]{1,6})?$', description: 0～1 之间的比率十进制字符串（如成功率）。}
     Timestamp: {type: string, format: date-time, description: RFC 3339 时间。}
     NullableTimestamp: {type: [string, 'null'], format: date-time, description: 可空的 RFC 3339 时间。}
@@ -3243,7 +3266,7 @@ components:
       additionalProperties: false
     ModelPrices:
       type: object
-      description: 通用及可选细分单价，积分/百万 token。细分未配置时继承对应通用桶价格，零表示免费。
+      description: 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。
       properties:
         input: {$ref: '#/components/schemas/Price'}
         output: {$ref: '#/components/schemas/Price'}
@@ -3476,6 +3499,7 @@ components:
       properties:
         id: {type: string}
         display_name: {type: string}
+        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         price_tiers:
           type: array
@@ -3496,7 +3520,7 @@ components:
         parameter_info: {type: string}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, display_name, base_prices, price_tiers, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at]
+      required: [id, display_name, price_currency, base_prices, price_tiers, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at]
       additionalProperties: false
     AdminModelList:
       type: object
@@ -3517,6 +3541,10 @@ components:
       properties:
         id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$', description: '模型名，即客户端请求中的 model；不含 / 与 :。'}
         display_name: {type: string}
+        price_currency:
+          allOf:
+          - {$ref: '#/components/schemas/PriceCurrency'}
+          description: 默认 CNY。基准价、细分价与条件价格档都按此币种填写。
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         price_tiers:
           type: array
@@ -3542,6 +3570,10 @@ components:
       type: object
       properties:
         display_name: {type: string}
+        price_currency:
+          allOf:
+          - {$ref: '#/components/schemas/PriceCurrency'}
+          description: 改变币种时，提供该模型的全部渠道的汇率优惠随之重设：改为 USD 时开启（数值不变的模型保持原价），改为 CNY 时关闭。
         base_prices: {$ref: '#/components/schemas/ModelPrices'}
         price_tiers:
           type: array
@@ -3583,7 +3615,16 @@ components:
         supports_structured_output: {type: boolean}
         supports_vision: {type: boolean}
         parameter_info: {type: string}
-        base_prices: {$ref: '#/components/schemas/ModelPrices'}
+        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
+        usd_cny_rate:
+          anyOf:
+          - {$ref: '#/components/schemas/ExchangeRate'}
+          - {type: 'null'}
+          description: 美元模型换算用的当前汇率；人民币模型为 null。
+        base_prices:
+          allOf:
+          - {$ref: '#/components/schemas/ModelPrices'}
+          description: 积分价；美元模型已按当前汇率换算。
         current_tier:
           anyOf:
           - {$ref: '#/components/schemas/TierRef'}
@@ -3596,7 +3637,7 @@ components:
           type: array
           items: {$ref: '#/components/schemas/Format'}
         online_channels: {type: integer}
-      required: [id, display_name, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, base_prices, current_tier, lowest_prices, formats, online_channels]
+      required: [id, display_name, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels]
       additionalProperties: false
     CatalogModelList:
       type: object
@@ -3617,6 +3658,8 @@ components:
           type: array
           items: {$ref: '#/components/schemas/Format'}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
+        fx_discount: {type: boolean, description: 美元模型开启了汇率优惠。}
+        effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
         current_prices: {$ref: '#/components/schemas/EffectivePrices'}
         success_rate_24h:
           anyOf:
@@ -3630,7 +3673,7 @@ components:
           - {$ref: '#/components/schemas/Ratio'}
           - {type: 'null'}
           description: 渠道设置了每日收入上限时，今日剩余比例（0～1）；未设置上限为 null。state 为 limited 时可据此显示剩余额度。
-      required: [id, name, owner, is_mine, formats, multiplier, current_prices, success_rate_24h, ttft_p50_ms, state, cooldown_remaining_seconds, daily_cap_remaining]
+      required: [id, name, owner, is_mine, formats, multiplier, fx_discount, effective_multiplier, current_prices, success_rate_24h, ttft_p50_ms, state, cooldown_remaining_seconds, daily_cap_remaining]
       additionalProperties: false
     RoutingPreference:
       type: object
@@ -3858,7 +3901,10 @@ components:
         model_id: {type: string}
         display_name: {type: string}
         upstream_model: {type: string}
+        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
+        fx_discount: {type: boolean, description: 汇率优惠，只对美元模型生效。}
+        effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
         formats:
           type: array
           items: {$ref: '#/components/schemas/Format'}
@@ -3869,7 +3915,7 @@ components:
           description: 键为格式。
         enabled: {type: boolean}
         current_prices: {$ref: '#/components/schemas/EffectivePrices'}
-      required: [model_id, display_name, upstream_model, multiplier, formats, format_tests, enabled, current_prices]
+      required: [model_id, display_name, upstream_model, price_currency, multiplier, fx_discount, effective_multiplier, formats, format_tests, enabled, current_prices]
       additionalProperties: false
     ChannelModelInput:
       type: object
@@ -3877,6 +3923,7 @@ components:
         model_id: {type: string}
         upstream_model: {type: string, description: 默认与 model_id 相同（模型重定向）。}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
+        fx_discount: {type: boolean, description: '汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。'}
         formats:
           type: array
           items: {$ref: '#/components/schemas/Format'}
@@ -4097,6 +4144,7 @@ components:
       additionalProperties: false
     PriceSnapshot:
       type: object
+      description: 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。
       properties:
         selected_prices: {$ref: '#/components/schemas/ModelPrices'}
         token_prices: {type: object, additionalProperties: {type: string}}
@@ -4117,6 +4165,14 @@ components:
           - {$ref: '#/components/schemas/TierRef'}
           - {type: 'null'}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
+        currency: {$ref: '#/components/schemas/PriceCurrency'}
+        usd_cny_rate:
+          anyOf:
+          - {$ref: '#/components/schemas/ExchangeRate'}
+          - {type: 'null'}
+          description: 美元模型计费时使用的汇率；人民币模型为 null。
+        fx_discount: {type: boolean}
+        effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
         fee_rate_nano: {type: integer}
         prices: {$ref: '#/components/schemas/EffectivePrices'}
       required: [base_prices, tier, multiplier, fee_rate_nano, prices]
@@ -4664,8 +4720,15 @@ components:
           items: {type: string}
           maxItems: 100
           description: 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。
+        usd_cny_rate: {$ref: '#/components/schemas/ExchangeRate'}
+        fx_auto_sync: {type: boolean, description: 每天自动同步汇率。}
+        fx_sync_minute: {type: integer, minimum: 0, maximum: 1439, description: 自动同步时间，Asia/Shanghai 当日第几分钟，默认 570（09:30）。}
+        usd_cny_rate_source: {type: string, enum: [manual, auto], description: manual 管理员填写；auto 自动同步。}
+        usd_cny_rate_updated_at: {$ref: '#/components/schemas/Timestamp'}
+        fx_sync_attempted_at: {$ref: '#/components/schemas/NullableTimestamp'}
+        fx_sync_error: {type: [string, 'null'], description: 最近一次同步失败的原因；成功后清空。}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at]
+      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute, usd_cny_rate_source, usd_cny_rate_updated_at, fx_sync_attempted_at, fx_sync_error, updated_at]
       additionalProperties: false
     SettingsUpdateRequest:
       type: object
@@ -4684,7 +4747,13 @@ components:
           items: {type: string}
           maxItems: 100
           description: 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。
-      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts]
+        usd_cny_rate:
+          allOf:
+          - {$ref: '#/components/schemas/ExchangeRate'}
+          description: 改变数值即记为手动汇率；开启自动同步后会在下次同步时被覆盖。
+        fx_auto_sync: {type: boolean}
+        fx_sync_minute: {type: integer, minimum: 0, maximum: 1439}
+      required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute]
       additionalProperties: false
     SettingsEnvelope:
       type: object

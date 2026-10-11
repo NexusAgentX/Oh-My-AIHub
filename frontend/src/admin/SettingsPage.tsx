@@ -1,9 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
-import { Button, Card, InlineError, PageHeader, QueryBoundary, SuccessMessage, TextareaField, TextField } from '../ui'
+import {
+  Button,
+  Card,
+  FormSection,
+  InlineError,
+  Notice,
+  PageHeader,
+  QueryBoundary,
+  SuccessMessage,
+  Switch,
+  TextareaField,
+  TextField,
+} from '../ui'
 import { Collapsible } from './components'
 import { formatDateTime } from './format'
-import { useAdminSettings, useUpdateSettings } from './queries'
+import { useAdminSettings, useSyncExchangeRate, useUpdateSettings } from './queries'
 import {
   changedAdvancedCount,
   formToSettings,
@@ -18,6 +30,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
   const [errors, setErrors] = useState<SettingsErrors>({})
   const [message, setMessage] = useState('')
   const update = useUpdateSettings()
+  const sync = useSyncExchangeRate()
   const set = (key: keyof SettingsForm) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [key]: event.target.value }))
     setMessage('')
@@ -39,7 +52,11 @@ function SettingsEditor({ settings }: { settings: Settings }) {
     })
   }
 
-  const field = (key: keyof SettingsForm, label: string, props: Record<string, unknown> = {}) => (
+  const field = (
+    key: Exclude<keyof SettingsForm, 'fxAutoSync'>,
+    label: string,
+    props: Record<string, unknown> = {},
+  ) => (
     <TextField
       error={errors[key]}
       inputMode="decimal"
@@ -50,12 +67,58 @@ function SettingsEditor({ settings }: { settings: Settings }) {
     />
   )
 
+  const syncNow = () => {
+    setMessage('')
+    sync.mutate(undefined, {
+      onSuccess: (data) => {
+        setForm((current) => ({ ...current, usdCnyRate: data.settings.usd_cny_rate }))
+        setMessage(`汇率已同步：1 美元 = ${data.settings.usd_cny_rate} 积分`)
+      },
+    })
+  }
+
   return (
     <form className="stack-form" noValidate onSubmit={submit}>
       <div className="field-row">
         {field('feePercent', '手续费率（%）')}
         {field('paymentTimeoutMinutes', 'C2C 付款超时（分钟）', { inputMode: 'numeric' })}
       </div>
+      <FormSection title="美元汇率">
+        <div className="field-row">
+          {field('usdCnyRate', '1 美元 = ? 积分', {
+            disabled: form.fxAutoSync,
+            hint: form.fxAutoSync ? '自动同步中，不能手动修改' : '美元模型按此换算成积分',
+          })}
+          {field('fxSyncTime', '每天同步时间（北京时间）', {
+            disabled: !form.fxAutoSync,
+            inputMode: 'numeric',
+            type: 'time',
+          })}
+        </div>
+        <Switch
+          checked={form.fxAutoSync}
+          label="每天自动同步（欧洲央行参考汇率）"
+          onChange={(checked) => {
+            setForm((current) => ({ ...current, fxAutoSync: checked }))
+            setMessage('')
+          }}
+        />
+        {settings.fx_sync_error && (
+          <Notice tone="danger">
+            上次同步失败（{formatDateTime(settings.fx_sync_attempted_at)}）：{settings.fx_sync_error}
+          </Notice>
+        )}
+        <InlineError>{sync.isError ? errorMessage(sync.error, '同步失败，请重试') : ''}</InlineError>
+        <div className="form-actions">
+          <span className="muted-copy form-actions-note">
+            {settings.usd_cny_rate_source === 'auto' ? '自动同步' : '手动填写'}，更新于{' '}
+            {formatDateTime(settings.usd_cny_rate_updated_at)}
+          </span>
+          <Button loading={sync.isPending} onClick={syncNow} type="button" variant="secondary">
+            立即同步
+          </Button>
+        </div>
+      </FormSection>
       <Collapsible changed={changedAdvancedCount(form)} title="高级设置">
         <div className="stack-form">
           <div className="field-row">

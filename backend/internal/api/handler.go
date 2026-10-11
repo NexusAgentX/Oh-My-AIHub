@@ -26,11 +26,13 @@ const (
 )
 
 type Dependencies struct {
-	Forum             *forum.Service
-	Identity          *identity.Service
-	Catalog           *catalog.Service
-	Ledger            *ledger.Service
-	Settings          *settings.Service
+	Forum    *forum.Service
+	Identity *identity.Service
+	Catalog  *catalog.Service
+	Ledger   *ledger.Service
+	Settings *settings.Service
+	// RateSync fetches the USD/CNY rate on demand; nil disables manual sync.
+	RateSync          *settings.RateSyncer
 	Audit             *audit.Service
 	Keys              *apikey.Service
 	Channels          *channel.Service
@@ -51,6 +53,7 @@ type app struct {
 	catalog           *catalog.Service
 	ledger            *ledger.Service
 	settings          *settings.Service
+	rateSync          *settings.RateSyncer
 	audit             *audit.Service
 	keys              *apikey.Service
 	channels          *channel.Service
@@ -81,6 +84,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		catalog:           dependencies.Catalog,
 		ledger:            dependencies.Ledger,
 		settings:          dependencies.Settings,
+		rateSync:          dependencies.RateSync,
 		audit:             dependencies.Audit,
 		keys:              dependencies.Keys,
 		channels:          dependencies.Channels,

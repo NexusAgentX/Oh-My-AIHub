@@ -1,6 +1,7 @@
 // Package settings holds the single-row platform settings: fee rate, C2C
-// payment timeout, default credit limit and the gateway defaults that
-// channels and routes inherit when they leave an advanced field empty.
+// payment timeout, default credit limit, the USD/CNY exchange rate of USD
+// models and the gateway defaults that channels and routes inherit when they
+// leave an advanced field empty.
 package settings
 
 import (
@@ -17,6 +18,18 @@ var ErrInvalidInput = errors.New("invalid settings")
 // MaxExtraBlockedHosts bounds the administrator-managed egress block list.
 const MaxExtraBlockedHosts = 100
 
+// Bounds of the USD/CNY rate (nano units, 1e9 = 1), as in the database.
+const (
+	MinUSDCNYRateNano int64 = 10_000_000      // 0.01
+	MaxUSDCNYRateNano int64 = 100_000_000_000 // 100
+)
+
+// Sources of the exchange rate.
+const (
+	RateSourceManual = "manual"
+	RateSourceAuto   = "auto"
+)
+
 type Settings struct {
 	FeeRateNano              int64
 	C2CPaymentTimeoutMinutes int32
@@ -27,13 +40,25 @@ type Settings struct {
 	DefaultCooldownFailures  int32
 	DefaultCooldownSeconds   int32
 	ExtraBlockedHosts        []string
-	UpdatedAt                time.Time
+	// USDCNYRateNano converts USD model prices into points (1e9 = 1 CNY per USD).
+	USDCNYRateNano int64
+	// FXAutoSync fetches the rate once a day after FXSyncMinute (minute of the
+	// Asia/Shanghai day).
+	FXAutoSync   bool
+	FXSyncMinute int32
+	// Read-only state of the rate: where the current value came from, when it
+	// changed, and the last automatic attempt with its error if it failed.
+	USDCNYRateSource    string
+	USDCNYRateUpdatedAt time.Time
+	FXSyncAttemptedAt   *time.Time
+	FXSyncError         *string
+	UpdatedAt           time.Time
 }
 
 type Store interface {
 	GetSettings(ctx context.Context) (Settings, error)
-	// UpdateSettings replaces every field and records an audit row with the
-	// previous and new values.
+	// UpdateSettings replaces every editable field and records an audit row
+	// with the previous and new values. A changed rate becomes a manual rate.
 	UpdateSettings(ctx context.Context, actorID string, value Settings) (Settings, error)
 }
 
@@ -96,6 +121,8 @@ func Validate(value Settings) error {
 		value.DefaultTotalTimeoutMS < value.DefaultTTFTTimeoutMS,
 		value.DefaultCooldownFailures < 1 || value.DefaultCooldownFailures > 100,
 		value.DefaultCooldownSeconds < 10 || value.DefaultCooldownSeconds > 86400,
+		value.USDCNYRateNano < MinUSDCNYRateNano || value.USDCNYRateNano > MaxUSDCNYRateNano,
+		value.FXSyncMinute < 0 || value.FXSyncMinute > 1439,
 		len(value.ExtraBlockedHosts) > MaxExtraBlockedHosts:
 		return ErrInvalidInput
 	}

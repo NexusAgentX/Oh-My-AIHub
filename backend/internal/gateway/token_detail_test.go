@@ -47,7 +47,7 @@ func TestStreamFactsAndReplacement(t *testing.T) {
 	if got.Usage.Detail.ServiceTier != "openai:default" || got.Usage.Detail.ThinkingMode != "qwen_thinking" || len(got.Usage.Detail.Tokens) != 0 || got.Usage.OutputTokens != 20 {
 		t.Fatalf("%+v", got.Usage.Detail)
 	}
-	snap := priceSnapshot(catalog.Model{}, ledger.PriceResult{}, ledger.FixedPointScale, 0, got.Usage, time.Now())
+	snap := priceSnapshot(catalog.Model{}, ledger.PriceResult{}, Candidate{MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, 0, 0, got.Usage, time.Now())
 	var decoded struct {
 		Detail ledger.UsageDetail `json:"detail"`
 	}
@@ -112,7 +112,7 @@ func TestSnapshotKeepsExactWinningPricesBeforeMultiplier(t *testing.T) {
 	if err != nil || priced.Cost != 1 {
 		t.Fatalf("%+v %v", priced, err)
 	}
-	raw := priceSnapshot(model, priced, 100_000_000, 0, usage, now)
+	raw := priceSnapshot(model, priced, Candidate{MultiplierNano: 100_000_000, RateNano: ledger.UnitRate}, 0, 0, usage, now)
 	model.PriceTiers[0].TokenPrices["input_audio"] = 900
 	var snapshot struct {
 		Selected struct {

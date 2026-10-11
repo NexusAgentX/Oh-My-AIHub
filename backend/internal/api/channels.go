@@ -7,6 +7,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -48,14 +49,17 @@ type channelAdvancedJSON struct {
 
 // channelModelJSON is the OpenAPI ChannelModel schema.
 type channelModelJSON struct {
-	ModelID       string                    `json:"model_id"`
-	DisplayName   string                    `json:"display_name"`
-	UpstreamModel string                    `json:"upstream_model"`
-	Multiplier    string                    `json:"multiplier"`
-	Formats       []channel.Format          `json:"formats"`
-	FormatTests   map[string]formatTestJSON `json:"format_tests"`
-	Enabled       bool                      `json:"enabled"`
-	CurrentPrices effectivePricesJSON       `json:"current_prices"`
+	ModelID             string                    `json:"model_id"`
+	DisplayName         string                    `json:"display_name"`
+	UpstreamModel       string                    `json:"upstream_model"`
+	PriceCurrency       string                    `json:"price_currency"`
+	Multiplier          string                    `json:"multiplier"`
+	FXDiscount          bool                      `json:"fx_discount"`
+	EffectiveMultiplier string                    `json:"effective_multiplier"`
+	Formats             []channel.Format          `json:"formats"`
+	FormatTests         map[string]formatTestJSON `json:"format_tests"`
+	Enabled             bool                      `json:"enabled"`
+	CurrentPrices       effectivePricesJSON       `json:"current_prices"`
 }
 
 // channelTodayJSON is the OpenAPI ChannelToday schema.
@@ -182,20 +186,27 @@ func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
 	}
 }
 
-func (a *app) newChannelJSON(item channel.Channel, models map[string]catalog.Model, now time.Time) channelJSON {
+func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Time) channelJSON {
 	items := make([]channelModelJSON, 0, len(item.Models))
 	for _, model := range item.Models {
-		known := models[model.ModelID]
+		known := view.models[model.ModelID]
+		if known.PriceCurrency == "" {
+			known.PriceCurrency = ledger.CurrencyCNY
+		}
 		prices, _ := currentPrices(known, now)
+		pricing := newChannelPricing(known, model.MultiplierNano, model.FXDiscount, view.usdRateNano)
 		items = append(items, channelModelJSON{
-			ModelID:       model.ModelID,
-			DisplayName:   known.DisplayName,
-			UpstreamModel: model.UpstreamModel,
-			Multiplier:    money.FromNano(model.MultiplierNano).String(),
-			Formats:       model.Formats,
-			FormatTests:   newFormatTestsJSON(model.FormatTests),
-			Enabled:       model.Enabled,
-			CurrentPrices: newEffectivePricesJSON(prices, model.MultiplierNano),
+			ModelID:             model.ModelID,
+			DisplayName:         known.DisplayName,
+			UpstreamModel:       model.UpstreamModel,
+			PriceCurrency:       known.PriceCurrency,
+			Multiplier:          money.FromNano(model.MultiplierNano).String(),
+			FXDiscount:          model.FXDiscount,
+			EffectiveMultiplier: money.FromNano(pricing.EffectiveNano).String(),
+			Formats:             model.Formats,
+			FormatTests:         newFormatTestsJSON(model.FormatTests),
+			Enabled:             model.Enabled,
+			CurrentPrices:       newEffectivePricesJSON(prices, model.MultiplierNano, pricing.RateNano),
 		})
 	}
 	var successRate *string
@@ -222,23 +233,34 @@ func (a *app) newChannelJSON(item channel.Channel, models map[string]catalog.Mod
 	}
 }
 
-func (a *app) newAdminChannelJSON(item channel.Channel, models map[string]catalog.Model, now time.Time) adminChannelJSON {
+func (a *app) newAdminChannelJSON(item channel.Channel, models catalogView, now time.Time) adminChannelJSON {
 	return adminChannelJSON{
 		channelJSON: a.newChannelJSON(item, models, now),
 		Owner:       accountRefJSON{ID: item.Owner.ID, Username: item.Owner.Username, DisplayName: item.Owner.DisplayName},
 	}
 }
 
-func (a *app) catalogByID(r *http.Request) (map[string]catalog.Model, error) {
+// catalogView is the catalog by model ID with the exchange rate that
+// converts USD model prices into points.
+type catalogView struct {
+	models      map[string]catalog.Model
+	usdRateNano int64
+}
+
+func (a *app) catalogByID(r *http.Request) (catalogView, error) {
 	models, err := a.catalog.List(r.Context(), true)
 	if err != nil {
-		return nil, err
+		return catalogView{}, err
+	}
+	defaults, _, err := a.gateway.Settings(r.Context())
+	if err != nil {
+		return catalogView{}, err
 	}
 	byID := make(map[string]catalog.Model, len(models))
 	for _, model := range models {
 		byID[model.ID] = model
 	}
-	return byID, nil
+	return catalogView{models: byID, usdRateNano: defaults.USDCNYRateNano}, nil
 }
 
 func newChannelEventsJSON(events []channel.Event) []channelEventJSON {
@@ -298,6 +320,7 @@ type channelModelRequest struct {
 	ModelID       string           `json:"model_id"`
 	UpstreamModel string           `json:"upstream_model"`
 	Multiplier    *string          `json:"multiplier"`
+	FXDiscount    *bool            `json:"fx_discount"`
 	Formats       []channel.Format `json:"formats"`
 	Enabled       *bool            `json:"enabled"`
 }
@@ -315,7 +338,8 @@ func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) 
 		}
 		enabled := request.Enabled == nil || *request.Enabled
 		models = append(models, channel.Model{
-			ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier, Formats: request.Formats, Enabled: enabled,
+			ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
+			FXDiscount: request.FXDiscount != nil && *request.FXDiscount, Formats: request.Formats, Enabled: enabled,
 		})
 	}
 	return models, nil

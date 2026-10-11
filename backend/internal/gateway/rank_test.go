@@ -30,6 +30,18 @@ func TestRankCheapestPutsOwnChannelFirstAndBreaksTiesBySuccessRate(t *testing.T)
 	}
 }
 
+func TestRankCheapestComparesConvertedPrices(t *testing.T) {
+	// A USD model at 6.8 CNY/USD: a 0.13 channel with the FX discount charges
+	// 0.13 × price, a 0.1 channel without it charges 0.68 × price.
+	discounted := candidate("a", "x", 0.13)
+	discounted.RateNano = 1_000_000_000
+	plain := candidate("b", "x", 0.1)
+	plain.RateNano = 6_800_000_000
+	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: []Candidate{plain, discounted}, ConsumerID: "me"})); got != "ab" {
+		t.Fatalf("order = %s, want ab", got)
+	}
+}
+
 func TestRankReliableUsesMedianForThinSamples(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1), candidate("d", "x", 1)}
 	stats := map[string]ChannelStats{

@@ -42,8 +42,16 @@ type PriceResult struct {
 // first conditional tier whose predicates match the prompt-side token volume
 // and the call start time, charges all four usage buckets at that tier's
 // prices times the channel multiplier, and rounds the cost and the fee up to
-// a whole nano separately.
+// a whole nano separately. Prices are in points (CalculatePriceAt converts
+// from another currency).
 func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time.Time, multiplierNano, feeRateNano int64) (PriceResult, error) {
+	return CalculatePriceAt(usage, basePrices, tiers, at, multiplierNano, UnitRate, feeRateNano)
+}
+
+// CalculatePriceAt is CalculatePriceV2 for prices in a currency that rateNano
+// (1e9 = 1, see ChannelRate) converts into points. The cost is rounded up once
+// on the converted total.
+func CalculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time.Time, multiplierNano, rateNano, feeRateNano int64) (PriceResult, error) {
 	promptTokens, err := PromptSideTokens(usage)
 	if err != nil {
 		return PriceResult{}, err
@@ -51,7 +59,7 @@ func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time
 	prices, tierSeq := SelectPriceTier(basePrices, tiers, promptTokens, at, usage.Detail)
 	usageValues := []int64{usage.InputTokens, usage.OutputTokens, usage.CacheWriteTokens, usage.CacheReadTokens}
 	priceValues := []money.Amount{prices.InputPerMillion, prices.OutputPerMillion, prices.CacheWritePerMillion, prices.CacheReadPerMillion}
-	if multiplierNano < 0 || feeRateNano < 0 || feeRateNano > FixedPointScale {
+	if multiplierNano < 0 || rateNano < 0 || feeRateNano < 0 || feeRateNano > FixedPointScale {
 		return PriceResult{}, ErrInvalidInput
 	}
 
@@ -79,9 +87,11 @@ func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time
 			}
 		}
 	}
+	numerator := new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano))
+	numerator.Mul(numerator, big.NewInt(rateNano))
 	cost, err := ceilNonNegative(
-		new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano)),
-		new(big.Int).Mul(big.NewInt(1_000_000), big.NewInt(FixedPointScale)),
+		numerator,
+		new(big.Int).Mul(big.NewInt(1_000_000), new(big.Int).Mul(big.NewInt(FixedPointScale), big.NewInt(FixedPointScale))),
 	)
 	if err != nil {
 		return PriceResult{}, err
@@ -118,8 +128,14 @@ func ceilNonNegative(numerator, denominator *big.Int) (int64, error) {
 // for display, truncating below one nano and clamping at the representable
 // maximum. Billing never uses it: CalculatePriceV2 rounds up on the total.
 func ScalePrice(price money.Amount, multiplierNano int64) money.Amount {
+	return ScalePriceAt(price, multiplierNano, UnitRate)
+}
+
+// ScalePriceAt is ScalePrice for a price that rateNano converts into points.
+func ScalePriceAt(price money.Amount, multiplierNano, rateNano int64) money.Amount {
 	scaled := new(big.Int).Mul(big.NewInt(price.Nano()), big.NewInt(multiplierNano))
-	scaled.Quo(scaled, big.NewInt(FixedPointScale))
+	scaled.Mul(scaled, big.NewInt(rateNano))
+	scaled.Quo(scaled, new(big.Int).Mul(big.NewInt(FixedPointScale), big.NewInt(FixedPointScale)))
 	if !scaled.IsInt64() {
 		return money.FromNano(math.MaxInt64)
 	}

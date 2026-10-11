@@ -56,6 +56,7 @@ type priceTierRequest struct {
 type modelRequest struct {
 	ID                       *string             `json:"id"`
 	DisplayName              *string             `json:"display_name"`
+	PriceCurrency            *string             `json:"price_currency"`
 	BasePrices               *pricesRequest      `json:"base_prices"`
 	PriceTiers               *[]priceTierRequest `json:"price_tiers"`
 	Enabled                  *bool               `json:"enabled"`
@@ -122,7 +123,7 @@ func parsePriceTiers(requests []priceTierRequest) ([]ledger.PriceTier, error) {
 // patch converts the request into a catalog patch; base prices are replaced as a set.
 func (request modelRequest) patch() (catalog.ModelPatch, error) {
 	patch := catalog.ModelPatch{
-		DisplayName: request.DisplayName, Enabled: request.Enabled, SortOrder: request.SortOrder,
+		DisplayName: request.DisplayName, PriceCurrency: request.PriceCurrency, Enabled: request.Enabled, SortOrder: request.SortOrder,
 		Provider: request.Provider, InputModalities: request.InputModalities, OutputModalities: request.OutputModalities,
 		SupportsTools: request.SupportsTools, SupportsStructuredOutput: request.SupportsStructuredOutput,
 		SupportsVision: request.SupportsVision, ParameterInfo: request.ParameterInfo,
@@ -180,6 +181,7 @@ type priceTierJSON struct {
 type adminModelJSON struct {
 	ID                       string          `json:"id"`
 	DisplayName              string          `json:"display_name"`
+	PriceCurrency            string          `json:"price_currency"`
 	BasePrices               modelPricesJSON `json:"base_prices"`
 	PriceTiers               []priceTierJSON `json:"price_tiers"`
 	Enabled                  bool            `json:"enabled"`
@@ -250,6 +252,7 @@ func newAdminModelJSON(model catalog.Model) adminModelJSON {
 	return adminModelJSON{
 		ID:                       model.ID,
 		DisplayName:              model.DisplayName,
+		PriceCurrency:            model.PriceCurrency,
 		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
 		PriceTiers:               tiers,
 		Enabled:                  model.Enabled,

@@ -40,8 +40,12 @@ var serviceTierPattern = regexp.MustCompile(`^(openai|anthropic|gemini):[A-Za-z0
 var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type Model struct {
-	ID                       string
-	DisplayName              string
+	ID          string
+	DisplayName string
+	// PriceCurrency is the currency of every price of the model (base prices,
+	// fine-grained prices and tiers): ledger.CurrencyCNY prices are points,
+	// ledger.CurrencyUSD prices are converted at the platform exchange rate.
+	PriceCurrency            string
 	InputPrice               money.Amount
 	OutputPrice              money.Amount
 	CacheWritePrice          money.Amount
@@ -62,6 +66,42 @@ type Model struct {
 	UpdatedAt                time.Time
 }
 
+// Rate converts the model's prices into points at the given USD/CNY rate.
+func (m Model) Rate(usdRateNano int64) int64 { return ledger.ModelRate(m.PriceCurrency, usdRateNano) }
+
+// InPoints returns the model with every price converted into points at the
+// given USD/CNY rate, for display: each price is truncated below one nano.
+// Billing converts once on the call total instead (ledger.CalculatePriceAt).
+func (m Model) InPoints(usdRateNano int64) Model {
+	rate := m.Rate(usdRateNano)
+	if rate == ledger.UnitRate {
+		return m
+	}
+	convert := func(price money.Amount) money.Amount { return ledger.ScalePriceAt(price, ledger.UnitRate, rate) }
+	convertMap := func(prices map[string]money.Amount) map[string]money.Amount {
+		if prices == nil {
+			return nil
+		}
+		result := make(map[string]money.Amount, len(prices))
+		for key, value := range prices {
+			result[key] = convert(value)
+		}
+		return result
+	}
+	converted := m
+	converted.InputPrice, converted.OutputPrice = convert(m.InputPrice), convert(m.OutputPrice)
+	converted.CacheWritePrice, converted.CacheReadPrice = convert(m.CacheWritePrice), convert(m.CacheReadPrice)
+	converted.TokenPrices = convertMap(m.TokenPrices)
+	converted.PriceTiers = make([]ledger.PriceTier, len(m.PriceTiers))
+	for index, tier := range m.PriceTiers {
+		tier.InputPrice, tier.OutputPrice = convert(tier.InputPrice), convert(tier.OutputPrice)
+		tier.CacheWritePrice, tier.CacheReadPrice = convert(tier.CacheWritePrice), convert(tier.CacheReadPrice)
+		tier.TokenPrices = convertMap(tier.TokenPrices)
+		converted.PriceTiers[index] = tier
+	}
+	return converted
+}
+
 // BasePrices projects the four base prices into the pricing formula input.
 func (m Model) BasePrices() ledger.Prices {
 	return ledger.Prices{
@@ -74,6 +114,7 @@ func (m Model) BasePrices() ledger.Prices {
 // ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
 type ModelPatch struct {
 	DisplayName              *string
+	PriceCurrency            *string
 	InputPrice               *money.Amount
 	OutputPrice              *money.Amount
 	CacheWritePrice          *money.Amount
@@ -114,6 +155,7 @@ func (p ModelPatch) Apply(model Model) Model {
 		}
 	}
 	set(&model.DisplayName, p.DisplayName)
+	set(&model.PriceCurrency, p.PriceCurrency)
 	setAmount(&model.InputPrice, p.InputPrice)
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
@@ -153,6 +195,9 @@ type Store interface {
 	CreateModel(ctx context.Context, actorID string, model Model) (Model, error)
 	// UpdateModel locks the model, passes the current value to mutate and
 	// stores the result (replacing tiers) with an audit row, in one transaction.
+	// When the price currency changes, the FX discount of every channel offering
+	// the model is set to (new currency is USD), so switching a model whose
+	// figures were dollars all along keeps every channel's price unchanged.
 	UpdateModel(ctx context.Context, actorID, id string, mutate func(Model) (Model, error)) (Model, error)
 }
 
@@ -202,6 +247,9 @@ func (s *Service) Delete(ctx context.Context, actorID, id string) error {
 func Normalize(model Model) Model {
 	model.ID = strings.TrimSpace(model.ID)
 	model.DisplayName = strings.TrimSpace(model.DisplayName)
+	if model.PriceCurrency = strings.ToUpper(strings.TrimSpace(model.PriceCurrency)); model.PriceCurrency == "" {
+		model.PriceCurrency = ledger.CurrencyCNY
+	}
 	model.Provider = strings.TrimSpace(model.Provider)
 	model.ParameterInfo = strings.TrimSpace(model.ParameterInfo)
 	model.InputModalities = normalizeModalities(model.InputModalities)
@@ -270,6 +318,9 @@ func validPrice(price money.Amount) bool {
 // Validate checks a normalized model against the catalog rules.
 func Validate(model Model) error {
 	if !modelIDPattern.MatchString(model.ID) || model.DisplayName == "" || utf8.RuneCountInString(model.DisplayName) > 128 {
+		return ErrInvalidInput
+	}
+	if model.PriceCurrency != "" && !ledger.ValidCurrency(model.PriceCurrency) {
 		return ErrInvalidInput
 	}
 	if utf8.RuneCountInString(model.Provider) > 64 || utf8.RuneCountInString(model.ParameterInfo) > 500 {

@@ -69,6 +69,8 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  syncExchangeRate: () =>
+    request<ResponseBody<'syncAdminExchangeRate'>>('/api/admin/settings/exchange-rate/sync', { method: 'POST' }),
   audit: (query: QueryOf<'listAdminAudit'>) =>
     request<ResponseBody<'listAdminAudit'>>(withQuery('/api/admin/audit', query)),
 

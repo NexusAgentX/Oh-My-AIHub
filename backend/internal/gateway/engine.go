@@ -473,6 +473,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.internalError(w, call, err)
 		return
 	}
+	for index := range candidates {
+		candidates[index].RateNano = ledger.ChannelRate(model.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
+	}
 	for _, candidate := range candidates {
 		if limits := EffectiveLimits(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
 			revenue, err := e.Store.ChannelRevenue(ctx, candidate.ChannelID, started)
@@ -996,12 +999,12 @@ func (e *Engine) streamBack(w http.ResponseWriter, r *http.Request, call *callSt
 		if self {
 			feeRate = 0
 		}
-		priced, err := ledger.CalculatePriceV2(observation.Usage, model.BasePrices(), model.PriceTiers, call.started, candidate.MultiplierNano, feeRate)
+		priced, err := ledger.CalculatePriceAt(observation.Usage, model.BasePrices(), model.PriceTiers, call.started, candidate.MultiplierNano, candidate.RateNano, feeRate)
 		if err != nil {
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
 			finish.Cost, finish.Fee = priced.Cost, priced.Fee
-			finish.PriceSnapshot = priceSnapshot(model, priced, candidate.MultiplierNano, feeRate, observation.Usage, call.started)
+			finish.PriceSnapshot = priceSnapshot(model, priced, candidate, defaults.USDCNYRateNano, feeRate, observation.Usage, call.started)
 			if !self && priced.Cost+priced.Fee > 0 {
 				finish.Bill = &Billing{ConsumerID: call.key.OwnerID, ProviderID: candidate.OwnerID, Cost: priced.Cost, Fee: priced.Fee}
 			}
@@ -1042,23 +1045,29 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 	e.Events.Publish(event)
 }
 
-func priceSnapshot(model catalog.Model, priced ledger.PriceResult, multiplierNano, feeRateNano int64, usage ledger.Usage, at time.Time) []byte {
+func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Candidate, usdRateNano, feeRateNano int64, usage ledger.Usage, at time.Time) []byte {
 	prompt, _ := ledger.PromptSideTokens(usage)
 	effective, seq := ledger.SelectPriceTier(model.BasePrices(), model.PriceTiers, prompt, at, usage.Detail)
-	multiplier := func(price money.Amount) string { return ledger.ScalePrice(price, multiplierNano).String() }
+	multiplierNano := candidate.MultiplierNano
+	multiplier := func(price money.Amount) string {
+		return ledger.ScalePriceAt(price, multiplierNano, candidate.RateNano).String()
+	}
 	price := func(amount money.Amount) string { return amount.String() }
 	snapshot := map[string]any{
 		"base_prices": map[string]string{
 			"input": price(model.InputPrice), "output": price(model.OutputPrice),
 			"cache_write": price(model.CacheWritePrice), "cache_read": price(model.CacheReadPrice),
 		},
-		"detail":            usage.Detail,
-		"token_prices":      map[string]string{},
-		"base_token_prices": map[string]string{},
-		"selected_prices":   map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}},
-		"tier":              nil,
-		"multiplier":        money.FromNano(multiplierNano).String(),
-		"fee_rate_nano":     feeRateNano,
+		"detail":               usage.Detail,
+		"token_prices":         map[string]string{},
+		"base_token_prices":    map[string]string{},
+		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}},
+		"tier":                 nil,
+		"multiplier":           money.FromNano(multiplierNano).String(),
+		"currency":             model.PriceCurrency,
+		"fx_discount":          model.PriceCurrency == ledger.CurrencyUSD && candidate.FXDiscount,
+		"effective_multiplier": money.FromNano(ledger.EffectiveMultiplier(multiplierNano, candidate.RateNano, model.Rate(usdRateNano))).String(),
+		"fee_rate_nano":        feeRateNano,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),
@@ -1080,6 +1089,11 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, multiplierNan
 	}
 	if seq > 0 {
 		snapshot["tier"] = map[string]any{"seq": seq, "name": model.PriceTiers[seq-1].Name}
+	}
+	// Base and selected prices stay in the model's currency; prices are points.
+	snapshot["usd_cny_rate"] = nil
+	if model.PriceCurrency == ledger.CurrencyUSD {
+		snapshot["usd_cny_rate"] = money.FromNano(usdRateNano).String()
 	}
 	detail := ledger.UsageDetail{}
 	if saved, ok := snapshot["detail"].(*ledger.UsageDetail); ok && saved != nil {

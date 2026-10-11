@@ -97,7 +97,7 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 		}
 		candidates = append(candidates, gateway.Candidate{
 			ChannelID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseURL: row.BaseUrl, UpstreamModel: row.UpstreamModel,
-			MultiplierNano: row.MultiplierNano, Advanced: advanced,
+			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount, Advanced: advanced,
 			Credential: channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
 		})
 	}
@@ -231,7 +231,7 @@ func (s *Store) OnlineChannels(ctx context.Context) ([]gateway.OnlineChannel, er
 	for _, row := range rows {
 		online := gateway.OnlineChannel{
 			ModelID: row.ModelID, ChannelID: row.ChannelID, ChannelName: row.ChannelName, OwnerID: row.OwnerID, OwnerName: row.OwnerName,
-			MultiplierNano: row.MultiplierNano,
+			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
 			Advanced: channel.Advanced{
 				ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
 				CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,

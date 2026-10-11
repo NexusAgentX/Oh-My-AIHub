@@ -1038,6 +1038,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/settings/exchange-rate/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 立即同步美元兑人民币汇率
+         * @description 从欧洲央行参考汇率（Frankfurter）读取 USD/CNY 并保存为自动汇率；不在 1～50 之间或与当前汇率相差超过 20% 时拒绝，失败原因记在 fx_sync_error。
+         */
+        post: operations["syncAdminExchangeRate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/audit": {
         parameters: {
             query?: never;
@@ -1534,6 +1554,15 @@ export interface components {
         Price: string;
         /** @description 渠道倍率的十进制字符串，0～1000，最多 9 位小数，默认 "1"。 */
         Multiplier: string;
+        /**
+         * @description 模型基准价的币种。CNY 的基准价即积分价（1 积分 ≈ 1 元）；USD 的基准价为美元，展示与计费时乘以平台美元汇率换算为积分。
+         * @enum {string}
+         */
+        PriceCurrency: "CNY" | "USD";
+        /** @description 1 美元兑人民币的十进制字符串，0.01～100，最多 9 位小数。 */
+        ExchangeRate: string;
+        /** @description 实际倍率：渠道对模型积分价实际乘上的倍率。开启汇率优惠的美元模型为「倍率 ÷ 汇率」，其余等于倍率。 */
+        EffectiveMultiplier: string;
         /** @description 0～1 之间的比率十进制字符串（如成功率）。 */
         Ratio: string;
         /**
@@ -1646,7 +1675,7 @@ export interface components {
             seq: number;
             name: string;
         };
-        /** @description 通用及可选细分单价，积分/百万 token。细分未配置时继承对应通用桶价格，零表示免费。 */
+        /** @description 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。 */
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
@@ -1821,6 +1850,7 @@ export interface components {
         AdminModel: {
             id: string;
             display_name: string;
+            price_currency: components["schemas"]["PriceCurrency"];
             base_prices: components["schemas"]["ModelPrices"];
             price_tiers: components["schemas"]["PriceTier"][];
             enabled: boolean;
@@ -1846,6 +1876,8 @@ export interface components {
             /** @description 模型名，即客户端请求中的 model；不含 / 与 :。 */
             id: string;
             display_name: string;
+            /** @description 默认 CNY。基准价、细分价与条件价格档都按此币种填写。 */
+            price_currency?: components["schemas"]["PriceCurrency"];
             base_prices: components["schemas"]["ModelPrices"];
             price_tiers?: components["schemas"]["PriceTierInput"][];
             enabled?: boolean;
@@ -1861,6 +1893,8 @@ export interface components {
         };
         ModelUpdateRequest: {
             display_name?: string;
+            /** @description 改变币种时，提供该模型的全部渠道的汇率优惠随之重设：改为 USD 时开启（数值不变的模型保持原价），改为 CNY 时关闭。 */
+            price_currency?: components["schemas"]["PriceCurrency"];
             base_prices?: components["schemas"]["ModelPrices"];
             /** @description 提供时整组替换价格档；空数组表示删除全部档位。 */
             price_tiers?: components["schemas"]["PriceTierInput"][];
@@ -1887,6 +1921,10 @@ export interface components {
             supports_structured_output: boolean;
             supports_vision: boolean;
             parameter_info: string;
+            price_currency: components["schemas"]["PriceCurrency"];
+            /** @description 美元模型换算用的当前汇率；人民币模型为 null。 */
+            usd_cny_rate: components["schemas"]["ExchangeRate"] | null;
+            /** @description 积分价；美元模型已按当前汇率换算。 */
             base_prices: components["schemas"]["ModelPrices"];
             current_tier: components["schemas"]["TierRef"] | null;
             lowest_prices: components["schemas"]["EffectivePrices"] | null;
@@ -1904,6 +1942,9 @@ export interface components {
             is_mine: boolean;
             formats: components["schemas"]["Format"][];
             multiplier: components["schemas"]["Multiplier"];
+            /** @description 美元模型开启了汇率优惠。 */
+            fx_discount: boolean;
+            effective_multiplier: components["schemas"]["EffectiveMultiplier"];
             current_prices: components["schemas"]["EffectivePrices"];
             success_rate_24h: components["schemas"]["Ratio"] | null;
             ttft_p50_ms: number | null;
@@ -2066,7 +2107,11 @@ export interface components {
             model_id: string;
             display_name: string;
             upstream_model: string;
+            price_currency: components["schemas"]["PriceCurrency"];
             multiplier: components["schemas"]["Multiplier"];
+            /** @description 汇率优惠，只对美元模型生效。 */
+            fx_discount: boolean;
+            effective_multiplier: components["schemas"]["EffectiveMultiplier"];
             formats: components["schemas"]["Format"][];
             /** @description 键为格式。 */
             format_tests: {
@@ -2080,6 +2125,8 @@ export interface components {
             /** @description 默认与 model_id 相同（模型重定向）。 */
             upstream_model?: string;
             multiplier?: components["schemas"]["Multiplier"];
+            /** @description 汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。 */
+            fx_discount?: boolean;
             formats: components["schemas"]["Format"][];
             enabled?: boolean;
         };
@@ -2220,6 +2267,7 @@ export interface components {
             ttft_ms: number | null;
             duration_ms: number | null;
         };
+        /** @description 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。 */
         PriceSnapshot: {
             selected_prices?: components["schemas"]["ModelPrices"];
             token_prices?: {
@@ -2241,6 +2289,11 @@ export interface components {
             base_prices: components["schemas"]["ModelPrices"];
             tier: components["schemas"]["TierRef"] | null;
             multiplier: components["schemas"]["Multiplier"];
+            currency?: components["schemas"]["PriceCurrency"];
+            /** @description 美元模型计费时使用的汇率；人民币模型为 null。 */
+            usd_cny_rate?: components["schemas"]["ExchangeRate"] | null;
+            fx_discount?: boolean;
+            effective_multiplier?: components["schemas"]["EffectiveMultiplier"];
             fee_rate_nano: number;
             prices: components["schemas"]["EffectivePrices"];
         };
@@ -2632,6 +2685,20 @@ export interface components {
             default_cooldown_seconds: number;
             /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
             extra_blocked_hosts: string[];
+            usd_cny_rate: components["schemas"]["ExchangeRate"];
+            /** @description 每天自动同步汇率。 */
+            fx_auto_sync: boolean;
+            /** @description 自动同步时间，Asia/Shanghai 当日第几分钟，默认 570（09:30）。 */
+            fx_sync_minute: number;
+            /**
+             * @description manual 管理员填写；auto 自动同步。
+             * @enum {string}
+             */
+            usd_cny_rate_source: "manual" | "auto";
+            usd_cny_rate_updated_at: components["schemas"]["Timestamp"];
+            fx_sync_attempted_at: components["schemas"]["NullableTimestamp"];
+            /** @description 最近一次同步失败的原因；成功后清空。 */
+            fx_sync_error: string | null;
             updated_at: components["schemas"]["Timestamp"];
         };
         /** @description 整体替换全部设置。 */
@@ -2647,6 +2714,10 @@ export interface components {
             default_cooldown_seconds: number;
             /** @description 叠加在 UPSTREAM_BLOCKED_HOSTS 之上的出站禁用主机。 */
             extra_blocked_hosts: string[];
+            /** @description 改变数值即记为手动汇率；开启自动同步后会在下次同步时被覆盖。 */
+            usd_cny_rate: components["schemas"]["ExchangeRate"];
+            fx_auto_sync: boolean;
+            fx_sync_minute: number;
         };
         SettingsEnvelope: {
             settings: components["schemas"]["Settings"];
@@ -5327,6 +5398,30 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    syncAdminExchangeRate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["Unavailable"];
         };
     };
     listAdminAudit: {

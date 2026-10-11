@@ -23,6 +23,7 @@ const (
 	ActionModelDeleted          = "model.deleted"
 	ActionModelUpdated          = "model.updated"
 	ActionSettingsUpdated       = "settings.updated"
+	ActionExchangeRateSynced    = "settings.exchange_rate_synced"
 	ActionInstanceInitialized   = "instance.initialized"
 	ActionChannelSuspended      = "channel.suspended"
 	ActionChannelUnsuspended    = "channel.unsuspended"
