@@ -3,9 +3,9 @@ import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { PasswordChangeForm } from '../auth/PasswordChangeForm'
 import { useUpdateDisplayNameMutation } from '../auth/queries'
-import { Button, Card, InlineError, PageHeader, SuccessMessage, TextField } from '../ui'
+import { Button, Card, PageHeader, SuccessMessage } from '../ui'
 
-/** 账户设置：修改显示名、查看用户名与角色、修改密码。 */
+/** 账户设置：显示名（点击可改）、用户名、角色与修改密码。 */
 export function AccountPage() {
   const { account } = useAuth()
   const [message, setMessage] = useState('')
@@ -14,9 +14,9 @@ export function AccountPage() {
     <>
       <PageHeader title="账户设置" />
       <div className="account-grid">
-        <Card title="账户">
-          <DisplayNameForm current={account.display_name} />
-          <dl className="detail-list account-details">
+        <Card flush title="账户">
+          <dl className="detail-list">
+            <DisplayNameRow current={account.display_name} />
             <div>
               <dt>用户名</dt>
               <dd className="mono">{account.username}</dd>
@@ -36,12 +36,19 @@ export function AccountPage() {
   )
 }
 
-function DisplayNameForm({ current }: { current: string }) {
+/** 显示名默认只读展示，点击后原地编辑；Enter 保存，Esc 取消。 */
+function DisplayNameRow({ current }: { current: string }) {
   const mutation = useUpdateDisplayNameMutation()
-  const [displayName, setDisplayName] = useState(current)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(current)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const trimmed = displayName.trim()
+  const trimmed = draft.trim()
+
+  const startEditing = () => {
+    setDraft(current)
+    setError('')
+    setEditing(true)
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -49,31 +56,57 @@ function DisplayNameForm({ current }: { current: string }) {
       setError('请填写显示名')
       return
     }
-    setError('')
-    setMessage('')
+    if (trimmed === current) {
+      setEditing(false)
+      return
+    }
     try {
-      const account = await mutation.mutateAsync(trimmed)
-      setDisplayName(account.display_name)
-      setMessage('显示名已更新')
+      await mutation.mutateAsync(trimmed)
+      setEditing(false)
     } catch (caught) {
       setError(errorMessage(caught, '保存失败，请稍后重试'))
     }
   }
 
+  if (!editing) {
+    return (
+      <div>
+        <dt>显示名</dt>
+        <dd>
+          <button className="inline-edit-trigger" onClick={startEditing} title="点击修改显示名" type="button">
+            {current}
+          </button>
+        </dd>
+      </div>
+    )
+  }
+
   return (
-    <form className="identity-form" onSubmit={submit}>
-      <SuccessMessage>{message}</SuccessMessage>
-      <InlineError>{error}</InlineError>
-      <TextField
-        label="显示名"
-        maxLength={64}
-        onChange={(event) => setDisplayName(event.target.value)}
-        required
-        value={displayName}
-      />
-      <Button disabled={!trimmed || trimmed === current} loading={mutation.isPending} type="submit">
-        保存显示名
-      </Button>
-    </form>
+    <div className="inline-edit-row">
+      <dt>显示名</dt>
+      <dd>
+        <form className="inline-edit-form" onSubmit={submit}>
+          <input
+            aria-invalid={Boolean(error)}
+            aria-label="显示名"
+            autoFocus
+            className="input"
+            maxLength={64}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setEditing(false)
+            }}
+            value={draft}
+          />
+          <Button loading={mutation.isPending} size="sm" type="submit">
+            保存
+          </Button>
+          <Button disabled={mutation.isPending} onClick={() => setEditing(false)} size="sm" type="button" variant="quiet">
+            取消
+          </Button>
+        </form>
+        {error && <p className="field-message field-error">{error}</p>}
+      </dd>
+    </div>
   )
 }
