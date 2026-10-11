@@ -19,6 +19,16 @@ WHERE api_key_id = sqlc.arg(key_id);
 -- name: ChannelRevenue :one
 SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $1 AND created_at >= $2;
 
+-- Every key the gateway can recognise, for the key snapshot (ADR-0040): the
+-- same row as LookupKey for each undeleted key, with the hash it is found by.
+-- name: ListAllKeys :many
+SELECT k.key_hash, k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
+       a.status AS account_status
+FROM api_keys k
+JOIN accounts a ON a.id = k.owner_id
+WHERE k.deleted_at IS NULL;
+
 -- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
@@ -32,6 +42,26 @@ JOIN accounts a ON a.id = c.owner_id
 WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id;
+
+-- Every row ListCandidates can return, for any model and format, for the
+-- candidate snapshot (ADR-0040): same columns and conditions, with the model
+-- and the formats the row serves instead of the two filters. Rows come in
+-- model order and, within a model, in channel id order, the order of
+-- ListCandidates.
+-- name: ListAllCandidates :many
+SELECT cm.model_id, cm.formats,
+       c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
+FROM channel_models cm
+JOIN channels c ON c.id = cm.channel_id
+JOIN accounts a ON a.id = c.owner_id
+WHERE cm.enabled AND NOT cm.pending_multiplier
+  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+ORDER BY cm.model_id, c.id;
 
 -- Health of channels over the last 24 hours, from the attempts of every call.
 -- Attempts the client abandoned or that were rejected as the request's own fault

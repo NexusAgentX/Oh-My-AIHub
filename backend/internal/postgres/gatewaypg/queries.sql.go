@@ -300,6 +300,164 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 	return i, err
 }
 
+const listAllCandidates = `-- name: ListAllCandidates :many
+SELECT cm.model_id, cm.formats,
+       c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
+FROM channel_models cm
+JOIN channels c ON c.id = cm.channel_id
+JOIN accounts a ON a.id = c.owner_id
+WHERE cm.enabled AND NOT cm.pending_multiplier
+  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+ORDER BY cm.model_id, c.id
+`
+
+type ListAllCandidatesRow struct {
+	ModelID                             string
+	Formats                             []string
+	ID                                  string
+	OwnerID                             string
+	Name                                string
+	BaseUrl                             string
+	ApiKeyCiphertext                    []byte
+	ApiKeyNonce                         []byte
+	ApiKeyKeyID                         string
+	UserAgent                           *string
+	HeaderRules                         []byte
+	ConcurrencyLimit                    *int32
+	RpmLimit                            *int32
+	DailyRevenueCapNano                 *money.Amount
+	TtftTimeoutMs                       *int32
+	TotalTimeoutMs                      *int32
+	CooldownFailures                    *int32
+	CooldownSeconds                     *int32
+	UpstreamModel                       string
+	MultiplierNano                      int64
+	FxDiscount                          bool
+	IsCustom                            bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
+}
+
+// Every row ListCandidates can return, for any model and format, for the
+// candidate snapshot (ADR-0040): same columns and conditions, with the model
+// and the formats the row serves instead of the two filters. Rows come in
+// model order and, within a model, in channel id order, the order of
+// ListCandidates.
+func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listAllCandidates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllCandidatesRow
+	for rows.Next() {
+		var i ListAllCandidatesRow
+		if err := rows.Scan(
+			&i.ModelID,
+			&i.Formats,
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.BaseUrl,
+			&i.ApiKeyCiphertext,
+			&i.ApiKeyNonce,
+			&i.ApiKeyKeyID,
+			&i.UserAgent,
+			&i.HeaderRules,
+			&i.ConcurrencyLimit,
+			&i.RpmLimit,
+			&i.DailyRevenueCapNano,
+			&i.TtftTimeoutMs,
+			&i.TotalTimeoutMs,
+			&i.CooldownFailures,
+			&i.CooldownSeconds,
+			&i.UpstreamModel,
+			&i.MultiplierNano,
+			&i.FxDiscount,
+			&i.IsCustom,
+			&i.CustomInputPriceNanoPerMillion,
+			&i.CustomOutputPriceNanoPerMillion,
+			&i.CustomCacheWritePriceNanoPerMillion,
+			&i.CustomCacheReadPriceNanoPerMillion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllKeys = `-- name: ListAllKeys :many
+SELECT k.key_hash, k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
+       a.status AS account_status
+FROM api_keys k
+JOIN accounts a ON a.id = k.owner_id
+WHERE k.deleted_at IS NULL
+`
+
+type ListAllKeysRow struct {
+	KeyHash           []byte
+	ID                string
+	OwnerID           string
+	Name              string
+	Prefix            string
+	Status            string
+	ExpiresAt         *time.Time
+	AllowedModels     []string
+	BudgetDailyNano   *money.Amount
+	BudgetMonthlyNano *money.Amount
+	BudgetTotalNano   *money.Amount
+	ModelAliases      []byte
+	AccountStatus     string
+}
+
+// Every key the gateway can recognise, for the key snapshot (ADR-0040): the
+// same row as LookupKey for each undeleted key, with the hash it is found by.
+func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
+	rows, err := q.db.Query(ctx, listAllKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllKeysRow
+	for rows.Next() {
+		var i ListAllKeysRow
+		if err := rows.Scan(
+			&i.KeyHash,
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Prefix,
+			&i.Status,
+			&i.ExpiresAt,
+			&i.AllowedModels,
+			&i.BudgetDailyNano,
+			&i.BudgetMonthlyNano,
+			&i.BudgetTotalNano,
+			&i.ModelAliases,
+			&i.AccountStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,

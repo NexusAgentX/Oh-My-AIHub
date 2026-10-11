@@ -202,6 +202,34 @@ type Store interface {
 	CustomModelOnline(ctx context.Context, modelID string) (bool, error)
 }
 
+// Models is the model catalog as the engine reads it. *catalog.Service reads
+// the database; the snapshot cache (internal/snapshot, ADR-0040) answers from
+// memory. What comes back may be shared between callers and must not be
+// modified.
+type Models interface {
+	Get(ctx context.Context, id string) (catalog.Model, error)
+	// List returns the catalog in display order; disabled models only when
+	// includeDisabled is set.
+	List(ctx context.Context, includeDisabled bool) ([]catalog.Model, error)
+}
+
+// KeyRecord is a key together with the digest it is looked up by, one row of
+// the key snapshot (see Store.LookupKey).
+type KeyRecord struct {
+	Hash []byte
+	Auth KeyAuth
+}
+
+// CandidateRecord is one row of the candidate snapshot: a channel model that
+// Store.Candidates can offer, with every format it serves. Records come in
+// model order and, within a model, in channel order, which is the order
+// Store.Candidates returns.
+type CandidateRecord struct {
+	ModelID   string
+	Formats   []channel.Format
+	Candidate Candidate
+}
+
 // OnlineModel is a model name with at least one listed channel; Custom marks
 // a channel-defined model outside the catalog. Formats are the formats the
 // model's channels declare, under the static conditions of Candidates (runtime

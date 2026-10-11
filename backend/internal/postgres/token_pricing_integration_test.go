@@ -15,7 +15,7 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 	ctx := context.Background()
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	service := catalog.NewService(e.store.Catalog)
+	service := e.catalog
 	specific := map[string]money.Amount{"input_audio": 0, "output_audio": mustAmount(t, "40")}
 	tiers := []ledger.PriceTier{{Name: "actual standard", ServiceTier: "openai:default", InputPrice: mustAmount(t, "10"), OutputPrice: mustAmount(t, "20"), TokenPrices: specific}}
 	saved, err := service.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{TokenPrices: &specific, PriceTiers: &tiers})

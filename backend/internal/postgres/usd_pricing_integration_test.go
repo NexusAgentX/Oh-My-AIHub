@@ -31,7 +31,7 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 	// model to USD turns its discount on, so its price does not change.
 	early := channel("early", "2", false)
 	currency := ledger.CurrencyUSD
-	if _, err := catalog.NewService(e.store.Catalog).Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceCurrency: &currency}); err != nil {
+	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceCurrency: &currency}); err != nil {
 		t.Fatal(err)
 	}
 	var discount bool

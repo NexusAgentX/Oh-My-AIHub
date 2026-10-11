@@ -40,6 +40,7 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 - [ADR-0037：首个管理员通过网页初始化](0037-initialize-first-admin-via-web.md)
 - [ADR-0038：美元计价模型按平台汇率换算积分](0038-price-usd-models-with-platform-exchange-rate.md)
 - [ADR-0039：按单实例部署，运行时状态放在进程内](0039-deploy-as-single-instance.md)
+- [ADR-0040：网关热路径的只读数据来自进程内快照，写后同步失效](0040-serve-gateway-reads-from-process-snapshots.md)
 
 ## 归档
 

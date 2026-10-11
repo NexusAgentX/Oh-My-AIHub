@@ -61,7 +61,7 @@ var (
 // Dependencies wires the gateway.
 type Dependencies struct {
 	Store    Store
-	Catalog  *catalog.Service
+	Catalog  Models
 	Settings *settings.Service
 	Routing  routing.Store
 	Keyring  *channel.Keyring

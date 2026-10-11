@@ -93,3 +93,15 @@ SELECT route_pref_id, channel_id, position, excluded
 FROM route_pref_channels
 WHERE route_pref_id = ANY(sqlc.arg(pref_ids)::uuid[])
 ORDER BY route_pref_id, position;
+
+-- Every stored routing preference with its channels in position order, for the
+-- routing snapshot (ADR-0040). One statement, so the preferences and their
+-- channel lists are read together.
+-- name: ListAllRoutePrefs :many
+SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.updated_at,
+       coalesce(array_agg(rpc.channel_id ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::uuid[] AS channel_ids,
+       coalesce(array_agg(rpc.excluded ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::boolean[] AS excluded_flags
+FROM route_prefs rp
+LEFT JOIN route_pref_channels rpc ON rpc.route_pref_id = rp.id
+GROUP BY rp.id
+ORDER BY rp.account_id, rp.api_key_id NULLS FIRST, rp.model_id;

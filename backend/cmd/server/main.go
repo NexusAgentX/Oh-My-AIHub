@@ -100,12 +100,22 @@ func main() {
 	}
 	logger.Info("stored secrets decrypted with the configured keyrings",
 		"channels", checked.Channels, "api_keys", checked.APIKeys, "c2c_orders", checked.C2COrders)
-	identityService, err := identity.NewService(store.Identity, 24*time.Hour)
+	// The gateway reads keys, the catalog, channels and routing preferences from
+	// memory (ADR-0040). Every service that writes them is built on the cached
+	// stores, so each change rebuilds the affected snapshot before it returns.
+	cached := store.Cached(logger)
+	loadContext, cancelLoad := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	err = cached.Cache.Load(loadContext)
+	cancelLoad()
+	if err != nil {
+		fatal(logger, "loading the gateway snapshots failed", err)
+	}
+	identityService, err := identity.NewService(cached.Identity, 24*time.Hour)
 	if err != nil {
 		fatal(logger, "creating the identity service failed", err)
 	}
 
-	catalogService := catalog.NewService(store.Catalog)
+	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
 	modelIDs := func(ctx context.Context) ([]string, error) {
 		models, err := catalogService.List(ctx, true)
@@ -139,13 +149,14 @@ func main() {
 		}()
 	})
 	engine := gateway.NewEngine(gateway.Dependencies{
-		Store: store.Gateway, Catalog: catalogService, Settings: settingsService, Routing: store.Routes,
+		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: bus, Logger: logger, Runtime: runtime,
 	})
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
 	go engine.RunReaper(engineContext, time.Minute)
 	go engine.RunRefresh(engineContext)
+	go cached.Cache.Run(engineContext)
 
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)
 	backgroundContext, stopBackground := context.WithCancel(context.Background())
@@ -181,15 +192,15 @@ func main() {
 			Settings: settingsService,
 			RateSync: rateSyncer,
 			Audit:    audit.NewService(store.Audit),
-			Keys:     apikey.NewService(store.Keys, credentialKeyring, keyModelIDs),
+			Keys:     apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
 			Channels: channel.NewService(channel.Dependencies{
-				Store: store.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
+				Store: cached.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
 				BlockedHosts: func(ctx context.Context) ([]string, error) {
 					value, err := settingsService.Get(ctx)
 					return value.ExtraBlockedHosts, err
 				},
 			}),
-			Routing:           store.Routes,
+			Routing:           cached.Routing,
 			Gateway:           engine,
 			Browse:            store.Gateway,
 			C2C:               c2cService,
