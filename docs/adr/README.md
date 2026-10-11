@@ -35,12 +35,13 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 - [ADR-0032：论坛采用 Vditor 源码编辑与统一 Markdown 渲染](0032-use-vditor-for-forum-markdown.md)
 - [ADR-0033：前端采用贴纸风视觉、双主题与自托管字体](0033-adopt-sticker-visual-language-and-dual-themes.md)
 - [ADR-0034：渠道自定义模型与转为官方后待设倍率](0034-adopt-channel-custom-models.md)
-- [ADR-0035：网关透明转发、事后记账与按用户按模型路由（第二版）](0035-adopt-transparent-gateway-v2.md)
+- [ADR-0035：网关透明转发、事后记账与按用户按模型路由（第二版）](0035-adopt-transparent-gateway-v2.md)（规则 4、6 的“上游错误原样返回”已由 ADR-0041 部分取代：出现的渠道上游 Key 会被抹掉）
 - [ADR-0036：凭据加密与启动全量校验、钉住地址的出站连接池](0036-adopt-credential-startup-check-and-pinned-egress-pool.md)
 - [ADR-0037：首个管理员通过网页初始化](0037-initialize-first-admin-via-web.md)
 - [ADR-0038：美元计价模型按平台汇率换算积分](0038-price-usd-models-with-platform-exchange-rate.md)
 - [ADR-0039：按单实例部署，运行时状态放在进程内](0039-deploy-as-single-instance.md)
 - [ADR-0040：网关热路径的只读数据来自进程内快照，写后同步失效](0040-serve-gateway-reads-from-process-snapshots.md)
+- [ADR-0041：上游错误体返回前抹掉渠道 Key](0041-redact-channel-key-in-upstream-errors.md)
 
 ## 归档
 
