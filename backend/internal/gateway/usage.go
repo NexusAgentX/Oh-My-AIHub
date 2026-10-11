@@ -3,7 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -55,6 +55,9 @@ type Observer struct {
 	responseID     string
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
+	// members is the scratch space the members of an event's objects are
+	// listed in (see objectOf).
+	members []jsonMember
 }
 
 type anthropicUsage struct{ input, output, cacheWrite, cacheRead int64 }
@@ -159,8 +162,8 @@ func (o *Observer) Finish() Observation {
 	}
 	observation := Observation{Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
-		sorted := append([]time.Duration(nil), o.intervals...)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+		sorted := slices.Clone(o.intervals)
+		slices.Sort(sorted)
 		p50 := int(percentile(sorted, 0.50).Milliseconds())
 		p95 := int(percentile(sorted, 0.95).Milliseconds())
 		observation.IntervalP50MS, observation.IntervalP95MS = &p50, &p95
@@ -182,17 +185,27 @@ func clamp(value int64) int64 {
 
 // absorb reads usage (and the response ID) out of one JSON object.
 func (o *Observer) absorb(raw []byte) {
-	defer o.absorbDetails(raw)
+	// One look at the member names decides what is worth decoding at all.
+	keys := scanFrameKeys(raw)
 	switch o.format {
 	case channel.FormatOpenAIChat:
-		o.absorbChat(raw)
+		if keys&keyUsage != 0 {
+			o.absorbChat(raw)
+		}
 	case channel.FormatOpenAIResponses:
-		o.absorbResponses(raw)
+		if keys&(keyUsage|keyID) != 0 {
+			o.absorbResponses(raw)
+		}
 	case channel.FormatAnthropic:
-		o.absorbAnthropic(raw)
+		if keys&keyUsage != 0 {
+			o.absorbAnthropic(raw)
+		}
 	case channel.FormatGemini:
-		o.absorbGemini(raw)
+		if keys&keyUsageMetadata != 0 {
+			o.absorbGemini(raw)
+		}
 	}
+	o.absorbDetails(raw, keys)
 }
 
 type tokenDetails struct {

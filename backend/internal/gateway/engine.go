@@ -382,27 +382,25 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	e.touchKey(ctx, key.KeyID)
 
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+	body, err := readRequestBody(w, r)
 	if err != nil {
 		call.requested = pathModel
 		e.reject(w, call, OutcomeRejectedModel, http.StatusRequestEntityTooLarge, "request_too_large", "请求体过大或读取失败")
 		return
 	}
 
-	var pricingRequest struct {
-		EnableThinking *bool  `json:"enable_thinking"`
-		ServiceTier    string `json:"service_tier"`
-	}
-	_ = json.Unmarshal(body, &pricingRequest)
-	call.thinkingRequested = pricingRequest.EnableThinking
-	call.requestedServiceTier = pricingRequest.ServiceTier
-	var scan objectScan
+	// One scan of the body gives the facts of every format: the two members that
+	// pick a price, and for the formats that name the model in the body, the
+	// model, stream flag and sticky response too. A Gemini body is not
+	// validated here (its model and stream flag are in the path), so a body the
+	// scan rejects only means there are no pricing members to read.
+	facts, scan, scanErr := ScanRequest(body)
+	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
 		call.requested, call.stream = pathModel, pathStream
 	} else {
-		facts, parsed, scanErr := ScanRequest(body)
-		call.requested, call.stream, scan = facts.Model, facts.Stream, parsed
+		call.requested, call.stream = facts.Model, facts.Stream
 		if scanErr != nil || !facts.HasModel || facts.Model == "" {
 			e.reject(w, call, OutcomeRejectedModel, http.StatusBadRequest, "invalid_request", "请求体缺少 model 字段或不是合法的 JSON 对象")
 			return
@@ -788,6 +786,9 @@ type attemptResult struct {
 	response *http.Response
 	first    []byte
 	firstErr error
+	// chunk is the pooled buffer first lies in. streamBack takes it over: it
+	// keeps reading into it once first has been delivered, and gives it back.
+	chunk *[]byte
 	// upstream is the context of the exchange; its cause says what cut it short.
 	upstream context.Context
 	cancel   context.CancelCauseFunc
@@ -911,13 +912,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 
 	upstreamBody := body
 	if call.format != channel.FormatGemini {
-		upstreamBody = ReplaceModel(body, scan, candidate.UpstreamModel)
-		if call.format == channel.FormatOpenAIChat && call.stream {
-			_, rescanned, scanErr := ScanRequest(upstreamBody)
-			if scanErr == nil {
-				upstreamBody, call.usageInjected = EnsureIncludeUsage(upstreamBody, rescanned)
-			}
-		}
+		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream)
 	}
 	target, err := UpstreamURL(candidate.BaseURL, r.URL.Path, r.URL.RawQuery, call.format, candidate.UpstreamModel, location, secret)
 	if err != nil {
@@ -1000,10 +995,10 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	result.record.StatusCode = &status
 
 	if status >= 200 && status < 300 {
-		chunk := make([]byte, chunkSize)
+		chunk := getChunk()
 		n, readErr := 0, error(nil)
 		for n == 0 && readErr == nil {
-			n, readErr = response.Body.Read(chunk)
+			n, readErr = response.Body.Read(*chunk)
 		}
 		// An end of body with nothing in it counts as an answer only if the
 		// attempt was not cancelled before it: a transport that is being torn
@@ -1014,6 +1009,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 			cause := context.Cause(attemptCtx)
 			response.Body.Close()
 			cancel(nil)
+			putChunk(chunk)
 			switch {
 			case r.Context().Err() != nil:
 				return abandoned()
@@ -1035,7 +1031,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		}
 		result.ttft = e.Now().Sub(result.started)
 		result.record.TTFTMS = millis(result.ttft)
-		result.response, result.first, result.firstErr = response, chunk[:n], readErr
+		result.response, result.chunk, result.first, result.firstErr = response, chunk, (*chunk)[:n], readErr
 		return result
 	}
 
@@ -1172,6 +1168,13 @@ func answerEnded(attempt context.Context, readErr error) bool {
 // over, or an idle or call time limit hits, so the usage at its end is billed.
 func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalog.Model, candidate Candidate, result attemptResult, defaults settings.Settings) {
 	response := result.response
+	// The buffer of the first read serves the rest of the answer too, once its
+	// first chunk has been delivered (everything that takes a chunk copies it).
+	buffer := result.chunk
+	if buffer == nil {
+		buffer = getChunk()
+	}
+	defer putChunk(buffer)
 	defer response.Body.Close()
 	defer result.cancel(nil)
 
@@ -1239,14 +1242,13 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	}
 	deliver(result.first)
 	readErr := result.firstErr
-	buffer := make([]byte, chunkSize)
 	for readErr == nil {
 		var n int
-		n, readErr = response.Body.Read(buffer)
+		n, readErr = response.Body.Read(*buffer)
 		if n > 0 && result.idle != nil {
 			result.idle.Reset(result.idleAfter) // data arrived: the stream is not idle
 		}
-		deliver(buffer[:n])
+		deliver((*buffer)[:n])
 	}
 	if strip != nil {
 		send(strip.Flush()) // what was held back for an event that never ended

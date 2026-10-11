@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -139,4 +140,236 @@ func FuzzScanAndSplice(f *testing.F) {
 			t.Fatalf("include_usage missing: %q -> %q", body, injected)
 		}
 	})
+}
+
+// ---- the pricing members ----
+
+// decodedPricing is what the gateway used to read the two pricing members with:
+// a full decode of the body by encoding/json. ScanRequest must give the same.
+func decodedPricing(body []byte) (*bool, string) {
+	var request struct {
+		EnableThinking *bool  `json:"enable_thinking"`
+		ServiceTier    string `json:"service_tier"`
+	}
+	_ = json.Unmarshal(body, &request)
+	return request.EnableThinking, request.ServiceTier
+}
+
+func describeFlag(flag *bool) string {
+	if flag == nil {
+		return "unset"
+	}
+	return map[bool]string{true: "true", false: "false"}[*flag]
+}
+
+func checkPricing(t testing.TB, body []byte) {
+	t.Helper()
+	facts, _, _ := ScanRequest(body)
+	wantThinking, wantTier := decodedPricing(body)
+	if describeFlag(facts.EnableThinking) != describeFlag(wantThinking) || facts.ServiceTier != wantTier {
+		t.Fatalf("%q:\nscan   enable_thinking=%s service_tier=%q\ndecode enable_thinking=%s service_tier=%q",
+			body, describeFlag(facts.EnableThinking), facts.ServiceTier, describeFlag(wantThinking), wantTier)
+	}
+}
+
+var pricingBodies = []string{
+	`{"model":"m","enable_thinking":false}`,
+	`{"model":"m","enable_thinking":true,"service_tier":"priority"}`,
+	`{"model":"m","enable_thinking":null,"service_tier":null}`,
+	`{"model":"m"}`, `{}`, `{"enable_thinking":"false"}`, `{"enable_thinking":0}`, `{"enable_thinking":{"a":1}}`, `{"enable_thinking":[true]}`,
+	`{"enable_thinking":true,"enable_thinking":"x"}`, `{"enable_thinking":true,"enable_thinking":null}`, `{"enable_thinking":null,"enable_thinking":{}}`,
+	`{"enable_thinking":false,"enable_thinking":true}`, `{"enable_thinking":true,"enable_thinking":false}`,
+	`{"Enable_Thinking":false}`, `{"ENABLE_THINKING":true}`, `{"enable\u005fthinking":false}`, `{"enable_thin\u212Aing":false}`,
+	`{"service_tier":"a","service_tier":5}`, `{"service_tier":"a","service_tier":null}`, `{"service_tier":"a","SERVICE_TIER":"b"}`,
+	`{"service_tier":"\u0061\ud83d\ude00\ud800"}`, "{\"service_tier\":\"caf\u00e9 \xff\"}", `{"service_tier":"line\nbreak \"quoted\""}`,
+	`{"service_tier":true}`, `{"service_tier":["a"]}`, `{"service_tier":{"a":"b"}}`, `{"s\u017fervice_tier":"x"}`,
+	`{"nested":{"enable_thinking":false,"service_tier":"x"},"model":"m"}`,
+	`{"messages":[{"enable_thinking":false}],"service_tier":"flex"}`,
+	` { "enable_thinking" : false , "service_tier" : "x" } `, "{\"enable_thinking\":\n\tfalse}",
+	// not a single valid JSON object: nothing is read, whatever the scan makes of it
+	`{"enable_thinking":false} trailing`, `{"enable_thinking":false}{"service_tier":"x"}`, `{"enable_thinking":tru}`, `{"enable_thinking":false,"a":01}`,
+	`{"enable_thinking":false,"a":"\x"}`, `{"enable_thinking":false`, `{"service_tier":"x",}`, `[{"enable_thinking":false}]`, `null`, `"x"`, ``,
+	`{"service_tier":"x","a":1.}`, `{"service_tier":"x","a":[1,]}`, `{"service_tier":"x","a":NaN}`,
+	"{\"service_tier\":\"x\",\"a\":\"raw\nnewline\"}",
+}
+
+func TestScanRequestReadsThePricingMembersLikeEncodingJSON(t *testing.T) {
+	for _, body := range pricingBodies {
+		checkPricing(t, []byte(body))
+	}
+	facts, _, err := ScanRequest([]byte(`{"model":"m","enable_thinking":false,"service_tier":"flex"}`))
+	if err != nil || facts.EnableThinking == nil || *facts.EnableThinking || facts.ServiceTier != "flex" {
+		t.Fatalf("facts = %+v, err = %v", facts, err)
+	}
+}
+
+// A body this size must not cost a decode of its own: the members are read
+// from the scan, and without any of them the body is not validated either.
+func TestScanRequestReadsPricingWithoutDecodingTheBody(t *testing.T) {
+	filler := strings.Repeat(`{"role":"user","content":"`+strings.Repeat("x", 1000)+`"},`, 2000)
+	body := []byte(`{"model":"m","messages":[` + filler + `{}],"enable_thinking":false,"service_tier":"flex"}`)
+	if !json.Valid(body) {
+		t.Fatal("test body is not valid JSON")
+	}
+	checkPricing(t, body)
+	allocated := testing.AllocsPerRun(5, func() { _, _, _ = ScanRequest(body) })
+	if allocated > 40 {
+		t.Fatalf("scanning a %d byte body made %.0f allocations", len(body), allocated)
+	}
+}
+
+func FuzzScanRequestPricing(f *testing.F) {
+	for _, body := range pricingBodies {
+		f.Add([]byte(body))
+	}
+	f.Fuzz(func(t *testing.T, body []byte) { checkPricing(t, body) })
+}
+
+// ---- one scan for the model and include_usage ----
+
+// legacyUpstreamBody is how the gateway used to build the body of an OpenAI
+// Chat stream: replace the model, scan the result again, then ensure usage.
+func legacyUpstreamBody(body []byte, scan objectScan, model string, ensureUsage bool) ([]byte, bool) {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	_ = encoder.Encode(model)
+	encoded := bytes.TrimRight(buffer.Bytes(), "\n")
+	var splices []splice
+	for _, member := range scan.all("model") {
+		splices = append(splices, splice{start: member.start, end: member.end, value: encoded})
+	}
+	upstream := applySplices(body, splices)
+	if !ensureUsage {
+		return upstream, false
+	}
+	_, rescanned, err := ScanRequest(upstream)
+	if err != nil {
+		return upstream, false
+	}
+	return EnsureIncludeUsage(upstream, rescanned)
+}
+
+var upstreamBodyCases = []string{
+	`{"model":"m","stream":true}`, `{"model":"m","stream":true,"stream_options":{"include_usage":true}}`,
+	`{"model":"m","stream":true,"stream_options":{"include_usage":false}}`, `{"model":"m","stream_options":{"other":1},"stream":true}`,
+	`{"stream_options":{"include_usage":false,"include_usage":false},"model":"m"}`, `{"stream_options":null,"model":"m"}`, `{"stream_options":5,"model":"m"}`,
+	`{"model":"m"}`, `{"model":"m","model":"n","stream":true}`, `{"stream":true,"model":"m"}`, `{"model":"m","stream_options":{}}`,
+	`{"mod\u0065l":"m","stream":true}`, `{"model":"up\"stream","x":1}`, `{"model":"é","x":1}`, `{"model":5}`, `{}`, ` {"stream" : true , "model" : "m" } `,
+	`{"model":"upstream","stream":true}`, `{"model":"upstream","stream":true,"stream_options":{"include_usage":true}}`,
+	`{"messages":[{"model":"x"}],"stream_options":{"include_usage":false},"model":"upstream"}`,
+}
+
+func TestUpstreamBodyIsReplaceModelThenEnsureIncludeUsage(t *testing.T) {
+	for _, text := range upstreamBodyCases {
+		body := []byte(text)
+		_, scan, err := ScanRequest(body)
+		if err != nil {
+			t.Fatalf("%s: %v", text, err)
+		}
+		for _, model := range []string{"upstream", "we\"ird<>&\n", "upstream/é", "", "m"} {
+			for _, ensure := range []bool{false, true} {
+				got, gotInjected := UpstreamBody(body, scan, model, ensure)
+				want, wantInjected := legacyUpstreamBody(body, scan, model, ensure)
+				if !bytes.Equal(got, want) || gotInjected != wantInjected {
+					t.Fatalf("%s, model %q, ensure %v:\ngot  %q (%v)\nwant %q (%v)", text, model, ensure, got, gotInjected, want, wantInjected)
+				}
+			}
+		}
+	}
+}
+
+func TestUpstreamBodyIsTheBodyItselfWhenNothingChanges(t *testing.T) {
+	body := []byte(`{"model":"upstream","stream":true,"stream_options":{"include_usage":true}}`)
+	_, scan, _ := ScanRequest(body)
+	got, injected := UpstreamBody(body, scan, "upstream", true)
+	if injected || len(got) != len(body) || &got[0] != &body[0] {
+		t.Fatalf("a body that needs no change was copied: %q (injected %v)", got, injected)
+	}
+	changed, injected := UpstreamBody(body, scan, "other", true)
+	if injected || string(changed) != `{"model":"other","stream":true,"stream_options":{"include_usage":true}}` {
+		t.Fatalf("got %q (injected %v)", changed, injected)
+	}
+}
+
+func FuzzUpstreamBody(f *testing.F) {
+	for _, text := range upstreamBodyCases {
+		f.Add([]byte(text), "upstream", true)
+	}
+	f.Fuzz(func(t *testing.T, body []byte, model string, ensure bool) {
+		_, scan, err := ScanRequest(body)
+		if err != nil {
+			return
+		}
+		got, gotInjected := UpstreamBody(body, scan, model, ensure)
+		want, wantInjected := legacyUpstreamBody(body, scan, model, ensure)
+		if !bytes.Equal(got, want) || gotInjected != wantInjected {
+			t.Fatalf("%q, model %q, ensure %v:\ngot  %q (%v)\nwant %q (%v)", body, model, ensure, got, gotInjected, want, wantInjected)
+		}
+	})
+}
+
+func TestEncodeStringMatchesEncodingJSON(t *testing.T) {
+	for _, value := range []string{"", "gpt-4o", "a b", `q"uote`, `back\slash`, "tab\t", "nl\n", "é", "\u2028\u2029", "<>&", "del\x7f", "\xff", "ctl\x01", "日本語"} {
+		var buffer bytes.Buffer
+		encoder := json.NewEncoder(&buffer)
+		encoder.SetEscapeHTML(false)
+		_ = encoder.Encode(value)
+		if want := bytes.TrimRight(buffer.Bytes(), "\n"); !bytes.Equal(encodeString(value), want) {
+			t.Fatalf("%q: got %s, want %s", value, encodeString(value), want)
+		}
+	}
+}
+
+// ---- skipString ----
+
+// legacySkipString is the byte-by-byte loop skipString replaced.
+func legacySkipString(text []byte, i int) (int, error) {
+	i++
+	for i < len(text) {
+		switch text[i] {
+		case '\\':
+			i += 2
+		case '"':
+			return i + 1, nil
+		default:
+			i++
+		}
+	}
+	return 0, errMalformedJSON
+}
+
+func checkSkipString(t testing.TB, text []byte) {
+	t.Helper()
+	for start := 0; start < len(text) && start < 8; start++ {
+		got, gotErr := skipString(text, start)
+		want, wantErr := legacySkipString(text, start)
+		if got != want || (gotErr == nil) != (wantErr == nil) {
+			t.Fatalf("skipString(%q, %d) = %d, %v; the byte loop gave %d, %v", text, start, got, gotErr, want, wantErr)
+		}
+	}
+}
+
+func TestSkipStringMatchesTheByteLoop(t *testing.T) {
+	for _, text := range []string{`""`, `"a"`, `"a\"b"`, `"a\\"`, `"a\\\"b"`, `"a\`, `"a\"`, `"`, `"\\`, `"\\\\"x"`, `"unterminated`, `"éé\n"tail`, `"x" "y"`} {
+		checkSkipString(t, []byte(text))
+	}
+	// Every string of quotes, backslashes and letters up to a length.
+	alphabet := []byte{'"', '\\', 'a', 'u'}
+	for length := 1; length <= 9; length++ {
+		text := make([]byte, length)
+		for code := 0; code < 1<<(2*length); code++ {
+			for i := range text {
+				text[i] = alphabet[code>>(2*i)&3]
+			}
+			checkSkipString(t, text)
+		}
+	}
+}
+
+func FuzzSkipString(f *testing.F) {
+	for _, seed := range []string{`"a\"b"`, `"a\\"`, `"\\\"`, `"abc`} {
+		f.Add([]byte(seed))
+	}
+	f.Fuzz(func(t *testing.T, text []byte) { checkSkipString(t, text) })
 }
