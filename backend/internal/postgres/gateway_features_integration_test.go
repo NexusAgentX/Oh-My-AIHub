@@ -219,7 +219,7 @@ func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
 	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true}`), nil)
 	if recorder.Code != http.StatusOK || time.Since(started) < time.Second {
 		t.Fatalf("call = %d after %s", recorder.Code, time.Since(started))
 	}
@@ -227,6 +227,44 @@ func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
 	err := e.pool.QueryRow(context.Background(), `SELECT attempts->0->>'end_reason' FROM calls WHERE id = $1`, recorder.Header().Get("X-AIHub-Request-Id")).Scan(&endReason)
 	if err != nil || endReason != "timeout_ttft" {
 		t.Fatalf("first attempt end reason = %q, %v", endReason, err)
+	}
+}
+
+// A non-streaming completion sends its first byte only when generation ends,
+// so the first-byte timeout does not apply: only the total timeout does.
+func TestGatewayFirstByteTimeoutDoesNotApplyToNonStreamingRequests(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	slow := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		select {
+		case <-time.After(1500 * time.Millisecond):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, chatBody)
+		case <-r.Context().Done():
+		}
+	})
+	fast := okUpstream(t)
+	e.createChannel(sharer, channelSpec{name: "slow", upstream: slow, multiplier: "1", advanced: map[string]any{"ttft_timeout_ms": 1000}})
+	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
+	_, secret := e.defaultKey(consumer)
+	started := time.Now()
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	if recorder.Code != http.StatusOK || time.Since(started) < 1500*time.Millisecond {
+		t.Fatalf("call = %d after %s", recorder.Code, time.Since(started))
+	}
+	if len(slow.inference()) != 1 || len(fast.inference()) != 0 {
+		t.Fatalf("attempts: slow %d, fast %d", len(slow.inference()), len(fast.inference()))
+	}
+	var attempts int
+	var endReason string
+	err := e.pool.QueryRow(context.Background(), `SELECT jsonb_array_length(attempts), attempts->0->>'end_reason' FROM calls WHERE id = $1`,
+		recorder.Header().Get("X-AIHub-Request-Id")).Scan(&attempts, &endReason)
+	if err != nil || attempts != 1 || endReason != "completed" {
+		t.Fatalf("attempts = %d, first end reason = %q, %v", attempts, endReason, err)
+	}
+	if row := e.callRow(recorder.Header().Get("X-AIHub-Request-Id")); row.Outcome != "succeeded" {
+		t.Fatalf("outcome = %q", row.Outcome)
 	}
 }
 

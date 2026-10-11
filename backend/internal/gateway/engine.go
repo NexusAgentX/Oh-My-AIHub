@@ -765,12 +765,22 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 
 	attemptCtx, cancel := context.WithCancelCause(ctx)
 	result.cancel = cancel
-	timer := time.AfterFunc(ttft, func() { cancel(errTTFT) })
+	// Only a stream promises an early first byte; a non-streaming completion
+	// answers when generation ends and is bounded by the total timeout alone.
+	var timer *time.Timer
+	if call.stream {
+		timer = time.AfterFunc(ttft, func() { cancel(errTTFT) })
+	}
+	stopTimer := func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}
 	var connected time.Time
 	trace := &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected = e.Now() }}
 	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
 	if err != nil {
-		timer.Stop()
+		stopTimer()
 		cancel(nil)
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
 	}
@@ -779,7 +789,7 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 
 	response, err := client.Do(request)
 	if err != nil {
-		timer.Stop()
+		stopTimer()
 		cause := context.Cause(attemptCtx)
 		cancel(nil)
 		cancelled := ctx.Err() != nil
@@ -815,7 +825,7 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 			n, readErr = response.Body.Read(chunk)
 		}
 		if readErr != nil && !errors.Is(readErr, io.EOF) && n == 0 {
-			timer.Stop()
+			stopTimer()
 			cause := context.Cause(attemptCtx)
 			response.Body.Close()
 			cancel(nil)
@@ -831,14 +841,14 @@ func (e *Engine) attempt(r *http.Request, call *callState, candidate Candidate, 
 				return fail(EndInterrupted, "read_error", "读取上游响应失败", &status)
 			}
 		}
-		timer.Stop()
+		stopTimer()
 		result.ttft = e.Now().Sub(result.started)
 		result.record.TTFTMS = millis(result.ttft)
 		result.response, result.first, result.firstErr = response, chunk[:n], readErr
 		return result
 	}
 
-	timer.Stop()
+	stopTimer()
 	if !fallbackStatus(status) {
 		// The request itself is at fault: hand the upstream answer back as is.
 		result.response, result.passthrough = response, true
