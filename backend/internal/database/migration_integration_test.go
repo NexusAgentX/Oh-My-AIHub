@@ -88,7 +88,7 @@ COMMIT;`)
  'ledger_transactions', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
  'ledger_entries', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
  'settings', (SELECT jsonb_agg(to_jsonb(a) - ARRAY['usd_cny_rate_nano', 'usd_cny_rate_source', 'usd_cny_rate_updated_at',
-   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error']) FROM settings a))::text`).Scan(&value)
+   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls']) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,6 +109,19 @@ COMMIT;`)
 	var source string
 	if err := db.QueryRowContext(ctx, `SELECT usd_cny_rate_nano, usd_cny_rate_source FROM settings`).Scan(&rate, &source); err != nil || rate != 6_800_000_000 || source != "manual" {
 		t.Fatalf("exchange rate after upgrade = %d %q %v", rate, source, err)
+	}
+	// 0006 adds the per-account in-flight cap with a default of 20 and lets a
+	// call be recorded as refused for exceeding it.
+	var inflightCap int
+	if err := db.QueryRowContext(ctx, `SELECT account_max_inflight_calls FROM settings`).Scan(&inflightCap); err != nil || inflightCap != 20 {
+		t.Fatalf("in-flight cap after upgrade = %d %v", inflightCap, err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE settings SET account_max_inflight_calls = 1001`); err == nil {
+		t.Fatal("a cap above 1000 must be rejected by the database")
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO calls (account_id, format, outcome) VALUES
+ ('11111111-1111-4111-8111-111111111111', 'openai_chat', 'rejected_inflight')`); err != nil {
+		t.Fatalf("recording a rejected_inflight call: %v", err)
 	}
 	var tables, versions int
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables

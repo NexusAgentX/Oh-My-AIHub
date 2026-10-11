@@ -30,6 +30,7 @@ export const outcomeLabels: Record<CallOutcome, string> = {
   rejected_model: '模型不可用',
   rejected_format: '接口不支持',
   rejected_no_channel: '无可用渠道',
+  rejected_inflight: '同时调用过多',
 }
 
 export function outcomeTone(outcome: CallOutcome): BadgeTone {

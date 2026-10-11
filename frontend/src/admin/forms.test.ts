@@ -12,6 +12,7 @@ const settings: Settings = {
   default_total_timeout_ms: 600000,
   default_cooldown_failures: 3,
   default_cooldown_seconds: 300,
+  account_max_inflight_calls: 20,
   extra_blocked_hosts: [],
   usd_cny_rate: '6.8',
   fx_auto_sync: false,
@@ -55,6 +56,23 @@ describe('settings form', () => {
     const form = { ...settingsToForm(settings), defaultMaxAttempts: '5', extraBlockedHosts: 'A.example.com\n a.example.com, b.example.com' }
     expect(changedAdvancedCount(form)).toBe(2)
     expect(formToSettings(form).body?.extra_blocked_hosts).toEqual(['a.example.com', 'b.example.com'])
+  })
+
+  it('counts the in-flight cap as an advanced item and accepts 0 as unlimited', () => {
+    const base = settingsToForm(settings)
+    expect(base.accountMaxInflightCalls).toBe('20')
+    expect(changedAdvancedCount({ ...base, accountMaxInflightCalls: '5' })).toBe(1)
+    expect(formToSettings({ ...base, accountMaxInflightCalls: '0' }).body?.account_max_inflight_calls).toBe(0)
+    expect(formToSettings({ ...base, accountMaxInflightCalls: ' 1000 ' }).body?.account_max_inflight_calls).toBe(1000)
+  })
+
+  it('rejects an in-flight cap outside 0～1000', () => {
+    const base = settingsToForm(settings)
+    for (const value of ['1001', '-1', '2.5', '', 'abc']) {
+      expect(formToSettings({ ...base, accountMaxInflightCalls: value }).errors).toMatchObject({
+        accountMaxInflightCalls: '0～1000，0 表示不限',
+      })
+    }
   })
 
   it('rejects out-of-range values', () => {

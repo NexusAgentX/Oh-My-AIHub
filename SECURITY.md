@@ -67,7 +67,7 @@
 - 渠道请求头规则不能设置或删除 `Host`、`Content-Length`、hop-by-hop 头、`Authorization`、`x-api-key`、`x-goog-api-key`、`Cookie`、`Accept-Encoding`。网关转发时丢弃客户端的 Cookie、`X-AIHub-Tag` 与 `X-Forwarded-*`/`Forwarded`/`Via`，不向上游泄露站内会话与客户端地址。
 - 平台 API Key 以 SHA-256 查找、以上游凭据密钥环可逆加密保存，使用户可以再次复制（[ADR-0028](docs/adr/0028-store-platform-api-keys-reversibly-encrypted.md)）：完整 Key 只返回给所有者，每次读取明文写入审计 `api_key.reveal`；列表与详情只含前缀；持有密钥环与数据库的人可以解出全部平台 Key，与上游 Key 的威胁模型一致。
 - 网关不持久化请求或响应正文，不记录客户端 IP；每个请求一行结构化日志，只含请求 ID、账号、Key 前缀、模型、格式、渠道、结果、状态码、耗时、token 与费用。上游原始错误（调用尝试里的 `error_message`）最多 4KB，后台任务每天把 30 天前的原始错误文本置空（保留状态码与错误码）。
-- 不预扣费意味着并发请求可能让单个账号透支超过信用额度若干次请求的费用，已接受（[ADR-0035](docs/adr/0035-adopt-transparent-gateway-v2.md)）。
+- 不预扣费意味着并发请求可能让单个账号透支超过信用额度；每个账号同时在途的调用数受平台设置 `account_max_inflight_calls` 约束（默认 20，超限 429、不收费），透支上界约为「在途上限 × 单次请求费用」，该上界已接受。管理员把上限设为 0（不限）即放弃这一约束。在途计数是单实例进程内状态，不预留余额，重启后清零（[ADR-0035](docs/adr/0035-adopt-transparent-gateway-v2.md)、[ADR-0039](docs/adr/0039-deploy-as-single-instance.md)）。
 
 ## 已实现的观测与指标安全边界
 

@@ -69,7 +69,8 @@ type Dependencies struct {
 // Engine serves the gateway endpoints.
 type Engine struct {
 	Dependencies
-	spend *SpendCache
+	spend    *SpendCache
+	inflight *Inflight
 
 	// Settings and channel stats are published as immutable snapshots by
 	// RunRefresh, so the request path reads them without locking or waiting on
@@ -104,7 +105,7 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.Runtime == nil {
 		dependencies.Runtime = NewRuntime(nil)
 	}
-	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), touched: map[string]time.Time{}}
+	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -454,6 +455,16 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		}
 	}
+
+	// From here until the call is booked the account holds one of its slots
+	// (ADR-0035 rule 2). The deferred release gives it back on every exit,
+	// panics included, and only after the call has been settled.
+	releaseInflight, admitted := e.inflight.Acquire(key.OwnerID, int(defaults.AccountMaxInflightCalls))
+	if !admitted {
+		e.finishRejected(w, call, OutcomeRejectedInflight, http.StatusTooManyRequests, "too_many_inflight_calls", "同时进行的调用过多，请稍后重试")
+		return
+	}
+	defer releaseInflight()
 
 	// Routing: the key's own setting, else the account's, else the default.
 	pref, err := e.Routing.Resolve(ctx, key.OwnerID, key.KeyID, call.modelID)

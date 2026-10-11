@@ -24,6 +24,7 @@ const (
 	OutcomeRejectedModel     = "rejected_model"
 	OutcomeRejectedFormat    = "rejected_format"
 	OutcomeRejectedNoChannel = "rejected_no_channel"
+	OutcomeRejectedInflight  = "rejected_inflight"
 	OutcomeUpstreamFailed    = "upstream_failed"
 	OutcomeInterrupted       = "interrupted"
 	OutcomeClientDisconnect  = "client_disconnected"

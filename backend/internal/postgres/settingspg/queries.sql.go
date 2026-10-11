@@ -13,7 +13,7 @@ import (
 )
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error FROM settings
+SELECT id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error, account_max_inflight_calls FROM settings
 `
 
 func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
@@ -38,12 +38,13 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 		&i.FxSyncMinute,
 		&i.FxSyncAttemptedAt,
 		&i.FxSyncError,
+		&i.AccountMaxInflightCalls,
 	)
 	return i, err
 }
 
 const lockSettings = `-- name: LockSettings :one
-SELECT id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error FROM settings FOR UPDATE
+SELECT id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error, account_max_inflight_calls FROM settings FOR UPDATE
 `
 
 func (q *Queries) LockSettings(ctx context.Context) (Setting, error) {
@@ -68,6 +69,7 @@ func (q *Queries) LockSettings(ctx context.Context) (Setting, error) {
 		&i.FxSyncMinute,
 		&i.FxSyncAttemptedAt,
 		&i.FxSyncError,
+		&i.AccountMaxInflightCalls,
 	)
 	return i, err
 }
@@ -76,7 +78,7 @@ const saveSyncFailure = `-- name: SaveSyncFailure :one
 UPDATE settings
 SET fx_sync_attempted_at = $1::timestamptz,
     fx_sync_error = $2::text
-RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error
+RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error, account_max_inflight_calls
 `
 
 type SaveSyncFailureParams struct {
@@ -106,6 +108,7 @@ func (q *Queries) SaveSyncFailure(ctx context.Context, arg SaveSyncFailureParams
 		&i.FxSyncMinute,
 		&i.FxSyncAttemptedAt,
 		&i.FxSyncError,
+		&i.AccountMaxInflightCalls,
 	)
 	return i, err
 }
@@ -118,7 +121,7 @@ SET usd_cny_rate_source = 'auto',
     usd_cny_rate_nano = $1::bigint,
     fx_sync_attempted_at = $2::timestamptz,
     fx_sync_error = NULL
-RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error
+RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error, account_max_inflight_calls
 `
 
 type SaveSyncedRateParams struct {
@@ -148,6 +151,7 @@ func (q *Queries) SaveSyncedRate(ctx context.Context, arg SaveSyncedRateParams) 
 		&i.FxSyncMinute,
 		&i.FxSyncAttemptedAt,
 		&i.FxSyncError,
+		&i.AccountMaxInflightCalls,
 	)
 	return i, err
 }
@@ -163,13 +167,14 @@ SET fee_rate_nano = $1,
     default_cooldown_failures = $7,
     default_cooldown_seconds = $8,
     extra_blocked_hosts = $9,
-    fx_auto_sync = $10,
-    fx_sync_minute = $11,
-    usd_cny_rate_source = CASE WHEN usd_cny_rate_nano = $12::bigint THEN usd_cny_rate_source ELSE 'manual' END,
-    usd_cny_rate_updated_at = CASE WHEN usd_cny_rate_nano = $12::bigint THEN usd_cny_rate_updated_at ELSE now() END,
-    usd_cny_rate_nano = $12::bigint,
+    account_max_inflight_calls = $10,
+    fx_auto_sync = $11,
+    fx_sync_minute = $12,
+    usd_cny_rate_source = CASE WHEN usd_cny_rate_nano = $13::bigint THEN usd_cny_rate_source ELSE 'manual' END,
+    usd_cny_rate_updated_at = CASE WHEN usd_cny_rate_nano = $13::bigint THEN usd_cny_rate_updated_at ELSE now() END,
+    usd_cny_rate_nano = $13::bigint,
     updated_at = now()
-RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error
+RETURNING id, fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit_nano, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, extra_blocked_hosts, updated_at, usd_cny_rate_nano, usd_cny_rate_source, usd_cny_rate_updated_at, fx_auto_sync, fx_sync_minute, fx_sync_attempted_at, fx_sync_error, account_max_inflight_calls
 `
 
 type UpdateSettingsParams struct {
@@ -182,6 +187,7 @@ type UpdateSettingsParams struct {
 	DefaultCooldownFailures  int32
 	DefaultCooldownSeconds   int32
 	ExtraBlockedHosts        []string
+	AccountMaxInflightCalls  int32
 	FxAutoSync               bool
 	FxSyncMinute             int32
 	UsdCnyRateNano           int64
@@ -198,6 +204,7 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		arg.DefaultCooldownFailures,
 		arg.DefaultCooldownSeconds,
 		arg.ExtraBlockedHosts,
+		arg.AccountMaxInflightCalls,
 		arg.FxAutoSync,
 		arg.FxSyncMinute,
 		arg.UsdCnyRateNano,
@@ -222,6 +229,7 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		&i.FxSyncMinute,
 		&i.FxSyncAttemptedAt,
 		&i.FxSyncError,
+		&i.AccountMaxInflightCalls,
 	)
 	return i, err
 }

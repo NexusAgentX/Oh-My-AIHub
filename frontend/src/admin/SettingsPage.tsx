@@ -133,6 +133,12 @@ function SettingsEditor({ settings }: { settings: Settings }) {
             {field('defaultCooldownFailures', '冷却：连续失败次数', { inputMode: 'numeric' })}
             {field('defaultCooldownSeconds', '冷却时长（秒）', { inputMode: 'numeric' })}
           </div>
+          <div className="field-row">
+            {field('accountMaxInflightCalls', '每账号同时进行的调用上限', {
+              hint: '超过时返回 429，不收费；0 表示不限',
+              inputMode: 'numeric',
+            })}
+          </div>
           <TextareaField
             error={errors.extraBlockedHosts}
             hint="每行一个，叠加在部署配置的禁用清单之上"
