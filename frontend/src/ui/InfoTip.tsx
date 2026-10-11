@@ -16,8 +16,11 @@ function bubblePosition(button: HTMLElement): CSSProperties {
   return { top: rect.bottom + 6, left, width }
 }
 
-/** 说明气泡：悬停、聚焦或点按 ⓘ 显示，点外部或 Esc 关闭。用于不宜常驻的解释文字。 */
-export function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * 说明气泡：悬停、聚焦或点按 ⓘ（或传入的 trigger 文字）显示，点外部或 Esc 关闭。
+ * 用于不宜常驻的解释文字。
+ */
+export function InfoTip({ label, children, trigger }: { label: string; children: ReactNode; trigger?: ReactNode }) {
   const [position, setPosition] = useState<CSSProperties | null>(null)
   const open = position !== null
   const root = useRef<HTMLSpanElement>(null)
@@ -56,14 +59,14 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
         aria-describedby={open ? id : undefined}
         aria-expanded={open}
         aria-label={label}
-        className="info-tip-button"
+        className={trigger ? 'info-tip-text' : 'info-tip-button'}
         onBlur={() => setOpen(false)}
         onClick={() => setOpen(true)}
         onFocus={() => setOpen(true)}
         ref={button}
         type="button"
       >
-        <Icon name="info" size={14} />
+        {trigger ?? <Icon name="info" size={14} />}
       </button>
       {open && (
         <span className="info-tip-bubble" id={id} role="tooltip" style={position}>

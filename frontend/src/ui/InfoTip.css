@@ -14,6 +14,16 @@
 }
 .info-tip-button:hover,
 .info-tip-button[aria-expanded='true'] { color: var(--ink); background: var(--hover); }
+.info-tip-text {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
 .info-tip-bubble {
   position: fixed;
   z-index: var(--z-overlay);

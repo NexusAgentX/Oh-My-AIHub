@@ -1,3 +1,4 @@
+import { InfoTip } from '../ui'
 import { formatMultiplier } from './format'
 
 /** 实际倍率最多显示 4 位小数，完整值放在 title 里。 */
@@ -23,9 +24,15 @@ export function MultiplierText({
 }) {
   if (!fxDiscount || !effective) return <>{formatMultiplier(multiplier)}</>
   return (
-    <span className="multiplier-text" title={`实际倍率 ${effective} = 设置倍率 ${multiplier} ÷ 美元汇率`}>
+    <span className="multiplier-text">
       <span>{shortMultiplier(effective)}</span>
-      <small>{formatMultiplier(multiplier)}</small>
+      <small>
+        <InfoTip label={`设置的倍率 ${formatMultiplier(multiplier)}`} trigger={formatMultiplier(multiplier)}>
+          <span>
+            {`渠道设置的倍率是 ${multiplier}，开启了汇率优惠，按「美元价 × ${multiplier}」扣积分，相当于积分价 ${shortMultiplier(effective)}（上面的实际倍率）。`}
+          </span>
+        </InfoTip>
+      </small>
     </span>
   )
 }
