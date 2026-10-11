@@ -223,6 +223,13 @@ func newEnv(t *testing.T) *env { return newEnvWith(t, nil) }
 func newEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 	t.Helper()
 	pool, store := isolatedDatabase(t)
+	return newEnvOn(t, pool, store, configure)
+}
+
+// newEnvOn is newEnvWith on a database the caller has set up, for the
+// performance baseline, which counts the statements its pool sends.
+func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure func(*gateway.Dependencies)) *env {
+	t.Helper()
 	ctx := context.Background()
 	service, admin, _ := accounts(t, store)
 
@@ -381,8 +388,11 @@ func (e *env) defaultKey(p person) (id, secret string) {
 }
 
 type channelSpec struct {
-	name       string
-	upstream   *upstream
+	name     string
+	upstream *upstream
+	// baseURL, when set, is used in place of the fake upstream's address; the
+	// performance baseline points channels at host names of its own.
+	baseURL    string
 	key        string
 	model      string
 	upstreamAs string
@@ -410,7 +420,11 @@ func (e *env) createChannel(owner person, spec channelSpec) string {
 	if spec.upstreamAs != "" {
 		model["upstream_model"] = spec.upstreamAs
 	}
-	body := map[string]any{"name": spec.name, "base_url": spec.upstream.server.URL, "api_key": spec.key, "models": []any{model}}
+	baseURL := spec.baseURL
+	if baseURL == "" {
+		baseURL = spec.upstream.server.URL
+	}
+	body := map[string]any{"name": spec.name, "base_url": baseURL, "api_key": spec.key, "models": []any{model}}
 	if spec.advanced != nil {
 		body["advanced"] = spec.advanced
 	}

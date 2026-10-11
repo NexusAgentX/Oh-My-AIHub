@@ -89,8 +89,8 @@ scripts/check-migration-upgrade.sh
 ]
 
 [tasks.lint-backend]
-description = "Run staticcheck on the backend (pinned; built with the project Go toolchain)"
-run = "go -C backend run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./..."
+description = "Run staticcheck on the backend (pinned; built with the project Go toolchain), the gateway performance baseline (build tag perfbaseline) included"
+run = "go -C backend run honnef.co/go/tools/cmd/staticcheck@v0.8.1 -tags perfbaseline ./..."
 
 [tasks.lint]
 description = "Run the frontend lint (oxlint) and backend staticcheck"
