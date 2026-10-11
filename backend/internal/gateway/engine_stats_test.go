@@ -189,6 +189,119 @@ func TestAnomaliesFoundWhileLoadingAreNotAnnounced(t *testing.T) {
 	}
 }
 
+// ---- editing a channel ----
+
+func (r *statsRig) demoted(channelID string) bool {
+	_, bad := r.engine.statsView().anomalies["m"][channelID]
+	return bad
+}
+
+// The channel is flagged as soon as its 4xx answers say so, and an edit takes
+// the flag away at once (not at the next refresh) while the channel's health
+// and every other channel stay as they are.
+func TestEditingAChannelEndsItsDemotionAtOnceAndLeavesTheRestAlone(t *testing.T) {
+	rig := newStatsRig()
+	rig.record("bad", 30, 29)
+	rig.record("other", 30, 29) // also broken, and not edited
+	for _, id := range []string{"good1", "good2", "good3"} {
+		rig.record(id, 30, 1)
+	}
+	rig.engine.RefreshStats()
+	if !rig.demoted("bad") || !rig.demoted("other") || rig.demoted("good1") {
+		t.Fatalf("setup: anomalies = %+v", rig.engine.statsView().anomalies)
+	}
+	health := rig.engine.Stats()["bad"]
+
+	rig.engine.ChannelEdited("bad")
+
+	if rig.demoted("bad") {
+		t.Fatal("the edited channel is still demoted")
+	}
+	if !rig.demoted("other") {
+		t.Fatal("editing one channel cleared another")
+	}
+	if got := rig.engine.Stats()["bad"]; got.Attempts != health.Attempts || got.Successes != health.Successes || health.Attempts == 0 {
+		t.Fatalf("health of the edited channel = %+v, was %+v", got, health)
+	}
+	// It stays clear on later refreshes: the old answers are gone, not hidden.
+	for range 3 {
+		*rig.clock = rig.clock.Add(10 * time.Second)
+		rig.engine.RefreshStats()
+	}
+	if rig.demoted("bad") {
+		t.Fatal("the demotion came back on a refresh")
+	}
+}
+
+// After an edit the rule needs a full sample of its own again, and when the new
+// configuration is just as broken the channel is flagged and announced again,
+// without waiting out the hour that normally separates two events.
+func TestAChannelStillBrokenAfterAnEditIsFlaggedAgainOnFreshAttemptsAndAnnounced(t *testing.T) {
+	rig := newStatsRig()
+	rig.record("bad", 30, 29)
+	rig.record("good", 30, 1)
+	rig.engine.RefreshStats()
+	if got := rig.announcements(); len(got) != 1 {
+		t.Fatalf("setup: events = %+v", got)
+	}
+
+	rig.engine.ChannelEdited("bad")
+	*rig.clock = rig.clock.Add(time.Minute) // well inside anomalyRenotifyAfter
+
+	rig.record("bad", anomalyMinSamples-1, anomalyMinSamples-1)
+	rig.engine.RefreshStats()
+	if rig.demoted("bad") {
+		t.Fatalf("flagged on %d fresh attempts, fewer than the %d the rule needs", anomalyMinSamples-1, anomalyMinSamples)
+	}
+	rig.record("bad", 1, 1)
+	rig.engine.RefreshStats()
+	if !rig.demoted("bad") {
+		t.Fatal("not flagged again on a full sample of 4xx answers")
+	}
+	events := rig.announcements()
+	if len(events) != 2 || events[1].channel != "bad" || events[1].kind != channel.EventAnomalousClientErrors {
+		t.Fatalf("events = %+v, want the first one and a second for the new configuration", events)
+	}
+}
+
+// Editing a channel that has no figures, or before anything was counted, is
+// harmless and still publishes a snapshot.
+func TestEditingAChannelTheStatisticsNeverSawIsHarmless(t *testing.T) {
+	rig := newStatsRig()
+	rig.engine.ChannelEdited("unknown")
+	if got := rig.engine.Stats(); len(got) != 0 {
+		t.Fatalf("stats = %v", got)
+	}
+	rig.record("a", 3, 0)
+	rig.engine.ChannelEdited("unknown")
+	if got := rig.engine.Stats()["a"]; got.Attempts != 3 {
+		t.Fatalf("stats of another channel = %+v", got)
+	}
+}
+
+// What the store reports for the time before the edit is not held against the
+// channel after a restart either, but its health is read as before.
+func TestLoadingTheHistoryOfAnEditedChannelDoesNotDemoteItOnTheOldAnswers(t *testing.T) {
+	rig := newStatsRig()
+	row := func(channelID string, edited bool) AttemptHistoryRow {
+		r := AttemptHistoryRow{ChannelID: channelID, ModelID: "m", Bucket: someEpoch, TTFTBin: -1, Counted: 2, Successes: 2, ClientErrors: 38}
+		if edited {
+			r.BeforeEditAttempts, r.BeforeEditClientErrors = 40, 38
+		}
+		return r
+	}
+	rig.engine.Store = &historyStore{rows: []AttemptHistoryRow{row("edited", true), row("untouched", false)}}
+	if err := rig.engine.LoadStats(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if rig.demoted("edited") || !rig.demoted("untouched") {
+		t.Fatalf("anomalies = %+v, want only the channel that was not edited", rig.engine.statsView().anomalies)
+	}
+	if got := rig.engine.Stats()["edited"]; got.Attempts != 2 || got.Successes != 2 {
+		t.Fatalf("health of the edited channel = %+v", got)
+	}
+}
+
 type historyStore struct {
 	Store
 	rows  []AttemptHistoryRow

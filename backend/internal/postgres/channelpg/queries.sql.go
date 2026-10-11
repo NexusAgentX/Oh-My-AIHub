@@ -667,6 +667,18 @@ func (q *Queries) SuspendChannel(ctx context.Context, arg SuspendChannelParams) 
 	return err
 }
 
+const touchChannel = `-- name: TouchChannel :exec
+UPDATE channels SET updated_at = now() WHERE id = $1
+`
+
+// Marks the channel as edited without changing a field of it: applying the probe
+// results rewrites the formats of its models. The gateway counts the 4xx
+// answers of a channel only from calls started after this time (AttemptHistory).
+func (q *Queries) TouchChannel(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, touchChannel, id)
+	return err
+}
+
 const unsuspendChannel = `-- name: UnsuspendChannel :exec
 UPDATE channels SET status = 'listed', suspended_reason = NULL, updated_at = now() WHERE id = $1
 `

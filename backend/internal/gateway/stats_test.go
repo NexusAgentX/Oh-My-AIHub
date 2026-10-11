@@ -406,6 +406,78 @@ func TestLoadSeedsTheWindowFromTheDatabaseRows(t *testing.T) {
 	}
 }
 
+// The part of a row that belongs to calls started before the channel's last edit
+// stays in the channel's health but not in the 4xx anomaly rule.
+func TestLoadLeavesTheAttemptsBeforeAnEditOutOfTheAnomalyRule(t *testing.T) {
+	now := bucketStart(someEpoch).Add(time.Minute)
+	book := NewStatsBook()
+	book.Load([]AttemptHistoryRow{
+		// 10 attempts completed and 30 were 4xx; of the 40, 25 (20 of them 4xx) began before the edit.
+		{ChannelID: "a", ModelID: "m", Bucket: someEpoch, TTFTBin: -1, Counted: 10, Successes: 9, ClientErrors: 30, BeforeEditAttempts: 25, BeforeEditClientErrors: 20},
+		// Everything in this row is from before the edit: no figure for the model at all.
+		{ChannelID: "a", ModelID: "m2", Bucket: someEpoch, TTFTBin: -1, Counted: 5, Successes: 1, ClientErrors: 35, BeforeEditAttempts: 40, BeforeEditClientErrors: 35},
+		// A channel never edited since (no before-edit figures) is counted whole.
+		{ChannelID: "b", ModelID: "m", Bucket: someEpoch, TTFTBin: -1, Counted: 10, ClientErrors: 30},
+	}, now)
+
+	view := book.view(now)
+	if a := view.channels["a"]; a.Attempts != 15 || a.Successes != 10 {
+		t.Fatalf("the success rate keeps every attempt: %+v", a)
+	}
+	got := map[string][2]int64{}
+	for model, byChannel := range view.models {
+		for _, sum := range byChannel {
+			got[model+"/"+sum.channel] = [2]int64{sum.total, sum.client}
+		}
+	}
+	want := map[string][2]int64{"m/a": {15, 10}, "m/b": {40, 30}}
+	if len(got) != len(want) || got["m/a"] != want["m/a"] || got["m/b"] != want["m/b"] {
+		t.Fatalf("model sums = %v, want %v (m2 has nothing left after the edit)", got, want)
+	}
+}
+
+func TestResetAnomalyStatsClearsOneChannelsModelFiguresOnly(t *testing.T) {
+	now := bucketStart(someEpoch).Add(time.Minute)
+	book := NewStatsBook()
+	for _, channelID := range []string{"a", "b"} {
+		for _, model := range []string{"m1", "m2"} {
+			for range 3 {
+				book.Record(channelID, model, true, attemptOf(EndCompleted, 100), now)
+			}
+			book.Record(channelID, model, true, attemptOf(EndClientError, -1), now)
+		}
+	}
+	before := book.view(now)
+	if len(before.models["m1"]) != 2 || len(before.models["m2"]) != 2 {
+		t.Fatalf("setup: %+v", before.models)
+	}
+
+	book.ResetAnomalyStats("a")
+	after := book.view(now)
+	for _, model := range []string{"m1", "m2"} {
+		if len(after.models[model]) != 1 || after.models[model][0].channel != "b" || after.models[model][0].total != 4 || after.models[model][0].client != 1 {
+			t.Errorf("model %s after the reset: %+v, want only b untouched", model, after.models[model])
+		}
+	}
+	// Success rate and first-token time of a do not move.
+	if got, want := after.channels["a"], before.channels["a"]; got.Attempts != want.Attempts || got.Successes != want.Successes ||
+		got.TTFTP50MS == nil || want.TTFTP50MS == nil || *got.TTFTP50MS != *want.TTFTP50MS {
+		t.Fatalf("channel a health = %+v, was %+v", got, want)
+	}
+	if got := after.channels["b"]; got.Attempts != 6 {
+		t.Fatalf("channel b = %+v", got)
+	}
+
+	// It counts afresh from here, and resetting a channel the book never saw is harmless.
+	book.Record("a", "m1", false, attemptOf(EndClientError, -1), now)
+	book.ResetAnomalyStats("nobody")
+	for _, sum := range book.view(now).models["m1"] {
+		if sum.channel == "a" && (sum.total != 1 || sum.client != 1) {
+			t.Fatalf("a on m1 after the reset: %+v", sum)
+		}
+	}
+}
+
 // ---- the anomaly rule ----
 
 func sums(entries ...[3]int64) []pairSums {

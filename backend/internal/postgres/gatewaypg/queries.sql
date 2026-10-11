@@ -75,6 +75,11 @@ ORDER BY cm.model_id, c.id;
 -- anomaly rule. The first-token figure counts streaming calls only: a
 -- non-streaming call's first byte is the whole answer, which would rank a
 -- channel by how long its answers are instead of how fast it starts.
+-- The before_edit_* columns count the attempts of calls started before the
+-- channel was last edited (channels.updated_at): the gateway leaves them out of
+-- the 4xx anomaly rule, which judges a channel afresh after every edit, but not
+-- out of the success rate and first-token time. The channel is joined by its
+-- ID; a channel that no longer exists has no edit time and nothing is "before".
 -- name: AttemptHistory :many
 SELECT (att->'channel'->>'id')::uuid AS channel_id,
        coalesce(c.model_id, '')::text AS model_id,
@@ -83,9 +88,12 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
                 THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
        count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
-       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors,
+       count(*) FILTER (WHERE c.created_at < ch.updated_at)::bigint AS before_edit_attempts,
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error' AND c.created_at < ch.updated_at)::bigint AS before_edit_client_errors
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
+LEFT JOIN channels ch ON ch.id = (att->'channel'->>'id')::uuid
 WHERE c.created_at >= sqlc.arg(since)::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
   AND att->>'end_reason' <> 'client_disconnected'

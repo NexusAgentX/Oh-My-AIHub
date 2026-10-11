@@ -496,6 +496,13 @@ func (s *Store) SaveTests(ctx context.Context, id string, results []channel.Test
 				return err
 			}
 		}
+		if apply {
+			// The formats are part of the channel's configuration: the 4xx
+			// answers it gave before no longer count against it.
+			if err := q.TouchChannel(ctx, id); err != nil {
+				return err
+			}
+		}
 		updated, err = get(ctx, q, id)
 		return err
 	})
