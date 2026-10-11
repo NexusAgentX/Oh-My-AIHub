@@ -1,8 +1,24 @@
 # 变更日志
 
-本文档记录对使用者、开发者和部署环境有意义的变化。当前最新版本为 v0.13.0；未发布变化记录在“未发布”章节。
+本文档记录对使用者、开发者和部署环境有意义的变化。当前最新版本为 v0.14.0；未发布变化记录在“未发布”章节。
 
 ## 未发布
+
+## v0.14.0 - 2026-10-11
+
+- 网关自己返回的错误改为各协议官方 SDK 能解析的格式：OpenAI 为 `{"error":{"message","type","param","code"}}`，Anthropic（`/v1/messages` 或带 `anthropic-version` 的请求）为 `{"type":"error","error":{"type","message"},"request_id"}`，Gemini（`/v1beta/`）为 Google 标准的 `{"error":{"code","message","status","details"}}`。涉及 Key 无效、余额或预算不足、模型不可用、无可用渠道、不支持的接口等；HTTP 状态码不变，上游错误仍原样透传（#330）。
+  - 兼容：旧格式 `{"error":"<code>","message"}` 不再返回，平台错误码改在 OpenAI 的 `error.code`、Gemini 的 `details[].reason` 里；OpenAI 格式的错误体不再带 `request_id`，请改读 `X-AIHub-Request-Id` 响应头。
+
+- 模型列表接口按各家官方格式补齐字段：Anthropic 客户端（带 `anthropic-version`）调用 `GET /v1/models` 时返回 Anthropic 形态并支持 `limit`、`after_id`、`before_id` 分页，附带上下文窗口与最大输出；`GET /v1beta/models` 补齐 Gemini 的必填字段与 token 上限，支持 `pageSize`、`pageToken` 分页；OpenAI 形态的 `owned_by` 改为模型提供方（#326、#330）。
+
+- 模型新增「最大输出（token）」，在后台模型编辑的高级设置中填写，模型卡片显示，并用于上述模型列表（#330）。
+  - 部署：迁移 `0004_model_max_output_tokens.sql` 只追加一个可空列，既有模型留空。
+
+- 添加渠道时自动发现上游模型会跟随 Anthropic、Gemini 模型列表的分页读完全部模型，模型多的中转站不再只发现前 20 / 50 个（#326）。
+
+- 发版后仍停留在旧页面的用户切到懒加载页面（如论坛）时，会自动刷新到新版本，不再出现“加载模块失败”的错误页；静态资源缺失时直接返回 404，带哈希的资源长期缓存（#327）。
+
+- 管理后台用户列表的信用额度列不再显示“已用”（#324）。
 
 ## v0.13.0 - 2026-10-11
 
