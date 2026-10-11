@@ -74,17 +74,7 @@ const columns: Column<AdminAccount>[] = [
     ),
   },
   { key: 'balance', header: '余额', numeric: true, cell: (account) => <Balance value={account.balance} /> },
-  {
-    key: 'credit',
-    header: '信用额度（已用）',
-    numeric: true,
-    cell: (account) => (
-      <>
-        {formatPoints(account.credit_limit)}
-        <small className="muted"> （{formatPoints(creditUsed(account))}）</small>
-      </>
-    ),
-  },
+  { key: 'credit', header: '信用额度', numeric: true, cell: (account) => <span className="num">{formatPoints(account.credit_limit)}</span> },
   { key: 'active', header: '最近活跃', hideOnMobile: true, cell: (account) => formatLastActive(account.last_active_at) },
 ]
 
