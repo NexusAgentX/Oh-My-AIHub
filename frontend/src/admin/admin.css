@@ -185,6 +185,10 @@
   .tier-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .tier-time { padding-left: 0; }
   .admin-topbar-back span { display: none; }
+  /* 「需要处理」：类型徽标与操作排在第一行，一句话占满下一行，长句不被挤成窄列 */
+  .attention-list li { gap: var(--space-2) var(--space-3); }
+  .attention-list .attention-title { order: 1; flex: 1 0 100%; }
+  .attention-list li > :last-child { margin-left: auto; }
   .chart-card .panel-actions { width: 100%; margin-left: 0; }
   .chart-controls { width: 100%; }
 }

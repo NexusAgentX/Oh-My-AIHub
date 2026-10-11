@@ -1050,6 +1050,79 @@ func (q *Queries) TotalCreditLimit(ctx context.Context) (int64, error) {
 	return credit_limit_nano, err
 }
 
+const unbilledConsumers = `-- name: UnbilledConsumers :many
+WITH per_account AS (
+  SELECT c.account_id,
+         count(*)::bigint AS succeeded,
+         count(*) FILTER (WHERE c.outcome = 'succeeded_unbilled')::bigint AS unbilled
+  FROM calls c
+  WHERE c.created_at >= $1::timestamptz AND c.outcome IN ('succeeded', 'succeeded_unbilled')
+  GROUP BY c.account_id
+  HAVING count(*) >= $2::bigint AND count(*) FILTER (WHERE c.outcome = 'succeeded_unbilled') > 0
+)
+SELECT a.id, a.username, a.display_name, p.succeeded, p.unbilled,
+       top.channel_id, coalesce(top.channel_name, '')::text AS channel_name, coalesce(top.channel_unbilled, 0)::bigint AS channel_unbilled
+FROM per_account p
+JOIN accounts a ON a.id = p.account_id
+LEFT JOIN LATERAL (
+  SELECT c.final_channel_id AS channel_id, ch.name AS channel_name, count(*)::bigint AS channel_unbilled
+  FROM calls c
+  JOIN channels ch ON ch.id = c.final_channel_id
+  WHERE c.account_id = p.account_id AND c.created_at >= $1::timestamptz AND c.outcome = 'succeeded_unbilled'
+  GROUP BY c.final_channel_id, ch.name
+  ORDER BY count(*) DESC, ch.name, c.final_channel_id
+  LIMIT 1
+) top ON true
+ORDER BY p.unbilled DESC, a.id
+`
+
+type UnbilledConsumersParams struct {
+	Since        time.Time
+	MinSucceeded int64
+}
+
+type UnbilledConsumersRow struct {
+	ID              string
+	Username        string
+	DisplayName     string
+	Succeeded       int64
+	Unbilled        int64
+	ChannelID       *string
+	ChannelName     string
+	ChannelUnbilled int64
+}
+
+// 窗口内成功调用不少于 min_succeeded 且含未计费的消费者账号，附其未计费最多的渠道。
+// 未计费占比的阈值与条数上限由 observe 服务判定，这里只做不改变结果的预筛。
+func (q *Queries) UnbilledConsumers(ctx context.Context, arg UnbilledConsumersParams) ([]UnbilledConsumersRow, error) {
+	rows, err := q.db.Query(ctx, unbilledConsumers, arg.Since, arg.MinSucceeded)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UnbilledConsumersRow
+	for rows.Next() {
+		var i UnbilledConsumersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.Succeeded,
+			&i.Unbilled,
+			&i.ChannelID,
+			&i.ChannelName,
+			&i.ChannelUnbilled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const userBalanceBefore = `-- name: UserBalanceBefore :one
 
 

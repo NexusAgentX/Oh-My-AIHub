@@ -496,6 +496,21 @@ type FailingChannel struct {
 	Attempts, Successes int64
 }
 
+// UnbilledConsumer is a consumer account with successful calls in the last 24
+// hours, some of them unbilled because the gateway could not read their usage.
+type UnbilledConsumer struct {
+	Account             AccountRef
+	Succeeded, Unbilled int64
+	// TopChannel is the channel that served most of the unbilled calls.
+	TopChannel *UnbilledChannel
+}
+
+// UnbilledChannel is a channel and how many of an account's unbilled calls it served.
+type UnbilledChannel struct {
+	ID, Name string
+	Unbilled int64
+}
+
 type C2CCounts struct {
 	OpenOrders, AwaitingPayment, OpenDisputes int64
 }
@@ -516,14 +531,15 @@ func (w C2CWindow) AvgPriceFen() *float64 {
 }
 
 type OverviewData struct {
-	Today, Last24h CallWindow
-	Failing        []FailingChannel
-	C2C            C2CCounts
-	C2C24h         C2CWindow
-	Balances       Balances
-	Checks         Checks
-	Risks          []Risk
-	Concentration  Concentration
+	Today, Last24h    CallWindow
+	Failing           []FailingChannel
+	UnbilledConsumers []UnbilledConsumer
+	C2C               C2CCounts
+	C2C24h            C2CWindow
+	Balances          Balances
+	Checks            Checks
+	Risks             []Risk
+	Concentration     Concentration
 }
 
 // Attention kinds of the administrator overview.
@@ -534,6 +550,7 @@ const (
 	AttentionConcentration = "credit_concentration"
 	AttentionChannelFail   = "channel_failing"
 	AttentionUnbilled      = "unbilled_usage"
+	AttentionUnbilledUser  = "unbilled_consumer"
 	AttentionUnbalanced    = "ledger_unbalanced"
 	AttentionReconcile     = "reconciliation_failed"
 )

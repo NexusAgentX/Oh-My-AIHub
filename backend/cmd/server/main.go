@@ -23,12 +23,16 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
+
+// keyringCheckTimeout bounds the startup decryption of every stored secret.
+const keyringCheckTimeout = 2 * time.Minute
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -83,6 +87,19 @@ func main() {
 	}
 	defer pool.Close()
 	store := postgres.New(pool)
+	// Prove every stored secret still opens with the configured keyrings before
+	// serving anything: a missing historical key ID must stop the start, not
+	// surface when someone uses the channel, API key or order.
+	checkContext, cancelCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	checked, err := keyringcheck.Verify(checkContext,
+		keyringcheck.Sources{Channels: store.Channels, APIKeys: store.Keys, C2COrders: store.C2C},
+		keyringcheck.Keyrings{Upstream: credentialKeyring, C2C: c2cKeyring})
+	cancelCheck()
+	if err != nil {
+		fatal(logger, "stored secrets cannot be decrypted with the configured keyrings", err)
+	}
+	logger.Info("stored secrets decrypted with the configured keyrings",
+		"channels", checked.Channels, "api_keys", checked.APIKeys, "c2c_orders", checked.C2COrders)
 	identityService, err := identity.NewService(store.Identity, 24*time.Hour)
 	if err != nil {
 		fatal(logger, "creating the identity service failed", err)

@@ -3,6 +3,7 @@ package observe
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"sort"
 	"strings"
@@ -58,10 +59,11 @@ type TrendInputs struct {
 
 // OverviewInputs are the call and C2C windows of the overview.
 type OverviewInputs struct {
-	Today, Last24h CallWindow
-	Failing        []FailingChannel
-	C2C            C2CCounts
-	C2C24h         C2CWindow
+	Today, Last24h    CallWindow
+	Failing           []FailingChannel
+	UnbilledConsumers []UnbilledConsumer
+	C2C               C2CCounts
+	C2C24h            C2CWindow
 }
 
 // SnapshotRequest says which parts to read, all inside one consistent snapshot.
@@ -623,8 +625,8 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	risks, concentration := risksOf(snapshot, now)
 	data := OverviewData{
 		Today: snapshot.Overview.Today, Last24h: snapshot.Overview.Last24h, Failing: snapshot.Overview.Failing,
-		C2C: snapshot.Overview.C2C, C2C24h: snapshot.Overview.C2C24h, Balances: snapshot.Balances, Checks: snapshot.Checks,
-		Risks: risks, Concentration: concentration,
+		UnbilledConsumers: snapshot.Overview.UnbilledConsumers, C2C: snapshot.Overview.C2C, C2C24h: snapshot.Overview.C2C24h,
+		Balances: snapshot.Balances, Checks: snapshot.Checks, Risks: risks, Concentration: concentration,
 	}
 	return Overview{Attention: attention(data), OverviewData: data}, nil
 }
@@ -664,6 +666,7 @@ func attention(data OverviewData) []AttentionItem {
 		items = append(items, AttentionItem{AttentionUnbilled, "warning",
 			fmt.Sprintf("24 小时内 %d 次成功调用读不到用量，未计费", data.Last24h.Unbilled), int(data.Last24h.Unbilled), "/admin/calls?outcome=succeeded_unbilled"})
 	}
+	items = append(items, unbilledConsumerItems(data.UnbilledConsumers)...)
 	if !data.Checks.ZeroSumOK {
 		items = append(items, AttentionItem{AttentionUnbalanced, "critical", "账户余额合计不为 0", 1, "/admin/points"})
 	}
@@ -696,6 +699,62 @@ func unbilledAbnormal(window CallWindow) bool {
 		return true
 	}
 	return window.Succeeded >= 20 && window.Unbilled*20 > window.Succeeded
+}
+
+// Thresholds of the per-consumer unbilled-usage rule (Feature #348). An account
+// is flagged when, within UnbilledConsumerWindow, it has at least
+// UnbilledConsumerMinSucceeded successful calls and at least
+// UnbilledConsumerMinPercent percent of them were unbilled. At most
+// UnbilledConsumerMaxItems accounts are listed, most unbilled calls first.
+const (
+	UnbilledConsumerWindow       = 24 * time.Hour
+	UnbilledConsumerMinSucceeded = 20
+	UnbilledConsumerMinPercent   = 20
+	UnbilledConsumerMaxItems     = 5
+)
+
+// unbilledConsumerAbnormal applies the share threshold in integers, so that
+// exactly UnbilledConsumerMinPercent percent counts.
+func unbilledConsumerAbnormal(consumer UnbilledConsumer) bool {
+	return consumer.Succeeded >= UnbilledConsumerMinSucceeded &&
+		consumer.Unbilled*100 >= consumer.Succeeded*UnbilledConsumerMinPercent
+}
+
+// unbilledConsumerItems turns the consumers over the threshold into attention
+// items. The channel serving most of an account's unbilled calls is named so the
+// administrator can tell the consumer's request from the channel's upstream.
+func unbilledConsumerItems(consumers []UnbilledConsumer) []AttentionItem {
+	var flagged []UnbilledConsumer
+	for _, consumer := range consumers {
+		if unbilledConsumerAbnormal(consumer) {
+			flagged = append(flagged, consumer)
+		}
+	}
+	sort.SliceStable(flagged, func(i, j int) bool {
+		if flagged[i].Unbilled != flagged[j].Unbilled {
+			return flagged[i].Unbilled > flagged[j].Unbilled
+		}
+		return flagged[i].Account.ID < flagged[j].Account.ID
+	})
+	if len(flagged) > UnbilledConsumerMaxItems {
+		flagged = flagged[:UnbilledConsumerMaxItems]
+	}
+	items := make([]AttentionItem, 0, len(flagged))
+	for _, consumer := range flagged {
+		title := fmt.Sprintf("账户「%s」%d 小时内 %d 次成功调用中 %d 次未计费（%.0f%%）",
+			consumer.Account.DisplayName, int(UnbilledConsumerWindow.Hours()), consumer.Succeeded, consumer.Unbilled,
+			100*float64(consumer.Unbilled)/float64(consumer.Succeeded))
+		if channel := consumer.TopChannel; channel != nil {
+			if channel.Unbilled*2 > consumer.Unbilled {
+				title += fmt.Sprintf("，多数经渠道「%s」", channel.Name)
+			} else {
+				title += fmt.Sprintf("，最多经渠道「%s」", channel.Name)
+			}
+		}
+		link := "/admin/calls?" + url.Values{"account_id": {consumer.Account.ID}, "outcome": {OutcomeUnbilled}}.Encode()
+		items = append(items, AttentionItem{AttentionUnbilledUser, "warning", title, int(consumer.Unbilled), link})
+	}
+	return items
 }
 
 // Transactions browses the ledger transactions, newest first.

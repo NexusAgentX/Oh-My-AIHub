@@ -96,6 +96,14 @@ WHERE id = $1 AND deleted_at IS NULL;
 -- name: GetChannelCredential :one
 SELECT api_key_ciphertext, api_key_nonce, api_key_key_id FROM channels WHERE id = $1 AND deleted_at IS NULL;
 
+-- Sealed upstream keys of every undeleted channel (soft-deleted ones are never
+-- read again), paged by id for the startup keyring check.
+-- name: ListChannelCredentials :many
+SELECT id, api_key_ciphertext, api_key_nonce, api_key_key_id FROM channels
+WHERE deleted_at IS NULL AND (sqlc.narg(after_id)::uuid IS NULL OR id > sqlc.narg(after_id))
+ORDER BY id
+LIMIT sqlc.arg(row_limit);
+
 -- name: InsertChannelEvent :exec
 INSERT INTO channel_events (channel_id, kind, reason) VALUES ($1, $2, $3);
 
