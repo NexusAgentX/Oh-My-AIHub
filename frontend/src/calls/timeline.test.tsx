@@ -72,6 +72,23 @@ describe('attempt timeline segments', () => {
     }
   })
 
+  it('labels every end reason the gateway records', () => {
+    const labelOf = (end_reason: string) =>
+      renderToStaticMarkup(<AttemptTimeline attempts={[{ ...failed, end_reason }]} />)
+    const expected: Record<string, string> = {
+      upstream_error: '上游错误',
+      connect_error: '连接失败',
+      timeout_ttft: '首字超时',
+      timeout_total: '总超时',
+      client_error: '请求错误',
+      client_disconnected: '客户端断开',
+      interrupted: '中断',
+    }
+    for (const [reason, label] of Object.entries(expected)) {
+      expect(labelOf(reason)).toContain(`429 · ${label}</span>`)
+    }
+  })
+
   it('renders status code, raw upstream error and streaming metrics', () => {
     const call = {
       ttft_ms: 300,

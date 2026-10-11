@@ -279,7 +279,7 @@ func TestObserveUsageSpendAndRevenue(t *testing.T) {
 		t.Fatalf("usage = %v", byDay)
 	}
 	days := asList(t, byDay["items"])
-	today := time.Now().In(time.FixedZone("Asia/Shanghai", 8*3600)).Format("2006-01-02")
+	today := o.databaseNow().In(time.FixedZone("Asia/Shanghai", 8*3600)).Format("2006-01-02")
 	if len(days) != 30 || asMap(t, days[29])["key"] != today || asMap(t, days[29])["calls"] != float64(2) || asMap(t, days[0])["calls"] != float64(0) {
 		t.Fatalf("daily rows = %v", days)
 	}
@@ -325,13 +325,6 @@ func TestObserveUsageSpendAndRevenue(t *testing.T) {
 func TestObservePointsReconcileTrendAndEntries(t *testing.T) {
 	o := newObserved(t)
 	o.adjust(o.consumer, "5")
-	// The report's cutoff must follow the database timestamps of the fixture,
-	// even when PostgreSQL runs in a VM whose clock is slightly ahead of the host.
-	var reportAt time.Time
-	if err := o.pool.QueryRow(context.Background(), `SELECT clock_timestamp()`).Scan(&reportAt); err != nil {
-		t.Fatal(err)
-	}
-	o.observe.SetClock(func() time.Time { return reportAt })
 	points := o.get(o.consumer, "/api/points")
 	period := asMap(t, points["period"])
 	if period["difference"] != "0" || period["call_spend"] != "-0.08008" || period["adjustments"] != "5" || period["opening_balance"] != "0" || period["closing_balance"] != "4.91992" {

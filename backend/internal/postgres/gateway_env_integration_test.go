@@ -304,6 +304,11 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	// As in the server: editing a channel clears its 4xx anomaly figures.
 	cached.Cache.OnChannelEdited(e.engine.ChannelEdited)
 	e.observe = observe.NewService(store.Observe)
+	// Rows are stamped by the database's clock and the observation windows end
+	// at the service's "now". Keep both on the database's clock: with the host's,
+	// a PostgreSQL clock that runs a few milliseconds ahead (a container or VM
+	// on a laptop) puts the newest fixture rows after the end of the window.
+	e.observe.SetClock(e.databaseNow)
 	e.feed = observe.NewFeed(e.observe, bus, logger)
 	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
 	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
@@ -328,6 +333,18 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	e.handler = e.newHandler(e.engine)
 	e.admin = e.login(admin.Username, "Founder-password-2026", admin.ID, false)
 	return e
+}
+
+// databaseNow is the current time on the PostgreSQL server, the clock that
+// stamps created_at and completed_at. It stands in for the host's time.Now
+// wherever a test compares fixture rows with "now". Without a reachable
+// database it falls back to the host's clock: every other query fails too.
+func (e *env) databaseNow() time.Time {
+	var now time.Time
+	if err := e.pool.QueryRow(context.Background(), `SELECT clock_timestamp()`).Scan(&now); err != nil {
+		return time.Now()
+	}
+	return now
 }
 
 // restartGateway replaces the engine and the handler with new ones over the same
