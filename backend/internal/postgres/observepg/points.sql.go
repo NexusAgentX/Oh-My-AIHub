@@ -443,12 +443,53 @@ func (q *Queries) LedgerAPIDaily(ctx context.Context, arg LedgerAPIDailyParams) 
 	return items, nil
 }
 
+const ledgerAdjustmentDaily = `-- name: LedgerAdjustmentDaily :many
+SELECT to_char(e.created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')::text AS day,
+       sum(e.amount_nano)::bigint AS adjustment_nano
+FROM ledger_entries e
+JOIN ledger_transactions t ON t.id = e.transaction_id
+JOIN ledger_accounts l ON l.id = e.ledger_account_id
+WHERE t.type = 'admin_adjust' AND l.kind = 'user'
+  AND e.created_at >= $1::timestamptz AND e.created_at < $2::timestamptz
+GROUP BY 1
+`
+
+type LedgerAdjustmentDailyParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type LedgerAdjustmentDailyRow struct {
+	Day            string
+	AdjustmentNano int64
+}
+
+func (q *Queries) LedgerAdjustmentDaily(ctx context.Context, arg LedgerAdjustmentDailyParams) ([]LedgerAdjustmentDailyRow, error) {
+	rows, err := q.db.Query(ctx, ledgerAdjustmentDaily, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LedgerAdjustmentDailyRow
+	for rows.Next() {
+		var i LedgerAdjustmentDailyRow
+		if err := rows.Scan(&i.Day, &i.AdjustmentNano); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ledgerBalances = `-- name: LedgerBalances :one
 
 SELECT coalesce(sum(l.balance_nano) FILTER (WHERE l.kind = 'user' AND l.balance_nano > 0), 0)::bigint AS user_positive_nano,
        coalesce(sum(l.balance_nano) FILTER (WHERE l.kind = 'user' AND l.balance_nano < 0), 0)::bigint AS user_negative_nano,
        coalesce(sum(l.balance_nano) FILTER (WHERE l.system_code = 'c2c_escrow'), 0)::bigint AS escrow_nano,
-       coalesce(sum(l.balance_nano) FILTER (WHERE l.system_code = 'platform_revenue'), 0)::bigint AS platform_revenue_nano,
+       coalesce(sum(l.balance_nano) FILTER (WHERE l.system_code = 'platform_revenue'), 0)::bigint AS platform_account_nano,
        coalesce(sum(l.balance_nano) FILTER (WHERE l.system_code = 'bad_debt'), 0)::bigint AS bad_debt_nano,
        coalesce(sum(l.balance_nano), 0)::bigint AS total_nano
 FROM ledger_accounts l
@@ -458,7 +499,7 @@ type LedgerBalancesRow struct {
 	UserPositiveNano    int64
 	UserNegativeNano    int64
 	EscrowNano          int64
-	PlatformRevenueNano int64
+	PlatformAccountNano int64
 	BadDebtNano         int64
 	TotalNano           int64
 }
@@ -471,7 +512,7 @@ func (q *Queries) LedgerBalances(ctx context.Context) (LedgerBalancesRow, error)
 		&i.UserPositiveNano,
 		&i.UserNegativeNano,
 		&i.EscrowNano,
-		&i.PlatformRevenueNano,
+		&i.PlatformAccountNano,
 		&i.BadDebtNano,
 		&i.TotalNano,
 	)
@@ -930,6 +971,31 @@ func (q *Queries) NegativeAccounts(ctx context.Context) ([]NegativeAccountsRow, 
 		return nil, err
 	}
 	return items, nil
+}
+
+const platformFlows = `-- name: PlatformFlows :one
+SELECT coalesce(sum(e.amount_nano) FILTER (WHERE t.type = 'api_call' AND l.system_code = 'platform_revenue'), 0)::bigint AS fee_nano,
+       coalesce(sum(e.amount_nano) FILTER (WHERE t.type = 'admin_adjust' AND l.kind = 'user'), 0)::bigint AS adjustment_nano
+FROM ledger_entries e
+JOIN ledger_transactions t ON t.id = e.transaction_id
+JOIN ledger_accounts l ON l.id = e.ledger_account_id
+WHERE t.type IN ('api_call', 'admin_adjust')
+  AND ($1::timestamptz IS NULL OR e.created_at < $1)
+`
+
+type PlatformFlowsRow struct {
+	FeeNano        int64
+	AdjustmentNano int64
+}
+
+// 平台收入只算手续费：api_call 交易中记入平台账户的分录。管理员调账（admin_adjust）单列，
+// 取它对用户账户的净额，正数表示平台向用户发放。平台账户余额 = 手续费 − 调账净额，
+// 只在天平等式等核对视图中出现。before 为空表示累计到现在。
+func (q *Queries) PlatformFlows(ctx context.Context, before *time.Time) (PlatformFlowsRow, error) {
+	row := q.db.QueryRow(ctx, platformFlows, before)
+	var i PlatformFlowsRow
+	err := row.Scan(&i.FeeNano, &i.AdjustmentNano)
+	return i, err
 }
 
 const topHolders = `-- name: TopHolders :many

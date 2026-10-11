@@ -174,7 +174,9 @@ func (s *fakeObserveStore) Snapshot(_ context.Context, request observe.SnapshotR
 	snapshot := observe.Snapshot{
 		Balances: observe.Balances{
 			UserPositive: money.FromNano(50_000_000_000), UserNegative: money.FromNano(-200_000_000_000), Escrow: money.FromNano(10_000_000_000),
-			PlatformRevenue: money.FromNano(5_000_000_000), BadDebt: money.FromNano(1_000_000_000), TotalCreditLimit: money.FromNano(100_000_000_000),
+			// The platform account is the fees minus the administrator adjustments.
+			PlatformAccount: money.FromNano(5_000_000_000), PlatformRevenue: money.FromNano(8_000_000_000), AdminAdjustments: money.FromNano(3_000_000_000),
+			BadDebt: money.FromNano(1_000_000_000), TotalCreditLimit: money.FromNano(100_000_000_000),
 			WriteOffs: 1, EscrowOrders: 2, EscrowTradesInProgress: 1,
 		},
 		Checks: observe.Checks{
@@ -208,8 +210,10 @@ func (s *fakeObserveStore) Snapshot(_ context.Context, request observe.SnapshotR
 				{ID: "r", Kind: "system", SystemCode: "platform_revenue", Balance: money.FromNano(2_000_000_000)},
 				{ID: "b", Kind: "system", SystemCode: "bad_debt", Balance: money.FromNano(1_000_000_000)},
 			},
-			Nets:     map[string]map[string]money.Amount{"u1": {day: money.FromNano(1_000_000_000)}},
-			APIDaily: map[string]struct{ Volume, Fee money.Amount }{day: {Volume: money.FromNano(8_000_000_000), Fee: money.FromNano(80_000_000)}},
+			Nets:       map[string]map[string]money.Amount{"u1": {day: money.FromNano(1_000_000_000)}},
+			APIDaily:   map[string]struct{ Volume, Fee money.Amount }{day: {Volume: money.FromNano(8_000_000_000), Fee: money.FromNano(80_000_000)}},
+			OpeningFee: money.FromNano(1_000_000_000), OpeningAdjustments: money.FromNano(2_000_000_000),
+			AdjustmentDaily: map[string]money.Amount{day: money.FromNano(1_000_000_000)},
 			C2CDaily: map[string]struct {
 				Volume   money.Amount
 				TotalFen int64

@@ -7,9 +7,9 @@ import { adminNavigation, adminTabCount, findAdminNavItem } from './navigation'
 import { formatLastActive } from './format'
 import { segments } from './LineChart'
 import { AttentionList, Indicators, attentionMeta } from './OverviewPage'
-import { LedgerEquation, riskColumns, trendGroups } from './PointsPage'
+import { Figures, LedgerEquation, riskColumns, trendGroups } from './PointsPage'
 import { ledgerChecks, ledgerEquation } from './pointsView'
-import { PriceSnapshotView, TransactionDetail, pricingNotes } from './transactions'
+import { PriceSnapshotView, TransactionDetail, ledgerAccountLabel, pricingNotes } from './transactions'
 import type { AdminOverview, AdminPoints, AdminPointsBalances, LedgerChecks, LedgerTransaction } from './types'
 
 const balances: AdminPointsBalances = {
@@ -17,7 +17,10 @@ const balances: AdminPointsBalances = {
   user_negative: '-60.03',
   credit_issued: '500',
   c2c_escrow: '30',
-  platform_revenue: '0.03',
+  // 平台收入只是手续费；调账另列。平台账户余额 = 手续费 − 调账净额，只用于天平等式。
+  platform_revenue: '10.03',
+  admin_adjustments: '10',
+  platform_account: '0.03',
   bad_debt: '-100.5',
   total: '0',
   total_credit_limit: '800',
@@ -36,23 +39,29 @@ describe('ledger equation', () => {
     const equation = ledgerEquation(balances)
     expect(sides(equation)).toEqual({
       left: [['信用发行', '60.03'], ['坏账', '100.5']],
-      right: [['流通积分', '130.5'], ['C2C 托管', '30'], ['平台收入', '0.03']],
+      right: [['流通积分', '130.5'], ['C2C 托管', '30'], ['平台账户', '0.03']],
     })
     expect(equation.balanced).toBe(true)
   })
 
-  it('moves negative platform revenue to the left as net spending', () => {
-    const equation = ledgerEquation({ ...balances, user_positive: '200.5', platform_revenue: '-70' })
+  it('moves a negative platform account to the left as net spending', () => {
+    const equation = ledgerEquation({ ...balances, user_positive: '200.5', admin_adjustments: '80.03', platform_account: '-70' })
     expect(sides(equation)).toEqual({
-      left: [['信用发行', '60.03'], ['坏账', '100.5'], ['平台收入', '70']],
+      left: [['信用发行', '60.03'], ['坏账', '100.5'], ['平台账户', '70']],
       right: [['流通积分', '200.5'], ['C2C 托管', '30']],
     })
     expect(equation.left[2].note).toBe('净支出')
   })
 
+  it('never labels the platform account balance as platform revenue', () => {
+    const equation = ledgerEquation(balances)
+    expect([...equation.left, ...equation.right].some((term) => term.label === '平台收入')).toBe(false)
+    expect(ledgerAccountLabel({ kind: 'system', system_code: 'platform_revenue', account: null })).toBe('平台账户')
+  })
+
   it('renders both sides with a balanced mark', () => {
     const markup = renderToStaticMarkup(<LedgerEquation balances={balances} />)
-    for (const text of ['信用发行', '60.03', '坏账', '流通积分', '130.50', 'C2C 托管', '平台收入', '=', '✓ 平衡']) {
+    for (const text of ['信用发行', '60.03', '坏账', '流通积分', '130.50', 'C2C 托管', '平台账户', '=', '✓ 平衡']) {
       expect(markup).toContain(text)
     }
   })
@@ -122,6 +131,22 @@ const failingChecks: LedgerChecks = {
 }
 
 describe('admin points views', () => {
+  it('shows platform revenue as the fees only and the administrator adjustments apart', () => {
+    const points: AdminPoints = {
+      balances,
+      check: { balanced: true, total: '0', checked_at: '2026-10-08T00:00:00Z' },
+      checks: passingChecks,
+      trend: [],
+      risks: [],
+      concentration: { top5_share: null, top: [] },
+    }
+    const markup = renderToStaticMarkup(<Figures points={points} />)
+    expect(markup).toMatch(/平台收入<\/[^>]+>\s*<strong[^>]*>10\.03</)
+    expect(markup).toMatch(/管理员调账净额<\/[^>]+>\s*<strong[^>]*>10\.00</)
+    expect(markup).toContain('累计手续费')
+    expect(markup).not.toMatch(/平台收入<\/[^>]+>\s*<strong[^>]*>0\.03</)
+  })
+
   it('offers credit issued, API settlement and C2C trend series', () => {
     expect(Object.values(trendGroups).flatMap((group) => group.series.map((item) => item.label))).toEqual([
       '流通',
@@ -129,6 +154,7 @@ describe('admin points views', () => {
       'C2C 托管',
       '平台收入',
       '坏账',
+      '管理员调账净额',
       'API 结算量',
       '手续费',
       'C2C 成交量',
@@ -139,6 +165,7 @@ describe('admin points views', () => {
       circulation: '100',
       credit_issued: '60',
       platform_revenue: '0.03',
+      admin_adjustments: '5',
       bad_debt: '0',
       c2c_escrow: '30',
       api_volume: '30.03',

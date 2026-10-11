@@ -455,6 +455,111 @@ func TestObserveAdminPointsChecksPassOnHealthyData(t *testing.T) {
 	}
 }
 
+// ledgerLine is one entry of a backdated transaction: a user account id or a system code.
+type ledgerLine struct {
+	account string
+	system  string
+	nano    int64
+}
+
+// backdate books a balanced transaction as if it happened earlier, keeping the
+// stored balances equal to the entries so that the reconciliation still passes.
+// (balance_after of the entries is not chained; no check reads it.)
+func (o *observed) backdate(age time.Duration, kind string, lines []ledgerLine) {
+	o.t.Helper()
+	ctx := context.Background()
+	tx, err := o.pool.Begin(ctx)
+	if err != nil {
+		o.t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var id string
+	if err := tx.QueryRow(ctx, `INSERT INTO ledger_transactions (type, idempotency_key, created_at) VALUES ($1, 'backdated:' || gen_random_uuid()::text, now() - $2 * interval '1 microsecond') RETURNING id`,
+		kind, age.Microseconds()).Scan(&id); err != nil {
+		o.t.Fatal(err)
+	}
+	for _, line := range lines {
+		var ledgerID string
+		if err := tx.QueryRow(ctx, `UPDATE ledger_accounts SET balance_nano = balance_nano + $3 WHERE account_id = NULLIF($1, '')::uuid OR system_code = NULLIF($2, '') RETURNING id`,
+			line.account, line.system, line.nano).Scan(&ledgerID); err != nil {
+			o.t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_nano, balance_after_nano, created_at)
+			VALUES ($1, $2, $3, $3, now() - $4 * interval '1 microsecond')`, id, ledgerID, line.nano, age.Microseconds()); err != nil {
+			o.t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		o.t.Fatal(err)
+	}
+}
+
+// Administrator adjustments use the platform account as counterparty, so the
+// account balance is fees minus adjustments. Platform revenue must stay the
+// fees alone and the adjustments are listed apart, in the report and in the
+// metrics, while every reconciliation still passes.
+func TestObservePlatformRevenueIsFeesOnlyAndAdjustmentsAreListedApart(t *testing.T) {
+	o := newObserved(t) // two billed calls: 0.00008 of fees
+	// History before every window of the report: 0.02 of fees and 9 issued.
+	o.backdate(40*24*time.Hour, "api_call", []ledgerLine{{o.consumer.id, "", -2_020_000_000}, {o.sharer.id, "", 2_000_000_000}, {"", "platform_revenue", 20_000_000}})
+	o.backdate(40*24*time.Hour, "admin_adjust", []ledgerLine{{o.outsider.id, "", 9_000_000_000}, {"", "platform_revenue", -9_000_000_000}})
+	o.adjust(o.consumer, "5")
+	o.adjust(o.sharer, "20")
+	o.adjust(o.consumer, "-2") // taken back
+	o.adjust(o.outsider, "1")
+
+	report := o.get(o.admin, "/api/admin/points")
+	balances := asMap(t, report["balances"])
+	if balances["platform_revenue"] != "0.02008" || balances["admin_adjustments"] != "33" || balances["platform_account"] != "-32.97992" || balances["total"] != "0" {
+		t.Fatalf("balances = %v", balances)
+	}
+	if got := o.systemBalance("platform_revenue"); got != "-32979920000" {
+		t.Fatalf("platform account nano = %s", got)
+	}
+	if checks := asMap(t, report["checks"]); checks["all_passed"] != true || asMap(t, report["check"])["balanced"] != true {
+		t.Fatalf("checks = %v", checks)
+	}
+
+	// The trend is cumulative: a window that opens after the history starts from it, a window
+	// that contains it counts it on its day, and an earlier window starts from nothing.
+	for days, want := range map[string][2]string{"7": {"0.02", "9"}, "30": {"0.02", "9"}, "90": {"0", "0"}} {
+		trend := asList(t, o.get(o.admin, "/api/admin/points?days="+days)["trend"])
+		first, last := asMap(t, trend[0]), asMap(t, trend[len(trend)-1])
+		if first["platform_revenue"] != want[0] || first["admin_adjustments"] != want[1] || last["platform_revenue"] != "0.02008" || last["admin_adjustments"] != "33" || last["api_fee"] != "0.00008" {
+			t.Fatalf("days=%s first %v last %v", days, first, last)
+		}
+	}
+	history := asMap(t, asList(t, o.get(o.admin, "/api/admin/points?days=90")["trend"])[90-41])
+	if history["platform_revenue"] != "0.02" || history["admin_adjustments"] != "9" || history["api_fee"] != "0.02" {
+		t.Fatalf("history day = %v", history)
+	}
+
+	// Taking everything back leaves the revenue untouched.
+	o.adjust(o.sharer, "-20")
+	o.adjust(o.outsider, "-1")
+	o.adjust(o.consumer, "-3")
+	o.backdate(40*24*time.Hour, "admin_adjust", []ledgerLine{{o.outsider.id, "", -9_000_000_000}, {"", "platform_revenue", 9_000_000_000}})
+	balances = asMap(t, o.get(o.admin, "/api/admin/points")["balances"])
+	if balances["platform_revenue"] != "0.02008" || balances["admin_adjustments"] != "0" || balances["platform_account"] != "0.02008" {
+		t.Fatalf("balances after taking everything back = %v", balances)
+	}
+
+	o.adjust(o.sharer, "7")
+	time.Sleep(300 * time.Millisecond) // the feed handles events asynchronously
+	if err := o.metrics.Refresh(context.Background(), o.observe); err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	o.metrics.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := recorder.Body.String()
+	for _, want := range []string{`aihub_points_platform_revenue 0.02008`, `aihub_points_admin_adjustments 7`, `aihub_ledger_imbalance 0`, `aihub_reconciliation_failed{check="zero_sum"} 0`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics lack %q", want)
+		}
+	}
+	o.assertZeroSum()
+}
+
 // breakLedger runs an SQL statement that makes the books inconsistent on
 // purpose. The immutability triggers guard entries and transactions, but the
 // derived columns can be tampered with, which is what the checks must catch.
@@ -1019,6 +1124,7 @@ func TestObserveMetricsExposeCoreSeriesWithoutUserLabels(t *testing.T) {
 		`aihub_points_circulating 0`,
 		`aihub_points_credit_issued 0.08008`,
 		`aihub_points_platform_revenue 8e-05`,
+		`aihub_points_admin_adjustments 0`,
 		`aihub_ledger_imbalance 0`,
 		`aihub_ledger_transactions_total{type="api_call"} 2`,
 		`aihub_reconciliation_failed{check="zero_sum"} 0`,

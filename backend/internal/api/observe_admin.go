@@ -97,6 +97,8 @@ type adminPointsBalancesJSON struct {
 	CreditIssued           string `json:"credit_issued"`
 	C2CEscrow              string `json:"c2c_escrow"`
 	PlatformRevenue        string `json:"platform_revenue"`
+	AdminAdjustments       string `json:"admin_adjustments"`
+	PlatformAccount        string `json:"platform_account"`
 	BadDebt                string `json:"bad_debt"`
 	Total                  string `json:"total"`
 	TotalCreditLimit       string `json:"total_credit_limit"`
@@ -107,16 +109,17 @@ type adminPointsBalancesJSON struct {
 
 // adminPointsTrendJSON is one trend element of the OpenAPI AdminPoints schema.
 type adminPointsTrendJSON struct {
-	Date            string   `json:"date"`
-	Circulation     string   `json:"circulation"`
-	CreditIssued    string   `json:"credit_issued"`
-	PlatformRevenue string   `json:"platform_revenue"`
-	BadDebt         string   `json:"bad_debt"`
-	C2CEscrow       string   `json:"c2c_escrow"`
-	APIVolume       string   `json:"api_volume"`
-	APIFee          string   `json:"api_fee"`
-	C2CVolume       string   `json:"c2c_volume"`
-	C2CAvgPriceFen  *float64 `json:"c2c_avg_price_fen"`
+	Date             string   `json:"date"`
+	Circulation      string   `json:"circulation"`
+	CreditIssued     string   `json:"credit_issued"`
+	PlatformRevenue  string   `json:"platform_revenue"`
+	AdminAdjustments string   `json:"admin_adjustments"`
+	BadDebt          string   `json:"bad_debt"`
+	C2CEscrow        string   `json:"c2c_escrow"`
+	APIVolume        string   `json:"api_volume"`
+	APIFee           string   `json:"api_fee"`
+	C2CVolume        string   `json:"c2c_volume"`
+	C2CAvgPriceFen   *float64 `json:"c2c_avg_price_fen"`
 }
 
 // adminPointsRiskJSON is the OpenAPI AdminPointsRisk schema.
@@ -301,6 +304,8 @@ func newAdminPointsBalancesJSON(balances observe.Balances) adminPointsBalancesJS
 		CreditIssued:           balances.CreditIssued().String(),
 		C2CEscrow:              balances.Escrow.String(),
 		PlatformRevenue:        balances.PlatformRevenue.String(),
+		AdminAdjustments:       balances.AdminAdjustments.String(),
+		PlatformAccount:        balances.PlatformAccount.String(),
 		BadDebt:                balances.BadDebt.String(),
 		Total:                  balances.Total.String(),
 		TotalCreditLimit:       balances.TotalCreditLimit.String(),
@@ -314,16 +319,17 @@ func newAdminPointsJSON(report observe.AdminPointsReport) adminPointsJSON {
 	trend := make([]adminPointsTrendJSON, 0, len(report.Trend))
 	for _, day := range report.Trend {
 		trend = append(trend, adminPointsTrendJSON{
-			Date:            day.Day,
-			Circulation:     day.Circulation.String(),
-			CreditIssued:    day.CreditIssued.String(),
-			PlatformRevenue: day.PlatformRevenue.String(),
-			BadDebt:         day.BadDebt.String(),
-			C2CEscrow:       day.Escrow.String(),
-			APIVolume:       day.APIVolume.String(),
-			APIFee:          day.APIFee.String(),
-			C2CVolume:       day.C2CVolume.String(),
-			C2CAvgPriceFen:  day.C2CAvgPriceFen,
+			Date:             day.Day,
+			Circulation:      day.Circulation.String(),
+			CreditIssued:     day.CreditIssued.String(),
+			PlatformRevenue:  day.PlatformRevenue.String(),
+			AdminAdjustments: day.AdminAdjustments.String(),
+			BadDebt:          day.BadDebt.String(),
+			C2CEscrow:        day.Escrow.String(),
+			APIVolume:        day.APIVolume.String(),
+			APIFee:           day.APIFee.String(),
+			C2CVolume:        day.C2CVolume.String(),
+			C2CAvgPriceFen:   day.C2CAvgPriceFen,
 		})
 	}
 	risks := make([]adminPointsRiskJSON, 0, len(report.Risks))

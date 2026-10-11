@@ -186,6 +186,16 @@ func TestCallObservationReports(t *testing.T) {
 	if len(points["risks"].([]any)) != 2 || len(points["trend"].([]any)) != 7 || points["checks"].(map[string]any)["all_passed"] != false {
 		t.Fatalf("admin points = %v", points)
 	}
+	// Platform revenue is the fees only; administrator adjustments are listed apart and the
+	// platform account balance (fees minus adjustments) is kept for the balance equation.
+	balances := points["balances"].(map[string]any)
+	if balances["platform_revenue"] != "8" || balances["admin_adjustments"] != "3" || balances["platform_account"] != "5" {
+		t.Fatalf("admin points balances = %v", balances)
+	}
+	trend := points["trend"].([]any)
+	if last := trend[len(trend)-1].(map[string]any); last["platform_revenue"] != "1.08" || last["admin_adjustments"] != "3" || trend[0].(map[string]any)["platform_revenue"] != "1" {
+		t.Fatalf("admin points trend = %v", trend)
+	}
 	if recorder := admin.call(t, http.MethodGet, "/api/admin/points?days=5", nil); recorder.Code != http.StatusBadRequest {
 		t.Fatalf("admin points days = %d", recorder.Code)
 	}
