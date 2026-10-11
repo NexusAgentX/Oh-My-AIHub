@@ -16,7 +16,7 @@
 1. `git clone` 并检出目标发布提交。
 2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id（具体要求见 `README.md` 的“Docker Compose 运行”）。
 3. `mise install && mise run install`。
-4. `mise run up` 启动安全栈：一次性 migration 容器先执行迁移，后端启动时校验两组密钥环格式与出站配置。
+4. `mise run up` 启动安全栈：一次性 migration 容器先执行迁移，后端启动时校验两组密钥环格式与出站配置，并逐条解密数据库里全部存量密文；密钥环缺少仍被引用的 key id 或存在损坏的密文时后端拒绝启动，日志（`docker compose logs backend`）列出记录类型与 ID。新库没有密文，直接通过。
 5. 浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员。
 6. 管理员登录后完成首次改密，再按需创建受邀账户。
 
@@ -29,7 +29,7 @@
 
 1. 确认目标提交在 `main` 上的 CI 已通过。
 2. 执行一次数据库备份（见备份恢复 Runbook）。
-3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。
+3. 拉取新提交并 `mise run up` 重建变更容器；迁移随启动自动执行。升级前确认两组密钥环仍含全部历史 key id：后端启动时会解密全部存量密文，缺失则无法启动（升级到首个带此检查的版本时尤其如此，此前缺失的密钥不会被发现）。
 4. 升级后烟测同上；核对未通过时按故障处理 Runbook 处置并保留现场。
 
 ## 生产部署（ai.isok.dev）

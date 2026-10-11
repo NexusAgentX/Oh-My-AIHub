@@ -47,6 +47,15 @@ WHERE o.seller_id = sqlc.arg(seller_id)
 ORDER BY o.created_at DESC, o.id DESC
 LIMIT sqlc.arg(row_limit);
 
+-- Sealed payment methods of every order, whatever its status: sellers list
+-- closed and filled orders, and sellers and administrators open the trades of
+-- finished orders. Paged by id for the startup keyring check.
+-- name: ListOrderMethods :many
+SELECT id, payment_methods_ciphertext, payment_methods_nonce, payment_methods_key_id FROM c2c_orders
+WHERE (sqlc.narg(after_id)::uuid IS NULL OR id > sqlc.narg(after_id))
+ORDER BY id
+LIMIT sqlc.arg(row_limit);
+
 -- name: OrderIDOfTrade :one
 SELECT order_id FROM c2c_trades WHERE id = $1;
 

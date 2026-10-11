@@ -374,6 +374,52 @@ func (q *Queries) ListAdminChannels(ctx context.Context, arg ListAdminChannelsPa
 	return items, nil
 }
 
+const listChannelCredentials = `-- name: ListChannelCredentials :many
+SELECT id, api_key_ciphertext, api_key_nonce, api_key_key_id FROM channels
+WHERE deleted_at IS NULL AND ($1::uuid IS NULL OR id > $1)
+ORDER BY id
+LIMIT $2
+`
+
+type ListChannelCredentialsParams struct {
+	AfterID  *string
+	RowLimit int32
+}
+
+type ListChannelCredentialsRow struct {
+	ID               string
+	ApiKeyCiphertext []byte
+	ApiKeyNonce      []byte
+	ApiKeyKeyID      string
+}
+
+// Sealed upstream keys of every undeleted channel (soft-deleted ones are never
+// read again), paged by id for the startup keyring check.
+func (q *Queries) ListChannelCredentials(ctx context.Context, arg ListChannelCredentialsParams) ([]ListChannelCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, listChannelCredentials, arg.AfterID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChannelCredentialsRow
+	for rows.Next() {
+		var i ListChannelCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApiKeyCiphertext,
+			&i.ApiKeyNonce,
+			&i.ApiKeyKeyID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChannelEvents = `-- name: ListChannelEvents :many
 SELECT id, kind, reason, created_at FROM channel_events WHERE channel_id = $1 ORDER BY id DESC LIMIT $2
 `

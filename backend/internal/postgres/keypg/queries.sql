@@ -42,6 +42,14 @@ DELETE FROM route_prefs WHERE api_key_id = $1;
 -- name: GetKeyCredential :one
 SELECT key_ciphertext, key_nonce, key_key_id FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL;
 
+-- Sealed platform keys of every undeleted API key, whatever its status, paged
+-- by id for the startup keyring check.
+-- name: ListKeyCredentials :many
+SELECT id, key_ciphertext, key_nonce, key_key_id FROM api_keys
+WHERE deleted_at IS NULL AND (sqlc.narg(after_id)::uuid IS NULL OR id > sqlc.narg(after_id))
+ORDER BY id
+LIMIT sqlc.arg(row_limit);
+
 -- name: KeySpend :many
 SELECT api_key_id,
        coalesce(sum(cost_nano + fee_nano) FILTER (WHERE created_at >= sqlc.arg(day_start)), 0)::bigint AS today_nano,

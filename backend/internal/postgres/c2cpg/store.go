@@ -322,6 +322,24 @@ func (s *Store) DueTrades(ctx context.Context, limit int) ([]string, error) {
 	return s.q.ListDueTrades(ctx, int32(limit))
 }
 
+// OrderMethodsAfter pages the sealed payment methods of every order, whatever
+// its status, in id order (an empty afterID starts at the first) for the
+// startup keyring check.
+func (s *Store) OrderMethodsAfter(ctx context.Context, afterID string, limit int) ([]c2c.StoredMethods, error) {
+	rows, err := s.q.ListOrderMethods(ctx, ListOrderMethodsParams{AfterID: pgkit.After(afterID), RowLimit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	stored := make([]c2c.StoredMethods, 0, len(rows))
+	for _, row := range rows {
+		stored = append(stored, c2c.StoredMethods{
+			OrderID: row.ID,
+			Sealed:  c2c.EncryptedValue{KeyID: row.PaymentMethodsKeyID, Nonce: row.PaymentMethodsNonce, Ciphertext: row.PaymentMethodsCiphertext},
+		})
+	}
+	return stored, nil
+}
+
 // lockedTrade takes the order lock before the trade lock, then reloads both.
 func lockedTrade(ctx context.Context, q *Queries, tradeID string) (c2c.Order, c2c.Trade, error) {
 	orderID, err := q.OrderIDOfTrade(ctx, tradeID)

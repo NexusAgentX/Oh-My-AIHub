@@ -16,7 +16,7 @@
 | 组成 | 位置 | 职责 |
 | --- | --- | --- |
 | 前端 | `frontend/` | React 单页应用；`nginx.conf` 提供静态资源并反向代理 |
-| 后端 | `backend/cmd/server` | 组装依赖、启动时校验密钥环与出站配置、运行后台任务 |
+| 后端 | `backend/cmd/server` | 组装依赖、启动时校验密钥环与出站配置并解密全部存量密文、运行后台任务 |
 | 迁移 | `backend/cmd/migrate`、`backend/internal/database/migrations/` | Goose 嵌入式编号迁移，已发布迁移只追加 |
 | API 契约 | `backend/api/openapi.yaml` | OpenAPI 3.1，前后端唯一契约（ADR-0021） |
 | 编排与工具 | `compose.yaml`、`mise.toml` | 数据库、一次性迁移、后端、前端；工具版本与常用任务 |
@@ -47,6 +47,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `gateway` | 透明网关（ADR-0027）：请求体扫描与 `model` 替换、旁路用量解析、候选排序、进程内渠道状态、事件总线 |
 | `observe`、`metrics` | 现算观测、对账核对与补记、SSE 推送；Prometheus 指标（ADR-0029） |
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
+| `keyringcheck` | 启动时逐条解密仍可能被读取的密文（未删除渠道与平台 API Key、全部 C2C 卖单），缺失或损坏的密钥拒绝启动；读取接口由各 `<domain>pg` 实现 |
 | `forum` | 板块、主题、回复、工单与附件校验（ADR-0031） |
 | `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据泄露检测 |
 
