@@ -31,7 +31,7 @@ export function TransactionTypeLabel({ type }: { type: TransactionType }) {
 }
 
 const systemLabels: Record<string, string> = {
-  platform_revenue: '平台收入',
+  platform_revenue: '平台账户',
   c2c_escrow: 'C2C 托管',
   bad_debt: '坏账',
 }

@@ -280,7 +280,8 @@ var (
 	descCirculating = prometheus.NewDesc("aihub_points_circulating", "Points held in positive user balances.", nil, nil)
 	descCredit      = prometheus.NewDesc("aihub_points_credit_issued", "Credit in use: absolute sum of negative user balances.", nil, nil)
 	descEscrow      = prometheus.NewDesc("aihub_points_escrow", "Points in the C2C escrow account.", nil, nil)
-	descRevenue     = prometheus.NewDesc("aihub_points_platform_revenue", "Points in the platform revenue account.", nil, nil)
+	descRevenue     = prometheus.NewDesc("aihub_points_platform_revenue", "Platform revenue: cumulative fees booked by api_call transactions. Excludes administrator adjustments (see aihub_points_admin_adjustments).", nil, nil)
+	descAdjustments = prometheus.NewDesc("aihub_points_admin_adjustments", "Net points issued to users by administrator adjustments (positive: platform issued to users, negative: taken back). Not part of platform revenue.", nil, nil)
 	descBadDebt     = prometheus.NewDesc("aihub_points_bad_debt", "Points in the bad debt account (negative: written off).", nil, nil)
 	descImbalance   = prometheus.NewDesc("aihub_ledger_imbalance", "Sum of all ledger balances; always 0 when the books balance.", nil, nil)
 	descLedgerTx    = prometheus.NewDesc("aihub_ledger_transactions_total", "Ledger transactions booked, by type.", []string{"type"}, nil)
@@ -290,7 +291,7 @@ var (
 )
 
 func (c *snapshotCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, desc := range []*prometheus.Desc{descCirculating, descCredit, descEscrow, descRevenue, descBadDebt, descImbalance, descLedgerTx, descLedgerSum, descReconFailed, descChannelUp} {
+	for _, desc := range []*prometheus.Desc{descCirculating, descCredit, descEscrow, descRevenue, descAdjustments, descBadDebt, descImbalance, descLedgerTx, descLedgerSum, descReconFailed, descChannelUp} {
 		ch <- desc
 	}
 }
@@ -311,6 +312,7 @@ func (c *snapshotCollector) Collect(ch chan<- prometheus.Metric) {
 	gauge(descCredit, points(balances.CreditIssued()))
 	gauge(descEscrow, points(balances.Escrow))
 	gauge(descRevenue, points(balances.PlatformRevenue))
+	gauge(descAdjustments, points(balances.AdminAdjustments))
 	gauge(descBadDebt, points(balances.BadDebt))
 	gauge(descImbalance, points(balances.Total))
 	for _, total := range snap.totals {

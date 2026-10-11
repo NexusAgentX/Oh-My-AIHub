@@ -543,9 +543,14 @@ func (s *Store) Snapshot(ctx context.Context, request observe.SnapshotRequest) (
 		if err != nil {
 			return err
 		}
+		flows, err := q.PlatformFlows(ctx, nil)
+		if err != nil {
+			return err
+		}
 		snapshot.Balances = observe.Balances{
 			UserPositive: money.FromNano(balances.UserPositiveNano), UserNegative: money.FromNano(balances.UserNegativeNano),
-			Escrow: money.FromNano(balances.EscrowNano), PlatformRevenue: money.FromNano(balances.PlatformRevenueNano),
+			Escrow: money.FromNano(balances.EscrowNano), PlatformAccount: money.FromNano(balances.PlatformAccountNano),
+			PlatformRevenue: money.FromNano(flows.FeeNano), AdminAdjustments: money.FromNano(flows.AdjustmentNano),
 			BadDebt: money.FromNano(balances.BadDebtNano), Total: money.FromNano(balances.TotalNano), TotalCreditLimit: money.FromNano(limit),
 			WriteOffs: writeOffs, EscrowOrders: escrow.Orders, EscrowTradesInProgress: escrow.TradesInProgress,
 		}
@@ -635,8 +640,9 @@ func checks(ctx context.Context, q *Queries, balances observe.Balances, now time
 
 func trendInputs(ctx context.Context, q *Queries, from, to time.Time) (observe.TrendInputs, error) {
 	inputs := observe.TrendInputs{
-		Nets:     map[string]map[string]money.Amount{},
-		APIDaily: map[string]struct{ Volume, Fee money.Amount }{},
+		Nets:            map[string]map[string]money.Amount{},
+		APIDaily:        map[string]struct{ Volume, Fee money.Amount }{},
+		AdjustmentDaily: map[string]money.Amount{},
 		C2CDaily: map[string]struct {
 			Volume   money.Amount
 			TotalFen int64
@@ -669,6 +675,18 @@ func trendInputs(ctx context.Context, q *Queries, from, to time.Time) (observe.T
 	}
 	for _, row := range api {
 		inputs.APIDaily[row.Day] = struct{ Volume, Fee money.Amount }{money.FromNano(row.VolumeNano), money.FromNano(row.FeeNano)}
+	}
+	opening, err := q.PlatformFlows(ctx, &from)
+	if err != nil {
+		return inputs, err
+	}
+	inputs.OpeningFee, inputs.OpeningAdjustments = money.FromNano(opening.FeeNano), money.FromNano(opening.AdjustmentNano)
+	adjustments, err := q.LedgerAdjustmentDaily(ctx, LedgerAdjustmentDailyParams{FromTime: from, ToTime: to})
+	if err != nil {
+		return inputs, err
+	}
+	for _, row := range adjustments {
+		inputs.AdjustmentDaily[row.Day] = money.FromNano(row.AdjustmentNano)
 	}
 	c2c, err := q.C2CDaily(ctx, C2CDailyParams{FromTime: from, ToTime: to})
 	if err != nil {

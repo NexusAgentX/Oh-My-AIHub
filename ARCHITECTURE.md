@@ -76,7 +76,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 ## 数据与不变量
 
 - **单位**：金额为 `bigint` 纳积分（1 积分 = 1e9），人民币为整数分，费率为纳比率，时间为 `timestamptz`（ADR-0006）。美元模型的价格以纳美元存储，汇率 `settings.usd_cny_rate_nano` 为纳单位；计费在用量总额上一次性乘倍率与换算率（`ledger.ChannelRate`：开汇率优惠为 1，否则为汇率）并向上取整，便宜优先排序比较「倍率 × 换算率」。
-- **账本**（ADR-0005、ADR-0025）：`ledgerpg.Post` 是唯一过账路径；幂等键唯一，重复提交返回原交易；按账本账户 id 升序加行锁；提交时由延迟约束触发器要求每笔交易至少两条分录且合计为 0；交易与分录不可修改、删除。系统账户为 `platform_revenue`、`c2c_escrow`、`bad_debt`。调用自己的渠道不产生账本交易（同一账户不能在一笔交易中出现两次），费用仍记在调用上，核对与补记排除这类调用。
+- **账本**（ADR-0005、ADR-0025）：`ledgerpg.Post` 是唯一过账路径；幂等键唯一，重复提交返回原交易；按账本账户 id 升序加行锁；提交时由延迟约束触发器要求每笔交易至少两条分录且合计为 0；交易与分录不可修改、删除。系统账户为 `platform_revenue`、`c2c_escrow`、`bad_debt`；`platform_revenue` 既收手续费，也是管理员调账的对手方，所以它的余额不等于平台收入（口径见 `PRODUCT.md`）。调用自己的渠道不产生账本交易（同一账户不能在一笔交易中出现两次），费用仍记在调用上，核对与补记排除这类调用。
 - **C2C 托管**：卖单满足 `total = available + in_trade + sold + closed`（数据库 CHECK），`c2c_escrow` 余额恒等于全部卖单 `available + in_trade` 之和；加锁顺序为订单 → 交易 → 账本账户；状态转换幂等。
 
 | 动作 | 过账 | 数量变化 |
@@ -93,6 +93,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 ## 可观测性
 
 - 一切观测现算自 `calls`、`ledger_*`、`c2c_*`，不存快照或历史表；需要一致状态的查询在同一 `REPEATABLE READ` 只读事务内完成。
+- 平台收入与调账净额也现算自分录：前者是 `api_call` 交易记入 `platform_revenue` 的分录之和，后者是 `admin_adjust` 交易对用户账户的净额；管理员积分页与指标 `aihub_points_platform_revenue`、`aihub_points_admin_adjustments` 用这两个口径，账户余额只用于天平等式。
 - 五项核对：全部余额合计为 0；每个账户余额等于分录合计；托管余额等于卖单 `available + in_trade`；每个应计费的成功调用都已记账；每笔放行交易都已记账。管理员可对漏记调用补记或作废，与正常记账使用同一幂等键。
 - `observe.Feed` 订阅网关事件总线，向 SSE 订阅者与 Prometheus 扇出；慢订阅者丢消息而不阻塞网关。指标不带用户或 Key 标签，端口只在内网。
 
