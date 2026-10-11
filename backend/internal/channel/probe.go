@@ -32,6 +32,7 @@ const (
 	maxTestCombos   = 200
 	errorTextLimit  = 200
 	probeAnthropicV = "2023-06-01"
+	probeMaxPages   = 20
 )
 
 // Discover reads the upstream model lists and matches them with the catalog.
@@ -57,12 +58,14 @@ func (s *Service) Discover(ctx context.Context, baseURL, apiKey string) (string,
 	type probe struct {
 		path    string
 		headers map[string]string
-		query   string
+		query   url.Values
 	}
+	// Anthropic and Gemini page their lists; ask for the largest page and
+	// follow the cursor. OpenAI returns everything at once.
 	probes := []probe{
 		{path: "/v1/models", headers: map[string]string{"Authorization": "Bearer " + apiKey}},
-		{path: "/v1/models", headers: map[string]string{"x-api-key": apiKey, "anthropic-version": probeAnthropicV}},
-		{path: "/v1beta/models", query: "key=" + url.QueryEscape(apiKey)},
+		{path: "/v1/models", headers: map[string]string{"x-api-key": apiKey, "anthropic-version": probeAnthropicV}, query: url.Values{"limit": {"1000"}}},
+		{path: "/v1beta/models", query: url.Values{"key": {apiKey}, "pageSize": {"1000"}}},
 	}
 	seen := map[string]bool{}
 	var upstream []string
@@ -76,20 +79,29 @@ func (s *Service) Discover(ctx context.Context, baseURL, apiKey string) (string,
 			return "", nil, ErrInvalidInput
 		}
 		target.Path = strings.TrimSuffix(target.Path, "/") + p.path
-		target.RawQuery = p.query
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
-		if err != nil {
-			continue
-		}
-		for name, value := range p.headers {
-			request.Header.Set(name, value)
-		}
-		request.Header.Set("Accept", "application/json")
-		for _, id := range readModelList(client, request) {
-			if !seen[id] {
-				seen[id] = true
-				upstream = append(upstream, id)
+		query := p.query
+		for page := 0; page < probeMaxPages; page++ {
+			target.RawQuery = query.Encode()
+			request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+			if err != nil {
+				break
 			}
+			for name, value := range p.headers {
+				request.Header.Set(name, value)
+			}
+			request.Header.Set("Accept", "application/json")
+			list := readModelList(client, request)
+			for _, id := range list.ids {
+				if !seen[id] {
+					seen[id] = true
+					upstream = append(upstream, id)
+				}
+			}
+			next := list.nextQuery(query)
+			if next == nil {
+				break
+			}
+			query = next
 		}
 	}
 	slices.Sort(upstream)
@@ -105,38 +117,68 @@ func (s *Service) Discover(ctx context.Context, baseURL, apiKey string) (string,
 	return normalized, result, nil
 }
 
-// readModelList extracts model IDs from an OpenAI-style ({"data":[{"id"}]})
-// or Gemini-style ({"models":[{"name":"models/x"}]}) list. Any failure yields
-// an empty list.
-func readModelList(client *http.Client, request *http.Request) []string {
+// modelList is one page of an upstream model list and its cursor.
+type modelList struct {
+	ids []string
+	// lastID is set when an Anthropic-style list says more pages follow.
+	lastID string
+	// pageToken is a Gemini-style nextPageToken.
+	pageToken string
+}
+
+// nextQuery returns the query of the following page, or nil on the last one.
+func (l modelList) nextQuery(current url.Values) url.Values {
+	if l.lastID == "" && l.pageToken == "" {
+		return nil
+	}
+	next := url.Values{}
+	for name, values := range current {
+		next[name] = values
+	}
+	if l.lastID != "" {
+		next.Set("after_id", l.lastID)
+	} else {
+		next.Set("pageToken", l.pageToken)
+	}
+	return next
+}
+
+// readModelList extracts model IDs from an OpenAI- or Anthropic-style
+// ({"data":[{"id"}],"has_more","last_id"}) or Gemini-style
+// ({"models":[{"name":"models/x"}],"nextPageToken"}) list. Any failure yields
+// an empty page.
+func readModelList(client *http.Client, request *http.Request) modelList {
 	response, err := client.Do(request)
 	if err != nil {
-		return nil
+		return modelList{}
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil
+		return modelList{}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, probeBodyLimit))
 	if err != nil {
-		return nil
+		return modelList{}
 	}
 	var parsed struct {
 		Data []struct {
 			ID string `json:"id"`
 		} `json:"data"`
-		Models []struct {
+		HasMore bool   `json:"has_more"`
+		LastID  string `json:"last_id"`
+		Models  []struct {
 			Name string `json:"name"`
 			ID   string `json:"id"`
 		} `json:"models"`
+		NextPageToken string `json:"nextPageToken"`
 	}
 	if json.Unmarshal(body, &parsed) != nil {
-		return nil
+		return modelList{}
 	}
-	var ids []string
+	var list modelList
 	for _, item := range parsed.Data {
 		if id := strings.TrimSpace(item.ID); id != "" && len(id) <= 256 {
-			ids = append(ids, id)
+			list.ids = append(list.ids, id)
 		}
 	}
 	for _, item := range parsed.Models {
@@ -145,10 +187,17 @@ func readModelList(client *http.Client, request *http.Request) []string {
 			id = strings.TrimSpace(item.ID)
 		}
 		if id != "" && len(id) <= 256 {
-			ids = append(ids, id)
+			list.ids = append(list.ids, id)
 		}
 	}
-	return ids
+	// A page without models cannot advance the cursor; stop rather than loop.
+	if len(list.ids) > 0 {
+		if parsed.HasMore {
+			list.lastID = strings.TrimSpace(parsed.LastID)
+		}
+		list.pageToken = strings.TrimSpace(parsed.NextPageToken)
+	}
+	return list
 }
 
 var dateSuffix = regexp.MustCompile(`[-@](?:\d{8}|\d{4}-\d{2}-\d{2}|\d{2}-\d{2}|\d{4})$`)
