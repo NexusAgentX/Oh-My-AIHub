@@ -96,7 +96,7 @@ func TestGatewayStreamOutlivesTheTotalTimeoutWhileOutputKeepsFlowing(t *testing.
 }
 
 func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) {
-	e := newEnv(t)
+	e := newEnvWith(t, slowCloseOutbound)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	silent := newUpstream(t, stallAfter(t, func(w http.ResponseWriter) {
@@ -127,7 +127,7 @@ func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) 
 }
 
 func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheTotalTimeout(t *testing.T) {
-	e := newEnv(t)
+	e := newEnvWith(t, slowCloseOutbound)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	slow := newUpstream(t, stallAfter(t, func(http.ResponseWriter) {}))
@@ -186,7 +186,7 @@ func TestGatewayInterruptsANonStreamingAnswerThatStallsMidBody(t *testing.T) {
 // The call time limit stops a stream that is still talking, blames nobody, and
 // bills what was read.
 func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.CallTimeLimit = 1500 * time.Millisecond })
+	e := newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = 1500 * time.Millisecond }))
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	endless := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -232,7 +232,7 @@ func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
 // A call that runs out of time before any output answers the client with an
 // error of its own and does not go on to the next candidate.
 func TestGatewayAnswersWhenTheCallTimeLimitPassesBeforeAnyOutput(t *testing.T) {
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.CallTimeLimit = time.Second })
+	e := newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = time.Second }))
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	stuck := newUpstream(t, stallAfter(t, func(http.ResponseWriter) {}))
@@ -243,7 +243,9 @@ func TestGatewayAnswersWhenTheCallTimeLimitPassesBeforeAnyOutput(t *testing.T) {
 	started := time.Now()
 	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusGatewayTimeout || !strings.Contains(recorder.Body.String(), `"call_deadline"`) || time.Since(started) < time.Second {
-		t.Fatalf("call = %d after %s: %s", recorder.Code, time.Since(started), recorder.Body.String())
+		var outcome, attempts string
+		_ = e.pool.QueryRow(context.Background(), `SELECT outcome, attempts::text FROM calls WHERE id = $1`, recorder.Header().Get("X-AIHub-Request-Id")).Scan(&outcome, &attempts)
+		t.Fatalf("call = %d after %s: %q\noutcome %s, attempts %s", recorder.Code, time.Since(started), recorder.Body.String(), outcome, attempts)
 	}
 	callID := recorder.Header().Get("X-AIHub-Request-Id")
 	if row := e.callRow(callID); row.Outcome != "interrupted" || row.Attempts != 1 || row.HasLedgerTx || row.CostNano != 0 {

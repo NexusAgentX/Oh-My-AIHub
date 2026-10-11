@@ -130,6 +130,10 @@ type scriptedBody struct {
 	ctx    context.Context
 	chunks chan []byte
 	fail   chan error
+	// endsCleanlyOnCancel makes a cancelled attempt end with io.EOF instead of
+	// an error: a transport being torn down can hand its reader the last bytes
+	// of a peer that has seen it hang up, and then a plain end of body.
+	endsCleanlyOnCancel bool
 }
 
 func (b *scriptedBody) Read(p []byte) (int, error) {
@@ -142,6 +146,9 @@ func (b *scriptedBody) Read(p []byte) (int, error) {
 	case err := <-b.fail:
 		return 0, err
 	case <-b.ctx.Done():
+		if b.endsCleanlyOnCancel {
+			return 0, io.EOF
+		}
 		return 0, b.ctx.Err()
 	}
 }

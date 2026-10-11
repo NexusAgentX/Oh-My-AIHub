@@ -21,7 +21,7 @@ import (
 const drainTestWindow = 1500 * time.Millisecond
 
 func newDrainEnv(t *testing.T) *env {
-	return newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = drainTestWindow })
+	return newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.DrainWindow = drainTestWindow }))
 }
 
 // liveGateway serves the environment's handler on a real server.

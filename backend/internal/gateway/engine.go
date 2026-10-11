@@ -960,7 +960,11 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		for n == 0 && readErr == nil {
 			n, readErr = response.Body.Read(chunk)
 		}
-		if readErr != nil && !errors.Is(readErr, io.EOF) && n == 0 {
+		// An end of body with nothing in it counts as an answer only if the
+		// attempt was not cancelled before it: a transport that is being torn
+		// down can still deliver the last bytes of a peer that has seen it hang
+		// up, and then reports a clean end (see answerEnded).
+		if readErr != nil && n == 0 && !answerEnded(attemptCtx, readErr) {
 			stopFirstByte()
 			cause := context.Cause(attemptCtx)
 			response.Body.Close()
@@ -998,7 +1002,13 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 	payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 	response.Body.Close()
+	cause := context.Cause(attemptCtx)
 	cancel(nil)
+	if errors.Is(cause, errCallDeadline) {
+		// The call ran out of time while this answer was still being read: what
+		// came in is cut short and says nothing about the channel.
+		return expired(&status)
+	}
 	answer := &upstreamFailure{status: status, header: ClientResponseHeaders(response.Header, response.Uncompressed), body: payload}
 	code := "upstream_" + http.StatusText(status)
 	if !fallbackStatus(status) {
@@ -1097,6 +1107,19 @@ func interruptionOf(cause error) *interruption {
 	return &interruption{code: "read_error", message: "读取上游响应失败", channelFault: true}
 }
 
+// answerEnded reports whether readErr is the clean end of an upstream answer:
+// io.EOF, and the attempt was not already cancelled when it came. Cancelling an
+// attempt (call time limit, idle or drain timeout, client gone) makes the
+// transport close its connection, but it can close it a moment too late:
+// closing a TLS connection first sends close_notify, the upstream sees it,
+// finishes its chunked body at once, and the reader that is blocked on the
+// connection gets those last bytes and a plain io.EOF instead of an error. So
+// an EOF after a cancellation proves nothing about the answer being complete;
+// the cause of the cancellation says what stopped it.
+func answerEnded(attempt context.Context, readErr error) bool {
+	return errors.Is(readErr, io.EOF) && context.Cause(attempt) == nil
+}
+
 // streamBack writes the upstream answer to the client chunk by chunk while the
 // observer reads usage, then settles the call. A client that leaves once the
 // writing has begun does not stop the reading (ADR-0035 rule 6): the rest of
@@ -1186,7 +1209,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// Whether the answer ran to its end, and whether the client was gone while
 	// it did. A client that closes its side after receiving everything, before
 	// the upstream has closed its own, is not a disconnect.
-	ended := errors.Is(readErr, io.EOF)
+	ended := answerEnded(result.upstream, readErr)
 	left := watch.isGone()
 	var stopped *interruption
 	if !ended && !left {
