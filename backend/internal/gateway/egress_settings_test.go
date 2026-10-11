@@ -29,7 +29,6 @@ func TestRefreshedBlockListIsAppliedToTheEgressPool(t *testing.T) {
 	}
 	source := newGatedSource(settings.Settings{DefaultMaxAttempts: 1})
 	engine := NewEngine(Dependencies{
-		Store:    statsOnlyStore{source: newGatedSource(map[string]ChannelStats{})},
 		Settings: settings.NewService(settingsOnlyStore{source: source}),
 		Outbound: policy,
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
