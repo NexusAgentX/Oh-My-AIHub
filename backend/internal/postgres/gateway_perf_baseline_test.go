@@ -665,7 +665,7 @@ func (s *perfStack) smoke() {
 	for _, format := range []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini} {
 		for _, stream := range []bool{false, true} {
 			request := gatewaybench.RequestSpec{Format: format, Stream: stream, APIKey: s.keys[0]}.Build(s.frontURL)
-			before := s.dials.Load()
+			before := s.upstream.Stats().Requests
 			result := gatewaybench.Run(context.Background(), s.gateway, gatewaybench.Plan{
 				Name: "smoke", Next: func(int64) gatewaybench.Request { return request }, Concurrency: 1, MaxRequests: 1,
 				Complete: func(tail []byte) bool { return gatewaybench.Complete(format, stream, tail) },
@@ -673,13 +673,17 @@ func (s *perfStack) smoke() {
 			if result.OK != 1 {
 				t.Fatalf("smoke %s stream=%v: %v %v", format, stream, result.Failures, result.FailureExamples)
 			}
-			if s.dials.Load() == before {
-				t.Fatalf("smoke %s stream=%v: the request did not reach the fake upstream through the outbound policy", format, stream)
+			// Not a new dial: the outbound policy pools its connections, so later
+			// requests to a host go out on the one that is open.
+			if s.upstream.Stats().Requests == before {
+				t.Fatalf("smoke %s stream=%v: the request did not reach the fake upstream", format, stream)
 			}
 		}
 	}
-	if s.resolver.lookups.Load() == 0 {
-		t.Fatal("the outbound policy never asked the resolver")
+	// The fake upstream listens on loopback, which the policy never dials: it was
+	// reached through a resolved, pinned address.
+	if s.dials.Load() == 0 || s.resolver.lookups.Load() == 0 {
+		t.Fatal("the outbound policy never resolved or dialed the fake upstream")
 	}
 }
 

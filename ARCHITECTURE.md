@@ -42,7 +42,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `identity` | 受邀账户、Argon2id 密码、服务器端会话、首次改密、管理员管理账户（ADR-0007、ADR-0013、ADR-0037） |
 | `ledger` | 交易类型与校验、系统账户、积分与账单读取、调账与坏账核销、计价公式（ADR-0012、ADR-0030） |
 | `catalog`、`settings` | 模型目录（含计价币种）与条件价格档；单行平台设置与美元汇率同步（ADR-0038） |
-| `channel` | 渠道与渠道模型、上游 Key 加密、模型发现与格式测试、上游凭据密钥环与固定出站策略（ADR-0036） |
+| `channel` | 渠道与渠道模型、上游 Key 加密、模型发现与格式测试、上游凭据密钥环与固定出站策略，以及网关转发的钉住地址连接池与 DNS 缓存（ADR-0036） |
 | `apikey`、`routing` | 平台 API Key（ADR-0028）；按用户按模型的路由偏好，账号级与 Key 级 |
 | `gateway` | 透明网关（ADR-0035）：请求体扫描与 `model` 替换、旁路用量解析、候选排序、进程内渠道状态、事件总线 |
 | `observe`、`metrics` | 现算观测、对账核对与补记、SSE 推送；Prometheus 指标（ADR-0029） |
@@ -66,6 +66,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 3. **选渠道**：候选为格式匹配的上架渠道，剔除取消勾选、冷却中和超过并发/RPM/当日收入上限的，再按路由模式（便宜/稳定/快速/手动）排序；快速模式用的首字中位数只统计流式调用。
 4. **透传与回退**：只替换鉴权与顶层 `model`，按需补 `include_usage`（`EnsureIncludeUsage` 同时返回客户端原本是否已开启，没开启则记 `call.usageInjected`），应用渠道请求头规则与 UA，不做格式转换；尚未向客户端写出字节前，连接失败、首字超时与可重试状态码换下一个候选；首字超时只用于流式请求，非流式响应要等生成结束才有首字节，只受总超时约束。其余 4xx 默认视为请求本身的问题，原样返回、不计渠道失败；例外是响应体表明模型不存在或不可用（`gateway.ModelUnavailable`，规则见 PRODUCT.md「4xx 与回退」），按上游错误处理，错误码 `upstream_model_unavailable`。因此这类 4xx 的响应体（最多 1MB）先读进内存再判断，不命中时写出缓冲内容，状态码、响应头与字节与上游一致。
    超时全部是请求 context 上的计时器，出站客户端自己不设 `Timeout`（ADR-0035 规则 5，出站连接因此可以跨请求复用）：非流式是整次请求的总超时（`timeout_total`，尚未写出字节，可回退）；流式在首字节前是首字超时，之后是相邻两次读到数据的间隔（空闲超时，每次读到数据重置）；整个调用另有从开始算起的上限 `callTimeLimit`（60 分钟，含全部尝试）。兜底任务的 61 分钟时限由它加 1 分钟余量得出，两处常量互相注释，改一处要同步另一处。
+   出站连接按“主机:端口”共享（`channel/egress.go`，ADR-0036 决定 7）：`ClientForGateway` 每次先做 Base URL 规范化与禁用名单检查，再从 DNS 缓存取已校验的地址——缓存 60 秒，并发解析合并为一次，答案含受保护地址就整体拒绝（拒绝最多缓存 5 秒），解析失败不缓存；连接池只向这些地址拨号，开启 keep-alive 与 HTTP/2，地址集合变化时换新客户端并关闭旧的空闲连接，`extra_blocked_hosts` 变化时关闭全部（`WithExtraBlockedHosts` 触发；仍用旧名单的快照改用一次性客户端）。渠道发现与格式测试不走连接池（`FreshClient`、`Client`）。新建与复用连接、DNS 命中与未命中次数见指标 `aihub_upstream_connections_new_total`、`aihub_upstream_connections_reused_total`、`aihub_upstream_dns_lookups_total`。
 5. **回写与记账**：响应原样逐块回写，旁路读取用量；结束时在一个事务内关闭调用并过账，价格快照随调用保存，历史不按现价重算。首字节之后的中断不再回退：空闲超时、总超时与读取错误记尝试 `interrupted`（`error_code` 为 `timeout_idle`、`timeout_total`、`read_error`）并计渠道失败；调用上限到期记 `interrupted` / `call_deadline`，不计渠道失败；两者都按已读到的用量结算。调用上限在首字节之前到期时，网关自己返回 504 `call_deadline`，不再尝试后面的候选。
    读到 `io.EOF` 只有在这次尝试没被取消时才算回答正常结束（`answerEnded`）。取消（调用上限、空闲或续读超时）会让传输层关闭连接，而关闭 TLS 连接先发 close_notify，对端（例如一直等着被取消的上游）可以抢在套接字真正关闭前发完分块响应体的结尾，阻塞在读上的一方会拿到最后几个字节和干净的 EOF 而不是错误；这种 EOF 按取消原因处理，不当成完成。
    客户端中途断开：开始回写之前（等响应、回退中）断开，立即取消上游，不收费；开始回写之后断开，网关停止写客户端、继续读上游，读到的字节只喂给旁路解析器（`clientWatch`），直到上游结束、读满 `drainWindow`（10 秒）、触发空闲超时或调用上限，再取消上游并按读到的用量结算，调用 `client_disconnected`。续读期间渠道并发槽位照常占用，上游出错与客户端断开都不计渠道失败，`response_bytes` 只算写给客户端的字节。客户端收完最后一帧就挂断、上游随后正常结束的调用不算断开，仍是 `succeeded`。

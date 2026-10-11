@@ -384,6 +384,10 @@ func (o testOutbound) GatewayClient(_ context.Context, _ string) (*http.Client, 
 	return o.client(0), nil
 }
 
+func (o testOutbound) FreshClient(_ context.Context, _ string) (*http.Client, error) {
+	return o.client(0), nil
+}
+
 func (o testOutbound) WithExtraBlockedHosts(hosts []string) (channel.Outbound, error) {
 	inner, err := o.Outbound.WithExtraBlockedHosts(hosts)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/idna"
@@ -36,6 +37,12 @@ type OutboundPolicy struct {
 	dialContext  func(context.Context, string, string) (net.Conn, error)
 	allowedPorts map[string]struct{}
 	blockedHosts []string
+	// blockedKey identifies blockedHosts; the egress pool serves a policy only
+	// while it is the pool's current key (see egressPool.setBlocked).
+	blockedKey string
+	// egress is the DNS cache and connection pool of gateway forwarding. Every
+	// copy of a policy made by WithExtraBlockedHosts shares it.
+	egress *egressPool
 	// testRootCAs is package-private so transport integration tests can use a
 	// real TLS socket without weakening certificate verification in production.
 	testRootCAs *x509.CertPool
@@ -68,11 +75,14 @@ func NewOutboundPolicyWithResolver(allowedPorts, additionalBlockedHosts []string
 	}
 	slices.Sort(blocked)
 	blocked = slices.Compact(blocked)
+	key := blockedKey(blocked)
 	return &OutboundPolicy{
 		resolver:     resolver,
-		dialContext:  (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext,
+		dialContext:  (&net.Dialer{Timeout: dialTimeout, KeepAlive: egressKeepAlive}).DialContext,
 		allowedPorts: ports,
 		blockedHosts: blocked,
+		blockedKey:   key,
+		egress:       newEgressPool(key),
 	}, nil
 }
 
@@ -190,16 +200,32 @@ func (p *OutboundPolicy) ValidateResolution(ctx context.Context, normalizedBaseU
 	if err != nil || parsed.Hostname() == "" {
 		return nil, ErrUnsafeUpstream
 	}
-	addresses, err := p.resolver.LookupNetIP(ctx, "ip", parsed.Hostname())
+	return validatedLookup(ctx, p.resolver, parsed.Hostname())
+}
+
+// errProtectedAddress is why validateAddresses refuses an answer.
+var errProtectedAddress = fmt.Errorf("%w: DNS returned a protected address", ErrUnsafeUpstream)
+
+// validatedLookup resolves host and returns its addresses, or ErrUnsafeUpstream
+// if the lookup failed or any address is protected.
+func validatedLookup(ctx context.Context, resolver Resolver, host string) ([]netip.Addr, error) {
+	addresses, err := resolver.LookupNetIP(ctx, "ip", host)
 	if err != nil || len(addresses) == 0 {
 		return nil, fmt.Errorf("%w: DNS resolution failed", ErrUnsafeUpstream)
 	}
+	return validateAddresses(addresses)
+}
+
+// validateAddresses is the one rule for what a resolution may contain: a single
+// protected address rejects the whole answer, so a host that also resolves to
+// an internal address is never dialed at all.
+func validateAddresses(addresses []net.IP) ([]netip.Addr, error) {
 	validated := make([]netip.Addr, 0, len(addresses))
 	seen := map[netip.Addr]struct{}{}
 	for _, address := range addresses {
 		parsedAddress, ok := netip.AddrFromSlice(address)
 		if !ok || unsafeAddress(parsedAddress.Unmap()) {
-			return nil, fmt.Errorf("%w: DNS returned a protected address", ErrUnsafeUpstream)
+			return nil, errProtectedAddress
 		}
 		parsedAddress = parsedAddress.Unmap()
 		if _, exists := seen[parsedAddress]; exists {
@@ -345,15 +371,53 @@ func (p *OutboundPolicy) ClientForProxy(ctx context.Context, normalizedBaseURL s
 	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, responseHeaderTimeout)
 }
 
-// ClientForGateway builds the client of one gateway attempt: the same pinned
-// dial, TLS and redirect rules as every other outbound call, but with neither
-// a response-header deadline (a non-streaming completion legitimately sends
-// its first byte only when generation ends) nor Client.Timeout (it would also
-// cut off a stream that is still producing output). Every deadline of a
-// forwarded request comes from the request's context, which the gateway owns:
-// the first-byte timeout and idle timeout of a stream, the total timeout of a
-// non-streaming request, and the limit of the whole call (ADR-0035 rule 5).
+// ClientForGateway returns the client of one gateway attempt. It differs from
+// the clients of discovery and format tests in two ways.
+//
+// It has neither a response-header deadline (a non-streaming completion
+// legitimately sends its first byte only when generation ends) nor
+// Client.Timeout (it would also cut off a stream that is still producing
+// output). Every deadline of a forwarded request comes from the request's
+// context, which the gateway owns: the first-byte timeout and idle timeout of a
+// stream, the total timeout of a non-streaming request, and the limit of the
+// whole call (ADR-0035 rule 5). That is also what lets the client be shared.
+//
+// And it is shared: one pooled client per host and port, dialing only the
+// addresses of a validated resolution that is cached for 60 seconds, with
+// keep-alive and HTTP/2 (ADR-0036 rule 7, see egress.go). The checks that gate a
+// request still run on every call: the Base URL is normalized against the
+// current block list and must be the canonical form, and the resolution is
+// validated before it enters the cache.
 func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
+	canonical, err := p.NormalizeBaseURL(normalizedBaseURL)
+	if err != nil || canonical != normalizedBaseURL {
+		return nil, ErrUnsafeUpstream
+	}
+	parsed, err := url.Parse(canonical)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, ErrUnsafeUpstream
+	}
+	port := parsed.Port()
+	if port == "" {
+		port = "443"
+	}
+	client, err := p.egress.client(ctx, p, parsed.Hostname(), port)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		// The pool belongs to a newer block list than this policy (the settings
+		// changed while this snapshot was still in use), or the policy has no
+		// pool: connect the way discovery does, resolving anew.
+		return p.clientFor(ctx, normalizedBaseURL, 0, 0)
+	}
+	return client, nil
+}
+
+// ClientForFresh is the client of a streaming format test: no deadline of its
+// own like ClientForGateway, but a one-shot connection to a freshly resolved
+// address like every other call outside the gateway's forwarding.
+func (p *OutboundPolicy) ClientForFresh(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
 	return p.clientFor(ctx, normalizedBaseURL, 0, 0)
 }
 
@@ -371,8 +435,15 @@ func (p *OutboundPolicy) WithExtraBlockedHosts(hosts []string) (Outbound, error)
 	slices.Sort(blocked)
 	copied := *p
 	copied.blockedHosts = slices.Compact(blocked)
+	copied.blockedKey = blockedKey(copied.blockedHosts)
+	// A changed block list closes every pooled connection at once; a policy
+	// that is still built from the old list is no longer served from the pool.
+	p.egress.setBlocked(copied.blockedKey)
 	return &copied, nil
 }
+
+// blockedKey identifies a block list. A newline cannot occur in a host name.
+func blockedKey(blocked []string) string { return strings.Join(blocked, "\n") }
 
 func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string, totalTimeout, responseHeaderTimeout time.Duration) (*http.Client, error) {
 	canonical, err := p.NormalizeBaseURL(normalizedBaseURL)
@@ -394,30 +465,61 @@ func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string
 		port = "443"
 	}
 	host := parsed.Hostname()
-	pinned := addresses[0]
 	transport := &http.Transport{
 		Proxy:                  nil,
 		DisableKeepAlives:      true,
 		ForceAttemptHTTP2:      false,
-		MaxResponseHeaderBytes: 1 << 20,
-		TLSHandshakeTimeout:    5 * time.Second,
+		MaxResponseHeaderBytes: maxResponseHeaderBytes,
+		TLSHandshakeTimeout:    tlsHandshakeTimeout,
 		ResponseHeaderTimeout:  responseHeaderTimeout,
 		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: p.testRootCAs},
-		DialContext: func(dialContext context.Context, network, address string) (net.Conn, error) {
-			requestedHost, requestedPort, splitErr := net.SplitHostPort(address)
-			if splitErr != nil || !strings.EqualFold(strings.TrimSuffix(requestedHost, "."), host) || requestedPort != port {
-				return nil, ErrUnsafeUpstream
-			}
-			return p.dialContext(dialContext, network, net.JoinHostPort(pinned.String(), port))
-		},
+		// Only the first address of the resolution, as ever: a one-shot client
+		// has no use for a fallback.
+		DialContext: p.pinnedDial(host, port, addresses[:1], nil),
 	}
 	return &http.Client{
-		Transport: transport,
-		Timeout:   totalTimeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+		Transport:     transport,
+		Timeout:       totalTimeout,
+		CheckRedirect: noRedirect,
 	}, nil
+}
+
+func noRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+// pinnedDial returns a dial function that connects to the given validated
+// addresses of host and to nothing else. The http.Transport asks it for the
+// host and port of the request URL, which must be the ones the client was
+// made for; the connection then goes to a validated address, never to the name,
+// while TLS still verifies the certificate against the name. The addresses are
+// tried in turn until one connects, starting with the one that connected last,
+// so that an unreachable first address costs a new connection nothing once
+// another has worked. dialed, if set, counts the connections made.
+func (p *OutboundPolicy) pinnedDial(host, port string, addresses []netip.Addr, dialed *atomic.Uint64) func(context.Context, string, string) (net.Conn, error) {
+	var preferred atomic.Int64
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		requestedHost, requestedPort, err := net.SplitHostPort(address)
+		if err != nil || !strings.EqualFold(strings.TrimSuffix(requestedHost, "."), host) || requestedPort != port {
+			return nil, ErrUnsafeUpstream
+		}
+		var lastErr error
+		first := int(preferred.Load())
+		for attempt := range addresses {
+			index := (first + attempt) % len(addresses)
+			conn, err := p.dialContext(ctx, network, net.JoinHostPort(addresses[index].String(), port))
+			if err == nil {
+				preferred.Store(int64(index))
+				if dialed != nil {
+					dialed.Add(1)
+				}
+				return conn, nil
+			}
+			lastErr = err
+			if ctx.Err() != nil {
+				break
+			}
+		}
+		return nil, lastErr
+	}
 }
 
 // ApplyAuthentication writes the default credential location of a format; the
@@ -443,10 +545,13 @@ type Outbound interface {
 	ValidateBaseURL(ctx context.Context, raw string) (string, error)
 	// Client returns a client for short, bounded calls (model discovery).
 	Client(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
-	// GatewayClient returns a client without any deadline of its own, for
-	// forwarded requests and streaming format tests; the caller bounds the
-	// exchange through the request's context.
+	// GatewayClient returns the shared, pooled client of forwarded requests. It
+	// has no deadline of its own; the caller bounds the exchange through the
+	// request's context.
 	GatewayClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error)
+	// FreshClient returns a one-shot client without any deadline of its own for
+	// the streaming format test: it resolves anew and keeps no connection.
+	FreshClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error)
 	// WithExtraBlockedHosts adds the administrator-managed host block list.
 	WithExtraBlockedHosts(hosts []string) (Outbound, error)
 }
@@ -459,4 +564,9 @@ func (p *OutboundPolicy) Client(ctx context.Context, normalizedBaseURL string, t
 // GatewayClient implements Outbound.
 func (p *OutboundPolicy) GatewayClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
 	return p.ClientForGateway(ctx, normalizedBaseURL)
+}
+
+// FreshClient implements Outbound.
+func (p *OutboundPolicy) FreshClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
+	return p.ClientForFresh(ctx, normalizedBaseURL)
 }

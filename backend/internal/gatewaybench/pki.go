@@ -72,8 +72,8 @@ func NewPKI(hosts ...string) (*PKI, error) {
 }
 
 // ServerConfig is the TLS configuration of a fake upstream. It offers HTTP/2
-// next to HTTP/1.1, so that a client which asks for it gets it; the gateway
-// does not yet.
+// next to HTTP/1.1, so that a client which asks for it gets it; the gateway's
+// pooled outbound client does (ADR-0036 rule 7).
 func (p *PKI) ServerConfig() *tls.Config {
 	return &tls.Config{
 		MinVersion:   tls.VersionTLS12,

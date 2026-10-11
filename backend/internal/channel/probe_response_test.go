@@ -19,9 +19,9 @@ type probeOutbound struct {
 	used   bool
 }
 
-// GatewayClient records that the probe asked for the gateway client and
-// bounded the exchange with its test timeout through the context.
-func (p *probeOutbound) GatewayClient(ctx context.Context, _ string) (*http.Client, error) {
+// FreshClient records that the probe asked for the one-shot client and bounded
+// the exchange with its test timeout through the context.
+func (p *probeOutbound) FreshClient(ctx context.Context, _ string) (*http.Client, error) {
 	deadline, ok := ctx.Deadline()
 	p.used = ok && time.Until(deadline) > testTimeout/2 && time.Until(deadline) <= testTimeout
 	return p.client, nil
@@ -111,19 +111,26 @@ type probeReadError struct{}
 
 func (probeReadError) Read([]byte) (int, error) { return 0, errors.New("read timed out") }
 
-func TestGatewayClientHasNoDeadlineOfItsOwn(t *testing.T) {
+func TestGatewayClientsHaveNoDeadlineOfTheirOwn(t *testing.T) {
 	policy, err := NewOutboundPolicyWithResolver(nil, nil, &fakeResolver{addresses: []net.IP{net.ParseIP("93.184.216.34")}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	client, err := policy.GatewayClient(context.Background(), "https://relay.example")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Client.Timeout would cut off a stream that is still producing output; the
 	// caller bounds the exchange through the request context.
-	if client.Timeout != 0 || client.Transport.(*http.Transport).ResponseHeaderTimeout != 0 {
-		t.Fatal("unexpected gateway client deadlines")
+	pooled, err := policy.GatewayClient(context.Background(), "https://relay.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pooled.Timeout != 0 || pooled.Transport.(*countedTransport).Transport.ResponseHeaderTimeout != 0 {
+		t.Fatal("unexpected pooled client deadlines")
+	}
+	fresh, err := policy.FreshClient(context.Background(), "https://relay.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.Timeout != 0 || fresh.Transport.(*http.Transport).ResponseHeaderTimeout != 0 {
+		t.Fatal("unexpected format test client deadlines")
 	}
 	discovery, err := policy.Client(context.Background(), "https://relay.example", probeTimeout)
 	if err != nil {
