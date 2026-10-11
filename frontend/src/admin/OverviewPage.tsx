@@ -12,6 +12,7 @@ const attentionKinds: Record<AttentionItem['kind'], { label: string; action: str
   channel_suspended: { label: '渠道下架', action: '查看渠道' },
   channel_failing: { label: '渠道异常', action: '查看渠道', countless: true },
   unbilled_usage: { label: '用量未读到', action: '查看调用', countless: true },
+  unbilled_consumer: { label: '账户用量未读到', action: '查看调用', countless: true },
   ledger_unbalanced: { label: '账本不平衡', action: '去核对', anchor: 'checks' },
   reconciliation_failed: { label: '记账或核对异常', action: '去核对', anchor: 'checks' },
   stuck_call: { label: '调用未结束', action: '查看调用' },

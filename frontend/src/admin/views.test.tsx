@@ -279,6 +279,23 @@ describe('needs-attention list', () => {
   })
 })
 
+describe('per-consumer unbilled items', () => {
+  it('shows the account sentence with a call-list link and no item count', () => {
+    const title = '账户「小王」24 小时内 40 次成功调用中 10 次未计费（25%），多数经渠道「甲」'
+    const markup = renderToStaticMarkup(
+      <MemoryRouter>
+        <AttentionList
+          items={[{ kind: 'unbilled_consumer', severity: 'warning', title, count: 10, link: '/admin/calls?account_id=u1&outcome=succeeded_unbilled' }]}
+        />
+      </MemoryRouter>,
+    )
+    expect(markup).toContain('账户用量未读到')
+    expect(markup).toContain(title)
+    expect(markup).toContain('href="/admin/calls?account_id=u1&amp;outcome=succeeded_unbilled"')
+    expect(markup).not.toContain('10 项')
+  })
+})
+
 describe('overview indicators', () => {
   const overview: AdminOverview = {
     attention: [],
@@ -309,6 +326,7 @@ describe('overview indicators', () => {
       'channel_suspended',
       'channel_failing',
       'unbilled_usage',
+      'unbilled_consumer',
       'ledger_unbalanced',
       'reconciliation_failed',
       'stuck_call',
@@ -320,6 +338,9 @@ describe('overview indicators', () => {
     expect(
       attentionMeta({ kind: 'unbilled_usage', severity: 'warning', title: '', count: 1, link: '/admin/calls?outcome=succeeded_unbilled' }).link,
     ).toBe('/admin/calls?outcome=succeeded_unbilled')
+    expect(
+      attentionMeta({ kind: 'unbilled_consumer', severity: 'warning', title: '', count: 8, link: '/admin/calls?account_id=u1&outcome=succeeded_unbilled' }).link,
+    ).toBe('/admin/calls?account_id=u1&outcome=succeeded_unbilled')
   })
 })
 
