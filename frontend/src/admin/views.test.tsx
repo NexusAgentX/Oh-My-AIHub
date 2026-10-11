@@ -27,32 +27,39 @@ const balances: AdminPointsBalances = {
 }
 
 describe('ledger equation', () => {
-  it('sums users, escrow, revenue and bad debt to the total', () => {
+  const sides = (equation: ReturnType<typeof ledgerEquation>) => ({
+    left: equation.left.map((term) => [term.label, term.value]),
+    right: equation.right.map((term) => [term.label, term.value]),
+  })
+
+  it('puts negative balances on the left and positive balances on the right', () => {
     const equation = ledgerEquation(balances)
-    expect(equation.terms.map((term) => [term.label, term.value])).toEqual([
-      ['用户', '70.47'],
-      ['C2C 托管', '30'],
-      ['平台收入', '0.03'],
-      ['坏账', '-100.5'],
-    ])
+    expect(sides(equation)).toEqual({
+      left: [['信用发行', '60.03'], ['坏账', '100.5']],
+      right: [['流通积分', '130.5'], ['C2C 托管', '30'], ['平台收入', '0.03']],
+    })
     expect(equation.balanced).toBe(true)
   })
 
-  it('renders "= 0.00" with a balanced mark', () => {
-    const markup = renderToStaticMarkup(<LedgerEquation balances={balances} />)
-    expect(markup).toContain('用户')
-    expect(markup).toContain('70.47')
-    expect(markup).toContain('C2C 托管')
-    expect(markup).toContain('平台收入')
-    expect(markup).toContain('坏账')
-    expect(markup).toContain('=')
-    expect(markup).toContain('0.00')
-    expect(markup).toContain('✓ 平衡')
+  it('moves negative platform revenue to the left as net spending', () => {
+    const equation = ledgerEquation({ ...balances, user_positive: '200.5', platform_revenue: '-70' })
+    expect(sides(equation)).toEqual({
+      left: [['信用发行', '60.03'], ['坏账', '100.5'], ['平台收入', '70']],
+      right: [['流通积分', '200.5'], ['C2C 托管', '30']],
+    })
+    expect(equation.left[2].note).toBe('净支出')
   })
 
-  it('flags an unbalanced ledger', () => {
+  it('renders both sides with a balanced mark', () => {
+    const markup = renderToStaticMarkup(<LedgerEquation balances={balances} />)
+    for (const text of ['信用发行', '60.03', '坏账', '流通积分', '130.50', 'C2C 托管', '平台收入', '=', '✓ 平衡']) {
+      expect(markup).toContain(text)
+    }
+  })
+
+  it('flags an unbalanced ledger with the difference', () => {
     const markup = renderToStaticMarkup(<LedgerEquation balances={{ ...balances, total: '0.01' }} />)
-    expect(markup).toContain('不平衡')
+    expect(markup).toContain('不平衡 · 差额 0.01')
     expect(markup).toContain('ledger-equation-broken')
   })
 

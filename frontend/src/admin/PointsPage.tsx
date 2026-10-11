@@ -19,7 +19,7 @@ import {
 import { ConfirmActionDialog, LoadMore } from './components'
 import { daysSince, formatDateTime, formatPoints, formatRatio } from './format'
 import { LineChart } from './LineChart'
-import { ledgerChecks, ledgerEquation, sortedTrend, type TrendWindow } from './pointsView'
+import { ledgerChecks, ledgerEquation, sortedTrend, type EquationTerm, type TrendWindow } from './pointsView'
 import {
   useAdminAccounts,
   useAdminAudit,
@@ -40,28 +40,34 @@ import type { AdminPoints, AdminPointsRisk, AuditEntry, LedgerRelated, LedgerTra
 
 type RelatedType = LedgerRelated['type']
 
-/** 等式行：用户 + C2C 托管 + 平台收入 + 坏账 = 合计。 */
+/** 天平等式：负余额（左）= 正余额（右）。 */
 export function LedgerEquation({ balances }: { balances: AdminPoints['balances'] }) {
   const equation = ledgerEquation(balances)
   return (
     <p className={`ledger-equation ${equation.balanced ? '' : 'ledger-equation-broken'}`}>
-      {equation.terms.map((term, index) => (
-        <span key={term.label}>
-          {index > 0 && <span className="equation-op">+</span>}
-          <span className="equation-term">
-            <small>{term.label}</small>
-            <strong className="num">{formatPoints(term.value)}</strong>
-          </span>
-        </span>
-      ))}
+      <EquationSide terms={equation.left} />
       <span className="equation-op">=</span>
-      <span className="equation-term">
-        <small>合计</small>
-        <strong className="num">{formatPoints(equation.total)}</strong>
-      </span>
-      <Badge tone={equation.balanced ? 'success' : 'danger'}>{equation.balanced ? '✓ 平衡' : '不平衡'}</Badge>
+      <EquationSide terms={equation.right} />
+      <Badge tone={equation.balanced ? 'success' : 'danger'}>
+        {equation.balanced ? '✓ 平衡' : `不平衡 · 差额 ${formatPoints(equation.total)}`}
+      </Badge>
     </p>
   )
+}
+
+function EquationSide({ terms }: { terms: EquationTerm[] }) {
+  return terms.map((term, index) => (
+    <span key={term.label}>
+      {index > 0 && <span className="equation-op">+</span>}
+      <span className="equation-term">
+        <small>
+          {term.label}
+          {term.note && `（${term.note}）`}
+        </small>
+        <strong className="num">{formatPoints(term.value)}</strong>
+      </span>
+    </span>
+  ))
 }
 
 function Figures({ points }: { points: AdminPoints }) {
