@@ -35,13 +35,16 @@ ORDER BY c.id;
 
 -- Health of channels over the last 24 hours, from the attempts of every call.
 -- Attempts the client abandoned or that were rejected as the request's own fault
--- say nothing about the channel and are left out.
+-- say nothing about the channel and are left out. The first-token median counts
+-- streaming calls only: a non-streaming call's first byte is the whole answer,
+-- which would rank a channel by how long its answers are instead of how fast it
+-- starts.
 -- name: ChannelStats24h :many
 SELECT (att->'channel'->>'id')::uuid AS channel_id,
        count(*)::bigint AS attempts,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
        coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
-            FILTER (WHERE att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
+            FILTER (WHERE c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
 WHERE c.created_at >= now() - interval '24 hours'
