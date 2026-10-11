@@ -504,9 +504,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return state == StateAvailable
 		},
 	})
-	if len(ordered) > maxAttempts {
-		ordered = ordered[:maxAttempts]
-	}
 	if len(ordered) == 0 {
 		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "no_channel_available", "当前没有可用的渠道")
 		return
@@ -514,12 +511,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 
 	var last *upstreamFailure
 	tried := 0
-	for _, candidate := range ordered {
-		limits := EffectiveLimits(candidate.Advanced, defaults)
-		release, reserved, _ := e.Runtime.Begin(candidate.ChannelID, limits, e.Now())
-		if !reserved {
-			continue
-		}
+	// maxAttempts counts attempts actually made: a candidate whose slot was
+	// taken since ranking is skipped and the next one fills in.
+	for slot := range e.reservations(ordered, maxAttempts, defaults) {
+		candidate, limits, release := slot.candidate, slot.limits, slot.release
 		tried++
 		call.lastChannelID = candidate.ChannelID
 		result := e.attempt(r, call, candidate, limits, defaults, policy, body, scan, location, ttftTimeout)
