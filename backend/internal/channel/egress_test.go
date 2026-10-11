@@ -728,3 +728,49 @@ func TestPolicyWithoutAPoolFallsBackToOneShotClients(t *testing.T) {
 		t.Fatalf("stats = %+v", stats)
 	}
 }
+
+// Streams are multiplexed on one HTTP/2 connection; cancelling one of them (a
+// call that hit its limit, or a client that left) resets that stream only.
+func TestCancellingOneHTTP2StreamLeavesTheOthersRunning(t *testing.T) {
+	rig := newEgressRig(t, true)
+	client, err := rig.policy.ClientForGateway(context.Background(), rig.baseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type stream struct {
+		cancel   context.CancelFunc
+		response *http.Response
+	}
+	var streams []stream
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		request, _ := http.NewRequestWithContext(ctx, http.MethodPost, rig.baseURL+"/stream", strings.NewReader(`{}`))
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.ProtoMajor != 2 {
+			t.Fatalf("stream %d runs over HTTP/%d", i, response.ProtoMajor)
+		}
+		chunk := make([]byte, len("first;"))
+		if _, err := io.ReadFull(response.Body, chunk); err != nil {
+			t.Fatal(err)
+		}
+		streams = append(streams, stream{cancel, response})
+		t.Cleanup(func() { cancel(); response.Body.Close() })
+	}
+	streams[0].cancel()
+	if _, err := io.ReadAll(streams[0].response.Body); err == nil {
+		t.Fatal("a cancelled stream ended without an error")
+	}
+	close(rig.streamGate)
+	for i := 1; i < 3; i++ {
+		rest, err := io.ReadAll(streams[i].response.Body)
+		if err != nil || string(rest) != "second" {
+			t.Fatalf("stream %d after another was cancelled: %q, %v", i, rest, err)
+		}
+	}
+	if dials := rig.dials(); len(dials) != 1 {
+		t.Fatalf("dials = %v, want one connection for all streams", dials)
+	}
+}
