@@ -289,10 +289,11 @@ func (b *fakeBrowse) OnlineChannels(context.Context) ([]gateway.OnlineChannel, e
 			continue
 		}
 		for _, model := range item.Models {
-			if model.Enabled {
+			if model.Enabled && !model.PendingMultiplier {
 				online = append(online, gateway.OnlineChannel{
 					ModelID: model.ModelID, ChannelID: item.ID, ChannelName: item.Name, OwnerID: item.Owner.ID, OwnerName: item.Owner.DisplayName,
 					Formats: model.Formats, MultiplierNano: model.MultiplierNano, FXDiscount: model.FXDiscount, Advanced: item.Advanced,
+					Custom: model.Custom,
 				})
 			}
 		}

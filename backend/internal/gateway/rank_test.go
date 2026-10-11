@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -177,4 +178,40 @@ func TestSpendCacheLoadsOncePerWindowAndAccumulates(t *testing.T) {
 	if _, _ = cache.Get("k", now.Add(24*time.Hour), load); loads != 2 {
 		t.Fatalf("a new day must reload, loads = %d", loads)
 	}
+}
+
+func customCandidate(id, owner string, input, output float64) Candidate {
+	return Candidate{ChannelID: id, OwnerID: owner, MultiplierNano: 1e9, Custom: &channel.CustomPrices{
+		Input: money.FromNano(int64(input * 1e9)), Output: money.FromNano(int64(output * 1e9)),
+	}}
+}
+
+func TestRankCheapestOrdersCustomModelsByBlendedPrice(t *testing.T) {
+	// Blends (3 × input + output) / 4: a = 2.5, b = 3, c = 1.75 but owned by
+	// the caller, d = 2.5 with a better success rate than a.
+	candidates := []Candidate{
+		customCandidate("a", "x", 1, 7), customCandidate("b", "x", 3, 3),
+		customCandidate("c", "me", 1, 4), customCandidate("d", "x", 2, 4),
+	}
+	stats := map[string]ChannelStats{"a": {Attempts: 40, Successes: 20}, "d": {Attempts: 40, Successes: 39}}
+	got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
+	if got != "cdab" {
+		t.Fatalf("order = %s, want cdab", got)
+	}
+}
+
+func TestPricingModelUsesCustomPrices(t *testing.T) {
+	model := catalogModel("foo-1")
+	custom := customCandidate("a", "x", 2, 8)
+	priced := custom.PricingModel(model)
+	if priced.InputPrice != money.FromNano(2e9) || priced.OutputPrice != money.FromNano(8e9) || priced.PriceCurrency != "CNY" || len(priced.PriceTiers) != 0 {
+		t.Fatalf("custom pricing model = %+v", priced)
+	}
+	if official := candidate("b", "x", 1).PricingModel(model); official.ID != model.ID || official.InputPrice != model.InputPrice {
+		t.Fatalf("official pricing model changed: %+v", official)
+	}
+}
+
+func catalogModel(id string) catalog.Model {
+	return catalog.Model{ID: id, DisplayName: id, PriceCurrency: "USD", InputPrice: money.FromNano(5e9), OutputPrice: money.FromNano(9e9)}
 }

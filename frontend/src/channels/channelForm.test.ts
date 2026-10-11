@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { advancedChangedCount, advancedInput, applyTestResults, emptyAdvanced, modelsInput, rowsFromDiscover, validateRows } from './channelForm'
+import { advancedChangedCount, advancedInput, applyTestResults, customNameFrom, emptyAdvanced, modelsInput, rowsFromChannel, rowsFromDiscover, validateRows } from './channelForm'
+import type { Channel } from '../api/types'
 
 describe('channel wizard', () => {
   const rows = rowsFromDiscover([
@@ -40,8 +41,33 @@ describe('channel wizard', () => {
   })
 
   it('rejects selling a model without a platform match or format', () => {
-    expect(validateRows([{ ...rows[2], sell: true }])).toBe('勾选的模型需要选择平台模型')
+    expect(validateRows([{ ...rows[2], sell: true }])).toBe('勾选的模型需要选择平台模型或设为自定义模型')
     expect(validateRows([{ ...rows[0], formats: [] }])).toContain('格式')
+  })
+
+  it('sends custom models with their prices and no multiplier', () => {
+    const custom = { ...rows[2], sell: true, custom: true, formats: ['openai_chat' as const], modelId: customNameFrom('vendor/unknown x'),
+      customPrices: { input: '1', output: '9', cacheWrite: '0', cacheRead: '0.1' } }
+    expect(custom.modelId).toBe('unknown-x')
+    expect(validateRows([custom])).toBe('')
+    expect(modelsInput([custom])).toEqual([{
+      model_id: 'unknown-x', upstream_model: 'unknown-x', formats: ['openai_chat'], enabled: true,
+      custom_prices: { input: '1', output: '9', cache_write: '0', cache_read: '0.1' },
+    }])
+    expect(validateRows([{ ...custom, customPrices: { ...custom.customPrices, cacheRead: '' } }])).toContain('四个价格')
+    expect(validateRows([{ ...custom, customPrices: { ...custom.customPrices, input: '100001' } }])).toContain('四个价格')
+    expect(validateRows([{ ...custom, modelId: '-bad' }])).toContain('自定义模型名')
+  })
+
+  it('asks for a multiplier before a pending model sells again', () => {
+    const channel = { models: [{
+      model_id: 'foo-1', upstream_model: 'foo-1', multiplier: '1', fx_discount: false, formats: ['openai_chat'],
+      format_tests: {}, enabled: false, custom_prices: null, pending_multiplier: true,
+    }] } as unknown as Channel
+    const [pending] = rowsFromChannel(channel)
+    expect([pending.pending, pending.multiplier, pending.custom, pending.sell]).toEqual([true, '', false, false])
+    expect(validateRows([{ ...pending, sell: true }])).toBe('foo-1 已加入模型目录，请先设置倍率')
+    expect(validateRows([{ ...pending, sell: true, multiplier: '1.5' }])).toBe('')
   })
 
   it('leaves advanced settings at platform defaults when blank', () => {

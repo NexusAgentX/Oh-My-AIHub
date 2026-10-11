@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
@@ -342,7 +344,7 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 		writeInvalidJSON(w)
 		return
 	}
-	if _, err := a.catalog.Get(r.Context(), modelID); err != nil {
+	if err := a.routable(r.Context(), modelID); err != nil {
 		writeDomainError(w, err)
 		return
 	}
@@ -360,6 +362,25 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 		return
 	}
 	writeJSON(w, http.StatusOK, newRoutingPreferenceJSON(saved))
+}
+
+// routable accepts a catalog model or a custom model a listed channel offers
+// (ADR-0034).
+func (a *app) routable(ctx context.Context, modelID string) error {
+	_, err := a.catalog.Get(ctx, modelID)
+	if !errors.Is(err, catalog.ErrNotFound) {
+		return err
+	}
+	online, onlineErr := a.browse.OnlineChannels(ctx)
+	if onlineErr != nil {
+		return onlineErr
+	}
+	for _, entry := range online {
+		if entry.ModelID == modelID && entry.Custom != nil {
+			return nil
+		}
+	}
+	return err
 }
 
 func (a *app) setRouting(w http.ResponseWriter, r *http.Request) {

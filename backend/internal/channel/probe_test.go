@@ -1,8 +1,11 @@
 package channel
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
 func TestMatchModelIsExactThenCaseInsensitiveThenDateStripped(t *testing.T) {
@@ -76,5 +79,37 @@ func TestNormalizeModelsDefaultsUpstreamAndOrdersFormats(t *testing.T) {
 		if _, err := NormalizeModels(bad, known); err == nil {
 			t.Fatalf("accepted %+v", bad)
 		}
+	}
+}
+
+func TestNormalizeModelsCustomModels(t *testing.T) {
+	known := func(id string) bool { return id == "gpt-5" || id == "retired" }
+	prices := &CustomPrices{Input: money.FromNano(2e9), Output: money.FromNano(8e9)}
+	got, err := NormalizeModels([]Model{{
+		ModelID: "foo-1", Formats: []Format{FormatOpenAIChat}, Custom: prices,
+		MultiplierNano: 3e9, FXDiscount: true, PendingMultiplier: true,
+	}}, known)
+	if err != nil || got[0].MultiplierNano != money.Scale || got[0].FXDiscount || got[0].PendingMultiplier || got[0].Custom.Output != prices.Output {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	if _, err := NormalizeModels([]Model{{ModelID: "retired", Formats: []Format{FormatOpenAIChat}, Custom: prices}}, known); !errors.Is(err, ErrModelNameTaken) {
+		t.Fatalf("catalog name: %v", err)
+	}
+	tooHigh := &CustomPrices{Input: money.FromNano(100_000*money.Scale + 1)}
+	for _, bad := range [][]Model{
+		{{ModelID: "foo/bar", Formats: []Format{FormatOpenAIChat}, Custom: prices}},
+		{{ModelID: "foo-1", Formats: []Format{FormatOpenAIChat}, Custom: tooHigh}},
+		{{ModelID: "foo-1", Formats: []Format{FormatOpenAIChat}, Custom: &CustomPrices{Output: -1}}},
+		{{ModelID: "foo-1", Formats: []Format{FormatOpenAIChat}, Custom: prices}, {ModelID: "foo-1", Formats: []Format{FormatOpenAIChat}, Custom: prices}},
+	} {
+		if _, err := NormalizeModels(bad, known); err == nil {
+			t.Fatalf("accepted %+v", bad)
+		}
+	}
+}
+
+func TestCustomPricesBlended(t *testing.T) {
+	if got := (CustomPrices{Input: money.FromNano(1e9), Output: money.FromNano(5e9), CacheRead: money.FromNano(9e9)}).Blended(); got != 2e9 {
+		t.Fatalf("blended = %v", got)
 	}
 }

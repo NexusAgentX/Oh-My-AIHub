@@ -1942,6 +1942,8 @@ export interface components {
             lowest_prices: components["schemas"]["EffectivePrices"] | null;
             formats: components["schemas"]["Format"][];
             online_channels: number;
+            /** @description 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。 */
+            custom: boolean;
         };
         CatalogModelList: {
             items: components["schemas"]["CatalogModel"][];
@@ -2131,6 +2133,17 @@ export interface components {
             };
             enabled: boolean;
             current_prices: components["schemas"]["EffectivePrices"];
+            /** @description 自定义模型（不在模型目录中）的四个积分价；官方模型为 null。 */
+            custom_prices: components["schemas"]["CustomPrices"] | null;
+            /** @description 原自定义模型已加入模型目录，停用中；渠道主设置倍率并启用后恢复。 */
+            pending_multiplier: boolean;
+        };
+        /** @description 自定义模型的四个基准价（积分/百万 token），按此价格直接计费，不乘倍率、不乘汇率、无条件价格档。 */
+        CustomPrices: {
+            input: components["schemas"]["Price"];
+            output: components["schemas"]["Price"];
+            cache_write: components["schemas"]["Price"];
+            cache_read: components["schemas"]["Price"];
         };
         ChannelModelInput: {
             model_id: string;
@@ -2141,6 +2154,8 @@ export interface components {
             fx_discount?: boolean;
             formats: components["schemas"]["Format"][];
             enabled?: boolean;
+            /** @description 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。 */
+            custom_prices?: components["schemas"]["CustomPrices"];
         };
         ChannelToday: {
             revenue: components["schemas"]["Amount"];
@@ -2171,7 +2186,7 @@ export interface components {
         ChannelEvent: {
             id: string;
             /** @enum {string} */
-            kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed";
+            kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed" | "model_pending_multiplier";
             reason: string;
             created_at: components["schemas"]["Timestamp"];
         };
@@ -2305,6 +2320,8 @@ export interface components {
             /** @description 美元模型计费时使用的汇率；人民币模型为 null。 */
             usd_cny_rate?: components["schemas"]["ExchangeRate"] | null;
             fx_discount?: boolean;
+            /** @description 渠道自定义模型按渠道自定价格计费；旧快照无此字段。 */
+            custom?: boolean;
             effective_multiplier?: components["schemas"]["EffectiveMultiplier"];
             fee_rate_nano: number;
             prices: components["schemas"]["EffectivePrices"];

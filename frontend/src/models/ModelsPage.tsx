@@ -17,6 +17,7 @@ function ModelCard({ model }: { model: CatalogModel }) {
       <header>
         <strong>{model.display_name || model.id}</strong>
         {model.current_tier && <Badge tone="accent">{model.current_tier.name}</Badge>}
+        {model.custom && <Badge tone="info">自定义</Badge>}
       </header>
       {model.display_name && model.display_name !== model.id && (
         <span className="model-card-id mono">{model.id}</span>

@@ -4,13 +4,24 @@
 
 package channelpg
 
+import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+)
+
 type ChannelModel struct {
-	ChannelID      string
-	ModelID        string
-	UpstreamModel  string
-	MultiplierNano int64
-	Formats        []string
-	FormatTests    []byte
-	Enabled        bool
-	FxDiscount     bool
+	ChannelID                           string
+	ModelID                             string
+	UpstreamModel                       string
+	MultiplierNano                      int64
+	Formats                             []string
+	FormatTests                         []byte
+	Enabled                             bool
+	FxDiscount                          bool
+	IsCustom                            bool
+	CustomInputPriceNanoPerMillion      *money.Amount
+	CustomOutputPriceNanoPerMillion     *money.Amount
+	CustomCacheWritePriceNanoPerMillion *money.Amount
+	CustomCacheReadPriceNanoPerMillion  *money.Amount
+	PendingMultiplier                   bool
+	CatalogModelID                      *string
 }

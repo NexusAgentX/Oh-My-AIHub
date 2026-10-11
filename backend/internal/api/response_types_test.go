@@ -112,6 +112,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 				"model_id": "m", "display_name": "", "upstream_model": "", "price_currency": "CNY", "multiplier": "0", "fx_discount": false,
 				"effective_multiplier": "0", "formats": []any{"gemini"}, "format_tests": emptyObject,
 				"enabled": false, "current_prices": map[string]any{"input": "0", "output": "0", "cache_write": "0", "cache_read": "0"},
+				"custom_prices": nil, "pending_multiplier": false,
 			}},
 		}},
 		{"channel format test with nothing recorded", newFormatTestsJSON(map[channel.Format]channel.FormatTest{channel.FormatGemini: {}})["gemini"], map[string]any{

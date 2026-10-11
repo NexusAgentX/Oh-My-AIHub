@@ -23,6 +23,31 @@ export type ModelRow = {
   /** 每种格式最近一次测试是否通过 */
   passed: Partial<Record<Format, boolean>>
   errors?: Partial<Record<Format, string>>
+  /** 自定义模型：不在目录中，modelId 为自定的模型名，按 customPrices 直接计费 */
+  custom: boolean
+  customPrices: CustomPriceForm
+  /** 原自定义模型已加入目录：设置倍率并勾选后恢复 */
+  pending: boolean
+}
+
+/** 自定义模型的四个基准价（积分/百万 token）。 */
+export type CustomPriceForm = { input: string; output: string; cacheWrite: string; cacheRead: string }
+
+export const emptyCustomPrices: CustomPriceForm = { input: '', output: '', cacheWrite: '', cacheRead: '' }
+
+/** 自定义模型名的规则同模型目录：字母或数字开头，可含 . _ -，至多 128 个字符。 */
+export const customModelNamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
+
+const pricePattern = /^(0|[1-9][0-9]{0,5})(\.[0-9]{1,9})?$/
+
+function validPrice(value: string) {
+  return pricePattern.test(value.trim()) && Number(value) <= 100000
+}
+
+/** 把上游名称转换成合法的自定义模型名（去掉前缀与非法字符）。 */
+export function customNameFrom(upstream: string) {
+  const base = upstream.trim().split(/[/:]/).pop() ?? ''
+  return base.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 128)
 }
 
 export type HeaderSetRow = { name: string; value: string }
@@ -70,6 +95,9 @@ export function rowsFromDiscover(models: DiscoveredModel[]): ModelRow[] {
     multiplier: '1',
     fxDiscount: false,
     passed: {},
+    custom: false,
+    customPrices: emptyCustomPrices,
+    pending: false,
   }))
 }
 
@@ -80,8 +108,19 @@ export function rowsFromChannel(channel: Channel): ModelRow[] {
     modelId: model.model_id,
     upstream: model.upstream_model,
     formats: model.formats,
-    multiplier: model.multiplier,
+    // 待设倍率的模型须重新填写倍率。
+    multiplier: model.pending_multiplier ? '' : model.multiplier,
     fxDiscount: model.fx_discount,
+    custom: model.custom_prices !== null,
+    customPrices: model.custom_prices
+      ? {
+          input: model.custom_prices.input,
+          output: model.custom_prices.output,
+          cacheWrite: model.custom_prices.cache_write,
+          cacheRead: model.custom_prices.cache_read,
+        }
+      : emptyCustomPrices,
+    pending: model.pending_multiplier,
     errors: Object.fromEntries(Object.entries(model.format_tests).filter(([, test]) => !test.ok).map(([format, test]) => [format, test.error || '测试未通过'])),
     passed: Object.fromEntries(Object.entries(model.format_tests).map(([format, test]) => [format, test.ok])),
   }))
@@ -114,24 +153,36 @@ export function discoverSummary(models: DiscoveredModel[]) {
 export function modelsInput(rows: ModelRow[]): ChannelModelInput[] {
   return rows
     .filter((row) => row.modelId)
-    .map((row) => ({
-      model_id: row.modelId,
-      upstream_model: row.upstream.trim() || row.modelId,
-      multiplier: row.multiplier.trim() || '1',
-      fx_discount: row.fxDiscount,
-      formats: row.formats,
-      enabled: row.sell,
-    }))
+    .map((row): ChannelModelInput => {
+      const base = { model_id: row.modelId, upstream_model: row.upstream.trim() || row.modelId, formats: row.formats, enabled: row.sell }
+      if (row.custom) {
+        const prices = row.customPrices
+        return {
+          ...base,
+          custom_prices: { input: prices.input.trim(), output: prices.output.trim(), cache_write: prices.cacheWrite.trim(), cache_read: prices.cacheRead.trim() },
+        }
+      }
+      return { ...base, multiplier: row.multiplier.trim() || '1', fx_discount: row.fxDiscount }
+    })
 }
 
 export function validateRows(rows: ModelRow[]) {
   const selling = rows.filter((row) => row.sell)
   if (selling.length === 0) return '至少勾选一个要卖的模型'
-  if (selling.some((row) => !row.modelId)) return '勾选的模型需要选择平台模型'
+  if (selling.some((row) => !row.modelId)) return '勾选的模型需要选择平台模型或设为自定义模型'
   if (selling.some((row) => row.formats.length === 0)) return '每个勾选的模型至少选择一种格式'
   const ids = rows.filter((row) => row.modelId).map((row) => row.modelId)
-  if (new Set(ids).size !== ids.length) return '同一个平台模型只能出现一次'
-  if (selling.some((row) => !/^\d+(\.\d{1,9})?$/.test(row.multiplier.trim() || '1') || Number(row.multiplier) > 1000)) {
+  if (new Set(ids).size !== ids.length) return '同一个模型只能出现一次'
+  const custom = rows.filter((row) => row.custom && row.modelId)
+  if (custom.some((row) => !customModelNamePattern.test(row.modelId))) {
+    return '自定义模型名须以字母或数字开头，只含字母、数字、. _ -'
+  }
+  if (custom.some((row) => !Object.values(row.customPrices).every(validPrice))) {
+    return '自定义模型须填写四个价格，0～100000 积分/百万 token'
+  }
+  const pending = selling.find((row) => row.pending && !row.multiplier.trim())
+  if (pending) return `${pending.modelId} 已加入模型目录，请先设置倍率`
+  if (selling.some((row) => !row.custom && (!/^\d+(\.\d{1,9})?$/.test(row.multiplier.trim() || '1') || Number(row.multiplier) > 1000))) {
     return '倍率须为 0～1000 的数字'
   }
   return ''

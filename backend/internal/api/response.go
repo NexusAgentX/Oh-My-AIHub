@@ -115,6 +115,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "own_order", "不能购买自己的卖单")
 	case errors.Is(err, c2c.ErrInvalidCursor):
 		writeBadCursor(w)
+	case errors.Is(err, channel.ErrModelNameTaken):
+		writeError(w, http.StatusUnprocessableEntity, "model_name_taken", "自定义模型不能与模型目录中的模型同名")
 	case errors.Is(err, channel.ErrInvalidInput), errors.Is(err, apikey.ErrInvalidInput), errors.Is(err, routing.ErrInvalidInput), errors.Is(err, c2c.ErrInvalidInput),
 		errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
 		errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount),

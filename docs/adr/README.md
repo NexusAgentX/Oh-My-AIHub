@@ -32,6 +32,7 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 - [ADR-0031：论坛附件采用受限 PostgreSQL 存储并继承内容权限](0031-store-forum-attachments-in-postgresql.md)
 - [ADR-0032：论坛采用 Vditor 源码编辑与统一 Markdown 渲染](0032-use-vditor-for-forum-markdown.md)
 - [ADR-0033：前端采用贴纸风视觉、双主题与自托管字体](0033-adopt-sticker-visual-language-and-dual-themes.md)
+- [ADR-0034：渠道自定义模型与转为官方后待设倍率](0034-adopt-channel-custom-models.md)
 
 ## 归档
 

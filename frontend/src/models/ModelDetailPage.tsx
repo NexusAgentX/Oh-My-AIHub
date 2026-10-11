@@ -40,12 +40,13 @@ function PriceDetails({ detail }: { detail: ModelDetail }) {
   return (
     <Disclosure title="价格详情">
       <p className="muted-copy">
+        {detail.model.custom && '渠道自定义模型：各渠道自定价格、按渠道价格直接计费，这里是按「(3 × 输入 + 输出) ÷ 4」最便宜的渠道价格；便宜优先按同一口径排序。'}
         积分 / 百万 token。细分价未设置时继承本组通用价；缺少可靠明细时按通用价结算。工具、容器、存储附加费未覆盖。
         {detail.model.usd_cny_rate && ` 美元定价模型，按 1 美元 = ${detail.model.usd_cny_rate} 积分换算。`}
       </p>
       <dl className="price-rules">
         <div>
-          <dt>基准价</dt>
+          <dt>{detail.model.custom ? '最低渠道价' : '基准价'}</dt>
           <dd>
             <PriceLine prices={detail.model.base_prices} />
           </dd>
@@ -120,8 +121,9 @@ export function ModelDetailPage() {
               title={detail.model.display_name || detail.model.id}
             />
             <div className="model-summary">
+              {detail.model.custom && <Badge tone="info">自定义模型</Badge>}
               <Badge tone="accent">
-                参考价（实际按调用条件）：{current.name} · 输入 {formatPoints(current.prices.input, { digits: 2 })} /
+                参考价（实际按调用条件）：{detail.model.custom ? '最低渠道价' : current.name} · 输入 {formatPoints(current.prices.input, { digits: 2 })} /
                 输出 {formatPoints(current.prices.output, { digits: 2 })}
               </Badge>
               <span className="model-summary-formats">

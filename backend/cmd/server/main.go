@@ -101,6 +101,15 @@ func main() {
 		}
 		return ids, nil
 	}
+	// Keys may also name custom models of channels (ADR-0034).
+	keyModelIDs := func(ctx context.Context) ([]string, error) {
+		ids, err := modelIDs(ctx)
+		if err != nil {
+			return nil, err
+		}
+		custom, err := store.Channels.CustomModelNames(ctx)
+		return append(ids, custom...), err
+	}
 	bus := gateway.NewBus()
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		bus.Publish(gateway.Event{Kind: channelEventKind(kind), At: time.Now(), ChannelID: channelID, Detail: reason})
@@ -155,7 +164,7 @@ func main() {
 			Settings: settingsService,
 			RateSync: rateSyncer,
 			Audit:    audit.NewService(store.Audit),
-			Keys:     apikey.NewService(store.Keys, credentialKeyring, modelIDs),
+			Keys:     apikey.NewService(store.Keys, credentialKeyring, keyModelIDs),
 			Channels: channel.NewService(channel.Dependencies{
 				Store: store.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
 				BlockedHosts: func(ctx context.Context) ([]string, error) {

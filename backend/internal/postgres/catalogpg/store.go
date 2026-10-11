@@ -13,6 +13,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
@@ -126,6 +127,9 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 	var created catalog.Model
 	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
+		if err := q.LockModelName(ctx, model.ID); err != nil {
+			return err
+		}
 		row, err := q.InsertModel(ctx, InsertModelParams{
 			ID: model.ID, DisplayName: model.DisplayName, PriceCurrency: model.PriceCurrency, TokenPrices: encodePrices(model.TokenPrices),
 			InputPriceNanoPerMillion: model.InputPrice, OutputPriceNanoPerMillion: model.OutputPrice,
@@ -146,9 +150,21 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 			return err
 		}
 		created = models[0]
+		converted, err := q.ConvertCustomModels(ctx, row.ID)
+		if err != nil {
+			return err
+		}
+		for _, channelID := range converted {
+			if err := q.InsertChannelEvent(ctx, InsertChannelEventParams{ChannelID: channelID, Kind: channel.EventModelPendingMultiplier, Reason: row.ID}); err != nil {
+				return err
+			}
+		}
+		detail := map[string]any{"after": auditView(created)}
+		if len(converted) > 0 {
+			detail["converted_custom_channels"] = converted
+		}
 		return auditpg.Record(ctx, tx, auditpg.Event{
-			ActorID: actorID, Action: audit.ActionModelCreated, TargetType: "model", TargetID: row.ID,
-			Detail: map[string]any{"after": auditView(created)},
+			ActorID: actorID, Action: audit.ActionModelCreated, TargetType: "model", TargetID: row.ID, Detail: detail,
 		})
 	})
 	return created, err

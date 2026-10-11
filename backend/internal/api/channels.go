@@ -60,6 +60,38 @@ type channelModelJSON struct {
 	FormatTests         map[string]formatTestJSON `json:"format_tests"`
 	Enabled             bool                      `json:"enabled"`
 	CurrentPrices       effectivePricesJSON       `json:"current_prices"`
+	CustomPrices        *customPricesJSON         `json:"custom_prices"`
+	PendingMultiplier   bool                      `json:"pending_multiplier"`
+}
+
+// customPricesJSON is the OpenAPI CustomPrices schema.
+type customPricesJSON struct {
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+	CacheWrite string `json:"cache_write"`
+	CacheRead  string `json:"cache_read"`
+}
+
+func newCustomPricesJSON(prices *channel.CustomPrices) *customPricesJSON {
+	if prices == nil {
+		return nil
+	}
+	return &customPricesJSON{
+		Input: prices.Input.String(), Output: prices.Output.String(),
+		CacheWrite: prices.CacheWrite.String(), CacheRead: prices.CacheRead.String(),
+	}
+}
+
+func (r customPricesJSON) prices() (*channel.CustomPrices, error) {
+	var parsed [4]money.Amount
+	for index, raw := range []string{r.Input, r.Output, r.CacheWrite, r.CacheRead} {
+		amount, err := money.Parse(raw)
+		if err != nil {
+			return nil, channel.ErrInvalidInput
+		}
+		parsed[index] = amount
+	}
+	return &channel.CustomPrices{Input: parsed[0], Output: parsed[1], CacheWrite: parsed[2], CacheRead: parsed[3]}, nil
 }
 
 // channelTodayJSON is the OpenAPI ChannelToday schema.
@@ -190,6 +222,9 @@ func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Ti
 	items := make([]channelModelJSON, 0, len(item.Models))
 	for _, model := range item.Models {
 		known := view.models[model.ModelID]
+		if model.Custom != nil {
+			known = model.Custom.Model(model.ModelID)
+		}
 		if known.PriceCurrency == "" {
 			known.PriceCurrency = ledger.CurrencyCNY
 		}
@@ -207,6 +242,8 @@ func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Ti
 			FormatTests:         newFormatTestsJSON(model.FormatTests),
 			Enabled:             model.Enabled,
 			CurrentPrices:       newEffectivePricesJSON(prices, model.MultiplierNano, pricing.RateNano),
+			CustomPrices:        newCustomPricesJSON(model.Custom),
+			PendingMultiplier:   model.PendingMultiplier,
 		})
 	}
 	var successRate *string
@@ -317,12 +354,13 @@ func (r advancedRequest) advanced() (channel.Advanced, error) {
 }
 
 type channelModelRequest struct {
-	ModelID       string           `json:"model_id"`
-	UpstreamModel string           `json:"upstream_model"`
-	Multiplier    *string          `json:"multiplier"`
-	FXDiscount    *bool            `json:"fx_discount"`
-	Formats       []channel.Format `json:"formats"`
-	Enabled       *bool            `json:"enabled"`
+	ModelID       string            `json:"model_id"`
+	UpstreamModel string            `json:"upstream_model"`
+	Multiplier    *string           `json:"multiplier"`
+	FXDiscount    *bool             `json:"fx_discount"`
+	Formats       []channel.Format  `json:"formats"`
+	Enabled       *bool             `json:"enabled"`
+	CustomPrices  *customPricesJSON `json:"custom_prices"`
 }
 
 func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) {
@@ -337,10 +375,18 @@ func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) 
 			multiplier = parsed.Nano()
 		}
 		enabled := request.Enabled == nil || *request.Enabled
-		models = append(models, channel.Model{
+		model := channel.Model{
 			ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
 			FXDiscount: request.FXDiscount != nil && *request.FXDiscount, Formats: request.Formats, Enabled: enabled,
-		})
+		}
+		if request.CustomPrices != nil {
+			prices, err := request.CustomPrices.prices()
+			if err != nil {
+				return nil, err
+			}
+			model.Custom = prices
+		}
+		models = append(models, model)
 	}
 	return models, nil
 }

@@ -27,6 +27,7 @@ import {
   applyTestResults,
   discoverSummary,
   emptyAdvanced,
+  emptyCustomPrices,
   modelsInput,
   rowKey,
   rowsFromChannel,
@@ -66,8 +67,11 @@ function Stepper({ current }: { current: number }) {
   )
 }
 
-function emptyRow(): ModelRow {
-  return { key: rowKey(), sell: true, modelId: '', upstream: '', formats: ['openai_chat'], multiplier: '1', fxDiscount: false, passed: {} }
+function emptyRow(custom = false): ModelRow {
+  return {
+    key: rowKey(), sell: true, modelId: '', upstream: '', formats: ['openai_chat'], multiplier: '1', fxDiscount: false, passed: {},
+    custom, customPrices: emptyCustomPrices, pending: false,
+  }
 }
 
 /** 选模型区：读取结果提示、测试格式、手动添加与表格。 */
@@ -92,7 +96,7 @@ function ModelsSection({
     <div className="channel-models">
       {summary && (
         <p className="muted-copy">
-          从上游读取到 {summary.total} 个模型，其中 {summary.matched} 个在平台目录里；格式已按模型预选，绿色是测试通过的
+          从上游读取到 {summary.total} 个模型，其中 {summary.matched} 个在平台目录里；不在目录的可设为自定义模型并自定价格。格式已按模型预选，绿色是测试通过的
         </p>
       )}
       <div className="channel-models-actions">
@@ -101,6 +105,9 @@ function ModelsSection({
         </Button>
         <Button icon={<Icon name="plus" />} onClick={() => onRows([...rows, emptyRow()])} size="sm" type="button" variant="quiet">
           手动添加
+        </Button>
+        <Button icon={<Icon name="plus" />} onClick={() => onRows([...rows, emptyRow(true)])} size="sm" type="button" variant="quiet">
+          自定义模型
         </Button>
       </div>
       <InlineError>{testError}</InlineError>

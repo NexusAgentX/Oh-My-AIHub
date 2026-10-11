@@ -11,6 +11,43 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
+const convertCustomModels = `-- name: ConvertCustomModels :many
+UPDATE channel_models SET
+    is_custom = false,
+    custom_input_price_nano_per_million = NULL,
+    custom_output_price_nano_per_million = NULL,
+    custom_cache_write_price_nano_per_million = NULL,
+    custom_cache_read_price_nano_per_million = NULL,
+    multiplier_nano = 1000000000,
+    fx_discount = false,
+    enabled = false,
+    pending_multiplier = true
+WHERE model_id = $1 AND is_custom
+RETURNING channel_id
+`
+
+// A new catalog model takes over the channels' custom models of the same name:
+// they become disabled official rows waiting for the owner's multiplier (ADR-0034).
+func (q *Queries) ConvertCustomModels(ctx context.Context, modelID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, convertCustomModels, modelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var channel_id string
+		if err := rows.Scan(&channel_id); err != nil {
+			return nil, err
+		}
+		items = append(items, channel_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteTiers = `-- name: DeleteTiers :exec
 DELETE FROM model_price_tiers WHERE model_id = $1
 `
@@ -51,6 +88,21 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 		&i.MaxOutputTokens,
 	)
 	return i, err
+}
+
+const insertChannelEvent = `-- name: InsertChannelEvent :exec
+INSERT INTO channel_events (channel_id, kind, reason) VALUES ($1, $2, $3)
+`
+
+type InsertChannelEventParams struct {
+	ChannelID string
+	Kind      string
+	Reason    string
+}
+
+func (q *Queries) InsertChannelEvent(ctx context.Context, arg InsertChannelEventParams) error {
+	_, err := q.db.Exec(ctx, insertChannelEvent, arg.ChannelID, arg.Kind, arg.Reason)
+	return err
 }
 
 const insertModel = `-- name: InsertModel :one
@@ -308,6 +360,16 @@ func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
 		&i.MaxOutputTokens,
 	)
 	return i, err
+}
+
+const lockModelName = `-- name: LockModelName :exec
+SELECT pg_advisory_xact_lock(hashtextextended('model_name:' || $1::text, 0))
+`
+
+// Same lock as channelpg.LockModelName: a name is never both custom and official.
+func (q *Queries) LockModelName(ctx context.Context, modelID string) error {
+	_, err := q.db.Exec(ctx, lockModelName, modelID)
+	return err
 }
 
 const setChannelFXDiscount = `-- name: SetChannelFXDiscount :exec

@@ -6,8 +6,19 @@ INSERT INTO channels (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
 
 -- name: InsertChannelModel :exec
-INSERT INTO channel_models (channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO channel_models (
+    channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount,
+    is_custom, custom_input_price_nano_per_million, custom_output_price_nano_per_million,
+    custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+
+-- Serializes custom model names against catalog creation (catalogpg.CreateModel
+-- takes the same lock) so a name is never both custom and official.
+-- name: LockModelName :exec
+SELECT pg_advisory_xact_lock(hashtextextended('model_name:' || sqlc.arg(model_id)::text, 0));
+
+-- name: CatalogModelExists :one
+SELECT EXISTS (SELECT 1 FROM models WHERE id = $1);
 
 -- name: DeleteChannelModels :exec
 DELETE FROM channel_models WHERE channel_id = $1;
@@ -52,7 +63,10 @@ ORDER BY c.created_at DESC, c.id DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount,
+       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
+       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million, cm.pending_multiplier,
+       cm.catalog_model_id
 FROM channel_models cm
 WHERE cm.channel_id = ANY(sqlc.arg(channel_ids)::uuid[])
 ORDER BY cm.channel_id, cm.model_id;
@@ -106,3 +120,10 @@ SELECT final_channel_id AS channel_id,
 FROM calls
 WHERE final_channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) AND created_at >= sqlc.arg(since)
 GROUP BY final_channel_id;
+
+-- name: ListCustomModelNames :many
+SELECT DISTINCT cm.model_id
+FROM channel_models cm
+JOIN channels c ON c.id = cm.channel_id
+WHERE cm.is_custom AND c.deleted_at IS NULL
+ORDER BY cm.model_id;

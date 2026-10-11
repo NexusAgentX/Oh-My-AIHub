@@ -320,6 +320,12 @@ func validPrice(price money.Amount) bool {
 	return price >= 0 && price <= MaxPriceNanoPerMillion
 }
 
+// ValidModelID reports whether id is a valid model name (the client `model`).
+func ValidModelID(id string) bool { return modelIDPattern.MatchString(id) }
+
+// ValidPrice reports whether a per-million price is within the catalog range.
+func ValidPrice(price money.Amount) bool { return validPrice(price) }
+
 // Validate checks a normalized model against the catalog rules.
 func Validate(model Model) error {
 	if !modelIDPattern.MatchString(model.ID) || model.DisplayName == "" || utf8.RuneCountInString(model.DisplayName) > 128 {

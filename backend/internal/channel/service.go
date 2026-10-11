@@ -3,6 +3,7 @@ package channel
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -206,6 +207,15 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, in UpdateInput
 		models, err := NormalizeModels(*in.Models, known)
 		if err != nil {
 			return Channel{}, err
+		}
+		// A pending model stays pending until the owner enables it, which
+		// confirms its multiplier.
+		for index, model := range models {
+			if model.Custom == nil && !model.Enabled && slices.ContainsFunc(current.Models, func(old Model) bool {
+				return old.ModelID == model.ModelID && old.PendingMultiplier
+			}) {
+				models[index].PendingMultiplier = true
+			}
 		}
 		update.Models = &models
 	}

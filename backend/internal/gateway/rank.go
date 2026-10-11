@@ -30,11 +30,16 @@ type RankInput struct {
 
 // price orders candidates by what they charge: the channel multiplier and
 // currency conversion applied to the model's current tier price (identical for
-// every candidate of one model, so multiplier × rate alone orders them).
-// Channels of the caller cost 0.
+// every candidate of one model, so multiplier × rate alone orders them). The
+// channels of a custom model each set their own prices and are ordered by the
+// 3:1 blend of them; a model's candidates are never mixed. Channels of the
+// caller cost 0.
 func price(candidate Candidate, consumerID string) float64 {
 	if candidate.OwnerID == consumerID {
 		return 0
+	}
+	if candidate.Custom != nil {
+		return candidate.Custom.Blended()
 	}
 	rate := candidate.RateNano
 	if rate == 0 {

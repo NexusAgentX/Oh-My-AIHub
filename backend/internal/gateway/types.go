@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -63,6 +64,18 @@ type Candidate struct {
 	RateNano   int64
 	Advanced   channel.Advanced
 	Credential channel.EncryptedCredential
+	// Custom is set for a custom model (ADR-0034): the channel's own point
+	// prices, charged without multiplier, exchange rate or tiers.
+	Custom *channel.CustomPrices
+}
+
+// PricingModel is the model a candidate bills: the catalog model itself, or
+// for a custom model the channel's own point prices without tiers.
+func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
+	if c.Custom == nil {
+		return model
+	}
+	return c.Custom.Model(model.ID)
 }
 
 // ChannelStats is the 24h health of a channel computed from call attempts.
@@ -182,7 +195,17 @@ type Store interface {
 	RecordChannelEvent(ctx context.Context, channelID, kind, reason string) error
 	// OnlineModels lists, for GET /v1/models, the models that have at least
 	// one listed channel.
-	OnlineModels(ctx context.Context) ([]string, error)
+	OnlineModels(ctx context.Context) ([]OnlineModel, error)
+	// CustomModelOnline reports whether a listed channel offers a custom
+	// model of that name.
+	CustomModelOnline(ctx context.Context, modelID string) (bool, error)
+}
+
+// OnlineModel is a model name with at least one listed channel; Custom marks
+// a channel-defined model outside the catalog.
+type OnlineModel struct {
+	ID     string
+	Custom bool
 }
 
 // OnlineChannel is one listed channel offering one model, for browsing.
@@ -196,6 +219,7 @@ type OnlineChannel struct {
 	MultiplierNano int64
 	FXDiscount     bool
 	Advanced       channel.Advanced
+	Custom         *channel.CustomPrices
 }
 
 // HomeStats are the counters on the home page.

@@ -10,6 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
@@ -18,6 +19,8 @@ var (
 	ErrConflict = errors.New("channel state conflict")
 	// ErrSuspended rejects owner changes of a channel an administrator took down.
 	ErrSuspended = errors.New("channel is suspended")
+	// ErrModelNameTaken rejects a custom model whose name is in the catalog.
+	ErrModelNameTaken = errors.New("custom model name is a catalog model")
 )
 
 type Status string
@@ -70,8 +73,36 @@ type FormatTest struct {
 	TestedAt   time.Time `json:"tested_at"`
 }
 
-// Model is one catalog model offered by a channel: the upstream name it maps
-// to, the price multiplier and the formats the upstream actually serves.
+// CustomPrices are the four per-million-token point prices of a custom model
+// (ADR-0034); they are charged as is, without multiplier, exchange rate or
+// tiers.
+type CustomPrices struct {
+	Input      money.Amount
+	Output     money.Amount
+	CacheWrite money.Amount
+	CacheRead  money.Amount
+}
+
+// Blended is the 3:1 input/output blend that orders channels of a custom
+// model by price (cheapest first and the lowest reference price, ADR-0034);
+// cache prices do not count.
+func (p CustomPrices) Blended() float64 {
+	return (3*float64(p.Input.Nano()) + float64(p.Output.Nano())) / 4
+}
+
+// Model is the catalog-shaped model a channel bills for a custom model: the
+// four prices in points without tiers or fine-grained prices.
+func (p CustomPrices) Model(id string) catalog.Model {
+	return catalog.Model{
+		ID: id, DisplayName: id, PriceCurrency: "CNY", Enabled: true,
+		InputModalities: []string{"text"}, OutputModalities: []string{"text"},
+		InputPrice: p.Input, OutputPrice: p.Output, CacheWritePrice: p.CacheWrite, CacheReadPrice: p.CacheRead,
+	}
+}
+
+// Model is one model offered by a channel: the upstream name it maps to, the
+// price multiplier and the formats the upstream actually serves. A model with
+// Custom prices is not in the catalog (ADR-0034).
 type Model struct {
 	ModelID        string
 	UpstreamModel  string
@@ -82,6 +113,10 @@ type Model struct {
 	Formats     []Format
 	FormatTests map[Format]FormatTest
 	Enabled     bool
+	Custom      *CustomPrices
+	// PendingMultiplier marks a former custom model that the catalog now
+	// lists: it stays disabled until the owner enables it with a multiplier.
+	PendingMultiplier bool
 }
 
 type Owner struct {
@@ -129,6 +164,9 @@ const (
 	EventListed          = "listed"
 	EventUnlisted        = "unlisted"
 	EventTestFailed      = "test_failed"
+	// EventModelPendingMultiplier records that a custom model of the channel
+	// became an official catalog model; the reason is the model ID.
+	EventModelPendingMultiplier = "model_pending_multiplier"
 )
 
 // NewChannel is a validated creation request.
@@ -253,7 +291,8 @@ func ValidateAdvanced(advanced Advanced) error {
 const MaxMultiplierNano int64 = 1000 * money.Scale
 
 // NormalizeModels trims and validates the offered models. known reports
-// whether a model ID exists in the catalog.
+// whether a model ID exists in the catalog: official models must, custom
+// models must not.
 func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
 	if len(models) == 0 || len(models) > MaxModels {
 		return nil, ErrInvalidInput
@@ -266,9 +305,23 @@ func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
 		if model.UpstreamModel == "" {
 			model.UpstreamModel = model.ModelID
 		}
-		if model.ModelID == "" || seen[model.ModelID] || !known(model.ModelID) ||
+		if model.ModelID == "" || seen[model.ModelID] ||
 			utf8.RuneCountInString(model.UpstreamModel) > 256 || hasControl(model.UpstreamModel) ||
 			model.MultiplierNano < 0 || model.MultiplierNano > MaxMultiplierNano {
+			return nil, ErrInvalidInput
+		}
+		if model.Custom != nil {
+			prices := *model.Custom
+			if known(model.ModelID) {
+				return nil, ErrModelNameTaken
+			}
+			if !catalog.ValidModelID(model.ModelID) || !catalog.ValidPrice(prices.Input) || !catalog.ValidPrice(prices.Output) ||
+				!catalog.ValidPrice(prices.CacheWrite) || !catalog.ValidPrice(prices.CacheRead) {
+				return nil, ErrInvalidInput
+			}
+			model.Custom = &prices
+			model.MultiplierNano, model.FXDiscount, model.PendingMultiplier = money.Scale, false, false
+		} else if !known(model.ModelID) {
 			return nil, ErrInvalidInput
 		}
 		seen[model.ModelID] = true

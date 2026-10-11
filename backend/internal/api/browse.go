@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"slices"
@@ -57,6 +58,7 @@ type catalogModelJSON struct {
 	LowestPrices             *effectivePricesJSON `json:"lowest_prices"`
 	Formats                  []channel.Format     `json:"formats"`
 	OnlineChannels           int                  `json:"online_channels"`
+	Custom                   bool                 `json:"custom"`
 }
 
 // catalogModelListJSON is the OpenAPI CatalogModelList schema.
@@ -211,6 +213,40 @@ func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, no
 	}
 }
 
+// newCustomModelJSON lists a custom model (ADR-0034) of the given online
+// channels: only its name, priced at the channel with the lowest 3:1 blend.
+func newCustomModelJSON(id string, online []gateway.OnlineChannel) catalogModelJSON {
+	var cheapest *channel.CustomPrices
+	for _, entry := range online {
+		if entry.Custom != nil && (cheapest == nil || entry.Custom.Blended() < cheapest.Blended()) {
+			cheapest = entry.Custom
+		}
+	}
+	item := newCatalogModelJSON(cheapest.Model(id), online, time.Time{}, ledger.UnitRate)
+	item.Custom = true
+	return item
+}
+
+// customOnline returns the online channels of a model name that are custom.
+func customOnline(entries []gateway.OnlineChannel) []gateway.OnlineChannel {
+	var custom []gateway.OnlineChannel
+	for _, entry := range entries {
+		if entry.Custom != nil {
+			custom = append(custom, entry)
+		}
+	}
+	return custom
+}
+
+// entryModel is the model an online channel prices: the catalog model, or
+// its own prices for a custom model.
+func entryModel(model catalog.Model, entry gateway.OnlineChannel) catalog.Model {
+	if entry.Custom != nil {
+		return entry.Custom.Model(model.ID)
+	}
+	return model
+}
+
 func groupByModel(entries []gateway.OnlineChannel) map[string][]gateway.OnlineChannel {
 	grouped := map[string][]gateway.OnlineChannel{}
 	for _, entry := range entries {
@@ -238,8 +274,20 @@ func (a *app) listModels(w http.ResponseWriter, r *http.Request) {
 	grouped := groupByModel(online)
 	now := time.Now()
 	items := make([]catalogModelJSON, 0, len(models))
+	listed := map[string]bool{}
 	for _, model := range models {
+		listed[model.ID] = true
 		items = append(items, newCatalogModelJSON(model, grouped[model.ID], now, defaults.USDCNYRateNano))
+	}
+	var customIDs []string
+	for id, entries := range grouped {
+		if !listed[id] && len(customOnline(entries)) > 0 {
+			customIDs = append(customIDs, id)
+		}
+	}
+	slices.Sort(customIDs)
+	for _, id := range customIDs {
+		items = append(items, newCustomModelJSON(id, customOnline(grouped[id])))
 	}
 	writeJSON(w, http.StatusOK, catalogModelListJSON{Items: items})
 }
@@ -248,8 +296,10 @@ func ratio(value float64) string { return strconv.FormatFloat(value, 'f', 6, 64)
 
 func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	model, err := a.catalog.Get(ctx, r.PathValue("modelID"))
-	if err != nil || !model.Enabled {
+	modelID := r.PathValue("modelID")
+	model, err := a.catalog.Get(ctx, modelID)
+	custom := errors.Is(err, catalog.ErrNotFound)
+	if (err != nil && !custom) || (err == nil && !model.Enabled) {
 		if err == nil {
 			err = catalog.ErrNotFound
 		}
@@ -261,6 +311,21 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+	if custom {
+		// Not in the catalog: a custom model if a listed channel offers one.
+		var entries []gateway.OnlineChannel
+		for _, entry := range online {
+			if entry.ModelID == modelID {
+				entries = append(entries, entry)
+			}
+		}
+		entries = customOnline(entries)
+		if len(entries) == 0 {
+			writeDomainError(w, catalog.ErrNotFound)
+			return
+		}
+		model = catalog.Model{ID: modelID, DisplayName: modelID, PriceCurrency: ledger.CurrencyCNY, Enabled: true}
+	}
 	defaults, _, err := a.gateway.Settings(ctx)
 	if err != nil {
 		writeDomainError(w, err)
@@ -268,12 +333,11 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	accountID := accountFromContext(ctx).ID
-	prices, _ := currentPrices(model, now)
 	stats := a.gateway.Stats(ctx)
 
 	var mine []gateway.OnlineChannel
 	for _, entry := range online {
-		if entry.ModelID == model.ID {
+		if entry.ModelID == model.ID && (entry.Custom != nil) == custom {
 			mine = append(mine, entry)
 		}
 	}
@@ -304,7 +368,9 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			left := ratio(math.Min(1, math.Max(0, remaining)))
 			capRemaining = &left
 		}
-		pricing := newChannelPricing(model, entry.MultiplierNano, entry.FXDiscount, defaults.USDCNYRateNano)
+		priced := entryModel(model, entry)
+		prices, _ := currentPrices(priced, now)
+		pricing := newChannelPricing(priced, entry.MultiplierNano, entry.FXDiscount, defaults.USDCNYRateNano)
 		channels = append(channels, modelChannelJSON{
 			ID:                       entry.ChannelID,
 			Name:                     entry.ChannelName,
@@ -330,8 +396,12 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		pref = routing.Default(model.ID)
 	}
+	summary := newCatalogModelJSON(model, mine, now, defaults.USDCNYRateNano)
+	if custom {
+		summary = newCustomModelJSON(model.ID, mine)
+	}
 	writeJSON(w, http.StatusOK, modelDetailJSON{
-		Model: newCatalogModelJSON(model, mine, now, defaults.USDCNYRateNano), PriceTiers: tiers, Channels: channels, Routing: newRoutingPreferenceJSON(pref),
+		Model: summary, PriceTiers: tiers, Channels: channels, Routing: newRoutingPreferenceJSON(pref),
 	})
 }
 

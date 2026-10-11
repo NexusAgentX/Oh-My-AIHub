@@ -64,3 +64,26 @@ INSERT INTO model_price_tiers (
 -- to "on" for USD: a model whose figures were dollars all along keeps its prices.
 -- name: SetChannelFXDiscount :exec
 UPDATE channel_models SET fx_discount = $2 WHERE model_id = $1;
+
+-- Same lock as channelpg.LockModelName: a name is never both custom and official.
+-- name: LockModelName :exec
+SELECT pg_advisory_xact_lock(hashtextextended('model_name:' || sqlc.arg(model_id)::text, 0));
+
+-- A new catalog model takes over the channels' custom models of the same name:
+-- they become disabled official rows waiting for the owner's multiplier (ADR-0034).
+-- name: ConvertCustomModels :many
+UPDATE channel_models SET
+    is_custom = false,
+    custom_input_price_nano_per_million = NULL,
+    custom_output_price_nano_per_million = NULL,
+    custom_cache_write_price_nano_per_million = NULL,
+    custom_cache_read_price_nano_per_million = NULL,
+    multiplier_nano = 1000000000,
+    fx_discount = false,
+    enabled = false,
+    pending_multiplier = true
+WHERE model_id = $1 AND is_custom
+RETURNING channel_id;
+
+-- name: InsertChannelEvent :exec
+INSERT INTO channel_events (channel_id, kind, reason) VALUES ($1, $2, $3);
