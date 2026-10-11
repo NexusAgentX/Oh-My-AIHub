@@ -466,8 +466,9 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 }
 
 const listOnlineModels = `-- name: ListOnlineModels :many
-SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom
+SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
 FROM channel_models cm
+CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
@@ -478,8 +479,11 @@ ORDER BY cm.model_id
 type ListOnlineModelsRow struct {
 	ModelID string
 	Custom  bool
+	Formats []string
 }
 
+// Models that ListCandidates could serve in at least one format, with those
+// formats; the static conditions are the same, runtime state is not considered.
 func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, error) {
 	rows, err := q.db.Query(ctx, listOnlineModels)
 	if err != nil {
@@ -489,7 +493,7 @@ func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, 
 	var items []ListOnlineModelsRow
 	for rows.Next() {
 		var i ListOnlineModelsRow
-		if err := rows.Scan(&i.ModelID, &i.Custom); err != nil {
+		if err := rows.Scan(&i.ModelID, &i.Custom, &i.Formats); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

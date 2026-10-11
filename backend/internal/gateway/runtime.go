@@ -227,6 +227,30 @@ func (r *Runtime) Failure(id string, limits Limits, now time.Time, reason string
 	return started
 }
 
+// CooldownFor takes the channel out of rotation for d starting now, without
+// waiting for the failure threshold (an upstream that says when to come back
+// is believed). It never shortens a cooldown that already runs longer, and it
+// restarts the consecutive failure count. It reports whether the channel was
+// not cooling before; only then is a cooldown_started event sent, so an
+// extension does not count as a second cooldown.
+func (r *Runtime) CooldownFor(id string, d time.Duration, now time.Time, reason string) bool {
+	if d <= 0 {
+		return false
+	}
+	r.mutex.Lock()
+	state := r.state(id)
+	started := !now.Before(state.cooldownUntil)
+	if until := now.Add(d); until.After(state.cooldownUntil) {
+		state.cooldownUntil = until
+	}
+	state.failures = 0
+	r.mutex.Unlock()
+	if started {
+		r.notify(id, channel.EventCooldownStarted, reason)
+	}
+	return started
+}
+
 // CooldownRemaining returns the seconds left of a cooldown, or 0.
 func (r *Runtime) CooldownRemaining(id string, now time.Time) time.Duration {
 	r.mutex.Lock()

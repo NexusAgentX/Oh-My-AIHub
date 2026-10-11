@@ -193,8 +193,8 @@ type Store interface {
 	// as interrupted (never billed) and returns how many it changed.
 	SweepStaleCalls(ctx context.Context, before time.Time) (int64, error)
 	RecordChannelEvent(ctx context.Context, channelID, kind, reason string) error
-	// OnlineModels lists, for GET /v1/models, the models that have at least
-	// one listed channel.
+	// OnlineModels lists, for the model list endpoints, the models that have
+	// at least one listed channel, with the formats those channels serve.
 	OnlineModels(ctx context.Context) ([]OnlineModel, error)
 	// CustomModelOnline reports whether a listed channel offers a custom
 	// model of that name.
@@ -202,10 +202,13 @@ type Store interface {
 }
 
 // OnlineModel is a model name with at least one listed channel; Custom marks
-// a channel-defined model outside the catalog.
+// a channel-defined model outside the catalog. Formats are the formats the
+// model's channels declare, under the static conditions of Candidates (runtime
+// state such as cooldown is not considered).
 type OnlineModel struct {
-	ID     string
-	Custom bool
+	ID      string
+	Custom  bool
+	Formats []channel.Format
 }
 
 // OnlineChannel is one listed channel offering one model, for browsing.

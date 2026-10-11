@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -245,6 +247,106 @@ func TestGatewayCooldownTakesAChannelOutAfterConsecutiveFailures(t *testing.T) {
 	listed := model["channels"].([]any)[0].(map[string]any)
 	if listed["state"] != "cooldown" || listed["cooldown_remaining_seconds"] == nil {
 		t.Fatalf("channel state = %v", listed)
+	}
+}
+
+func TestGatewayRateLimitWithRetryAfterRestsTheChannelForThatLong(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	var limited atomic.Bool
+	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		if !limited.Swap(true) {
+			w.Header().Set("Retry-After", "2")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, "slow down")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, chatBody)
+	})
+	// The default threshold is three failures in a row: the single 429 alone would not cool the channel.
+	id := e.createChannel(sharer, channelSpec{name: "limited", upstream: relay, advanced: map[string]any{"cooldown_seconds": 60}})
+	_, secret := e.defaultKey(consumer)
+	send := func() *httptest.ResponseRecorder {
+		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	}
+
+	started := time.Now()
+	if first := send(); first.Code != http.StatusTooManyRequests || first.Body.String() != "slow down" {
+		t.Fatalf("limited call = %d %q", first.Code, first.Body.String())
+	}
+	// The channel is skipped while the upstream asked for quiet...
+	if second := send(); second.Code != http.StatusServiceUnavailable || !strings.Contains(second.Body.String(), `"no_channel_available"`) {
+		t.Fatalf("call during the wait = %d %s", second.Code, second.Body.String())
+	}
+	if hits := len(relay.inference()); hits != 1 {
+		t.Fatalf("upstream hit %d times during the wait", hits)
+	}
+	// ...and available again once the two seconds are over, long before the 60 second cooldown.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		recorder := send()
+		if recorder.Code == http.StatusOK {
+			break
+		}
+		if recorder.Code != http.StatusServiceUnavailable || time.Now().After(deadline) {
+			t.Fatalf("call after the wait = %d %s (%s since the 429)", recorder.Code, recorder.Body.String(), time.Since(started))
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if waited := time.Since(started); waited < 2*time.Second {
+		t.Fatalf("channel came back after %s, before the Retry-After of 2s", waited)
+	}
+	if hits := len(relay.inference()); hits != 2 {
+		t.Fatalf("upstream hit %d times, want the 429 and the recovered call", hits)
+	}
+
+	var reasons []string
+	rows, err := e.pool.Query(context.Background(), `SELECT reason FROM channel_events WHERE channel_id = $1 AND kind = $2`, id, channel.EventCooldownStarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var reason string
+		_ = rows.Scan(&reason)
+		reasons = append(reasons, reason)
+	}
+	if len(reasons) != 1 || reasons[0] != gateway.CooldownRateLimited {
+		t.Fatalf("cooldown_started reasons = %v", reasons)
+	}
+	if events := e.channelEvents(id); events[len(events)-1] != channel.EventCooldownEnded {
+		t.Fatalf("events = %v", events)
+	}
+}
+
+func TestGatewayRateLimitWithoutRetryAfterIsOnlyCounted(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("consumer", "100")
+	sharer := e.member("sharer", "0")
+	var limited atomic.Bool
+	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		if !limited.Swap(true) {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, chatBody)
+	})
+	id := e.createChannel(sharer, channelSpec{name: "limited", upstream: relay})
+	_, secret := e.defaultKey(consumer)
+	body := []byte(`{"model":"gpt-test"}`)
+	if first := e.call(secret, http.MethodPost, "/v1/chat/completions", body, nil); first.Code != http.StatusTooManyRequests {
+		t.Fatalf("limited call = %d", first.Code)
+	}
+	if second := e.call(secret, http.MethodPost, "/v1/chat/completions", body, nil); second.Code != http.StatusOK {
+		t.Fatalf("call right after a 429 without a hint = %d %s", second.Code, second.Body.String())
+	}
+	for _, kind := range e.channelEvents(id) {
+		if kind == channel.EventCooldownStarted {
+			t.Fatal("a 429 without Retry-After started a cooldown")
+		}
 	}
 }
 

@@ -240,7 +240,11 @@ func (s *Store) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, error)
 	}
 	result := make([]gateway.OnlineModel, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, gateway.OnlineModel{ID: row.ModelID, Custom: row.Custom})
+		online := gateway.OnlineModel{ID: row.ModelID, Custom: row.Custom, Formats: make([]channel.Format, 0, len(row.Formats))}
+		for _, format := range row.Formats {
+			online.Formats = append(online.Formats, channel.Format(format))
+		}
+		result = append(result, online)
 	}
 	return result, nil
 }

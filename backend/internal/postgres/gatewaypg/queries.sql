@@ -84,9 +84,12 @@ UPDATE calls SET ledger_tx_id = $2 WHERE id = $1;
 UPDATE calls SET outcome = 'interrupted', completed_at = now()
 WHERE outcome = 'in_progress' AND created_at < $1;
 
+-- Models that ListCandidates could serve in at least one format, with those
+-- formats; the static conditions are the same, runtime state is not considered.
 -- name: ListOnlineModels :many
-SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom
+SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
 FROM channel_models cm
+CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
