@@ -346,13 +346,15 @@ func (p *OutboundPolicy) ClientForProxy(ctx context.Context, normalizedBaseURL s
 }
 
 // ClientForGateway builds the client of one gateway attempt: the same pinned
-// dial, TLS and redirect rules as every other outbound call, but without a
-// response-header deadline, because a non-streaming completion legitimately
-// sends its first byte only when generation ends. The caller enforces the
-// first-byte timeout itself, and only for streaming requests; totalTimeout
-// bounds the whole exchange, which is the only limit on a non-streaming one.
-func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
-	return p.clientFor(ctx, normalizedBaseURL, totalTimeout, 0)
+// dial, TLS and redirect rules as every other outbound call, but with neither
+// a response-header deadline (a non-streaming completion legitimately sends
+// its first byte only when generation ends) nor Client.Timeout (it would also
+// cut off a stream that is still producing output). Every deadline of a
+// forwarded request comes from the request's context, which the gateway owns:
+// the first-byte timeout and idle timeout of a stream, the total timeout of a
+// non-streaming request, and the limit of the whole call (ADR-0035 rule 5).
+func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
+	return p.clientFor(ctx, normalizedBaseURL, 0, 0)
 }
 
 // WithExtraBlockedHosts returns a policy that additionally refuses the given
@@ -441,9 +443,10 @@ type Outbound interface {
 	ValidateBaseURL(ctx context.Context, raw string) (string, error)
 	// Client returns a client for short, bounded calls (model discovery).
 	Client(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
-	// GatewayClient returns a client without a separate response-header deadline,
-	// for forwarded requests and streaming format tests.
-	GatewayClient(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error)
+	// GatewayClient returns a client without any deadline of its own, for
+	// forwarded requests and streaming format tests; the caller bounds the
+	// exchange through the request's context.
+	GatewayClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error)
 	// WithExtraBlockedHosts adds the administrator-managed host block list.
 	WithExtraBlockedHosts(hosts []string) (Outbound, error)
 }
@@ -454,6 +457,6 @@ func (p *OutboundPolicy) Client(ctx context.Context, normalizedBaseURL string, t
 }
 
 // GatewayClient implements Outbound.
-func (p *OutboundPolicy) GatewayClient(ctx context.Context, normalizedBaseURL string, totalTimeout time.Duration) (*http.Client, error) {
-	return p.ClientForGateway(ctx, normalizedBaseURL, totalTimeout)
+func (p *OutboundPolicy) GatewayClient(ctx context.Context, normalizedBaseURL string) (*http.Client, error) {
+	return p.ClientForGateway(ctx, normalizedBaseURL)
 }

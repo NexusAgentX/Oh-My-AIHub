@@ -19,8 +19,11 @@ type probeOutbound struct {
 	used   bool
 }
 
-func (p *probeOutbound) GatewayClient(_ context.Context, _ string, timeout time.Duration) (*http.Client, error) {
-	p.used = timeout == testTimeout
+// GatewayClient records that the probe asked for the gateway client and
+// bounded the exchange with its test timeout through the context.
+func (p *probeOutbound) GatewayClient(ctx context.Context, _ string) (*http.Client, error) {
+	deadline, ok := ctx.Deadline()
+	p.used = ok && time.Until(deadline) > testTimeout/2 && time.Until(deadline) <= testTimeout
 	return p.client, nil
 }
 
@@ -58,7 +61,9 @@ func TestFormatProbesUseStreaming(t *testing.T) {
 			}))
 			defer server.Close()
 			policy := &probeOutbound{client: server.Client()}
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			// No deadline on the caller's context, so the one the double sees is
+			// the probe's own.
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			got := (&Service{}).probeOnce(ctx, policy, Channel{BaseURL: server.URL}, Model{ModelID: "test", UpstreamModel: "test"}, tc.format, "secret")
 			if !policy.used || !got.OK {
@@ -106,17 +111,19 @@ type probeReadError struct{}
 
 func (probeReadError) Read([]byte) (int, error) { return 0, errors.New("read timed out") }
 
-func TestProbeClientKeepsTotalDeadlineWithoutHeaderDeadline(t *testing.T) {
+func TestGatewayClientHasNoDeadlineOfItsOwn(t *testing.T) {
 	policy, err := NewOutboundPolicyWithResolver(nil, nil, &fakeResolver{addresses: []net.IP{net.ParseIP("93.184.216.34")}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, err := policy.GatewayClient(context.Background(), "https://relay.example", testTimeout)
+	client, err := policy.GatewayClient(context.Background(), "https://relay.example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.Timeout != testTimeout || client.Transport.(*http.Transport).ResponseHeaderTimeout != 0 {
-		t.Fatal("unexpected test deadlines")
+	// Client.Timeout would cut off a stream that is still producing output; the
+	// caller bounds the exchange through the request context.
+	if client.Timeout != 0 || client.Transport.(*http.Transport).ResponseHeaderTimeout != 0 {
+		t.Fatal("unexpected gateway client deadlines")
 	}
 	discovery, err := policy.Client(context.Background(), "https://relay.example", probeTimeout)
 	if err != nil {
