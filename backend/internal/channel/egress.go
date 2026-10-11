@@ -360,9 +360,14 @@ func sameAddresses(a, b []netip.Addr) bool {
 // newHost builds the client of one host and port for one resolution.
 func (e *egressPool) newHost(p *OutboundPolicy, key hostKey, entry *dnsEntry) *pooledHost {
 	transport := &http.Transport{
-		Proxy:                  nil,
-		DisableKeepAlives:      false,
-		ForceAttemptHTTP2:      true, // a custom DialContext switches HTTP/2 off unless forced
+		Proxy:             nil,
+		DisableKeepAlives: false,
+		// A custom DialContext switches HTTP/2 off unless it is forced. HTTP/2
+		// carries the concurrent streams of one upstream on a few connections;
+		// over HTTP/1.1 every stream beyond the idle limit would open, and
+		// handshake, a connection of its own. Its price is a little more CPU per
+		// streamed chunk (measured in PR #374).
+		ForceAttemptHTTP2:      true,
 		MaxIdleConnsPerHost:    egressMaxIdlePerHost,
 		IdleConnTimeout:        egressIdleTimeout,
 		MaxResponseHeaderBytes: maxResponseHeaderBytes,
