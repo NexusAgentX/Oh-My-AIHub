@@ -17,15 +17,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
-type channelStatsFixture struct {
-	gateway.Store
-	stats map[string]gateway.ChannelStats
-}
-
-func (s channelStatsFixture) ChannelStats(context.Context) (map[string]gateway.ChannelStats, error) {
-	return s.stats, nil
-}
-
 type onlineChannelsFixture struct {
 	gateway.Browse
 	online  []gateway.OnlineChannel
@@ -49,14 +40,16 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	median := 420.7
-	engine := gateway.NewEngine(gateway.Dependencies{
-		Store: channelStatsFixture{stats: map[string]gateway.ChannelStats{
-			idPrefix + "a002": {Attempts: 4, Successes: 3},
-			idPrefix + "a003": {Attempts: 10, Successes: 9, TTFTP50MS: &median},
-		}},
-		Settings: settings.NewService(store), Outbound: policy,
-	})
+	// a002: four attempts, three completed, none of them streaming (no first
+	// token figure); a003: ten attempts, nine completed streams starting after 420 ms.
+	book := gateway.NewStatsBook()
+	now := time.Now()
+	for range 3 {
+		book.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
+	}
+	book.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
+	seedChannelHealth(book, idPrefix+"a003", "m1")
+	engine := gateway.NewEngine(gateway.Dependencies{Settings: settings.NewService(store), Outbound: policy, StatsBook: book})
 	identityService, err := identity.NewService(store, time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +98,7 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	want := map[string]row{
 		"无统计":   {state: "available"},
 		"无首字延迟": {state: "available", successRate: "0.750000"},
-		"有首字延迟": {state: "available", successRate: "0.900000", ttft: float64(420)},
+		"有首字延迟": {state: "available", successRate: "0.900000", ttft: float64(412)}, // 420 ms falls into the 395–430 ms bin, reported as its middle, 412.5
 		"冷却中":   {state: "cooldown"},
 		"并发已满":  {state: "limited"},
 		"有上限":   {state: "available", capRemaining: "0.250000"},

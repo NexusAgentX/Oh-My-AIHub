@@ -15,6 +15,7 @@ const eventLabels: Record<ChannelEvent['kind'], { label: string; tone: BadgeTone
   unlisted: { label: '下架', tone: 'neutral' },
   test_failed: { label: '测试失败', tone: 'danger' },
   model_pending_multiplier: { label: '待设倍率', tone: 'warning' },
+  anomalous_client_errors: { label: '4xx 异常', tone: 'warning' },
 }
 
 /** 健康事件列表：冷却、恢复、触发限额、被下架，带原因。 */

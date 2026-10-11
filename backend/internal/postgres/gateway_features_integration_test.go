@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -195,10 +196,8 @@ func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
 	}
 	send(`{"model":"claude-test"}`)
 
-	stats, err := e.store.Gateway.ChannelStats(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	e.engine.RefreshStats()
+	stats := e.engine.Stats()
 	got := stats[mixed]
 	if got.Attempts != 3 || got.Successes != 3 {
 		t.Fatalf("mixed channel attempts = %d, successes = %d", got.Attempts, got.Successes)
@@ -207,7 +206,8 @@ func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
 	if got.TTFTP50MS == nil {
 		t.Fatalf("mixed channel has no first-token median, want the streaming call's %d ms", streamTTFT)
 	}
-	if *got.TTFTP50MS != float64(streamTTFT) {
+	// The median is read off a histogram: the streaming call's time to within the 4.6% a bin can be off.
+	if math.Abs(*got.TTFTP50MS-float64(streamTTFT)) > 0.046*float64(streamTTFT) {
 		t.Fatalf("mixed channel first-token median = %v ms, want the streaming call's %d ms", *got.TTFTP50MS, streamTTFT)
 	}
 	// A channel that has only served non-streaming calls has no first-token figure at all.

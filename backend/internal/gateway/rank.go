@@ -20,6 +20,10 @@ type RankInput struct {
 	Excluded   []string
 	Candidates []Candidate
 	Stats      map[string]ChannelStats
+	// Demoted are the channels that answer this model with 4xx almost every
+	// time while the others do not (detectAnomalies): they are tried after all
+	// the others, in any mode, but not excluded.
+	Demoted    map[string]Anomaly
 	ConsumerID string
 	// Sticky is the channel that served the previous Responses turn, if any.
 	Sticky string
@@ -137,6 +141,10 @@ func Rank(in RankInput) []Candidate {
 		return a.ChannelID < b.ChannelID
 	})
 
+	if len(in.Demoted) > 0 {
+		pool = demote(pool, in.Demoted)
+	}
+
 	if in.Sticky != "" {
 		if index := slices.IndexFunc(pool, func(c Candidate) bool { return c.ChannelID == in.Sticky }); index > 0 {
 			sticky := pool[index]
@@ -145,4 +153,19 @@ func Rank(in RankInput) []Candidate {
 		}
 	}
 	return pool
+}
+
+// demote moves the demoted candidates behind the others, each group keeping its
+// order.
+func demote(pool []Candidate, demoted map[string]Anomaly) []Candidate {
+	rest := make([]Candidate, 0, len(pool))
+	var last []Candidate
+	for _, candidate := range pool {
+		if _, bad := demoted[candidate.ChannelID]; bad {
+			last = append(last, candidate)
+		} else {
+			rest = append(rest, candidate)
+		}
+	}
+	return append(rest, last...)
 }

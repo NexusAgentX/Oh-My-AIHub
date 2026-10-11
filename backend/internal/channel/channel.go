@@ -164,6 +164,10 @@ const (
 	EventListed          = "listed"
 	EventUnlisted        = "unlisted"
 	EventTestFailed      = "test_failed"
+	// EventAnomalousClientErrors records that the channel answers a model with
+	// 4xx almost every time while the model's other channels do not, which points
+	// at the channel's configuration; the reason names the model and the counts.
+	EventAnomalousClientErrors = "anomalous_client_errors"
 	// EventModelPendingMultiplier records that a custom model of the channel
 	// became an official catalog model; the reason is the model ID.
 	EventModelPendingMultiplier = "model_pending_multiplier"

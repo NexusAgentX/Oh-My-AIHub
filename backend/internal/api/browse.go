@@ -333,7 +333,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	accountID := accountFromContext(ctx).ID
-	stats := a.gateway.Stats(ctx)
+	stats := a.gateway.Stats()
 
 	var mine []gateway.OnlineChannel
 	for _, entry := range online {

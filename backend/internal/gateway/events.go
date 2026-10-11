@@ -18,6 +18,9 @@ const (
 	EventChannelCooldown EventKind = "channel_cooldown_started"
 	EventChannelRecover  EventKind = "channel_cooldown_ended"
 	EventChannelLimit    EventKind = "channel_limit_reached"
+	// EventChannelAnomaly reports a channel that answers a model with 4xx almost
+	// every time while the model's other channels do not.
+	EventChannelAnomaly EventKind = "channel_anomalous_client_errors"
 	// EventSettlementFailed reports a call whose ledger booking failed; the
 	// call is closed without a ledger transaction and awaits repair.
 	EventSettlementFailed EventKind = "settlement_failed"

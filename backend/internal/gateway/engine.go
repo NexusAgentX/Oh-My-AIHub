@@ -41,11 +41,12 @@ const (
 	clientWriteLimit = 2 * time.Minute
 	keyTouchEvery    = time.Minute
 
-	// How often RunRefresh re-reads platform settings and 24h channel stats.
-	// The settings interval is also how long an administrator's change can
-	// take to reach the gateway.
+	// How often RunRefresh re-reads platform settings and republishes the 24h
+	// channel stats. The settings interval is also how long an administrator's
+	// change can take to reach the gateway. The stats are read from memory (see
+	// StatsBook), so the interval costs no database work.
 	settingsRefreshInterval = 5 * time.Second
-	statsRefreshInterval    = 60 * time.Second
+	statsRefreshInterval    = 5 * time.Second
 	// refreshTimeout abandons a refresh query that hangs.
 	refreshTimeout = 30 * time.Second
 )
@@ -72,6 +73,9 @@ type Dependencies struct {
 	Logger   *slog.Logger
 	Runtime  *Runtime
 	Now      func() time.Time
+	// StatsBook holds the channel statistics (rolling 24-hour windows). Nil
+	// means a new, empty one; tests pass their own to seed it.
+	StatsBook *StatsBook
 	// CallTimeLimit is the longest one call may run, every attempt included.
 	// Zero means the production value, callTimeLimit; tests shorten it.
 	CallTimeLimit time.Duration
@@ -86,14 +90,18 @@ type Engine struct {
 	spend    *SpendCache
 	inflight *Inflight
 
-	// Settings and channel stats are published as immutable snapshots by
-	// RunRefresh, so the request path reads them without locking or waiting on
-	// the database. The load mutexes only serialise loads (the very first one
-	// included); readers never take them once a snapshot exists.
+	// Settings are published as an immutable snapshot by RunRefresh, so the
+	// request path reads them without locking or waiting on the database. The
+	// load mutex only serialises loads (the very first one included); readers
+	// never take it once a snapshot exists. The channel stats are published the
+	// same way, from memory (engine_stats.go).
 	settingsSnap atomic.Pointer[settingsSnapshot]
 	settingsLoad sync.Mutex
-	statsSnap    atomic.Pointer[map[string]ChannelStats]
-	statsLoad    sync.Mutex
+	statsSnap    atomic.Pointer[statsSnapshot]
+	statsBuild   sync.Mutex
+	// anomalyNotified is when each channel on each model last had its
+	// anomalous_client_errors event; guarded by statsBuild.
+	anomalyNotified map[pairKey]time.Time
 
 	mutex   sync.Mutex // guards touched
 	touched map[string]time.Time
@@ -125,7 +133,10 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.DrainWindow <= 0 {
 		dependencies.DrainWindow = drainWindow
 	}
-	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}}
+	if dependencies.StatsBook == nil {
+		dependencies.StatsBook = NewStatsBook()
+	}
+	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -170,45 +181,12 @@ func (e *Engine) loadSettings(ctx context.Context, force bool) (*settingsSnapsho
 	return snapshot, nil
 }
 
-// Stats returns the current 24h channel health with the same first-load rules
-// as Settings. If the first load fails it returns an empty map (ranking then
-// treats every channel as unrated) and the next caller or refresh tries again.
-func (e *Engine) Stats(ctx context.Context) map[string]ChannelStats {
-	if stats := e.statsSnap.Load(); stats != nil {
-		return *stats
-	}
-	stats, err := e.loadStats(ctx, false)
-	if err != nil {
-		e.Logger.Error("gateway: channel stats failed", "error", err)
-		return map[string]ChannelStats{}
-	}
-	return stats
-}
-
-// loadStats is loadSettings for the channel stats.
-func (e *Engine) loadStats(ctx context.Context, force bool) (map[string]ChannelStats, error) {
-	e.statsLoad.Lock()
-	defer e.statsLoad.Unlock()
-	if current := e.statsSnap.Load(); current != nil && !force {
-		return *current, nil
-	}
-	value, err := e.Store.ChannelStats(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if value == nil {
-		value = map[string]ChannelStats{}
-	}
-	e.statsSnap.Store(&value)
-	return value, nil
-}
-
 // RunRefresh keeps the settings and channel-stats snapshots current until ctx
 // ends: settings every few seconds so administrator changes reach the gateway
-// quickly, the heavier 24h stats once a minute. The two run independently so a
-// slow stats query never delays a settings refresh, and neither blocks
-// requests. A failed refresh is logged and the previous snapshot stays in
-// effect. The first refresh of each runs immediately.
+// quickly, the channel stats (counted in memory, no query) just as often. The
+// two run independently so a slow settings query never delays the stats, and
+// neither blocks requests. A failed settings refresh is logged and the previous
+// snapshot stays in effect. The first refresh of each runs immediately.
 func (e *Engine) RunRefresh(ctx context.Context) {
 	e.runRefresh(ctx, settingsRefreshInterval, statsRefreshInterval)
 }
@@ -222,9 +200,9 @@ func (e *Engine) runRefresh(ctx context.Context, settingsEvery, statsEvery time.
 		})
 	})
 	wg.Go(func() {
-		e.refreshEvery(ctx, "channel stats", statsEvery, func(ctx context.Context) error {
-			_, err := e.loadStats(ctx, true)
-			return err
+		e.refreshEvery(ctx, "channel stats", statsEvery, func(context.Context) error {
+			e.RefreshStats()
+			return nil
 		})
 	})
 	wg.Wait()
@@ -536,9 +514,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			sticky = channelID
 		}
 	}
+	stats := e.statsView()
 	ordered := Rank(RankInput{
-		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: e.Stats(ctx),
-		ConsumerID: key.OwnerID, Sticky: sticky,
+		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
+		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
 			return state == StateAvailable
@@ -560,6 +539,11 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, ttftTimeout)
 		call.attempts = append(call.attempts, result.record)
 		e.publishAttempt(call, candidate, result.record)
+		if result.response == nil {
+			// An attempt with an answer to stream back is counted when
+			// streamBack has settled how it ended.
+			e.recordAttempt(call, candidate, result.record)
+		}
 		switch {
 		case result.clientGone:
 			release()
@@ -1291,6 +1275,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if stopped != nil {
 		record.ErrorCode, record.ErrorMessage = stringPointer(stopped.code), stringPointer(stopped.message)
 	}
+	e.recordAttempt(call, candidate, *record)
 
 	finish := CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: outcome, ModelID: call.modelID, ChannelID: candidate.ChannelID,

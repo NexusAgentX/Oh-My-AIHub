@@ -36,6 +36,7 @@ type platform struct {
 	observe  *fakeObserveStore
 	c2c      *fakeC2CStore
 	bus      *fakeEvents
+	stats    *gateway.StatsBook
 	handler  http.Handler
 }
 
@@ -101,9 +102,9 @@ func newPlatform(t *testing.T) *platform {
 			return value.ExtraBlockedHosts, err
 		},
 	})
+	stats := gateway.NewStatsBook()
 	engine := gateway.NewEngine(gateway.Dependencies{
-		Store: fakeGatewayStore{channels: channelStore}, Catalog: catalogService, Settings: settingsService,
-		Routing: routingStore, Keyring: keyring, Outbound: outbound,
+		Catalog: catalogService, Settings: settingsService, Routing: routingStore, Keyring: keyring, Outbound: outbound, StatsBook: stats,
 	})
 	observeStore := &fakeObserveStore{channels: channelStore}
 	observeService := observe.NewService(observeStore)
@@ -124,7 +125,7 @@ func newPlatform(t *testing.T) *platform {
 		Routing: routingStore, Gateway: engine, Browse: browse, C2C: c2c.NewService(c2cStore, c2cKeyring),
 		Observe: observeService, Feed: feed, Forum: forum.NewService(newFakeForumStore(store)), CookieSecure: true,
 	})
-	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, handler: handler}
+	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, stats: stats, handler: handler}
 }
 
 func (p *platform) admin(t *testing.T) *client {

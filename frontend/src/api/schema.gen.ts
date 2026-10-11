@@ -2186,7 +2186,7 @@ export interface components {
         ChannelEvent: {
             id: string;
             /** @enum {string} */
-            kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed" | "model_pending_multiplier";
+            kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed" | "model_pending_multiplier" | "anomalous_client_errors";
             reason: string;
             created_at: components["schemas"]["Timestamp"];
         };

@@ -98,7 +98,7 @@ func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish)
 var (
 	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "CustomModelOnline", "ResponseChannel"}
 	gatewayStoreOthers   = []string{
-		"TouchKey", "Points", "KeySpend", "ChannelRevenue", "ChannelStats", "InsertCall", "FinishCall",
+		"TouchKey", "Points", "KeySpend", "ChannelRevenue", "AttemptHistory", "InsertCall", "FinishCall",
 		"SweepStaleCalls", "RecordChannelEvent",
 	}
 )

@@ -201,21 +201,21 @@ func (s *Store) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, 
 	return records, nil
 }
 
-func (s *Store) ChannelStats(ctx context.Context) (map[string]gateway.ChannelStats, error) {
-	rows, err := s.q.ChannelStats24h(ctx)
+// AttemptHistory reads the attempts of the statistics window for
+// gateway.Engine.LoadStats.
+func (s *Store) AttemptHistory(ctx context.Context, since time.Time) ([]gateway.AttemptHistoryRow, error) {
+	rows, err := s.q.AttemptHistory(ctx, AttemptHistoryParams{Edges: gateway.TTFTBinEdges(), Since: since})
 	if err != nil {
 		return nil, err
 	}
-	stats := make(map[string]gateway.ChannelStats, len(rows))
+	history := make([]gateway.AttemptHistoryRow, 0, len(rows))
 	for _, row := range rows {
-		entry := gateway.ChannelStats{Attempts: row.Attempts, Successes: row.Successes}
-		if row.TtftP50Ms >= 0 {
-			value := row.TtftP50Ms
-			entry.TTFTP50MS = &value
-		}
-		stats[row.ChannelID] = entry
+		history = append(history, gateway.AttemptHistoryRow{
+			ChannelID: row.ChannelID, ModelID: row.ModelID, Bucket: row.Bucket, TTFTBin: int(row.TtftBin),
+			Counted: row.Counted, Successes: row.Successes, ClientErrors: row.ClientErrors,
+		})
 	}
-	return stats, nil
+	return history, nil
 }
 
 func (s *Store) ResponseChannel(ctx context.Context, accountID, responseID string) (string, error) {

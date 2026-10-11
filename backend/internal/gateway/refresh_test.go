@@ -71,15 +71,6 @@ func (g *gatedSource[T]) read(ctx context.Context) (T, error) {
 	return g.value, g.err
 }
 
-type statsOnlyStore struct {
-	Store
-	source *gatedSource[map[string]ChannelStats]
-}
-
-func (s statsOnlyStore) ChannelStats(ctx context.Context) (map[string]ChannelStats, error) {
-	return s.source.read(ctx)
-}
-
 type settingsOnlyStore struct {
 	settings.Store
 	source *gatedSource[settings.Settings]
@@ -92,7 +83,6 @@ func (s settingsOnlyStore) GetSettings(ctx context.Context) (settings.Settings, 
 type refreshFixture struct {
 	engine   *Engine
 	settings *gatedSource[settings.Settings]
-	stats    *gatedSource[map[string]ChannelStats]
 	logs     *syncBuffer
 }
 
@@ -121,11 +111,9 @@ func newRefreshFixture(t *testing.T) *refreshFixture {
 	}
 	f := &refreshFixture{
 		settings: newGatedSource(settings.Settings{DefaultMaxAttempts: 1}),
-		stats:    newGatedSource(map[string]ChannelStats{"a": {Attempts: 1}}),
 		logs:     &syncBuffer{},
 	}
 	f.engine = NewEngine(Dependencies{
-		Store:    statsOnlyStore{source: f.stats},
 		Settings: settings.NewService(settingsOnlyStore{source: f.settings}),
 		Outbound: policy,
 		Logger:   slog.New(slog.NewTextHandler(f.logs, nil)),
@@ -182,19 +170,6 @@ func (f *refreshFixture) maxAttempts(t *testing.T) int32 {
 	}
 }
 
-func (f *refreshFixture) attempts(t *testing.T, channelID string) int64 {
-	t.Helper()
-	got := make(chan int64, 1)
-	go func() { got <- f.engine.Stats(context.Background())[channelID].Attempts }()
-	select {
-	case value := <-got:
-		return value
-	case <-time.After(2 * time.Second):
-		t.Fatal("Stats blocked while a refresh was running")
-		return 0
-	}
-}
-
 func eventually(t *testing.T, what string, check func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -215,29 +190,6 @@ func waitEntered[T any](t *testing.T, source *gatedSource[T]) {
 	}
 }
 
-func TestStatsReadsDoNotWaitForRefresh(t *testing.T) {
-	f := newRefreshFixture(t)
-	f.start(t)
-	eventually(t, "the first stats load", func() bool { return f.attempts(t, "a") == 1 })
-
-	f.stats.block()
-	f.stats.set(map[string]ChannelStats{"a": {Attempts: 2}}, nil)
-	waitEntered(t, f.stats) // a refresh is now parked inside the stats query
-
-	// Readers (the Serve and browse paths) keep getting the previous value.
-	for range 50 {
-		if got := f.attempts(t, "a"); got != 1 {
-			t.Fatalf("attempts = %d while refreshing, want the previous 1", got)
-		}
-	}
-	// A settings change still reaches the gateway while the stats query is stuck.
-	f.settings.set(settings.Settings{DefaultMaxAttempts: 7}, nil)
-	eventually(t, "settings to refresh independently of stats", func() bool { return f.maxAttempts(t) == 7 })
-
-	f.stats.release()
-	eventually(t, "the new stats to be published", func() bool { return f.attempts(t, "a") == 2 })
-}
-
 func TestSettingsReadsDoNotWaitForRefresh(t *testing.T) {
 	f := newRefreshFixture(t)
 	f.start(t)
@@ -251,9 +203,6 @@ func TestSettingsReadsDoNotWaitForRefresh(t *testing.T) {
 		if got := f.maxAttempts(t); got != 1 {
 			t.Fatalf("max attempts = %d while refreshing, want the previous 1", got)
 		}
-		if got := f.attempts(t, "a"); got != 1 {
-			t.Fatalf("stats = %d, want 1", got)
-		}
 	}
 
 	f.settings.release()
@@ -263,22 +212,15 @@ func TestSettingsReadsDoNotWaitForRefresh(t *testing.T) {
 func TestFailedRefreshKeepsPreviousValues(t *testing.T) {
 	f := newRefreshFixture(t)
 	f.start(t)
-	eventually(t, "the first load", func() bool { return f.maxAttempts(t) == 1 && f.attempts(t, "a") == 1 })
+	eventually(t, "the first load", func() bool { return f.maxAttempts(t) == 1 })
 
 	f.settings.set(settings.Settings{}, errors.New("settings down"))
-	f.stats.set(nil, errors.New("stats down"))
-	eventually(t, "both failures to be logged", func() bool {
-		logs := f.logs.String()
-		return strings.Contains(logs, "settings down") && strings.Contains(logs, "stats down")
-	})
+	eventually(t, "the failure to be logged", func() bool { return strings.Contains(f.logs.String(), "settings down") })
 	// Several more failing rounds later nothing has changed for readers.
 	failed := f.settings.calls.Load()
 	eventually(t, "more failing rounds", func() bool { return f.settings.calls.Load() >= failed+3 })
 	if got := f.maxAttempts(t); got != 1 {
 		t.Fatalf("max attempts = %d after failed refreshes, want the previous 1", got)
-	}
-	if got := f.attempts(t, "a"); got != 1 {
-		t.Fatalf("attempts = %d after failed refreshes, want the previous 1", got)
 	}
 	if _, _, err := f.engine.Settings(context.Background()); err != nil {
 		t.Fatalf("Settings returned %v after a failed refresh", err)
@@ -286,8 +228,7 @@ func TestFailedRefreshKeepsPreviousValues(t *testing.T) {
 
 	// Recovery: the next successful refresh replaces the value.
 	f.settings.set(settings.Settings{DefaultMaxAttempts: 4}, nil)
-	f.stats.set(map[string]ChannelStats{"a": {Attempts: 5}}, nil)
-	eventually(t, "recovery", func() bool { return f.maxAttempts(t) == 4 && f.attempts(t, "a") == 5 })
+	eventually(t, "recovery", func() bool { return f.maxAttempts(t) == 4 })
 }
 
 func TestInvalidBlockedHostsKeepPreviousSettings(t *testing.T) {
@@ -302,44 +243,6 @@ func TestInvalidBlockedHostsKeepPreviousSettings(t *testing.T) {
 	}
 }
 
-func TestFirstLoadIsSharedAndFailureIsNotCached(t *testing.T) {
-	f := newRefreshFixture(t)
-	f.stats.block()
-
-	const readers = 20
-	results := make(chan int64, readers)
-	for range readers {
-		go func() { results <- f.engine.Stats(context.Background())["a"].Attempts }()
-	}
-	waitEntered(t, f.stats)
-	time.Sleep(20 * time.Millisecond) // let the other readers queue behind the first load
-	f.stats.release()
-	for range readers {
-		select {
-		case got := <-results:
-			if got != 1 {
-				t.Fatalf("attempts = %d, want 1", got)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("a reader never got the first load")
-		}
-	}
-	if calls := f.stats.calls.Load(); calls != 1 {
-		t.Fatalf("%d stats queries for %d concurrent first readers, want 1", calls, readers)
-	}
-
-	// A failed first load degrades to an empty map and is retried, not kept.
-	g := newRefreshFixture(t)
-	g.stats.set(nil, errors.New("stats down"))
-	if got := g.engine.Stats(context.Background()); len(got) != 0 {
-		t.Fatalf("stats = %v, want empty after a failed first load", got)
-	}
-	g.stats.set(map[string]ChannelStats{"a": {Attempts: 3}}, nil)
-	if got := g.attempts(t, "a"); got != 3 {
-		t.Fatalf("attempts = %d, want the retried load to succeed", got)
-	}
-}
-
 func TestRefreshStopsWhenContextEnds(t *testing.T) {
 	f := newRefreshFixture(t)
 	stop := f.start(t)
@@ -347,9 +250,7 @@ func TestRefreshStopsWhenContextEnds(t *testing.T) {
 
 	// Stop while a refresh is parked in the database: it must be abandoned and
 	// must not be reported as a failure.
-	f.stats.block()
 	f.settings.block()
-	waitEntered(t, f.stats)
 	waitEntered(t, f.settings)
 	stop()
 	if logs := f.logs.String(); strings.Contains(logs, "refresh failed") {
@@ -357,7 +258,6 @@ func TestRefreshStopsWhenContextEnds(t *testing.T) {
 	}
 
 	// Nothing refreshes any more.
-	f.stats.release()
 	f.settings.set(settings.Settings{DefaultMaxAttempts: 8}, nil)
 	f.settings.release()
 	calls := f.settings.calls.Load()
