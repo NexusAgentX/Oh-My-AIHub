@@ -9,6 +9,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
@@ -21,7 +22,9 @@ import (
 // at once.
 //
 // The stores that are not listed here (ledger, settings, forum, C2C, observe,
-// audit) write nothing the snapshots hold.
+// audit) write nothing the snapshots hold. What they book does reach the
+// gateway's balance cache, whichever way their services are built: the cache
+// subscribes to the Books every posting goes through (Store.Books).
 type Cached struct {
 	Cache *snapshot.Cache
 
@@ -46,6 +49,9 @@ func (s *Store) Cached(logger *slog.Logger, options ...func(*snapshot.Config)) *
 		option(&config)
 	}
 	cache := snapshot.New(config)
+	// Every ledger posting of this store, from any service, reports to the
+	// balance cache once its transaction has ended.
+	s.Books.Observe(cache.Balances())
 	return &Cached{
 		Cache:    cache,
 		Gateway:  cache.Gateway(s.Gateway),
@@ -75,4 +81,8 @@ func (l snapshotLoader) LoadRoutePrefs(ctx context.Context) ([]routing.Scoped, e
 
 func (l snapshotLoader) LoadModels(ctx context.Context) ([]catalog.Model, error) {
 	return l.store.Catalog.ListModels(ctx, true)
+}
+
+func (l snapshotLoader) LoadPoints(ctx context.Context, accountIDs []string) (map[string]ledger.Points, error) {
+	return l.store.Ledger.ListPoints(ctx, accountIDs)
 }

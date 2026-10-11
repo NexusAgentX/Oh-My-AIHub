@@ -21,15 +21,22 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 )
 
 type Store struct {
-	pool *pgxpool.Pool
-	q    *Queries
+	pool  *pgxpool.Pool
+	q     *Queries
+	books *ledgerpg.Books
 }
 
-func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool)} }
+// NewStore builds the store; the repair of a missed posting reports to books
+// (nil means nobody listens).
+func NewStore(pool *pgxpool.Pool, books *ledgerpg.Books) *Store {
+	if books == nil {
+		books = ledgerpg.NewBooks()
+	}
+	return &Store{pool: pool, q: New(pool), books: books}
+}
 
 var _ observe.Store = (*Store)(nil)
 
@@ -827,7 +834,7 @@ func (s *Store) GetTransaction(ctx context.Context, id string) (observe.Transact
 
 func (s *Store) Repair(ctx context.Context, repair observe.Repair) (observe.RepairResult, error) {
 	var result observe.RepairResult
-	err := pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err := s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := s.q.WithTx(tx)
 		call, err := q.LockCallForRepair(ctx, repair.CallID)
 		if errors.Is(err, pgx.ErrNoRows) {
