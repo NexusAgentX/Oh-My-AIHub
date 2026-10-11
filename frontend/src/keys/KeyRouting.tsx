@@ -136,7 +136,7 @@ export function KeyRoutingSection({ keyId, routing }: { keyId: string; routing: 
               <option value="">选择模型</option>
               {choices.map((model) => (
                 <option key={model.id} value={model.id}>
-                  {model.id}
+                  {model.custom ? `${model.id}（自定义）` : model.id}
                 </option>
               ))}
             </select>

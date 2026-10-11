@@ -8,7 +8,7 @@ const model: CatalogModel = {
   supports_vision: false, parameter_info: '', current_tier: null, price_currency: 'CNY', usd_cny_rate: null,
   base_prices: { input: '1', output: '2', cache_read: '0', cache_write: '0' },
   lowest_prices: { input: '0.123456789', output: '2', cache_read: '0', cache_write: '0' },
-  formats: ['openai_chat'], online_channels: 2,
+  formats: ['openai_chat'], online_channels: 2, custom: false,
 }
 const offline = { ...model, id: 'offline', online_channels: 0, lowest_prices: null, formats: [] }
 const unknown = { ...model, id: 'unknown', context_window: null, supports_tools: false }

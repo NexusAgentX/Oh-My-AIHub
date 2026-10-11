@@ -5,7 +5,37 @@ import { shortMultiplier } from '../money/MultiplierText'
 import { useModelDetails, useModels } from '../models/queries'
 import { channelPrice, currentPrices, effectiveMultiplier } from '../models/pricing'
 import { Button, Icon, IconButton, InfoTip } from '../ui'
-import type { ModelRow } from './channelForm'
+import { customNameFrom, type CustomPriceForm, type ModelRow } from './channelForm'
+
+/** 平台模型下拉中「自定义模型」的取值。 */
+const CUSTOM = '__custom__'
+
+const customPriceFields: Array<[keyof CustomPriceForm, string]> = [
+  ['input', '输入'],
+  ['output', '输出'],
+  ['cacheWrite', '缓存写'],
+  ['cacheRead', '缓存读'],
+]
+
+/** 自定义模型的四个基准价，积分/百万 token，按此直接计费。 */
+function CustomPrices({ row, onChange }: { row: ModelRow; onChange: (prices: CustomPriceForm) => void }) {
+  return (
+    <span aria-label="自定义价格（积分/百万 token）" className="custom-prices" role="group">
+      {customPriceFields.map(([field, label]) => (
+        <label key={field}>
+          <span>{label}</span>
+          <input
+            aria-label={`${label}价`}
+            className="input num"
+            inputMode="decimal"
+            onChange={(event) => onChange({ ...row.customPrices, [field]: event.target.value.trim() })}
+            value={row.customPrices[field]}
+          />
+        </label>
+      ))}
+    </span>
+  )
+}
 
 /** 四个可切换的格式标签；测试通过的显示绿色 ✓。 */
 function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: Format[]) => void }) {
@@ -64,15 +94,20 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
   testingModel: string | null
 }) {
   const catalog = useModels()
-  const ids = [...new Set(rows.filter((row) => row.modelId).map((row) => row.modelId))]
+  const ids = [...new Set(rows.filter((row) => row.modelId && !row.custom).map((row) => row.modelId))]
   const details = useModelDetails(ids)
   const usdRate = (row: ModelRow) => {
-    const model = catalog.data?.items.find((item) => item.id === row.modelId)
+    if (row.custom) return null
+    const model = catalog.data?.items.find((item) => item.id === row.modelId && !item.custom)
     return model?.price_currency === 'USD' ? model.usd_cny_rate : null
   }
   /** 实际倍率：勾选汇率优惠的美元模型为「倍率 ÷ 汇率」。 */
   const effectiveOf = (row: ModelRow) => effectiveMultiplier(row.multiplier || '1', row.fxDiscount, usdRate(row))
   const priceOf = (row: ModelRow) => {
+    if (row.custom) {
+      const { input, output } = row.customPrices
+      return input && output ? `${formatPoints(input, { digits: 2 })} / ${formatPoints(output, { digits: 2 })}` : '—'
+    }
     const detail = details[ids.indexOf(row.modelId)]?.data
     if (!detail) return '—'
     const prices = currentPrices(detail).prices
@@ -83,7 +118,14 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
   }
   const update = (key: string, patch: Partial<ModelRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)))
-  const options = catalog.data?.items.map((model) => model.id) ?? []
+  const options = catalog.data?.items.filter((model) => !model.custom).map((model) => model.id) ?? []
+  const choose = (row: ModelRow, value: string) => {
+    if (value === CUSTOM) {
+      update(row.key, { custom: true, modelId: row.custom ? row.modelId : customNameFrom(row.upstream), sell: true, pending: false })
+      return
+    }
+    update(row.key, { custom: false, modelId: value, sell: value ? row.sell || true : false })
+  }
 
   if (rows.length === 0) return <p className="muted-copy">没有模型</p>
   return (
@@ -92,7 +134,7 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
         <span>卖</span>
         <span>平台模型 / 上游名称</span>
         <span>支持的格式</span>
-        <span>倍率</span>
+        <span>倍率 / 自定义价格</span>
         <span>实际价 入/出</span>
         <span />
       </li>
@@ -110,16 +152,26 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
             <select
               aria-label="平台模型"
               className="input select-input mono"
-              onChange={(event) => update(row.key, { modelId: event.target.value, sell: event.target.value ? row.sell || true : false })}
-              value={row.modelId}
+              onChange={(event) => choose(row, event.target.value)}
+              value={row.custom ? CUSTOM : row.modelId}
             >
               <option value="">不在目录</option>
-              {[...new Set([...options, ...(row.modelId ? [row.modelId] : [])])].map((model) => (
+              <option value={CUSTOM}>自定义模型</option>
+              {[...new Set([...options, ...(row.modelId && !row.custom ? [row.modelId] : [])])].map((model) => (
                 <option key={model} value={model}>
                   {model}
                 </option>
               ))}
             </select>
+            {row.custom && (
+              <input
+                aria-label="自定义模型名"
+                className="input mono"
+                onChange={(event) => update(row.key, { modelId: event.target.value.trim() })}
+                placeholder="模型名（客户端请求的 model）"
+                value={row.modelId}
+              />
+            )}
             <input
               aria-label="上游名称"
               className="input mono"
@@ -135,30 +187,37 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
             ))}
           </div>
           <div className="model-row-multiplier">
-            <span className="multiplier-input">
-              <span aria-hidden="true">×</span>
-              <input
-                aria-label="倍率"
-                className="input num"
-                inputMode="decimal"
-                onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
-                value={row.multiplier}
-              />
-            </span>
-            {usdRate(row) && (
-              <span className="model-row-fx">
-                <button
-                  aria-pressed={row.fxDiscount}
-                  className={`format-toggle ${row.fxDiscount ? 'format-toggle-on' : ''}`}
-                  onClick={() => update(row.key, { fxDiscount: !row.fxDiscount })}
-                  title="自动计算汇率优惠"
-                  type="button"
-                >
-                  {row.fxDiscount && <Icon name="check" size={12} />}
-                  汇率优惠
-                </button>
-                <FXDiscountTip rate={usdRate(row)!} />
-              </span>
+            {row.custom ? (
+              <CustomPrices onChange={(customPrices) => update(row.key, { customPrices })} row={row} />
+            ) : (
+              <>
+                {row.pending && <p className="model-row-pending">已加入模型目录，设置倍率并勾选后恢复</p>}
+                <span className="multiplier-input">
+                  <span aria-hidden="true">×</span>
+                  <input
+                    aria-label="倍率"
+                    className="input num"
+                    inputMode="decimal"
+                    onChange={(event) => update(row.key, { multiplier: event.target.value.trim() })}
+                    value={row.multiplier}
+                  />
+                </span>
+                {usdRate(row) && (
+                  <span className="model-row-fx">
+                    <button
+                      aria-pressed={row.fxDiscount}
+                      className={`format-toggle ${row.fxDiscount ? 'format-toggle-on' : ''}`}
+                      onClick={() => update(row.key, { fxDiscount: !row.fxDiscount })}
+                      title="自动计算汇率优惠"
+                      type="button"
+                    >
+                      {row.fxDiscount && <Icon name="check" size={12} />}
+                      汇率优惠
+                    </button>
+                    <FXDiscountTip rate={usdRate(row)!} />
+                  </span>
+                )}
+              </>
             )}
           </div>
           <span className="model-row-price num">
