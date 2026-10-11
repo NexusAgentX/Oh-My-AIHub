@@ -25,7 +25,6 @@ function KeyRow({ apiKey, onOpen }: { apiKey: ApiKey; onOpen: () => void }) {
           <strong>{apiKey.name}</strong>
           <code className="mono">{apiKey.prefix}…</code>
           <span className="key-row-badges">
-            {apiKey.is_default && <Badge tone="accent">默认</Badge>}
             {keyBadges(apiKey).map((badge) => (
               <Badge key={badge} tone="info">
                 {badge}
