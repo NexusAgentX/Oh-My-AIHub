@@ -56,6 +56,7 @@ type Model struct {
 	SortOrder                int32
 	Provider                 string
 	ContextWindow            *int64
+	MaxOutputTokens          *int64
 	InputModalities          []string
 	OutputModalities         []string
 	SupportsTools            bool
@@ -125,6 +126,7 @@ type ModelPatch struct {
 	SortOrder                *int32
 	Provider                 *string
 	ContextWindow            **int64
+	MaxOutputTokens          **int64
 	InputModalities          *[]string
 	OutputModalities         *[]string
 	SupportsTools            *bool
@@ -173,6 +175,9 @@ func (p ModelPatch) Apply(model Model) Model {
 	set(&model.Provider, p.Provider)
 	if p.ContextWindow != nil {
 		model.ContextWindow = *p.ContextWindow
+	}
+	if p.MaxOutputTokens != nil {
+		model.MaxOutputTokens = *p.MaxOutputTokens
 	}
 	if p.InputModalities != nil {
 		model.InputModalities = *p.InputModalities
@@ -326,7 +331,7 @@ func Validate(model Model) error {
 	if utf8.RuneCountInString(model.Provider) > 64 || utf8.RuneCountInString(model.ParameterInfo) > 500 {
 		return ErrInvalidInput
 	}
-	if model.ContextWindow != nil && *model.ContextWindow <= 0 {
+	if (model.ContextWindow != nil && *model.ContextWindow <= 0) || (model.MaxOutputTokens != nil && *model.MaxOutputTokens <= 0) {
 		return ErrInvalidInput
 	}
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {

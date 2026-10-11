@@ -1857,6 +1857,7 @@ export interface components {
             sort_order: number;
             provider: string;
             context_window: number | null;
+            max_output_tokens: number | null;
             input_modalities: string[];
             output_modalities: string[];
             supports_tools: boolean;
@@ -1884,6 +1885,7 @@ export interface components {
             sort_order?: number;
             provider?: string;
             context_window?: number | null;
+            max_output_tokens?: number | null;
             input_modalities?: string[];
             output_modalities?: string[];
             supports_tools?: boolean;
@@ -1902,6 +1904,7 @@ export interface components {
             sort_order?: number;
             provider?: string;
             context_window?: number | null;
+            max_output_tokens?: number | null;
             input_modalities?: string[];
             output_modalities?: string[];
             supports_tools?: boolean;
@@ -1915,6 +1918,7 @@ export interface components {
             display_name: string;
             provider: string;
             context_window: number | null;
+            max_output_tokens: number | null;
             input_modalities: string[];
             output_modalities: string[];
             supports_tools: boolean;

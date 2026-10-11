@@ -3,7 +3,7 @@ import type { CatalogModel } from '../api/types'
 import { contextFilterError, defaultFilters, filterModels, priceFilterError } from './filters'
 
 const model: CatalogModel = {
-  id: 'gpt-demo', display_name: 'Demo Model', provider: 'OpenAI', context_window: 128000,
+  id: 'gpt-demo', display_name: 'Demo Model', provider: 'OpenAI', context_window: 128000, max_output_tokens: null,
   input_modalities: [], output_modalities: [], supports_tools: true, supports_structured_output: true,
   supports_vision: false, parameter_info: '', current_tier: null, price_currency: 'CNY', usd_cny_rate: null,
   base_prices: { input: '1', output: '2', cache_read: '0', cache_write: '0' },

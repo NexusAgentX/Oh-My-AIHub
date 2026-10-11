@@ -150,6 +150,14 @@ describe('price tier list', () => {
     expect(validateModelForm({ ...form, id: 'claude-sonnet-4.5' }, true).id).toBeUndefined()
     expect(validateModelForm({ ...form, id: '' }, false).id).toBeUndefined()
   })
+
+  it('accepts a positive max output or none', () => {
+    const form = { ...emptyModelForm(), id: 'm', displayName: 'x' }
+    expect(validateModelForm({ ...form, maxOutputTokens: '' }, true).maxOutputTokens).toBeUndefined()
+    expect(validateModelForm({ ...form, maxOutputTokens: '8192' }, true).maxOutputTokens).toBeUndefined()
+    expect(validateModelForm({ ...form, maxOutputTokens: '0' }, true).maxOutputTokens).toBe('正整数，或留空')
+    expect(validateModelForm({ ...form, maxOutputTokens: '1.5' }, true).maxOutputTokens).toBe('正整数，或留空')
+  })
 })
 
 it('keeps explicit zero, omits inherited detail prices and accepts response conditions', () => {
