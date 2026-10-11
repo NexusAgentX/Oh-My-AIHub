@@ -56,10 +56,14 @@ func TestHandlerSetsABoundedDefaultWriteDeadline(t *testing.T) {
 
 func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
-	for _, path := range []string{"/v1/chat/completions", "/v1/responses", "/v1/messages", "/v1beta/models/gemini-2.5-flash:generateContent"} {
+	// Each entry answers in its own protocol's error shape.
+	for path, want := range map[string]string{
+		"/v1/chat/completions": `"code":"invalid_api_key"`, "/v1/responses": `"code":"invalid_api_key"`,
+		"/v1/messages": `"type":"authentication_error"`, "/v1beta/models/gemini-2.5-flash:generateContent": `"reason":"INVALID_API_KEY"`,
+	} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
-		if recorder.Code != http.StatusUnauthorized || !strings.Contains(recorder.Body.String(), `"error":"invalid_api_key"`) {
+		if recorder.Code != http.StatusUnauthorized || !strings.Contains(recorder.Body.String(), want) {
 			t.Fatalf("POST %s = %d %s", path, recorder.Code, recorder.Body.String())
 		}
 	}
@@ -73,7 +77,11 @@ func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(target.method, target.path, strings.NewReader(`{}`)))
-		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), `"error":"unsupported_endpoint"`) {
+		want := `"code":"unsupported_endpoint"`
+		if strings.HasPrefix(target.path, "/v1beta/") {
+			want = `"reason":"UNSUPPORTED_ENDPOINT"`
+		}
+		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), want) {
 			// A Gemini operation is rejected after authentication, so it may answer 401 first.
 			if !(strings.Contains(target.path, "countTokens") && recorder.Code == http.StatusUnauthorized) {
 				t.Fatalf("%s %s = %d %s", target.method, target.path, recorder.Code, recorder.Body.String())

@@ -266,10 +266,10 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 			"start_minute_of_day": 540, "end_minute_of_day": 720,
 			"prices": map[string]string{"input": "3", "output": "9", "cache_write": "0", "cache_read": "0.3"},
 		}},
-		"provider": "DeepSeek", "context_window": 128000,
+		"provider": "DeepSeek", "context_window": 128000, "max_output_tokens": 8192,
 	}
 	created := admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", model)["model"].(map[string]any)
-	if created["enabled"] != true || len(created["price_tiers"].([]any)) != 1 || created["price_tiers"].([]any)[0].(map[string]any)["seq"] != float64(1) {
+	if created["enabled"] != true || created["max_output_tokens"] != float64(8192) || len(created["price_tiers"].([]any)) != 1 || created["price_tiers"].([]any)[0].(map[string]any)["seq"] != float64(1) {
 		t.Fatalf("created model = %v", created)
 	}
 	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", model); recorder.Code != http.StatusConflict {
@@ -279,15 +279,19 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", invalid); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("slash model = %d", recorder.Code)
 	}
+	zeroOutput := map[string]any{"id": "zero-output", "display_name": "x", "base_prices": model["base_prices"], "max_output_tokens": 0}
+	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", zeroOutput); recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("zero max_output_tokens = %d", recorder.Code)
+	}
 	tooExpensive := map[string]any{"id": "pricey", "display_name": "x", "base_prices": map[string]string{"input": "100000.000000001", "output": "0", "cache_write": "0", "cache_read": "0"}}
 	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", tooExpensive); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("price ceiling = %d", recorder.Code)
 	}
 
 	patched := admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/models/deepseek-chat", map[string]any{
-		"enabled": false, "price_tiers": []any{}, "context_window": nil,
+		"enabled": false, "price_tiers": []any{}, "context_window": nil, "max_output_tokens": nil,
 	})["model"].(map[string]any)
-	if patched["enabled"] != false || len(patched["price_tiers"].([]any)) != 0 || patched["context_window"] != nil || patched["display_name"] != "DeepSeek Chat" {
+	if patched["enabled"] != false || len(patched["price_tiers"].([]any)) != 0 || patched["context_window"] != nil || patched["max_output_tokens"] != nil || patched["display_name"] != "DeepSeek Chat" {
 		t.Fatalf("patched model = %v", patched)
 	}
 	if recorder := admin.call(t, http.MethodPatch, "/api/admin/models/missing", map[string]any{"enabled": true}); recorder.Code != http.StatusNotFound {

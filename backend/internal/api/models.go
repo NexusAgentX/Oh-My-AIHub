@@ -63,6 +63,7 @@ type modelRequest struct {
 	SortOrder                *int32              `json:"sort_order"`
 	Provider                 *string             `json:"provider"`
 	ContextWindow            optional[int64]     `json:"context_window"`
+	MaxOutputTokens          optional[int64]     `json:"max_output_tokens"`
 	InputModalities          *[]string           `json:"input_modalities"`
 	OutputModalities         *[]string           `json:"output_modalities"`
 	SupportsTools            *bool               `json:"supports_tools"`
@@ -131,6 +132,9 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 	if request.ContextWindow.Set {
 		patch.ContextWindow = &request.ContextWindow.Value
 	}
+	if request.MaxOutputTokens.Set {
+		patch.MaxOutputTokens = &request.MaxOutputTokens.Value
+	}
 	if request.BasePrices != nil {
 		prices, err := request.BasePrices.parse()
 		if err != nil {
@@ -188,6 +192,7 @@ type adminModelJSON struct {
 	SortOrder                int32           `json:"sort_order"`
 	Provider                 string          `json:"provider"`
 	ContextWindow            *int64          `json:"context_window"`
+	MaxOutputTokens          *int64          `json:"max_output_tokens"`
 	InputModalities          []string        `json:"input_modalities"`
 	OutputModalities         []string        `json:"output_modalities"`
 	SupportsTools            bool            `json:"supports_tools"`
@@ -259,6 +264,7 @@ func newAdminModelJSON(model catalog.Model) adminModelJSON {
 		SortOrder:                model.SortOrder,
 		Provider:                 model.Provider,
 		ContextWindow:            model.ContextWindow,
+		MaxOutputTokens:          model.MaxOutputTokens,
 		InputModalities:          model.InputModalities,
 		OutputModalities:         model.OutputModalities,
 		SupportsTools:            model.SupportsTools,

@@ -43,6 +43,7 @@ type catalogModelJSON struct {
 	DisplayName              string               `json:"display_name"`
 	Provider                 string               `json:"provider"`
 	ContextWindow            *int64               `json:"context_window"`
+	MaxOutputTokens          *int64               `json:"max_output_tokens"`
 	InputModalities          []string             `json:"input_modalities"`
 	OutputModalities         []string             `json:"output_modalities"`
 	SupportsTools            bool                 `json:"supports_tools"`
@@ -193,6 +194,7 @@ func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, no
 		DisplayName:              model.DisplayName,
 		Provider:                 model.Provider,
 		ContextWindow:            model.ContextWindow,
+		MaxOutputTokens:          model.MaxOutputTokens,
 		InputModalities:          model.InputModalities,
 		OutputModalities:         model.OutputModalities,
 		SupportsTools:            model.SupportsTools,

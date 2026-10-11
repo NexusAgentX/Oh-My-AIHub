@@ -20,8 +20,9 @@ INSERT INTO models (
     input_price_nano_per_million, output_price_nano_per_million,
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
-    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices, price_currency
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices, price_currency,
+    max_output_tokens
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 RETURNING *;
 
 -- name: UpdateModel :one
@@ -43,6 +44,7 @@ UPDATE models SET
     parameter_info = $16,
     token_prices = $17,
     price_currency = $18,
+    max_output_tokens = $19,
     updated_at = now()
 WHERE id = $1
 RETURNING *;

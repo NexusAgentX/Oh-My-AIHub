@@ -290,6 +290,7 @@ export type ModelForm = {
   sortOrder: string
   provider: string
   contextWindow: string
+  maxOutputTokens: string
   inputModalities: string[]
   outputModalities: string[]
   supportsTools: boolean
@@ -311,6 +312,7 @@ export function emptyModelForm(): ModelForm {
     sortOrder: '0',
     provider: '',
     contextWindow: '',
+    maxOutputTokens: '',
     inputModalities: ['text'],
     outputModalities: ['text'],
     supportsTools: false,
@@ -347,6 +349,7 @@ export function modelToForm(model: AdminModel): ModelForm {
     sortOrder: String(model.sort_order),
     provider: model.provider,
     contextWindow: model.context_window === null ? '' : String(model.context_window),
+    maxOutputTokens: model.max_output_tokens === null ? '' : String(model.max_output_tokens),
     inputModalities: model.input_modalities,
     outputModalities: model.output_modalities,
     supportsTools: model.supports_tools,
@@ -363,6 +366,7 @@ export function changedModelAdvanced(form: ModelForm) {
   return [
     form.provider.trim() !== '',
     form.contextWindow.trim() !== '',
+    form.maxOutputTokens.trim() !== '',
     !isTextOnly(form.inputModalities),
     !isTextOnly(form.outputModalities),
     form.supportsTools,
@@ -375,7 +379,7 @@ export function changedModelAdvanced(form: ModelForm) {
 const modelIDPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 
 export type ModelErrors = Partial<
-  Record<'id' | 'displayName' | 'prices' | 'sortOrder' | 'contextWindow' | 'parameterInfo' | 'tiers', string>
+  Record<'id' | 'displayName' | 'prices' | 'sortOrder' | 'contextWindow' | 'maxOutputTokens' | 'parameterInfo' | 'tiers', string>
 >
 
 export function validateModelForm(form: ModelForm, creating: boolean): ModelErrors {
@@ -389,10 +393,10 @@ export function validateModelForm(form: ModelForm, creating: boolean): ModelErro
   const prices = validatePrices(form.prices)
   if (prices) errors.prices = prices
   if (!/^-?\d+$/.test(form.sortOrder.trim())) errors.sortOrder = '请输入整数'
-  const contextWindow = form.contextWindow.trim()
-  if (contextWindow && (!/^\d+$/.test(contextWindow) || Number(contextWindow) < 1)) {
-    errors.contextWindow = '正整数，或留空'
-  }
+  const positiveOrEmpty = (value: string) => !value || (/^\d+$/.test(value) && Number(value) >= 1)
+  if (!positiveOrEmpty(form.contextWindow.trim())) errors.contextWindow = '正整数，或留空'
+  if (!positiveOrEmpty(form.maxOutputTokens.trim())) errors.maxOutputTokens = '正整数，或留空'
+
   if (form.parameterInfo.length > 500) errors.parameterInfo = '最多 500 个字符'
   if (form.tiers.length > maxPriceTiers) errors.tiers = `最多 ${maxPriceTiers} 档`
   return errors
@@ -408,6 +412,7 @@ function modelFields(form: ModelForm) {
     sort_order: Number(form.sortOrder.trim()),
     provider: form.provider.trim(),
     context_window: form.contextWindow.trim() ? Number(form.contextWindow.trim()) : null,
+    max_output_tokens: form.maxOutputTokens.trim() ? Number(form.maxOutputTokens.trim()) : null,
     input_modalities: form.inputModalities.length > 0 ? form.inputModalities : ['text'],
     output_modalities: form.outputModalities.length > 0 ? form.outputModalities : ['text'],
     supports_tools: form.supportsTools,

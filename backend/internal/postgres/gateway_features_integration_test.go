@@ -293,8 +293,14 @@ func TestGatewayAppliesKeyAliasesAndAllowedModels(t *testing.T) {
 		t.Fatalf("models = %d %s", list.Code, list.Body.String())
 	}
 	anthropic := e.call("", http.MethodGet, "/v1/models?limit=1", nil, map[string]string{"x-api-key": secret, "anthropic-version": "2023-06-01"})
-	if anthropic.Code != http.StatusOK || !strings.Contains(anthropic.Body.String(), `"type":"model"`) || !strings.Contains(anthropic.Body.String(), `"has_more":true`) {
+	if anthropic.Code != http.StatusOK || !strings.Contains(anthropic.Body.String(), `"type":"model"`) || !strings.Contains(anthropic.Body.String(), `"has_more":true`) || !strings.Contains(anthropic.Body.String(), `"lifecycle":"active"`) {
 		t.Fatalf("anthropic models = %d %s", anthropic.Code, anthropic.Body.String())
+	}
+	if first := e.call("", http.MethodGet, "/v1beta/models?pageSize=1&key="+secret, nil, nil); first.Code != http.StatusOK || !strings.Contains(first.Body.String(), `"nextPageToken"`) || !strings.Contains(first.Body.String(), `"baseModelId"`) {
+		t.Fatalf("gemini first page = %d %s", first.Code, first.Body.String())
+	}
+	if bad := e.call("", http.MethodGet, "/v1beta/models?pageToken=bm9wZQ&key="+secret, nil, nil); bad.Code != http.StatusBadRequest || !strings.Contains(bad.Body.String(), `"status":"INVALID_ARGUMENT"`) {
+		t.Fatalf("gemini bad token = %d %s", bad.Code, bad.Body.String())
 	}
 	gemini := e.call("", http.MethodGet, "/v1beta/models?key="+secret, nil, nil)
 	if gemini.Code != http.StatusOK || !strings.Contains(gemini.Body.String(), `"name":"models/gpt-test"`) {

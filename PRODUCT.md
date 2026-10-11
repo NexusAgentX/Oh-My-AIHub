@@ -73,7 +73,7 @@ Oh-My-AIHub 是受邀小圈子使用的「**API 市场 + 积分 C2C 市场**」�
 
 ### 网关、渠道、Key 与路由
 
-- 四种原生格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini；不做格式转换。渠道的每个模型声明支持的格式（按模型族预选 + 「测试格式」自动修正）；网关按请求路径识别格式，只选支持该格式的渠道。平台自己回答 `GET /v1/models`（请求带 `anthropic-version` 时按 Anthropic 形态分页返回，否则为 OpenAI 形态）与 `GET /v1beta/models`；其他路径返回「不支持的接口」。不做向量、图片、语音、Realtime。
+- 四种原生格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini；不做格式转换。渠道的每个模型声明支持的格式（按模型族预选 + 「测试格式」自动修正）；网关按请求路径识别格式，只选支持该格式的渠道。平台自己回答 `GET /v1/models`（请求带 `anthropic-version` 时按 Anthropic 形态分页返回，否则为 OpenAI 形态）与 `GET /v1beta/models`（按 Gemini 形态分页），字段按各家官方格式给齐，目录没有的信息（发布时间、生命周期、能力位）按官方允许的方式填空值；其他路径返回「不支持的接口」。不做向量、图片、语音、Realtime。
 - 透明转发只做四件事：换鉴权（放在客户端原来的位置）、换 User-Agent（渠道可选）、按渠道规则设置/覆写/删除请求头、把请求体顶层 `model` 换成渠道的上游名称（字节级替换）。唯一例外：OpenAI Chat 流式请求补 `stream_options.include_usage=true`。响应全部原样返回。
 - 不预扣费：请求前只检查「余额 > −信用额度」与 Key 预算；请求结束后按用量一次记账；失败不收费；成功但读不到用量不收费。
 - 路由：每个用户对每个模型选择便宜优先（默认）/ 稳定优先 / 快速优先 / 手动排序；任何模式都可以取消勾选渠道；对所有 Key 生效，单把 Key 可单独覆盖。手动模式下新上架的渠道排在最后且默认不勾选。
