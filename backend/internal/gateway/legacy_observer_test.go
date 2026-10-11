@@ -2,10 +2,10 @@ package gateway
 
 // This file is a frozen copy of the side-channel reader as it was before the
 // frame pre-scan (G8.5): decode every event into maps and structs, always. It
-// is the oracle of TestObserverMatchesTheOriginalOnAnyEvent and
-// FuzzObserverMatchesTheOriginal, which say that skipping or lighter decoding
-// changes no state of the reader. Do not "fix" it: when the reader's rules
-// change on purpose, change this copy in the same commit.
+// is the oracle of the tests in observer_equivalence_test.go, which say that
+// skipping or lighter decoding changes no state of the reader. Do not "fix" it:
+// when the reader's rules change on purpose, change this copy in the same
+// commit.
 
 import (
 	"bytes"

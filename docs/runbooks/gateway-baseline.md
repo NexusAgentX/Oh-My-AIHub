@@ -24,6 +24,7 @@
 | 位置 | 作用 |
 | --- | --- |
 | `backend/internal/gatewaybench` | 四种格式的模拟上游（首字时间、块间隔、token 数、usage 帧可配）、压测程序（并发数与 QPS，开环或闭环）、测试 CA、数据库语句计数器。有单元测试，随 `go test ./...` 运行 |
+| `backend/internal/gateway/stream_bench_test.go`、`request_bench_test.go` | 不要网络和数据库的 Go 基准，用来单看一个函数的代价：`stream_bench_test.go` 把基线模拟上游的四种流（1000 token）依次送过旁路解析器、纯用量帧过滤器和整个 `streamBack` 写回路径；`request_bench_test.go` 比较请求体的读取、扫描与拼接和它们改进前的做法。运行：`go -C backend test ./internal/gateway -run '^$' -bench . -benchmem`；分配次数与字节数是确定的，耗时依赖机器 |
 | `backend/internal/postgres/gateway_perf_*_test.go` | 带 build tag `perfbaseline` 的测试：同一进程里启动真实的网关引擎、API 处理器、PostgreSQL、模拟上游与压测程序，跑场景并输出报告。普通 `go test ./...` 与 CI 不编译它们（`mise run lint-backend` 会带上这个 tag 做静态检查，防止它悄悄编译不过） |
 
 ### 出站限制没有被放宽

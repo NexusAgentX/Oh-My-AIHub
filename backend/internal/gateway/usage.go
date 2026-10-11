@@ -3,7 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -162,8 +162,8 @@ func (o *Observer) Finish() Observation {
 	}
 	observation := Observation{Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
-		sorted := append([]time.Duration(nil), o.intervals...)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+		sorted := slices.Clone(o.intervals)
+		slices.Sort(sorted)
 		p50 := int(percentile(sorted, 0.50).Milliseconds())
 		p95 := int(percentile(sorted, 0.95).Milliseconds())
 		observation.IntervalP50MS, observation.IntervalP95MS = &p50, &p95
