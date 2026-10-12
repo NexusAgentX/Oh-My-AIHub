@@ -478,7 +478,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
         {section === 'overview' && <ChannelStatsPanel channelId={channel.id} onViewFailures={() => setSection('health')} />}
         {section === 'calls' && <ChannelCalls channelId={channel.id} />}
         {section === 'health' && <ChannelHealth channelId={channel.id} events={detail.events} />}
-        {section === 'settings' && <>
+        {section === 'settings' && <div className="channel-settings">
           <form className="channel-edit" noValidate onSubmit={save}>
             <div className="channel-save-bar">
               <div className="form-actions channel-edit-actions">
@@ -531,7 +531,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
               </Button>
             </div>
           </Card>
-        </>}
+        </div>}
       </Tabs>
       <ConfirmDialog
         busy={remove.isPending}
