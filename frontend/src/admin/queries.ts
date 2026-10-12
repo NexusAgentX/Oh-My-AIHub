@@ -1,3 +1,4 @@
+import { formDefaultsKey } from '../settings/queries'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -192,7 +193,12 @@ export function useSaveModel() {
 }
 
 export function useUpdateSettings() {
-  return useAdminMutation((body: RequestBody<'updateAdminSettings'>) => adminApi.updateSettings(body))
+  const client = useQueryClient()
+  return useAdminMutation(async (body: RequestBody<'updateAdminSettings'>) => {
+    const result = await adminApi.updateSettings(body)
+    await client.invalidateQueries({ queryKey: formDefaultsKey })
+    return result
+  })
 }
 
 export function useSyncExchangeRate() {
