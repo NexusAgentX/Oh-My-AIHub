@@ -58,6 +58,16 @@ type runData struct {
 	CPUPerRequestNS float64 `json:"cpu_per_request_ns"`
 	AllocBytes      float64 `json:"alloc_bytes_per_request"`
 	Mallocs         float64 `json:"mallocs_per_request"`
+	// StatementMS is the mean duration of each statement, as the client saw it.
+	StatementMS map[string]float64 `json:"statement_mean_ms"`
+	// LockHold is how long the settlement kept the ledger row locks taken;
+	// tools older than G8.7 do not write it (Holds is 0).
+	LockHold struct {
+		Holds      int64   `json:"holds"`
+		MeanMS     float64 `json:"mean_ms"`
+		P99MS      float64 `json:"p99_ms"`
+		Statements float64 `json:"statements_per_hold"`
+	} `json:"ledger_lock_hold"`
 }
 
 type scenarioResult struct {
@@ -80,14 +90,23 @@ type results struct {
 type metric struct {
 	name   string
 	format string
-	// value is nil for the metrics that do not come from a scenario's runs.
-	value func(scenarioResult) float64
+	// value is nil for the metrics that do not come from a scenario's runs;
+	// ok is false when the tool that wrote the results did not measure it.
+	value func(scenarioResult) (value float64, ok bool)
 }
 
-func addedTTFT(percentile string) func(scenarioResult) float64 {
-	return func(s scenarioResult) float64 {
+func always(f func(scenarioResult) float64) func(scenarioResult) (float64, bool) {
+	return func(s scenarioResult) (float64, bool) { return f(s), true }
+}
+
+func addedTTFT(percentile string) func(scenarioResult) (float64, bool) {
+	return always(func(s scenarioResult) float64 {
 		return s.Gateway.Summary.TTFTMS[percentile] - s.Direct.Summary.TTFTMS[percentile]
-	}
+	})
+}
+
+func lockHold(f func(scenarioResult) float64) func(scenarioResult) (float64, bool) {
+	return func(s scenarioResult) (float64, bool) { return f(s), s.Gateway.LockHold.Holds > 0 }
 }
 
 func failures(r runData) float64 {
@@ -101,14 +120,23 @@ func failures(r runData) float64 {
 var metrics = []metric{
 	{"added ttft p50 (ms)", "%.2f", addedTTFT("p50")},
 	{"added ttft p99 (ms)", "%.1f", addedTTFT("p99")},
-	{"gateway throughput (/s)", "%.0f", func(s scenarioResult) float64 { return s.Gateway.Summary.ThroughputPS }},
-	{"net CPU (ms/req)", "%.2f", func(s scenarioResult) float64 { return (s.Gateway.CPUPerRequestNS - s.Direct.CPUPerRequestNS) / 1e6 }},
-	{"net alloc (KB/req)", "%.1f", func(s scenarioResult) float64 { return (s.Gateway.AllocBytes - s.Direct.AllocBytes) / 1024 }},
-	{"net allocs (/req)", "%.0f", func(s scenarioResult) float64 { return s.Gateway.Mallocs - s.Direct.Mallocs }},
-	{"DB statements (/req)", "%.2f", func(s scenarioResult) float64 { return s.QueriesTotal }},
+	{"gateway throughput (/s)", "%.0f", always(func(s scenarioResult) float64 { return s.Gateway.Summary.ThroughputPS })},
+	{"net CPU (ms/req)", "%.2f", always(func(s scenarioResult) float64 { return (s.Gateway.CPUPerRequestNS - s.Direct.CPUPerRequestNS) / 1e6 })},
+	{"net alloc (KB/req)", "%.1f", always(func(s scenarioResult) float64 { return (s.Gateway.AllocBytes - s.Direct.AllocBytes) / 1024 })},
+	{"net allocs (/req)", "%.0f", always(func(s scenarioResult) float64 { return s.Gateway.Mallocs - s.Direct.Mallocs })},
+	{"DB statements (/req)", "%.2f", always(func(s scenarioResult) float64 { return s.QueriesTotal })},
+	// How long the settlement keeps the ledger row locks, and how long a settlement
+	// waits for them (the LockLedgerAccounts statement, as the client sees it).
+	{"lock hold mean (ms)", "%.2f", lockHold(func(s scenarioResult) float64 { return s.Gateway.LockHold.MeanMS })},
+	{"lock hold p99 (ms)", "%.1f", lockHold(func(s scenarioResult) float64 { return s.Gateway.LockHold.P99MS })},
+	{"statements per lock hold", "%.1f", lockHold(func(s scenarioResult) float64 { return s.Gateway.LockHold.Statements })},
+	{"lock queue: LockLedgerAccounts mean (ms)", "%.2f", func(s scenarioResult) (float64, bool) {
+		v, ok := s.Gateway.StatementMS["LockLedgerAccounts"]
+		return v, ok
+	}},
 	// The upstream answered straight, without the gateway: how noisy the machine was.
-	{"direct ttft p99 (ms)", "%.1f", func(s scenarioResult) float64 { return s.Direct.Summary.TTFTMS["p99"] }},
-	{"gateway failed", "%.0f", func(s scenarioResult) float64 { return failures(s.Gateway) }},
+	{"direct ttft p99 (ms)", "%.1f", always(func(s scenarioResult) float64 { return s.Direct.Summary.TTFTMS["p99"] })},
+	{"gateway failed", "%.0f", always(func(s scenarioResult) float64 { return failures(s.Gateway) })},
 }
 
 // sweepMetric is the one metric of a sweep.
@@ -279,7 +307,9 @@ func collect(passes []pass) *samples {
 		for _, scenario := range p.results.Scenarios {
 			label := scenarioLabel(p.phase, scenario.Name)
 			for i, m := range metrics {
-				s.add(p.side, label, i, m.value(scenario))
+				if value, ok := m.value(scenario); ok {
+					s.add(p.side, label, i, value)
+				}
 			}
 		}
 		for _, sweep := range p.results.Sweeps {

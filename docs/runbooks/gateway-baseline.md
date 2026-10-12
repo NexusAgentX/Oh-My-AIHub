@@ -128,7 +128,7 @@ gh run watch    # 选择刚触发的运行；默认参数一个作业要数小�
 
 ### 读结果
 
-- 作业摘要（运行页面的 Summary）：先是环境，再是“Base against head”表，每个场景的每个指标给出 base 与 head 的中位数 [最小–最大]、相对变化，以及两侧范围是否重叠；重叠表示变化在这台机器的噪声之内。“direct ttft p99”是不经网关、直连模拟上游的首字时间，反映当时机器有多吵。之后是“Runs”表：每次运行的数据库往返与提交延迟、负载和 CPU steal，据此判断哪几次运行不可信。
+- 作业摘要（运行页面的 Summary）：先是环境，再是“Base against head”表，每个场景的每个指标给出 base 与 head 的中位数 [最小–最大]、相对变化，以及两侧范围是否重叠；重叠表示变化在这台机器的噪声之内。“direct ttft p99”是不经网关、直连模拟上游的首字时间，反映当时机器有多吵。“lock queue”是等账本行锁的时间（`LockLedgerAccounts` 语句的均值）；“lock hold”是结算持有这把锁的时间，只有带锁持有测量的基线工具（G8.7 之后）才写出，另一侧是旧工具时显示“–”。之后是“Runs”表：每次运行的数据库往返与提交延迟、负载和 CPU steal，据此判断哪几次运行不可信。
 - `jobs` 大于 1 时多一个“Spread between jobs”摘要：各作业的 base / head 中位数并排，并给出各指标在作业之间的离散度（最高与最低的差除以中位数），以及每个作业的 CPU 型号。
 - artifact `perf-baseline-job-<n>`（保留 30 天）：`<side>/r<轮>/<阶段>/` 下是每次运行的 `report.md`、`results.json`、pprof（`nonstream` 与 `stream` 各有一次带 pprof 的运行）、完整日志 `test.log` 与 `meta.txt`；`environment.txt`、`cpu.txt`、`refs.txt` 与 `comparison.md`（摘要原文）在根目录。pprof 的看法同下文。
 
