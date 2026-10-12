@@ -18,8 +18,10 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("observed resource not found")
-	ErrInvalidInput = errors.New("invalid observation query")
+	ErrNotFound        = errors.New("observed resource not found")
+	ErrInvalidInput    = errors.New("invalid observation query")
+	ErrAnalysisBusy    = errors.New("analysis capacity exhausted")
+	ErrAnalysisTimeout = errors.New("analysis time budget exhausted")
 	// ErrNotRepairable reports a call that is not eligible for repair
 	// (already booked, not billable, or served by the caller's own channel).
 	ErrNotRepairable = errors.New("call is not repairable")

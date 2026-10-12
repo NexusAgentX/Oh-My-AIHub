@@ -173,7 +173,8 @@ export function CallAnalysis({
         withQuery(`${path}/analysis`, { ...params, group_by: group, split_by: split, bucket_seconds: Number(bucket) }),
       ),
     enabled: eligible,
-    refetchInterval: live ? 3000 : false,
+    refetchInterval: live ? 15_000 : false,
+    retry: false,
   })
   const dims = Object.entries(dimensions).filter(([key]) => key !== 'account' || path.startsWith('/api/admin/'))
   if (!eligible) return <p className="muted-copy">选择起止时间可查看趋势与分组对比（最长 366 天）。</p>

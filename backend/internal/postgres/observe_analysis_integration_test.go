@@ -39,6 +39,7 @@ func TestObserveAnalysisSharedFiltersAndDrill(t *testing.T) {
 	if asMap(t, private["current"])["calls"] != float64(0) {
 		t.Fatal("account leak")
 	}
+	waitForSettlementTiming(t, o.pool, o.fellBack)
 	detail := asMap(t, o.get(o.consumer, "/api/calls/"+o.fellBack)["call"])
 	diagnostics := asMap(t, detail["diagnostics"])
 	stages := asList(t, diagnostics["stages"])

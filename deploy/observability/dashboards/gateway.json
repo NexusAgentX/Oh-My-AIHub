@@ -955,7 +955,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(__name__) (rate({__name__=~\"aihub_gateway_events_dropped_total|aihub_live_messages_dropped_total|aihub_live_read_failures_total|aihub_metrics_refresh_failures_total|aihub_settlement_failures_total\"}[$__rate_interval]))",
+          "expr": "sum by(__name__) (rate({__name__=~\"aihub_gateway_events_dropped_total|aihub_live_messages_dropped_total|aihub_live_read_failures_total|aihub_diagnostic_timings_dropped_total|aihub_diagnostic_timings_failed_total|aihub_metrics_refresh_failures_total|aihub_settlement_failures_total\"}[$__rate_interval]))",
           "legendFormat": "{{__name__}}"
         }
       ],

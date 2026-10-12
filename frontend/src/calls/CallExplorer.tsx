@@ -63,7 +63,7 @@ export function CallExplorer<T extends CallRowBase>({
   const [liveAt, setLiveAt] = useState(0)
   useEffect(() => {
     if (!live) return
-    const timer = window.setInterval(() => setLiveAt(Date.now()), 3000)
+    const timer = window.setInterval(() => setLiveAt(Date.now()), 15_000)
     return () => window.clearInterval(timer)
   }, [live])
   const [drill, setDrill] = useState<{ base: string; params: CallListParams; label: string } | null>(null)
@@ -80,7 +80,7 @@ export function CallExplorer<T extends CallRowBase>({
   }, [params, drillParams, live, liveAt])
   const pages = useCallPages<Page<T>>(listPath, activeParams, {
     limit: pageSize,
-    refetchInterval: live && (!params.to || drillParams.to) ? 3000 : false,
+    refetchInterval: live && (!params.to || drillParams.to) ? 15_000 : false,
   })
   const [page, setPage] = useState(0)
   const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
@@ -138,7 +138,7 @@ export function CallExplorer<T extends CallRowBase>({
         <CallAnalysis
           path={listPath}
           params={activeParams}
-          live={live}
+          live={live && (!params.to || Boolean(drillParams.to))}
           onDrill={(next, label) => {
             setPage(0)
             setDrill({ base: baseKey, params: { ...drillParams, ...next }, label })

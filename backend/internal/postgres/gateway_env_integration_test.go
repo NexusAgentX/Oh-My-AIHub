@@ -29,6 +29,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaybench"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
@@ -315,6 +316,10 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	feedContext, stopFeed := context.WithCancel(context.Background())
 	t.Cleanup(stopFeed)
 	go e.feed.Run(feedContext)
+	diagnosticContext, stopDiagnostics := context.WithCancel(gatewaybench.Background(context.Background()))
+	diagnosticDone := make(chan struct{})
+	go func() { defer close(diagnosticDone); store.Gateway.RunDiagnostics(diagnosticContext) }()
+	t.Cleanup(func() { stopDiagnostics(); <-diagnosticDone })
 	e.newHandler = func(engine *gateway.Engine) http.Handler {
 		return api.NewHandler(api.Dependencies{
 			Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,

@@ -121,11 +121,16 @@ UPDATE calls SET
     ttft_ms = sqlc.narg(ttft_ms), duration_ms = sqlc.arg(duration_ms), output_tokens_per_second = sqlc.narg(tokens_per_second),
     inter_token_p50_ms = sqlc.narg(inter_token_p50_ms), inter_token_p95_ms = sqlc.narg(inter_token_p95_ms),
     response_bytes = sqlc.arg(response_bytes), upstream_response_id = sqlc.narg(upstream_response_id),
-    completed_at = now()
+    diagnostics = sqlc.narg(diagnostics), completed_at = clock_timestamp()
 WHERE id = sqlc.arg(id) AND outcome = 'in_progress';
 
--- name: SetCallDiagnostics :exec
-UPDATE calls SET diagnostics=$2, completed_at=clock_timestamp() WHERE id=$1;
+-- name: SetCallSettlements :exec
+UPDATE calls c SET diagnostics = jsonb_set(c.diagnostics, '{stages}',
+    coalesce(c.diagnostics->'stages', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('stage', 'settlement', 'duration_ms', d.duration_ms)))
+FROM (SELECT unnest(sqlc.arg(ids)::uuid[]) AS id,
+             unnest(sqlc.arg(durations)::double precision[]) AS duration_ms) d
+WHERE c.id = d.id AND c.outcome <> 'in_progress' AND c.diagnostics IS NOT NULL
+    AND NOT (coalesce(c.diagnostics->'stages', '[]'::jsonb) @> '[{"stage":"settlement"}]'::jsonb);
 
 -- name: SetCallLedgerTx :exec
 UPDATE calls SET ledger_tx_id = $2 WHERE id = $1;

@@ -22,10 +22,11 @@ import (
 )
 
 type Store struct {
-	pool   *pgxpool.Pool
-	q      *Queries
-	ledger *ledgerpg.Store
-	books  *ledgerpg.Books
+	pool        *pgxpool.Pool
+	q           *Queries
+	ledger      *ledgerpg.Store
+	books       *ledgerpg.Books
+	diagnostics *diagnosticWriter
 }
 
 // NewStore builds the store; the ledger posting that ends a billed call
@@ -34,7 +35,7 @@ func NewStore(pool *pgxpool.Pool, books *ledgerpg.Books) *Store {
 	if books == nil {
 		books = ledgerpg.NewBooks()
 	}
-	return &Store{pool: pool, q: New(pool), ledger: ledgerpg.NewStore(pool, books), books: books}
+	return &Store{pool: pool, q: New(pool), ledger: ledgerpg.NewStore(pool, books), books: books, diagnostics: newDiagnosticWriter()}
 }
 
 func (s *Store) LookupKey(ctx context.Context, hash []byte) (gateway.KeyAuth, error) {
@@ -258,6 +259,7 @@ func int32Pointer(value *int) *int32 {
 }
 
 func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gateway.FinishResult, error) {
+	settlementStarted := time.Now()
 	attempts, err := json.Marshal(nonNilAttempts(finish.Attempts))
 	if err != nil {
 		return gateway.FinishResult{}, err
@@ -265,36 +267,14 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	duration := int32(finish.DurationMS)
 	bytesRead := finish.ResponseBytes
 	var result gateway.FinishResult
-	settlementStarted := time.Now()
-	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) (retErr error) {
+	raw, previousSettlement, err := encodeDiagnostics(finish.Diagnostics)
+	if err != nil {
+		return gateway.FinishResult{}, err
+	}
+	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := New(tx)
-		defer func() {
-			if retErr != nil || !result.Finished || finish.Diagnostics == nil {
-				return
-			}
-			d := *finish.Diagnostics
-			d.Stages = append([]gateway.StageTiming{}, d.Stages...)
-			elapsed := float64(time.Since(settlementStarted)) / float64(time.Millisecond)
-			found := false
-			for i := range d.Stages {
-				if d.Stages[i].Stage == "settlement" {
-					d.Stages[i].DurationMS += elapsed
-					found = true
-					break
-				}
-			}
-			if !found {
-				d.Stages = append(d.Stages, gateway.StageTiming{Stage: "settlement", DurationMS: elapsed})
-			}
-			raw, encodeErr := json.Marshal(d)
-			if encodeErr != nil {
-				retErr = encodeErr
-				return
-			}
-			retErr = q.SetCallDiagnostics(ctx, SetCallDiagnosticsParams{ID: finish.ID, Diagnostics: raw})
-		}()
 		affected, err := q.FinishCall(ctx, FinishCallParams{
-			ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),
+			Diagnostics: raw, ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),
 			RoutingMode: optional(finish.RoutingMode), RoutingSource: optional(finish.RoutingSource), Attempts: attempts,
 			InputTokens: finish.Usage.InputTokens, OutputTokens: finish.Usage.OutputTokens,
 			CacheWriteTokens: finish.Usage.CacheWriteTokens, CacheReadTokens: finish.Usage.CacheReadTokens,
@@ -334,6 +314,10 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 		result.TxID = posted.ID
 		return nil
 	})
+	if err == nil && result.Finished && finish.Diagnostics != nil {
+		completed := time.Now()
+		s.diagnostics.offer(settlementTiming{ID: finish.ID, DurationMS: previousSettlement + float64(completed.Sub(settlementStarted))/float64(time.Millisecond)})
+	}
 	return result, err
 }
 
