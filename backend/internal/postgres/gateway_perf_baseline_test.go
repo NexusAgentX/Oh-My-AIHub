@@ -706,11 +706,24 @@ func (s *perfStack) prime() {
 	}
 }
 
-func (s *perfStack) environment(started time.Time, before, after databaseProbe) string {
-	cpu := "unknown"
+// cpuModel names the processor: macOS asks sysctl, Linux (the performance
+// workflow's runners) reads /proc/cpuinfo.
+func cpuModel() string {
 	if out, err := exec.Command("sysctl", "-n", "machdep.cpu.brand_string").Output(); err == nil {
-		cpu = strings.TrimSpace(string(out))
+		return strings.TrimSpace(string(out))
 	}
+	if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if key, value, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(key) == "model name" {
+				return strings.TrimSpace(value)
+			}
+		}
+	}
+	return "unknown"
+}
+
+func (s *perfStack) environment(started time.Time, before, after databaseProbe) string {
+	cpu := cpuModel()
 	probe := func(p databaseProbe) string {
 		return fmt.Sprintf("round trip mean %s p99 %s, commit mean %s p99 %s",
 			p.RoundTripMean.Round(10*time.Microsecond), p.RoundTripP99.Round(10*time.Microsecond), p.CommitMean.Round(10*time.Microsecond), p.CommitP99.Round(10*time.Microsecond))
