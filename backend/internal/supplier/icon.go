@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
+	"errors"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,29 +40,19 @@ func NormalizeIcon(data string) (string, error) {
 }
 func rasterIcon(raw []byte) (string, error) {
 	if len(raw) > maxIconBytes {
-		return "", ErrInvalid
+		return "", ErrIconTooLarge
 	}
-	// ICO files can contain PNG images. Unsupported bitmap-only ICOs fall back
-	// to another website icon, or the directory's initial-letter placeholder.
-	if len(raw) >= 22 && bytes.Equal(raw[:4], []byte{0, 0, 1, 0}) {
-		count := int(binary.LittleEndian.Uint16(raw[4:6]))
-		for i := 0; i < count && 6+(i+1)*16 <= len(raw); i++ {
-			entry := raw[6+i*16 : 6+(i+1)*16]
-			size, offset := uint64(binary.LittleEndian.Uint32(entry[8:12])), uint64(binary.LittleEndian.Uint32(entry[12:16]))
-			if offset+size <= uint64(len(raw)) && size >= 8 && bytes.Equal(raw[offset:offset+8], []byte{137, 80, 78, 71, 13, 10, 26, 10}) {
-				raw = raw[offset : offset+size]
-				break
-			}
-		}
+	var img image.Image
+	var err error
+	if bytes.HasPrefix(raw, []byte{0, 0, 1, 0}) {
+		img, err = decodeICO(raw)
+	} else {
+		img, err = decodeRaster(raw)
 	}
-	config, _, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > 1024 || config.Height > 1024 {
-		return "", ErrInvalid
-	}
-	img, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
-		return "", ErrInvalid
+		return "", err
 	}
+	config := image.Config{Width: img.Bounds().Dx(), Height: img.Bounds().Dy()}
 	// Small, bounded local copy; no new image processing dependency.
 	width, height := config.Width, config.Height
 	if width > 128 || height > 128 {
@@ -85,6 +77,42 @@ func rasterIcon(raw []byte) (string, error) {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buffer.Bytes()), nil
 }
 
+var (
+	ErrIconFormat   = errors.New("unsupported or invalid icon image")
+	ErrIconTooLarge = errors.New("icon exceeds size limit")
+	ErrIconTimeout  = errors.New("icon fetch timed out")
+	ErrIconRedirect = errors.New("icon fetch requires redirect")
+	ErrIconDownload = errors.New("icon download failed")
+	ErrIconNotFound = errors.New("icon not found")
+)
+
+type IconHTTPError struct{ Status int }
+
+func (e *IconHTTPError) Error() string { return fmt.Sprintf("icon server returned HTTP %d", e.Status) }
+
+func decodeRaster(raw []byte) (image.Image, error) {
+	config, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil || config.Width < 1 || config.Height < 1 {
+		return nil, ErrIconFormat
+	}
+	if config.Width > 1024 || config.Height > 1024 {
+		return nil, ErrIconTooLarge
+	}
+	img, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return nil, ErrIconFormat
+	}
+	return img, nil
+}
+
+func iconDownloadError(err error) error {
+	var networkError net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkError) && networkError.Timeout()) {
+		return ErrIconTimeout
+	}
+	return ErrIconDownload
+}
+
 // FetchIcon is administrator-only at the HTTP boundary. Each request uses
 // the existing DNS-pinned egress policy; redirects, credentials and proxies
 // are not permitted. No website is contacted during directory browsing.
@@ -96,7 +124,11 @@ func (s *Service) FetchIcon(ctx context.Context, raw string) (string, string, er
 	defer cancel()
 	website, _ := url.Parse(raw)
 	candidates := []string{}
+	failures := []error{}
 	page, err := s.fetch(ctx, website.String(), 512<<10)
+	if err != nil {
+		failures = append(failures, err)
+	}
 	if err == nil {
 		tokenizer := html.NewTokenizer(bytes.NewReader(page))
 		for {
@@ -136,45 +168,59 @@ func (s *Service) FetchIcon(ctx context.Context, raw string) (string, string, er
 	for _, candidate := range candidates {
 		body, e := s.fetch(ctx, candidate, maxIconBytes)
 		if e != nil {
+			failures = append(failures, e)
+			if errors.Is(e, ErrIconTimeout) {
+				return "", "", ErrIconTimeout
+			}
 			continue
 		}
 		icon, e := rasterIcon(body)
 		if e == nil {
 			return icon, candidate, nil
 		}
+		failures = append(failures, e)
 	}
-	return "", "", ErrInvalid
+	return "", "", errors.Join(failures...)
 }
 func (s *Service) fetch(ctx context.Context, raw string, limit int64) ([]byte, error) {
 	if !WebURL(raw, false) {
-		return nil, ErrInvalid
+		return nil, ErrIconDownload
 	}
 	u, _ := url.Parse(raw)
 	origin := u.Scheme + "://" + u.Host
 	base, err := s.Outbound.NormalizeBaseURL(origin)
 	if err != nil {
-		return nil, err
+		return nil, iconDownloadError(err)
 	}
 	client, err := s.Outbound.FreshClient(ctx, base)
 	if err != nil {
-		return nil, err
+		return nil, iconDownloadError(err)
 	}
 	defer client.CloseIdleConnections()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
 	if err != nil {
-		return nil, err
+		return nil, iconDownloadError(err)
 	}
 	response, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, iconDownloadError(err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode >= 300 && response.StatusCode < 400 {
+		return nil, ErrIconRedirect
+	}
+	if response.StatusCode == http.StatusNotFound {
+		return nil, ErrIconNotFound
+	}
 	if response.StatusCode != http.StatusOK {
-		return nil, ErrInvalid
+		return nil, &IconHTTPError{Status: response.StatusCode}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
-	if err != nil || int64(len(body)) > limit {
-		return nil, ErrInvalid
+	if err != nil {
+		return nil, iconDownloadError(err)
+	}
+	if int64(len(body)) > limit {
+		return nil, ErrIconTooLarge
 	}
 	return body, nil
 }
