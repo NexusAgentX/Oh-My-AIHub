@@ -65,7 +65,7 @@ func NewOutboundPolicyWithResolver(allowedPorts, additionalBlockedHosts []string
 		}
 		ports[strconv.Itoa(port)] = struct{}{}
 	}
-	blocked := []string{"api.openai.com"}
+	blocked := make([]string, 0, len(additionalBlockedHosts))
 	for _, value := range additionalBlockedHosts {
 		normalized, err := normalizeHostname(value)
 		if err != nil {

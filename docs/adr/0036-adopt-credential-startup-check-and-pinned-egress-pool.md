@@ -120,4 +120,6 @@ ADR-0009 规定了上游凭据的版本化加密，以及“每次解析、钉�
 
 ## 替代关系
 
+OpenAI 官方域名及其子域的永久禁用规则由 [ADR-0042](0042-remove-permanent-provider-host-ban.md) 取代；其余凭据与出站安全决策仍有效。
+
 取代 [ADR-0009](archive/0009-adopt-encrypted-upstream-credentials-and-pinned-egress.md)。ADR-0028 所说的“上游凭据密钥环”由本 ADR 规定。
