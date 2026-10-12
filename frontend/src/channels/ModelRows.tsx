@@ -182,9 +182,6 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
           </div>
           <div className="model-row-formats">
             <FormatToggles onChange={(next) => update(row.key, { formats: next })} row={row} />
-            {formats.filter((format) => row.passed[format] === false).map((format) => (
-              <p className="model-format-error" key={format}>{formatLabels[format]}：{row.errors?.[format] || '测试未通过'}</p>
-            ))}
           </div>
           <div className="model-row-multiplier">
             {row.custom ? (
