@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { Format } from '../api/types'
 import { formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
@@ -86,13 +87,25 @@ function FXDiscountTip({ rate }: { rate: string }) {
 }
 
 /** 选模型表格：卖、平台模型、上游名称、格式、倍率与按参考价格档的实际价。 */
-export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
+export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testingModel }: {
+  addedRowKey?: string
   rows: ModelRow[]
   onChange: (rows: ModelRow[]) => void
   onTest: (modelId: string) => void
   testing: boolean
   testingModel: string | null
 }) {
+  const addedModel = useRef<HTMLSelectElement>(null)
+  const addedCustomName = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const field = addedCustomName.current ?? addedModel.current
+    if (!field) return
+    field.focus({ preventScroll: true })
+    field.closest('.model-row')?.scrollIntoView({
+      block: 'center',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }, [addedRowKey])
   const catalog = useModels()
   const ids = [...new Set(rows.filter((row) => row.modelId && !row.custom).map((row) => row.modelId))]
   const details = useModelDetails(ids)
@@ -151,6 +164,7 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
           <div className="model-row-names">
             <select
               aria-label="平台模型"
+              ref={row.key === addedRowKey && !row.custom ? addedModel : undefined}
               className="input select-input mono"
               onChange={(event) => choose(row, event.target.value)}
               value={row.custom ? CUSTOM : row.modelId}
@@ -166,6 +180,7 @@ export function ModelRows({ rows, onChange, onTest, testing, testingModel }: {
             {row.custom && (
               <input
                 aria-label="自定义模型名"
+                ref={row.key === addedRowKey ? addedCustomName : undefined}
                 className="input mono"
                 onChange={(event) => update(row.key, { modelId: event.target.value.trim() })}
                 placeholder="模型名（客户端请求的 model）"
