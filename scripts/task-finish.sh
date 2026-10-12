@@ -292,6 +292,11 @@ main() {
     info "没有找到分支 $branch 的 worktree，无需删除。"
   fi
   if [ "$have_local" -eq 1 ]; then
+    # 已确认分支进入 origin/main 且 main 已快进；让 -d 按 main 判断，
+    # 避免旧 upstream 落后于已合并的本地提交时误拒绝删除。
+    if git -C "$MAIN_WS" config --get "branch.$branch.merge" >/dev/null; then
+      run git -C "$MAIN_WS" branch --unset-upstream "$branch"
+    fi
     run git -C "$MAIN_WS" branch -d "$branch"
   else
     info "本地分支 $branch 已不存在，无需删除。"
