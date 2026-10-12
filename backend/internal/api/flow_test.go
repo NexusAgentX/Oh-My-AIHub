@@ -158,6 +158,10 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("display name before password change = %d %s", recorder.Code, recorder.Body.String())
 	}
 	// 密码至少 8 位，须含大写、小写与数字，不要求特殊字符。
+	recorder := wang.call(t, http.MethodPost, "/api/me/password", map[string]string{"current_password": "wrong-password", "new_password": "Wang2026"})
+	if recorder.Code != http.StatusUnauthorized || errorCode(t, recorder) != "invalid_credentials" || !strings.Contains(recorder.Body.String(), "当前密码不正确") {
+		t.Fatalf("wrong current password = %d: %s", recorder.Code, recorder.Body.String())
+	}
 	for _, weak := range []string{"Wang201", "wang-password-2026", "WANG-PASSWORD-2026", "Wang-password"} {
 		if recorder := wang.call(t, http.MethodPost, "/api/me/password", map[string]string{"current_password": initialPassword, "new_password": weak}); recorder.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("weak password %q = %d %s", weak, recorder.Code, recorder.Body.String())
