@@ -46,7 +46,7 @@ for arg in "$@"; do
       ;;
     -*)
       usage
-      die "未知选项 $arg。"
+      die "未知选项 ${arg}。"
       ;;
     *)
       if [ -n "$task" ]; then
@@ -109,7 +109,7 @@ check_worktree_clean() {
     path="${entry:3}"
     if [ "$code" = '!!' ]; then
       if reason="$(ignored_cache_reason "$path")"; then
-        ok_ignored="$ok_ignored  $path（$reason）"$'\n'
+        ok_ignored="$ok_ignored  ${path}（${reason}）"$'\n'
       else
         bad_ignored="$bad_ignored  $path"$'\n'
       fi
@@ -152,7 +152,7 @@ find_merged_pull_request() {
   while IFS=$'\t' read -r number state merged _ merge_sha url; do
     [ -n "$number" ] || continue
     if [ "$state" = "open" ]; then
-      die "PR #$number 仍是 open（$url），尚未合并。"
+      die "PR #$number 仍是 open（${url}），尚未合并。"
     fi
     if [ "$merged" != "-" ] && [ -z "$found" ]; then
       found="$number $merge_sha"
@@ -178,7 +178,7 @@ cleanup_docker() {
   if [ -n "$ids" ]; then
     # shellcheck disable=SC2086 # 容器 ID 不含空白，需按词拆分
     project="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' $ids | sort -u | head -n 1)"
-    info "发现 $(printf '%s\n' "$ids" | wc -l | tr -d ' ') 个 Compose 容器（项目 $project），停止并移除容器与网络。"
+    info "发现 $(printf '%s\n' "$ids" | wc -l | tr -d ' ') 个 Compose 容器（项目 ${project}），停止并移除容器与网络。"
     if [ -d "$wt" ]; then
       (cd "$wt" && run docker compose -p "$project" down) || die "docker compose down 失败，已停止；worktree 与分支均未改动。"
     else
@@ -238,7 +238,7 @@ main() {
       git -C "$MAIN_WS" log --oneline --max-count=10 "origin/main..$branch" >&2
       die "本地分支 $branch 有未进入 origin/main 的提交（见上），可能含未合并或未推送的工作；脚本不会删除。"
     fi
-    info "本地分支 $branch（${tip:0:7}）已在 origin/main 中。"
+    info "本地分支 ${branch}（${tip:0:7}）已在 origin/main 中。"
   fi
   if git -C "$MAIN_WS" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
     have_remote=1
@@ -247,7 +247,7 @@ main() {
       git -C "$MAIN_WS" log --oneline --max-count=10 "origin/main..origin/$branch" >&2
       die "远端分支 origin/$branch 有未进入 origin/main 的提交（见上）；脚本不会删除。"
     fi
-    info "远端分支 origin/$branch（${tip:0:7}）已在 origin/main 中。"
+    info "远端分支 origin/${branch}（${tip:0:7}）已在 origin/main 中。"
   fi
 
   # worktree：以检出该分支的 worktree 为准。
@@ -265,7 +265,7 @@ main() {
     case "$here/" in
       "$worktree"/*)
         if [ "$dry_run" -eq 1 ]; then
-          warn "当前目录位于要删除的 worktree 内；实际执行时会拒绝，请先 cd $MAIN_WS。"
+          warn "当前目录位于要删除的 worktree 内；实际执行时会拒绝，请先 cd ${MAIN_WS}。"
         else
           die "当前目录位于要删除的 worktree $worktree 内。请先 cd $MAIN_WS 再运行。"
         fi
@@ -292,6 +292,11 @@ main() {
     info "没有找到分支 $branch 的 worktree，无需删除。"
   fi
   if [ "$have_local" -eq 1 ]; then
+    # 已确认分支进入 origin/main 且 main 已快进；让 -d 按 main 判断，
+    # 避免旧 upstream 落后于已合并的本地提交时误拒绝删除。
+    if git -C "$MAIN_WS" config --get "branch.$branch.merge" >/dev/null; then
+      run git -C "$MAIN_WS" branch --unset-upstream "$branch"
+    fi
     run git -C "$MAIN_WS" branch -d "$branch"
   else
     info "本地分支 $branch 已不存在，无需删除。"
@@ -306,11 +311,11 @@ main() {
   local counts
   counts="$(main_sync_counts)"
   if [ "$dry_run" -eq 1 ]; then
-    info "[dry-run] 当前 main...origin/main：$counts（实际执行快进后应为 0 0）。"
+    info "[dry-run] 当前 main...origin/main：${counts}（实际执行快进后应为 0 0）。"
     return 0
   fi
   if [ "$counts" != "0 0" ]; then
-    die "清理后 main...origin/main 为“$counts”，不是“0 0”。请手动核对主工作区。"
+    die "清理后 main...origin/main 为“${counts}”，不是“0 0”。请手动核对主工作区。"
   fi
   info "任务 $branch 已清理。main...origin/main：$counts"
 }

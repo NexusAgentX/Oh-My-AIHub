@@ -30,7 +30,7 @@ parse_task_name() {
   fi
   case "$name" in
     */*) ;;
-    *) die "任务名“$name”无效：须写成 <type>/<slug>（如 fix/251-key-layout）；type 只能是：$TASK_TYPES。" ;;
+    *) die "任务名“${name}”无效：须写成 <type>/<slug>（如 fix/251-key-layout）；type 只能是：${TASK_TYPES}。" ;;
   esac
   type="${name%%/*}"
   slug="${name#*/}"
@@ -40,16 +40,16 @@ parse_task_name() {
     fi
   done
   if [ "$found" -ne 1 ]; then
-    die "任务类型“$type”无效：type 只能是 $TASK_TYPES 之一（如 fix/251-key-layout）。"
+    die "任务类型“${type}”无效：type 只能是 $TASK_TYPES 之一（如 fix/251-key-layout）。"
   fi
   if [ -z "$slug" ]; then
-    die "任务名“$name”缺少 slug（如 $type/251-key-layout）。"
+    die "任务名“${name}”缺少 slug（如 $type/251-key-layout）。"
   fi
   case "$slug" in
     *$'\n'*) slug_ok=0 ;; # grep 按行匹配，多行 slug 须单独拒绝
   esac
   if [ "$slug_ok" -ne 1 ] || [ "${#slug}" -gt 60 ] || ! printf '%s' "$slug" | LC_ALL=C grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
-    die "任务 slug“$slug”无效：只能含小写字母、数字和单个连字符，不能以连字符开头或结尾，最长 60 个字符（如 251-key-layout）。"
+    die "任务 slug“${slug}”无效：只能含小写字母、数字和单个连字符，不能以连字符开头或结尾，最长 60 个字符（如 251-key-layout）。"
   fi
   TASK_BRANCH="$type/$slug"
   TASK_DIR="$type-$slug"
