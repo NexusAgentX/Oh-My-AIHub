@@ -27,8 +27,15 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 		WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name <> 'goose_db_version'`).Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 22 {
-		t.Fatalf("schema tables = %d, want 22", tables)
+	if tables != 24 {
+		t.Fatalf("schema tables = %d, want 24", tables)
+	}
+	var suppliers, supplierEndpoints int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM suppliers), (SELECT count(*) FROM supplier_endpoints)`).Scan(&suppliers, &supplierEndpoints); err != nil {
+		t.Fatal(err)
+	}
+	if suppliers != 0 || supplierEndpoints != 0 {
+		t.Fatalf("supplier directory must start empty: %d suppliers, %d endpoints", suppliers, supplierEndpoints)
 	}
 	var systemAccounts, settingsRows, feeRate int64
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ledger_accounts WHERE kind = 'system'`).Scan(&systemAccounts); err != nil {
