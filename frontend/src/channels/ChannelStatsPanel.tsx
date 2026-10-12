@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ChannelEvent, ChannelFailure, ChannelStats } from '../api/types'
 import { formatMs, formatPoints, formatRatio } from '../money/format'
 import { formatDateTime } from '../money/time'
-import { BarChart, Badge, Card, EmptyState, MetricGrid, Metric, QueryBoundary, Segmented, type BadgeTone } from '../ui'
+import { Button, BarChart, Badge, Card, EmptyState, MetricGrid, Metric, QueryBoundary, Segmented, type BadgeTone } from '../ui'
 import { useChannelStats } from './queries'
 
 const eventLabels: Record<ChannelEvent['kind'], { label: string; tone: BadgeTone }> = {
@@ -91,7 +91,7 @@ function endReasonLabel(reason: string) {
 }
 
 /** 渠道统计：24h/7d 成功率、收入与今日上限进度、首字与速度 p50/p95、调用趋势、按模型收入、失败分布与最近失败。 */
-export function ChannelStatsPanel({ channelId }: { channelId: string }) {
+export function ChannelStatsPanel({ channelId, onViewFailures }: { channelId: string; onViewFailures?: () => void }) {
   const [range, setRange] = useState<'24h' | '7d'>('7d')
   const stats = useChannelStats(channelId)
   return (
@@ -112,71 +112,116 @@ export function ChannelStatsPanel({ channelId }: { channelId: string }) {
       <QueryBoundary errorFallback="渠道统计加载失败" query={stats}>
         {(data) => (
           <div className="channel-stats">
-            <MetricGrid label="渠道统计">
-              <Metric
-                hint={`${data.last_24h.succeeded} / ${data.last_24h.calls} 次 · 7 天 ${formatRatio(data.last_7d.success_rate)}`}
-                label="24 小时成功率"
-                value={formatRatio(data.last_24h.success_rate)}
-              />
-              <Metric
-                hint={data.today.daily_cap ? `上限 ${formatPoints(data.today.daily_cap)}` : '未设上限'}
-                label="今日收入"
-                progress={data.today.progress === null ? undefined : Number(data.today.progress) * 100}
-                value={formatPoints(data.today.revenue)}
-              />
-              <Metric hint={`p95 ${formatMs(data.ttft_p95_ms)}`} label="首字 p50" value={formatMs(data.ttft_p50_ms)} />
-              <Metric
-                hint={`p95 ${speed(data.output_tokens_per_second_p95)}`}
-                label="速度 p50"
-                value={speed(data.output_tokens_per_second_p50)}
-              />
-            </MetricGrid>
-            {range === '24h' ? (
-              <BarChart
-                data={data.hourly.map((hour) => ({
-                  key: hour.hour,
-                  label: hourFormat.format(new Date(hour.hour)),
-                  value: hour.calls,
-                  display: `${hour.calls} 次 · 成功 ${hour.succeeded}`,
-                }))}
-                label="每小时调用量"
-              />
-            ) : (
-              data.daily.length > 0 && (
+            {!onViewFailures && <ChannelMetricValues data={data} />}
+            <div className={onViewFailures ? 'channel-chart-grid' : 'channel-stats'}>
+              {range === '24h' ? (
                 <BarChart
-                  data={data.daily.map((day) => ({
-                    key: day.date,
-                    label: day.date.slice(5),
-                    value: day.calls,
-                    display: `${day.calls} 次 · 成功 ${day.succeeded}`,
+                  data={data.hourly.map((hour) => ({
+                    key: hour.hour,
+                    label: hourFormat.format(new Date(hour.hour)),
+                    value: hour.calls,
+                    display: `${hour.calls} 次 · 成功 ${hour.succeeded}`,
                   }))}
-                  label="每日调用量"
+                  label="每小时调用量"
                 />
-              )
-            )}
-            {data.by_model.length > 0 && (
-              <BarChart
-                data={data.by_model.map((model) => ({
-                  key: model.model_id,
-                  label: model.model_id,
-                  value: Number(model.revenue),
-                  display: `${formatPoints(model.revenue)} · ${model.calls} 次`,
-                }))}
-                label="按模型收入（7 天）"
-                orientation="horizontal"
-              />
-            )}
-            <section className="channel-stats-section" aria-label="失败按状态码">
-              <h3 className="section-title">失败按状态码（7 天）</h3>
-              <StatusCodes codes={data.status_codes} />
-            </section>
+              ) : (
+                data.daily.length > 0 && (
+                  <BarChart
+                    data={data.daily.map((day) => ({
+                      key: day.date,
+                      label: day.date.slice(5),
+                      value: day.calls,
+                      display: `${day.calls} 次 · 成功 ${day.succeeded}`,
+                    }))}
+                    label="每日调用量"
+                  />
+                )
+              )}
+              {data.by_model.length > 0 && (
+                <BarChart
+                  data={data.by_model.map((model) => ({
+                    key: model.model_id,
+                    label: model.model_id,
+                    value: Number(model.revenue),
+                    display: `${formatPoints(model.revenue)} · ${model.calls} 次`,
+                  }))}
+                  label="按模型收入（7 天）"
+                  orientation="horizontal"
+                />
+              )}
+              <section className="channel-stats-section" aria-label="失败按状态码">
+                <h3 className="section-title">失败按状态码（7 天）</h3>
+                <StatusCodes codes={data.status_codes} />
+              </section>
+            </div>
             <section className="channel-stats-section" aria-label="最近失败">
               <h3 className="section-title">最近失败</h3>
-              <RecentFailures failures={data.recent_failures} />
+              <RecentFailures failures={onViewFailures ? data.recent_failures.slice(0, 3) : data.recent_failures} />
+              {onViewFailures && data.recent_failures.length > 0 && <Button variant="quiet" size="sm" onClick={onViewFailures}>查看全部异常</Button>}
             </section>
           </div>
         )}
       </QueryBoundary>
     </Card>
   )
+}
+
+function ChannelMetricValues({ data }: { data: ChannelStats }) {
+  return (
+    <MetricGrid label="渠道统计">
+      <Metric
+        hint={`${data.last_24h.succeeded} / ${data.last_24h.calls} 次 · 7 天 ${formatRatio(data.last_7d.success_rate)}`}
+        label="24 小时成功率"
+        value={formatRatio(data.last_24h.success_rate)}
+      />
+      <Metric
+        hint={data.today.daily_cap ? `上限 ${formatPoints(data.today.daily_cap)}` : '未设上限'}
+        label="今日收入"
+        progress={data.today.progress === null ? undefined : Number(data.today.progress) * 100}
+        value={formatPoints(data.today.revenue)}
+      />
+      <Metric hint={`p95 ${formatMs(data.ttft_p95_ms)}`} label="首字 p50" value={formatMs(data.ttft_p50_ms)} />
+      <Metric
+        hint={`p95 ${speed(data.output_tokens_per_second_p95)}`}
+        label="速度 p50"
+        value={speed(data.output_tokens_per_second_p50)}
+      />
+    </MetricGrid>
+  )
+}
+
+export function ChannelMetrics({ channelId }: { channelId: string }) {
+  const stats = useChannelStats(channelId)
+  return <QueryBoundary errorFallback="渠道统计加载失败" query={stats}>{(data) => <ChannelMetricValues data={data} />}</QueryBoundary>
+}
+
+export function ChannelHealth({ channelId, events }: { channelId: string; events: ChannelEvent[] }) {
+  const stats = useChannelStats(channelId)
+  const [eventPage, setEventPage] = useState(0)
+  const [failurePage, setFailurePage] = useState(0)
+  const currentEventPage = Math.min(eventPage, Math.max(0, Math.ceil(events.length / 10) - 1))
+  return <div className="channel-health">
+    <Card title="最近失败">
+      <QueryBoundary errorFallback="最近失败加载失败" query={stats}>{(data) => {
+        const page = Math.min(failurePage, Math.max(0, Math.ceil(data.recent_failures.length / 5) - 1))
+        return <>
+          <RecentFailures failures={data.recent_failures.slice(page * 5, (page + 1) * 5)} />
+          <RecordPages label="最近失败分页" page={page} count={data.recent_failures.length} size={5} onChange={setFailurePage} />
+        </>
+      }}</QueryBoundary>
+    </Card>
+    <Card title="健康事件">
+      <ChannelEvents events={events.slice(currentEventPage * 10, (currentEventPage + 1) * 10)} />
+      <RecordPages label="健康事件分页" page={currentEventPage} count={events.length} size={10} onChange={setEventPage} />
+    </Card>
+  </div>
+}
+
+function RecordPages({ label, page, count, size, onChange }: { label: string; page: number; count: number; size: number; onChange: (page: number) => void }) {
+  if (count <= size) return null
+  return <nav aria-label={label} className="channel-record-pages">
+    <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>上一页</Button>
+    <span className="muted num">{page + 1} / {Math.ceil(count / size)} · 最近 {count} 条</span>
+    <Button variant="secondary" size="sm" disabled={(page + 1) * size >= count} onClick={() => onChange(page + 1)}>下一页</Button>
+  </nav>
 }

@@ -5,6 +5,7 @@ import type { Channel, ChannelDetail, ChannelCall } from '../api/types'
 import { CallExplorer, FormatTags, channelCallColumns, outcomeLabels, outcomeOptions } from '../calls'
 import { rangeFrom, type RangePreset } from '../money/time'
 import {
+  Badge,
   Button,
   Card,
   ConfirmDialog,
@@ -17,10 +18,12 @@ import {
   Segmented,
   SuccessMessage,
   Switch,
+  Tabs,
   TextField,
 } from '../ui'
 import { AdvancedFields } from './AdvancedFields'
 import {
+  channelStatus,
   advancedChangedCount,
   advancedFromChannel,
   advancedInput,
@@ -37,7 +40,7 @@ import {
   type AdvancedForm,
   type ModelRow,
 } from './channelForm'
-import { ChannelEvents, ChannelStatsPanel } from './ChannelStatsPanel'
+import { ChannelHealth, ChannelMetrics, ChannelStatsPanel } from './ChannelStatsPanel'
 import { ModelRows } from './ModelRows'
 import {
   useChannel,
@@ -319,6 +322,8 @@ function ChannelCalls({ channelId }: { channelId: string }) {
   return (
     <Card title="调用">
       <CallExplorer<ChannelCall>
+        key={JSON.stringify(params)}
+        pageSize={20}
         caption="渠道调用"
         chargedLabel="收入"
         columns={channelCallColumns()}
@@ -355,10 +360,12 @@ function ChannelCalls({ channelId }: { channelId: string }) {
   )
 }
 
-/** 编辑：同一结构平铺，另含统计、健康事件、调用与删除。 */
+/** 配置草稿留在父组件，切换分区时不丢失未保存的值。 */
 function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
   const navigate = useNavigate()
   const channel = detail.channel
+  const [section, setSection] = useState<'overview' | 'settings' | 'calls' | 'health'>('overview')
+  const status = channelStatus(channel)
   const [name, setName] = useState(channel.name)
   const [baseUrl, setBaseUrl] = useState(channel.base_url)
   const [apiKey, setApiKey] = useState('')
@@ -448,72 +455,78 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
       <PageHeader
         back={{ to: '/channels', label: '我的渠道' }}
         title={channel.name}
+        actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />
       {channel.status === 'suspended' && (
         <div className="notice notice-danger" role="alert">
           被管理员下架{channel.suspended_reason ? `：${channel.suspended_reason}` : ''}
         </div>
       )}
-      <form className="channel-edit" noValidate onSubmit={save}>
-        <Card title="连接">
-          <div className="stack-form">
-            <div className="field-row">
-              <TextField label="名称" maxLength={64} onChange={(event) => setName(event.target.value)} value={name} />
-              <TextField inputMode="url" label="Base URL" onChange={(event) => setBaseUrl(event.target.value)} type="url" value={baseUrl} />
+      <ChannelMetrics channelId={channel.id} />
+      <Tabs label="渠道详情" value={section} onChange={setSection} items={[
+        { key: 'overview', label: '概览' },
+        { key: 'settings', label: '模型与配置' },
+        { key: 'calls', label: '调用记录' },
+        { key: 'health', label: '健康事件' },
+      ]}>
+        {section === 'overview' && <ChannelStatsPanel channelId={channel.id} onViewFailures={() => setSection('health')} />}
+        {section === 'calls' && <ChannelCalls channelId={channel.id} />}
+        {section === 'health' && <ChannelHealth channelId={channel.id} events={detail.events} />}
+        {section === 'settings' && <>
+          <form className="channel-edit" noValidate onSubmit={save}>
+            <div className="channel-save-bar">
+              <div className="form-actions channel-edit-actions">
+                <Switch checked={listed} disabled={channel.status === 'suspended'} label={listed ? '上架' : '下架'} onChange={setListed} />
+                <Button loading={update.isPending && !test.isPending}>保存</Button>
+              </div>
+              <InlineError>{error}</InlineError>
+              <SuccessMessage>{message}</SuccessMessage>
             </div>
-            <PasswordField
-              autoComplete="off"
-              hint="已保存，留空不修改"
-              label="上游 Key"
-              onChange={(event) => setApiKey(event.target.value)}
-              value={apiKey}
-            />
-            <div>
-              <Button disabled={!apiKey.trim()} loading={discover.isPending} onClick={rediscover} size="sm" type="button" variant="secondary">
-                重新读取模型
+            <Card title="连接">
+              <div className="stack-form">
+                <div className="field-row">
+                  <TextField label="名称" maxLength={64} onChange={(event) => setName(event.target.value)} value={name} />
+                  <TextField inputMode="url" label="Base URL" onChange={(event) => setBaseUrl(event.target.value)} type="url" value={baseUrl} />
+                </div>
+                <PasswordField
+                  autoComplete="off"
+                  hint="已保存，留空不修改"
+                  label="上游 Key"
+                  onChange={(event) => setApiKey(event.target.value)}
+                  value={apiKey}
+                />
+                <div>
+                  <Button disabled={!apiKey.trim()} loading={discover.isPending} onClick={rediscover} size="sm" type="button" variant="secondary">
+                    重新读取模型
+                  </Button>
+                </div>
+              </div>
+            </Card>
+            <Card title="模型">
+              <ModelsSection
+                onRows={setRows}
+                onTest={(modelId) => void runTest(modelId)}
+                rows={rows}
+                summary={summary}
+                testError={testError}
+                testing={testing}
+                testingModel={testingModel}
+              />
+            </Card>
+            <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
+              <AdvancedFields form={advanced} onChange={setAdvanced} />
+            </Disclosure>
+          </form>
+          <Card className="danger-zone" title="删除渠道">
+            <div className="danger-zone-body">
+              <span className="muted-copy">删除后不再接收调用，历史记录保留</span>
+              <Button icon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)} type="button" variant="danger">
+                删除
               </Button>
             </div>
-          </div>
-        </Card>
-        <Card title="模型">
-          <ModelsSection
-            onRows={setRows}
-            onTest={(modelId) => void runTest(modelId)}
-            rows={rows}
-            summary={summary}
-            testError={testError}
-            testing={testing}
-            testingModel={testingModel}
-          />
-        </Card>
-        <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
-          <AdvancedFields form={advanced} onChange={setAdvanced} />
-        </Disclosure>
-        <InlineError>{error}</InlineError>
-        <SuccessMessage>{message}</SuccessMessage>
-        <div className="form-actions channel-edit-actions">
-          <Switch
-            checked={listed}
-            disabled={channel.status === 'suspended'}
-            label={listed ? '上架' : '下架'}
-            onChange={setListed}
-          />
-          <Button loading={update.isPending && !test.isPending}>保存</Button>
-        </div>
-      </form>
-      <ChannelStatsPanel channelId={channel.id} />
-      <Card title="健康事件">
-        <ChannelEvents events={detail.events} />
-      </Card>
-      <ChannelCalls channelId={channel.id} />
-      <Card className="danger-zone" title="删除渠道">
-        <div className="danger-zone-body">
-          <span className="muted-copy">删除后不再接收调用，历史记录保留</span>
-          <Button icon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)} type="button" variant="danger">
-            删除
-          </Button>
-        </div>
-      </Card>
+          </Card>
+        </>}
+      </Tabs>
       <ConfirmDialog
         busy={remove.isPending}
         confirmLabel="删除"

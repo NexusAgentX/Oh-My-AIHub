@@ -40,7 +40,7 @@ export function useCallPages<Page extends CursorPage<unknown>>(
   { limit = 50, enabled = true }: { limit?: number; enabled?: boolean } = {},
 ) {
   return useInfiniteQuery({
-    queryKey: callKeys.list(path, params),
+    queryKey: [...callKeys.list(path, params), limit],
     queryFn: ({ pageParam }) =>
       request<Page>(withQuery(path, { ...params, limit, cursor: pageParam || undefined })),
     initialPageParam: '',
