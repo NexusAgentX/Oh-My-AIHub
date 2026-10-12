@@ -98,10 +98,10 @@ it('opens recent anomalies separately and pages failures and health events', asy
 })
 
 it('keeps live calls bounded and returns to the first page when live mode starts', async () => {
-  let source: { onmessage?: (event: { data: string }) => void } | undefined
+  const sources: Array<{ onmessage?: (event: { data: string }) => void }> = []
   vi.stubGlobal('EventSource', class {
     onmessage?: (event: { data: string }) => void
-    constructor() { source = this }
+    constructor() { sources.push(this) }
     close() {}
   })
   await click('调用记录')
@@ -109,9 +109,22 @@ it('keeps live calls bounded and returns to the first page when live mode starts
   await act(async () => (host.querySelector('[role="switch"]') as HTMLElement).click())
   expect(host.textContent).toContain('第 1 页')
   await act(async () => {
-    for (let i = 0; i < 30; i++) source?.onmessage?.({ data: JSON.stringify({ id: `live-${i}`, model_id: `live-model-${i}`, created_at: '2026-10-12T12:00:00Z', format: 'openai_chat', stream: true, outcome: 'succeeded', usage: {}, revenue: '1', error: null }) })
+    for (let i = 0; i < 30; i++) sources[0]?.onmessage?.({ data: JSON.stringify({ id: `live-${i}`, model_id: `live-model-${i}`, created_at: '2026-10-12T12:00:00Z', format: 'openai_chat', stream: true, outcome: 'succeeded', usage: {}, revenue: '1', error: null }) })
   })
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
   expect(host.textContent).toContain('live-model-29')
   expect([...host.querySelectorAll('button')].find((b) => b.textContent === '下一页')?.disabled).toBe(true)
+})
+
+
+it('keeps the current call page on a pagination error and allows retrying', async () => {
+  await click('调用记录')
+  vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: '翻页请求失败' } }), { status: 500 }))
+  await click('下一页')
+  expect(host.textContent).toContain('第 1 页')
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
+  expect(host.querySelector('[role="alert"]')).not.toBeNull()
+  await click('下一页')
+  expect(host.textContent).toContain('第 2 页')
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
 })

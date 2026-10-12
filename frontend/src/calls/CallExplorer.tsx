@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { errorMessage } from '../api/query'
 import type { CallDetail, CallStats } from '../api/types'
-import { Button, QueryBoundary } from '../ui'
+import { Button, InlineError, QueryBoundary } from '../ui'
 import { CallDetailDrawer } from './CallDetail'
 import { CallStatsBar } from './CallStatsBar'
 import { CallTable, type CallColumn, type CallRowBase } from './CallTable'
@@ -117,6 +118,7 @@ export function CallExplorer<T extends CallRowBase>({
               onSelect={detailPath ? (row) => setSelected(row.id) : undefined}
               rows={pageSize ? displayed : data}
             />
+            {pageSize && pages.isFetchNextPageError && <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>}
             {pageSize && <nav aria-label="调用记录分页" className="channel-record-pages">
               <Button variant="secondary" size="sm" disabled={currentPage === 0 || pages.isFetchingNextPage} onClick={() => setPage(currentPage - 1)}>上一页</Button>
               <span className="muted num">第 {currentPage + 1} 页</span>
