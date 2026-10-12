@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
  * 新增图标时在 paths 中补一条，并保持 1.8 描边、圆角端点。
  */
 const paths = {
+  globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c-5 5-5 13 0 18M12 3c5 5 5 13 0 18" /></>,
   // 导航
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
   key: (

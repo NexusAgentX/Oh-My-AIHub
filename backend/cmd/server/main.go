@@ -29,6 +29,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
 // keyringCheckTimeout bounds the startup decryption of every stored secret.
@@ -199,14 +200,15 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			Identity: identityService,
-			Forum:    forumService,
-			Catalog:  catalogService,
-			Ledger:   ledger.NewService(store.Ledger),
-			Settings: settingsService,
-			RateSync: rateSyncer,
-			Audit:    audit.NewService(store.Audit),
-			Keys:     apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
+			Suppliers: &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
+			Identity:  identityService,
+			Forum:     forumService,
+			Catalog:   catalogService,
+			Ledger:    ledger.NewService(store.Ledger),
+			Settings:  settingsService,
+			RateSync:  rateSyncer,
+			Audit:     audit.NewService(store.Audit),
+			Keys:      apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
 			Channels: channel.NewService(channel.Dependencies{
 				Store: cached.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
 				BlockedHosts: func(ctx context.Context) ([]string, error) {

@@ -373,7 +373,7 @@ describe('overview indicators', () => {
 
 describe('admin shell', () => {
   it('uses one icon per item and four mobile tabs', () => {
-    expect(adminNavigation.map((item) => item.label)).toEqual(['概览', '调用', '积分', '用户', '模型', '渠道', '申诉', '设置'])
+    expect(adminNavigation.map((item) => item.label)).toEqual(['概览', '调用', '积分', '用户', '模型', '供应商', '渠道', '申诉', '设置'])
     expect(new Set(adminNavigation.map((item) => item.icon)).size).toBe(adminNavigation.length)
     expect(adminTabCount).toBe(4)
   })

@@ -15,6 +15,7 @@ export const adminNavigation: AdminNavItem[] = [
   { label: '积分', to: '/admin/points', icon: 'wallet' },
   { label: '用户', to: '/admin/users', icon: 'users' },
   { label: '模型', to: '/admin/models', icon: 'layers' },
+  { label: '供应商', to: '/admin/suppliers', icon: 'globe' },
   { label: '渠道', to: '/admin/channels', icon: 'shield' },
   { label: '申诉', to: '/admin/disputes', icon: 'scale' },
   { label: '设置', to: '/admin/settings', icon: 'settings' },

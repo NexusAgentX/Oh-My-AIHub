@@ -295,7 +295,7 @@ func TestAdminChannelAddsOwnerToChannelFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner, _ := decoded["owner"].(map[string]any)
-	if decoded["id"] != "c1" || decoded["name"] != "渠道" || len(decoded) != 12 ||
+	if decoded["id"] != "c1" || decoded["name"] != "渠道" || len(decoded) != 14 ||
 		!reflect.DeepEqual(owner, map[string]any{"id": "o1", "username": "owner", "display_name": "车主"}) {
 		t.Fatalf("admin channel = %s", raw)
 	}

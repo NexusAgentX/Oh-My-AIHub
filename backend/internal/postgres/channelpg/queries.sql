@@ -2,8 +2,8 @@
 INSERT INTO channels (
     id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id, status,
     user_agent, header_rules, concurrency_limit, rpm_limit, daily_revenue_cap_nano,
-    ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, sqlc.narg(idle_timeout_ms));
+    ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms, summary, description
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, sqlc.narg(idle_timeout_ms), sqlc.arg(summary), sqlc.arg(description));
 
 -- name: InsertChannelModel :exec
 INSERT INTO channel_models (
@@ -24,7 +24,7 @@ SELECT EXISTS (SELECT 1 FROM models WHERE id = $1);
 DELETE FROM channel_models WHERE channel_id = $1;
 
 -- name: GetChannel :one
-SELECT c.id, c.owner_id, c.name, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -36,7 +36,7 @@ WHERE c.id = $1 AND c.deleted_at IS NULL;
 SELECT status FROM channels WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
 -- name: ListOwnerChannels :many
-SELECT c.id, c.owner_id, c.name, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -46,7 +46,7 @@ WHERE c.owner_id = $1 AND c.deleted_at IS NULL
 ORDER BY c.created_at DESC, c.id DESC;
 
 -- name: ListAdminChannels :many
-SELECT c.id, c.owner_id, c.name, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -74,6 +74,8 @@ ORDER BY cm.channel_id, cm.model_id;
 -- name: UpdateChannelFields :exec
 UPDATE channels SET
     name = coalesce(sqlc.narg(name), name),
+    summary = coalesce(sqlc.narg(summary), summary),
+    description = coalesce(sqlc.narg(description), description),
     base_url = coalesce(sqlc.narg(base_url), base_url),
     status = coalesce(sqlc.narg(status), status),
     updated_at = now()

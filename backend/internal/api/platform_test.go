@@ -23,6 +23,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
 // platform 是装配了全部领域的内存实现的处理器：密钥与路由、渠道与模型浏览、
@@ -119,7 +120,8 @@ func newPlatform(t *testing.T) *platform {
 	c2cStore := newFakeC2CStore(store)
 	rates := &fakeRateSource{rateNano: 7_100_000_000}
 	handler := NewHandler(Dependencies{
-		Identity: identityService, Catalog: catalogService, Ledger: ledger.NewService(store), Settings: settingsService,
+		Suppliers: &supplier.Service{Store: &fakeSupplierStore{channels: channelStore}, Outbound: outbound},
+		Identity:  identityService, Catalog: catalogService, Ledger: ledger.NewService(store), Settings: settingsService,
 		RateSync: settings.NewRateSyncer(store, rates),
 		Audit:    audit.NewService(store), Keys: apikey.NewService(newFakeKeyStore(), keyring, knownModels), Channels: channelService,
 		Routing: routingStore, Gateway: engine, Browse: browse, C2C: c2c.NewService(c2cStore, c2cKeyring),

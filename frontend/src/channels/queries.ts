@@ -33,6 +33,7 @@ function useInvalidateChannels() {
   return () =>
     Promise.all([
       client.invalidateQueries({ queryKey: channelKeys.all }),
+      client.invalidateQueries({ queryKey: ['sharing'] }),
       client.invalidateQueries({ queryKey: ['models'] }),
       client.invalidateQueries({ queryKey: ['home'] }),
     ])

@@ -1,3 +1,4 @@
+import { SharingNav } from '../sharing/components'
 import { Link } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { Channel } from '../api/types'
@@ -61,6 +62,7 @@ export function ChannelsPage() {
         }
         title="我的渠道"
       />
+      <SharingNav />
       <QueryBoundary
         empty={
           <EmptyState

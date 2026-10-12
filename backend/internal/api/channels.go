@@ -106,6 +106,8 @@ type channelTodayJSON struct {
 type channelJSON struct {
 	ID              string              `json:"id"`
 	Name            string              `json:"name"`
+	Summary         string              `json:"summary"`
+	Description     string              `json:"description"`
 	BaseURL         string              `json:"base_url"`
 	Status          channel.Status      `json:"status"`
 	SuspendedReason *string             `json:"suspended_reason"`
@@ -259,6 +261,8 @@ func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Ti
 	return channelJSON{
 		ID:              item.ID,
 		Name:            item.Name,
+		Summary:         item.Summary,
+		Description:     item.Description,
 		BaseURL:         item.BaseURL,
 		Status:          item.Status,
 		SuspendedReason: item.SuspendedReason,
@@ -394,12 +398,14 @@ func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) 
 }
 
 type channelRequest struct {
-	Name     *string                `json:"name"`
-	BaseURL  *string                `json:"base_url"`
-	APIKey   *string                `json:"api_key"`
-	Status   *channel.Status        `json:"status"`
-	Models   *[]channelModelRequest `json:"models"`
-	Advanced *advancedRequest       `json:"advanced"`
+	Name        *string                `json:"name"`
+	Summary     *string                `json:"summary"`
+	Description *string                `json:"description"`
+	BaseURL     *string                `json:"base_url"`
+	APIKey      *string                `json:"api_key"`
+	Status      *channel.Status        `json:"status"`
+	Models      *[]channelModelRequest `json:"models"`
+	Advanced    *advancedRequest       `json:"advanced"`
 }
 
 // ---- handlers ----
@@ -439,6 +445,12 @@ func (a *app) createChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input := channel.CreateInput{Name: *request.Name, BaseURL: *request.BaseURL, APIKey: *request.APIKey, Models: models}
+	if request.Summary != nil {
+		input.Summary = *request.Summary
+	}
+	if request.Description != nil {
+		input.Description = *request.Description
+	}
 	if request.Status != nil {
 		input.Status = *request.Status
 	}
@@ -514,11 +526,11 @@ func (a *app) updateChannel(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
-	if request.Name == nil && request.BaseURL == nil && request.APIKey == nil && request.Status == nil && request.Models == nil && request.Advanced == nil {
+	if request.Summary == nil && request.Description == nil && request.Name == nil && request.BaseURL == nil && request.APIKey == nil && request.Status == nil && request.Models == nil && request.Advanced == nil {
 		writeDomainError(w, channel.ErrInvalidInput)
 		return
 	}
-	input := channel.UpdateInput{Name: request.Name, BaseURL: request.BaseURL, APIKey: request.APIKey, Status: request.Status}
+	input := channel.UpdateInput{Name: request.Name, Summary: request.Summary, Description: request.Description, BaseURL: request.BaseURL, APIKey: request.APIKey, Status: request.Status}
 	var err error
 	if request.Models != nil {
 		models, convertErr := modelsFromRequest(*request.Models)

@@ -1,3 +1,4 @@
+import { ChannelHallPage, HallChannelPage, SuppliersPage, SupplierDetailPage } from './sharing/Pages'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import {
@@ -94,6 +95,10 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<ModelsPage />} path="/models" />
           <Route element={<ModelDetailPage />} path="/models/:model" />
           <Route element={<KeysPage />} path="/keys" />
+          <Route element={<ChannelHallPage />} path="/channel-hall" />
+          <Route element={<HallChannelPage />} path="/channel-hall/:id" />
+          <Route element={<SuppliersPage />} path="/suppliers" />
+          <Route element={<SupplierDetailPage />} path="/suppliers/:id" />
           <Route element={<ChannelsPage />} path="/channels" />
           <Route element={<ChannelEditorPage />} path="/channels/new" />
           <Route element={<ChannelEditorPage />} path="/channels/:id" />
