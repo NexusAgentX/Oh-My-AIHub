@@ -91,6 +91,10 @@ func (a *app) changePassword(w http.ResponseWriter, r *http.Request) {
 	defer func() { <-a.accountPasswordSlots }()
 	result, err := a.identity.ChangePassword(r.Context(), account.ID, request.CurrentPassword, request.NewPassword)
 	if err != nil {
+		if errors.Is(err, identity.ErrInvalidCredentials) {
+			writeError(w, http.StatusUnauthorized, "invalid_credentials", "当前密码不正确")
+			return
+		}
 		writeDomainError(w, err)
 		return
 	}
