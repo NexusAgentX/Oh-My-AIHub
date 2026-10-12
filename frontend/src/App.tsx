@@ -26,6 +26,7 @@ import { ModelDetailPage } from './models/ModelDetailPage'
 import { ModelsPage } from './models/ModelsPage'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
+import { RouteErrorPage } from './layouts/RouteErrorPage'
 import { NotFoundPage } from './layouts/NotFoundPage'
 import { ProductLayout } from './layouts/ProductLayout'
 import { PageLoading } from './ui'
@@ -78,7 +79,7 @@ function AppProviders() {
 }
 
 export const appRoutes = createRoutesFromElements(
-  <Route element={<AppProviders />} HydrateFallback={PageLoading}>
+  <Route element={<AppProviders />} errorElement={<RouteErrorPage />} HydrateFallback={PageLoading}>
     <Route element={<InstanceInitializePage />} path="/initialize" />
     <Route element={<RequireInitialized />}>
     <Route element={<WelcomePage />} path="/welcome" />
