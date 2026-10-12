@@ -248,3 +248,37 @@ func TestScenarioLabel(t *testing.T) {
 		}
 	}
 }
+
+// withHold adds what the tool of G8.7 and later writes about the settlement's lock to a scenario.
+func withHold(s map[string]any, holds int64, meanMS, p99MS, statements, queueMS float64) map[string]any {
+	gateway := s["gateway"].(map[string]any)
+	gateway["ledger_lock_hold"] = map[string]any{"holds": holds, "mean_ms": meanMS, "p99_ms": p99MS, "statements_per_hold": statements}
+	gateway["statement_mean_ms"] = map[string]float64{"LockLedgerAccounts": queueMS}
+	return s
+}
+
+func TestCompareJobLockHold(t *testing.T) {
+	// The base side was measured by a tool that does not know the hold: those rows
+	// show a dash there, not a zero.
+	dir := jobDir(t, "",
+		fixturePass{side: "base", round: 1, phase: "default", results: results1(scenario("nonstream-saturated", 50, 5, 55, 10, 1, 0))},
+		fixturePass{side: "head", round: 1, phase: "default", results: results1(withHold(scenario("nonstream-saturated", 50, 5, 55, 10, 1, 0), 900, 2.5, 9.5, 3, 12.25))},
+		fixturePass{side: "base", round: 2, phase: "default", results: results1(withHold(scenario("nonstream-saturated", 50, 5, 55, 10, 1, 0), 800, 5, 20, 6, 30))},
+		fixturePass{side: "head", round: 2, phase: "default", results: results1(withHold(scenario("nonstream-saturated", 50, 5, 55, 10, 1, 0), 900, 3.5, 11.5, 3, 14.25))},
+	)
+	var out strings.Builder
+	if err := compareJob(&out, dir); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, want := range []string{
+		// one hold sample on the base side (round 2), two on the head side.
+		"| lock hold mean (ms) | 5.00 | 3.00 [2.50–3.50] | -40.0% | – | 1/2 |",
+		"| statements per lock hold | 6.0 | 3.0 [3.0–3.0] | -50.0% | – | 1/2 |",
+		"| lock queue: LockLedgerAccounts mean (ms) | 30.00 | 13.25 [12.25–14.25] | -55.8% | – | 1/2 |",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output lacks %q\n%s", want, got)
+		}
+	}
+}
