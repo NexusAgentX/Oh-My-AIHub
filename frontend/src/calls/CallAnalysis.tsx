@@ -154,7 +154,7 @@ export function CallAnalysis({
 }: {
   path: string
   params: CallListParams
-  onDrill: (p: CallListParams) => void
+  onDrill: (p: CallListParams, label: string) => void
   live: boolean
 }) {
   const [category, setCategory] = useState('reliability')
@@ -312,7 +312,7 @@ export function CallAnalysis({
                                 Math.max(new Date(row.key).getTime(), new Date(report.from).getTime()),
                               ).toISOString(),
                               to: end,
-                            })
+                            }, `${formatDateTime(row.key)} — ${formatDateTime(end)}`)
                           }}
                         >
                           <span
@@ -349,7 +349,8 @@ export function CallAnalysis({
                   <button
                     key={`${row.key}/${row.split_key}`}
                     className="analysis-comparison-row"
-                    onClick={() => onDrill(analysisDrill(group, row.key, split, row.split_key))}
+                    onClick={() => onDrill(analysisDrill(group, row.key, split, row.split_key),
+                      [dimensionLabel(group, row.key, row.label), ...(split !== 'all' ? [dimensionLabel(split, row.split_key, row.split_label)] : [])].join(' · '))}
                   >
                     <strong>
                       {dimensionLabel(group, row.key, row.label)}

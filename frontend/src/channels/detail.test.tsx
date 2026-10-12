@@ -34,6 +34,7 @@ afterEach(async () => {
   await act(async () => root.unmount())
   client.clear()
   host.remove()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 async function waitForUI(assertion: () => void) {
@@ -129,6 +130,11 @@ it('keeps filtered live calls bounded and ignores incomplete event rows', async 
   expect(host.textContent).not.toContain('live-model-29')
   expect(host.textContent).toContain('call-model-0')
   expect([...host.querySelectorAll('button')].find((b) => b.textContent === '下一页')?.disabled).toBe(true)
+  const reads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/calls?')).length
+  const before = reads()
+  // 开放结束时间的渠道查询参数不变，仍应定时刷新服务端筛选结果。
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3100)) })
+  expect(reads()).toBeGreaterThan(before)
 })
 
 

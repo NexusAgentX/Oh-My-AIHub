@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { errorMessage } from '../api/query'
 import type { CallDetail, CallStats } from '../api/types'
 import { Button, InlineError, QueryBoundary } from '../ui'
-import { CallAnalysis, dimensionLabel } from './CallAnalysis'
+import { CallAnalysis } from './CallAnalysis'
 import { CallDetailDrawer } from './CallDetail'
 import { CallStatsBar } from './CallStatsBar'
 import { CallTable, type CallColumn, type CallRowBase } from './CallTable'
@@ -66,7 +66,7 @@ export function CallExplorer<T extends CallRowBase>({
     const timer = window.setInterval(() => setLiveAt(Date.now()), 3000)
     return () => window.clearInterval(timer)
   }, [live])
-  const [drill, setDrill] = useState<{ base: string; params: CallListParams } | null>(null)
+  const [drill, setDrill] = useState<{ base: string; params: CallListParams; label: string } | null>(null)
   const baseKey = JSON.stringify(params)
   const drillParams = useMemo(() => (drill?.base === baseKey ? drill.params : {}), [drill, baseKey])
   const activeParams = useMemo(() => {
@@ -78,7 +78,10 @@ export function CallExplorer<T extends CallRowBase>({
     }
     return result
   }, [params, drillParams, live, liveAt])
-  const pages = useCallPages<Page<T>>(listPath, activeParams, { limit: pageSize })
+  const pages = useCallPages<Page<T>>(listPath, activeParams, {
+    limit: pageSize,
+    refetchInterval: live && (!params.to || drillParams.to) ? 3000 : false,
+  })
   const [page, setPage] = useState(0)
   const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
   const stream = useCallStream<T>(live && streamPath ? streamPath : null)
@@ -124,7 +127,7 @@ export function CallExplorer<T extends CallRowBase>({
       {Object.keys(drillParams).length > 0 && (
         <div className="call-drill">
           <span>
-            已下钻 · {drillParams.dimension ? dimensionLabel(drillParams.dimension,String(drillParams.dimension_value??""),String(drillParams.dimension_value??"")) : '选定时间段'}
+            已下钻 · {drill?.label}
           </span>
           <Button variant="quiet" onClick={() => setDrill(null)}>
             返回全部筛选结果
@@ -136,9 +139,9 @@ export function CallExplorer<T extends CallRowBase>({
           path={listPath}
           params={activeParams}
           live={live}
-          onDrill={(next) => {
+          onDrill={(next, label) => {
             setPage(0)
-            setDrill({ base: baseKey, params: { ...drillParams, ...next } })
+            setDrill({ base: baseKey, params: { ...drillParams, ...next }, label })
           }}
         />
       )}

@@ -58,7 +58,7 @@ export const userCallsStreamPath = '/api/calls/stream'
 export function useCallPages<Page extends CursorPage<unknown>>(
   path: string,
   params: CallListParams,
-  { limit = 50, enabled = true }: { limit?: number; enabled?: boolean } = {},
+  { limit = 50, enabled = true, refetchInterval = false }: { limit?: number; enabled?: boolean; refetchInterval?: number | false } = {},
 ) {
   return useInfiniteQuery({
     queryKey: [...callKeys.list(path, params), limit],
@@ -67,6 +67,7 @@ export function useCallPages<Page extends CursorPage<unknown>>(
     initialPageParam: '',
     getNextPageParam: (last: Page) => last.next_cursor ?? undefined,
     enabled,
+    refetchInterval,
   })
 }
 

@@ -110,15 +110,18 @@ export function CallDetailView({ call }: { call: CallDetail }) {
             '—'
           )}
         </Row>
-        <Row label="费用">
+        <Row label="实际扣费">
           <span className="num">
             {formatPoints(call.charged)}
             <small className="muted">
               {' '}
-              = {formatPoints(call.cost)} + 手续费 {formatPoints(call.fee)}
+              · 计价 {formatPoints(call.cost)} + 手续费 {formatPoints(call.fee)}
             </small>
           </span>
         </Row>
+        {call.diagnostics && (
+          <Row label="入账">{call.ledger_transaction_id ? '已入账' : call.completed_at ? '未入账' : '处理中'}</Row>
+        )}
         <Row label="tokens">
           <span className="num">
             输入 {formatTokens(call.usage.input_tokens)} · 输出 {formatTokens(call.usage.output_tokens)}
