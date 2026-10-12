@@ -17,6 +17,7 @@ const (
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrAccountDisabled    = errors.New("account disabled")
 	ErrNotFound           = errors.New("not found")
 	ErrConflict           = errors.New("conflict")
 	ErrForbidden          = errors.New("forbidden")

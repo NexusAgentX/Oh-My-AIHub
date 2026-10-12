@@ -38,7 +38,7 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	defer func() { <-a.loginPasswordSlots }()
 	result, err := a.identity.Login(r.Context(), request.Username, request.Password)
 	if err != nil {
-		if errors.Is(err, identity.ErrInvalidCredentials) {
+		if errors.Is(err, identity.ErrInvalidCredentials) || errors.Is(err, identity.ErrAccountDisabled) {
 			a.loginLimiter.failure(limitKey)
 			a.loginIPLimiter.failure(ipLimitKey)
 		}

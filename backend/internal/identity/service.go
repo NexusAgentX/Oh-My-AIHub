@@ -73,8 +73,12 @@ func (s *Service) Login(ctx context.Context, username, password string) (LoginRe
 		return LoginResult{}, err
 	}
 	passwordMatches := VerifyPassword(account.PasswordHash, password)
-	if account.Status != StatusActive || !passwordMatches {
+	if !passwordMatches {
 		return LoginResult{}, ErrInvalidCredentials
+	}
+
+	if account.Status != StatusActive {
+		return LoginResult{}, ErrAccountDisabled
 	}
 
 	token, session, err := s.newSession(account.ID, account.PasswordVersion)

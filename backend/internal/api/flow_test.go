@@ -251,8 +251,14 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("disabled session = %d", recorder.Code)
 	}
 	login := &client{spec: spec, handler: handler}
-	if recorder := login.call(t, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang2026"}); recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("disabled login = %d", recorder.Code)
+	if recorder := login.call(t, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "Wang2026"}); recorder.Code != http.StatusForbidden || errorCode(t, recorder) != "account_disabled" {
+		t.Fatalf("disabled login = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder := login.call(t, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": "wrong-password"}); recorder.Code != http.StatusUnauthorized || errorCode(t, recorder) != "invalid_credentials" {
+		t.Fatalf("disabled login with wrong password = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if login.cookie != nil {
+		t.Fatal("disabled login created a session cookie")
 	}
 	admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/accounts/"+memberID, map[string]any{"status": "active"})
 

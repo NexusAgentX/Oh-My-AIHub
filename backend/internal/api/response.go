@@ -63,6 +63,8 @@ func writeInvalidJSON(w http.ResponseWriter) {
 
 func writeDomainError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, identity.ErrAccountDisabled):
+		writeError(w, http.StatusForbidden, "account_disabled", "账号已停用，请联系管理员")
 	case errors.Is(err, identity.ErrInvalidCredentials):
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden):

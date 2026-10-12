@@ -229,7 +229,7 @@ export interface paths {
         put?: never;
         /**
          * 登录
-         * @description 成功时设置会话 Cookie。用户名或密码错误、账户停用均返回 401 invalid_credentials。
+         * @description 成功时设置会话 Cookie。用户名或密码错误返回 401 invalid_credentials；密码正确但账户停用返回 403 account_disabled，不创建会话。
          */
         post: operations["login"];
         delete?: never;
