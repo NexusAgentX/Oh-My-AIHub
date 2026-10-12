@@ -59,3 +59,21 @@ func TestIconValidationAndLocalRasterCopy(t *testing.T) {
 		t.Fatal("insecure source accepted")
 	}
 }
+
+func TestOpenAIOfficialEndpoint(t *testing.T) {
+	policy, err := channel.NewOutboundPolicy(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := Service{Outbound: policy}
+	value, err := service.Normalize(Supplier{Name: "OpenAI", Kind: "official", WebsiteURL: "https://openai.com", Visible: true, Endpoints: []Endpoint{{BaseURL: "https://api.openai.com/v1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value.Endpoints) != 1 || value.Endpoints[0].BaseURL != "https://api.openai.com" {
+		t.Fatalf("unexpected endpoints: %+v", value.Endpoints)
+	}
+	if Match([]Supplier{value}, "https://api.openai.com") == nil {
+		t.Fatal("official endpoint not recognized")
+	}
+}

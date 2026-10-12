@@ -633,12 +633,17 @@ func TestFormatTestClientResolvesAnewAndKeepsNoConnection(t *testing.T) {
 
 func TestNonCanonicalOrBlockedBaseURLNeverReachesThePool(t *testing.T) {
 	rig := newEgressRig(t, false)
+	policy, err := rig.policy.WithExtraBlockedHosts([]string{"blocked.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rig.policy = policy.(*OutboundPolicy)
 	for _, raw := range []string{
 		rig.baseURL + "/",
 		strings.ToUpper(rig.baseURL),
 		"http://example.com",
 		"https://127.0.0.1",
-		"https://api.openai.com",
+		"https://blocked.example",
 		"https://example.com:444",
 	} {
 		if _, err := rig.policy.ClientForGateway(context.Background(), raw); !errors.Is(err, ErrUnsafeUpstream) {

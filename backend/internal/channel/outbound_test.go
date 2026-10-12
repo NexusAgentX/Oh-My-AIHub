@@ -46,7 +46,7 @@ func (r *fakeResolver) LookupNetIP(context.Context, string, string) ([]net.IP, e
 	return r.addresses, r.err
 }
 
-func TestNormalizeBaseURLAndPermanentOfficialEndpointBan(t *testing.T) {
+func TestNormalizeBaseURLAndConfiguredHostBan(t *testing.T) {
 	policy, err := NewOutboundPolicy([]string{"8443"}, []string{"blocked.example"})
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +58,9 @@ func TestNormalizeBaseURLAndPermanentOfficialEndpointBan(t *testing.T) {
 		"https://gateway.example/relayv1":     "https://gateway.example/relayv1",
 		"https://Gateway.Example./relay/":     "https://gateway.example/relay",
 		"https://bücher.example:443/root":     "https://xn--bcher-kva.example/root",
+		"https://api.openai.com":              "https://api.openai.com",
+		"https://API.OPENAI.COM./v1/":         "https://api.openai.com",
+		"https://sub.api.openai.com":          "https://sub.api.openai.com",
 		"https://api.openai.com.evil":         "https://api.openai.com.evil",
 		"https://gateway.example:8443/root":   "https://gateway.example:8443/root",
 	}
@@ -70,7 +73,7 @@ func TestNormalizeBaseURLAndPermanentOfficialEndpointBan(t *testing.T) {
 	invalid := []string{
 		"http://gateway.example", "https://user@gateway.example", "https://gateway.example?", "https://gateway.example?q=1",
 		"https://gateway.example#fragment", "https://127.0.0.1", "https://[2001:4860:4860::8888]",
-		"https://api.openai.com", "https://API.OPENAI.COM.", "https://sub.api.openai.com", "https://blocked.example",
+		"https://blocked.example", "https://sub.blocked.example",
 		"https://gateway.example:444", "https://gateway.example/v1/chat/completions",
 		"https://gateway.example/v1/v1", "https://gateway.example/../v1", "https://gateway.example/v1beta/models",
 		"https://gateway.example/%2e%2e/root", "https://gateway.example/root%2fescape", "https://gateway.example/root\\escape",
@@ -296,5 +299,20 @@ func TestEndpointAndAuthenticationAreProtocolSpecific(t *testing.T) {
 	ApplyAuthentication(request, FormatOpenAIResponses, "secret")
 	if request.Header.Get("Authorization") != "Bearer secret" {
 		t.Fatalf("OpenAI authorization = %q", request.Header.Get("Authorization"))
+	}
+}
+
+func TestOfficialEndpointCanBeExplicitlyBlocked(t *testing.T) {
+	policy, err := NewOutboundPolicy(nil, []string{"API.OPENAI.COM."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{"https://api.openai.com", "https://sub.api.openai.com"} {
+		if _, err := policy.NormalizeBaseURL(raw); err == nil {
+			t.Fatalf("configured ban accepted %q", raw)
+		}
+	}
+	if _, err := policy.NormalizeBaseURL("https://api.openai.com.example"); err != nil {
+		t.Fatal(err)
 	}
 }

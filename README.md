@@ -60,7 +60,7 @@ export C2C_PRIVATE_DATA_ACTIVE_KEY_ID='v1'
 mise run dev-backend
 ```
 
-`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留（暂无重加密工具，旧 key id 不能移除）；密钥环和数据库备份必须配套保存，不能每次启动临时生成。渠道的上游 Key 与平台 API Key 使用它加密；服务启动时校验密钥环格式，并逐条解密库中全部未删除渠道的上游 Key 与未删除的平台 API Key，缺少对应 key id 或密文损坏时拒绝启动，日志列出记录类型与 ID。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，额外禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 追加。`api.openai.com` 及其子域永久禁用，不能通过配置解除。
+`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留（暂无重加密工具，旧 key id 不能移除）；密钥环和数据库备份必须配套保存，不能每次启动临时生成。渠道的上游 Key 与平台 API Key 使用它加密；服务启动时校验密钥环格式，并逐条解密库中全部未删除渠道的上游 Key 与未删除的平台 API Key，缺少对应 key id 或密文损坏时拒绝启动，日志列出记录类型与 ID。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 配置；不内置任何供应商域名禁用项。
 
 `C2C_PRIVATE_DATA_KEYRING` 采用相同的 `key-id=base64-key` 语法，但必须使用与上游凭据不同的密钥，用于加密 C2C 收款方式文字（Feature C）。服务启动时校验密钥环格式，并逐条解密全部 C2C 卖单（含已关闭、已成交的）的收款方式，缺少对应 key id 或密文损坏时拒绝启动；任何仍被库存引用的旧密钥都必须保留。该密钥环同样必须与数据库备份配套保存，不得每次启动临时生成。
 
