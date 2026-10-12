@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
 import { errorMessage } from '../api/query'
 import type { Account } from '../api/types'
 import { Button, InlineError, PasswordField } from '../ui'
@@ -39,7 +40,9 @@ export function PasswordChangeForm({
       setConfirmation('')
       onChanged(account)
     } catch (caught) {
-      setError(errorMessage(caught, '保存失败，请稍后重试'))
+      setError(caught instanceof ApiError && caught.code === 'invalid_credentials'
+        ? `${currentLabel}不正确`
+        : errorMessage(caught, '保存失败，请稍后重试'))
     }
   }
 
