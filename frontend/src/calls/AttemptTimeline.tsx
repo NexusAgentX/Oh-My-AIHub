@@ -1,6 +1,6 @@
 import type { CallAttempt, CallDetail } from '../api/types'
 import { formatMs } from '../money/format'
-import { Badge } from '../ui'
+import { Badge, CopyButton } from '../ui'
 import { endReasonLabel } from './labels'
 import { attemptSegments, attemptSucceeded, segmentLabels, timelineScale } from './timeline'
 
@@ -21,6 +21,7 @@ function AttemptRow({
       <div className="attempt-head">
         <span className="attempt-index">#{index + 1}</span>
         <strong>{attempt.channel?.name ?? '未选到渠道'}</strong>
+        {attempt.channel && <CopyButton iconOnly label="复制尝试渠道 ID" value={attempt.channel.id} />}
         {ok ? (
           <Badge tone="success">{attempt.status_code ?? ''} 成功</Badge>
         ) : (

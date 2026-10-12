@@ -348,6 +348,15 @@ export function CallFilterBar({
             />
           </label>
           <label>
+            尝试渠道 ID
+            <input
+              className="input"
+              aria-label="尝试渠道 ID"
+              value={value.attempt_channel_id ?? ''}
+              onChange={(e) => set({ attempt_channel_id: e.target.value.trim() })}
+            />
+          </label>
+          <label>
             上游状态码
             <input
               className="input"
@@ -403,7 +412,7 @@ export function CallFilterBar({
               onChange={(e) => set({ to: e.target.value ? new Date(e.target.value).toISOString() : '' })}
             />
           </label>
-          <Button variant="quiet" onClick={() => onChange({ ...emptyCallFilters })}>
+          <Button variant="quiet" onClick={() => { setTag(''); setRequestId(''); setIdError(''); onChange({ ...emptyCallFilters }) }}>
             清除筛选
           </Button>
         </div>
