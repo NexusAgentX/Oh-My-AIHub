@@ -25,7 +25,7 @@ func TestDiagnosticWriterBatchesFlushesAndDrains(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDiagnosticWriter()
 		ctx, cancel := context.WithCancel(context.Background())
-		var batches []int
+		batches := make(chan int, 8)
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
@@ -33,7 +33,7 @@ func TestDiagnosticWriterBatchesFlushesAndDrains(t *testing.T) {
 				if _, ok := ctx.Deadline(); !ok {
 					t.Error("unbounded write")
 				}
-				batches = append(batches, len(b))
+				batches <- len(b)
 				return nil
 			})
 		}()
@@ -41,19 +41,19 @@ func TestDiagnosticWriterBatchesFlushesAndDrains(t *testing.T) {
 			d.offer(settlementTiming{ID: "call"})
 		}
 		synctest.Wait()
-		if len(batches) != 1 || batches[0] != diagnosticBatchSize {
-			t.Fatalf("batches %v", batches)
+		if len(batches) != 1 || <-batches != diagnosticBatchSize {
+			t.Fatal("full batch not flushed")
 		}
 		time.Sleep(diagnosticFlushInterval)
 		synctest.Wait()
-		if len(batches) != 2 || batches[1] != 3 {
-			t.Fatalf("timer batches %v", batches)
+		if len(batches) != 1 || <-batches != 3 {
+			t.Fatal("partial batch not flushed by timer")
 		}
 		d.offer(settlementTiming{ID: "last"})
 		cancel()
 		<-done
-		if len(batches) != 3 || batches[2] != 1 || d.failed.Load() != 0 {
-			t.Fatalf("shutdown batches %v failed %d", batches, d.failed.Load())
+		if len(batches) != 1 || <-batches != 1 || d.failed.Load() != 0 {
+			t.Fatalf("shutdown failed %d", d.failed.Load())
 		}
 		d.offer(settlementTiming{ID: "late"})
 		if d.dropped.Load() != 1 {
