@@ -92,6 +92,12 @@ function ModelsSection({
   testingModel: string | null
   testError: string
 }) {
+  const [addedRowKey, setAddedRowKey] = useState<string>()
+  const addRow = (custom = false) => {
+    const row = emptyRow(custom)
+    setAddedRowKey(row.key)
+    onRows([...rows, row])
+  }
   return (
     <div className="channel-models">
       {summary && (
@@ -103,15 +109,15 @@ function ModelsSection({
         <Button disabled={testing || !rows.some((row) => row.sell && row.modelId)} loading={testing && testingModel === null} onClick={() => onTest()} size="sm" type="button" variant="secondary">
           测试格式
         </Button>
-        <Button icon={<Icon name="plus" />} onClick={() => onRows([...rows, emptyRow()])} size="sm" type="button" variant="quiet">
+        <Button icon={<Icon name="plus" />} onClick={() => addRow()} size="sm" type="button" variant="quiet">
           手动添加
         </Button>
-        <Button icon={<Icon name="plus" />} onClick={() => onRows([...rows, emptyRow(true)])} size="sm" type="button" variant="quiet">
+        <Button icon={<Icon name="plus" />} onClick={() => addRow(true)} size="sm" type="button" variant="quiet">
           自定义模型
         </Button>
       </div>
       <InlineError>{testError}</InlineError>
-      <ModelRows onChange={onRows} onTest={onTest} rows={rows} testing={testing} testingModel={testingModel} />
+      <ModelRows addedRowKey={addedRowKey} onChange={onRows} onTest={onTest} rows={rows} testing={testing} testingModel={testingModel} />
     </div>
   )
 }
