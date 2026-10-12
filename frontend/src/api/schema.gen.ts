@@ -1024,6 +1024,23 @@ export interface paths {
         patch: operations["updateAdminModel"];
         trace?: never;
     };
+    "/api/form-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 表单留空时使用的平台默认值 */
+        get: operations["getFormDefaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/settings": {
         parameters: {
             query?: never;
@@ -2751,6 +2768,13 @@ export interface components {
             usd_cny_rate: components["schemas"]["ExchangeRate"];
             fx_auto_sync: boolean;
             fx_sync_minute: number;
+        };
+        FormDefaults: {
+            default_max_attempts: number;
+            default_ttft_timeout_ms: number;
+            default_total_timeout_ms: number;
+            default_cooldown_failures: number;
+            default_cooldown_seconds: number;
         };
         SettingsEnvelope: {
             settings: components["schemas"]["Settings"];
@@ -5417,6 +5441,28 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getFormDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前平台默认值，仅包含路由与渠道表单需要的字段。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefaults"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getAdminSettings: {

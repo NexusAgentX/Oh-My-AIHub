@@ -1999,6 +1999,23 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /api/form-defaults:
+    get:
+      operationId: getFormDefaults
+      tags: [settings]
+      summary: 表单留空时使用的平台默认值
+      x-access: ready
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      responses:
+        '200':
+          description: 当前平台默认值，仅包含路由与渠道表单需要的字段。
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FormDefaults'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /api/admin/settings:
     get:
       operationId: getAdminSettings
@@ -4814,6 +4831,16 @@ components:
         fx_sync_minute: {type: integer, minimum: 0, maximum: 1439}
       required: [fee_rate_nano, c2c_payment_timeout_minutes, default_credit_limit, default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds, account_max_inflight_calls, extra_blocked_hosts, usd_cny_rate, fx_auto_sync, fx_sync_minute]
       additionalProperties: false
+    FormDefaults:
+      type: object
+      additionalProperties: false
+      required: [default_max_attempts, default_ttft_timeout_ms, default_total_timeout_ms, default_cooldown_failures, default_cooldown_seconds]
+      properties:
+        default_max_attempts: {type: integer}
+        default_ttft_timeout_ms: {type: integer}
+        default_total_timeout_ms: {type: integer}
+        default_cooldown_failures: {type: integer}
+        default_cooldown_seconds: {type: integer}
     SettingsEnvelope:
       type: object
       properties:

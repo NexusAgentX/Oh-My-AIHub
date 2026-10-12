@@ -1,3 +1,4 @@
+import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
@@ -41,6 +42,8 @@ export function RoutingEditor({
   onChange: (draft: RoutingDraft) => void
   scopeHint?: string
 }) {
+  const { data: defaults, isError } = useFormDefaults()
+  const pending = isError ? '默认值加载失败' : '加载默认值…'
   const [dragging, setDragging] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const hintID = useId()
@@ -168,6 +171,7 @@ export function RoutingEditor({
             hint="留空使用平台默认"
             inputMode="numeric"
             label="最多尝试几个渠道"
+            placeholder={defaults ? String(defaults.default_max_attempts) : pending}
             min={1}
             onChange={(event) => onChange({ ...draft, max_attempts: parseOptionalInt(event.target.value) })}
             type="number"
@@ -177,6 +181,7 @@ export function RoutingEditor({
             hint="毫秒，留空使用平台默认"
             inputMode="numeric"
             label="首字超时"
+            placeholder={defaults ? String(defaults.default_ttft_timeout_ms) : pending}
             min={1}
             onChange={(event) => onChange({ ...draft, ttft_timeout_ms: parseOptionalInt(event.target.value) })}
             type="number"

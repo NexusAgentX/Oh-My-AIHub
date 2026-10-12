@@ -65,6 +65,30 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 	}
 }
 
+// FormDefaults contains only the settings needed to explain inherited form values.
+type formDefaultsJSON struct {
+	DefaultMaxAttempts      int32 `json:"default_max_attempts"`
+	DefaultTTFTTimeoutMS    int32 `json:"default_ttft_timeout_ms"`
+	DefaultTotalTimeoutMS   int32 `json:"default_total_timeout_ms"`
+	DefaultCooldownFailures int32 `json:"default_cooldown_failures"`
+	DefaultCooldownSeconds  int32 `json:"default_cooldown_seconds"`
+}
+
+func (a *app) getFormDefaults(w http.ResponseWriter, r *http.Request) {
+	value, err := a.settings.Get(r.Context())
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, formDefaultsJSON{
+		DefaultMaxAttempts:      value.DefaultMaxAttempts,
+		DefaultTTFTTimeoutMS:    value.DefaultTTFTTimeoutMS,
+		DefaultTotalTimeoutMS:   value.DefaultTotalTimeoutMS,
+		DefaultCooldownFailures: value.DefaultCooldownFailures,
+		DefaultCooldownSeconds:  value.DefaultCooldownSeconds,
+	})
+}
+
 func (a *app) getAdminSettings(w http.ResponseWriter, r *http.Request) {
 	value, err := a.settings.Get(r.Context())
 	if err != nil {
@@ -220,6 +244,7 @@ func (a *app) listAdminAudit(w http.ResponseWriter, r *http.Request) {
 
 // registerAdminSettingsRoutes 注册平台设置与操作记录路由。
 func (a *app) registerAdminSettingsRoutes(r *router) {
+	r.ready("GET /api/form-defaults", a.getFormDefaults)
 	r.admin("GET /api/admin/settings", a.getAdminSettings)
 	r.admin("PUT /api/admin/settings", a.updateAdminSettings)
 	r.admin("POST /api/admin/settings/exchange-rate/sync", a.syncExchangeRate)

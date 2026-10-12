@@ -351,6 +351,18 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 		saved["account_max_inflight_calls"] != float64(0) {
 		t.Fatalf("saved settings = %v", saved)
 	}
+	// Ordinary members can read current defaults, without receiving admin-only settings.
+	member, _ := newMember(t, spec, admin.handler, admin, "defaults-reader")
+	defaults := member.expect(t, http.StatusOK, http.MethodGet, "/api/form-defaults", nil)
+	for _, key := range []string{"default_max_attempts", "default_ttft_timeout_ms", "default_total_timeout_ms", "default_cooldown_failures", "default_cooldown_seconds"} {
+		if defaults[key] != saved[key] {
+			t.Fatalf("default %s = %v, want %v", key, defaults[key], saved[key])
+		}
+	}
+	if len(defaults) != 5 {
+		t.Fatalf("unexpected exposed settings: %v", defaults)
+	}
+	member.expect(t, http.StatusUnauthorized, http.MethodGet, "/api/form-defaults", nil, withoutCookie)
 	update["default_total_timeout_ms"] = 1000
 	if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid settings = %d", recorder.Code)

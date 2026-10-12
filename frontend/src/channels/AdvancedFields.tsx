@@ -1,8 +1,19 @@
+import { useFormDefaults } from '../settings/queries'
 import { Button, Icon, IconButton, TextField } from '../ui'
 import type { AdvancedForm } from './channelForm'
 
 /** 渠道高级设置：留空即平台默认。 */
 export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChange: (form: AdvancedForm) => void }) {
+  const { data: defaults, isError } = useFormDefaults()
+  const pending = isError ? '默认值加载失败' : '加载默认值…'
+  const placeholders: Partial<Record<keyof AdvancedForm, string>> = {
+    concurrency: '不限',
+    rpm: '不限',
+    ttftTimeout: defaults ? String(defaults.default_ttft_timeout_ms) : pending,
+    totalTimeout: defaults ? String(defaults.default_total_timeout_ms) : pending,
+    cooldownFailures: defaults ? String(defaults.default_cooldown_failures) : pending,
+    cooldownMinutes: defaults ? String(defaults.default_cooldown_seconds / 60) : pending,
+  }
   const set = (patch: Partial<AdvancedForm>) => onChange({ ...form, ...patch })
   const int = (label: string, key: keyof AdvancedForm, hint?: string) => (
     <TextField
@@ -11,7 +22,7 @@ export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChang
       label={label}
       min={1}
       onChange={(event) => set({ [key]: event.target.value } as Partial<AdvancedForm>)}
-      placeholder="默认"
+      placeholder={placeholders[key]}
       type="number"
       value={form[key] as string}
     />
