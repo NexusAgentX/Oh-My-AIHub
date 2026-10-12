@@ -1,3 +1,5 @@
+import { Link, useLocation } from 'react-router-dom'
+import { CallDiagnostics } from './CallDiagnostics'
 import { PriceSnapshotView } from '../admin/transactions'
 import type { CallDetail } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
@@ -25,9 +27,26 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
+export function CallResponseMetrics({ call }: { call: CallDetail }) {
+  return (
+    <>
+      {' '}
+      <Row label={call.stream ? '输出速度' : '端到端平均速度'}>
+        {call.output_tokens_per_second == null ? '—' : `${call.output_tokens_per_second.toFixed(1)} tokens/s`}
+      </Row>
+      {call.stream && call.inter_token_p50_ms !== null && (
+        <Row label="数据帧间隔 p50 / p95">
+          {formatMs(call.inter_token_p50_ms)} / {formatMs(call.inter_token_p95_ms)}
+        </Row>
+      )}
+    </>
+  )
+}
+
 /** 调用详情内容：请求信息、计价、尝试时间线。抽屉与独立页面共用。 */
 export function CallDetailView({ call }: { call: CallDetail }) {
   const snapshot = call.price_snapshot
+  const admin = useLocation().pathname.startsWith('/admin/')
   return (
     <div className="call-detail">
       <div className="call-detail-id">
@@ -38,7 +57,26 @@ export function CallDetailView({ call }: { call: CallDetail }) {
         <Row label="结果">
           <OutcomeBadge outcome={call.outcome} />
         </Row>
-        <Row label="时间">{formatDateTime(call.created_at)}</Row>
+        <Row label="开始">{formatDateTime(call.created_at)}</Row>
+        {call.completed_at && <Row label="完成">{formatDateTime(call.completed_at)}</Row>}
+        {call.client_user_agent && <Row label="客户端">{call.client_user_agent}</Row>}
+        {call.upstream_response_id && (
+          <Row label="上游响应 ID">
+            <code>{call.upstream_response_id}</code>
+            <CopyButton iconOnly label="复制上游响应 ID" value={call.upstream_response_id} />
+          </Row>
+        )}
+        {call.response_bytes !== null && <Row label="已发送">{call.response_bytes.toLocaleString()} bytes</Row>}
+        {call.ledger_transaction_id && (
+          <Row label="账本交易">
+            <Link
+              to={`${admin ? '/admin/points?tab=transactions' : '/points?tab=bill'}&transaction=${call.ledger_transaction_id}`}
+            >
+              {call.ledger_transaction_id}
+            </Link>
+          </Row>
+        )}
+        <CallResponseMetrics call={call} />
         <Row label="模型">
           {call.model_id ?? call.requested_model}
           {call.model_id && call.requested_model !== call.model_id && (
@@ -90,10 +128,11 @@ export function CallDetailView({ call }: { call: CallDetail }) {
         </Row>
         <Row label="耗时">
           <span className="num">
-            首字 {formatMs(call.ttft_ms)} · 总计 {formatMs(call.duration_ms)}
+            首响应 {formatMs(call.ttft_ms)} · 总计 {formatMs(call.duration_ms)}
           </span>
         </Row>
       </dl>
+      {call.diagnostics && <CallDiagnostics data={call.diagnostics} />}
       {snapshot && (
         <section className="call-detail-section" aria-label="计价明细">
           <h3>计价明细</h3>

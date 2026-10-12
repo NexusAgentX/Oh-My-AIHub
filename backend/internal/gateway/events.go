@@ -50,6 +50,14 @@ type Publisher interface {
 	Publish(Event)
 }
 
+type Publishers []Publisher
+
+func (ps Publishers) Publish(e Event) {
+	for _, p := range ps {
+		p.Publish(e)
+	}
+}
+
 type discard struct{}
 
 func (discard) Publish(Event) {}

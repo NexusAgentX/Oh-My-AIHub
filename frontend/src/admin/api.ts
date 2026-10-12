@@ -9,7 +9,7 @@ type QueryOf<Op extends keyof operations> = operations[Op]['parameters'] extends
   : never
 
 /** 拼接查询串：跳过 undefined 与空字符串。 */
-export function withQuery(path: string, params: Record<string, string | number | undefined>) {
+export function withQuery(path: string, params: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === '') continue

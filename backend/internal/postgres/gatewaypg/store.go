@@ -265,8 +265,34 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	duration := int32(finish.DurationMS)
 	bytesRead := finish.ResponseBytes
 	var result gateway.FinishResult
-	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
+	settlementStarted := time.Now()
+	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) (retErr error) {
 		q := New(tx)
+		defer func() {
+			if retErr != nil || !result.Finished || finish.Diagnostics == nil {
+				return
+			}
+			d := *finish.Diagnostics
+			d.Stages = append([]gateway.StageTiming{}, d.Stages...)
+			elapsed := float64(time.Since(settlementStarted)) / float64(time.Millisecond)
+			found := false
+			for i := range d.Stages {
+				if d.Stages[i].Stage == "settlement" {
+					d.Stages[i].DurationMS += elapsed
+					found = true
+					break
+				}
+			}
+			if !found {
+				d.Stages = append(d.Stages, gateway.StageTiming{Stage: "settlement", DurationMS: elapsed})
+			}
+			raw, encodeErr := json.Marshal(d)
+			if encodeErr != nil {
+				retErr = encodeErr
+				return
+			}
+			retErr = q.SetCallDiagnostics(ctx, SetCallDiagnosticsParams{ID: finish.ID, Diagnostics: raw})
+		}()
 		affected, err := q.FinishCall(ctx, FinishCallParams{
 			ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),
 			RoutingMode: optional(finish.RoutingMode), RoutingSource: optional(finish.RoutingSource), Attempts: attempts,

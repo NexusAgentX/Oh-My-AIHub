@@ -231,22 +231,24 @@ LEFT JOIN calls c ON t.related_type = 'call' AND c.id = t.related_id
 LEFT JOIN api_keys k ON k.id = c.api_key_id
 WHERE l.account_id = $1
   AND ($2::text = '' OR t.type = $2)
-  AND ($3::text = '' OR c.api_key_id::text = $3)
-  AND ($4::timestamptz IS NULL OR e.created_at >= $4)
-  AND ($5::timestamptz IS NULL OR e.created_at < $5)
-  AND ($6::bigint = 0 OR e.id < $6)
+  AND ($3::text = '' OR t.id::text = $3)
+  AND ($4::text = '' OR c.api_key_id::text = $4)
+  AND ($5::timestamptz IS NULL OR e.created_at >= $5)
+  AND ($6::timestamptz IS NULL OR e.created_at < $6)
+  AND ($7::bigint = 0 OR e.id < $7)
 ORDER BY e.id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type ListUserEntriesParams struct {
-	AccountID *string
-	Type      string
-	ApiKeyID  string
-	FromTime  *time.Time
-	ToTime    *time.Time
-	BeforeID  int64
-	RowLimit  int32
+	AccountID     *string
+	Type          string
+	TransactionID string
+	ApiKeyID      string
+	FromTime      *time.Time
+	ToTime        *time.Time
+	BeforeID      int64
+	RowLimit      int32
 }
 
 type ListUserEntriesRow struct {
@@ -267,6 +269,7 @@ func (q *Queries) ListUserEntries(ctx context.Context, arg ListUserEntriesParams
 	rows, err := q.db.Query(ctx, listUserEntries,
 		arg.AccountID,
 		arg.Type,
+		arg.TransactionID,
 		arg.ApiKeyID,
 		arg.FromTime,
 		arg.ToTime,

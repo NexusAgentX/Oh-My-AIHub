@@ -1,0 +1,25 @@
+# Optional internal monitoring: combine with compose.yaml (see runbook).
+services:
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=15d"]
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.2.3
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set a dedicated Grafana password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3100}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/observability/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+volumes:
+  prometheus-data:
+  grafana-data:

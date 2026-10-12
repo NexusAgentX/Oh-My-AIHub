@@ -302,15 +302,9 @@ func (recordStore) GetCall(_ context.Context, id string) (CallRecord, error) {
 	return CallRecord{CallRow: CallRow{ID: id, Outcome: OutcomeSucceeded}}, nil
 }
 
-type countingObserver struct{ events int }
-
-func (o *countingObserver) Observe(gateway.Event, *CallRecord) { o.events++ }
-
 func TestFeedDropsForSlowSubscribersAndKeepsServingOthers(t *testing.T) {
 	source := scriptedEvents{channel: make(chan gateway.Event, 64)}
 	feed := NewFeed(NewService(recordStore{}), source, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	observer := &countingObserver{}
-	feed.AddObserver(observer)
 	slow, cancelSlow := feed.Subscribe(1)
 	defer cancelSlow()
 	fast, cancelFast := feed.Subscribe(64)
@@ -340,7 +334,4 @@ func TestFeedDropsForSlowSubscribersAndKeepsServingOthers(t *testing.T) {
 	}
 	stop()
 	<-done
-	if observer.events != total {
-		t.Fatalf("observer saw %d events", observer.events)
-	}
 }

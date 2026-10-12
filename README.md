@@ -84,6 +84,8 @@ mise run dev-frontend
 curl http://127.0.0.1:9090/metrics | grep '^aihub_'
 ```
 
+可选 Prometheus / Grafana 看板、指标口径与排障见[观测手册](docs/runbooks/observability.md)。调用计数与耗时直接记录于网关完成路径，独立于实时 UI 的消息丢失。
+
 指标不带用户或 Key 标签：`aihub_requests_total`、`aihub_active_requests`、`aihub_upstream_attempts_total`、`aihub_upstream_latency_seconds`、`aihub_first_token_latency_seconds`、`aihub_inter_token_latency_seconds`、`aihub_tokens_total`、`aihub_cost_points_total`、`aihub_channel_up`、`aihub_channel_cooldowns_total`，网关出站连接池的 `aihub_upstream_connections_new_total`、`aihub_upstream_connections_reused_total`、`aihub_upstream_dns_lookups_total{result}`（命中率为 `hit / (hit + miss)`），以及积分与核对类的 `aihub_points_*`、`aihub_ledger_imbalance`（应恒为 0）、`aihub_ledger_transactions_total`、`aihub_ledger_amount_total`、`aihub_settlement_failures_total`、`aihub_reconciliation_failed{check}`。积分类指标每分钟计算一次。`aihub_points_platform_revenue` 是累计手续费，不含管理员调账；调账净额（正数表示平台向用户发放）单列为 `aihub_points_admin_adjustments`。
 
 ## Docker Compose 运行

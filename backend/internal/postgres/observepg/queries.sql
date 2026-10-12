@@ -26,6 +26,21 @@ WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_i
   AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
   AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)
   AND (sqlc.narg(request_id)::uuid IS NULL OR c.id = sqlc.narg(request_id)::uuid)
+  AND (sqlc.arg(dimension)::text = '' OR (CASE sqlc.arg(dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(dimension_value)::text)
+  AND (sqlc.arg(second_dimension)::text = '' OR (CASE sqlc.arg(second_dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(second_value)::text)
+  AND (sqlc.narg(stream)::boolean IS NULL OR c.stream=sqlc.narg(stream)::boolean)
+  AND (sqlc.narg(min_attempts)::int IS NULL OR jsonb_array_length(c.attempts)>=sqlc.narg(min_attempts)::int)
+  AND (sqlc.narg(max_attempts)::int IS NULL OR jsonb_array_length(c.attempts)<=sqlc.narg(max_attempts)::int)
+  AND (sqlc.narg(billed)::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=sqlc.narg(billed)::boolean)
+  AND (sqlc.narg(delivery)::text IS NULL OR c.diagnostics->>'delivery'=sqlc.narg(delivery)::text)
+  AND (sqlc.narg(usage_status)::text IS NULL OR c.diagnostics->>'usage_status'=sqlc.narg(usage_status)::text)
+  AND ((sqlc.narg(status_code)::int IS NULL AND sqlc.narg(error_code)::text IS NULL AND sqlc.narg(end_reason)::text IS NULL AND sqlc.narg(attempt_channel)::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE (sqlc.narg(status_code)::int IS NULL OR (att->>'status_code')::int=sqlc.narg(status_code)::int)
+      AND (sqlc.narg(error_code)::text IS NULL OR att->>'error_code'=sqlc.narg(error_code)::text)
+      AND (sqlc.narg(end_reason)::text IS NULL OR att->>'end_reason'=sqlc.narg(end_reason)::text)
+      AND (sqlc.narg(attempt_channel)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(attempt_channel)::text)
+      AND (sqlc.narg(scope_channel_text)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(scope_channel_text)::text)))
   AND (sqlc.narg(from_time)::timestamptz IS NULL OR c.created_at >= sqlc.narg(from_time)::timestamptz)
   AND (sqlc.narg(to_time)::timestamptz IS NULL OR c.created_at < sqlc.narg(to_time)::timestamptz)
   AND (sqlc.narg(min_duration)::int IS NULL OR c.duration_ms >= sqlc.narg(min_duration)::int)
@@ -46,8 +61,8 @@ SELECT count(*)::bigint AS calls,
        coalesce(sum(c.input_tokens), 0)::bigint AS input_tokens,
        coalesce(sum(c.output_tokens), 0)::bigint AS output_tokens,
        coalesce(sum(c.cache_write_tokens + c.cache_read_tokens), 0)::bigint AS cache_tokens,
-       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p50_ms,
-       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p95_ms
+       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.stream AND c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p50_ms,
+       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.stream AND c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p95_ms
 FROM calls c
 WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_id)::uuid)
   AND (sqlc.narg(scope_channel_id)::uuid IS NULL
@@ -60,6 +75,21 @@ WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_i
   AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
   AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)
   AND (sqlc.narg(request_id)::uuid IS NULL OR c.id = sqlc.narg(request_id)::uuid)
+  AND (sqlc.arg(dimension)::text = '' OR (CASE sqlc.arg(dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(dimension_value)::text)
+  AND (sqlc.arg(second_dimension)::text = '' OR (CASE sqlc.arg(second_dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(second_value)::text)
+  AND (sqlc.narg(stream)::boolean IS NULL OR c.stream=sqlc.narg(stream)::boolean)
+  AND (sqlc.narg(min_attempts)::int IS NULL OR jsonb_array_length(c.attempts)>=sqlc.narg(min_attempts)::int)
+  AND (sqlc.narg(max_attempts)::int IS NULL OR jsonb_array_length(c.attempts)<=sqlc.narg(max_attempts)::int)
+  AND (sqlc.narg(billed)::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=sqlc.narg(billed)::boolean)
+  AND (sqlc.narg(delivery)::text IS NULL OR c.diagnostics->>'delivery'=sqlc.narg(delivery)::text)
+  AND (sqlc.narg(usage_status)::text IS NULL OR c.diagnostics->>'usage_status'=sqlc.narg(usage_status)::text)
+  AND ((sqlc.narg(status_code)::int IS NULL AND sqlc.narg(error_code)::text IS NULL AND sqlc.narg(end_reason)::text IS NULL AND sqlc.narg(attempt_channel)::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE (sqlc.narg(status_code)::int IS NULL OR (att->>'status_code')::int=sqlc.narg(status_code)::int)
+      AND (sqlc.narg(error_code)::text IS NULL OR att->>'error_code'=sqlc.narg(error_code)::text)
+      AND (sqlc.narg(end_reason)::text IS NULL OR att->>'end_reason'=sqlc.narg(end_reason)::text)
+      AND (sqlc.narg(attempt_channel)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(attempt_channel)::text)
+      AND (sqlc.narg(scope_channel_text)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(scope_channel_text)::text)))
   AND (sqlc.narg(from_time)::timestamptz IS NULL OR c.created_at >= sqlc.narg(from_time)::timestamptz)
   AND (sqlc.narg(to_time)::timestamptz IS NULL OR c.created_at < sqlc.narg(to_time)::timestamptz)
   AND (sqlc.narg(min_duration)::int IS NULL OR c.duration_ms >= sqlc.narg(min_duration)::int)
@@ -263,3 +293,115 @@ WHERE c.id = due.id;
 
 -- name: ListChannelsForMetrics :many
 SELECT id, status FROM channels WHERE deleted_at IS NULL;
+
+-- name: AnalyzeCalls :many
+WITH filtered AS (
+ SELECT c.*, CASE sqlc.arg(group_by)::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin((sqlc.arg(bucket_seconds)::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS group_key, CASE sqlc.arg(split_by)::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin((sqlc.arg(bucket_seconds)::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS split_key,
+ coalesce(ch.name,'') AS channel_name,coalesce(k.name,'') AS key_name,a.display_name AS account_name,
+ CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano+c.fee_nano END AS charged,
+ (SELECT coalesce(sum((t.value->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) WITH ORDINALITY t(value,position) WHERE t.position<jsonb_array_length(c.attempts)) AS fallback_ms,
+ jsonb_array_length(c.attempts) AS attempt_count,
+ (SELECT count(*) FROM jsonb_array_elements(c.attempts) t WHERE t->>'end_reason'='completed') AS attempt_success,
+ (SELECT coalesce(sum((t->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) t) AS upstream_ms
+ FROM calls c
+ LEFT JOIN channels ch ON ch.id=c.final_channel_id
+ LEFT JOIN api_keys k ON k.id=c.api_key_id
+ JOIN accounts a ON a.id=c.account_id
+ WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_id)::uuid)
+  AND (sqlc.narg(scope_channel_id)::uuid IS NULL
+       OR c.final_channel_id = sqlc.narg(scope_channel_id)::uuid
+       OR c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', sqlc.narg(scope_channel_text)::text))))
+  AND (sqlc.narg(final_channel_id)::uuid IS NULL OR c.final_channel_id = sqlc.narg(final_channel_id)::uuid)
+  AND (sqlc.narg(api_key_id)::uuid IS NULL OR c.api_key_id = sqlc.narg(api_key_id)::uuid)
+  AND (sqlc.narg(model)::text IS NULL OR c.model_id = sqlc.narg(model)::text OR c.requested_model = sqlc.narg(model)::text)
+  AND (sqlc.narg(format)::text IS NULL OR c.format = sqlc.narg(format)::text)
+  AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
+  AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)
+  AND (sqlc.narg(request_id)::uuid IS NULL OR c.id = sqlc.narg(request_id)::uuid)
+  AND (sqlc.arg(dimension)::text = '' OR (CASE sqlc.arg(dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(dimension_value)::text)
+  AND (sqlc.arg(second_dimension)::text = '' OR (CASE sqlc.arg(second_dimension)::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = sqlc.arg(second_value)::text)
+  AND (sqlc.narg(stream)::boolean IS NULL OR c.stream=sqlc.narg(stream)::boolean)
+  AND (sqlc.narg(min_attempts)::int IS NULL OR jsonb_array_length(c.attempts)>=sqlc.narg(min_attempts)::int)
+  AND (sqlc.narg(max_attempts)::int IS NULL OR jsonb_array_length(c.attempts)<=sqlc.narg(max_attempts)::int)
+  AND (sqlc.narg(billed)::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=sqlc.narg(billed)::boolean)
+  AND (sqlc.narg(delivery)::text IS NULL OR c.diagnostics->>'delivery'=sqlc.narg(delivery)::text)
+  AND (sqlc.narg(usage_status)::text IS NULL OR c.diagnostics->>'usage_status'=sqlc.narg(usage_status)::text)
+  AND ((sqlc.narg(status_code)::int IS NULL AND sqlc.narg(error_code)::text IS NULL AND sqlc.narg(end_reason)::text IS NULL AND sqlc.narg(attempt_channel)::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE (sqlc.narg(status_code)::int IS NULL OR (att->>'status_code')::int=sqlc.narg(status_code)::int)
+      AND (sqlc.narg(error_code)::text IS NULL OR att->>'error_code'=sqlc.narg(error_code)::text)
+      AND (sqlc.narg(end_reason)::text IS NULL OR att->>'end_reason'=sqlc.narg(end_reason)::text)
+      AND (sqlc.narg(attempt_channel)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(attempt_channel)::text)
+      AND (sqlc.narg(scope_channel_text)::text IS NULL OR att->'channel'->>'id'=sqlc.narg(scope_channel_text)::text)))
+  AND (sqlc.narg(from_time)::timestamptz IS NULL OR c.created_at >= sqlc.narg(from_time)::timestamptz)
+  AND (sqlc.narg(to_time)::timestamptz IS NULL OR c.created_at < sqlc.narg(to_time)::timestamptz)
+  AND (sqlc.narg(min_duration)::int IS NULL OR c.duration_ms >= sqlc.narg(min_duration)::int)
+  AND (sqlc.narg(max_duration)::int IS NULL OR c.duration_ms <= sqlc.narg(max_duration)::int)
+  AND (sqlc.narg(min_tokens)::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= sqlc.narg(min_tokens)::bigint)
+  AND (sqlc.narg(max_tokens)::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= sqlc.narg(max_tokens)::bigint)
+  AND (sqlc.narg(min_charged)::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= sqlc.narg(min_charged)::bigint)
+  AND (sqlc.narg(max_charged)::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= sqlc.narg(max_charged)::bigint)
+)
+SELECT group_key,split_key,
+ CASE sqlc.arg(group_by)::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE group_key END::text AS label,
+ CASE sqlc.arg(split_by)::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE split_key END::text AS split_label,
+ (count(*) FILTER (WHERE attempt_count>0 AND outcome<>'in_progress'))::bigint AS attempted,
+ (count(*) FILTER (WHERE stream AND outcome<>'in_progress'))::bigint AS stream_finished,
+ (count(*) FILTER (WHERE stream AND outcome IN ('interrupted','client_disconnected')))::bigint AS stream_interrupted,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY fallback_ms) FILTER (WHERE attempt_count>1),-1))::double precision AS fallback_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY fallback_ms) FILTER (WHERE attempt_count>1),-1))::double precision AS fallback_p95,
+ (count(*))::bigint AS calls,
+ (count(*) FILTER (WHERE outcome<>'in_progress'))::bigint AS finished,
+ (count(*) FILTER (WHERE outcome IN ('succeeded','succeeded_unbilled')))::bigint AS succeeded,
+ (count(*) FILTER (WHERE attempts->0->>'end_reason'='completed'))::bigint AS first_succeeded,
+ (count(*) FILTER (WHERE jsonb_array_length(attempts)>1))::bigint AS retried,
+ (count(*) FILTER (WHERE jsonb_array_length(attempts)>1 AND outcome IN ('succeeded','succeeded_unbilled')))::bigint AS recovered,
+ (coalesce(sum(attempt_count),0))::bigint AS attempts,
+ (coalesce(sum(attempt_success),0))::bigint AS attempt_succeeded,
+ (count(*) FILTER (WHERE diagnostics->>'delivery'='complete'))::bigint AS delivered,
+ (count(*) FILTER (WHERE diagnostics->>'delivery' IN ('complete','interrupted','client_disconnected')))::bigint AS delivery_known,
+ (count(*) FILTER (WHERE ledger_tx_id IS NOT NULL))::bigint AS billed,
+ (count(*) FILTER (WHERE diagnostics->>'usage_status'='reported'))::bigint AS usage_reported,
+ (count(*) FILTER (WHERE diagnostics->>'usage_status' IN ('missing','parse_limit')))::bigint AS usage_missing,
+ (count(*) FILTER (WHERE stream))::bigint AS streamed,
+ (coalesce(sum(input_tokens),0))::bigint AS input_tokens,
+ (coalesce(sum(output_tokens),0))::bigint AS output_tokens,
+ (coalesce(sum(cache_read_tokens),0))::bigint AS cache_read_tokens,
+ (coalesce(sum(cache_write_tokens),0))::bigint AS cache_write_tokens,
+ (coalesce(sum(charged),0))::bigint AS charged_nano,
+ (coalesce(sum(CASE WHEN ledger_tx_id IS NOT NULL THEN fee_nano ELSE 0 END),0))::bigint AS fee_nano,
+ (count(*) FILTER (WHERE outcome='interrupted'))::bigint AS interrupted,
+ (count(*) FILTER (WHERE outcome='client_disconnected'))::bigint AS disconnected,
+ (count(*) FILTER (WHERE outcome='succeeded_unbilled'))::bigint AS unbilled,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p99,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p99,
+ (coalesce(percentile_cont(0.1) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p10,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p99,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (diagnostics->>'max_frame_gap_ms')::double precision) FILTER (WHERE stream),-1))::double precision AS max_gap_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p99,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='authentication' LIMIT 1)),-1))::double precision AS authentication_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='request' LIMIT 1)),-1))::double precision AS request_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='open_call' LIMIT 1)),-1))::double precision AS open_call_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='admission' LIMIT 1)),-1))::double precision AS admission_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='routing' LIMIT 1)),-1))::double precision AS routing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='pricing' LIMIT 1)),-1))::double precision AS pricing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='settlement' LIMIT 1)),-1))::double precision AS settlement_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='client_write' LIMIT 1)),-1))::double precision AS client_write_p95
+FROM filtered
+GROUP BY group_key,split_key
+ORDER BY group_key,split_key
+LIMIT 1001;

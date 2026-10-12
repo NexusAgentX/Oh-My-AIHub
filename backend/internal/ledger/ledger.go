@@ -202,13 +202,14 @@ type EntryView struct {
 }
 
 type EntryFilter struct {
-	AccountID string
-	Type      TransactionType
-	APIKeyID  string
-	From      *time.Time
-	To        *time.Time
-	BeforeID  int64
-	Limit     int
+	TransactionID string
+	AccountID     string
+	Type          TransactionType
+	APIKeyID      string
+	From          *time.Time
+	To            *time.Time
+	BeforeID      int64
+	Limit         int
 }
 
 // Adjustment is an administrator's manual credit (+) or debit (-) of a user

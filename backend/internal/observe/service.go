@@ -88,6 +88,7 @@ type Snapshot struct {
 
 // Store is the persistence of the observation queries (observepg).
 type Store interface {
+	Analyze(context.Context, CallFilter, string, string, int) (AnalysisReport, error)
 	ListCalls(ctx context.Context, filter CallFilter, after *CallCursor, limit int) ([]CallRow, error)
 	CallStats(ctx context.Context, filter CallFilter) (CallStats, error)
 	GetCall(ctx context.Context, id string) (CallRecord, error)
@@ -213,6 +214,8 @@ func (s *Service) Call(ctx context.Context, id string, viewer Viewer) (CallDetai
 	restricted.Key, restricted.Tag = nil, nil
 	restricted.ClientUserAgent, restricted.RoutingMode, restricted.RoutingSource = nil, nil, nil
 	restricted.LedgerTxID = nil
+	restricted.Diagnostics = nil
+	restricted.UpstreamResponseID = nil
 	restricted.Attempts = attempts
 	restricted.AttemptCount = len(attempts)
 	if !servedByMe {

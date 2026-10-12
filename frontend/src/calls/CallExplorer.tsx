@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { errorMessage } from '../api/query'
 import type { CallDetail, CallStats } from '../api/types'
 import { Button, InlineError, QueryBoundary } from '../ui'
+import { CallAnalysis, dimensionLabel } from './CallAnalysis'
 import { CallDetailDrawer } from './CallDetail'
 import { CallStatsBar } from './CallStatsBar'
 import { CallTable, type CallColumn, type CallRowBase } from './CallTable'
@@ -58,10 +59,28 @@ export function CallExplorer<T extends CallRowBase>({
   openCallId?: string | null
   onOpenCall?: (id: string | null) => void
 }) {
-  const pages = useCallPages<Page<T>>(listPath, params, { limit: pageSize })
+  const [live, setLive] = useState(false)
+  const [liveAt, setLiveAt] = useState(0)
+  useEffect(() => {
+    if (!live) return
+    const timer = window.setInterval(() => setLiveAt(Date.now()), 3000)
+    return () => window.clearInterval(timer)
+  }, [live])
+  const [drill, setDrill] = useState<{ base: string; params: CallListParams } | null>(null)
+  const baseKey = JSON.stringify(params)
+  const drillParams = useMemo(() => (drill?.base === baseKey ? drill.params : {}), [drill, baseKey])
+  const activeParams = useMemo(() => {
+    const result = { ...params, ...drillParams }
+    if (live && liveAt && params.to && !drillParams.to) {
+      const offset = liveAt - Date.parse(params.to)
+      result.to = new Date(liveAt).toISOString()
+      if (params.from) result.from = new Date(Date.parse(params.from) + offset).toISOString()
+    }
+    return result
+  }, [params, drillParams, live, liveAt])
+  const pages = useCallPages<Page<T>>(listPath, activeParams, { limit: pageSize })
   const [page, setPage] = useState(0)
   const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
-  const [live, setLive] = useState(false)
   const stream = useCallStream<T>(live && streamPath ? streamPath : null)
   const [localOpen, setLocalOpen] = useState<string | null>(null)
   const selected = openCallId !== undefined ? openCallId : localOpen
@@ -69,17 +88,11 @@ export function CallExplorer<T extends CallRowBase>({
   const detail = useCall(detailPath ? selected : null, detailPath)
 
   const loaded = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data])
-  const fresh = useMemo(
-    () => stream.items.filter((row) => matchesFilters(row as T & Record<string, unknown>, params)),
-    [stream.items, params],
-  )
-  const rows = useMemo(() => {
-    const seen = new Set(fresh.map((row) => row.id))
-    return [...fresh, ...loaded.filter((row) => !seen.has(row.id))]
-  }, [fresh, loaded])
-  const highlight = useMemo(() => new Set(fresh.map((row) => row.id)), [fresh])
+  const rows = loaded
   const displayed = pageSize
-    ? currentPage === 0 ? rows.slice(0, pageSize) : pages.data?.pages[currentPage]?.items ?? []
+    ? currentPage === 0
+      ? rows.slice(0, pageSize)
+      : (pages.data?.pages[currentPage]?.items ?? [])
     : rows
   const nextPage = async () => {
     if (currentPage + 1 < (pages.data?.pages.length ?? 0)) setPage(currentPage + 1)
@@ -99,6 +112,7 @@ export function CallExplorer<T extends CallRowBase>({
             enabled={live}
             onChange={(value) => {
               setPage(0)
+              setLiveAt(Date.now())
               setLive(value)
               if (!value) stream.clear()
             }}
@@ -107,6 +121,27 @@ export function CallExplorer<T extends CallRowBase>({
           />
         )}
       </div>
+      {Object.keys(drillParams).length > 0 && (
+        <div className="call-drill">
+          <span>
+            已下钻 · {drillParams.dimension ? dimensionLabel(drillParams.dimension,String(drillParams.dimension_value??""),String(drillParams.dimension_value??"")) : '选定时间段'}
+          </span>
+          <Button variant="quiet" onClick={() => setDrill(null)}>
+            返回全部筛选结果
+          </Button>
+        </div>
+      )}
+      {(listPath === '/api/calls' || listPath === '/api/admin/calls') && (
+        <CallAnalysis
+          path={listPath}
+          params={activeParams}
+          live={live}
+          onDrill={(next) => {
+            setPage(0)
+            setDrill({ base: baseKey, params: { ...drillParams, ...next } })
+          }}
+        />
+      )}
       {summary && <CallStatsBar chargedLabel={chargedLabel} stats={summary} />}
       <QueryBoundary errorFallback="调用记录加载失败" query={{ ...pages, data: pages.data ? rows : undefined }}>
         {(data) => (
@@ -114,16 +149,34 @@ export function CallExplorer<T extends CallRowBase>({
             <CallTable
               caption={caption}
               columns={columns}
-              highlight={highlight}
               onSelect={detailPath ? (row) => setSelected(row.id) : undefined}
               rows={pageSize ? displayed : data}
             />
-            {pageSize && pages.isFetchNextPageError && <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>}
-            {pageSize && <nav aria-label="调用记录分页" className="channel-record-pages">
-              <Button variant="secondary" size="sm" disabled={currentPage === 0 || pages.isFetchingNextPage} onClick={() => setPage(currentPage - 1)}>上一页</Button>
-              <span className="muted num">第 {currentPage + 1} 页</span>
-              <Button variant="secondary" size="sm" loading={pages.isFetchingNextPage} disabled={live || (!pages.hasNextPage && currentPage + 1 >= (pages.data?.pages.length ?? 0))} onClick={() => void nextPage()}>下一页</Button>
-            </nav>}
+            {pageSize && pages.isFetchNextPageError && (
+              <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>
+            )}
+            {pageSize && (
+              <nav aria-label="调用记录分页" className="channel-record-pages">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={currentPage === 0 || pages.isFetchingNextPage}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  上一页
+                </Button>
+                <span className="muted num">第 {currentPage + 1} 页</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={pages.isFetchingNextPage}
+                  disabled={live || (!pages.hasNextPage && currentPage + 1 >= (pages.data?.pages.length ?? 0))}
+                  onClick={() => void nextPage()}
+                >
+                  下一页
+                </Button>
+              </nav>
+            )}
             {!pageSize && pages.hasNextPage && (
               <div className="table-pagination">
                 <Button
@@ -144,7 +197,15 @@ export function CallExplorer<T extends CallRowBase>({
         <CallDetailDrawer
           onClose={() => setSelected(null)}
           open={Boolean(selected)}
-          query={detail as { data: CallDetail | undefined; isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown }}
+          query={
+            detail as {
+              data: CallDetail | undefined
+              isPending: boolean
+              isError: boolean
+              error: unknown
+              refetch: () => unknown
+            }
+          }
         />
       )}
     </div>

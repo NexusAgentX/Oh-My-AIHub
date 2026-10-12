@@ -79,7 +79,7 @@ describe('call stats bar', () => {
       ttft_p95_ms: 1250,
     }
     const markup = renderToStaticMarkup(<CallStatsBar stats={stats} />)
-    expect(markup).toContain('首字 p50 / p95')
+    expect(markup).toContain('首响应 p50 / p95')
     expect(markup).toContain('320 ms')
     expect(markup).toContain('1.25 s')
     expect(markup).toContain('1,700')

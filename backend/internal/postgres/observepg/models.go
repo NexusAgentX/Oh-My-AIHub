@@ -42,4 +42,5 @@ type Call struct {
 	LedgerTxID            *string
 	CreatedAt             time.Time
 	CompletedAt           *time.Time
+	Diagnostics           []byte
 }

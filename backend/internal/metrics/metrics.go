@@ -21,10 +21,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
 
-// staleActive is how long a started call may stay in the active gauge before
-// it is dropped as a missed finish event (the event bus drops under load).
-const staleActive = 2 * time.Hour
-
 // ReconciliationChecks are the label values of aihub_reconciliation_failed.
 var ReconciliationChecks = []string{"zero_sum", "account_balances", "escrow", "billing_calls", "released_trades"}
 
@@ -35,9 +31,10 @@ type Source interface {
 	Channels(ctx context.Context) ([]observe.ChannelState, error)
 }
 
-// Metrics owns the registry. It implements observe.Observer.
+// Metrics owns the registry. It records gateway completions directly.
 type Metrics struct {
 	registry *prometheus.Registry
+	detail   *detailMetrics
 
 	activeRequests *prometheus.GaugeVec
 	requests       *prometheus.CounterVec
@@ -51,15 +48,9 @@ type Metrics struct {
 	settlement     prometheus.Counter
 
 	mutex      sync.Mutex
-	active     map[string]activeCall
 	models     map[string]bool
 	snapshot   snapshot
 	inCooldown func(channelID string, now time.Time) bool
-}
-
-type activeCall struct {
-	format string
-	at     time.Time
 }
 
 type snapshot struct {
@@ -74,19 +65,19 @@ type snapshot struct {
 // whether a channel is cooling down right now (may be nil).
 func New(inCooldown func(channelID string, now time.Time) bool) *Metrics {
 	m := &Metrics{
-		registry: prometheus.NewRegistry(), active: map[string]activeCall{}, models: map[string]bool{}, inCooldown: inCooldown,
+		registry: prometheus.NewRegistry(), models: map[string]bool{}, inCooldown: inCooldown,
 		activeRequests: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "aihub_active_requests", Help: "Gateway requests in flight, by API format."}, []string{"format"}),
 		requests:       prometheus.NewCounterVec(prometheus.CounterOpts{Name: "aihub_requests_total", Help: "Finished gateway requests."}, []string{"format", "model", "outcome"}),
 		attempts:       prometheus.NewCounterVec(prometheus.CounterOpts{Name: "aihub_upstream_attempts_total", Help: "Upstream attempts per channel."}, []string{"channel", "status_class", "result"}),
 		upstream: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name: "aihub_upstream_latency_seconds", Help: "Total duration of an upstream attempt.", Buckets: []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
-		}, []string{"format", "model"}),
+		}, []string{"format", "model", "channel", "stream"}),
 		firstToken: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name: "aihub_first_token_latency_seconds", Help: "Time from request start to the first response byte.", Buckets: []float64{0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60},
-		}, []string{"format", "model"}),
+		}, []string{"format", "model", "channel", "stream"}),
 		interToken: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name: "aihub_inter_token_latency_seconds", Help: "Median gap between streamed frames of a call (one observation per streamed call).", Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5},
-		}, []string{"format", "model"}),
+		}, []string{"format", "model", "channel", "stream"}),
 		tokens:     prometheus.NewCounterVec(prometheus.CounterOpts{Name: "aihub_tokens_total", Help: "Tokens read from upstream usage, by kind."}, []string{"model", "kind"}),
 		cost:       prometheus.NewCounterVec(prometheus.CounterOpts{Name: "aihub_cost_points_total", Help: "Points debited from callers (cost plus fee)."}, []string{"model"}),
 		cooldowns:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "aihub_channel_cooldowns_total", Help: "Channel cooldowns started."}, []string{"channel", "reason"}),
@@ -97,6 +88,7 @@ func New(inCooldown func(channelID string, now time.Time) bool) *Metrics {
 		m.activeRequests, m.requests, m.attempts, m.upstream, m.firstToken, m.interToken, m.tokens, m.cost, m.cooldowns, m.settlement,
 		&snapshotCollector{m: m},
 	)
+	m.detail = newDetailMetrics(m.registry)
 	return m
 }
 
@@ -169,30 +161,6 @@ func (m *Metrics) modelLabel(call *observe.CallRecord, event gateway.Event) stri
 }
 
 // Observe implements observe.Observer.
-func (m *Metrics) Observe(event gateway.Event, call *observe.CallRecord) {
-	switch event.Kind {
-	case gateway.EventCallStarted:
-		m.mutex.Lock()
-		if _, exists := m.active[event.CallID]; !exists && event.CallID != "" {
-			m.active[event.CallID] = activeCall{format: event.Format, at: event.At}
-			m.activeRequests.WithLabelValues(event.Format).Inc()
-		}
-		m.mutex.Unlock()
-	case gateway.EventCallFinished:
-		m.mutex.Lock()
-		if started, exists := m.active[event.CallID]; exists {
-			delete(m.active, event.CallID)
-			m.activeRequests.WithLabelValues(started.format).Dec()
-		}
-		m.mutex.Unlock()
-		m.finished(event, call)
-	case gateway.EventChannelCooldown:
-		m.cooldowns.WithLabelValues(event.ChannelID, event.Detail).Inc()
-	case gateway.EventSettlementFailed:
-		m.settlement.Inc()
-	}
-}
-
 func (m *Metrics) finished(event gateway.Event, call *observe.CallRecord) {
 	format, outcome := event.Format, event.Outcome
 	if call != nil {
@@ -209,14 +177,18 @@ func (m *Metrics) finished(event gateway.Event, call *observe.CallRecord) {
 		}
 		m.attempts.WithLabelValues(attempt.Channel.ID, statusClass(attempt.StatusCode), attemptResult(attempt.EndReason)).Inc()
 		if attempt.DurationMS != nil {
-			m.upstream.WithLabelValues(format, model).Observe(float64(*attempt.DurationMS) / 1000)
+			m.upstream.WithLabelValues(format, model, attempt.Channel.ID, strconv.FormatBool(call.Stream)).Observe(float64(*attempt.DurationMS) / 1000)
 		}
 	}
-	if call.TTFTMS != nil {
-		m.firstToken.WithLabelValues(format, model).Observe(float64(*call.TTFTMS) / 1000)
+	channelID := "none"
+	if call.Channel != nil {
+		channelID = call.Channel.ID
+	}
+	if call.Stream && call.TTFTMS != nil {
+		m.firstToken.WithLabelValues(format, model, channelID, "true").Observe(float64(*call.TTFTMS) / 1000)
 	}
 	if call.IntervalP50MS != nil {
-		m.interToken.WithLabelValues(format, model).Observe(float64(*call.IntervalP50MS) / 1000)
+		m.interToken.WithLabelValues(format, model, channelID, "true").Observe(float64(*call.IntervalP50MS) / 1000)
 	}
 	for kind, value := range map[string]int64{
 		"input": call.Usage.InputTokens, "output": call.Usage.OutputTokens,
@@ -272,13 +244,8 @@ func (m *Metrics) Refresh(ctx context.Context, source Source) error {
 	}
 	now := time.Now()
 	m.mutex.Lock()
+	m.detail.lastRefresh.Set(float64(now.Unix()))
 	m.snapshot = snapshot{ready: true, balances: balances, failed: failed, totals: totals, channels: channels}
-	for id, started := range m.active {
-		if now.Sub(started.at) > staleActive {
-			delete(m.active, id)
-			m.activeRequests.WithLabelValues(started.format).Dec()
-		}
-	}
 	m.mutex.Unlock()
 	return nil
 }
@@ -290,6 +257,7 @@ func (m *Metrics) Run(ctx context.Context, source Source, interval time.Duration
 	for {
 		refreshContext, cancel := context.WithTimeout(ctx, 30*time.Second)
 		if err := m.Refresh(refreshContext, source); err != nil && ctx.Err() == nil {
+			m.detail.refreshFailures.Inc()
 			logger.Error("metrics refresh failed", "error", err)
 		}
 		cancel()

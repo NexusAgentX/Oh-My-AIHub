@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,18 @@ func optionalInt(query map[string][]string, name string) (*int, bool) {
 	return &value, true
 }
 
+func optionalBool(query map[string][]string, name string) (*bool, bool) {
+	values := query[name]
+	if len(values) == 0 || values[0] == "" {
+		return nil, true
+	}
+	if values[0] != "true" && values[0] != "false" {
+		return nil, false
+	}
+	v := values[0] == "true"
+	return &v, true
+}
+
 func optionalAmount(query map[string][]string, name string) (*money.Amount, bool) {
 	values := query[name]
 	if len(values) == 0 || values[0] == "" {
@@ -73,7 +86,43 @@ func parseCallFilter(r *http.Request) (observe.CallFilter, bool) {
 		Tag: query.Get("tag"), RequestID: query.Get("request_id"), AccountID: query.Get("account_id"), FinalChannelID: query.Get("channel_id"),
 	}
 	ok := true
-	for _, id := range []string{filter.APIKeyID, filter.RequestID, filter.AccountID, filter.FinalChannelID} {
+	filter.Dimension = query.Get("dimension")
+	filter.DimensionValue = query.Get("dimension_value")
+	filter.SecondDimension = query.Get("second_dimension")
+	filter.SecondValue = query.Get("second_value")
+	for _, d := range []string{filter.Dimension, filter.SecondDimension} {
+		if d != "" && !slices.Contains(observe.AnalysisDimensions, d) {
+			ok = false
+		}
+	}
+	stream, streamOK := optionalBool(query, "stream")
+	filter.Stream = stream
+	ok = ok && streamOK
+	billed, billedOK := optionalBool(query, "billed")
+	filter.Billed = billed
+	ok = ok && billedOK
+	filter.ErrorCode = query.Get("error_code")
+	filter.EndReason = query.Get("end_reason")
+	filter.Delivery = query.Get("delivery")
+	filter.UsageStatus = query.Get("usage_status")
+	filter.AttemptChannelID = query.Get("attempt_channel_id")
+	for _, value := range []string{filter.ErrorCode, filter.EndReason, filter.Delivery, filter.UsageStatus} {
+		if len(value) > 80 {
+			ok = false
+		}
+	}
+	var a, b, c bool
+	filter.MinAttempts, a = optionalInt(query, "min_attempts")
+	filter.MaxAttempts, b = optionalInt(query, "max_attempts")
+	filter.StatusCode, c = optionalInt(query, "status_code")
+	ok = ok && a && b && c
+	if filter.StatusCode != nil && (*filter.StatusCode < 100 || *filter.StatusCode > 599) {
+		ok = false
+	}
+	if filter.MinAttempts != nil && filter.MaxAttempts != nil && *filter.MinAttempts > *filter.MaxAttempts {
+		ok = false
+	}
+	for _, id := range []string{filter.APIKeyID, filter.RequestID, filter.AccountID, filter.FinalChannelID, filter.AttemptChannelID} {
 		if id != "" && !uuidPattern.MatchString(id) {
 			ok = false
 		}
@@ -88,6 +137,11 @@ func parseCallFilter(r *http.Request) (observe.CallFilter, bool) {
 	filter.MinDurationMS, minDurationOK = optionalInt(query, "min_duration_ms")
 	filter.MaxDurationMS, maxDurationOK = optionalInt(query, "max_duration_ms")
 	durationOK = minDurationOK && maxDurationOK
+	for _, v := range []*int{filter.MinDurationMS, filter.MaxDurationMS, filter.MinAttempts, filter.MaxAttempts} {
+		if v != nil && int64(*v) > 2147483647 {
+			ok = false
+		}
+	}
 	var minTokens, maxTokens *int
 	minTokens, minTokensOK = optionalInt(query, "min_tokens")
 	maxTokens, maxTokensOK = optionalInt(query, "max_tokens")
@@ -103,6 +157,21 @@ func parseCallFilter(r *http.Request) (observe.CallFilter, bool) {
 	filter.MinCharged, minCostOK = optionalAmount(query, "min_cost")
 	filter.MaxCharged, maxCostOK = optionalAmount(query, "max_cost")
 	costOK = minCostOK && maxCostOK
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		ok = false
+	}
+	if filter.MinDurationMS != nil && filter.MaxDurationMS != nil && *filter.MinDurationMS > *filter.MaxDurationMS {
+		ok = false
+	}
+	if filter.MinTokens != nil && filter.MaxTokens != nil && *filter.MinTokens > *filter.MaxTokens {
+		ok = false
+	}
+	if filter.MinCharged != nil && *filter.MinCharged < 0 || filter.MaxCharged != nil && *filter.MaxCharged < 0 {
+		ok = false
+	}
+	if filter.MinCharged != nil && filter.MaxCharged != nil && *filter.MinCharged > *filter.MaxCharged {
+		ok = false
+	}
 	return filter, ok && fromOK && toOK && durationOK && tokensOK && costOK
 }
 
@@ -181,20 +250,27 @@ type adminCallJSON struct {
 
 // callAttemptJSON is the OpenAPI CallAttempt schema.
 type callAttemptJSON struct {
-	Channel       *channelRefJSON `json:"channel"`
-	StatusCode    *int            `json:"status_code"`
-	ErrorCode     *string         `json:"error_code"`
-	ErrorMessage  *string         `json:"error_message"`
-	ConnectMS     *int            `json:"connect_ms"`
-	TTFTMS        *int            `json:"ttft_ms"`
-	DurationMS    *int            `json:"duration_ms"`
-	ResponseBytes *int64          `json:"response_bytes"`
-	EndReason     string          `json:"end_reason"`
+	UpstreamModel    string               `json:"upstream_model"`
+	Timeouts         *attemptTimeoutsJSON `json:"timeouts"`
+	OffsetMS         *int                 `json:"offset_ms"`
+	ReusedConnection *bool                `json:"reused_connection"`
+	FallbackReason   string               `json:"fallback_reason"`
+	Channel          *channelRefJSON      `json:"channel"`
+	StatusCode       *int                 `json:"status_code"`
+	ErrorCode        *string              `json:"error_code"`
+	ErrorMessage     *string              `json:"error_message"`
+	ConnectMS        *int                 `json:"connect_ms"`
+	TTFTMS           *int                 `json:"ttft_ms"`
+	DurationMS       *int                 `json:"duration_ms"`
+	ResponseBytes    *int64               `json:"response_bytes"`
+	EndReason        string               `json:"end_reason"`
 }
 
 // callDetailJSON is the OpenAPI CallDetail schema: a CallSummary plus routing, attempts and speed.
 // price_snapshot is the jsonb the gateway stored with the call, passed through unchanged (null when absent).
 type callDetailJSON struct {
+	Diagnostics        *callDiagnosticsJSON `json:"diagnostics"`
+	UpstreamResponseID *string              `json:"upstream_response_id"`
 	callSummaryJSON
 	RoutingMode           *string           `json:"routing_mode"`
 	RoutingSource         *string           `json:"routing_source"`
@@ -475,6 +551,7 @@ func newCallStatsJSON(stats observe.CallStats) callStatsJSON {
 
 func newCallAttemptJSON(attempt observe.Attempt) callAttemptJSON {
 	return callAttemptJSON{
+		UpstreamModel: attempt.UpstreamModel, Timeouts: newAttemptTimeoutsJSON(attempt.Timeouts), OffsetMS: attempt.OffsetMS, ReusedConnection: attempt.ReusedConnection, FallbackReason: attempt.FallbackReason,
 		Channel:       newChannelRefJSON(attempt.Channel),
 		StatusCode:    attempt.StatusCode,
 		ErrorCode:     attempt.ErrorCode,
@@ -510,6 +587,7 @@ func newCallDetailJSON(detail observe.CallDetail) callDetailJSON {
 		}
 	}
 	return callDetailJSON{
+		Diagnostics: newCallDiagnosticsJSON(detail.Diagnostics), UpstreamResponseID: detail.UpstreamResponseID,
 		callSummaryJSON:       newCallSummaryJSON(detail.CallRow),
 		RoutingMode:           detail.RoutingMode,
 		RoutingSource:         detail.RoutingSource,
@@ -694,6 +772,7 @@ func (a *app) listChannelCalls(w http.ResponseWriter, r *http.Request) {
 	// A channel owner sees calls by outcome, model, format and size only, never
 	// by consumer, key, tag or cost.
 	filter = observe.CallFilter{
+		Stream: filter.Stream, StatusCode: filter.StatusCode, ErrorCode: filter.ErrorCode, EndReason: filter.EndReason,
 		ScopeChannelID: channelID, Model: filter.Model, Format: filter.Format, Outcome: filter.Outcome, RequestID: filter.RequestID,
 		From: filter.From, To: filter.To, MinDurationMS: filter.MinDurationMS, MaxDurationMS: filter.MaxDurationMS,
 		MinTokens: filter.MinTokens, MaxTokens: filter.MaxTokens,
@@ -779,6 +858,7 @@ func (a *app) getChannelStats(w http.ResponseWriter, r *http.Request) {
 
 // registerObserveRoutes 注册调用、用量与渠道统计路由（Feature G）。
 func (a *app) registerObserveRoutes(r *router) {
+	r.implement("G", "GET /api/calls/analysis", accessReady, a.analyzeMyCalls)
 	r.implement("G", "GET /api/calls", accessReady, a.listMyCalls)
 	r.implement("G", "GET /api/calls/stream", accessReady, a.streamMyCalls)
 	r.implement("G", "GET /api/calls/{callID}", accessReady, a.getCall)
@@ -786,6 +866,7 @@ func (a *app) registerObserveRoutes(r *router) {
 	r.implement("G", "GET /api/channels/{channelID}/stats", accessReady, a.getChannelStats)
 	r.implement("G", "GET /api/channels/{channelID}/calls", accessReady, a.listChannelCalls)
 	r.implement("G", "GET /api/channels/{channelID}/calls/stream", accessReady, a.streamChannelCalls)
+	r.implement("G", "GET /api/admin/calls/analysis", accessAdmin, a.analyzeAdminCalls)
 	r.implement("G", "GET /api/admin/calls", accessAdmin, a.listAdminCalls)
 	r.implement("G", "GET /api/admin/calls/stream", accessAdmin, a.streamAdminCalls)
 	r.implement("G", "GET /api/admin/overview", accessAdmin, a.getAdminOverview)

@@ -194,6 +194,11 @@ func (a *app) listPointsEntries(w http.ResponseWriter, r *http.Request) {
 	from, fromOK := parseTimeParam(r, "from")
 	to, toOK := parseTimeParam(r, "to")
 	keyID := query.Get("api_key_id")
+	transactionID := query.Get("transaction_id")
+	if transactionID != "" && !uuidPattern.MatchString(transactionID) {
+		writeInvalidQuery(w)
+		return
+	}
 	if !limitOK || !cursorOK || !fromOK || !toOK || (keyID != "" && !uuidPattern.MatchString(keyID)) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "查询参数无效")
 		return
@@ -204,13 +209,13 @@ func (a *app) listPointsEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	if exportCSV {
 		a.exportPointsEntries(w, r, observe.EntryFilter{
-			AccountID: accountFromContext(r.Context()).ID, Type: query.Get("type"), APIKeyID: keyID, From: from, To: to,
+			AccountID: accountFromContext(r.Context()).ID, Type: query.Get("type"), APIKeyID: keyID, TransactionID: transactionID, From: from, To: to,
 		})
 		return
 	}
 	entries, err := a.ledger.Entries(r.Context(), ledger.EntryFilter{
 		AccountID: accountFromContext(r.Context()).ID, Type: ledger.TransactionType(query.Get("type")),
-		APIKeyID: keyID, From: from, To: to, BeforeID: before, Limit: limit + 1,
+		APIKeyID: keyID, TransactionID: transactionID, From: from, To: to, BeforeID: before, Limit: limit + 1,
 	})
 	if err != nil {
 		writeDomainError(w, err)
@@ -229,7 +234,7 @@ func (a *app) listPointsEntries(w http.ResponseWriter, r *http.Request) {
 	response := pointsEntryPageJSON{Items: items, NextCursor: nextCursor(hasMore, cursor)}
 	if group != "" {
 		summary, err := a.observe.EntriesSummary(r.Context(), observe.EntryFilter{
-			AccountID: accountFromContext(r.Context()).ID, Type: query.Get("type"), APIKeyID: keyID, From: from, To: to,
+			AccountID: accountFromContext(r.Context()).ID, Type: query.Get("type"), APIKeyID: keyID, TransactionID: transactionID, From: from, To: to,
 		}, group)
 		if err != nil {
 			writeObserveError(w, err)

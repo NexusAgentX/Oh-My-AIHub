@@ -528,6 +528,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calls/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 调用多维分析
+         * @description 与调用列表同一筛选，最多366天；分位直接来自样本。channel 为最终渠道，error/status 为最后尝试；空值为未采集。前期对比使用紧邻且等长时间窗。最多1000分组，超限返回400要求缩小范围，不截断。
+         */
+        get: operations["analyzeCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calls": {
         parameters: {
             query?: never;
@@ -1210,6 +1230,26 @@ export interface paths {
          * @description 概览：需要处理的列表与四个指标块（账本、信用占用、24 小时调用、24 小时 C2C 成交）。
          */
         get: operations["getAdminOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/calls/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 调用多维分析
+         * @description 与调用列表同一筛选，最多366天；分位直接来自样本。channel 为最终渠道，error/status 为最后尝试；空值为未采集。前期对比使用紧邻且等长时间窗。最多1000分组，超限返回400要求缩小范围，不截断。
+         */
+        get: operations["analyzeAdminCalls"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2278,7 +2318,120 @@ export interface components {
             id: string;
             name: string;
         };
+        AttemptTimeouts: {
+            first_byte_ms: number;
+            idle_ms: number;
+            total_ms: number;
+        };
+        StageTiming: {
+            stage: string;
+            duration_ms: number;
+        };
+        RouteDecision: {
+            channel: components["schemas"]["ChannelRef"];
+            reason: string;
+            rank: number;
+        };
+        CallDiagnostics: {
+            stages: components["schemas"]["StageTiming"][];
+            routing: components["schemas"]["RouteDecision"][];
+            stop_reason: string;
+            usage_status: string;
+            delivery: string;
+            frames: number;
+            max_frame_gap_ms: number | null;
+            upstream_bytes: number;
+            max_attempts: number;
+            call_timeout_ms: number;
+            drain_timeout_ms: number;
+        };
+        AnalysisValues: {
+            fallback_p95: number | null;
+            fallback_p50: number | null;
+            /** Format: int64 */
+            attempted: number;
+            /** Format: int64 */
+            stream_finished: number;
+            /** Format: int64 */
+            stream_interrupted: number;
+            calls: number;
+            finished: number;
+            succeeded: number;
+            first_succeeded: number;
+            retried: number;
+            recovered: number;
+            attempts: number;
+            attempt_succeeded: number;
+            delivered: number;
+            delivery_known: number;
+            billed: number;
+            usage_reported: number;
+            usage_missing: number;
+            streamed: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_read_tokens: number;
+            cache_write_tokens: number;
+            charged: components["schemas"]["Amount"];
+            fee: components["schemas"]["Amount"];
+            interrupted: number;
+            disconnected: number;
+            unbilled: number;
+            ttft_p50: number | null;
+            ttft_p95: number | null;
+            ttft_p99: number | null;
+            duration_p50: number | null;
+            duration_p95: number | null;
+            duration_p99: number | null;
+            speed_p10: number | null;
+            speed_p50: number | null;
+            speed_p95: number | null;
+            gap_p50: number | null;
+            gap_p95: number | null;
+            gap_p99: number | null;
+            max_gap_p95: number | null;
+            cost_p50: number | null;
+            cost_p95: number | null;
+            cost_p99: number | null;
+            retry_p50: number | null;
+            retry_p95: number | null;
+            overhead_p50: number | null;
+            overhead_p95: number | null;
+            authentication_p95: number | null;
+            request_p95: number | null;
+            open_call_p95: number | null;
+            admission_p95: number | null;
+            routing_p95: number | null;
+            pricing_p95: number | null;
+            settlement_p95: number | null;
+            client_write_p95: number | null;
+        };
+        AnalysisRow: {
+            key: string;
+            label: string;
+            split_key: string;
+            split_label: string;
+            values: components["schemas"]["AnalysisValues"];
+        };
+        AnalysisReport: {
+            from: components["schemas"]["Timestamp"];
+            to: components["schemas"]["Timestamp"];
+            previous_from: components["schemas"]["Timestamp"];
+            previous_to: components["schemas"]["Timestamp"];
+            group_by: string;
+            split_by: string;
+            bucket_seconds: number;
+            current: components["schemas"]["AnalysisValues"];
+            previous: components["schemas"]["AnalysisValues"];
+            groups: components["schemas"]["AnalysisRow"][];
+            trend: components["schemas"]["AnalysisRow"][];
+        };
         CallAttempt: {
+            upstream_model: string;
+            timeouts: components["schemas"]["AttemptTimeouts"] | null;
+            offset_ms: number | null;
+            reused_connection: boolean | null;
+            fallback_reason: string;
             channel: components["schemas"]["ChannelRef"] | null;
             status_code: number | null;
             error_code: string | null;
@@ -2350,6 +2503,8 @@ export interface components {
             prices: components["schemas"]["EffectivePrices"];
         };
         CallDetail: {
+            diagnostics: components["schemas"]["CallDiagnostics"] | null;
+            upstream_response_id: string | null;
             /**
              * Format: uuid
              * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
@@ -3228,6 +3383,20 @@ export interface components {
         actorID: string;
         /** @description 请求 ID，精确匹配。 */
         requestID: string;
+        streamQuery: boolean;
+        minAttempts: number;
+        maxAttempts: number;
+        statusCodeQuery: number;
+        errorCodeQuery: string;
+        endReasonQuery: string;
+        deliveryQuery: string;
+        usageStatusQuery: string;
+        billedQuery: boolean;
+        attemptChannelQuery: string;
+        dimensionQuery: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+        dimensionValueQuery: string;
+        secondDimensionQuery: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+        secondValueQuery: string;
         /** @description 总耗时下限（毫秒，含）。 */
         minDurationMs: number;
         /** @description 总耗时上限（毫秒，含）。 */
@@ -4470,9 +4639,94 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    analyzeCalls: {
+        parameters: {
+            query?: {
+                dimension?: components["parameters"]["dimensionQuery"];
+                dimension_value?: components["parameters"]["dimensionValueQuery"];
+                second_dimension?: components["parameters"]["secondDimensionQuery"];
+                second_value?: components["parameters"]["secondValueQuery"];
+                stream?: components["parameters"]["streamQuery"];
+                min_attempts?: components["parameters"]["minAttempts"];
+                max_attempts?: components["parameters"]["maxAttempts"];
+                status_code?: components["parameters"]["statusCodeQuery"];
+                error_code?: components["parameters"]["errorCodeQuery"];
+                end_reason?: components["parameters"]["endReasonQuery"];
+                delivery?: components["parameters"]["deliveryQuery"];
+                usage_status?: components["parameters"]["usageStatusQuery"];
+                billed?: components["parameters"]["billedQuery"];
+                attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
+                /** @description 请求 ID，精确匹配。 */
+                request_id?: components["parameters"]["requestID"];
+                /** @description 总耗时下限（毫秒，含）。 */
+                min_duration_ms?: components["parameters"]["minDurationMs"];
+                /** @description 总耗时上限（毫秒，含）。 */
+                max_duration_ms?: components["parameters"]["maxDurationMs"];
+                /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+                min_tokens?: components["parameters"]["minTokens"];
+                /** @description 总 tokens 上限（含）。 */
+                max_tokens?: components["parameters"]["maxTokens"];
+                /** @description 实际扣除（费用 + 手续费）下限（含）。 */
+                min_cost?: components["parameters"]["minCost"];
+                /** @description 实际扣除（费用 + 手续费）上限（含）。 */
+                max_cost?: components["parameters"]["maxCost"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 调用标签（X-AIHub-Tag）。 */
+                tag?: components["parameters"]["tag"];
+                /** @description API 格式。 */
+                format?: components["parameters"]["format"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                group_by?: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+                split_by?: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+                bucket_seconds?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listCalls: {
         parameters: {
             query?: {
+                dimension?: components["parameters"]["dimensionQuery"];
+                dimension_value?: components["parameters"]["dimensionValueQuery"];
+                second_dimension?: components["parameters"]["secondDimensionQuery"];
+                second_value?: components["parameters"]["secondValueQuery"];
+                stream?: components["parameters"]["streamQuery"];
+                min_attempts?: components["parameters"]["minAttempts"];
+                max_attempts?: components["parameters"]["maxAttempts"];
+                status_code?: components["parameters"]["statusCodeQuery"];
+                error_code?: components["parameters"]["errorCodeQuery"];
+                end_reason?: components["parameters"]["endReasonQuery"];
+                delivery?: components["parameters"]["deliveryQuery"];
+                usage_status?: components["parameters"]["usageStatusQuery"];
+                billed?: components["parameters"]["billedQuery"];
+                attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -4662,6 +4916,10 @@ export interface operations {
     listChannelCalls: {
         parameters: {
             query?: {
+                stream?: components["parameters"]["streamQuery"];
+                status_code?: components["parameters"]["statusCodeQuery"];
+                error_code?: components["parameters"]["errorCodeQuery"];
+                end_reason?: components["parameters"]["endReasonQuery"];
                 /** @description API 格式。 */
                 format?: components["parameters"]["format"];
                 /** @description 请求 ID，精确匹配。 */
@@ -4774,6 +5032,7 @@ export interface operations {
     listPointsEntries: {
         parameters: {
             query?: {
+                transaction_id?: string;
                 /** @description 汇总方式：day 或 key；省略则不返回 summary。 */
                 group?: components["parameters"]["pointsGroup"];
                 /** @description 交易类型。 */
@@ -5795,9 +6054,96 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    analyzeAdminCalls: {
+        parameters: {
+            query?: {
+                dimension?: components["parameters"]["dimensionQuery"];
+                dimension_value?: components["parameters"]["dimensionValueQuery"];
+                second_dimension?: components["parameters"]["secondDimensionQuery"];
+                second_value?: components["parameters"]["secondValueQuery"];
+                stream?: components["parameters"]["streamQuery"];
+                min_attempts?: components["parameters"]["minAttempts"];
+                max_attempts?: components["parameters"]["maxAttempts"];
+                status_code?: components["parameters"]["statusCodeQuery"];
+                error_code?: components["parameters"]["errorCodeQuery"];
+                end_reason?: components["parameters"]["endReasonQuery"];
+                delivery?: components["parameters"]["deliveryQuery"];
+                usage_status?: components["parameters"]["usageStatusQuery"];
+                billed?: components["parameters"]["billedQuery"];
+                attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
+                /** @description 请求 ID，精确匹配。 */
+                request_id?: components["parameters"]["requestID"];
+                /** @description 总耗时下限（毫秒，含）。 */
+                min_duration_ms?: components["parameters"]["minDurationMs"];
+                /** @description 总耗时上限（毫秒，含）。 */
+                max_duration_ms?: components["parameters"]["maxDurationMs"];
+                /** @description 总 tokens（输入 + 输出 + 缓存读写）下限（含）。 */
+                min_tokens?: components["parameters"]["minTokens"];
+                /** @description 总 tokens 上限（含）。 */
+                max_tokens?: components["parameters"]["maxTokens"];
+                /** @description 实际扣除（费用 + 手续费）下限（含）。 */
+                min_cost?: components["parameters"]["minCost"];
+                /** @description 实际扣除（费用 + 手续费）上限（含）。 */
+                max_cost?: components["parameters"]["maxCost"];
+                /** @description 模型名。 */
+                model?: components["parameters"]["modelQuery"];
+                /** @description 结果分类。 */
+                outcome?: components["parameters"]["outcome"];
+                /** @description API Key ID。 */
+                api_key_id?: components["parameters"]["apiKeyIDQuery"];
+                /** @description 调用标签（X-AIHub-Tag）。 */
+                tag?: components["parameters"]["tag"];
+                /** @description API 格式。 */
+                format?: components["parameters"]["format"];
+                /** @description 账户 ID。 */
+                account_id?: components["parameters"]["accountIDQuery"];
+                /** @description 渠道 ID。 */
+                channel_id?: components["parameters"]["channelIDQuery"];
+                /** @description 开始时间（含）。 */
+                from?: components["parameters"]["from"];
+                /** @description 结束时间（不含）。 */
+                to?: components["parameters"]["to"];
+                group_by?: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+                split_by?: "all" | "model" | "channel" | "format" | "stream" | "key" | "tag" | "account" | "outcome" | "error" | "error_code" | "status" | "stop" | "service_tier";
+                bucket_seconds?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listAdminCalls: {
         parameters: {
             query?: {
+                dimension?: components["parameters"]["dimensionQuery"];
+                dimension_value?: components["parameters"]["dimensionValueQuery"];
+                second_dimension?: components["parameters"]["secondDimensionQuery"];
+                second_value?: components["parameters"]["secondValueQuery"];
+                stream?: components["parameters"]["streamQuery"];
+                min_attempts?: components["parameters"]["minAttempts"];
+                max_attempts?: components["parameters"]["maxAttempts"];
+                status_code?: components["parameters"]["statusCodeQuery"];
+                error_code?: components["parameters"]["errorCodeQuery"];
+                end_reason?: components["parameters"]["endReasonQuery"];
+                delivery?: components["parameters"]["deliveryQuery"];
+                usage_status?: components["parameters"]["usageStatusQuery"];
+                billed?: components["parameters"]["billedQuery"];
+                attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */

@@ -124,6 +124,9 @@ UPDATE calls SET
     completed_at = now()
 WHERE id = sqlc.arg(id) AND outcome = 'in_progress';
 
+-- name: SetCallDiagnostics :exec
+UPDATE calls SET diagnostics=$2, completed_at=clock_timestamp() WHERE id=$1;
+
 -- name: SetCallLedgerTx :exec
 UPDATE calls SET ledger_tx_id = $2 WHERE id = $1;
 

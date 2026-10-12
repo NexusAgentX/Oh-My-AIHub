@@ -1,0 +1,1097 @@
+{
+  "uid": "aihub-gateway",
+  "title": "AIHub · 网关观测",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": [
+    "aihub"
+  ],
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "format",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "aihub-prometheus"
+        },
+        "query": "label_values(aihub_http_requests_total,format)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "aihub-prometheus"
+        },
+        "query": "label_values(aihub_requests_total,model)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "channel",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "aihub-prometheus"
+        },
+        "query": "label_values(aihub_upstream_attempts_total,channel)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "stream",
+        "type": "custom",
+        "query": "true,false",
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "入口请求 / 秒",
+      "description": "含鉴权和打开记录失败；仅推理入口。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(format,status) (rate(aihub_http_requests_total{format=~\"$format\"}[$__rate_interval]))",
+          "legendFormat": "{{format}} HTTP {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "正在处理",
+      "description": "包含生成与结算；进程重启清零。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "aihub_active_requests{format=~\"$format\"}",
+          "legendFormat": "{{format}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "调用结果 / 秒",
+      "description": "按调用最终结果；不等于交付或记账。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,outcome) (rate(aihub_requests_total{format=~\"$format\",model=~\"$model\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "首次尝试成功率",
+      "description": "只以实际尝试的请求为分母。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,channel) (rate(aihub_first_attempt_total{model=~\"$model\",channel=~\"$channel\",result=\"success\"}[$__rate_interval])) / sum by(model,channel) (rate(aihub_first_attempt_total{model=~\"$model\",channel=~\"$channel\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "完整处理耗时 p95",
+      "description": "包括回退、生成与结算。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_request_duration_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "流式首响应 p95",
+      "description": "首个响应体字节，不保证含内容 token。只有流式样本。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_first_token_latency_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "上游尝试耗时 p95",
+      "description": "每次尝试按实际渠道归属。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_upstream_latency_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "网关额外耗时 p95",
+      "description": "处理总耗时减全部上游尝试；包含结算。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_gateway_overhead_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "回退次数 p95",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_request_retries_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "回退额外耗时 p95",
+      "description": "发生回退的请求在最终尝试之前花费的时间。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_fallback_duration_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "生成速度 p10",
+      "description": "tokens/s；低分位反映慢速尾部；只有流式样本。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.1, sum by(le,model,channel) (rate(aihub_output_tokens_per_second_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "最大数据帧停顿 p95",
+      "description": "每个流的最大帧间隔分布，不是逐 token 延迟。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_max_frame_gap_seconds_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "内部阶段 p95",
+      "description": "client_write 与上游读取过程重叠，不要把所有阶段相加。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,stage) (rate(aihub_stage_duration_seconds_bucket{format=~\"$format\"}[$__rate_interval])))",
+          "legendFormat": "{{stage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "尝试错误 / 秒",
+      "description": "HTTP 状态与归一化原因；无原始错误文本标签。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,channel,status,reason) (rate(aihub_attempt_errors_total{format=~\"$format\",model=~\"$model\",channel=~\"$channel\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{channel}} {{status}} {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "交付 / 秒",
+      "description": "HTTP 200 之后也可能中断；以网关观测的写入结果为准。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(result) (rate(aihub_delivery_total{format=~\"$format\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "用量观测 / 秒",
+      "description": "reported / missing / parse_limit / not_observed。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(result) (rate(aihub_usage_observation_total{format=~\"$format\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "tokens / 秒",
+      "description": "输入、输出、缓存读与写互斥；归属最终渠道。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,channel,kind) (rate(aihub_channel_tokens_total{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{channel}} {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "输入缓存读占比",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,channel) (rate(aihub_channel_tokens_total{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\",kind=\"cache_read\"}[$__rate_interval])) / sum by(model,channel) (rate(aihub_channel_tokens_total{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\",kind=~\"input|cache_read|cache_write\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "单次实际扣费 p95",
+      "description": "积分；没有记账的调用为零。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,model,channel) (rate(aihub_call_cost_points_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "手续费 / 秒",
+      "description": "积分；只计成功过账的费用。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(model,channel) (rate(aihub_channel_fee_points_total{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval]))",
+          "legendFormat": "{{model}} {{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "响应体字节 p95",
+      "description": "上游读取与写给客户端分别计数；usage 过滤与断连会造成差异。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,direction) (rate(aihub_response_bytes_bucket{format=~\"$format\",model=~\"$model\",channel=~\"$channel\",stream=~\"$stream\"}[$__rate_interval])))",
+          "legendFormat": "{{direction}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "记账结果 / 秒",
+      "description": "not_booked 包括免费、自用、拒绝与记账失败，不能直接当失败率。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(result) (rate(aihub_accounting_total{format=~\"$format\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "观测丢失与失败 / 秒",
+      "description": "实时流丢失不影响核心计数；记账故障需查站内核对。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(__name__) (rate({__name__=~\"aihub_gateway_events_dropped_total|aihub_live_messages_dropped_total|aihub_live_read_failures_total|aihub_metrics_refresh_failures_total|aihub_settlement_failures_total\"}[$__rate_interval]))",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "定时刷新距今",
+      "description": "正常约 60 秒内；零时间戳表示尚未成功刷新。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-aihub_metrics_last_refresh_timestamp_seconds",
+          "legendFormat": "刷新延迟"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "抓取状态",
+      "description": "0 表示 Prometheus 读不到网关。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"aihub\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "账本与核对异常",
+      "description": "应为零；无样本不等于健康。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "aihub-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "aihub_reconciliation_failed or aihub_ledger_imbalance",
+          "legendFormat": "{{__name__}} {{check}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}

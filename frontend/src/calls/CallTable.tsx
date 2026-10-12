@@ -66,7 +66,7 @@ export const callColumns = {
   }),
   ttft: <T extends CallRowBase>(): CallColumn<T> => ({
     key: 'ttft',
-    header: '首字',
+    header: '首响应',
     numeric: true,
     hideOnMobile: true,
     cell: (row) => formatMs(row.ttft_ms),
@@ -114,6 +114,7 @@ export function summaryColumns<T extends CallSummary>({
   columns.push(
     callColumns.tokens<T>(),
     callColumns.ttft<T>(),
+    {key:'duration',header:'总耗时',numeric:true,cell:(row)=>formatMs(row.duration_ms)},
     { key: 'charged', header: '花费', numeric: true, cell: (row) => formatPoints(row.charged) },
     callColumns.outcome<T>(),
   )

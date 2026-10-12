@@ -111,15 +111,20 @@ type CallInsert struct {
 
 // Attempt is one try on one channel (calls.attempts).
 type Attempt struct {
-	Channel      *AttemptChannel `json:"channel"`
-	StatusCode   *int            `json:"status_code"`
-	ErrorCode    *string         `json:"error_code"`
-	ErrorMessage *string         `json:"error_message"`
-	ConnectMS    *int            `json:"connect_ms"`
-	TTFTMS       *int            `json:"ttft_ms"`
-	DurationMS   *int            `json:"duration_ms"`
-	ResponseByte *int64          `json:"response_bytes"`
-	EndReason    string          `json:"end_reason"`
+	UpstreamModel    string           `json:"upstream_model"`
+	Timeouts         *AttemptTimeouts `json:"timeouts"`
+	OffsetMS         *int             `json:"offset_ms"`
+	ReusedConnection *bool            `json:"reused_connection"`
+	FallbackReason   string           `json:"fallback_reason"`
+	Channel          *AttemptChannel  `json:"channel"`
+	StatusCode       *int             `json:"status_code"`
+	ErrorCode        *string          `json:"error_code"`
+	ErrorMessage     *string          `json:"error_message"`
+	ConnectMS        *int             `json:"connect_ms"`
+	TTFTMS           *int             `json:"ttft_ms"`
+	DurationMS       *int             `json:"duration_ms"`
+	ResponseByte     *int64           `json:"response_bytes"`
+	EndReason        string           `json:"end_reason"`
 }
 
 type AttemptChannel struct {
@@ -151,6 +156,7 @@ type Billing struct {
 // CallFinish closes a call record and, when Bill is set, books the ledger
 // transaction "call:<id>" in the same database transaction.
 type CallFinish struct {
+	Diagnostics        *Diagnostics
 	ID                 string
 	AccountID          string
 	Outcome            string

@@ -294,7 +294,7 @@ func (s *fakeStore) ListEntries(_ context.Context, filter ledger.EntryFilter) ([
 	var result []ledger.EntryView
 	for index := len(s.entries) - 1; index >= 0; index-- {
 		entry := s.entries[index]
-		if entry.RelatedID != filter.AccountID || (filter.BeforeID > 0 && entry.ID >= filter.BeforeID) || (filter.Type != "" && entry.Type != filter.Type) {
+		if entry.RelatedID != filter.AccountID || (filter.TransactionID != "" && entry.TransactionID != filter.TransactionID) || (filter.BeforeID > 0 && entry.ID >= filter.BeforeID) || (filter.Type != "" && entry.Type != filter.Type) {
 			continue
 		}
 		result = append(result, entry)

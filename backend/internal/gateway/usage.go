@@ -22,10 +22,13 @@ const (
 
 // Observation is what the side-channel reader learned about a response.
 type Observation struct {
-	Usage      ledger.Usage
-	Found      bool
-	ResponseID string
-	Frames     int
+	StopReason    string
+	UsageStatus   string
+	MaxFrameGapMS *int
+	Usage         ledger.Usage
+	Found         bool
+	ResponseID    string
+	Frames        int
 	// IntervalP50MS and IntervalP95MS describe the gaps between data frames.
 	IntervalP50MS *int
 	IntervalP95MS *int
@@ -38,13 +41,14 @@ type Observer struct {
 	stream bool
 	sse    bool
 
-	line      []byte
-	skipLine  bool
-	buffer    []byte
-	overflow  bool
-	last      time.Time
-	intervals []time.Duration
-	frames    int
+	line         []byte
+	skipLine     bool
+	buffer       []byte
+	overflow     bool
+	parseLimited bool
+	last         time.Time
+	intervals    []time.Duration
+	frames       int
 
 	detail         ledger.UsageDetail
 	qwenObserved   bool
@@ -53,6 +57,8 @@ type Observer struct {
 	usage          ledger.Usage
 	found          bool
 	responseID     string
+	stopReason     string
+	maxGap         time.Duration
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
 	// members is the scratch space the members of an event's objects are
@@ -89,8 +95,14 @@ func (o *Observer) Write(chunk []byte, at time.Time) {
 
 func (o *Observer) frame(at time.Time) {
 	o.frames++
-	if !o.last.IsZero() && len(o.intervals) < maxIntervals {
-		o.intervals = append(o.intervals, at.Sub(o.last))
+	if !o.last.IsZero() {
+		gap := at.Sub(o.last)
+		if len(o.intervals) < maxIntervals {
+			o.intervals = append(o.intervals, gap)
+		}
+		if gap > o.maxGap {
+			o.maxGap = gap
+		}
 	}
 	o.last = at
 }
@@ -101,7 +113,7 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 		if newline < 0 {
 			if !o.skipLine {
 				if len(o.line)+len(chunk) > maxLineBuffer {
-					o.skipLine, o.line = true, nil
+					o.skipLine, o.line, o.parseLimited = true, nil, true
 				} else {
 					o.line = append(o.line, chunk...)
 				}
@@ -112,6 +124,8 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 			if len(o.line)+newline <= maxLineBuffer {
 				o.line = append(o.line, chunk[:newline]...)
 				o.handleLine(o.line, at)
+			} else {
+				o.parseLimited = true
 			}
 		}
 		o.line, o.skipLine = o.line[:0], false
@@ -160,8 +174,15 @@ func (o *Observer) Finish() Observation {
 	if len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || len(o.detail.Notes) > 0 {
 		o.usage.Detail = &o.detail
 	}
-	observation := Observation{Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
+	status := "missing"
+	if o.found {
+		status = "reported"
+	} else if o.overflow || o.parseLimited {
+		status = "parse_limit"
+	}
+	observation := Observation{StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
+		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
 		slices.Sort(sorted)
 		p50 := int(percentile(sorted, 0.50).Milliseconds())
@@ -187,6 +208,9 @@ func clamp(value int64) int64 {
 func (o *Observer) absorb(raw []byte) {
 	// One look at the member names decides what is worth decoding at all.
 	keys := scanFrameKeys(raw)
+	if keys&keyStop != 0 || o.format == channel.FormatOpenAIResponses {
+		o.observeStop(raw)
+	}
 	switch o.format {
 	case channel.FormatOpenAIChat:
 		if keys&keyUsage != 0 {
