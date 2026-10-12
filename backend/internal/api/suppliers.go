@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -259,7 +261,8 @@ func (a *app) fetchSupplierIcon(w http.ResponseWriter, r *http.Request) {
 	service := supplier.Service{Outbound: policy}
 	data, source, err := service.FetchIcon(r.Context(), input.WebsiteURL)
 	if err != nil {
-		writeError(w, 422, "icon_unavailable", "未获取到可用图标，可上传图片或保留默认图标")
+		code, message := supplierIconError(err)
+		writeError(w, 422, code, message)
 		return
 	}
 	writeJSON(w, 200, supplierIconJSON{IconData: data, IconSource: source})
@@ -489,4 +492,27 @@ func (a *app) registerSupplierRoutes(r *router) {
 	r.implement("407", "POST /api/admin/suppliers", accessAdmin, a.saveSupplier)
 	r.implement("407", "PUT /api/admin/suppliers/{supplierID}", accessAdmin, a.saveSupplier)
 	r.implement("407", "POST /api/admin/suppliers/icon", accessAdmin, a.fetchSupplierIcon)
+}
+
+// Only expose classified failures, never upstream bodies or transport errors.
+func supplierIconError(err error) (string, string) {
+	var httpError *supplier.IconHTTPError
+	switch {
+	case errors.Is(err, supplier.ErrInvalid):
+		return "icon_invalid_url", "请填写有效的 HTTPS 官网地址"
+	case errors.Is(err, supplier.ErrIconTimeout):
+		return "icon_timeout", "获取图标超时，请重试或上传图片"
+	case errors.Is(err, supplier.ErrIconFormat):
+		return "icon_unsupported", "图标格式不支持或文件损坏，请上传 PNG、JPEG 或 GIF"
+	case errors.Is(err, supplier.ErrIconTooLarge):
+		return "icon_too_large", "网页或图标超过大小限制，请上传 256 KB、1024 × 1024 以内的图片"
+	case errors.As(err, &httpError):
+		return "icon_http_error", fmt.Sprintf("官网或图标服务器返回 HTTP %d，可上传图片", httpError.Status)
+	case errors.Is(err, supplier.ErrIconRedirect):
+		return "icon_redirect", "官网或图标地址发生跳转，请填写跳转后的官网地址或上传图片"
+	case errors.Is(err, supplier.ErrIconDownload):
+		return "icon_download_failed", "图标下载失败，请检查官网地址或上传图片"
+	default:
+		return "icon_unavailable", "未找到可用图标，可上传图片或保留默认图标"
+	}
 }
