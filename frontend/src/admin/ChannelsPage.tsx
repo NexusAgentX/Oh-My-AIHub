@@ -11,12 +11,13 @@ import {
   SearchInput,
   Segmented,
   Toolbar,
+  Tabs,
   type BadgeTone,
   type Column,
 } from '../ui'
-import { ChannelStatsPanel } from '../channels/ChannelStatsPanel'
+import { ChannelHealth, ChannelMetrics, ChannelStatsPanel } from '../channels/ChannelStatsPanel'
 import { MultiplierText } from '../money/MultiplierText'
-import { ConfirmActionDialog, DetailList, LoadMore } from './components'
+import { Collapsible, ConfirmActionDialog, DetailList, LoadMore } from './components'
 import { formatCount, formatDateTime, formatPoints, formatRatio } from './format'
 import { useAdminChannel, useAdminChannels, useChannelSuspension } from './queries'
 import type { AdminChannel, ChannelEvent, ChannelStatus } from './types'
@@ -38,19 +39,6 @@ const formatLabels: Record<string, string> = {
   openai_responses: 'Responses',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
-}
-
-const eventLabels: Record<ChannelEvent['kind'], string> = {
-  cooldown_started: '开始冷却',
-  cooldown_ended: '冷却结束',
-  limit_reached: '触发限额',
-  suspended: '被下架',
-  unsuspended: '恢复',
-  listed: '上架',
-  unlisted: '下架',
-  test_failed: '测试失败',
-  model_pending_multiplier: '待设倍率',
-  anomalous_client_errors: '4xx 异常',
 }
 
 const columns: Column<AdminChannel>[] = [
@@ -125,6 +113,7 @@ export function ChannelsPage() {
 
 function ChannelDetail({ channel, events }: { channel: AdminChannel; events: ChannelEvent[] }) {
   const [dialog, setDialog] = useState(false)
+  const [section, setSection] = useState<'overview' | 'settings' | 'health'>('overview')
   const suspension = useChannelSuspension()
   const suspended = channel.status === 'suspended'
   const advanced = channel.advanced
@@ -143,6 +132,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
           </>
         }
         back={{ to: '/admin/channels', label: '渠道' }}
+        description={<><ChannelStatusBadge channel={channel} /> · {channel.owner.display_name}（@{channel.owner.username}）</>}
         title={channel.name}
       />
       {suspended && channel.suspended_reason && (
@@ -150,120 +140,124 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
           <span>下架原因：{channel.suspended_reason}</span>
         </p>
       )}
-      <div className="admin-two-column">
-        <Card title="配置摘要">
-          <DetailList
-            items={[
-              /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
-              ['状态', <ChannelStatusBadge channel={channel} />],
-              ['所有者', `${channel.owner.display_name}（@${channel.owner.username}）`],
-              ['Base URL', <span className="mono break">{channel.base_url}</span>],
-              ['上游 Key', '已加密保存，不回显'],
-              ['User-Agent', advanced.user_agent ?? '透传客户端'],
-              [
-                '请求头规则',
-                `设置 ${advanced.header_rules.set.length} 条 · 删除 ${advanced.header_rules.remove.length} 条`,
-              ],
-              ['并发 / 每分钟请求', `${orDefault(advanced.concurrency_limit)} / ${orDefault(advanced.rpm_limit)}`],
-              ['每日收入上限', advanced.daily_revenue_cap === null ? '不限' : formatPoints(advanced.daily_revenue_cap)],
-              ['首字超时', orDefault(advanced.ttft_timeout_ms, ' ms')],
-              ['空闲超时', orDefault(advanced.idle_timeout_ms, ' ms')],
-              ['请求超时', orDefault(advanced.request_timeout_ms, ' ms')],
-              [
-                '失败冷却',
-                advanced.cooldown_failures === null && advanced.cooldown_seconds === null
-                  ? '平台默认'
-                  : `连续 ${orDefault(advanced.cooldown_failures)} 次 → ${orDefault(advanced.cooldown_seconds, ' 秒')}`,
-              ],
-              ['创建时间', formatDateTime(channel.created_at)],
-              /* oxlint-enable react/jsx-key */
-            ]}
-          />
-        </Card>
-        <Card title="今日">
-          <DetailList
-            items={[
-              ['调用', formatCount(channel.today.calls)],
-              ['成功率', formatRatio(channel.today.success_rate)],
-              ['收入', formatPoints(channel.today.revenue)],
-              ['冷却至', channel.cooldown_until ? formatDateTime(channel.cooldown_until) : '—'],
-            ]}
-          />
-        </Card>
-      </div>
-      <ChannelStatsPanel channelId={channel.id} />
-      <Card flush title={`模型（${channel.models.length}）`}>
-        <DataTable
-          caption="渠道模型"
-          columns={[
-            {
-              key: 'model',
-              header: '模型',
-              primary: true,
-              cell: (model) => (
-                <>
-                  <strong className="mono">{model.model_id}</strong>
-                  {model.upstream_model !== model.model_id && <small>上游：{model.upstream_model}</small>}
-                </>
-              ),
-            },
-            {
-              key: 'formats',
-              header: '格式',
-              cell: (model) => (
-                <span className="badge-row">
-                  {model.formats.map((format) => (
-                    <Badge key={format} tone={model.format_tests[format]?.ok ? 'success' : 'neutral'}>
-                      {formatLabels[format] ?? format}
-                    </Badge>
-                  ))}
-                </span>
-              ),
-            },
-            {
-              key: 'multiplier',
-              header: '倍率',
-              numeric: true,
-              cell: (model) => (
-                <MultiplierText
-                  effective={model.effective_multiplier}
-                  fxDiscount={model.fx_discount}
-                  multiplier={model.multiplier}
-                />
-              ),
-            },
-            {
-              key: 'prices',
-              header: '现价 输入/输出',
-              numeric: true,
-              cell: (model) => `${model.current_prices.input} / ${model.current_prices.output}`,
-            },
-            {
-              key: 'enabled',
-              header: '状态',
-              cell: (model) => <Badge tone={model.enabled ? 'success' : 'neutral'}>{model.enabled ? '在卖' : '停卖'}</Badge>,
-            },
-          ]}
-          empty={<p className="muted-copy empty-pad">没有模型</p>}
-          rowKey={(model) => model.model_id}
-          rows={channel.models}
-        />
-      </Card>
-      <Card title="健康事件">
-        {events.length === 0 ? (
-          <p className="muted-copy">暂无事件</p>
-        ) : (
-          <ol className="timeline">
-            {events.map((event) => (
-              <li key={event.id}>
-                <span className="timeline-time">{formatDateTime(event.created_at)}</span>
-                <strong>{eventLabels[event.kind]}</strong>
-                {event.reason && <span className="muted-copy">{event.reason}</span>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
+      <ChannelMetrics channelId={channel.id} />
+      <Tabs
+        label="管理端渠道详情"
+        items={[
+          { key: 'overview', label: '概览' },
+          { key: 'settings', label: '模型与配置' },
+          { key: 'health', label: '健康事件' },
+        ]}
+        value={section}
+        onChange={setSection}
+      >
+        {section === 'overview' && <ChannelStatsPanel channelId={channel.id} onViewFailures={() => setSection('health')} />}
+        {section === 'health' && <ChannelHealth channelId={channel.id} events={events} />}
+        {section === 'settings' && <div className="channel-settings">
+          <div className="admin-two-column">
+            <Card title="配置摘要">
+              <DetailList
+                items={[
+                  /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
+                  ['Base URL', <span className="mono break">{channel.base_url}</span>],
+                  ['上游 Key', '已加密保存，不回显'],
+                  ['创建时间', formatDateTime(channel.created_at)],
+                  /* oxlint-enable react/jsx-key */
+                ]}
+              />
+            </Card>
+            <Card title="今日">
+              <DetailList
+                items={[
+                  ['调用', formatCount(channel.today.calls)],
+                  ['成功率', formatRatio(channel.today.success_rate)],
+                  ['收入', formatPoints(channel.today.revenue)],
+                  ['冷却至', channel.cooldown_until ? formatDateTime(channel.cooldown_until) : '—'],
+                ]}
+              />
+            </Card>
+          </div>
+          <Card flush title={`模型（${channel.models.length}）`}>
+            <DataTable
+              caption="渠道模型"
+              columns={[
+                {
+                  key: 'model',
+                  header: '模型',
+                  primary: true,
+                  cell: (model) => (
+                    <>
+                      <strong className="mono">{model.model_id}</strong>
+                      {model.upstream_model !== model.model_id && <small>上游：{model.upstream_model}</small>}
+                    </>
+                  ),
+                },
+                {
+                  key: 'formats',
+                  header: '格式',
+                  cell: (model) => (
+                    <span className="badge-row">
+                      {model.formats.map((format) => (
+                        <Badge key={format} tone={model.format_tests[format]?.ok ? 'success' : 'neutral'}>
+                          {formatLabels[format] ?? format}
+                        </Badge>
+                      ))}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'multiplier',
+                  header: '倍率',
+                  numeric: true,
+                  cell: (model) => (
+                    <MultiplierText
+                      effective={model.effective_multiplier}
+                      fxDiscount={model.fx_discount}
+                      multiplier={model.multiplier}
+                    />
+                  ),
+                },
+                {
+                  key: 'prices',
+                  header: '现价 输入/输出',
+                  numeric: true,
+                  cell: (model) => `${model.current_prices.input} / ${model.current_prices.output}`,
+                },
+                {
+                  key: 'enabled',
+                  header: '状态',
+                  cell: (model) => <Badge tone={model.enabled ? 'success' : 'neutral'}>{model.enabled ? '在卖' : '停卖'}</Badge>,
+                },
+              ]}
+              empty={<p className="muted-copy empty-pad">没有模型</p>}
+              rowKey={(model) => model.model_id}
+              rows={channel.models}
+            />
+          </Card>
+          <Collapsible title="高级配置">
+            <DetailList
+              items={[
+                ['User-Agent', advanced.user_agent ?? '透传客户端'],
+                [
+                  '请求头规则',
+                  `设置 ${advanced.header_rules.set.length} 条 · 删除 ${advanced.header_rules.remove.length} 条`,
+                ],
+                ['并发 / 每分钟请求', `${orDefault(advanced.concurrency_limit)} / ${orDefault(advanced.rpm_limit)}`],
+                ['每日收入上限', advanced.daily_revenue_cap === null ? '不限' : formatPoints(advanced.daily_revenue_cap)],
+                ['首字超时', orDefault(advanced.ttft_timeout_ms, ' ms')],
+                ['空闲超时', orDefault(advanced.idle_timeout_ms, ' ms')],
+                ['请求超时', orDefault(advanced.request_timeout_ms, ' ms')],
+                [
+                  '失败冷却',
+                  advanced.cooldown_failures === null && advanced.cooldown_seconds === null
+                    ? '平台默认'
+                    : `连续 ${orDefault(advanced.cooldown_failures)} 次 → ${orDefault(advanced.cooldown_seconds, ' 秒')}`,
+                ],
+              ]}
+            />
+          </Collapsible>
+        </div>}
+      </Tabs>
       <ConfirmActionDialog
         confirmLabel={suspended ? '确认恢复' : '确认下架'}
         danger={!suspended}
@@ -290,7 +284,7 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
 export function ChannelDetailPage() {
   const { channelID = '' } = useParams()
   const detail = useAdminChannel(channelID)
-  if (detail.data) return <ChannelDetail channel={detail.data.channel} events={detail.data.events} />
+  if (detail.data) return <ChannelDetail key={channelID} channel={detail.data.channel} events={detail.data.events} />
   return (
     <>
       <PageHeader
