@@ -119,6 +119,9 @@ export function RoutingEditor({
                 )}
                 <div className="routing-name">
                   <strong>{channel.name}</strong>
+                  <span className="routing-owner muted-copy">
+                    {channel.is_mine ? '由你提供' : `由 ${channel.owner.display_name} 提供`}
+                  </span>
                   <span className="routing-badges">
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
                     <Badge tone={state.tone}>{state.label}</Badge>

@@ -69,6 +69,7 @@
 }
 .routing-name { display: grid; min-width: 0; gap: 4px; }
 .routing-name strong { overflow-wrap: anywhere; }
+.routing-owner { overflow-wrap: anywhere; }
 .routing-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .routing-metrics { display: grid; grid-template-columns: 112px 104px 72px 56px; gap: var(--space-4); align-items: start; margin: 0; font-size: var(--text-sm); }
 .routing-metrics dt { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
