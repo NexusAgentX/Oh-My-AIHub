@@ -106,18 +106,18 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
           </div>
         </>
       )}
-      {seller && trade.status === 'paid' && (
+      {((seller && trade.status === 'paid') || canDispute) && (
         <div className="form-actions">
-          <Button onClick={() => setConfirm('release')} type="button">
-            确认收款并放行
-          </Button>
-        </div>
-      )}
-      {canDispute && (
-        <div className="form-actions">
-          <Button onClick={() => setConfirm('dispute')} type="button" variant="danger">
-            {trade.status === 'disputed' ? '提交申诉陈述' : '申诉'}
-          </Button>
+          {seller && trade.status === 'paid' && (
+            <Button onClick={() => setConfirm('release')} type="button">
+              确认收款并放行
+            </Button>
+          )}
+          {canDispute && (
+            <Button onClick={() => setConfirm('dispute')} type="button" variant="danger">
+              {trade.status === 'disputed' ? '提交申诉陈述' : '申诉'}
+            </Button>
+          )}
         </div>
       )}
       {!confirm && <InlineError>{error}</InlineError>}
