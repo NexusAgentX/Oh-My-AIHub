@@ -1,0 +1,261 @@
+name: perf-baseline
+
+run-name: perf-baseline ${{ inputs.base_ref }}..${{ inputs.head_ref }}
+
+# 网关性能基线（docs/runbooks/gateway-baseline.md）的手动运行。
+# 维护者的笔记本测不出可信的延迟、CPU 与 QPS，这里改在 GitHub 托管的标准 Linux x64 机器上测：
+# 同一个作业里编译 base_ref 与 head_ref 两份基线工具，交替运行同一套场景（scripts/perf-ab.sh），
+# 在作业摘要里给出每个指标的 base 与 head 中位数、范围和相对变化（backend/internal/gatewaybench/perfcompare）。
+# 同一作业内的 A/B 对比可靠；不同作业（不同机器、不同时间）的绝对值有波动，要看摘要里的 CPU 型号，
+# 需要量化这种波动时用 jobs 并行跑同一对提交。
+#
+# 只在手动触发时运行：不在 push 或 PR 上自动运行，也不是 main 规则集的必需检查。
+# workflow_dispatch 的工作流必须先存在于默认分支才能触发：gh workflow run perf-baseline.yml -f base_ref=... -f head_ref=...
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'A 侧：分支、tag 或提交（短 SHA 可用）'
+        required: false
+        default: main
+        type: string
+      head_ref:
+        description: 'B 侧：分支、tag 或提交（短 SHA 可用）'
+        required: false
+        default: main
+        type: string
+      scenarios:
+        description: '场景，逗号分隔，语法见 scripts/perf-ab.sh（nonstream@200 表示 200 次/秒的非流式）'
+        required: false
+        default: 'nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream'
+        type: string
+      repeat:
+        description: '轮数：每轮把每个场景在两侧各测一次，两侧交替先后'
+        required: false
+        default: '3'
+        type: string
+      jobs:
+        description: '并行作业数：每个作业在各自的机器上完整跑一遍，用来量不同作业之间的波动'
+        required: false
+        default: '1'
+        type: string
+      tool_args:
+        description: '传给基线工具的额外参数，如 -perf.duration=10s -perf.sweepstep=5s（高级）'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # 校验输入，把 ref 解析成提交（所有作业测同一对提交），并生成并行作业的矩阵。
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      jobs: ${{ steps.plan.outputs.jobs }}
+      base_sha: ${{ steps.plan.outputs.base_sha }}
+      head_sha: ${{ steps.plan.outputs.head_sha }}
+      scenarios: ${{ steps.plan.outputs.scenarios }}
+      repeat: ${{ steps.plan.outputs.repeat }}
+      tool_args: ${{ steps.plan.outputs.tool_args }}
+    steps:
+      - name: Validate inputs and resolve the refs
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_REF: ${{ inputs.base_ref }}
+          HEAD_REF: ${{ inputs.head_ref }}
+          SCENARIOS: ${{ inputs.scenarios }}
+          REPEAT: ${{ inputs.repeat }}
+          JOBS: ${{ inputs.jobs }}
+          TOOL_ARGS: ${{ inputs.tool_args }}
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          # 输入只经环境变量进入脚本；这里再按白名单检查，之后的步骤才可以放心使用。
+          ref_re='^[A-Za-z0-9][A-Za-z0-9._/-]*$'
+          [[ "$BASE_REF" =~ $ref_re ]] || fail "base_ref 只能含字母、数字和 . _ / -：$BASE_REF"
+          [[ "$HEAD_REF" =~ $ref_re ]] || fail "head_ref 只能含字母、数字和 . _ / -：$HEAD_REF"
+          [[ "$REPEAT" =~ ^[1-9][0-9]?$ ]] || fail "repeat 必须是 1 到 99 的整数：$REPEAT"
+          [[ "$JOBS" =~ ^([1-9]|10)$ ]] || fail "jobs 必须是 1 到 10 的整数：$JOBS"
+          [[ "$SCENARIOS" =~ ^[a-z0-9@,-]+$ ]] || fail "scenarios 含有不允许的字符：$SCENARIOS"
+          tool_re='^(-perf\.[a-z]+=[A-Za-z0-9.]+)?( -perf\.[a-z]+=[A-Za-z0-9.]+)*$'
+          [[ "$TOOL_ARGS" =~ $tool_re ]] || fail "tool_args 只接受 -perf.<名称>=<值>，以空格分隔：$TOOL_ARGS"
+
+          base_sha="$(gh api "repos/${REPOSITORY}/commits/${BASE_REF}" --jq .sha)" || fail "无法把 base_ref 解析成本仓库的提交：$BASE_REF"
+          head_sha="$(gh api "repos/${REPOSITORY}/commits/${HEAD_REF}" --jq .sha)" || fail "无法把 head_ref 解析成本仓库的提交：$HEAD_REF"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ && "$head_sha" =~ ^[0-9a-f]{40}$ ]] || fail "解析出的提交号不是 40 位十六进制：$base_sha $head_sha"
+          matrix="$(jq -nc --argjson n "$JOBS" '[range(1; $n + 1)]')"
+          {
+            echo "matrix=$matrix"
+            echo "jobs=$JOBS"
+            echo "base_sha=$base_sha"
+            echo "head_sha=$head_sha"
+            echo "scenarios=$SCENARIOS"
+            echo "repeat=$REPEAT"
+            echo "tool_args=$TOOL_ARGS"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Plan"
+            echo
+            echo "- base: \`$BASE_REF\` = \`$base_sha\`"
+            echo "- head: \`$HEAD_REF\` = \`$head_sha\`"
+            echo "- scenarios: \`$SCENARIOS\`; rounds: $REPEAT; parallel jobs: $JOBS"
+            echo "- extra tool arguments: \`${TOOL_ARGS:-none}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  perf:
+    name: perf (job ${{ matrix.job }})
+    needs: plan
+    runs-on: ubuntu-24.04
+    # 默认参数一个作业要数小时；公开仓库的托管机器不限分钟数，作业上限 6 小时，这里取 300 分钟。
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    # 与 ci.yml 的 integration 作业相同的 PostgreSQL。
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: oh_my_aihub
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: oh_my_aihub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oh_my_aihub -d oh_my_aihub_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://oh_my_aihub:ci-only-password@127.0.0.1:5432/oh_my_aihub_test?sslmode=disable
+      PERF_SCENARIOS: ${{ needs.plan.outputs.scenarios }}
+      PERF_ROUNDS: ${{ needs.plan.outputs.repeat }}
+      PERF_TOOL_ARGS: ${{ needs.plan.outputs.tool_args }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 要检出任意分支、tag 或提交，需要完整历史；后面运行的是任意引用上的代码，所以不留下凭据。
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          install: true
+      # 只读取 ci.yml 的 integration 作业留下的缓存，不新增缓存条目。
+      - name: Restore Go caches
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Check out base and head
+        env:
+          BASE_SHA: ${{ needs.plan.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.plan.outputs.head_sha }}
+        run: |
+          mkdir -p perf-out
+          for sha in "$BASE_SHA" "$HEAD_SHA"; do
+            git rev-parse --verify --quiet "$sha^{commit}" >/dev/null || git fetch --no-tags --quiet origin "$sha"
+          done
+          git worktree add --detach "$RUNNER_TEMP/perf-src/base" "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/perf-src/head" "$HEAD_SHA"
+          {
+            echo "base=$BASE_SHA"
+            echo "head=$HEAD_SHA"
+            echo "tools=$GITHUB_SHA"
+            echo "run=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > perf-out/refs.txt
+      - name: Record the environment
+        run: |
+          cid="$(docker ps --filter ancestor=postgres:18-alpine --format '{{.ID}}' | head -n1)"
+          psql_q() { docker exec -e PGPASSWORD=ci-only-password "$cid" psql -U oh_my_aihub -d oh_my_aihub_test -Atc "$1"; }
+          cpu_model="$(lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -n1)"
+          mem_gib="$(awk '/MemTotal/ { printf "%.1f", $2 / 1048576 }' /proc/meminfo)"
+          echo "${cpu_model}, $(nproc) vCPU, ${mem_gib} GiB, $(uname -m)" | tee perf-out/cpu.txt
+          {
+            echo "runner: ${RUNNER_NAME:-?}, image ${ImageOS:-?} ${ImageVersion:-?}"
+            echo "== lscpu"; lscpu
+            echo "== nproc"; nproc
+            echo "== memory"; free -m
+            echo "== kernel"; uname -a
+            echo "== load average"; cat /proc/loadavg
+            echo "== disk"; df -h / /var/lib/docker 2>/dev/null || true
+            echo "== go"; mise exec -- go version
+            echo "== postgres"; psql_q 'select version()'
+            psql_q "select name || ' = ' || setting || coalesce(unit, '') from pg_settings where name in ('shared_buffers', 'max_connections', 'fsync', 'synchronous_commit', 'wal_sync_method', 'max_wal_size', 'checkpoint_timeout')"
+          } > perf-out/environment.txt
+      - name: Run the baseline, base against head
+        run: mise exec -- scripts/perf-ab.sh "$RUNNER_TEMP/perf-src/base" "$RUNNER_TEMP/perf-src/head" "$GITHUB_WORKSPACE/perf-out"
+      - name: Summary
+        if: always()
+        env:
+          MATRIX_JOB: ${{ matrix.job }}
+          BASE_SHA: ${{ needs.plan.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.plan.outputs.head_sha }}
+        run: |
+          {
+            echo "## Gateway performance baseline, job $MATRIX_JOB"
+            echo
+            echo "- base \`$BASE_SHA\`, head \`$HEAD_SHA\`"
+            echo "- machine: $(cat perf-out/cpu.txt 2>/dev/null || echo unknown)"
+            echo "- scenarios \`$PERF_SCENARIOS\`, $PERF_ROUNDS round(s), extra tool arguments \`${PERF_TOOL_ARGS:-none}\`"
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY" > perf-out/comparison.md
+          mise exec -- go -C backend run ./internal/gatewaybench/perfcompare "$GITHUB_WORKSPACE/perf-out" | tee -a perf-out/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f perf-out/environment.txt ]; then
+            {
+              echo "<details><summary>Environment</summary>"
+              echo
+              echo '```'
+              cat perf-out/environment.txt
+              echo '```'
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-baseline-job-${{ matrix.job }}
+          path: perf-out
+          retention-days: 30
+          if-no-files-found: warn
+
+  # 并行作业不止一个时，把各作业的结果并排，给出同一代码在不同机器上的波动。
+  cross-job:
+    name: spread between jobs
+    needs: [plan, perf]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.jobs != '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          install: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: perf-baseline-job-*
+          path: perf-jobs
+      - name: Summary
+        run: |
+          {
+            echo "## Spread between jobs"
+            echo
+            mise exec -- go -C backend run ./internal/gatewaybench/perfcompare "$GITHUB_WORKSPACE"/perf-jobs/perf-baseline-job-*
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -152,6 +152,10 @@ func main() {
 		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: bus, Logger: logger, Runtime: runtime,
 	})
+	// An edit of a channel (settings, models, formats, suspension) clears what the
+	// 4xx anomaly rule counted against it before, and a channel ranked last for
+	// those answers is ranked on its merits again before the edit returns.
+	cached.Cache.OnChannelEdited(engine.ChannelEdited)
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
 	// The channel statistics are counted in memory from here on; the database is

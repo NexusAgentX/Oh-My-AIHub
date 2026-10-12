@@ -4,6 +4,10 @@
 // counter for the database. docs/runbooks/gateway-baseline.md says how to run
 // the baseline and how to read it.
 //
+// The perfcompare command in this directory turns the results of several runs
+// into the comparison tables of the performance workflow
+// (.github/workflows/perf-baseline.yml).
+//
 // Nothing here is imported by the server. The pieces are driven by the build
 // tagged test in internal/postgres (gateway_perf_baseline_test.go), which runs
 // the gateway in process against a PostgreSQL database; the test, not this

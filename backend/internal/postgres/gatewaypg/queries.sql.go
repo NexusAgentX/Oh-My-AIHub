@@ -20,9 +20,12 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
                 THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, $1::int[]) - 1 END, -1)::int AS ttft_bin,
        count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
-       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors,
+       count(*) FILTER (WHERE c.created_at < ch.updated_at)::bigint AS before_edit_attempts,
+       count(*) FILTER (WHERE att->>'end_reason' = 'client_error' AND c.created_at < ch.updated_at)::bigint AS before_edit_client_errors
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
+LEFT JOIN channels ch ON ch.id = (att->'channel'->>'id')::uuid
 WHERE c.created_at >= $2::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
   AND att->>'end_reason' <> 'client_disconnected'
@@ -35,13 +38,15 @@ type AttemptHistoryParams struct {
 }
 
 type AttemptHistoryRow struct {
-	ChannelID    string
-	ModelID      string
-	Bucket       int64
-	TtftBin      int32
-	Counted      int64
-	Successes    int64
-	ClientErrors int64
+	ChannelID              string
+	ModelID                string
+	Bucket                 int64
+	TtftBin                int32
+	Counted                int64
+	Successes              int64
+	ClientErrors           int64
+	BeforeEditAttempts     int64
+	BeforeEditClientErrors int64
 }
 
 // The attempts of calls started in the window the engine keeps channel statistics
@@ -56,6 +61,11 @@ type AttemptHistoryRow struct {
 // anomaly rule. The first-token figure counts streaming calls only: a
 // non-streaming call's first byte is the whole answer, which would rank a
 // channel by how long its answers are instead of how fast it starts.
+// The before_edit_* columns count the attempts of calls started before the
+// channel was last edited (channels.updated_at): the gateway leaves them out of
+// the 4xx anomaly rule, which judges a channel afresh after every edit, but not
+// out of the success rate and first-token time. The channel is joined by its
+// ID; a channel that no longer exists has no edit time and nothing is "before".
 func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) ([]AttemptHistoryRow, error) {
 	rows, err := q.db.Query(ctx, attemptHistory, arg.Edges, arg.Since)
 	if err != nil {
@@ -73,6 +83,8 @@ func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) 
 			&i.Counted,
 			&i.Successes,
 			&i.ClientErrors,
+			&i.BeforeEditAttempts,
+			&i.BeforeEditClientErrors,
 		); err != nil {
 			return nil, err
 		}

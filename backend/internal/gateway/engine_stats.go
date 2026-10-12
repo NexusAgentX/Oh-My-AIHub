@@ -102,3 +102,31 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 func (e *Engine) recordAttempt(call *callState, candidate Candidate, record Attempt) {
 	e.StatsBook.Record(candidate.ChannelID, call.modelID, call.stream, record, e.Now())
 }
+
+// ChannelEdited tells the engine that a channel's configuration was changed (its
+// settings, its models, its formats) or that it was taken down or restored.
+// Whatever 4xx answers the channel gave before are no longer evidence about it:
+// they came from the old configuration, and a channel ranked last is rarely
+// called, so without this it would stay last until they age out of the
+// 24-hour window. The 4xx anomaly figures of the channel are cleared, the
+// rule is applied again and the result published before it returns, so the next
+// ranking already takes the channel for what the new configuration earns. The
+// channel's success rate and first-token time stay, and so do its cooldown and
+// limits. If the new configuration turns out just as broken, it is flagged
+// and announced again once the rule has enough fresh attempts.
+//
+// A call that began before the edit and ends after it is counted as of its end.
+// After a restart the same call is left out, because the warm-up judges by when
+// calls began (AttemptHistoryRow.BeforeEditAttempts); the difference is the
+// calls in flight at the moment of the edit.
+func (e *Engine) ChannelEdited(channelID string) {
+	e.StatsBook.ResetAnomalyStats(channelID)
+	e.statsBuild.Lock()
+	for key := range e.anomalyNotified {
+		if key.channel == channelID {
+			delete(e.anomalyNotified, key)
+		}
+	}
+	e.statsBuild.Unlock()
+	e.RefreshStats()
+}

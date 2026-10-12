@@ -202,6 +202,11 @@ type env struct {
 	metrics *metrics.Metrics
 	runtime *gateway.Runtime
 	keyring *channel.Keyring
+
+	// engineDeps and newHandler are what restartGateway rebuilds the engine
+	// and the HTTP handler from.
+	engineDeps gateway.Dependencies
+	newHandler func(*gateway.Engine) http.Handler
 }
 
 type syncBuffer struct {
@@ -294,8 +299,16 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	if configure != nil {
 		configure(&dependencies)
 	}
+	e.engineDeps = dependencies
 	e.engine = gateway.NewEngine(dependencies)
+	// As in the server: editing a channel clears its 4xx anomaly figures.
+	cached.Cache.OnChannelEdited(e.engine.ChannelEdited)
 	e.observe = observe.NewService(store.Observe)
+	// Rows are stamped by the database's clock and the observation windows end
+	// at the service's "now". Keep both on the database's clock: with the host's,
+	// a PostgreSQL clock that runs a few milliseconds ahead (a container or VM
+	// on a laptop) puts the newest fixture rows after the end of the window.
+	e.observe.SetClock(e.databaseNow)
 	e.feed = observe.NewFeed(e.observe, bus, logger)
 	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
 	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
@@ -303,20 +316,51 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	feedContext, stopFeed := context.WithCancel(context.Background())
 	t.Cleanup(stopFeed)
 	go e.feed.Run(feedContext)
-	e.handler = api.NewHandler(api.Dependencies{
-		Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,
-		Audit: audit.NewService(store.Audit), Keys: apikey.NewService(cached.Keys, keyring, modelIDs),
-		Channels: channel.NewService(channel.Dependencies{
-			Store: cached.Channels, Keyring: keyring, Outbound: outbound, KnownModels: modelIDs,
-			BlockedHosts: func(ctx context.Context) ([]string, error) {
-				value, err := settingsService.Get(ctx)
-				return value.ExtraBlockedHosts, err
-			},
-		}),
-		Routing: cached.Routing, Gateway: e.engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
-	})
+	e.newHandler = func(engine *gateway.Engine) http.Handler {
+		return api.NewHandler(api.Dependencies{
+			Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,
+			Audit: audit.NewService(store.Audit), Keys: apikey.NewService(cached.Keys, keyring, modelIDs),
+			Channels: channel.NewService(channel.Dependencies{
+				Store: cached.Channels, Keyring: keyring, Outbound: outbound, KnownModels: modelIDs,
+				BlockedHosts: func(ctx context.Context) ([]string, error) {
+					value, err := settingsService.Get(ctx)
+					return value.ExtraBlockedHosts, err
+				},
+			}),
+			Routing: cached.Routing, Gateway: engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
+		})
+	}
+	e.handler = e.newHandler(e.engine)
 	e.admin = e.login(admin.Username, "Founder-password-2026", admin.ID, false)
 	return e
+}
+
+// databaseNow is the current time on the PostgreSQL server, the clock that
+// stamps created_at and completed_at. It stands in for the host's time.Now
+// wherever a test compares fixture rows with "now". Without a reachable
+// database it falls back to the host's clock: every other query fails too.
+func (e *env) databaseNow() time.Time {
+	var now time.Time
+	if err := e.pool.QueryRow(context.Background(), `SELECT clock_timestamp()`).Scan(&now); err != nil {
+		return time.Now()
+	}
+	return now
+}
+
+// restartGateway replaces the engine and the handler with new ones over the same
+// database, the way a restart of the server would: the channel statistics start
+// empty and are loaded from the calls table (LoadStats). Cooldowns and other
+// runtime state are kept, which these tests do not depend on.
+func (e *env) restartGateway() {
+	e.t.Helper()
+	dependencies := e.engineDeps
+	dependencies.StatsBook = nil
+	engine := gateway.NewEngine(dependencies)
+	e.cached.Cache.OnChannelEdited(engine.ChannelEdited)
+	if err := engine.LoadStats(context.Background()); err != nil {
+		e.t.Fatal(err)
+	}
+	e.engine, e.handler = engine, e.newHandler(engine)
 }
 
 func (e *env) login(username, password, id string, changePassword bool) person {

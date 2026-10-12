@@ -218,6 +218,7 @@ func (s *Store) AttemptHistory(ctx context.Context, since time.Time) ([]gateway.
 		history = append(history, gateway.AttemptHistoryRow{
 			ChannelID: row.ChannelID, ModelID: row.ModelID, Bucket: row.Bucket, TTFTBin: int(row.TtftBin),
 			Counted: row.Counted, Successes: row.Successes, ClientErrors: row.ClientErrors,
+			BeforeEditAttempts: row.BeforeEditAttempts, BeforeEditClientErrors: row.BeforeEditClientErrors,
 		})
 	}
 	return history, nil
