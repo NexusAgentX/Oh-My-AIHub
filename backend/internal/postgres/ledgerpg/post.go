@@ -69,10 +69,15 @@ func Post(ctx context.Context, tx Tx, t ledger.Transaction, opts ...Option) (led
 	inserted, err := q.InsertTransaction(ctx, params)
 	if errors.Is(err, pgx.ErrNoRows) {
 		replayed, err := replay(ctx, q, t)
-		if err == nil && settings.beforeLock != nil {
-			err = settings.beforeLock(ctx, replayed.ID)
+		if err != nil {
+			return ledger.Posted{}, err
 		}
-		return replayed, err
+		if settings.beforeLock != nil {
+			if err := settings.beforeLock(ctx, replayed.ID); err != nil {
+				return ledger.Posted{}, err
+			}
+		}
+		return replayed, nil
 	}
 	if err != nil {
 		return ledger.Posted{}, err

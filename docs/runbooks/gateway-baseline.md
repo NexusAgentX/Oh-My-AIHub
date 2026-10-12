@@ -60,12 +60,12 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`budget`、`sticky`、`formats`、`sweep-nonstream`、`sweep-stream`，逗号分隔 |
+| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`sticky`、`formats`、`sweep-nonstream`、`sweep-stream`，逗号分隔 |
 | `-perf.duration` / `-perf.warmup` | 30s / 3s | 每次运行的测量窗口与预热（流式场景的预热至少是一条流时长的 1.5 倍） |
 | `-perf.repeat` | 1 | 每个场景重复次数，报告给出中位数与范围。机器上有别的负载时建议 3 |
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
 | `-perf.consumers` / `-perf.channels` | 100 / 3 | 消费者账号数（各有两把 Key，其中一把带预算）与同价渠道数 |
-| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或并发场景的 500 个 worker。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
+| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或闭环场景（`concurrent`、`saturate`）的 worker 数。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
 | `-perf.dns` | 0 | 假 DNS 解析器的延迟。G7 之前用来看每次尝试重新解析的代价；DNS 缓存之后每个主机每 60 秒才解析一次，它只影响刷新的那一次 |
 | `-perf.synccommit` | on | 设为 `off` 时网关的数据库连接不等提交落盘，用来区分“存储慢”和“网关慢” |
 | `-perf.sweepstep` | 10s | 扫描中每一级的测量窗口 |
@@ -80,6 +80,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 | `nonstream-small` | OpenAI Chat 非流式，上游 50 ms 后一次返回 64 个输出 token | 50 次/秒（开环） |
 | `stream-1k` | OpenAI Chat 流式，首字 200 ms，每 5 ms 一块，共 1000 个 token（约 5 秒一条） | 20 次/秒 |
 | `concurrent-500` | OpenAI Chat 流式，首字 100 ms，每 20 ms 一块，共 100 个 token | 500 个 worker 背靠背（闭环） |
+| `nonstream-saturated` | 同 `nonstream-small`，但 worker 数多于数据库连接 | 64 个 worker 背靠背（闭环）：看吞吐上限本身，即结算在饱和时每秒能处理多少个调用；扫描找的是满足延迟判据的最高速率，对存储的偶发停顿很敏感（同一代码两轮可以差一倍），这个数字稳定得多 |
 | `key-budget` | 同 `nonstream-small`，Key 带日、月、总预算 | 50 次/秒 |
 | `responses-sticky` | OpenAI Responses 非流式，请求带上一轮的 `previous_response_id` | 50 次/秒 |
 | `formats` | 四种格式的流式与非流式各一个场景 | 非流式 40 次/秒，流式 10 次/秒 |

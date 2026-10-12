@@ -38,8 +38,8 @@ import (
 // same machine, with nothing else busy, before and after a change.
 
 var (
-	perfScenarios = flag.String("perf.scenarios", "nonstream,stream,concurrent,budget,sticky,formats,sweep-nonstream,sweep-stream",
-		"comma separated: nonstream, stream, concurrent, budget, sticky, formats, sweep-nonstream, sweep-stream")
+	perfScenarios = flag.String("perf.scenarios", "nonstream,stream,concurrent,saturate,budget,sticky,formats,sweep-nonstream,sweep-stream",
+		"comma separated: nonstream, stream, concurrent, saturate, budget, sticky, formats, sweep-nonstream, sweep-stream")
 	perfDuration   = flag.Duration("perf.duration", 30*time.Second, "measured window of a scenario run")
 	perfRepeat     = flag.Int("perf.repeat", 1, "run every scenario this many times (the report shows the median)")
 	perfQuiet      = flag.Float64("perf.quiet", 0, "before every run wait (up to 3 minutes) for the 1-minute load average to fall below this; 0 does not wait")
@@ -52,7 +52,7 @@ var (
 	perfProfile    = flag.Duration("perf.profile", 20*time.Second, "length of the profiled run of a profiled scenario (needs -perf.out)")
 	perfSweepStep  = flag.Duration("perf.sweepstep", 10*time.Second, "measured window of one step of a sweep")
 	perfQPS        = flag.Float64("perf.qps", 0, "replace the reference rate of the named rate-driven scenarios (not the sweeps or formats)")
-	perfWorkers    = flag.Int("perf.workers", 0, "replace the worker count of the concurrency scenario")
+	perfWorkers    = flag.Int("perf.workers", 0, "replace the worker count of the closed-loop scenarios (concurrent, saturate)")
 	perfAudit      = flag.Int64("perf.audit", 400, "requests of the database audit run of a scenario")
 )
 
@@ -115,8 +115,13 @@ func namedScenarios() map[string]perfScenario {
 		"nonstream":  {name: "nonstream-small", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, profiled: true},
 		"stream":     {name: "stream-1k", format: channel.FormatOpenAIChat, stream: true, profile: longStream, qps: 20, cap: 4000, profiled: true},
 		"concurrent": {name: "concurrent-500", format: channel.FormatOpenAIChat, stream: true, profile: chatStream, workers: 500},
-		"budget":     {name: "key-budget", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, budget: true},
-		"sticky":     {name: "responses-sticky", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, sticky: true},
+		// More workers than database connections, back to back: the rate at which
+		// the gateway can settle calls when nothing else limits it. The sweeps find
+		// the rate that holds a latency bound; this finds the ceiling itself and
+		// moves much less with the stalls of the machine's storage.
+		"saturate": {name: "nonstream-saturated", format: channel.FormatOpenAIChat, profile: quickAnswer, workers: 64},
+		"budget":   {name: "key-budget", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, budget: true},
+		"sticky":   {name: "responses-sticky", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, sticky: true},
 	}
 	for key, sc := range scenarios {
 		if sc.workers == 0 && *perfQPS > 0 {
@@ -639,7 +644,7 @@ func TestGatewayPerfBaseline(t *testing.T) {
 	var reports []scenarioReport
 	named := namedScenarios()
 	var chosen []perfScenario
-	for _, key := range []string{"nonstream", "stream", "concurrent", "budget", "sticky"} {
+	for _, key := range []string{"nonstream", "stream", "concurrent", "saturate", "budget", "sticky"} {
 		if selected[key] {
 			chosen = append(chosen, named[key])
 		}
@@ -946,15 +951,15 @@ func writeSweepTable(w *strings.Builder, name string, best float64, steps []swee
 	fmt.Fprintf(w, "\n## Sweep: %s\n\n", name)
 	fmt.Fprintf(w, "Highest rate that held: **%.0f requests/s**. A step holds when no arrival is dropped, the error rate is at most %.1f%%, at least %.0f%% of the rate completes, and ttft p99 stays within %s of the upstream's own.\n\n",
 		best, 100*sustainErrorRate, 100*sustainAchieved, sustainTTFTMargin)
-	fmt.Fprint(w, "| rate | completed/s | failed | dropped | ttft p50 | ttft p99 | peak in flight | CPU ms/req | DB waited | LockLedgerAccounts ms | lock hold ms | commit ms | held | why not |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	fmt.Fprint(w, "| rate | completed/s | failed | dropped | ttft p50 | ttft p99 | peak in flight | CPU ms/req | DB waited | LockLedgerAccounts ms | lock hold ms (mean / p99 / max) | commit ms | held | why not |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, step := range steps {
 		r := step.Run
 		waited := 0.0
 		if r.PoolAcquires > 0 {
 			waited = 100 * float64(r.PoolWaited) / float64(r.PoolAcquires)
 		}
-		fmt.Fprintf(w, "| %.0f | %.0f | %d | %d | %s | %s | %d | %.2f | %.0f%% | %.1f | %.2f | %.1f | %v | %s |\n", step.QPS, r.Result.Throughput(), r.Result.Failed(), r.Result.Dropped,
+		fmt.Fprintf(w, "| %.0f | %.0f | %d | %d | %s | %s | %d | %.2f | %.0f%% | %.1f | %.2f / %.1f / %.0f | %.1f | %v | %s |\n", step.QPS, r.Result.Throughput(), r.Result.Failed(), r.Result.Dropped,
 			ms(r.Result.TTFT.Percentile(50)), ms(r.Result.TTFT.Percentile(99)), r.Result.PeakInFlight, millis(r.CPUPerRequest), waited,
-			r.StatementMS["LockLedgerAccounts"], r.LockHold.MeanMS, r.StatementMS["(commit)"], step.Pass, step.Why)
+			r.StatementMS["LockLedgerAccounts"], r.LockHold.MeanMS, r.LockHold.P99MS, r.LockHold.MaxMS, r.StatementMS["(commit)"], step.Pass, step.Why)
 	}
 }
