@@ -4,6 +4,160 @@
  */
 
 export interface paths {
+    "/api/admin/suppliers/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 预览地址将关联的已上架渠道数量 */
+        post: operations["previewSupplierImpact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listSuppliers */
+        get: operations["listSuppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/{supplierID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getSupplier */
+        get: operations["getSupplier"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/recognize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** recognizeSupplier */
+        post: operations["recognizeSupplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-hall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listChannelHall */
+        get: operations["listChannelHall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-hall/{channelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getHallChannel */
+        get: operations["getHallChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** adminListSuppliers */
+        get: operations["adminListSuppliers"];
+        put?: never;
+        /** createSupplier */
+        post: operations["createSupplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/suppliers/{supplierID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** updateSupplier */
+        put: operations["updateSupplier"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/suppliers/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** fetchSupplierIcon */
+        post: operations["fetchSupplierIcon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forum/boards": {
         parameters: {
             query?: never;
@@ -2187,6 +2341,8 @@ export interface components {
         };
         /** @description 我的渠道；上游 Key 不回显。 */
         Channel: {
+            summary: string;
+            description: string;
             /** Format: uuid */
             id: string;
             name: string;
@@ -2233,6 +2389,8 @@ export interface components {
             upstream_models: components["schemas"]["DiscoveredModel"][];
         };
         ChannelCreateRequest: {
+            summary?: string;
+            description?: string;
             name: string;
             base_url: string;
             api_key: string;
@@ -2242,6 +2400,8 @@ export interface components {
             advanced?: components["schemas"]["ChannelAdvancedInput"];
         };
         ChannelUpdateRequest: {
+            summary?: string;
+            description?: string;
             name?: string;
             base_url?: string;
             /** @description 提供时替换上游 Key。 */
@@ -2806,6 +2966,8 @@ export interface components {
         };
         /** @description 管理员视角的渠道；上游 Key 不回显。 */
         AdminChannel: {
+            summary: string;
+            description: string;
             /** Format: uuid */
             id: string;
             name: string;
@@ -3062,6 +3224,118 @@ export interface components {
             /** Format: uuid */
             transaction_id: string | null;
         };
+        Supplier: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "relay";
+            summary: string;
+            description: string;
+            website_url: string;
+            docs_url: string;
+            status_url: string;
+            icon_data: string;
+            icon_source: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SupplierEndpoint: {
+            base_url: string;
+            label: string;
+        };
+        AdminSupplier: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "relay";
+            summary: string;
+            description: string;
+            website_url: string;
+            docs_url: string;
+            status_url: string;
+            icon_data: string;
+            icon_source: string;
+            /** Format: date-time */
+            updated_at: string;
+            visible: boolean;
+            endpoints: components["schemas"]["SupplierEndpoint"][];
+            linked_channels: number;
+        };
+        SupplierInput: {
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "relay";
+            summary: string;
+            description: string;
+            website_url: string;
+            docs_url: string;
+            status_url: string;
+            icon_data: string;
+            icon_source: string;
+            visible: boolean;
+            endpoints: components["schemas"]["SupplierEndpoint"][];
+        };
+        SupplierList: {
+            items: components["schemas"]["Supplier"][];
+            next_cursor: string | null;
+        };
+        AdminSupplierList: {
+            items: components["schemas"]["AdminSupplier"][];
+            next_cursor: string | null;
+        };
+        SupplierRecognition: {
+            supplier: components["schemas"]["Supplier"] | null;
+        };
+        SupplierRecognitionInput: {
+            base_url: string;
+        };
+        SupplierIcon: {
+            icon_data: string;
+            icon_source: string;
+        };
+        SupplierIconInput: {
+            website_url: string;
+        };
+        HallOffer: {
+            model: components["schemas"]["CatalogModel"];
+            multiplier: string;
+            effective_multiplier: string;
+            fx_discount: boolean;
+        };
+        HallChannel: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            summary: string;
+            description: string;
+            owner: components["schemas"]["Party"];
+            is_mine: boolean;
+            supplier: components["schemas"]["Supplier"] | null;
+            models: components["schemas"]["HallOffer"][];
+            formats: components["schemas"]["Format"][];
+            /** @enum {string} */
+            state: "available" | "cooldown" | "limited";
+            cooldown_remaining_seconds: number | null;
+            success_rate_24h: string | null;
+            ttft_p50_ms: number | null;
+        };
+        HallList: {
+            items: components["schemas"]["HallChannel"][];
+            next_cursor: string | null;
+        };
+        SupplierDetail: {
+            supplier: components["schemas"]["Supplier"];
+            channels: components["schemas"]["HallChannel"][];
+            models: components["schemas"]["CatalogModel"][];
+        };
+        SupplierImpactInput: {
+            endpoints: components["schemas"]["SupplierEndpoint"][];
+        };
+        SupplierImpact: {
+            linked_channels: number;
+        };
     };
     responses: {
         /** @description 请求格式无效或参数非法（invalid_json、invalid_request、invalid_cursor）。 */
@@ -3259,6 +3533,312 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    previewSupplierImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierImpactInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierImpact"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSuppliers: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    recognizeSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRecognitionInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierRecognition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listChannelHall: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                q?: string;
+                supplier?: string;
+                model?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HallList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getHallChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HallChannel"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    adminListSuppliers: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplier"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplier"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    fetchSupplierIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierIconInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierIcon"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     listForumBoards: {
         parameters: {
             query?: never;

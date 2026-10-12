@@ -138,6 +138,8 @@ type Channel struct {
 	ID              string
 	Owner           Owner
 	Name            string
+	Summary         string
+	Description     string
 	BaseURL         string
 	Status          Status
 	SuspendedReason *string
@@ -176,25 +178,29 @@ const (
 
 // NewChannel is a validated creation request.
 type NewChannel struct {
-	ID         string
-	OwnerID    string
-	Name       string
-	BaseURL    string
-	Credential EncryptedCredential
-	Status     Status
-	Advanced   Advanced
-	Models     []Model
+	ID          string
+	OwnerID     string
+	Name        string
+	Summary     string
+	Description string
+	BaseURL     string
+	Credential  EncryptedCredential
+	Status      Status
+	Advanced    Advanced
+	Models      []Model
 }
 
 // Update changes the given fields; nil fields stay unchanged. Advanced and
 // Models replace the whole block.
 type Update struct {
-	Name       *string
-	BaseURL    *string
-	Credential *EncryptedCredential
-	Status     *Status
-	Advanced   *Advanced
-	Models     *[]Model
+	Name        *string
+	Summary     *string
+	Description *string
+	BaseURL     *string
+	Credential  *EncryptedCredential
+	Status      *Status
+	Advanced    *Advanced
+	Models      *[]Model
 }
 
 type AdminFilter struct {

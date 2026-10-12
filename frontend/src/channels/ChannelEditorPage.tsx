@@ -1,3 +1,4 @@
+import { SupplierRecognition } from '../sharing/SupplierRecognition'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
@@ -20,6 +21,7 @@ import {
   Switch,
   Tabs,
   TextField,
+  TextareaField,
 } from '../ui'
 import { AdvancedFields } from './AdvancedFields'
 import {
@@ -130,6 +132,8 @@ function ChannelWizard() {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
+  const [blurb, setBlurb] = useState('')
+  const [description, setDescription] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [rows, setRows] = useState<ModelRow[]>([])
@@ -167,7 +171,7 @@ function ChannelWizard() {
   }
 
   const body = (status: 'listed' | 'unlisted') => ({
-    name: name.trim(),
+    name: name.trim(), summary: blurb.trim(), description: description.trim(),
     base_url: baseUrl.trim(),
     api_key: apiKey.trim(),
     status,
@@ -243,6 +247,9 @@ function ChannelWizard() {
               type="url"
               value={baseUrl}
             />
+            <TextField label="一句话简介" maxLength={160} value={blurb} onChange={(e) => setBlurb(e.target.value)} />
+            <TextareaField label="详细说明（Markdown）" maxLength={8000} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <SupplierRecognition baseURL={baseUrl} />
             <PasswordField autoComplete="off" label="上游 Key" onChange={(event) => setApiKey(event.target.value)} value={apiKey} />
             <InlineError>{error}</InlineError>
             <div className="form-actions">
@@ -373,6 +380,8 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
   const [section, setSection] = useState<'overview' | 'settings' | 'calls' | 'health'>('overview')
   const status = channelStatus(channel)
   const [name, setName] = useState(channel.name)
+  const [blurb, setBlurb] = useState(channel.summary)
+  const [description, setDescription] = useState(channel.description)
   const [baseUrl, setBaseUrl] = useState(channel.base_url)
   const [apiKey, setApiKey] = useState('')
   const [rows, setRows] = useState<ModelRow[]>(() => rowsFromChannel(channel))
@@ -391,7 +400,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
   const remove = useDeleteChannel()
 
   const body = () => ({
-    name: name.trim(),
+    name: name.trim(), summary: blurb.trim(), description: description.trim(),
     base_url: baseUrl.trim(),
     ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
     ...(channel.status === 'suspended' ? {} : { status: listed ? ('listed' as const) : ('unlisted' as const) }),
@@ -494,6 +503,9 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
                   <TextField label="名称" maxLength={64} onChange={(event) => setName(event.target.value)} value={name} />
                   <TextField inputMode="url" label="Base URL" onChange={(event) => setBaseUrl(event.target.value)} type="url" value={baseUrl} />
                 </div>
+                <SupplierRecognition baseURL={baseUrl} />
+                <TextField label="一句话简介" maxLength={160} value={blurb} onChange={(e) => setBlurb(e.target.value)} />
+                <TextareaField label="详细说明（Markdown）" maxLength={8000} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
                 <PasswordField
                   autoComplete="off"
                   hint="已保存，留空不修改"

@@ -5,6 +5,7 @@ package postgres
 
 import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/forumpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/supplierpg"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -20,6 +21,7 @@ import (
 )
 
 type Store struct {
+	Suppliers *supplierpg.Store
 	// Books is where the stores that book (ledger, gateway, C2C, observe)
 	// report what their ledger transactions did; Cached subscribes the
 	// gateway's balance cache to it.
@@ -42,18 +44,19 @@ type Store struct {
 func New(pool *pgxpool.Pool) *Store {
 	books := ledgerpg.NewBooks()
 	return &Store{
-		Books:    books,
-		Forum:    forumpg.NewStore(pool),
-		Identity: identitypg.NewStore(pool),
-		Catalog:  catalogpg.NewStore(pool),
-		Settings: settingspg.NewStore(pool),
-		Audit:    auditpg.NewStore(pool),
-		Ledger:   ledgerpg.NewStore(pool, books),
-		Channels: channelpg.NewStore(pool),
-		Keys:     keypg.NewStore(pool),
-		Routes:   keypg.NewRoutes(pool),
-		Gateway:  gatewaypg.NewStore(pool, books),
-		C2C:      c2cpg.NewStore(pool, books),
-		Observe:  observepg.NewStore(pool, books),
+		Books:     books,
+		Suppliers: supplierpg.NewStore(pool),
+		Forum:     forumpg.NewStore(pool),
+		Identity:  identitypg.NewStore(pool),
+		Catalog:   catalogpg.NewStore(pool),
+		Settings:  settingspg.NewStore(pool),
+		Audit:     auditpg.NewStore(pool),
+		Ledger:    ledgerpg.NewStore(pool, books),
+		Channels:  channelpg.NewStore(pool),
+		Keys:      keypg.NewStore(pool),
+		Routes:    keypg.NewRoutes(pool),
+		Gateway:   gatewaypg.NewStore(pool, books),
+		C2C:       c2cpg.NewStore(pool, books),
+		Observe:   observepg.NewStore(pool, books),
 	}
 }

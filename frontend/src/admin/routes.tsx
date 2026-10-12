@@ -17,6 +17,7 @@ export const adminRoutes = (
       <Route lazy={async () => ({ Component: (await import('./PointsPage')).PointsPage })} path="points" />
       <Route lazy={async () => ({ Component: (await import('./UsersPage')).UsersPage })} path="users" />
       <Route lazy={async () => ({ Component: (await import('./ModelsPage')).ModelsPage })} path="models" />
+      <Route lazy={async () => ({ Component: (await import('./SuppliersPage')).SuppliersPage })} path="suppliers" />
       <Route lazy={async () => ({ Component: (await import('./ChannelsPage')).ChannelsPage })} path="channels" />
       <Route
         lazy={async () => ({ Component: (await import('./ChannelsPage')).ChannelDetailPage })}

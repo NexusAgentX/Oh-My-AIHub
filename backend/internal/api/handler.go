@@ -18,6 +18,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
 const (
@@ -26,11 +27,12 @@ const (
 )
 
 type Dependencies struct {
-	Forum    *forum.Service
-	Identity *identity.Service
-	Catalog  *catalog.Service
-	Ledger   *ledger.Service
-	Settings *settings.Service
+	Suppliers *supplier.Service
+	Forum     *forum.Service
+	Identity  *identity.Service
+	Catalog   *catalog.Service
+	Ledger    *ledger.Service
+	Settings  *settings.Service
 	// RateSync fetches the USD/CNY rate on demand; nil disables manual sync.
 	RateSync          *settings.RateSyncer
 	Audit             *audit.Service
@@ -48,6 +50,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	suppliers         *supplier.Service
 	forum             *forum.Service
 	identity          *identity.Service
 	catalog           *catalog.Service
@@ -79,6 +82,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		suppliers:         dependencies.Suppliers,
 		forum:             dependencies.Forum,
 		identity:          dependencies.Identity,
 		catalog:           dependencies.Catalog,
@@ -110,6 +114,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerAdminSettingsRoutes(routes)
 	application.registerKeyRoutes(routes)
 	application.registerBrowseRoutes(routes)
+	application.registerSupplierRoutes(routes)
 	application.registerChannelRoutes(routes)
 	application.registerGatewayRoutes(routes)
 	application.registerC2CRoutes(routes)

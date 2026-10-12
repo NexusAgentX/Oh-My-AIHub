@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelChannel, RoutingMode } from '../api/types'
@@ -121,7 +122,7 @@ export function RoutingEditor({
                   </button>
                 )}
                 <div className="routing-name">
-                  <strong>{channel.name}</strong>
+                  <Link draggable={false} to={`/channel-hall/${channel.id}`}>{channel.name}</Link>
                   <span className="routing-owner muted-copy">
                     {channel.is_mine ? '由你提供' : `由 ${channel.owner.display_name} 提供`}
                   </span>
