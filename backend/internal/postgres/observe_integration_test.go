@@ -97,8 +97,8 @@ func TestObserveCallListFiltersSummaryAndPaging(t *testing.T) {
 	if summary["charged"] != "0.08008" || summary["input_tokens"] != float64(2000) || summary["output_tokens"] != float64(1000) || summary["total_tokens"] != float64(3000) {
 		t.Fatalf("summary = %v", summary)
 	}
-	if summary["ttft_p50_ms"] == nil || summary["ttft_p95_ms"] == nil {
-		t.Fatalf("ttft percentiles missing: %v", summary)
+	if summary["ttft_p50_ms"] != nil || summary["ttft_p95_ms"] != nil {
+		t.Fatalf("non-stream calls entered streaming ttft percentiles: %v", summary)
 	}
 	newest := asMap(t, items[0])
 	if newest["id"] != o.succeeded || newest["charged"] != expectedCharge || newest["tag"] != "second" || newest["attempt_count"] == nil {
@@ -1188,8 +1188,8 @@ func TestObserveMetricsExposeCoreSeriesWithoutUserLabels(t *testing.T) {
 		`aihub_cost_points_total{model="gpt-test"} 0.08008`,
 		`aihub_upstream_attempts_total{channel="` + o.brokenID + `",result="error",status_class="5xx"} 2`,
 		`aihub_upstream_attempts_total{channel="` + o.goodID + `",result="success",status_class="2xx"} 2`,
-		`aihub_first_token_latency_seconds_count{format="openai_chat",model="gpt-test"} 2`,
-		`aihub_upstream_latency_seconds_count{format="openai_chat",model="gpt-test"} 4`,
+		`aihub_upstream_latency_seconds_count{channel="` + o.brokenID + `",format="openai_chat",model="gpt-test",stream="false"} 2`,
+		`aihub_upstream_latency_seconds_count{channel="` + o.goodID + `",format="openai_chat",model="gpt-test",stream="false"} 2`,
 		`aihub_channel_up{channel="` + o.goodID + `"} 1`,
 		`aihub_points_circulating 0`,
 		`aihub_points_credit_issued 0.08008`,

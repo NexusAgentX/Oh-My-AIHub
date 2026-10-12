@@ -139,8 +139,13 @@ func main() {
 		return append(ids, custom...), err
 	}
 	bus := gateway.NewBus()
+	var platformMetrics *metrics.Metrics
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
-		bus.Publish(gateway.Event{Kind: channelEventKind(kind), At: time.Now(), ChannelID: channelID, Detail: reason})
+		event := gateway.Event{Kind: channelEventKind(kind), At: time.Now(), ChannelID: channelID, Detail: reason}
+		bus.Publish(event)
+		if platformMetrics != nil {
+			platformMetrics.Publish(event)
+		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -149,9 +154,10 @@ func main() {
 			}
 		}()
 	})
+	platformMetrics = metrics.New(func(channelID string, now time.Time) bool { return !runtime.CooldownUntil(channelID, now).IsZero() })
 	engine := gateway.NewEngine(gateway.Dependencies{
 		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
-		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: bus, Logger: logger, Runtime: runtime,
+		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
 	// An edit of a channel (settings, models, formats, suspension) clears what the
 	// 4xx anomaly rule counted against it before, and a channel ranked last for
@@ -183,8 +189,7 @@ func main() {
 
 	observeService := observe.NewService(store.Observe)
 	feed := observe.NewFeed(observeService, bus, logger)
-	platformMetrics := metrics.New(func(channelID string, now time.Time) bool { return !runtime.CooldownUntil(channelID, now).IsZero() })
-	feed.AddObserver(platformMetrics)
+	platformMetrics.SetFeedHealth(bus.Dropped, feed.Dropped, feed.ReadFailures)
 	platformMetrics.SetEgress(outboundPolicy.EgressStats)
 	go feed.Run(backgroundContext)
 	go platformMetrics.Run(backgroundContext, observeService, time.Minute, logger)

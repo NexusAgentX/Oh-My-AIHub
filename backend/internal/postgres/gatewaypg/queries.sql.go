@@ -849,6 +849,20 @@ func (q *Queries) ResponseChannel(ctx context.Context, arg ResponseChannelParams
 	return final_channel_id, err
 }
 
+const setCallDiagnostics = `-- name: SetCallDiagnostics :exec
+UPDATE calls SET diagnostics=$2, completed_at=clock_timestamp() WHERE id=$1
+`
+
+type SetCallDiagnosticsParams struct {
+	ID          string
+	Diagnostics []byte
+}
+
+func (q *Queries) SetCallDiagnostics(ctx context.Context, arg SetCallDiagnosticsParams) error {
+	_, err := q.db.Exec(ctx, setCallDiagnostics, arg.ID, arg.Diagnostics)
+	return err
+}
+
 const setCallLedgerTx = `-- name: SetCallLedgerTx :exec
 UPDATE calls SET ledger_tx_id = $2 WHERE id = $1
 `

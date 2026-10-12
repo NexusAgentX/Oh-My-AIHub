@@ -33,6 +33,7 @@ export function usePointsPeriod(from?: string, to?: string) {
 }
 
 export type EntryParams = {
+ transaction_id?: string
   /** 汇总方式；省略则不返回 summary */
   group?: 'day' | 'key'
   type?: string

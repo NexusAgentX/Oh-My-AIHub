@@ -34,6 +34,7 @@ afterEach(async () => {
   await act(async () => root.unmount())
   client.clear()
   host.remove()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 async function waitForUI(assertion: () => void) {
@@ -109,7 +110,7 @@ it('opens recent anomalies separately and pages failures and health events', asy
   expect(host.querySelectorAll('.channel-events li')).toHaveLength(3)
 })
 
-it('keeps live calls bounded and returns to the first page when live mode starts', async () => {
+it('keeps filtered live calls bounded and ignores incomplete event rows', async () => {
   const sources: Array<{ onmessage?: (event: { data: string }) => void }> = []
   vi.stubGlobal('EventSource', class {
     onmessage?: (event: { data: string }) => void
@@ -126,8 +127,14 @@ it('keeps live calls bounded and returns to the first page when live mode starts
     for (let i = 0; i < 30; i++) sources[0]?.onmessage?.({ data: JSON.stringify({ id: `live-${i}`, model_id: `live-model-${i}`, created_at: '2026-10-12T12:00:00Z', format: 'openai_chat', stream: true, outcome: 'succeeded', usage: {}, revenue: '1', error: null }) })
   })
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
-  expect(host.textContent).toContain('live-model-29')
+  expect(host.textContent).not.toContain('live-model-29')
+  expect(host.textContent).toContain('call-model-0')
   expect([...host.querySelectorAll('button')].find((b) => b.textContent === '下一页')?.disabled).toBe(true)
+  const reads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/calls?')).length
+  const before = reads()
+  // 开放结束时间的渠道查询参数不变，仍应定时刷新服务端筛选结果。
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3100)) })
+  expect(reads()).toBeGreaterThan(before)
 })
 
 

@@ -5,6 +5,26 @@ import { formatLabels, formats, outcomeLabels, outcomeOptions } from './labels'
 import type { CallListParams } from './queries'
 
 export type CallFilterState = {
+  stream?: string
+  min_duration_ms?: string
+  max_duration_ms?: string
+  min_tokens?: string
+  max_tokens?: string
+  min_cost?: string
+  max_cost?: string
+  min_attempts?: string
+  max_attempts?: string
+  status_code?: string
+  error_code?: string
+  end_reason?: string
+  delivery?: string
+  usage_status?: string
+  billed?: string
+  from?: string
+  to?: string
+  channel_id?: string
+  attempt_channel_id?: string
+
   range: RangePreset
   model: string
   apiKeyId: string
@@ -25,6 +45,13 @@ export const emptyCallFilters: CallFilterState = {
   requestId: '',
 }
 
+function toLocalInput(iso?: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isRequestId(value: string) {
@@ -33,7 +60,26 @@ export function isRequestId(value: string) {
 
 export function filtersToParams(filters: CallFilterState, now = new Date()): CallListParams {
   return {
-    from: filters.requestId ? undefined : rangeFrom(filters.range, now),
+    from: filters.requestId ? undefined : filters.from || rangeFrom(filters.range, now),
+    to: filters.requestId ? undefined : filters.to || (filters.range === 'all' ? undefined : now.toISOString()),
+    stream: filters.stream === undefined || filters.stream === '' ? undefined : filters.stream === 'true',
+    min_duration_ms: filters.min_duration_ms ? Number(filters.min_duration_ms) : undefined,
+    max_duration_ms: filters.max_duration_ms ? Number(filters.max_duration_ms) : undefined,
+    min_tokens: filters.min_tokens ? Number(filters.min_tokens) : undefined,
+    max_tokens: filters.max_tokens ? Number(filters.max_tokens) : undefined,
+    min_cost: filters.min_cost || undefined,
+    max_cost: filters.max_cost || undefined,
+    min_attempts: filters.min_attempts ? Number(filters.min_attempts) : undefined,
+    max_attempts: filters.max_attempts ? Number(filters.max_attempts) : undefined,
+    status_code: filters.status_code ? Number(filters.status_code) : undefined,
+    error_code: filters.error_code || undefined,
+    end_reason: filters.end_reason || undefined,
+    delivery: filters.delivery || undefined,
+    usage_status: filters.usage_status || undefined,
+    billed: filters.billed === undefined || filters.billed === '' ? undefined : filters.billed === 'true',
+    channel_id: filters.channel_id || undefined,
+    attempt_channel_id: filters.attempt_channel_id || undefined,
+
     request_id: filters.requestId || undefined,
     model: filters.model || undefined,
     api_key_id: filters.apiKeyId || undefined,
@@ -64,7 +110,12 @@ function FilterSelect({
   return (
     <label className="filter-select">
       <span className="visually-hidden">{label}</span>
-      <select aria-label={label} className="input select-input" onChange={(event) => onChange(event.target.value)} value={value}>
+      <select
+        aria-label={label}
+        className="input select-input"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
         <option value="">{label}：全部</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -112,7 +163,7 @@ export function CallFilterBar({
   }
   return (
     <div className="call-filters">
-      <Segmented label="时间范围" onChange={(range) => set({ range })} options={rangeOptions} value={value.range} />
+      <Segmented label="时间范围" onChange={(range) => set({ range,from:undefined,to:undefined })} options={rangeOptions} value={value.range} />
       {models && (
         <FilterSelect
           label="模型"
@@ -157,6 +208,215 @@ export function CallFilterBar({
           value={tag}
         />
       </form>
+      <details className="call-advanced">
+        <summary>高级筛选</summary>
+        <div className="call-advanced-grid">
+          <FilterSelect
+            label="响应方式"
+            value={value.stream ?? ''}
+            onChange={(stream) => set({ stream })}
+            options={[
+              { value: 'true', label: '流式' },
+              { value: 'false', label: '非流式' },
+            ]}
+          />
+          <FilterSelect
+            label="记账"
+            value={value.billed ?? ''}
+            onChange={(billed) => set({ billed })}
+            options={[
+              { value: 'true', label: '已记账' },
+              { value: 'false', label: '未记账' },
+            ]}
+          />
+          <FilterSelect
+            label="交付"
+            value={value.delivery ?? ''}
+            onChange={(delivery) => set({ delivery })}
+            options={[
+              { value: 'complete', label: '完整' },
+              { value: 'client_disconnected', label: '客户端断开' },
+              { value: 'interrupted', label: '中断' },
+              { value: 'not_started', label: '未开始' },
+            ]}
+          />
+          <FilterSelect
+            label="用量"
+            value={value.usage_status ?? ''}
+            onChange={(usage_status) => set({ usage_status })}
+            options={[
+              { value: 'reported', label: '已读到' },
+              { value: 'missing', label: '未读到' },
+              { value: 'parse_limit', label: '解析超限' },
+              { value: 'not_observed', label: '未观察' },
+            ]}
+          />
+          <label>
+            最短耗时 ms
+            <input
+              className="input"
+              aria-label="最短耗时 ms"
+              type="number"
+              min="0"
+              step="1"
+              value={value.min_duration_ms ?? ''}
+              onChange={(e) => set({ min_duration_ms: e.target.value })}
+            />
+          </label>
+          <label>
+            最长耗时 ms
+            <input
+              className="input"
+              aria-label="最长耗时 ms"
+              type="number"
+              min="0"
+              step="1"
+              value={value.max_duration_ms ?? ''}
+              onChange={(e) => set({ max_duration_ms: e.target.value })}
+            />
+          </label>
+          <label>
+            最少 tokens
+            <input
+              className="input"
+              aria-label="最少 tokens"
+              type="number"
+              min="0"
+              step="1"
+              value={value.min_tokens ?? ''}
+              onChange={(e) => set({ min_tokens: e.target.value })}
+            />
+          </label>
+          <label>
+            最多 tokens
+            <input
+              className="input"
+              aria-label="最多 tokens"
+              type="number"
+              min="0"
+              step="1"
+              value={value.max_tokens ?? ''}
+              onChange={(e) => set({ max_tokens: e.target.value })}
+            />
+          </label>
+          <label>
+            最低费用
+            <input
+              className="input"
+              aria-label="最低费用"
+              type="number"
+              min="0"
+              step="any"
+              value={value.min_cost ?? ''}
+              onChange={(e) => set({ min_cost: e.target.value })}
+            />
+          </label>
+          <label>
+            最高费用
+            <input
+              className="input"
+              aria-label="最高费用"
+              type="number"
+              min="0"
+              step="any"
+              value={value.max_cost ?? ''}
+              onChange={(e) => set({ max_cost: e.target.value })}
+            />
+          </label>
+          <label>
+            最少尝试
+            <input
+              className="input"
+              aria-label="最少尝试"
+              type="number"
+              min="0"
+              step="1"
+              value={value.min_attempts ?? ''}
+              onChange={(e) => set({ min_attempts: e.target.value })}
+            />
+          </label>
+          <label>
+            最多尝试
+            <input
+              className="input"
+              aria-label="最多尝试"
+              type="number"
+              min="0"
+              step="1"
+              value={value.max_attempts ?? ''}
+              onChange={(e) => set({ max_attempts: e.target.value })}
+            />
+          </label>
+          <label>
+            尝试渠道 ID
+            <input
+              className="input"
+              aria-label="尝试渠道 ID"
+              value={value.attempt_channel_id ?? ''}
+              onChange={(e) => set({ attempt_channel_id: e.target.value.trim() })}
+            />
+          </label>
+          <label>
+            上游状态码
+            <input
+              className="input"
+              aria-label="上游状态码"
+              type="number"
+              min="0"
+              step="1"
+              value={value.status_code ?? ''}
+              onChange={(e) => set({ status_code: e.target.value })}
+            />
+          </label>
+          <label>
+            上游错误码
+            <input
+              className="input"
+              aria-label="上游错误码"
+              type="text"
+              min="0"
+              step="1"
+              value={value.error_code ?? ''}
+              onChange={(e) => set({ error_code: e.target.value })}
+            />
+          </label>
+          <label>
+            尝试结束原因
+            <input
+              className="input"
+              aria-label="尝试结束原因"
+              type="text"
+              min="0"
+              step="1"
+              value={value.end_reason ?? ''}
+              onChange={(e) => set({ end_reason: e.target.value })}
+            />
+          </label>
+          <label>
+            开始时间
+            <input
+              className="input"
+              aria-label="开始时间"
+              type="datetime-local"
+              value={toLocalInput(value.from)}
+              onChange={(e) => set({ from: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+            />
+          </label>
+          <label>
+            结束时间
+            <input
+              className="input"
+              aria-label="结束时间"
+              type="datetime-local"
+              value={toLocalInput(value.to)}
+              onChange={(e) => set({ to: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+            />
+          </label>
+          <Button variant="quiet" onClick={() => { setTag(''); setRequestId(''); setIdError(''); onChange({ ...emptyCallFilters }) }}>
+            清除筛选
+          </Button>
+        </div>
+      </details>
       <form className="filter-inline-form filter-id-form" onSubmit={submitId}>
         <input
           aria-describedby={idError ? 'call-request-id-error' : undefined}

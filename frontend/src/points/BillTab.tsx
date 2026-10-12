@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { PointsEntry, PointsPeriod, TransactionType } from '../api/types'
 import { useKeys } from '../keys/queries'
 import { amountSign, formatPoints } from '../money/format'
@@ -75,6 +75,8 @@ function Reconciliation({ from, to }: { from?: string; to?: string }) {
 }
 
 export function BillTab() {
+ const [search,setSearch]=useSearchParams()
+ const transactionID=search.get('transaction')||undefined
   const [month, setMonth] = useState(currentMonth())
   const [type, setType] = useState<'' | TransactionType>('')
   const [keyId, setKeyId] = useState('')
@@ -83,7 +85,7 @@ export function BillTab() {
   const [exporting, setExporting] = useState(false)
   const keys = useKeys()
   const range = monthRange(month)
-  const params: EntryParams = { ...range, type: type || undefined, api_key_id: keyId || undefined }
+  const params: EntryParams = { ...(transactionID?{transaction_id:transactionID}:range), type: type || undefined, api_key_id: keyId || undefined }
   const entries = usePointsEntries({ ...params, group: mode === 'entries' ? undefined : mode })
   const rows = entries.data?.pages.flatMap((page) => page.items) ?? []
   const summary = entries.data?.pages[0]?.summary
@@ -102,11 +104,12 @@ export function BillTab() {
 
   return (
     <div className="bill-tab">
-      <Reconciliation from={range.from} to={range.to} />
+      {!transactionID&&<Reconciliation from={range.from} to={range.to} />}
+ {transactionID&&<div className="call-drill"><span>交易 {transactionID}</span><Button variant="quiet" onClick={()=>{const next=new URLSearchParams(search);next.delete("transaction");setSearch(next)}}>清除交易筛选</Button></div>}
       <div className="call-filters">
         <label className="filter-select">
           <span className="visually-hidden">月份</span>
-          <input aria-label="月份" className="input" onChange={(event) => setMonth(event.target.value)} type="month" value={month} />
+          <input disabled={Boolean(transactionID)} aria-label="月份" className="input" onChange={(event) => setMonth(event.target.value)} type="month" value={month} />
         </label>
         <label className="filter-select">
           <span className="visually-hidden">类型</span>
@@ -159,7 +162,7 @@ export function BillTab() {
                 label="按天汇总"
               />
             ) : (
-              <EmptyState mascot={false} title="本月没有账单" />
+              <EmptyState mascot={false} title={transactionID?"没有匹配的账单":"本月没有账单"} />
             )
           }
           if (mode === 'key') {
@@ -180,7 +183,7 @@ export function BillTab() {
           }
           return (
             <div className="panel panel-flush">
-              <DataTable caption="账单" columns={columns} empty={<EmptyState title="本月没有账单" />} rowKey={(entry) => entry.id} rows={data} />
+              <DataTable caption="账单" columns={columns} empty={<EmptyState title={transactionID?"没有匹配的账单":"本月没有账单"} />} rowKey={(entry) => entry.id} rows={data} />
               {entries.hasNextPage && (
                 <div className="table-pagination">
                   <Button loading={entries.isFetchingNextPage} onClick={() => void entries.fetchNextPage()} size="sm" type="button" variant="secondary">

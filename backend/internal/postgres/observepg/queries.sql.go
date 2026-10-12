@@ -12,6 +12,337 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
+const analyzeCalls = `-- name: AnalyzeCalls :many
+WITH filtered AS (
+ SELECT c.id, c.account_id, c.api_key_id, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.client_user_agent, c.routing_mode, c.routing_source, c.outcome, c.final_channel_id, c.attempts, c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens, c.price_snapshot, c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms, c.output_tokens_per_second, c.inter_token_p50_ms, c.inter_token_p95_ms, c.response_bytes, c.upstream_response_id, c.ledger_tx_id, c.created_at, c.completed_at, c.diagnostics, CASE $1::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS group_key, CASE $2::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS split_key,
+ coalesce(ch.name,'') AS channel_name,coalesce(k.name,'') AS key_name,a.display_name AS account_name,
+ CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano+c.fee_nano END AS charged,
+ (SELECT coalesce(sum((t.value->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) WITH ORDINALITY t(value,position) WHERE t.position<jsonb_array_length(c.attempts)) AS fallback_ms,
+ jsonb_array_length(c.attempts) AS attempt_count,
+ (SELECT count(*) FROM jsonb_array_elements(c.attempts) t WHERE t->>'end_reason'='completed') AS attempt_success,
+ (SELECT coalesce(sum((t->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) t) AS upstream_ms
+ FROM calls c
+ LEFT JOIN channels ch ON ch.id=c.final_channel_id
+ LEFT JOIN api_keys k ON k.id=c.api_key_id
+ JOIN accounts a ON a.id=c.account_id
+ WHERE ($4::uuid IS NULL OR c.account_id = $4::uuid)
+  AND ($5::uuid IS NULL
+       OR c.final_channel_id = $5::uuid
+       OR c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', $6::text))))
+  AND ($7::uuid IS NULL OR c.final_channel_id = $7::uuid)
+  AND ($8::uuid IS NULL OR c.api_key_id = $8::uuid)
+  AND ($9::text IS NULL OR c.model_id = $9::text OR c.requested_model = $9::text)
+  AND ($10::text IS NULL OR c.format = $10::text)
+  AND ($11::text IS NULL OR c.outcome = $11::text)
+  AND ($12::text IS NULL OR c.tag = $12::text)
+  AND ($13::uuid IS NULL OR c.id = $13::uuid)
+  AND ($14::text = '' OR (CASE $14::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $15::text)
+  AND ($16::text = '' OR (CASE $16::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $17::text)
+  AND ($18::boolean IS NULL OR c.stream=$18::boolean)
+  AND ($19::int IS NULL OR jsonb_array_length(c.attempts)>=$19::int)
+  AND ($20::int IS NULL OR jsonb_array_length(c.attempts)<=$20::int)
+  AND ($21::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$21::boolean)
+  AND ($22::text IS NULL OR c.diagnostics->>'delivery'=$22::text)
+  AND ($23::text IS NULL OR c.diagnostics->>'usage_status'=$23::text)
+  AND (($24::int IS NULL AND $25::text IS NULL AND $26::text IS NULL AND $27::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE ($24::int IS NULL OR (att->>'status_code')::int=$24::int)
+      AND ($25::text IS NULL OR att->>'error_code'=$25::text)
+      AND ($26::text IS NULL OR att->>'end_reason'=$26::text)
+      AND ($27::text IS NULL OR att->'channel'->>'id'=$27::text)
+      AND ($6::text IS NULL OR att->'channel'->>'id'=$6::text)))
+  AND ($28::timestamptz IS NULL OR c.created_at >= $28::timestamptz)
+  AND ($29::timestamptz IS NULL OR c.created_at < $29::timestamptz)
+  AND ($30::int IS NULL OR c.duration_ms >= $30::int)
+  AND ($31::int IS NULL OR c.duration_ms <= $31::int)
+  AND ($32::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $32::bigint)
+  AND ($33::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $33::bigint)
+  AND ($34::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $34::bigint)
+  AND ($35::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $35::bigint)
+)
+SELECT group_key,split_key,
+ CASE $1::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE group_key END::text AS label,
+ CASE $2::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE split_key END::text AS split_label,
+ (count(*) FILTER (WHERE attempt_count>0 AND outcome<>'in_progress'))::bigint AS attempted,
+ (count(*) FILTER (WHERE stream AND outcome<>'in_progress'))::bigint AS stream_finished,
+ (count(*) FILTER (WHERE stream AND outcome IN ('interrupted','client_disconnected')))::bigint AS stream_interrupted,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY fallback_ms) FILTER (WHERE attempt_count>1),-1))::double precision AS fallback_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY fallback_ms) FILTER (WHERE attempt_count>1),-1))::double precision AS fallback_p95,
+ (count(*))::bigint AS calls,
+ (count(*) FILTER (WHERE outcome<>'in_progress'))::bigint AS finished,
+ (count(*) FILTER (WHERE outcome IN ('succeeded','succeeded_unbilled')))::bigint AS succeeded,
+ (count(*) FILTER (WHERE attempts->0->>'end_reason'='completed'))::bigint AS first_succeeded,
+ (count(*) FILTER (WHERE jsonb_array_length(attempts)>1))::bigint AS retried,
+ (count(*) FILTER (WHERE jsonb_array_length(attempts)>1 AND outcome IN ('succeeded','succeeded_unbilled')))::bigint AS recovered,
+ (coalesce(sum(attempt_count),0))::bigint AS attempts,
+ (coalesce(sum(attempt_success),0))::bigint AS attempt_succeeded,
+ (count(*) FILTER (WHERE diagnostics->>'delivery'='complete'))::bigint AS delivered,
+ (count(*) FILTER (WHERE diagnostics->>'delivery' IN ('complete','interrupted','client_disconnected')))::bigint AS delivery_known,
+ (count(*) FILTER (WHERE ledger_tx_id IS NOT NULL))::bigint AS billed,
+ (count(*) FILTER (WHERE diagnostics->>'usage_status'='reported'))::bigint AS usage_reported,
+ (count(*) FILTER (WHERE diagnostics->>'usage_status' IN ('missing','parse_limit')))::bigint AS usage_missing,
+ (count(*) FILTER (WHERE stream))::bigint AS streamed,
+ (coalesce(sum(input_tokens),0))::bigint AS input_tokens,
+ (coalesce(sum(output_tokens),0))::bigint AS output_tokens,
+ (coalesce(sum(cache_read_tokens),0))::bigint AS cache_read_tokens,
+ (coalesce(sum(cache_write_tokens),0))::bigint AS cache_write_tokens,
+ (coalesce(sum(charged),0))::bigint AS charged_nano,
+ (coalesce(sum(CASE WHEN ledger_tx_id IS NOT NULL THEN fee_nano ELSE 0 END),0))::bigint AS fee_nano,
+ (count(*) FILTER (WHERE outcome='interrupted'))::bigint AS interrupted,
+ (count(*) FILTER (WHERE outcome='client_disconnected'))::bigint AS disconnected,
+ (count(*) FILTER (WHERE outcome='succeeded_unbilled'))::bigint AS unbilled,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft_ms) FILTER (WHERE stream),-1))::double precision AS ttft_p99,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE true),-1))::double precision AS duration_p99,
+ (coalesce(percentile_cont(0.1) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p10,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY output_tokens_per_second) FILTER (WHERE stream),-1))::double precision AS speed_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p99,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (diagnostics->>'max_frame_gap_ms')::double precision) FILTER (WHERE stream),-1))::double precision AS max_gap_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p95,
+ (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p99,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='authentication' LIMIT 1)),-1))::double precision AS authentication_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='request' LIMIT 1)),-1))::double precision AS request_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='open_call' LIMIT 1)),-1))::double precision AS open_call_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='admission' LIMIT 1)),-1))::double precision AS admission_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='routing' LIMIT 1)),-1))::double precision AS routing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='pricing' LIMIT 1)),-1))::double precision AS pricing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='settlement' LIMIT 1)),-1))::double precision AS settlement_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='client_write' LIMIT 1)),-1))::double precision AS client_write_p95
+FROM filtered
+GROUP BY group_key,split_key
+ORDER BY group_key,split_key
+LIMIT 1001
+`
+
+type AnalyzeCallsParams struct {
+	GroupBy          string
+	SplitBy          string
+	BucketSeconds    int32
+	AccountID        *string
+	ScopeChannelID   *string
+	ScopeChannelText *string
+	FinalChannelID   *string
+	ApiKeyID         *string
+	Model            *string
+	Format           *string
+	Outcome          *string
+	Tag              *string
+	RequestID        *string
+	Dimension        string
+	DimensionValue   string
+	SecondDimension  string
+	SecondValue      string
+	Stream           *bool
+	MinAttempts      *int32
+	MaxAttempts      *int32
+	Billed           *bool
+	Delivery         *string
+	UsageStatus      *string
+	StatusCode       *int32
+	ErrorCode        *string
+	EndReason        *string
+	AttemptChannel   *string
+	FromTime         *time.Time
+	ToTime           *time.Time
+	MinDuration      *int32
+	MaxDuration      *int32
+	MinTokens        *int64
+	MaxTokens        *int64
+	MinCharged       *int64
+	MaxCharged       *int64
+}
+
+type AnalyzeCallsRow struct {
+	GroupKey          string
+	SplitKey          string
+	Label             string
+	SplitLabel        string
+	Attempted         int64
+	StreamFinished    int64
+	StreamInterrupted int64
+	FallbackP50       float64
+	FallbackP95       float64
+	Calls             int64
+	Finished          int64
+	Succeeded         int64
+	FirstSucceeded    int64
+	Retried           int64
+	Recovered         int64
+	Attempts          int64
+	AttemptSucceeded  int64
+	Delivered         int64
+	DeliveryKnown     int64
+	Billed            int64
+	UsageReported     int64
+	UsageMissing      int64
+	Streamed          int64
+	InputTokens       int64
+	OutputTokens      int64
+	CacheReadTokens   int64
+	CacheWriteTokens  int64
+	ChargedNano       int64
+	FeeNano           int64
+	Interrupted       int64
+	Disconnected      int64
+	Unbilled          int64
+	TtftP50           float64
+	TtftP95           float64
+	TtftP99           float64
+	DurationP50       float64
+	DurationP95       float64
+	DurationP99       float64
+	SpeedP10          float64
+	SpeedP50          float64
+	SpeedP95          float64
+	GapP50            float64
+	GapP95            float64
+	GapP99            float64
+	MaxGapP95         float64
+	CostP50           float64
+	CostP95           float64
+	CostP99           float64
+	RetryP50          float64
+	RetryP95          float64
+	OverheadP50       float64
+	OverheadP95       float64
+	AuthenticationP95 float64
+	RequestP95        float64
+	OpenCallP95       float64
+	AdmissionP95      float64
+	RoutingP95        float64
+	PricingP95        float64
+	SettlementP95     float64
+	ClientWriteP95    float64
+}
+
+func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]AnalyzeCallsRow, error) {
+	rows, err := q.db.Query(ctx, analyzeCalls,
+		arg.GroupBy,
+		arg.SplitBy,
+		arg.BucketSeconds,
+		arg.AccountID,
+		arg.ScopeChannelID,
+		arg.ScopeChannelText,
+		arg.FinalChannelID,
+		arg.ApiKeyID,
+		arg.Model,
+		arg.Format,
+		arg.Outcome,
+		arg.Tag,
+		arg.RequestID,
+		arg.Dimension,
+		arg.DimensionValue,
+		arg.SecondDimension,
+		arg.SecondValue,
+		arg.Stream,
+		arg.MinAttempts,
+		arg.MaxAttempts,
+		arg.Billed,
+		arg.Delivery,
+		arg.UsageStatus,
+		arg.StatusCode,
+		arg.ErrorCode,
+		arg.EndReason,
+		arg.AttemptChannel,
+		arg.FromTime,
+		arg.ToTime,
+		arg.MinDuration,
+		arg.MaxDuration,
+		arg.MinTokens,
+		arg.MaxTokens,
+		arg.MinCharged,
+		arg.MaxCharged,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AnalyzeCallsRow
+	for rows.Next() {
+		var i AnalyzeCallsRow
+		if err := rows.Scan(
+			&i.GroupKey,
+			&i.SplitKey,
+			&i.Label,
+			&i.SplitLabel,
+			&i.Attempted,
+			&i.StreamFinished,
+			&i.StreamInterrupted,
+			&i.FallbackP50,
+			&i.FallbackP95,
+			&i.Calls,
+			&i.Finished,
+			&i.Succeeded,
+			&i.FirstSucceeded,
+			&i.Retried,
+			&i.Recovered,
+			&i.Attempts,
+			&i.AttemptSucceeded,
+			&i.Delivered,
+			&i.DeliveryKnown,
+			&i.Billed,
+			&i.UsageReported,
+			&i.UsageMissing,
+			&i.Streamed,
+			&i.InputTokens,
+			&i.OutputTokens,
+			&i.CacheReadTokens,
+			&i.CacheWriteTokens,
+			&i.ChargedNano,
+			&i.FeeNano,
+			&i.Interrupted,
+			&i.Disconnected,
+			&i.Unbilled,
+			&i.TtftP50,
+			&i.TtftP95,
+			&i.TtftP99,
+			&i.DurationP50,
+			&i.DurationP95,
+			&i.DurationP99,
+			&i.SpeedP10,
+			&i.SpeedP50,
+			&i.SpeedP95,
+			&i.GapP50,
+			&i.GapP95,
+			&i.GapP99,
+			&i.MaxGapP95,
+			&i.CostP50,
+			&i.CostP95,
+			&i.CostP99,
+			&i.RetryP50,
+			&i.RetryP95,
+			&i.OverheadP50,
+			&i.OverheadP95,
+			&i.AuthenticationP95,
+			&i.RequestP95,
+			&i.OpenCallP95,
+			&i.AdmissionP95,
+			&i.RoutingP95,
+			&i.PricingP95,
+			&i.SettlementP95,
+			&i.ClientWriteP95,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const callStats = `-- name: CallStats :one
 SELECT count(*)::bigint AS calls,
        count(*) FILTER (WHERE c.outcome IN ('succeeded', 'succeeded_unbilled'))::bigint AS succeeded,
@@ -20,8 +351,8 @@ SELECT count(*)::bigint AS calls,
        coalesce(sum(c.input_tokens), 0)::bigint AS input_tokens,
        coalesce(sum(c.output_tokens), 0)::bigint AS output_tokens,
        coalesce(sum(c.cache_write_tokens + c.cache_read_tokens), 0)::bigint AS cache_tokens,
-       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p50_ms,
-       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p95_ms
+       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.stream AND c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p50_ms,
+       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY c.ttft_ms) FILTER (WHERE c.stream AND c.ttft_ms IS NOT NULL), -1)::double precision AS ttft_p95_ms
 FROM calls c
 WHERE ($1::uuid IS NULL OR c.account_id = $1::uuid)
   AND ($2::uuid IS NULL
@@ -34,14 +365,29 @@ WHERE ($1::uuid IS NULL OR c.account_id = $1::uuid)
   AND ($8::text IS NULL OR c.outcome = $8::text)
   AND ($9::text IS NULL OR c.tag = $9::text)
   AND ($10::uuid IS NULL OR c.id = $10::uuid)
-  AND ($11::timestamptz IS NULL OR c.created_at >= $11::timestamptz)
-  AND ($12::timestamptz IS NULL OR c.created_at < $12::timestamptz)
-  AND ($13::int IS NULL OR c.duration_ms >= $13::int)
-  AND ($14::int IS NULL OR c.duration_ms <= $14::int)
-  AND ($15::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $15::bigint)
-  AND ($16::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $16::bigint)
-  AND ($17::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $17::bigint)
-  AND ($18::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $18::bigint)
+  AND ($11::text = '' OR (CASE $11::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $12::text)
+  AND ($13::text = '' OR (CASE $13::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $14::text)
+  AND ($15::boolean IS NULL OR c.stream=$15::boolean)
+  AND ($16::int IS NULL OR jsonb_array_length(c.attempts)>=$16::int)
+  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)<=$17::int)
+  AND ($18::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$18::boolean)
+  AND ($19::text IS NULL OR c.diagnostics->>'delivery'=$19::text)
+  AND ($20::text IS NULL OR c.diagnostics->>'usage_status'=$20::text)
+  AND (($21::int IS NULL AND $22::text IS NULL AND $23::text IS NULL AND $24::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE ($21::int IS NULL OR (att->>'status_code')::int=$21::int)
+      AND ($22::text IS NULL OR att->>'error_code'=$22::text)
+      AND ($23::text IS NULL OR att->>'end_reason'=$23::text)
+      AND ($24::text IS NULL OR att->'channel'->>'id'=$24::text)
+      AND ($3::text IS NULL OR att->'channel'->>'id'=$3::text)))
+  AND ($25::timestamptz IS NULL OR c.created_at >= $25::timestamptz)
+  AND ($26::timestamptz IS NULL OR c.created_at < $26::timestamptz)
+  AND ($27::int IS NULL OR c.duration_ms >= $27::int)
+  AND ($28::int IS NULL OR c.duration_ms <= $28::int)
+  AND ($29::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $29::bigint)
+  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $30::bigint)
+  AND ($31::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $31::bigint)
+  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $32::bigint)
 `
 
 type CallStatsParams struct {
@@ -55,6 +401,20 @@ type CallStatsParams struct {
 	Outcome          *string
 	Tag              *string
 	RequestID        *string
+	Dimension        string
+	DimensionValue   string
+	SecondDimension  string
+	SecondValue      string
+	Stream           *bool
+	MinAttempts      *int32
+	MaxAttempts      *int32
+	Billed           *bool
+	Delivery         *string
+	UsageStatus      *string
+	StatusCode       *int32
+	ErrorCode        *string
+	EndReason        *string
+	AttemptChannel   *string
 	FromTime         *time.Time
 	ToTime           *time.Time
 	MinDuration      *int32
@@ -89,6 +449,20 @@ func (q *Queries) CallStats(ctx context.Context, arg CallStatsParams) (CallStats
 		arg.Outcome,
 		arg.Tag,
 		arg.RequestID,
+		arg.Dimension,
+		arg.DimensionValue,
+		arg.SecondDimension,
+		arg.SecondValue,
+		arg.Stream,
+		arg.MinAttempts,
+		arg.MaxAttempts,
+		arg.Billed,
+		arg.Delivery,
+		arg.UsageStatus,
+		arg.StatusCode,
+		arg.ErrorCode,
+		arg.EndReason,
+		arg.AttemptChannel,
 		arg.FromTime,
 		arg.ToTime,
 		arg.MinDuration,
@@ -543,7 +917,7 @@ func (q *Queries) ChannelStatusCodes(ctx context.Context, arg ChannelStatusCodes
 }
 
 const getCall = `-- name: GetCall :one
-SELECT c.id, c.account_id, c.api_key_id, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.client_user_agent, c.routing_mode, c.routing_source, c.outcome, c.final_channel_id, c.attempts, c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens, c.price_snapshot, c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms, c.output_tokens_per_second, c.inter_token_p50_ms, c.inter_token_p95_ms, c.response_bytes, c.upstream_response_id, c.ledger_tx_id, c.created_at, c.completed_at, a.username AS account_username, a.display_name AS account_display_name,
+SELECT c.id, c.account_id, c.api_key_id, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.client_user_agent, c.routing_mode, c.routing_source, c.outcome, c.final_channel_id, c.attempts, c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens, c.price_snapshot, c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms, c.output_tokens_per_second, c.inter_token_p50_ms, c.inter_token_p95_ms, c.response_bytes, c.upstream_response_id, c.ledger_tx_id, c.created_at, c.completed_at, c.diagnostics, a.username AS account_username, a.display_name AS account_display_name,
        k.name AS api_key_name, ch.name AS channel_name
 FROM calls c
 JOIN accounts a ON a.id = c.account_id
@@ -595,6 +969,7 @@ func (q *Queries) GetCall(ctx context.Context, id string) (GetCallRow, error) {
 		&i.Call.LedgerTxID,
 		&i.Call.CreatedAt,
 		&i.Call.CompletedAt,
+		&i.Call.Diagnostics,
 		&i.AccountUsername,
 		&i.AccountDisplayName,
 		&i.ApiKeyName,
@@ -651,17 +1026,32 @@ WHERE ($2::uuid IS NULL OR c.account_id = $2::uuid)
   AND ($8::text IS NULL OR c.outcome = $8::text)
   AND ($9::text IS NULL OR c.tag = $9::text)
   AND ($10::uuid IS NULL OR c.id = $10::uuid)
-  AND ($11::timestamptz IS NULL OR c.created_at >= $11::timestamptz)
-  AND ($12::timestamptz IS NULL OR c.created_at < $12::timestamptz)
-  AND ($13::int IS NULL OR c.duration_ms >= $13::int)
-  AND ($14::int IS NULL OR c.duration_ms <= $14::int)
-  AND ($15::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $15::bigint)
-  AND ($16::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $16::bigint)
-  AND ($17::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $17::bigint)
-  AND ($18::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $18::bigint)
-  AND ($19::timestamptz IS NULL OR (c.created_at, c.id) < ($19::timestamptz, $20::uuid))
+  AND ($11::text = '' OR (CASE $11::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $12::text)
+  AND ($13::text = '' OR (CASE $13::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $14::text)
+  AND ($15::boolean IS NULL OR c.stream=$15::boolean)
+  AND ($16::int IS NULL OR jsonb_array_length(c.attempts)>=$16::int)
+  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)<=$17::int)
+  AND ($18::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$18::boolean)
+  AND ($19::text IS NULL OR c.diagnostics->>'delivery'=$19::text)
+  AND ($20::text IS NULL OR c.diagnostics->>'usage_status'=$20::text)
+  AND (($21::int IS NULL AND $22::text IS NULL AND $23::text IS NULL AND $24::text IS NULL)
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
+      WHERE ($21::int IS NULL OR (att->>'status_code')::int=$21::int)
+      AND ($22::text IS NULL OR att->>'error_code'=$22::text)
+      AND ($23::text IS NULL OR att->>'end_reason'=$23::text)
+      AND ($24::text IS NULL OR att->'channel'->>'id'=$24::text)
+      AND ($1::text IS NULL OR att->'channel'->>'id'=$1::text)))
+  AND ($25::timestamptz IS NULL OR c.created_at >= $25::timestamptz)
+  AND ($26::timestamptz IS NULL OR c.created_at < $26::timestamptz)
+  AND ($27::int IS NULL OR c.duration_ms >= $27::int)
+  AND ($28::int IS NULL OR c.duration_ms <= $28::int)
+  AND ($29::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $29::bigint)
+  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $30::bigint)
+  AND ($31::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $31::bigint)
+  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $32::bigint)
+  AND ($33::timestamptz IS NULL OR (c.created_at, c.id) < ($33::timestamptz, $34::uuid))
 ORDER BY c.created_at DESC, c.id DESC
-LIMIT $21
+LIMIT $35
 `
 
 type ListCallsParams struct {
@@ -675,6 +1065,20 @@ type ListCallsParams struct {
 	Outcome          *string
 	Tag              *string
 	RequestID        *string
+	Dimension        string
+	DimensionValue   string
+	SecondDimension  string
+	SecondValue      string
+	Stream           *bool
+	MinAttempts      *int32
+	MaxAttempts      *int32
+	Billed           *bool
+	Delivery         *string
+	UsageStatus      *string
+	StatusCode       *int32
+	ErrorCode        *string
+	EndReason        *string
+	AttemptChannel   *string
 	FromTime         *time.Time
 	ToTime           *time.Time
 	MinDuration      *int32
@@ -733,6 +1137,20 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]ListCal
 		arg.Outcome,
 		arg.Tag,
 		arg.RequestID,
+		arg.Dimension,
+		arg.DimensionValue,
+		arg.SecondDimension,
+		arg.SecondValue,
+		arg.Stream,
+		arg.MinAttempts,
+		arg.MaxAttempts,
+		arg.Billed,
+		arg.Delivery,
+		arg.UsageStatus,
+		arg.StatusCode,
+		arg.ErrorCode,
+		arg.EndReason,
+		arg.AttemptChannel,
 		arg.FromTime,
 		arg.ToTime,
 		arg.MinDuration,

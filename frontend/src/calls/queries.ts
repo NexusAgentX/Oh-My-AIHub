@@ -7,6 +7,27 @@ import type { CallDetail, UsageReport } from '../api/types'
  * 用户（/api/calls）、渠道（/api/channels/{id}/calls）与管理员（/api/admin/calls）共用。
  */
 export type CallListParams = {
+ dimension?: string
+ dimension_value?: string
+ second_dimension?: string
+ second_value?: string
+ stream?: boolean
+ min_duration_ms?: number
+ max_duration_ms?: number
+ min_tokens?: number
+ max_tokens?: number
+ min_cost?: string
+ max_cost?: string
+ min_attempts?: number
+ max_attempts?: number
+ status_code?: number
+ error_code?: string
+ end_reason?: string
+ delivery?: string
+ usage_status?: string
+ billed?: boolean
+ attempt_channel_id?: string
+
   /** 请求 ID 精确匹配 */
   request_id?: string
   model?: string
@@ -37,7 +58,7 @@ export const userCallsStreamPath = '/api/calls/stream'
 export function useCallPages<Page extends CursorPage<unknown>>(
   path: string,
   params: CallListParams,
-  { limit = 50, enabled = true }: { limit?: number; enabled?: boolean } = {},
+  { limit = 50, enabled = true, refetchInterval = false }: { limit?: number; enabled?: boolean; refetchInterval?: number | false } = {},
 ) {
   return useInfiniteQuery({
     queryKey: [...callKeys.list(path, params), limit],
@@ -46,6 +67,7 @@ export function useCallPages<Page extends CursorPage<unknown>>(
     initialPageParam: '',
     getNextPageParam: (last: Page) => last.next_cursor ?? undefined,
     enabled,
+    refetchInterval,
   })
 }
 

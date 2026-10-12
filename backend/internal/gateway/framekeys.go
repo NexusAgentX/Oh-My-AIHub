@@ -26,9 +26,10 @@ const (
 	keyReasoning
 	// keyID: an "id" member, where an OpenAI Responses event names its response.
 	keyID
+	keyStop
 
 	// nullableKeys are the keys that are ignored when their value is null.
-	nullableKeys = keyUsage | keyUsageMetadata | keyServiceTier
+	nullableKeys = keyUsage | keyUsageMetadata | keyServiceTier | keyStop
 	// detailKeys are the keys absorbDetails reads anything under. The objects
 	// it looks into on the way (response, message, choices, delta) are not
 	// among them: they only lead to these.
@@ -43,6 +44,7 @@ var frameKeyNames = [...]struct {
 	keys frameKeys
 }{
 	{"id", keyID},
+	{"finish_reason", keyStop}, {"stop_reason", keyStop}, {"finishreason", keyStop},
 	{"usage", keyUsage},
 	{"service_tier", keyServiceTier},
 	{"usagemetadata", keyUsageMetadata},

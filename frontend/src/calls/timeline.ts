@@ -11,7 +11,7 @@ export type Segment = {
 
 export const segmentLabels: Record<SegmentKind, string> = {
   connect: '连接',
-  wait: '等首字',
+  wait: '等首响应',
   output: '输出',
   failed: '失败',
 }
@@ -27,12 +27,12 @@ export function attemptTotalMs(attempt: CallAttempt) {
 
 /** 所有尝试共用的时间轴长度（至少 1ms，避免除零）。 */
 export function timelineScale(attempts: CallAttempt[]) {
-  return Math.max(1, ...attempts.map(attemptTotalMs))
+  return Math.max(1, ...attempts.map(a=>(a.offset_ms??0)+attemptTotalMs(a)))
 }
 
 /**
- * 把一次尝试拆成水平条的分段：连接 → 等首字 → 输出；
- * 没有首字就失败的尝试，连接之后的部分记为「失败」。
+ * 把一次尝试拆成水平条的分段：连接 → 等首响应 → 输出；
+ * 没有首响应就失败的尝试，连接之后的部分记为「失败」。
  */
 export function attemptSegments(attempt: CallAttempt, scaleMs: number): Segment[] {
   const total = attemptTotalMs(attempt)

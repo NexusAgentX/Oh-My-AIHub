@@ -53,6 +53,8 @@ func (p *platform) observeFixtures(consumer, channelID, keyID string) observatio
 	billed.Key, billed.Tag, billed.Channel, billed.LedgerTxID = &observe.KeyRef{ID: keyID, Name: "默认 Key"}, &tag, channelRef, &tx
 	billed.RoutingMode, billed.RoutingSource, billed.ClientUserAgent = &mode, &source, &agent
 	billed.TokensPerSecond, billed.IntervalP50MS, billed.IntervalP95MS, billed.ResponseBytes = &speed, &intervalP50, &intervalP95, &responseBytes
+	billed.Diagnostics = &gateway.Diagnostics{StopReason: "stop", UsageStatus: "reported", Delivery: "complete", Stages: []gateway.StageTiming{{Stage: "routing", DurationMS: 1.25}}, Routing: []gateway.RouteDecision{{Channel: gateway.AttemptChannel{ID: channelID, Name: "阿里中转"}, Reason: "cheapest", Rank: 1}}}
+	billed.UpstreamResponseID = &agent
 	billed.PriceSnapshot = json.RawMessage(priceSnapshotJSON)
 	billed.Attempts = []observe.Attempt{
 		{Channel: channelRef, StatusCode: &status, ErrorCode: &errCode, ErrorMessage: &errMessage, ConnectMS: &connect, EndReason: "upstream_error"},
@@ -121,7 +123,7 @@ func TestCallObservationReports(t *testing.T) {
 		t.Fatalf("call detail = %v", own)
 	}
 	seen := bob.expect(t, http.StatusOK, http.MethodGet, "/api/calls/"+ids.billed, nil)["call"].(map[string]any)
-	if seen["api_key"] != nil || seen["ledger_transaction_id"] != nil {
+	if seen["api_key"] != nil || seen["ledger_transaction_id"] != nil || seen["diagnostics"] != nil || seen["upstream_response_id"] != nil {
 		t.Fatalf("channel owner sees consumer data: %v", seen)
 	}
 	for _, request := range []struct {

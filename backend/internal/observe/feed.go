@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -21,30 +22,23 @@ type FeedMessage struct {
 	Call CallRecord
 }
 
-// Observer receives every gateway event, with the stored call for call
-// events. It must not block.
-type Observer interface {
-	Observe(event gateway.Event, call *CallRecord)
-}
-
 // Events is the in-process gateway event bus.
 type Events interface {
 	Subscribe(buffer int) (<-chan gateway.Event, func())
 }
 
-// Feed turns gateway events into live call messages and drives the observers
-// (the Prometheus metrics). Subscribers have a bounded buffer: a slow one
+// Feed turns gateway events into live call messages. Subscribers have a bounded buffer: a slow one
 // loses messages instead of slowing the gateway (Epic #170, decision 11).
 type Feed struct {
-	service   *Service
-	events    Events
-	logger    *slog.Logger
-	observers []Observer
+	service *Service
+	events  Events
+	logger  *slog.Logger
 
-	mutex       sync.Mutex
-	next        int
-	subscribers map[int]chan FeedMessage
-	dropped     uint64
+	mutex        sync.Mutex
+	next         int
+	subscribers  map[int]chan FeedMessage
+	dropped      uint64
+	readFailures atomic.Uint64
 }
 
 func NewFeed(service *Service, events Events, logger *slog.Logger) *Feed {
@@ -53,9 +47,6 @@ func NewFeed(service *Service, events Events, logger *slog.Logger) *Feed {
 	}
 	return &Feed{service: service, events: events, logger: logger, subscribers: map[int]chan FeedMessage{}}
 }
-
-// AddObserver registers an observer; call before Run.
-func (f *Feed) AddObserver(observer Observer) { f.observers = append(f.observers, observer) }
 
 // Subscribe returns a channel of live messages and a function that ends the
 // subscription.
@@ -104,6 +95,8 @@ func (f *Feed) Dropped() uint64 {
 	return f.dropped
 }
 
+func (f *Feed) ReadFailures() uint64 { return f.readFailures.Load() }
+
 // Run processes events until ctx ends.
 func (f *Feed) Run(ctx context.Context) {
 	events, cancel := f.events.Subscribe(4096)
@@ -129,20 +122,16 @@ func (f *Feed) handle(ctx context.Context, event gateway.Event) {
 	case gateway.EventCallFinished:
 		kind = FeedFinished
 	}
-	var record *CallRecord
-	// A started call is only needed by live subscribers; the metrics learn of it from the event alone.
-	if kind != "" && event.CallID != "" && (kind == FeedFinished || f.hasSubscribers()) {
+	// Never read the database if no UI is listening; metrics are recorded by the engine.
+	if kind != "" && event.CallID != "" && f.hasSubscribers() {
 		loadContext, cancel := context.WithTimeout(ctx, 5*time.Second)
 		loaded, err := f.service.Record(loadContext, event.CallID)
 		cancel()
 		if err != nil {
+			f.readFailures.Add(1)
 			f.logger.Warn("live feed: reading call failed", "request_id", event.CallID, "error", err)
 		} else {
-			record = &loaded
 			f.publish(FeedMessage{Kind: kind, Call: loaded})
 		}
-	}
-	for _, observer := range f.observers {
-		observer.Observe(event, record)
 	}
 }

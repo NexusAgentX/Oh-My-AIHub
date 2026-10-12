@@ -75,6 +75,7 @@ LEFT JOIN calls c ON t.related_type = 'call' AND c.id = t.related_id
 LEFT JOIN api_keys k ON k.id = c.api_key_id
 WHERE l.account_id = sqlc.arg(account_id)
   AND (sqlc.arg(type)::text = '' OR t.type = sqlc.arg(type))
+  AND (sqlc.arg(transaction_id)::text = '' OR t.id::text = sqlc.arg(transaction_id))
   AND (sqlc.arg(api_key_id)::text = '' OR c.api_key_id::text = sqlc.arg(api_key_id))
   AND (sqlc.narg(from_time)::timestamptz IS NULL OR e.created_at >= sqlc.narg(from_time))
   AND (sqlc.narg(to_time)::timestamptz IS NULL OR e.created_at < sqlc.narg(to_time))

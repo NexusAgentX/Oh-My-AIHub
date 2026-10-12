@@ -63,16 +63,17 @@ var (
 
 // Dependencies wires the gateway.
 type Dependencies struct {
-	Store    Store
-	Catalog  Models
-	Settings *settings.Service
-	Routing  routing.Store
-	Keyring  *channel.Keyring
-	Outbound channel.Outbound
-	Events   Publisher
-	Logger   *slog.Logger
-	Runtime  *Runtime
-	Now      func() time.Time
+	Store     Store
+	Catalog   Models
+	Settings  *settings.Service
+	Routing   routing.Store
+	Keyring   *channel.Keyring
+	Outbound  channel.Outbound
+	Events    Publisher
+	Telemetry Telemetry
+	Logger    *slog.Logger
+	Runtime   *Runtime
+	Now       func() time.Time
 	// StatsBook holds the channel statistics (rolling 24-hour windows). Nil
 	// means a new, empty one; tests pass their own to seed it.
 	StatsBook *StatsBook
@@ -250,6 +251,11 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	phase                string
+	phaseAt              time.Time
+	diagnostics          Diagnostics
+	finish               CallFinish
+	booked               bool
 	id                   string
 	started              time.Time
 	key                  KeyAuth
@@ -343,11 +349,37 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// (clientWatch), because an answer already under way is read to its end.
 	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
+	call := &callState{started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
+	observed := &observedWriter{ResponseWriter: w}
+	w = observed
+	if e.Telemetry != nil {
+		e.Telemetry.Active(string(format), 1)
+	}
+	defer func() {
+		if e.Telemetry == nil {
+			return
+		}
+		e.Telemetry.Active(string(format), -1)
+		if call.phase != "" {
+			call.stage(call.phase, call.phaseAt, e.Now())
+		}
+		finish := call.finish
+		if finish.Outcome == "" {
+			finish.Outcome = OutcomeUpstreamFailed
+			if observed.status == 401 {
+				finish.Outcome = OutcomeRejectedKey
+			}
+		}
+		finish.Diagnostics = &call.diagnostics
+		e.Telemetry.Complete(Completion{Format: string(format), Stream: call.stream, Status: observed.status, Duration: e.Now().Sub(started), Finish: finish, Booked: call.booked})
+	}()
 	key, location, ok := e.authenticate(w, r)
+	call.stage("authentication", started, e.Now())
 	if !ok {
 		return
 	}
-	call := &callState{started: started, key: key, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call.key = key
 
 	if !key.AccountActive || !keyUsable(key, started) {
 		status, code, message := http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期"
@@ -360,6 +392,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	e.touchKey(ctx, key.KeyID)
 
+	prepareAt := e.Now()
+	call.phase, call.phaseAt = "request", prepareAt
 	body, err := readRequestBody(w, r)
 	if err != nil {
 		call.requested = pathModel
@@ -389,6 +423,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 
+	call.stage("request", prepareAt, e.Now())
+	openAt := e.Now()
+	call.phase, call.phaseAt = "open_call", openAt
 	id, err := e.Store.InsertCall(ctx, CallInsert{
 		AccountID: key.OwnerID, KeyID: key.KeyID, RequestedModel: call.requested, Format: format, Stream: call.stream,
 		Tag: call.tag, UserAgent: call.userAgent, Outcome: OutcomeInProgress,
@@ -398,6 +435,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		WriteError(w, call.dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
 		return
 	}
+	call.stage("open_call", openAt, e.Now())
+	admissionAt := e.Now()
+	call.phase, call.phaseAt = "admission", admissionAt
 	call.id = id
 	w.Header().Set("X-AIHub-Request-Id", id)
 	e.Events.Publish(Event{Kind: EventCallStarted, At: started, CallID: id, AccountID: key.OwnerID, KeyID: key.KeyID, Model: call.requested, Format: string(format)})
@@ -473,6 +513,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	defer releaseInflight()
 
+	call.stage("admission", admissionAt, e.Now())
+	routingAt := e.Now()
+	call.phase, call.phaseAt = "routing", routingAt
 	// Routing: the key's own setting, else the account's, else the default.
 	pref, err := e.Routing.Resolve(ctx, key.OwnerID, key.KeyID, call.modelID)
 	if err != nil {
@@ -484,6 +527,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if pref.MaxAttempts != nil {
 		maxAttempts = int(*pref.MaxAttempts)
 	}
+	call.diagnostics.MaxAttempts = maxAttempts
 	timeouts := resolveTimeouts(defaults, pref)
 
 	candidates, err := e.Store.Candidates(ctx, call.modelID, format)
@@ -512,6 +556,23 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	stats := e.statsView()
+	for _, candidate := range candidates {
+		reason := "eligible"
+		switch {
+		case containsString(pref.Excluded, candidate.ChannelID):
+			reason = "excluded"
+		case pref.Mode == routing.ModeManual && !containsString(pref.Order, candidate.ChannelID):
+			reason = "not_selected"
+		default:
+			state, why := e.Runtime.Check(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), started)
+			if state != StateAvailable {
+				reason = why
+			} else if _, bad := stats.anomalies[call.modelID][candidate.ChannelID]; bad {
+				reason = "demoted"
+			}
+		}
+		call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: reason})
+	}
 	ordered := Rank(RankInput{
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
 		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
@@ -520,6 +581,20 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return state == StateAvailable
 		},
 	})
+	for i, candidate := range ordered {
+		for j := range call.diagnostics.Routing {
+			d := &call.diagnostics.Routing[j]
+			if d.Channel.ID == candidate.ChannelID {
+				d.Rank = i + 1
+				if candidate.ChannelID == sticky {
+					d.Reason = "sticky"
+				} else if d.Reason == "eligible" {
+					d.Reason = string(pref.Mode)
+				}
+			}
+		}
+	}
+	call.stage("routing", routingAt, e.Now())
 	if len(ordered) == 0 {
 		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "no_channel_available", "当前没有可用的渠道")
 		return
@@ -534,6 +609,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		tried++
 		call.lastChannelID = candidate.ChannelID
 		result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, timeouts)
+		if len(call.attempts) > 0 {
+			result.record.FallbackReason = call.attempts[len(call.attempts)-1].EndReason
+		}
 		call.attempts = append(call.attempts, result.record)
 		e.publishAttempt(call, candidate, result.record)
 		if result.response == nil {
@@ -610,7 +688,7 @@ func (e *Engine) internalError(w http.ResponseWriter, call *callState, err error
 func (e *Engine) reject(w http.ResponseWriter, call *callState, outcome string, status int, code, message string) {
 	id, err := e.Store.InsertCall(context.WithoutCancel(context.Background()), CallInsert{
 		AccountID: call.key.OwnerID, KeyID: call.key.KeyID, RequestedModel: call.requested, Format: call.format, Stream: call.stream,
-		Tag: call.tag, UserAgent: call.userAgent, Outcome: outcome,
+		Tag: call.tag, UserAgent: call.userAgent, Outcome: OutcomeInProgress,
 	})
 	if err != nil {
 		e.Logger.Error("gateway: recording rejected call failed", "error", err)
@@ -618,15 +696,13 @@ func (e *Engine) reject(w http.ResponseWriter, call *callState, outcome string, 
 		return
 	}
 	call.id = id
-	e.log(call, outcome, status, 0, ledger.Usage{}, 0, 0)
-	e.Events.Publish(Event{Kind: EventCallFinished, At: e.Now(), CallID: id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, Model: call.requested, Format: string(call.format), Outcome: outcome, StatusCode: status})
-	WriteError(w, call.dialect, status, code, message, id)
+	e.finishRejected(w, call, outcome, status, code, message)
 }
 
 // finishRejected closes an already opened call without a channel.
 func (e *Engine) finishRejected(w http.ResponseWriter, call *callState, outcome string, status int, code, message string) {
 	duration := int(e.Now().Sub(call.started).Milliseconds())
-	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
+	_, err := e.finishCall(context.WithoutCancel(context.Background()), call, CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: outcome, ModelID: call.modelID, RoutingMode: string(call.mode),
 		RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration,
 	})
@@ -641,7 +717,7 @@ func (e *Engine) finishRejected(w http.ResponseWriter, call *callState, outcome 
 // finishAbandoned closes a call whose client left before any output.
 func (e *Engine) finishAbandoned(call *callState, channelID string) {
 	duration := int(e.Now().Sub(call.started).Milliseconds())
-	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
+	_, err := e.finishCall(context.WithoutCancel(context.Background()), call, CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeClientDisconnect, ModelID: call.modelID, ChannelID: channelID,
 		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration,
 	})
@@ -657,7 +733,7 @@ func (e *Engine) finishAbandoned(call *callState, channelID string) {
 // bill; the channels are not blamed.
 func (e *Engine) finishExpired(w http.ResponseWriter, call *callState) {
 	duration := int(e.Now().Sub(call.started).Milliseconds())
-	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
+	_, err := e.finishCall(context.WithoutCancel(context.Background()), call, CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeInterrupted, ModelID: call.modelID, ChannelID: call.lastChannelID,
 		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration,
 	})
@@ -835,7 +911,7 @@ func fallbackStatus(status int) bool {
 //   - non-streaming: the request timeout for the whole exchange.
 func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, candidate Candidate, limits Limits, defaults settings.Settings,
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, timeouts attemptTimeouts) attemptResult {
-	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}}}
+	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, UpstreamModel: candidate.UpstreamModel, OffsetMS: millis(e.Now().Sub(call.started))}}
 	// closeFailed writes the failure into the attempt record; fail also counts
 	// it against the channel.
 	closeFailed := func(endReason, code, message string, status *int) attemptResult {
@@ -880,6 +956,13 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	result.secret = secret
 
 	timeouts = timeouts.withChannel(candidate.Advanced)
+	result.record.Timeouts = &AttemptTimeouts{FirstByteMS: timeouts.ttft.Milliseconds(), IdleMS: timeouts.idle.Milliseconds(), TotalMS: timeouts.request.Milliseconds()}
+	if call.stream {
+		result.record.Timeouts.TotalMS = 0
+	} else {
+		result.record.Timeouts.FirstByteMS = 0
+		result.record.Timeouts.IdleMS = 0
+	}
 	client, err := policy.GatewayClient(ctx, candidate.BaseURL)
 	if err != nil {
 		return fail(EndConnectError, "egress_blocked", "出站校验未通过", nil)
@@ -931,7 +1014,11 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		}
 	}
 	var connected time.Time
-	trace := &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected = e.Now() }}
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) {
+		connected = e.Now()
+		reused := info.Reused
+		result.record.ReusedConnection = &reused
+	}}
 	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
 	if err != nil {
 		cancel(nil)
@@ -1065,7 +1152,7 @@ func (e *Engine) finishUpstreamFailure(w http.ResponseWriter, call *callState, l
 	if last != nil {
 		status = last.status
 	}
-	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
+	_, err := e.finishCall(context.WithoutCancel(context.Background()), call, CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeUpstreamFailed, ModelID: call.modelID, ChannelID: call.lastChannelID,
 		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration,
 	})
@@ -1085,7 +1172,7 @@ func (e *Engine) finishUpstreamFailure(w http.ResponseWriter, call *callState, l
 func (e *Engine) forwardPassthrough(w http.ResponseWriter, call *callState, answer *upstreamFailure) {
 	answer.write(w, call.id)
 	duration := int(e.Now().Sub(call.started).Milliseconds())
-	_, err := e.Store.FinishCall(context.WithoutCancel(context.Background()), CallFinish{
+	_, err := e.finishCall(context.WithoutCancel(context.Background()), call, CallFinish{
 		ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeUpstreamFailed, ModelID: call.modelID, ChannelID: call.lastChannelID,
 		RoutingMode: string(call.mode), RoutingSource: string(call.source), Attempts: call.attempts, DurationMS: duration, ResponseBytes: int64(len(answer.body)),
 	})
@@ -1176,7 +1263,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.format == channel.FormatOpenAIChat && call.thinkingRequested != nil && !*call.thinkingRequested {
 		observer.qwenObserved = true
 	}
-	var written int64
+	var written, upstreamBytes int64
+	var clientWriteTime time.Duration
 	// undelivered is set when a part of the answer did not reach the client.
 	undelivered := false
 	send := func(chunk []byte) {
@@ -1188,13 +1276,21 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			return
 		}
 		_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
-		if _, err := w.Write(chunk); err != nil {
+		writeAt := e.Now()
+		n, err := w.Write(chunk)
+		written += int64(n)
+		if err == nil {
+			err = controller.Flush()
+			if errors.Is(err, http.ErrNotSupported) {
+				err = nil
+			}
+		}
+		clientWriteTime += e.Now().Sub(writeAt)
+		if err != nil {
 			undelivered = true
 			watch.left() // a client that cannot be written to has left
 			return
 		}
-		_ = controller.Flush()
-		written += int64(len(chunk))
 	}
 	// When the gateway turned include_usage on for a client that had not asked
 	// for it, the usage-only frame the upstream adds is kept from the client
@@ -1209,6 +1305,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		}
 		// The observer sees every byte the upstream sends, wanted by the client
 		// or not: that is what makes the usage at the end billable.
+		upstreamBytes += int64(len(chunk))
 		observer.Write(chunk, e.Now())
 		if strip != nil {
 			chunk = strip.Filter(chunk)
@@ -1241,6 +1338,18 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
+	call.diagnostics.StopReason = observation.StopReason
+	call.diagnostics.UsageStatus = observation.UsageStatus
+	call.diagnostics.Frames = observation.Frames
+	call.diagnostics.MaxFrameGapMS = observation.MaxFrameGapMS
+	call.diagnostics.UpstreamBytes = upstreamBytes
+	call.diagnostics.Delivery = "complete"
+	if clientGone {
+		call.diagnostics.Delivery = "client_disconnected"
+	} else if !ended {
+		call.diagnostics.Delivery = "interrupted"
+	}
+	call.diagnostics.Stages = append(call.diagnostics.Stages, StageTiming{Stage: "client_write", DurationMS: float64(clientWriteTime) / float64(time.Millisecond)})
 
 	duration := int(e.Now().Sub(call.started).Milliseconds())
 	ttftFromStart := int(result.started.Sub(call.started).Milliseconds()) + int(result.ttft.Milliseconds())
@@ -1282,6 +1391,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
 		finish.TokensPerSecond = &speed
 	}
+	pricingAt := e.Now()
 	if observation.Found {
 		self := candidate.OwnerID == call.key.OwnerID
 		feeRate := defaults.FeeRateNano
@@ -1299,6 +1409,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
+	call.stage("pricing", pricingAt, e.Now())
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
 
@@ -1308,13 +1419,13 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 // can find and repair.
 func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish, status int, usage ledger.Usage) {
 	ctx := context.WithoutCancel(context.Background())
-	outcome, err := e.Store.FinishCall(ctx, finish)
+	outcome, err := e.finishCall(ctx, call, finish)
 	if err != nil {
 		e.Logger.Error("gateway: booking call failed", "request_id", call.id, "error", err)
 		e.Events.Publish(Event{Kind: EventSettlementFailed, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format)})
 		fallback := finish
 		fallback.Bill = nil
-		if _, retryErr := e.Store.FinishCall(ctx, fallback); retryErr != nil {
+		if _, retryErr := e.finishCall(ctx, call, fallback); retryErr != nil {
 			e.Logger.Error("gateway: closing call failed", "request_id", call.id, "error", retryErr)
 		}
 	} else if outcome.Finished && finish.Bill != nil {

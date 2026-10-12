@@ -273,20 +273,22 @@ LEFT JOIN calls c ON t.related_type = 'call' AND c.id = t.related_id
 LEFT JOIN api_keys k ON k.id = c.api_key_id
 WHERE l.account_id = $1::uuid
   AND ($2::text = '' OR t.type = $2)
-  AND ($3::text = '' OR c.api_key_id::text = $3)
-  AND ($4::timestamptz IS NULL OR e.created_at >= $4)
-  AND ($5::timestamptz IS NULL OR e.created_at < $5)
+  AND ($3::text = '' OR t.id::text = $3)
+  AND ($4::text = '' OR c.api_key_id::text = $4)
+  AND ($5::timestamptz IS NULL OR e.created_at >= $5)
+  AND ($6::timestamptz IS NULL OR e.created_at < $6)
 ORDER BY e.id DESC
-LIMIT $6
+LIMIT $7
 `
 
 type ExportUserEntriesParams struct {
-	AccountID string
-	Type      string
-	ApiKeyID  string
-	FromTime  *time.Time
-	ToTime    *time.Time
-	RowLimit  int32
+	AccountID     string
+	Type          string
+	TransactionID string
+	ApiKeyID      string
+	FromTime      *time.Time
+	ToTime        *time.Time
+	RowLimit      int32
 }
 
 type ExportUserEntriesRow struct {
@@ -307,6 +309,7 @@ func (q *Queries) ExportUserEntries(ctx context.Context, arg ExportUserEntriesPa
 	rows, err := q.db.Query(ctx, exportUserEntries,
 		arg.AccountID,
 		arg.Type,
+		arg.TransactionID,
 		arg.ApiKeyID,
 		arg.FromTime,
 		arg.ToTime,
@@ -1210,19 +1213,21 @@ JOIN ledger_transactions t ON t.id = e.transaction_id
 LEFT JOIN calls c ON t.related_type = 'call' AND c.id = t.related_id
 WHERE l.account_id = $1::uuid
   AND ($2::text = '' OR t.type = $2)
-  AND ($3::text = '' OR c.api_key_id::text = $3)
-  AND ($4::timestamptz IS NULL OR e.created_at >= $4)
-  AND ($5::timestamptz IS NULL OR e.created_at < $5)
+  AND ($3::text = '' OR t.id::text = $3)
+  AND ($4::text = '' OR c.api_key_id::text = $4)
+  AND ($5::timestamptz IS NULL OR e.created_at >= $5)
+  AND ($6::timestamptz IS NULL OR e.created_at < $6)
 GROUP BY 1
 ORDER BY 1 DESC
 `
 
 type UserEntriesByDayParams struct {
-	AccountID string
-	Type      string
-	ApiKeyID  string
-	FromTime  *time.Time
-	ToTime    *time.Time
+	AccountID     string
+	Type          string
+	TransactionID string
+	ApiKeyID      string
+	FromTime      *time.Time
+	ToTime        *time.Time
 }
 
 type UserEntriesByDayRow struct {
@@ -1236,6 +1241,7 @@ func (q *Queries) UserEntriesByDay(ctx context.Context, arg UserEntriesByDayPara
 	rows, err := q.db.Query(ctx, userEntriesByDay,
 		arg.AccountID,
 		arg.Type,
+		arg.TransactionID,
 		arg.ApiKeyID,
 		arg.FromTime,
 		arg.ToTime,
@@ -1274,19 +1280,21 @@ LEFT JOIN api_keys k ON k.id = c.api_key_id
 WHERE l.account_id = $1::uuid
   AND t.type = 'api_call' AND e.amount_nano < 0
   AND ($2::text = '' OR t.type = $2)
-  AND ($3::text = '' OR c.api_key_id::text = $3)
-  AND ($4::timestamptz IS NULL OR e.created_at >= $4)
-  AND ($5::timestamptz IS NULL OR e.created_at < $5)
+  AND ($3::text = '' OR t.id::text = $3)
+  AND ($4::text = '' OR c.api_key_id::text = $4)
+  AND ($5::timestamptz IS NULL OR e.created_at >= $5)
+  AND ($6::timestamptz IS NULL OR e.created_at < $6)
 GROUP BY c.api_key_id
 ORDER BY 3 DESC
 `
 
 type UserEntriesByKeyParams struct {
-	AccountID string
-	Type      string
-	ApiKeyID  string
-	FromTime  *time.Time
-	ToTime    *time.Time
+	AccountID     string
+	Type          string
+	TransactionID string
+	ApiKeyID      string
+	FromTime      *time.Time
+	ToTime        *time.Time
 }
 
 type UserEntriesByKeyRow struct {
@@ -1300,6 +1308,7 @@ func (q *Queries) UserEntriesByKey(ctx context.Context, arg UserEntriesByKeyPara
 	rows, err := q.db.Query(ctx, userEntriesByKey,
 		arg.AccountID,
 		arg.Type,
+		arg.TransactionID,
 		arg.ApiKeyID,
 		arg.FromTime,
 		arg.ToTime,

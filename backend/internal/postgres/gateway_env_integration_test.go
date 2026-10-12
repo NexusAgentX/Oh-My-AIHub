@@ -292,9 +292,11 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	})
 	bus := gateway.NewBus()
 	e.runtime = runtime
+	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
+	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
 	dependencies := gateway.Dependencies{
 		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
-		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: bus,
+		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: gateway.Publishers{bus, e.metrics}, Telemetry: e.metrics,
 	}
 	if configure != nil {
 		configure(&dependencies)
@@ -310,9 +312,6 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	// on a laptop) puts the newest fixture rows after the end of the window.
 	e.observe.SetClock(e.databaseNow)
 	e.feed = observe.NewFeed(e.observe, bus, logger)
-	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
-	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
-	e.feed.AddObserver(e.metrics)
 	feedContext, stopFeed := context.WithCancel(context.Background())
 	t.Cleanup(stopFeed)
 	go e.feed.Run(feedContext)

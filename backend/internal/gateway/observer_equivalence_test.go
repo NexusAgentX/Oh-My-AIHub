@@ -58,7 +58,10 @@ func sameReading(t testing.TB, format channel.Format, qwen bool, events []string
 			t.Fatalf("%s: after event %d %q\nreads  %+v\nwas    %+v", format, index, event, got, want)
 		}
 	}
-	if got, want := current.Finish(), original.Finish(); !reflect.DeepEqual(got, want) {
+	got, want := current.Finish(), original.Finish()
+	// Diagnostics are new; usage equivalence remains checked against the original reader.
+	got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%s: the whole answer %q\nreads  %+v\nwas    %+v", format, events, got, want)
 	}
 }
@@ -369,7 +372,9 @@ func TestObserverMatchesTheOriginalOnFramedStreams(t *testing.T) {
 					}
 					at = at.Add(3 * time.Millisecond)
 				}
-				if got, want := current.Finish(), original.Finish(); !reflect.DeepEqual(got, want) || !got.Found {
+				got, want := current.Finish(), original.Finish()
+				got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
+				if !reflect.DeepEqual(got, want) || !got.Found {
 					t.Fatalf("%s chunk %d:\nreads %+v\nwas   %+v", format, chunk, got, want)
 				}
 			}

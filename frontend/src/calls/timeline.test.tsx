@@ -1,12 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { CallAttempt, CallDetail } from '../api/types'
+import { CallResponseMetrics } from './CallDetail'
 import { AttemptTimeline } from './AttemptTimeline'
 import { attemptSegments, timelineScale } from './timeline'
 import { mergeStreamItem } from './useCallStream'
 import { matchesFilters } from './CallExplorer'
 
-const failed: CallAttempt = {
+const failed: CallAttempt = {upstream_model:'m',timeouts:null,offset_ms:null,reused_connection:null,fallback_reason:'',
   channel: { id: 'c1', name: '老陈的中转' },
   status_code: 429,
   error_code: 'upstream_error',
@@ -18,7 +19,7 @@ const failed: CallAttempt = {
   end_reason: 'upstream_error',
 }
 
-const succeeded: CallAttempt = {
+const succeeded: CallAttempt = {upstream_model:'m',timeouts:null,offset_ms:null,reused_connection:null,fallback_reason:'',
   channel: { id: 'c2', name: '小王的渠道' },
   status_code: 200,
   error_code: null,
@@ -63,11 +64,11 @@ describe('attempt timeline segments', () => {
       inter_token_p95_ms: null,
       usage: { input_tokens: 1, output_tokens: 6, cache_read_tokens: 0, cache_write_tokens: 0 },
     } as CallDetail
-    const render = (value: CallDetail) => renderToStaticMarkup(<AttemptTimeline attempts={[succeeded]} call={value} />)
+    const render = (value: CallDetail) => renderToStaticMarkup(<CallResponseMetrics call={value} />)
     expect(render(call)).toContain('2.5 tokens/s')
     for (const duration of [0, null]) {
       const markup = render({ ...call, duration_ms: duration, output_tokens_per_second: null })
-      expect(markup).toContain('速度</dt><dd class="num">—</dd>')
+      expect(markup).toContain('速度</dt><dd>—</dd>')
       expect(markup).not.toMatch(/Infinity|NaN/)
     }
   })
@@ -91,13 +92,14 @@ describe('attempt timeline segments', () => {
 
   it('renders status code, raw upstream error and streaming metrics', () => {
     const call = {
+      stream: true,
       ttft_ms: 300,
       output_tokens_per_second: 42.5,
       inter_token_p50_ms: 20,
       inter_token_p95_ms: 80,
       usage: { input_tokens: 1200, output_tokens: 300, cache_read_tokens: 0, cache_write_tokens: 0 },
     } as CallDetail
-    const markup = renderToStaticMarkup(<AttemptTimeline attempts={[failed, succeeded]} call={call} />)
+    const markup = renderToStaticMarkup(<><AttemptTimeline attempts={[failed, succeeded]} /><CallResponseMetrics call={call} /></>)
     expect(markup).toContain('老陈的中转')
     expect(markup).toContain('429 · 上游错误')
     expect(markup).toContain('{&quot;error&quot;:&quot;rate limited&quot;}')

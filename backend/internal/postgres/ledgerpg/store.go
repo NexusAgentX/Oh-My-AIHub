@@ -52,7 +52,7 @@ func (s *Store) ListPoints(ctx context.Context, accountIDs []string) (map[string
 
 func (s *Store) ListEntries(ctx context.Context, filter ledger.EntryFilter) ([]ledger.EntryView, error) {
 	rows, err := s.q.ListUserEntries(ctx, ListUserEntriesParams{
-		AccountID: &filter.AccountID, Type: string(filter.Type), ApiKeyID: filter.APIKeyID,
+		AccountID: &filter.AccountID, Type: string(filter.Type), ApiKeyID: filter.APIKeyID, TransactionID: filter.TransactionID,
 		FromTime: filter.From, ToTime: filter.To, BeforeID: filter.BeforeID, RowLimit: int32(filter.Limit),
 	})
 	if err != nil {

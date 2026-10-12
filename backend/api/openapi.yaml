@@ -1639,6 +1639,64 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /api/calls/analysis:
+    get:
+      operationId: analyzeCalls
+      tags: [calls]
+      summary: 调用多维分析
+      description: 与调用列表同一筛选，最多366天；分位直接来自样本。channel 为最终渠道，error/status 为最后尝试；空值为未采集。前期对比使用紧邻且等长时间窗。最多1000分组，超限返回400要求缩小范围，不截断。
+      x-access: ready
+      x-feature: G
+      security:
+      - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/dimensionQuery'}
+      - {$ref: '#/components/parameters/dimensionValueQuery'}
+      - {$ref: '#/components/parameters/secondDimensionQuery'}
+      - {$ref: '#/components/parameters/secondValueQuery'}
+      - {$ref: '#/components/parameters/streamQuery'}
+      - {$ref: '#/components/parameters/minAttempts'}
+      - {$ref: '#/components/parameters/maxAttempts'}
+      - {$ref: '#/components/parameters/statusCodeQuery'}
+      - {$ref: '#/components/parameters/errorCodeQuery'}
+      - {$ref: '#/components/parameters/endReasonQuery'}
+      - {$ref: '#/components/parameters/deliveryQuery'}
+      - {$ref: '#/components/parameters/usageStatusQuery'}
+      - {$ref: '#/components/parameters/billedQuery'}
+      - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/requestID'}
+      - {$ref: '#/components/parameters/minDurationMs'}
+      - {$ref: '#/components/parameters/maxDurationMs'}
+      - {$ref: '#/components/parameters/minTokens'}
+      - {$ref: '#/components/parameters/maxTokens'}
+      - {$ref: '#/components/parameters/minCost'}
+      - {$ref: '#/components/parameters/maxCost'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
+      - {$ref: '#/components/parameters/modelQuery'}
+      - {$ref: '#/components/parameters/outcome'}
+      - {$ref: '#/components/parameters/apiKeyIDQuery'}
+      - {$ref: '#/components/parameters/tag'}
+      - {$ref: '#/components/parameters/format'}
+      - {$ref: '#/components/parameters/from'}
+      - {$ref: '#/components/parameters/to'}
+      - in: query
+        name: group_by
+        schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+      - in: query
+        name: split_by
+        schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+      - in: query
+        name: bucket_seconds
+        schema: {type: integer}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AnalysisReport'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /api/calls:
     get:
       operationId: listCalls
@@ -1650,6 +1708,20 @@ paths:
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/dimensionQuery'}
+      - {$ref: '#/components/parameters/dimensionValueQuery'}
+      - {$ref: '#/components/parameters/secondDimensionQuery'}
+      - {$ref: '#/components/parameters/secondValueQuery'}
+      - {$ref: '#/components/parameters/streamQuery'}
+      - {$ref: '#/components/parameters/minAttempts'}
+      - {$ref: '#/components/parameters/maxAttempts'}
+      - {$ref: '#/components/parameters/statusCodeQuery'}
+      - {$ref: '#/components/parameters/errorCodeQuery'}
+      - {$ref: '#/components/parameters/endReasonQuery'}
+      - {$ref: '#/components/parameters/deliveryQuery'}
+      - {$ref: '#/components/parameters/usageStatusQuery'}
+      - {$ref: '#/components/parameters/billedQuery'}
+      - {$ref: '#/components/parameters/attemptChannelQuery'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -1785,6 +1857,10 @@ paths:
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/streamQuery'}
+      - {$ref: '#/components/parameters/statusCodeQuery'}
+      - {$ref: '#/components/parameters/errorCodeQuery'}
+      - {$ref: '#/components/parameters/endReasonQuery'}
       - {$ref: '#/components/parameters/format'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
@@ -1865,6 +1941,7 @@ paths:
       security:
       - {sessionCookie: []}
       parameters:
+      - {in: query, name: transaction_id, schema: {type: string, format: uuid}}
       - {$ref: '#/components/parameters/pointsGroup'}
       - {$ref: '#/components/parameters/transactionType'}
       - {$ref: '#/components/parameters/apiKeyIDQuery'}
@@ -2668,6 +2745,65 @@ paths:
               schema: {$ref: '#/components/schemas/AdminOverview'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /api/admin/calls/analysis:
+    get:
+      operationId: analyzeAdminCalls
+      tags: [calls]
+      summary: 调用多维分析
+      description: 与调用列表同一筛选，最多366天；分位直接来自样本。channel 为最终渠道，error/status 为最后尝试；空值为未采集。前期对比使用紧邻且等长时间窗。最多1000分组，超限返回400要求缩小范围，不截断。
+      x-access: admin
+      x-feature: G
+      security:
+      - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/dimensionQuery'}
+      - {$ref: '#/components/parameters/dimensionValueQuery'}
+      - {$ref: '#/components/parameters/secondDimensionQuery'}
+      - {$ref: '#/components/parameters/secondValueQuery'}
+      - {$ref: '#/components/parameters/streamQuery'}
+      - {$ref: '#/components/parameters/minAttempts'}
+      - {$ref: '#/components/parameters/maxAttempts'}
+      - {$ref: '#/components/parameters/statusCodeQuery'}
+      - {$ref: '#/components/parameters/errorCodeQuery'}
+      - {$ref: '#/components/parameters/endReasonQuery'}
+      - {$ref: '#/components/parameters/deliveryQuery'}
+      - {$ref: '#/components/parameters/usageStatusQuery'}
+      - {$ref: '#/components/parameters/billedQuery'}
+      - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/requestID'}
+      - {$ref: '#/components/parameters/minDurationMs'}
+      - {$ref: '#/components/parameters/maxDurationMs'}
+      - {$ref: '#/components/parameters/minTokens'}
+      - {$ref: '#/components/parameters/maxTokens'}
+      - {$ref: '#/components/parameters/minCost'}
+      - {$ref: '#/components/parameters/maxCost'}
+      - {$ref: '#/components/parameters/modelQuery'}
+      - {$ref: '#/components/parameters/outcome'}
+      - {$ref: '#/components/parameters/apiKeyIDQuery'}
+      - {$ref: '#/components/parameters/tag'}
+      - {$ref: '#/components/parameters/format'}
+      - {$ref: '#/components/parameters/accountIDQuery'}
+      - {$ref: '#/components/parameters/channelIDQuery'}
+      - {$ref: '#/components/parameters/from'}
+      - {$ref: '#/components/parameters/to'}
+      - in: query
+        name: group_by
+        schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+      - in: query
+        name: split_by
+        schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+      - in: query
+        name: bucket_seconds
+        schema: {type: integer}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AnalysisReport'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /api/admin/calls:
     get:
       operationId: listAdminCalls
@@ -2679,6 +2815,20 @@ paths:
       security:
       - {sessionCookie: []}
       parameters:
+      - {$ref: '#/components/parameters/dimensionQuery'}
+      - {$ref: '#/components/parameters/dimensionValueQuery'}
+      - {$ref: '#/components/parameters/secondDimensionQuery'}
+      - {$ref: '#/components/parameters/secondValueQuery'}
+      - {$ref: '#/components/parameters/streamQuery'}
+      - {$ref: '#/components/parameters/minAttempts'}
+      - {$ref: '#/components/parameters/maxAttempts'}
+      - {$ref: '#/components/parameters/statusCodeQuery'}
+      - {$ref: '#/components/parameters/errorCodeQuery'}
+      - {$ref: '#/components/parameters/endReasonQuery'}
+      - {$ref: '#/components/parameters/deliveryQuery'}
+      - {$ref: '#/components/parameters/usageStatusQuery'}
+      - {$ref: '#/components/parameters/billedQuery'}
+      - {$ref: '#/components/parameters/attemptChannelQuery'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -3152,6 +3302,62 @@ components:
       required: false
       description: 请求 ID，精确匹配。
       schema: {type: string, format: uuid}
+    streamQuery:
+      in: query
+      name: stream
+      schema: {type: boolean}
+    minAttempts:
+      in: query
+      name: min_attempts
+      schema: {type: integer}
+    maxAttempts:
+      in: query
+      name: max_attempts
+      schema: {type: integer}
+    statusCodeQuery:
+      in: query
+      name: status_code
+      schema: {type: integer}
+    errorCodeQuery:
+      in: query
+      name: error_code
+      schema: {type: string}
+    endReasonQuery:
+      in: query
+      name: end_reason
+      schema: {type: string}
+    deliveryQuery:
+      in: query
+      name: delivery
+      schema: {type: string}
+    usageStatusQuery:
+      in: query
+      name: usage_status
+      schema: {type: string}
+    billedQuery:
+      in: query
+      name: billed
+      schema: {type: boolean}
+    attemptChannelQuery:
+      in: query
+      name: attempt_channel_id
+      schema: {type: string}
+    dimensionQuery:
+      in: query
+      name: dimension
+      schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+    dimensionValueQuery:
+      in: query
+      name: dimension_value
+      schema: {type: string}
+    secondDimensionQuery:
+      in: query
+      name: second_dimension
+      schema: {type: string, enum: [all, model, channel, format, stream, key, tag, account, outcome, error, error_code, status, stop, service_tier]}
+    secondValueQuery:
+      in: query
+      name: second_value
+      schema: {type: string}
     minDurationMs:
       name: min_duration_ms
       in: query
@@ -4578,9 +4784,140 @@ components:
         name: {type: string}
       required: [id, name]
       additionalProperties: false
+    AttemptTimeouts:
+      type: object
+      properties:
+        first_byte_ms: {type: integer}
+        idle_ms: {type: integer}
+        total_ms: {type: integer}
+      required: [first_byte_ms, idle_ms, total_ms]
+      additionalProperties: false
+    StageTiming:
+      type: object
+      properties:
+        stage: {type: string}
+        duration_ms: {type: number}
+      required: [stage, duration_ms]
+      additionalProperties: false
+    RouteDecision:
+      type: object
+      properties:
+        channel: {$ref: '#/components/schemas/ChannelRef'}
+        reason: {type: string}
+        rank: {type: integer}
+      required: [channel, reason, rank]
+      additionalProperties: false
+    CallDiagnostics:
+      type: object
+      properties:
+        stages: {type: array, items: {$ref: '#/components/schemas/StageTiming'}}
+        routing: {type: array, items: {$ref: '#/components/schemas/RouteDecision'}}
+        stop_reason: {type: string}
+        usage_status: {type: string}
+        delivery: {type: string}
+        frames: {type: integer}
+        max_frame_gap_ms: {type: [integer, 'null']}
+        upstream_bytes: {type: integer}
+        max_attempts: {type: integer}
+        call_timeout_ms: {type: integer}
+        drain_timeout_ms: {type: integer}
+      required: [stages, routing, stop_reason, usage_status, delivery, frames, max_frame_gap_ms, upstream_bytes, max_attempts, call_timeout_ms, drain_timeout_ms]
+      additionalProperties: false
+    AnalysisValues:
+      type: object
+      properties:
+        fallback_p95: {type: [number, 'null']}
+        fallback_p50: {type: [number, 'null']}
+        attempted: {type: integer, format: int64}
+        stream_finished: {type: integer, format: int64}
+        stream_interrupted: {type: integer, format: int64}
+        calls: {type: integer}
+        finished: {type: integer}
+        succeeded: {type: integer}
+        first_succeeded: {type: integer}
+        retried: {type: integer}
+        recovered: {type: integer}
+        attempts: {type: integer}
+        attempt_succeeded: {type: integer}
+        delivered: {type: integer}
+        delivery_known: {type: integer}
+        billed: {type: integer}
+        usage_reported: {type: integer}
+        usage_missing: {type: integer}
+        streamed: {type: integer}
+        input_tokens: {type: integer}
+        output_tokens: {type: integer}
+        cache_read_tokens: {type: integer}
+        cache_write_tokens: {type: integer}
+        charged: {$ref: '#/components/schemas/Amount'}
+        fee: {$ref: '#/components/schemas/Amount'}
+        interrupted: {type: integer}
+        disconnected: {type: integer}
+        unbilled: {type: integer}
+        ttft_p50: {type: [number, 'null']}
+        ttft_p95: {type: [number, 'null']}
+        ttft_p99: {type: [number, 'null']}
+        duration_p50: {type: [number, 'null']}
+        duration_p95: {type: [number, 'null']}
+        duration_p99: {type: [number, 'null']}
+        speed_p10: {type: [number, 'null']}
+        speed_p50: {type: [number, 'null']}
+        speed_p95: {type: [number, 'null']}
+        gap_p50: {type: [number, 'null']}
+        gap_p95: {type: [number, 'null']}
+        gap_p99: {type: [number, 'null']}
+        max_gap_p95: {type: [number, 'null']}
+        cost_p50: {type: [number, 'null']}
+        cost_p95: {type: [number, 'null']}
+        cost_p99: {type: [number, 'null']}
+        retry_p50: {type: [number, 'null']}
+        retry_p95: {type: [number, 'null']}
+        overhead_p50: {type: [number, 'null']}
+        overhead_p95: {type: [number, 'null']}
+        authentication_p95: {type: [number, 'null']}
+        request_p95: {type: [number, 'null']}
+        open_call_p95: {type: [number, 'null']}
+        admission_p95: {type: [number, 'null']}
+        routing_p95: {type: [number, 'null']}
+        pricing_p95: {type: [number, 'null']}
+        settlement_p95: {type: [number, 'null']}
+        client_write_p95: {type: [number, 'null']}
+      required: [fallback_p95, fallback_p50, attempted, stream_finished, stream_interrupted, calls, finished, succeeded, first_succeeded, retried, recovered, attempts, attempt_succeeded, delivered, delivery_known, billed, usage_reported, usage_missing, streamed, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, charged, fee, interrupted, disconnected, unbilled, ttft_p50, ttft_p95, ttft_p99, duration_p50, duration_p95, duration_p99, speed_p10, speed_p50, speed_p95, gap_p50, gap_p95, gap_p99, max_gap_p95, cost_p50, cost_p95, cost_p99, retry_p50, retry_p95, overhead_p50, overhead_p95, authentication_p95, request_p95, open_call_p95, admission_p95, routing_p95, pricing_p95, settlement_p95, client_write_p95]
+      additionalProperties: false
+    AnalysisRow:
+      type: object
+      properties:
+        key: {type: string}
+        label: {type: string}
+        split_key: {type: string}
+        split_label: {type: string}
+        values: {$ref: '#/components/schemas/AnalysisValues'}
+      required: [key, label, split_key, split_label, values]
+      additionalProperties: false
+    AnalysisReport:
+      type: object
+      properties:
+        from: {$ref: '#/components/schemas/Timestamp'}
+        to: {$ref: '#/components/schemas/Timestamp'}
+        previous_from: {$ref: '#/components/schemas/Timestamp'}
+        previous_to: {$ref: '#/components/schemas/Timestamp'}
+        group_by: {type: string}
+        split_by: {type: string}
+        bucket_seconds: {type: integer}
+        current: {$ref: '#/components/schemas/AnalysisValues'}
+        previous: {$ref: '#/components/schemas/AnalysisValues'}
+        groups: {type: array, items: {$ref: '#/components/schemas/AnalysisRow'}}
+        trend: {type: array, items: {$ref: '#/components/schemas/AnalysisRow'}}
+      required: [from, to, previous_from, previous_to, group_by, split_by, bucket_seconds, current, previous, groups, trend]
+      additionalProperties: false
     CallAttempt:
       type: object
       properties:
+        upstream_model: {type: string}
+        timeouts: {anyOf: [{$ref: '#/components/schemas/AttemptTimeouts'}, {type: 'null'}]}
+        offset_ms: {type: [integer, 'null']}
+        reused_connection: {type: [boolean, 'null']}
+        fallback_reason: {type: string}
         channel:
           anyOf:
           - {$ref: '#/components/schemas/ChannelRef'}
@@ -4593,7 +4930,7 @@ components:
         duration_ms: {type: [integer, 'null']}
         response_bytes: {type: [integer, 'null']}
         end_reason: {type: string, description: 例如 completed、upstream_error、timeout_ttft、timeout_total、client_disconnected。}
-      required: [channel, status_code, error_code, error_message, connect_ms, ttft_ms, duration_ms, response_bytes, end_reason]
+      required: [upstream_model, timeouts, offset_ms, reused_connection, fallback_reason, channel, status_code, error_code, error_message, connect_ms, ttft_ms, duration_ms, response_bytes, end_reason]
       additionalProperties: false
     CallSummary:
       type: object
@@ -4664,6 +5001,8 @@ components:
     CallDetail:
       type: object
       properties:
+        diagnostics: {anyOf: [{$ref: '#/components/schemas/CallDiagnostics'}, {type: 'null'}]}
+        upstream_response_id: {type: [string, 'null']}
         id: {type: string, format: uuid, description: 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         completed_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -4706,7 +5045,7 @@ components:
         inter_token_p95_ms: {type: [integer, 'null']}
         response_bytes: {type: [integer, 'null']}
         ledger_transaction_id: {type: [string, 'null'], format: uuid}
-      required: [id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, attempt_count, usage, cost, fee, charged, ttft_ms, duration_ms, routing_mode, routing_source, client_user_agent, attempts, price_snapshot, output_tokens_per_second, inter_token_p50_ms, inter_token_p95_ms, response_bytes, ledger_transaction_id]
+      required: [diagnostics, upstream_response_id, id, created_at, completed_at, model_id, requested_model, format, stream, tag, api_key, outcome, channel, attempt_count, usage, cost, fee, charged, ttft_ms, duration_ms, routing_mode, routing_source, client_user_agent, attempts, price_snapshot, output_tokens_per_second, inter_token_p50_ms, inter_token_p95_ms, response_bytes, ledger_transaction_id]
       additionalProperties: false
     CallDetailEnvelope:
       type: object

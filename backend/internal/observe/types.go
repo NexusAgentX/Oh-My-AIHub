@@ -11,6 +11,7 @@ package observe
 import (
 	"encoding/json"
 	"errors"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -48,15 +49,20 @@ func (u Usage) Total() int64 {
 
 // Attempt mirrors one element of calls.attempts as the gateway writes it.
 type Attempt struct {
-	Channel      *ChannelRef `json:"channel"`
-	StatusCode   *int        `json:"status_code"`
-	ErrorCode    *string     `json:"error_code"`
-	ErrorMessage *string     `json:"error_message"`
-	ConnectMS    *int        `json:"connect_ms"`
-	TTFTMS       *int        `json:"ttft_ms"`
-	DurationMS   *int        `json:"duration_ms"`
-	ResponseByte *int64      `json:"response_bytes"`
-	EndReason    string      `json:"end_reason"`
+	UpstreamModel    string                   `json:"upstream_model"`
+	Timeouts         *gateway.AttemptTimeouts `json:"timeouts"`
+	OffsetMS         *int                     `json:"offset_ms"`
+	ReusedConnection *bool                    `json:"reused_connection"`
+	FallbackReason   string                   `json:"fallback_reason"`
+	Channel          *ChannelRef              `json:"channel"`
+	StatusCode       *int                     `json:"status_code"`
+	ErrorCode        *string                  `json:"error_code"`
+	ErrorMessage     *string                  `json:"error_message"`
+	ConnectMS        *int                     `json:"connect_ms"`
+	TTFTMS           *int                     `json:"ttft_ms"`
+	DurationMS       *int                     `json:"duration_ms"`
+	ResponseByte     *int64                   `json:"response_bytes"`
+	EndReason        string                   `json:"end_reason"`
 }
 
 // Succeeded reports whether the attempt delivered the response.
@@ -73,7 +79,13 @@ func IsSuccess(outcome string) bool { return outcome == OutcomeSucceeded || outc
 
 // CallFilter selects calls. Empty strings and nil pointers mean "no filter".
 type CallFilter struct {
-	AccountID string
+	Dimension, DimensionValue, SecondDimension, SecondValue string
+	Stream                                                  *bool
+	MinAttempts, MaxAttempts, StatusCode                    *int
+	ErrorCode, EndReason, Delivery, UsageStatus             string
+	Billed                                                  *bool
+	AttemptChannelID                                        string
+	AccountID                                               string
 	// ScopeChannelID selects calls that served or attempted this channel
 	// (the channel owner's view).
 	ScopeChannelID string
@@ -166,6 +178,8 @@ func rate(part, whole int64) *float64 {
 
 // CallRecord is the complete stored call.
 type CallRecord struct {
+	Diagnostics        *gateway.Diagnostics
+	UpstreamResponseID *string
 	CallRow
 	RoutingMode     *string
 	RoutingSource   *string
@@ -334,10 +348,11 @@ type EntrySummary struct {
 
 // EntryFilter filters a user's ledger entries.
 type EntryFilter struct {
-	AccountID string
-	Type      string
-	APIKeyID  string
-	From, To  *time.Time
+	TransactionID string
+	AccountID     string
+	Type          string
+	APIKeyID      string
+	From, To      *time.Time
 }
 
 // ExportEntry is one ledger entry of a user for the CSV export.

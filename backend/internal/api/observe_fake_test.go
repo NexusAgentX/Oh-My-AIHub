@@ -15,6 +15,7 @@ import (
 // canned fixtures; every other query panics through the nil embedded
 // interface, which the PostgreSQL integration tests cover instead.
 type fakeObserveStore struct {
+	analysisFilter observe.CallFilter
 	observe.Store
 	exported []observe.ExportEntry
 
@@ -264,4 +265,9 @@ func (s *fakeObserveStore) Repair(_ context.Context, repair observe.Repair) (obs
 		return observe.RepairResult{}, nil
 	}
 	return observe.RepairResult{}, observe.ErrNotFound
+}
+
+func (s *fakeObserveStore) Analyze(ctx context.Context, f observe.CallFilter, g, sp string, b int) (observe.AnalysisReport, error) {
+	s.analysisFilter = f
+	return observe.AnalysisReport{From: *f.From, To: *f.To, PreviousFrom: f.From.Add(-f.To.Sub(*f.From)), PreviousTo: *f.From, GroupBy: g, SplitBy: sp, BucketSeconds: b}, nil
 }

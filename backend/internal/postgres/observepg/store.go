@@ -118,7 +118,8 @@ func (s *Store) snapshot(ctx context.Context, fn func(q *Queries) error) error {
 // ---- calls ----
 
 func callListParams(filter observe.CallFilter) ListCallsParams {
-	return ListCallsParams{
+	return ListCallsParams{Dimension: filter.Dimension, DimensionValue: filter.DimensionValue, SecondDimension: filter.SecondDimension, SecondValue: filter.SecondValue,
+		Stream: filter.Stream, MinAttempts: int32Of(filter.MinAttempts), MaxAttempts: int32Of(filter.MaxAttempts), StatusCode: int32Of(filter.StatusCode), Billed: filter.Billed, Delivery: nonEmpty(filter.Delivery), UsageStatus: nonEmpty(filter.UsageStatus), ErrorCode: nonEmpty(filter.ErrorCode), EndReason: nonEmpty(filter.EndReason), AttemptChannel: nonEmpty(filter.AttemptChannelID),
 		AccountID: nonEmpty(filter.AccountID), ScopeChannelID: nonEmpty(filter.ScopeChannelID), ScopeChannelText: nonEmpty(filter.ScopeChannelID),
 		FinalChannelID: nonEmpty(filter.FinalChannelID), ApiKeyID: nonEmpty(filter.APIKeyID), Model: nonEmpty(filter.Model),
 		Format: nonEmpty(filter.Format), Outcome: nonEmpty(filter.Outcome), Tag: nonEmpty(filter.Tag), RequestID: nonEmpty(filter.RequestID),
@@ -168,7 +169,8 @@ func (s *Store) ListCalls(ctx context.Context, filter observe.CallFilter, after 
 
 func (s *Store) CallStats(ctx context.Context, filter observe.CallFilter) (observe.CallStats, error) {
 	list := callListParams(filter)
-	row, err := s.q.CallStats(ctx, CallStatsParams{
+	row, err := s.q.CallStats(ctx, CallStatsParams{Dimension: list.Dimension, DimensionValue: list.DimensionValue, SecondDimension: list.SecondDimension, SecondValue: list.SecondValue,
+		Stream: list.Stream, MinAttempts: list.MinAttempts, MaxAttempts: list.MaxAttempts, StatusCode: list.StatusCode, Billed: list.Billed, Delivery: list.Delivery, UsageStatus: list.UsageStatus, ErrorCode: list.ErrorCode, EndReason: list.EndReason, AttemptChannel: list.AttemptChannel,
 		AccountID: list.AccountID, ScopeChannelID: list.ScopeChannelID, ScopeChannelText: list.ScopeChannelText, FinalChannelID: list.FinalChannelID,
 		ApiKeyID: list.ApiKeyID, Model: list.Model, Format: list.Format, Outcome: list.Outcome, Tag: list.Tag, RequestID: list.RequestID,
 		FromTime: list.FromTime, ToTime: list.ToTime, MinDuration: list.MinDuration, MaxDuration: list.MaxDuration,
@@ -204,6 +206,12 @@ func (s *Store) GetCall(ctx context.Context, id string) (observe.CallRecord, err
 		RoutingMode: call.RoutingMode, RoutingSource: call.RoutingSource, ClientUserAgent: call.ClientUserAgent,
 		Attempts: parseAttempts(call.Attempts), PriceSnapshot: json.RawMessage(call.PriceSnapshot), TokensPerSecond: call.OutputTokensPerSecond,
 		IntervalP50MS: intOf(call.InterTokenP50Ms), IntervalP95MS: intOf(call.InterTokenP95Ms), ResponseBytes: call.ResponseBytes,
+	}
+	record.UpstreamResponseID = call.UpstreamResponseID
+	if len(call.Diagnostics) > 0 {
+		if err := json.Unmarshal(call.Diagnostics, &record.Diagnostics); err != nil {
+			return observe.CallRecord{}, err
+		}
 	}
 	record.AttemptCount = len(record.Attempts)
 	if call.ApiKeyID != nil {
@@ -470,7 +478,7 @@ func (s *Store) EntrySummary(ctx context.Context, filter observe.EntryFilter, by
 	var summary observe.EntrySummary
 	if byDay {
 		rows, err := s.q.UserEntriesByDay(ctx, UserEntriesByDayParams{
-			AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, FromTime: filter.From, ToTime: filter.To,
+			AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, TransactionID: filter.TransactionID, FromTime: filter.From, ToTime: filter.To,
 		})
 		if err != nil {
 			return summary, err
@@ -481,7 +489,7 @@ func (s *Store) EntrySummary(ctx context.Context, filter observe.EntryFilter, by
 	}
 	if byKey {
 		rows, err := s.q.UserEntriesByKey(ctx, UserEntriesByKeyParams{
-			AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, FromTime: filter.From, ToTime: filter.To,
+			AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, TransactionID: filter.TransactionID, FromTime: filter.From, ToTime: filter.To,
 		})
 		if err != nil {
 			return summary, err
@@ -499,7 +507,7 @@ func (s *Store) EntrySummary(ctx context.Context, filter observe.EntryFilter, by
 
 func (s *Store) ExportEntries(ctx context.Context, filter observe.EntryFilter, limit int) ([]observe.ExportEntry, error) {
 	rows, err := s.q.ExportUserEntries(ctx, ExportUserEntriesParams{
-		AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, FromTime: filter.From, ToTime: filter.To, RowLimit: int32(limit),
+		AccountID: filter.AccountID, Type: filter.Type, ApiKeyID: filter.APIKeyID, TransactionID: filter.TransactionID, FromTime: filter.From, ToTime: filter.To, RowLimit: int32(limit),
 	})
 	if err != nil {
 		return nil, err
