@@ -31,21 +31,25 @@ type Service struct {
 func NewService(dependencies Dependencies) *Service { return &Service{Dependencies: dependencies} }
 
 type CreateInput struct {
-	Name     string
-	BaseURL  string
-	APIKey   string
-	Status   Status
-	Models   []Model
-	Advanced Advanced
+	Name        string
+	Summary     string
+	Description string
+	BaseURL     string
+	APIKey      string
+	Status      Status
+	Models      []Model
+	Advanced    Advanced
 }
 
 type UpdateInput struct {
-	Name     *string
-	BaseURL  *string
-	APIKey   *string
-	Status   *Status
-	Models   *[]Model
-	Advanced *Advanced
+	Name        *string
+	Summary     *string
+	Description *string
+	BaseURL     *string
+	APIKey      *string
+	Status      *Status
+	Models      *[]Model
+	Advanced    *Advanced
 }
 
 func (s *Service) outbound(ctx context.Context) (Outbound, error) {
@@ -93,7 +97,7 @@ func (s *Service) Create(ctx context.Context, ownerID string, in CreateInput) (C
 	if in.Status == "" {
 		in.Status = StatusListed
 	}
-	if !validName(in.Name) || !validCredential(strings.TrimSpace(in.APIKey)) || (in.Status != StatusListed && in.Status != StatusUnlisted) {
+	if utf8.RuneCountInString(in.Summary) > 160 || utf8.RuneCountInString(in.Description) > 8000 || !validName(in.Name) || !validCredential(strings.TrimSpace(in.APIKey)) || (in.Status != StatusListed && in.Status != StatusUnlisted) {
 		return Channel{}, ErrInvalidInput
 	}
 	if err := ValidateAdvanced(in.Advanced); err != nil {
@@ -123,7 +127,7 @@ func (s *Service) Create(ctx context.Context, ownerID string, in CreateInput) (C
 		models[index].Enabled = true
 	}
 	return s.Store.Create(ctx, NewChannel{
-		ID: id, OwnerID: ownerID, Name: in.Name, BaseURL: baseURL, Credential: credential,
+		ID: id, OwnerID: ownerID, Name: in.Name, Summary: strings.TrimSpace(in.Summary), Description: strings.TrimSpace(in.Description), BaseURL: baseURL, Credential: credential,
 		Status: in.Status, Advanced: in.Advanced, Models: models,
 	})
 }
@@ -158,7 +162,10 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, in UpdateInput
 	if err != nil {
 		return Channel{}, err
 	}
-	update := Update{}
+	update := Update{Summary: in.Summary, Description: in.Description}
+	if (in.Summary != nil && utf8.RuneCountInString(*in.Summary) > 160) || (in.Description != nil && utf8.RuneCountInString(*in.Description) > 8000) {
+		return Channel{}, ErrInvalidInput
+	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if !validName(name) {

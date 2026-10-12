@@ -182,3 +182,10 @@ sql:
         <<: *gen
         package: forumpg
         out: internal/postgres/forumpg
+  - <<: *domain
+    queries: internal/postgres/supplierpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: supplierpg
+        out: internal/postgres/supplierpg

@@ -25,6 +25,404 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/admin/suppliers/preview:
+    post:
+      operationId: previewSupplierImpact
+      tags: [channels]
+      summary: 预览地址将关联的已上架渠道数量
+      x-access: admin
+      x-feature: '407'
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SupplierImpactInput'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupplierImpact'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /api/suppliers:
+    get:
+      operationId: listSuppliers
+      tags:
+        - channels
+      summary: listSuppliers
+      x-access: ready
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+  /api/suppliers/{supplierID}:
+    get:
+      operationId: getSupplier
+      tags:
+        - channels
+      summary: getSupplier
+      x-access: ready
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: supplierID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/suppliers/recognize:
+    post:
+      operationId: recognizeSupplier
+      tags:
+        - channels
+      summary: recognizeSupplier
+      x-access: ready
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierRecognition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierRecognitionInput'
+  /api/channel-hall:
+    get:
+      operationId: listChannelHall
+      tags:
+        - channels
+      summary: listChannelHall
+      x-access: ready
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: supplier
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+  /api/channel-hall/{channelID}:
+    get:
+      operationId: getHallChannel
+      tags:
+        - channels
+      summary: getHallChannel
+      x-access: ready
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallChannel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: channelID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/admin/suppliers:
+    get:
+      operationId: adminListSuppliers
+      tags:
+        - channels
+      summary: adminListSuppliers
+      x-access: admin
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSupplierList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+    post:
+      operationId: createSupplier
+      tags:
+        - channels
+      summary: createSupplier
+      x-access: admin
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSupplier'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierInput'
+  /api/admin/suppliers/{supplierID}:
+    put:
+      operationId: updateSupplier
+      tags:
+        - channels
+      summary: updateSupplier
+      x-access: admin
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSupplier'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+        - name: supplierID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierInput'
+  /api/admin/suppliers/icon:
+    post:
+      operationId: fetchSupplierIcon
+      tags:
+        - channels
+      summary: fetchSupplierIcon
+      x-access: admin
+      x-feature: '407'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierIcon'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierIconInput'
   "/api/forum/boards":
     get:
       operationId: listForumBoards
@@ -4231,6 +4629,8 @@ components:
       type: object
       description: 我的渠道；上游 Key 不回显。
       properties:
+        summary: {type: string, maxLength: 160}
+        description: {type: string, maxLength: 8000}
         id: {type: string, format: uuid}
         name: {type: string}
         base_url: {type: string}
@@ -4244,7 +4644,7 @@ components:
         today: {$ref: '#/components/schemas/ChannelToday'}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at]
+      required: [summary, description, id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at]
       additionalProperties: false
     ChannelList:
       type: object
@@ -4309,6 +4709,8 @@ components:
     ChannelCreateRequest:
       type: object
       properties:
+        summary: {type: string, maxLength: 160}
+        description: {type: string, maxLength: 8000}
         name: {type: string, minLength: 1, maxLength: 64}
         base_url: {type: string}
         api_key: {type: string}
@@ -4323,6 +4725,8 @@ components:
     ChannelUpdateRequest:
       type: object
       properties:
+        summary: {type: string, maxLength: 160}
+        description: {type: string, maxLength: 8000}
         name: {type: string, minLength: 1, maxLength: 64}
         base_url: {type: string}
         api_key: {type: string, description: 提供时替换上游 Key。}
@@ -5224,6 +5628,8 @@ components:
       type: object
       description: 管理员视角的渠道；上游 Key 不回显。
       properties:
+        summary: {type: string, maxLength: 160}
+        description: {type: string, maxLength: 8000}
         id: {type: string, format: uuid}
         name: {type: string}
         base_url: {type: string}
@@ -5238,7 +5644,7 @@ components:
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
         owner: {$ref: '#/components/schemas/AccountRef'}
-      required: [id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at, owner]
+      required: [summary, description, id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at, owner]
       additionalProperties: false
     AdminChannelPage:
       type: object
@@ -5579,4 +5985,350 @@ components:
         call: {$ref: '#/components/schemas/CallDetail'}
         transaction_id: {type: [string, 'null'], format: uuid}
       required: [call, transaction_id]
+      additionalProperties: false
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+            - official
+            - relay
+        summary:
+          type: string
+        description:
+          type: string
+        website_url:
+          type: string
+        docs_url:
+          type: string
+        status_url:
+          type: string
+        icon_data:
+          type: string
+        icon_source:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - kind
+        - summary
+        - description
+        - website_url
+        - docs_url
+        - status_url
+        - icon_data
+        - icon_source
+        - updated_at
+      additionalProperties: false
+    SupplierEndpoint:
+      type: object
+      properties:
+        base_url:
+          type: string
+        label:
+          type: string
+      required:
+        - base_url
+        - label
+      additionalProperties: false
+    AdminSupplier:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+            - official
+            - relay
+        summary:
+          type: string
+        description:
+          type: string
+        website_url:
+          type: string
+        docs_url:
+          type: string
+        status_url:
+          type: string
+        icon_data:
+          type: string
+        icon_source:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        visible:
+          type: boolean
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierEndpoint'
+        linked_channels:
+          type: integer
+      required:
+        - id
+        - name
+        - kind
+        - summary
+        - description
+        - website_url
+        - docs_url
+        - status_url
+        - icon_data
+        - icon_source
+        - updated_at
+        - visible
+        - endpoints
+        - linked_channels
+      additionalProperties: false
+    SupplierInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        kind:
+          type: string
+          enum:
+            - official
+            - relay
+        summary:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 8000
+        website_url:
+          type: string
+        docs_url:
+          type: string
+        status_url:
+          type: string
+        icon_data:
+          type: string
+        icon_source:
+          type: string
+        visible:
+          type: boolean
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierEndpoint'
+          maxItems: 32
+      required:
+        - name
+        - kind
+        - summary
+        - description
+        - website_url
+        - docs_url
+        - status_url
+        - icon_data
+        - icon_source
+        - visible
+        - endpoints
+      additionalProperties: false
+    SupplierList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Supplier'
+        next_cursor:
+          type:
+            - string
+            - 'null'
+      required:
+        - items
+        - next_cursor
+      additionalProperties: false
+    AdminSupplierList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminSupplier'
+        next_cursor:
+          type:
+            - string
+            - 'null'
+      required:
+        - items
+        - next_cursor
+      additionalProperties: false
+    SupplierRecognition:
+      type: object
+      properties:
+        supplier:
+          anyOf:
+            - $ref: '#/components/schemas/Supplier'
+            - type: 'null'
+      required:
+        - supplier
+      additionalProperties: false
+    SupplierRecognitionInput:
+      type: object
+      properties:
+        base_url:
+          type: string
+      required:
+        - base_url
+      additionalProperties: false
+    SupplierIcon:
+      type: object
+      properties:
+        icon_data:
+          type: string
+        icon_source:
+          type: string
+      required:
+        - icon_data
+        - icon_source
+      additionalProperties: false
+    SupplierIconInput:
+      type: object
+      properties:
+        website_url:
+          type: string
+      required:
+        - website_url
+      additionalProperties: false
+    HallOffer:
+      type: object
+      properties:
+        model:
+          $ref: '#/components/schemas/CatalogModel'
+        multiplier:
+          type: string
+        effective_multiplier:
+          type: string
+        fx_discount:
+          type: boolean
+      required:
+        - model
+        - multiplier
+        - effective_multiplier
+        - fx_discount
+      additionalProperties: false
+    HallChannel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        summary:
+          type: string
+        description:
+          type: string
+        owner:
+          $ref: '#/components/schemas/Party'
+        is_mine:
+          type: boolean
+        supplier:
+          anyOf:
+            - $ref: '#/components/schemas/Supplier'
+            - type: 'null'
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallOffer'
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format'
+        state:
+          type: string
+          enum:
+            - available
+            - cooldown
+            - limited
+        cooldown_remaining_seconds:
+          type:
+            - integer
+            - 'null'
+        success_rate_24h:
+          type:
+            - string
+            - 'null'
+        ttft_p50_ms:
+          type:
+            - integer
+            - 'null'
+      required:
+        - id
+        - name
+        - summary
+        - description
+        - owner
+        - is_mine
+        - supplier
+        - models
+        - formats
+        - state
+        - cooldown_remaining_seconds
+        - success_rate_24h
+        - ttft_p50_ms
+      additionalProperties: false
+    HallList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallChannel'
+        next_cursor:
+          type:
+            - string
+            - 'null'
+      required:
+        - items
+        - next_cursor
+      additionalProperties: false
+    SupplierDetail:
+      type: object
+      properties:
+        supplier:
+          $ref: '#/components/schemas/Supplier'
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallChannel'
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogModel'
+      required:
+        - supplier
+        - channels
+        - models
+      additionalProperties: false
+    SupplierImpactInput:
+      type: object
+      properties:
+        endpoints: {type: array, maxItems: 32, items: {$ref: '#/components/schemas/SupplierEndpoint'}}
+      required: [endpoints]
+      additionalProperties: false
+    SupplierImpact:
+      type: object
+      properties:
+        linked_channels: {type: integer, minimum: 0}
+      required: [linked_channels]
       additionalProperties: false

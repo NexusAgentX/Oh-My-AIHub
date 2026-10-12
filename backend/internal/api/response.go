@@ -20,6 +20,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
@@ -63,6 +64,12 @@ func writeInvalidJSON(w http.ResponseWriter) {
 
 func writeDomainError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, supplier.ErrInvalid):
+		writeError(w, 422, "invalid_supplier", "供应商资料或图标无效，请检查 HTTPS 地址与字段长度")
+	case errors.Is(err, supplier.ErrConflict):
+		writeError(w, 409, "supplier_endpoint_conflict", "API 地址已被其他供应商使用")
+	case errors.Is(err, supplier.ErrNotFound):
+		writeError(w, 404, "not_found", "资源不存在")
 	case errors.Is(err, identity.ErrAccountDisabled):
 		writeError(w, http.StatusForbidden, "account_disabled", "账号已停用，请联系管理员")
 	case errors.Is(err, identity.ErrInvalidCredentials):

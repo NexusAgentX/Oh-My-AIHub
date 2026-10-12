@@ -4,7 +4,7 @@ const time = '2026-10-12T12:00:00Z'
 const prices = { input: '1', output: '4', cache_write: '1', cache_read: '0.1' }
 export const detail: ChannelDetail = {
   channel: {
-    id: 'demo', name: '示例共享渠道', base_url: 'https://upstream.example/v1', status: 'listed',
+    id: 'demo', summary: '', description: '', name: '示例共享渠道', base_url: 'https://upstream.example/v1', status: 'listed',
     suspended_reason: null, cooldown_until: null, created_at: time, updated_at: time,
     today: { revenue: '14.8', calls: 1377, success_rate: '0.993' },
     advanced: { user_agent: null, header_rules: { set: [], remove: [] }, concurrency_limit: null, rpm_limit: null,

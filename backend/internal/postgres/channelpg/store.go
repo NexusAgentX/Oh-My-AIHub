@@ -66,7 +66,7 @@ func decodeRules(raw []byte) channel.HeaderRules {
 func toChannel(row GetChannelRow) channel.Channel {
 	return channel.Channel{
 		ID: row.ID, Owner: channel.Owner{ID: row.OwnerID, Username: row.OwnerUsername, DisplayName: row.OwnerDisplayName},
-		Name: row.Name, BaseURL: row.BaseUrl, Status: channel.Status(row.Status), SuspendedReason: row.SuspendedReason,
+		Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, Status: channel.Status(row.Status), SuspendedReason: row.SuspendedReason,
 		Advanced: channel.Advanced{
 			UserAgent: row.UserAgent, HeaderRules: decodeRules(row.HeaderRules),
 			ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
@@ -237,7 +237,7 @@ func (s *Store) Create(ctx context.Context, in channel.NewChannel) (channel.Chan
 	err = pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := New(tx)
 		if err := q.InsertChannel(ctx, InsertChannelParams{
-			ID: in.ID, OwnerID: in.OwnerID, Name: in.Name, BaseUrl: in.BaseURL,
+			ID: in.ID, OwnerID: in.OwnerID, Name: in.Name, Summary: in.Summary, Description: in.Description, BaseUrl: in.BaseURL,
 			ApiKeyCiphertext: in.Credential.Ciphertext, ApiKeyNonce: in.Credential.Nonce, ApiKeyKeyID: in.Credential.KeyID,
 			Status: string(in.Status), UserAgent: in.Advanced.UserAgent, HeaderRules: rules,
 			ConcurrencyLimit: in.Advanced.ConcurrencyLimit, RpmLimit: in.Advanced.RPMLimit, DailyRevenueCapNano: in.Advanced.DailyRevenueCap,
@@ -323,7 +323,7 @@ func (s *Store) Update(ctx context.Context, id string, update channel.Update) (c
 			value := string(*update.Status)
 			status = &value
 		}
-		if err := q.UpdateChannelFields(ctx, UpdateChannelFieldsParams{ID: id, Name: update.Name, BaseUrl: update.BaseURL, Status: status}); err != nil {
+		if err := q.UpdateChannelFields(ctx, UpdateChannelFieldsParams{ID: id, Name: update.Name, Summary: update.Summary, Description: update.Description, BaseUrl: update.BaseURL, Status: status}); err != nil {
 			return err
 		}
 		if status != nil && *status != current {

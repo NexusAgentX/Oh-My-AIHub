@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"net"
 	"net/http"
@@ -78,7 +80,7 @@ func (s *fakeChannelStore) Create(_ context.Context, n channel.NewChannel) (chan
 	rate := 0.5
 	created := s.tick()
 	item := &fakeStoredChannel{Channel: channel.Channel{
-		ID: n.ID, Owner: s.owner(n.OwnerID), Name: n.Name, BaseURL: n.BaseURL, Status: n.Status, Advanced: n.Advanced,
+		ID: n.ID, Owner: s.owner(n.OwnerID), Name: n.Name, Summary: n.Summary, Description: n.Description, BaseURL: n.BaseURL, Status: n.Status, Advanced: n.Advanced,
 		Models: slices.Clone(n.Models), Today: channel.Today{Revenue: money.FromNano(1_500_000_000), Calls: 2, SuccessRate: &rate},
 		CreatedAt: created, UpdatedAt: created,
 	}, credential: n.Credential}
@@ -149,6 +151,12 @@ func (s *fakeChannelStore) Update(_ context.Context, id string, update channel.U
 	item, err := s.find(id)
 	if err != nil {
 		return channel.Channel{}, err
+	}
+	if update.Summary != nil {
+		item.Summary = *update.Summary
+	}
+	if update.Description != nil {
+		item.Description = *update.Description
 	}
 	if update.Name != nil {
 		item.Name = *update.Name
@@ -400,6 +408,9 @@ func newFakeUpstream(t *testing.T) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body)
 		switch {
+		case r.URL.Path == "/apple-touch-icon.png":
+			w.Header().Set("Content-Type", "image/png")
+			_ = png.Encode(w, image.NewNRGBA(image.Rect(0, 0, 16, 16)))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/models" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer "):
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"data":[{"id":"deepseek-chat"},{"id":"some-unlisted-model"}]}`)

@@ -25,7 +25,7 @@ export const productNavigation: NavGroup[] = [
   },
   {
     label: '共享',
-    items: [{ label: '我的渠道', to: '/channels', icon: 'server' }],
+    items: [{ label: '渠道大厅', to: '/channel-hall', icon: 'layers' }, { label: '供应商', to: '/suppliers', icon: 'globe' }, { label: '我的渠道', to: '/channels', icon: 'server' }],
   },
   {
     label: '积分',
@@ -52,7 +52,7 @@ export type MobileTab = {
 export const mobileTabs: MobileTab[] = [
   { label: '首页', to: '/home', icon: 'home' },
   { label: '模型', to: '/models', icon: 'store' },
-  { label: '渠道', to: '/channels', icon: 'server' },
+  { label: '渠道', to: '/channel-hall', icon: 'server', also: ['/channels', '/suppliers'] },
   { label: '积分', to: '/points', icon: 'wallet' },
   { label: '我的', to: '/me', icon: 'account', also: ['/keys', '/usage', '/account', '/forum'] },
 ]
