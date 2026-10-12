@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { errorMessage } from '../api/query'
 import type { CallDetail, CallStats } from '../api/types'
-import { Button, QueryBoundary } from '../ui'
+import { Button, InlineError, QueryBoundary } from '../ui'
 import { CallDetailDrawer } from './CallDetail'
 import { CallStatsBar } from './CallStatsBar'
 import { CallTable, type CallColumn, type CallRowBase } from './CallTable'
@@ -29,6 +30,7 @@ export function matchesFilters(row: CallRowBase & Record<string, unknown>, param
  * 用户用量页、渠道编辑页与管理员调用页共用；接口路径与列由调用方决定。
  */
 export function CallExplorer<T extends CallRowBase>({
+  pageSize,
   caption,
   listPath,
   streamPath,
@@ -40,6 +42,8 @@ export function CallExplorer<T extends CallRowBase>({
   openCallId,
   onOpenCall,
 }: {
+  /** 有值时每页固定条数，翻页替换列表；省略时加载更多。 */
+  pageSize?: number
   caption: string
   listPath: string
   /** 提供时显示「实时」开关 */
@@ -54,7 +58,9 @@ export function CallExplorer<T extends CallRowBase>({
   openCallId?: string | null
   onOpenCall?: (id: string | null) => void
 }) {
-  const pages = useCallPages<Page<T>>(listPath, params)
+  const pages = useCallPages<Page<T>>(listPath, params, { limit: pageSize })
+  const [page, setPage] = useState(0)
+  const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
   const [live, setLive] = useState(false)
   const stream = useCallStream<T>(live && streamPath ? streamPath : null)
   const [localOpen, setLocalOpen] = useState<string | null>(null)
@@ -72,6 +78,16 @@ export function CallExplorer<T extends CallRowBase>({
     return [...fresh, ...loaded.filter((row) => !seen.has(row.id))]
   }, [fresh, loaded])
   const highlight = useMemo(() => new Set(fresh.map((row) => row.id)), [fresh])
+  const displayed = pageSize
+    ? currentPage === 0 ? rows.slice(0, pageSize) : pages.data?.pages[currentPage]?.items ?? []
+    : rows
+  const nextPage = async () => {
+    if (currentPage + 1 < (pages.data?.pages.length ?? 0)) setPage(currentPage + 1)
+    else {
+      const result = await pages.fetchNextPage()
+      if (!result.isError && (result.data?.pages.length ?? 0) > currentPage + 1) setPage(currentPage + 1)
+    }
+  }
   const summary = pages.data?.pages[0]?.summary
 
   return (
@@ -82,6 +98,7 @@ export function CallExplorer<T extends CallRowBase>({
           <LiveToggle
             enabled={live}
             onChange={(value) => {
+              setPage(0)
               setLive(value)
               if (!value) stream.clear()
             }}
@@ -99,9 +116,15 @@ export function CallExplorer<T extends CallRowBase>({
               columns={columns}
               highlight={highlight}
               onSelect={detailPath ? (row) => setSelected(row.id) : undefined}
-              rows={data}
+              rows={pageSize ? displayed : data}
             />
-            {pages.hasNextPage && (
+            {pageSize && pages.isFetchNextPageError && <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>}
+            {pageSize && <nav aria-label="调用记录分页" className="channel-record-pages">
+              <Button variant="secondary" size="sm" disabled={currentPage === 0 || pages.isFetchingNextPage} onClick={() => setPage(currentPage - 1)}>上一页</Button>
+              <span className="muted num">第 {currentPage + 1} 页</span>
+              <Button variant="secondary" size="sm" loading={pages.isFetchingNextPage} disabled={live || (!pages.hasNextPage && currentPage + 1 >= (pages.data?.pages.length ?? 0))} onClick={() => void nextPage()}>下一页</Button>
+            </nav>}
+            {!pageSize && pages.hasNextPage && (
               <div className="table-pagination">
                 <Button
                   loading={pages.isFetchingNextPage}

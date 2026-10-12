@@ -123,3 +123,14 @@
 
 .model-row-actions { display: flex; align-items: center; gap: 4px; }
 .model-row-formats { min-width: 0; }
+
+.channel-health,
+.channel-settings { display: grid; gap: var(--space-4); }
+.channel-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
+.channel-save-bar { position: sticky; top: calc(var(--topbar-height) + var(--space-2)); z-index: 10; padding: var(--space-3); border: var(--sticker-border); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--shadow-sm); }
+.channel-save-bar .form-actions { margin: 0; }
+.channel-record-pages { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); }
+.channel-record-pages > span { font-size: var(--text-xs); }
+@media (max-width: 960px) {
+  .channel-chart-grid { grid-template-columns: minmax(0, 1fr); }
+}
