@@ -15,6 +15,8 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   saved = undefined
   vi.stubGlobal('fetch', vi.fn(async (input: string, options?: RequestInit) => {
+    // 用慢于旧等待窗口的响应验证测试不会提前断言。
+    await new Promise((resolve) => setTimeout(resolve, 35))
     if (options?.method === 'PATCH') {
       saved = JSON.parse(String(options.body))
       return new Response(JSON.stringify({ channel: detail.channel }))
@@ -26,7 +28,7 @@ beforeEach(async () => {
   document.body.append(host)
   root = createRoot(host)
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/channels/demo']}><Routes><Route path="/channels/:id" element={<ChannelEditorPage />} /></Routes></MemoryRouter></QueryClientProvider>))
-  await settle()
+  await waitForUI(() => expect(host.querySelectorAll('.channel-failures li')).toHaveLength(3))
 })
 afterEach(async () => {
   await act(async () => root.unmount())
@@ -34,12 +36,23 @@ afterEach(async () => {
   host.remove()
   vi.unstubAllGlobals()
 })
-async function settle() { await act(async () => { await new Promise((resolve) => setTimeout(resolve, 15)) }) }
+async function waitForUI(assertion: () => void) {
+  const deadline = Date.now() + 2000
+  for (;;) {
+    // 在 act 内交还事件循环，直到具体界面断言通过，超时则保留断言错误。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    try {
+      assertion()
+      return
+    } catch (error) {
+      if (Date.now() >= deadline) throw error
+    }
+  }
+}
 async function click(text: string, scope: ParentNode = host) {
   const button = [...scope.querySelectorAll('button')].find((item) => item.textContent === text)
   expect(button, text).toBeDefined()
   await act(async () => button!.click())
-  await settle()
 }
 function panel() { return host.querySelector('[role="tabpanel"]')! }
 
@@ -58,28 +71,27 @@ it('opens a bounded overview, preserves the configuration draft across sections,
   await click('模型与配置')
   expect(host.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('未保存的名称')
   await click('保存')
+  await waitForUI(() => expect(host.querySelector('.success-message')?.textContent).toBe('已保存'))
   expect(saved?.name).toBe('未保存的名称')
   expect(saved).not.toHaveProperty('api_key')
-  expect(host.textContent).toContain('已保存')
 })
 
 it('pages calls without accumulating rows and resets pagination when filters change', async () => {
   await click('调用记录')
-  expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
+  await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(20))
   await click('下一页')
+  await waitForUI(() => expect(host.textContent).toContain('call-model-20'))
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
-  expect(host.textContent).toContain('call-model-20')
   expect(host.textContent).not.toContain('call-model-0')
   await click('下一页')
-  expect(host.querySelectorAll('tbody tr')).toHaveLength(5)
+  await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(5))
   expect([...host.querySelectorAll('button')].find((b) => b.textContent === '下一页')?.disabled).toBe(true)
   await click('上一页')
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
   const select = host.querySelector<HTMLSelectElement>('select[aria-label="结果"]')!
   await act(async () => { select.value = 'upstream_failed'; select.dispatchEvent(new Event('change', { bubbles: true })) })
-  await settle()
+  await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(9))
   expect(host.textContent).toContain('第 1 页')
-  expect(host.querySelectorAll('tbody tr')).toHaveLength(9)
 })
 
 it('opens recent anomalies separately and pages failures and health events', async () => {
@@ -105,7 +117,9 @@ it('keeps live calls bounded and returns to the first page when live mode starts
     close() {}
   })
   await click('调用记录')
+  await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(20))
   await click('下一页')
+  await waitForUI(() => expect(host.textContent).toContain('第 2 页'))
   await act(async () => (host.querySelector('[role="switch"]') as HTMLElement).click())
   expect(host.textContent).toContain('第 1 页')
   await act(async () => {
@@ -119,12 +133,13 @@ it('keeps live calls bounded and returns to the first page when live mode starts
 
 it('keeps the current call page on a pagination error and allows retrying', async () => {
   await click('调用记录')
+  await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(20))
   vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: '翻页请求失败' } }), { status: 500 }))
   await click('下一页')
   expect(host.textContent).toContain('第 1 页')
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
-  expect(host.querySelector('[role="alert"]')).not.toBeNull()
+  await waitForUI(() => expect(host.querySelector('[role="alert"]')).not.toBeNull())
   await click('下一页')
-  expect(host.textContent).toContain('第 2 页')
+  await waitForUI(() => expect(host.textContent).toContain('第 2 页'))
   expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
 })
