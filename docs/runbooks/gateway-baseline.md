@@ -26,6 +26,8 @@
 | `backend/internal/gatewaybench` | 四种格式的模拟上游（首字时间、块间隔、token 数、usage 帧可配）、压测程序（并发数与 QPS，开环或闭环）、测试 CA、数据库语句计数器。有单元测试，随 `go test ./...` 运行 |
 | `backend/internal/gateway/stream_bench_test.go`、`request_bench_test.go` | 不要网络和数据库的 Go 基准，用来单看一个函数的代价：`stream_bench_test.go` 把基线模拟上游的四种流（1000 token）依次送过旁路解析器、纯用量帧过滤器和整个 `streamBack` 写回路径；`request_bench_test.go` 比较请求体的读取、扫描与拼接和它们改进前的做法。运行：`go -C backend test ./internal/gateway -run '^$' -bench . -benchmem`；分配次数与字节数是确定的，耗时依赖机器 |
 | `backend/internal/postgres/gateway_perf_*_test.go` | 带 build tag `perfbaseline` 的测试：同一进程里启动真实的网关引擎、API 处理器、PostgreSQL、模拟上游与压测程序，跑场景并输出报告。普通 `go test ./...` 与 CI 不编译它们（`mise run lint-backend` 会带上这个 tag 做静态检查，防止它悄悄编译不过） |
+| `.github/workflows/perf-baseline.yml`、`scripts/perf-ab.sh` | 在 GitHub 托管的 Linux 机器上手动运行基线，让两份代码交替运行并出对比表，见下文“在 GitHub Actions 上运行”。不是必需检查，也不在 push 或 PR 上自动运行 |
+| `backend/internal/gatewaybench/perfcompare` | 把 `results.json` 汇总成 Markdown 对比表（中位数、范围、相对变化）的命令，有单元测试，随 `go test ./...` 运行 |
 
 ### 出站限制没有被放宽
 
@@ -93,6 +95,52 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 - 闭环负载（并发场景）的 worker 在一条回答的时间内错开启动；一起启动、回答又一样长的 worker 会成批到达，成批结算，量到的是人为的排队。
 
 模拟上游贴着真实 API 的形状：OpenAI Chat 流式只在请求带 `stream_options.include_usage` 时才发纯用量帧（网关替客户端打开它，所以会经过纯用量帧过滤）、每块带 `"usage":null`；Anthropic 的 `message_start` 带输入、`message_delta` 带输出；Gemini 每块重复累计用量；Responses 的最后一个事件重复整段文本。
+
+## 在 GitHub Actions 上运行
+
+维护者的笔记本不安静（别的开发任务、内存换页、热压力、休眠、换网络），本机测出的延迟、CPU 与 QPS 可信度低。公开仓库用 GitHub 托管的标准 Linux x64 机器（`ubuntu-24.04`，4 vCPU、16 GB，与生产 VPS 同架构同核数同内存）不限时长，所以延迟、CPU 与 QPS 的前后对比放到那里测。工作流是 `.github/workflows/perf-baseline.yml`，只手动触发。
+
+### 触发
+
+```sh
+gh workflow run perf-baseline.yml -f base_ref=9d551df -f head_ref=main
+gh run watch    # 选择刚触发的运行；默认参数一个作业要数小时（作业上限 300 分钟）
+```
+
+工作流文件必须先在默认分支上才能手动触发。输入：
+
+| 输入 | 默认 | 说明 |
+| --- | --- | --- |
+| `base_ref` / `head_ref` | `main` / `main` | A 侧与 B 侧：分支、tag 或提交（短 SHA 可用）。工作流先把它们解析成提交，所有并行作业测同一对提交 |
+| `scenarios` | `nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream` | 语法同 `-perf.scenarios`；`<场景>@<速率>` 表示以 `-perf.qps=<速率>` 单独运行（`nonstream@200` 是 200 次/秒的非流式），场景限 `nonstream`、`stream`、`budget`、`sticky` |
+| `repeat` | 3 | 轮数：每轮把每个场景在两侧各测一次 |
+| `jobs` | 1 | 并行作业数，每个作业在自己的机器上完整跑一遍；用来量同一对提交在不同机器上的波动，不用来加速 |
+| `tool_args` | 空 | 传给基线工具的额外参数，只接受 `-perf.<名称>=<值>`，如 `-perf.duration=10s -perf.sweepstep=5s` |
+
+### 一个作业里做什么
+
+- 检出 `base_ref` 与 `head_ref` 两份代码，各自编译带 `-tags perfbaseline` 的测试二进制；PostgreSQL 18 是服务容器，参数同 `ci.yml` 的 `integration` 作业。两边用同一个数据库实例，基线工具每次运行都在库里新建 schema、建数据、结束后删除。
+- 运行分阶段：`default`（不带 `@` 的场景）、`qps<N>`（带 `@N` 的场景）、`sweep`（QPS 扫描，耗时最长，单独成阶段）。每一轮里按阶段依次进行，每个阶段先后跑 base 与 head 各一次；奇数轮 base 先，偶数轮 head 先。同一场景的两侧运行相隔不过十几分钟，机器随时间的漂移被抵消，三轮得到三个样本。细节与参数见 `scripts/perf-ab.sh` 开头的注释。
+- 记录环境：`lscpu`（CPU 型号）、`nproc`、内存、内核、PostgreSQL 版本与关键设置；每次运行的数据库往返与提交延迟（工具报告里，开始与结束各一次）、开始时的负载均值，以及运行期间整机 CPU 忙碌与被宿主机偷走（steal）的比例。
+- 某次运行失败不会中断后面的运行，作业最后失败，摘要里仍列出已有的结果。
+
+### 读结果
+
+- 作业摘要（运行页面的 Summary）：先是环境，再是“Base against head”表，每个场景的每个指标给出 base 与 head 的中位数 [最小–最大]、相对变化，以及两侧范围是否重叠；重叠表示变化在这台机器的噪声之内。“direct ttft p99”是不经网关、直连模拟上游的首字时间，反映当时机器有多吵。之后是“Runs”表：每次运行的数据库往返与提交延迟、负载和 CPU steal，据此判断哪几次运行不可信。
+- `jobs` 大于 1 时多一个“Spread between jobs”摘要：各作业的 base / head 中位数并排，并给出各指标在作业之间的离散度（最高与最低的差除以中位数），以及每个作业的 CPU 型号。
+- artifact `perf-baseline-job-<n>`（保留 30 天）：`<side>/r<轮>/<阶段>/` 下是每次运行的 `report.md`、`results.json`、pprof（`nonstream` 与 `stream` 各有一次带 pprof 的运行）、完整日志 `test.log` 与 `meta.txt`；`environment.txt`、`cpu.txt`、`refs.txt` 与 `comparison.md`（摘要原文）在根目录。pprof 的看法同下文。
+
+### 可信度
+
+- 同一作业内的 A/B 对比可靠：两侧在同一台虚拟机、同一个数据库、交替先后上运行。仍要看范围是否重叠：中位数相差而范围重叠的变化不能当作改进。
+- 不同作业（不同机器、不同时间）的绝对值有波动，CPU 型号不同时更大；不要拿两次工作流运行的绝对值直接比较，要比较就用 `jobs` 大于 1 的运行，或看“同一提交在两次运行里的差”来估计这个波动。
+- 虚拟机的宿主机上可能有别的租户：“Runs”表里 CPU steal 明显高于其余运行的那几次应当剔除，或重跑。
+- 计数类指标（每请求数据库语句、分配次数、新建连接与 DNS 查询）不受机器影响，仍可直接比较。
+- 服务容器里的 PostgreSQL 用默认设置，数据目录在运行器的磁盘上；提交延迟与笔记本、生产 VPS 都不同，绝对值只作数量级参考，这与“局限”里的说明一致。
+
+### 本机试运行计划
+
+`PERF_DRY_RUN=1 PERF_ROUNDS=2 scripts/perf-ab.sh a b out` 只打印运行计划，不编译也不运行；汇总命令：`go -C backend run ./internal/gatewaybench/perfcompare <作业目录>`（多个作业目录并排）。
 
 ## 看结果
 
