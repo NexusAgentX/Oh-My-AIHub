@@ -8,7 +8,7 @@
 #
 # 环境变量：
 #   PERF_SCENARIOS  逗号分隔，默认与 G8.0 一致。取值同基线工具的 -perf.scenarios：
-#                   nonstream stream concurrent budget sticky formats sweep-nonstream sweep-stream；
+#                   nonstream stream concurrent saturate budget sticky formats sweep-nonstream sweep-stream；
 #                   另可写 <场景>@<速率>（场景限 nonstream stream budget sticky），以 -perf.qps=<速率> 单独运行，
 #                   如 nonstream@200 就是 200 次/秒的非流式。
 #   PERF_ROUNDS     轮数，默认 3。每轮把每个场景在 base 与 head 上各测一次；奇数轮 base 先、偶数轮 head 先，
@@ -59,7 +59,7 @@ rates=()
 for token in "${tokens[@]}"; do
   case "$token" in
     sweep-nonstream | sweep-stream) sweeps+=("$token") ;;
-    nonstream | stream | concurrent | budget | sticky | formats) plain+=("$token") ;;
+    nonstream | stream | concurrent | saturate | budget | sticky | formats) plain+=("$token") ;;
     nonstream@* | stream@* | budget@* | sticky@*)
       rate="${token#*@}"
       [[ "$rate" =~ ^[1-9][0-9]*$ ]] || die "速率必须是正整数：$token"

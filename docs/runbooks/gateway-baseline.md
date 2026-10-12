@@ -10,6 +10,7 @@
 | 最大可持续 QPS | 逐级提高请求速率，满足下列判据的最高一级 |
 | CPU 与内存分配 | 每请求的进程 CPU 时间、分配字节数与次数，pprof 的 CPU 与分配热点 |
 | 每请求数据库语句数 | 按 sqlc 查询名统计，含事务的 `begin` 与 `commit`；每条语句是一次数据库往返 |
+| 结算锁持有时间 | 结算事务持有账本账户行锁（`platform_revenue` 是热行）的时间：从 `LockLedgerAccounts` 返回到提交返回，客户端口径；以及这段时间里每条语句的往返和语句之间客户端自己的时间 |
 | 其他 | 数据库连接池等待、上游新建连接数、DNS 查询数、goroutine 与堆峰值、各语句的平均耗时 |
 
 最大可持续 QPS 的判据（`gateway_perf_baseline_test.go` 中的常量）：同时满足
@@ -23,7 +24,7 @@
 
 | 位置 | 作用 |
 | --- | --- |
-| `backend/internal/gatewaybench` | 四种格式的模拟上游（首字时间、块间隔、token 数、usage 帧可配）、压测程序（并发数与 QPS，开环或闭环）、测试 CA、数据库语句计数器。有单元测试，随 `go test ./...` 运行 |
+| `backend/internal/gatewaybench` | 四种格式的模拟上游（首字时间、块间隔、token 数、usage 帧可配）、压测程序（并发数与 QPS，开环或闭环）、测试 CA、数据库语句计数器与锁持有测量（`hold.go`）。有单元测试，随 `go test ./...` 运行 |
 | `backend/internal/gateway/stream_bench_test.go`、`request_bench_test.go` | 不要网络和数据库的 Go 基准，用来单看一个函数的代价：`stream_bench_test.go` 把基线模拟上游的四种流（1000 token）依次送过旁路解析器、纯用量帧过滤器和整个 `streamBack` 写回路径；`request_bench_test.go` 比较请求体的读取、扫描与拼接和它们改进前的做法。运行：`go -C backend test ./internal/gateway -run '^$' -bench . -benchmem`；分配次数与字节数是确定的，耗时依赖机器 |
 | `backend/internal/postgres/gateway_perf_*_test.go` | 带 build tag `perfbaseline` 的测试：同一进程里启动真实的网关引擎、API 处理器、PostgreSQL、模拟上游与压测程序，跑场景并输出报告。普通 `go test ./...` 与 CI 不编译它们（`mise run lint-backend` 会带上这个 tag 做静态检查，防止它悄悄编译不过） |
 | `.github/workflows/perf-baseline.yml`、`scripts/perf-ab.sh` | 在 GitHub 托管的 Linux 机器上手动运行基线，让两份代码交替运行并出对比表，见下文“在 GitHub Actions 上运行”。不是必需检查，也不在 push 或 PR 上自动运行 |
@@ -61,12 +62,12 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`budget`、`sticky`、`formats`、`sweep-nonstream`、`sweep-stream`，逗号分隔 |
+| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`sticky`、`formats`、`sweep-nonstream`、`sweep-stream`，逗号分隔 |
 | `-perf.duration` / `-perf.warmup` | 30s / 3s | 每次运行的测量窗口与预热（流式场景的预热至少是一条流时长的 1.5 倍） |
 | `-perf.repeat` | 1 | 每个场景重复次数，报告给出中位数与范围。机器上有别的负载时建议 3 |
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
 | `-perf.consumers` / `-perf.channels` | 100 / 3 | 消费者账号数（各有两把 Key，其中一把带预算）与同价渠道数 |
-| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或并发场景的 500 个 worker。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
+| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或闭环场景（`concurrent`、`saturate`）的 worker 数。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
 | `-perf.dns` | 0 | 假 DNS 解析器的延迟。G7 之前用来看每次尝试重新解析的代价；DNS 缓存之后每个主机每 60 秒才解析一次，它只影响刷新的那一次 |
 | `-perf.synccommit` | on | 设为 `off` 时网关的数据库连接不等提交落盘，用来区分“存储慢”和“网关慢” |
 | `-perf.sweepstep` | 10s | 扫描中每一级的测量窗口 |
@@ -81,6 +82,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 | `nonstream-small` | OpenAI Chat 非流式，上游 50 ms 后一次返回 64 个输出 token | 50 次/秒（开环） |
 | `stream-1k` | OpenAI Chat 流式，首字 200 ms，每 5 ms 一块，共 1000 个 token（约 5 秒一条） | 20 次/秒 |
 | `concurrent-500` | OpenAI Chat 流式，首字 100 ms，每 20 ms 一块，共 100 个 token | 500 个 worker 背靠背（闭环） |
+| `nonstream-saturated` | 同 `nonstream-small`，但 worker 数多于数据库连接 | 64 个 worker 背靠背（闭环）：看吞吐上限本身，即结算在饱和时每秒能处理多少个调用；扫描找的是满足延迟判据的最高速率，对存储的偶发停顿很敏感（同一代码两轮可以差一倍），这个数字稳定得多 |
 | `key-budget` | 同 `nonstream-small`，Key 带日、月、总预算 | 50 次/秒 |
 | `responses-sticky` | OpenAI Responses 非流式，请求带上一轮的 `previous_response_id` | 50 次/秒 |
 | `formats` | 四种格式的流式与非流式各一个场景 | 非流式 40 次/秒，流式 10 次/秒 |
@@ -144,7 +146,7 @@ gh run watch    # 选择刚触发的运行；默认参数一个作业要数小�
 
 ## 看结果
 
-`report.md` 依次是：环境（含数据库的往返与提交延迟——这两个数差别很大时，两次结果不可比）、各场景的延迟对比、每请求成本、每请求数据库语句、扫描表、数据库表读取情况。`results.json` 是同样内容的机器可读形式。
+`report.md` 依次是：环境（含数据库的往返与提交延迟——这两个数差别很大时，两次结果不可比）、各场景的延迟对比、每请求成本、每请求数据库语句、结算锁持有（均值、p50、p99，以及一次持有由哪些语句的往返、语句之间客户端的时间和提交组成）、扫描表、数据库表读取情况。扫描表里的“lock hold ms”是每一级的锁持有均值，与同一行的 `LockLedgerAccounts ms`（排队等锁）对照看：持有越长，后来者排得越久。`results.json` 是同样内容的机器可读形式。
 
 pprof 文件在 `-perf.out` 目录：
 
