@@ -17,7 +17,7 @@ type Setting struct {
 	DefaultCreditLimitNano   money.Amount
 	DefaultMaxAttempts       int32
 	DefaultTtftTimeoutMs     int32
-	DefaultTotalTimeoutMs    int32
+	DefaultRequestTimeoutMs  int32
 	DefaultCooldownFailures  int32
 	DefaultCooldownSeconds   int32
 	ExtraBlockedHosts        []string
@@ -30,4 +30,5 @@ type Setting struct {
 	FxSyncAttemptedAt        *time.Time
 	FxSyncError              *string
 	AccountMaxInflightCalls  int32
+	DefaultIdleTimeoutMs     int32
 }

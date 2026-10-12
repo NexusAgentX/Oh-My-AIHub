@@ -49,7 +49,7 @@ func TestValidateAdvancedRejectsForbiddenHeadersAndBadRanges(t *testing.T) {
 	}
 	zero, tooHigh, short, long := int32(0), int32(200), int32(500), int32(5)
 	bad = append(bad, Advanced{ConcurrencyLimit: &zero}, Advanced{CooldownFailures: &tooHigh}, Advanced{TTFTTimeoutMS: &short},
-		Advanced{TTFTTimeoutMS: &[]int32{60000}[0], TotalTimeoutMS: &[]int32{30000}[0]}, Advanced{CooldownSeconds: &long})
+		Advanced{IdleTimeoutMS: &[]int32{999}[0]}, Advanced{CooldownSeconds: &long})
 	for index, advanced := range bad {
 		if err := ValidateAdvanced(advanced); err == nil {
 			t.Fatalf("case %d was accepted: %+v", index, advanced)

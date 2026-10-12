@@ -60,7 +60,8 @@ export type AdvancedForm = {
   rpm: string
   dailyCap: string
   ttftTimeout: string
-  totalTimeout: string
+  requestTimeout: string
+  idleTimeout: string
   cooldownFailures: string
   cooldownMinutes: string
 }
@@ -73,7 +74,8 @@ export const emptyAdvanced: AdvancedForm = {
   rpm: '',
   dailyCap: '',
   ttftTimeout: '',
-  totalTimeout: '',
+  requestTimeout: '',
+  idleTimeout: '',
   cooldownFailures: '',
   cooldownMinutes: '',
 }
@@ -201,7 +203,8 @@ export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
     rpm: numberOrEmpty(advanced.rpm_limit),
     dailyCap: advanced.daily_revenue_cap ?? '',
     ttftTimeout: numberOrEmpty(advanced.ttft_timeout_ms),
-    totalTimeout: numberOrEmpty(advanced.total_timeout_ms),
+    requestTimeout: numberOrEmpty(advanced.request_timeout_ms),
+    idleTimeout: numberOrEmpty(advanced.idle_timeout_ms),
     cooldownFailures: numberOrEmpty(advanced.cooldown_failures),
     cooldownMinutes: advanced.cooldown_seconds === null ? '' : String(Math.max(1, Math.round(advanced.cooldown_seconds / 60))),
   }
@@ -215,7 +218,7 @@ export function advancedChangedCount(form: AdvancedForm) {
     form.concurrency,
     form.rpm,
     form.dailyCap,
-    form.ttftTimeout || form.totalTimeout,
+    form.ttftTimeout || form.idleTimeout || form.requestTimeout,
     form.cooldownFailures || form.cooldownMinutes,
   ].filter(Boolean).length
 }
@@ -231,7 +234,8 @@ export function validateAdvanced(form: AdvancedForm) {
     ['并发上限', form.concurrency],
     ['每分钟请求数', form.rpm],
     ['首字超时', form.ttftTimeout],
-    ['总超时', form.totalTimeout],
+    ['空闲超时', form.idleTimeout],
+    ['请求超时', form.requestTimeout],
     ['连续失败次数', form.cooldownFailures],
     ['冷却时长', form.cooldownMinutes],
   ]
@@ -254,7 +258,8 @@ export function advancedInput(form: AdvancedForm): ChannelAdvancedInput {
     rpm_limit: intOrNull(form.rpm),
     daily_revenue_cap: form.dailyCap.trim() || null,
     ttft_timeout_ms: intOrNull(form.ttftTimeout),
-    total_timeout_ms: intOrNull(form.totalTimeout),
+    request_timeout_ms: intOrNull(form.requestTimeout),
+    idle_timeout_ms: intOrNull(form.idleTimeout),
     cooldown_failures: intOrNull(form.cooldownFailures),
     cooldown_seconds: intOrNull(form.cooldownMinutes) === null ? null : (intOrNull(form.cooldownMinutes) as number) * 60,
   }

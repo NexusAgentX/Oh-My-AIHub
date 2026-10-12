@@ -166,7 +166,9 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
               ],
               ['并发 / 每分钟请求', `${orDefault(advanced.concurrency_limit)} / ${orDefault(advanced.rpm_limit)}`],
               ['每日收入上限', advanced.daily_revenue_cap === null ? '不限' : formatPoints(advanced.daily_revenue_cap)],
-              ['首字 / 总超时', `${orDefault(advanced.ttft_timeout_ms, ' ms')} / ${orDefault(advanced.total_timeout_ms, ' ms')}`],
+              ['首字超时', orDefault(advanced.ttft_timeout_ms, ' ms')],
+              ['空闲超时', orDefault(advanced.idle_timeout_ms, ' ms')],
+              ['请求超时', orDefault(advanced.request_timeout_ms, ' ms')],
               [
                 '失败冷却',
                 advanced.cooldown_failures === null && advanced.cooldown_seconds === null

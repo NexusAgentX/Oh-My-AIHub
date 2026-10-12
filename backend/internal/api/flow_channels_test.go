@@ -25,12 +25,17 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 		"models": []map[string]any{{"model_id": "deepseek-chat", "upstream_model": "deepseek-chat-v2", "multiplier": "1.2", "formats": []string{"openai_chat", "anthropic"}}},
 		"advanced": map[string]any{
 			"user_agent": "relay-test/1.0", "header_rules": map[string]any{"set": []map[string]string{{"name": "X-Relay", "value": "1"}}, "remove": []string{"X-Old"}},
-			"concurrency_limit": 4, "rpm_limit": 60, "daily_revenue_cap": dailyCap, "ttft_timeout_ms": 20000, "total_timeout_ms": 300000,
+			"concurrency_limit": 4, "rpm_limit": 60, "daily_revenue_cap": dailyCap, "ttft_timeout_ms": 20000, "request_timeout_ms": 300000, "idle_timeout_ms": 10000,
 			"cooldown_failures": 3, "cooldown_seconds": 60,
 		},
 	}
 	created := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", body)["channel"].(map[string]any)
 	channelID := created["id"].(string)
+	for field, want := range map[string]float64{"ttft_timeout_ms": 20000, "idle_timeout_ms": 10000, "request_timeout_ms": 300000} {
+		if got := created["advanced"].(map[string]any)[field]; got != want {
+			t.Fatalf("channel %s = %v", field, got)
+		}
+	}
 	if created["status"] != "listed" || created["advanced"].(map[string]any)["daily_revenue_cap"] != "50" ||
 		created["models"].([]any)[0].(map[string]any)["multiplier"] != "1.2" || created["today"].(map[string]any)["success_rate"] != "0.500000" {
 		t.Fatalf("created channel = %v", created)

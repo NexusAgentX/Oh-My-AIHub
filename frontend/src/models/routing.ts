@@ -7,6 +7,8 @@ export type RoutingDraft = {
   excluded: string[]
   max_attempts: number | null
   ttft_timeout_ms: number | null
+  idle_timeout_ms: number | null
+  request_timeout_ms: number | null
 }
 
 /**
@@ -25,6 +27,8 @@ export function draftFromPreference(preference: RoutingPreference, channels: Mod
     excluded: manualWithOrder ? [...new Set([...excluded, ...added])] : excluded,
     max_attempts: preference.max_attempts,
     ttft_timeout_ms: preference.ttft_timeout_ms,
+    idle_timeout_ms: preference.idle_timeout_ms,
+    request_timeout_ms: preference.request_timeout_ms,
   }
 }
 
@@ -73,6 +77,8 @@ export function toRoutingInput(draft: RoutingDraft): RoutingPreferenceInput {
     excluded: draft.excluded,
     max_attempts: draft.max_attempts,
     ttft_timeout_ms: draft.ttft_timeout_ms,
+    idle_timeout_ms: draft.idle_timeout_ms,
+    request_timeout_ms: draft.request_timeout_ms,
   }
 }
 
@@ -82,7 +88,7 @@ export function sameDraft(a: RoutingDraft, b: RoutingDraft) {
 
 /** 高级项中偏离平台默认（null）的数量。 */
 export function advancedChanged(draft: RoutingDraft) {
-  return (draft.max_attempts === null ? 0 : 1) + (draft.ttft_timeout_ms === null ? 0 : 1)
+  return [draft.max_attempts, draft.ttft_timeout_ms, draft.idle_timeout_ms, draft.request_timeout_ms].filter((value) => value !== null).length
 }
 
 export function channelStateLabel(channel: ModelChannel) {

@@ -60,7 +60,8 @@ type Advanced struct {
 	RPMLimit         *int32
 	DailyRevenueCap  *money.Amount
 	TTFTTimeoutMS    *int32
-	TotalTimeoutMS   *int32
+	RequestTimeoutMS *int32
+	IdleTimeoutMS    *int32
 	CooldownFailures *int32
 	CooldownSeconds  *int32
 }
@@ -278,14 +279,11 @@ func ValidateAdvanced(advanced Advanced) error {
 	}
 	inRange := func(value *int32, low, high int32) bool { return value == nil || (*value >= low && *value <= high) }
 	if !inRange(advanced.ConcurrencyLimit, 1, 1<<30) || !inRange(advanced.RPMLimit, 1, 1<<30) ||
-		!inRange(advanced.TTFTTimeoutMS, 1000, 600000) || !inRange(advanced.TotalTimeoutMS, 1000, 3600000) ||
+		!inRange(advanced.TTFTTimeoutMS, 1000, 600000) || !inRange(advanced.RequestTimeoutMS, 1000, 3600000) || !inRange(advanced.IdleTimeoutMS, 1000, 3600000) ||
 		!inRange(advanced.CooldownFailures, 1, 100) || !inRange(advanced.CooldownSeconds, 10, 86400) {
 		return ErrInvalidInput
 	}
 	if advanced.DailyRevenueCap != nil && *advanced.DailyRevenueCap <= 0 {
-		return ErrInvalidInput
-	}
-	if advanced.TTFTTimeoutMS != nil && advanced.TotalTimeoutMS != nil && *advanced.TotalTimeoutMS < *advanced.TTFTTimeoutMS {
 		return ErrInvalidInput
 	}
 	return nil

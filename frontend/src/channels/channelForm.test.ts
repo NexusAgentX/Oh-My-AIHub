@@ -78,3 +78,11 @@ describe('channel wizard', () => {
     expect(advancedInput(form)).toMatchObject({ rpm_limit: 60, cooldown_failures: 3, cooldown_seconds: 300 })
   })
 })
+
+it('counts an idle-only override and keeps all three timeouts independent', () => {
+  expect(advancedChangedCount({ ...emptyAdvanced, idleTimeout: '2000' })).toBe(1)
+  expect(advancedInput({ ...emptyAdvanced, ttftTimeout: '60000', idleTimeout: '2000', requestTimeout: '10000' })).toMatchObject({
+    ttft_timeout_ms: 60000, idle_timeout_ms: 2000, request_timeout_ms: 10000,
+  })
+  expect(advancedInput(emptyAdvanced)).toMatchObject({ ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null })
+})

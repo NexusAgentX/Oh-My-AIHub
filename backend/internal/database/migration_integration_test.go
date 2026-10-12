@@ -76,6 +76,7 @@ INSERT INTO ledger_transactions (id, type, idempotency_key) VALUES
 INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_nano, balance_after_nano)
  SELECT '22222222-2222-4222-8222-222222222222', id, balance_nano, balance_nano
  FROM ledger_accounts WHERE balance_nano <> 0;
+UPDATE settings SET default_total_timeout_ms = 123000;
 COMMIT;`)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +90,7 @@ COMMIT;`)
  'ledger_transactions', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
  'ledger_entries', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
  'settings', (SELECT jsonb_agg(to_jsonb(a) - ARRAY['usd_cny_rate_nano', 'usd_cny_rate_source', 'usd_cny_rate_updated_at',
-   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls']) FROM settings a))::text`).Scan(&value)
+   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls', 'default_total_timeout_ms', 'default_request_timeout_ms', 'default_idle_timeout_ms']) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,6 +130,15 @@ COMMIT;`)
 	if err := db.QueryRowContext(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'channel_events_kind_check'`).Scan(&eventKinds); err != nil ||
 		!strings.Contains(eventKinds, "anomalous_client_errors") || !strings.Contains(eventKinds, "model_pending_multiplier") {
 		t.Fatalf("channel event kinds after upgrade = %q %v", eventKinds, err)
+	}
+	// 0008 keeps the old combined timeout in both new stages and removes
+	// the cross-stage comparison: a short idle wait can follow a long TTFT.
+	var requestTimeout, idleTimeout int
+	if err := db.QueryRowContext(ctx, `SELECT default_request_timeout_ms, default_idle_timeout_ms FROM settings`).Scan(&requestTimeout, &idleTimeout); err != nil || requestTimeout != 123000 || idleTimeout != 123000 {
+		t.Fatalf("split timeouts = %d/%d, %v", requestTimeout, idleTimeout, err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE settings SET default_request_timeout_ms=1000, default_idle_timeout_ms=1000`); err != nil {
+		t.Fatalf("independent timeout stages rejected: %v", err)
 	}
 	var tables, versions int
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables

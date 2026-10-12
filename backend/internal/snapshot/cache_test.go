@@ -380,3 +380,21 @@ func TestResponseLRUEvictsTheLeastRecentlyUsed(t *testing.T) {
 		t.Fatalf("update = %q", channelID)
 	}
 }
+
+func TestTimeoutRoutesAreReplacedPerModelNotPerField(t *testing.T) {
+	idle, request := int32(2000), int32(10000)
+	loader := &fakeLoader{prefs: []routing.Scoped{
+		{AccountID: "a", Pref: routing.Pref{ModelID: "m", Source: routing.SourceAccount, IdleTimeoutMS: &idle, RequestTimeoutMS: &request}},
+		{AccountID: "a", Pref: routing.Pref{ModelID: "other", Source: routing.SourceAccount, IdleTimeoutMS: &idle, RequestTimeoutMS: &request}},
+		{AccountID: "a", KeyID: "k", Pref: routing.Pref{ModelID: "m", Source: routing.SourceKey, RequestTimeoutMS: &request}},
+	}}
+	store := newTestCache(loader).Routing(nil)
+	own, err := store.Resolve(context.Background(), "a", "k", "m")
+	if err != nil || own.Source != routing.SourceKey || own.IdleTimeoutMS != nil || own.RequestTimeoutMS == nil || *own.RequestTimeoutMS != request {
+		t.Fatalf("key route = %+v, %v", own, err)
+	}
+	other, err := store.Resolve(context.Background(), "a", "k", "other")
+	if err != nil || other.Source != routing.SourceAccount || other.IdleTimeoutMS == nil || *other.IdleTimeoutMS != idle {
+		t.Fatalf("other model = %+v, %v", other, err)
+	}
+}

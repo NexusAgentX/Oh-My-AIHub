@@ -139,7 +139,7 @@ func TestTheFirstReadOfAnAttemptJudgesAnEndOfBodyByTheCancellation(t *testing.T)
 		{"call limit", cleanEndTransport{}, false, channel.Advanced{}, 50 * time.Millisecond, EndInterrupted, codeCallDeadline, true, false},
 		{"call limit on a stream", cleanEndTransport{}, true, channel.Advanced{}, 50 * time.Millisecond, EndInterrupted, codeCallDeadline, true, false},
 		{"first-byte timeout", cleanEndTransport{}, true, channel.Advanced{TTFTTimeoutMS: millis(50)}, 0, EndTimeoutTTFT, "timeout_ttft", false, false},
-		{"total timeout", cleanEndTransport{}, false, channel.Advanced{TotalTimeoutMS: millis(50)}, 0, EndTimeoutTotal, "timeout_total", false, false},
+		{"total timeout", cleanEndTransport{}, false, channel.Advanced{RequestTimeoutMS: millis(50)}, 0, EndTimeoutTotal, "timeout_total", false, false},
 		{"an empty answer nobody cancelled", emptyTransport{}, false, channel.Advanced{}, 0, "", "", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -155,8 +155,8 @@ func TestTheFirstReadOfAnAttemptJudgesAnEndOfBodyByTheCancellation(t *testing.T)
 				ctx, stop = context.WithTimeoutCause(ctx, tc.limit, errCallDeadline)
 				defer stop()
 			}
-			result := engine.attempt(ctx, request, call, candidate, Limits{}, settings.Settings{DefaultTotalTimeoutMS: 600000, DefaultTTFTTimeoutMS: 600000},
-				engine.Outbound, body, scan, authBearer, 600*time.Second)
+			result := engine.attempt(ctx, request, call, candidate, Limits{}, settings.Settings{DefaultRequestTimeoutMS: 600000, DefaultIdleTimeoutMS: 600000, DefaultTTFTTimeoutMS: 600000},
+				engine.Outbound, body, scan, authBearer, attemptTimeouts{request: 600 * time.Second, idle: 600 * time.Second, ttft: 600 * time.Second})
 			if result.cancel != nil {
 				defer result.cancel(nil)
 			}

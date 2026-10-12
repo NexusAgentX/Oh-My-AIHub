@@ -9,7 +9,8 @@ const settings: Settings = {
   default_credit_limit: '0',
   default_max_attempts: 3,
   default_ttft_timeout_ms: 30000,
-  default_total_timeout_ms: 600000,
+  default_request_timeout_ms: 600000,
+  default_idle_timeout_ms: 600000,
   default_cooldown_failures: 3,
   default_cooldown_seconds: 300,
   account_max_inflight_calls: 20,
@@ -107,5 +108,15 @@ describe('display formats', () => {
     expect(formatRatio('0.952')).toBe('95.2%')
     expect(formatRatio('1')).toBe('100%')
     expect(formatRatio(null)).toBe('—')
+  })
+})
+
+describe('independent timeout stages', () => {
+  it('round-trips distinct values even when idle and request are shorter than TTFT', () => {
+    const form = { ...settingsToForm(settings), defaultTtftSeconds: '60', defaultIdleSeconds: '2', defaultRequestSeconds: '10' }
+    const result = formToSettings(form)
+    expect(result.errors).toBeUndefined()
+    expect(result.body).toMatchObject({ default_ttft_timeout_ms: 60000, default_idle_timeout_ms: 2000, default_request_timeout_ms: 10000 })
+    expect(changedAdvancedCount(form)).toBe(3)
   })
 })

@@ -18,7 +18,8 @@ type settingsJSON struct {
 	DefaultCreditLimit       string     `json:"default_credit_limit"`
 	DefaultMaxAttempts       int32      `json:"default_max_attempts"`
 	DefaultTTFTTimeoutMS     int32      `json:"default_ttft_timeout_ms"`
-	DefaultTotalTimeoutMS    int32      `json:"default_total_timeout_ms"`
+	DefaultRequestTimeoutMS  int32      `json:"default_request_timeout_ms"`
+	DefaultIdleTimeoutMS     int32      `json:"default_idle_timeout_ms"`
 	DefaultCooldownFailures  int32      `json:"default_cooldown_failures"`
 	DefaultCooldownSeconds   int32      `json:"default_cooldown_seconds"`
 	AccountMaxInflightCalls  int32      `json:"account_max_inflight_calls"`
@@ -49,7 +50,8 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 		DefaultCreditLimit:       value.DefaultCreditLimit.String(),
 		DefaultMaxAttempts:       value.DefaultMaxAttempts,
 		DefaultTTFTTimeoutMS:     value.DefaultTTFTTimeoutMS,
-		DefaultTotalTimeoutMS:    value.DefaultTotalTimeoutMS,
+		DefaultRequestTimeoutMS:  value.DefaultRequestTimeoutMS,
+		DefaultIdleTimeoutMS:     value.DefaultIdleTimeoutMS,
 		DefaultCooldownFailures:  value.DefaultCooldownFailures,
 		DefaultCooldownSeconds:   value.DefaultCooldownSeconds,
 		AccountMaxInflightCalls:  value.AccountMaxInflightCalls,
@@ -69,7 +71,8 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 type formDefaultsJSON struct {
 	DefaultMaxAttempts      int32 `json:"default_max_attempts"`
 	DefaultTTFTTimeoutMS    int32 `json:"default_ttft_timeout_ms"`
-	DefaultTotalTimeoutMS   int32 `json:"default_total_timeout_ms"`
+	DefaultRequestTimeoutMS int32 `json:"default_request_timeout_ms"`
+	DefaultIdleTimeoutMS    int32 `json:"default_idle_timeout_ms"`
 	DefaultCooldownFailures int32 `json:"default_cooldown_failures"`
 	DefaultCooldownSeconds  int32 `json:"default_cooldown_seconds"`
 }
@@ -83,7 +86,8 @@ func (a *app) getFormDefaults(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, formDefaultsJSON{
 		DefaultMaxAttempts:      value.DefaultMaxAttempts,
 		DefaultTTFTTimeoutMS:    value.DefaultTTFTTimeoutMS,
-		DefaultTotalTimeoutMS:   value.DefaultTotalTimeoutMS,
+		DefaultRequestTimeoutMS: value.DefaultRequestTimeoutMS,
+		DefaultIdleTimeoutMS:    value.DefaultIdleTimeoutMS,
 		DefaultCooldownFailures: value.DefaultCooldownFailures,
 		DefaultCooldownSeconds:  value.DefaultCooldownSeconds,
 	})
@@ -105,7 +109,8 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultCreditLimit       *string   `json:"default_credit_limit"`
 		DefaultMaxAttempts       *int32    `json:"default_max_attempts"`
 		DefaultTTFTTimeoutMS     *int32    `json:"default_ttft_timeout_ms"`
-		DefaultTotalTimeoutMS    *int32    `json:"default_total_timeout_ms"`
+		DefaultRequestTimeoutMS  *int32    `json:"default_request_timeout_ms"`
+		DefaultIdleTimeoutMS     *int32    `json:"default_idle_timeout_ms"`
 		DefaultCooldownFailures  *int32    `json:"default_cooldown_failures"`
 		DefaultCooldownSeconds   *int32    `json:"default_cooldown_seconds"`
 		AccountMaxInflightCalls  *int32    `json:"account_max_inflight_calls"`
@@ -119,7 +124,7 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.FeeRateNano == nil || request.C2CPaymentTimeoutMinutes == nil || request.DefaultCreditLimit == nil ||
-		request.DefaultMaxAttempts == nil || request.DefaultTTFTTimeoutMS == nil || request.DefaultTotalTimeoutMS == nil ||
+		request.DefaultMaxAttempts == nil || request.DefaultTTFTTimeoutMS == nil || request.DefaultRequestTimeoutMS == nil || request.DefaultIdleTimeoutMS == nil ||
 		request.DefaultCooldownFailures == nil || request.DefaultCooldownSeconds == nil || request.AccountMaxInflightCalls == nil ||
 		request.ExtraBlockedHosts == nil ||
 		request.USDCNYRate == nil || request.FXAutoSync == nil || request.FXSyncMinute == nil {
@@ -139,7 +144,8 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	updated, err := a.settings.Update(r.Context(), accountFromContext(r.Context()).ID, settings.Settings{
 		FeeRateNano: *request.FeeRateNano, C2CPaymentTimeoutMinutes: *request.C2CPaymentTimeoutMinutes,
 		DefaultCreditLimit: creditLimit, DefaultMaxAttempts: *request.DefaultMaxAttempts,
-		DefaultTTFTTimeoutMS: *request.DefaultTTFTTimeoutMS, DefaultTotalTimeoutMS: *request.DefaultTotalTimeoutMS,
+		DefaultTTFTTimeoutMS: *request.DefaultTTFTTimeoutMS, DefaultRequestTimeoutMS: *request.DefaultRequestTimeoutMS,
+		DefaultIdleTimeoutMS:    *request.DefaultIdleTimeoutMS,
 		DefaultCooldownFailures: *request.DefaultCooldownFailures, DefaultCooldownSeconds: *request.DefaultCooldownSeconds,
 		AccountMaxInflightCalls: *request.AccountMaxInflightCalls, ExtraBlockedHosts: *request.ExtraBlockedHosts,
 		USDCNYRateNano: rate.Nano(), FXAutoSync: *request.FXAutoSync, FXSyncMinute: *request.FXSyncMinute,

@@ -39,14 +39,16 @@ const (
 // Pref is one resolved preference. Without any stored row the preference is
 // the default: cheapest first, every channel ticked, platform defaults.
 type Pref struct {
-	ModelID       string
-	Source        Source
-	Mode          Mode
-	Order         []string // manual order of channel IDs (ticked and unticked)
-	Excluded      []string // unticked channel IDs
-	MaxAttempts   *int32
-	TTFTTimeoutMS *int32
-	UpdatedAt     *time.Time
+	ModelID          string
+	Source           Source
+	Mode             Mode
+	Order            []string // manual order of channel IDs (ticked and unticked)
+	Excluded         []string // unticked channel IDs
+	MaxAttempts      *int32
+	TTFTTimeoutMS    *int32
+	IdleTimeoutMS    *int32
+	RequestTimeoutMS *int32
+	UpdatedAt        *time.Time
 }
 
 // Default is the preference of a model nobody configured.
@@ -87,6 +89,11 @@ func Validate(p Pref) (Pref, error) {
 	}
 	if p.TTFTTimeoutMS != nil && (*p.TTFTTimeoutMS < 1000 || *p.TTFTTimeoutMS > 600000) {
 		return Pref{}, ErrInvalidInput
+	}
+	for _, timeout := range []*int32{p.IdleTimeoutMS, p.RequestTimeoutMS} {
+		if timeout != nil && (*timeout < 1000 || *timeout > 3600000) {
+			return Pref{}, ErrInvalidInput
+		}
 	}
 	return p, nil
 }

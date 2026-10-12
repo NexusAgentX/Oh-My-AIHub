@@ -9,7 +9,8 @@ export type SettingsForm = {
   defaultMaxAttempts: string
   /** 秒；接口为毫秒 */
   defaultTtftSeconds: string
-  defaultTotalSeconds: string
+  defaultRequestSeconds: string
+  defaultIdleSeconds: string
   defaultCooldownFailures: string
   defaultCooldownSeconds: string
   /** 每个账号同时在途的调用数上限；0 表示不限 */
@@ -28,7 +29,8 @@ const factoryAdvanced = {
   defaultCreditLimit: '0',
   defaultMaxAttempts: '3',
   defaultTtftSeconds: '30',
-  defaultTotalSeconds: '600',
+  defaultRequestSeconds: '600',
+  defaultIdleSeconds: '600',
   defaultCooldownFailures: '3',
   defaultCooldownSeconds: '300',
   accountMaxInflightCalls: '20',
@@ -52,7 +54,8 @@ export function settingsToForm(settings: Settings): SettingsForm {
     defaultCreditLimit: formatPointAmount(settings.default_credit_limit),
     defaultMaxAttempts: String(settings.default_max_attempts),
     defaultTtftSeconds: String(settings.default_ttft_timeout_ms / 1000),
-    defaultTotalSeconds: String(settings.default_total_timeout_ms / 1000),
+    defaultRequestSeconds: String(settings.default_request_timeout_ms / 1000),
+    defaultIdleSeconds: String(settings.default_idle_timeout_ms / 1000),
     defaultCooldownFailures: String(settings.default_cooldown_failures),
     defaultCooldownSeconds: String(settings.default_cooldown_seconds),
     accountMaxInflightCalls: String(settings.account_max_inflight_calls),
@@ -92,8 +95,10 @@ export function formToSettings(
   if (attempts === null) errors.defaultMaxAttempts = '1～10'
   const ttft = integerIn(form.defaultTtftSeconds, 1, 600)
   if (ttft === null) errors.defaultTtftSeconds = '1～600 秒'
-  const total = integerIn(form.defaultTotalSeconds, 1, 3600)
-  if (total === null) errors.defaultTotalSeconds = '1～3600 秒'
+  const idle = integerIn(form.defaultIdleSeconds, 1, 3600)
+  if (idle === null) errors.defaultIdleSeconds = '1～3600 秒'
+  const request = integerIn(form.defaultRequestSeconds, 1, 3600)
+  if (request === null) errors.defaultRequestSeconds = '1～3600 秒'
   const failures = integerIn(form.defaultCooldownFailures, 1, 100)
   if (failures === null) errors.defaultCooldownFailures = '1～100 次'
   const cooldown = integerIn(form.defaultCooldownSeconds, 10, 86400)
@@ -123,7 +128,8 @@ export function formToSettings(
       default_credit_limit: credit,
       default_max_attempts: attempts!,
       default_ttft_timeout_ms: ttft! * 1000,
-      default_total_timeout_ms: total! * 1000,
+      default_request_timeout_ms: request! * 1000,
+      default_idle_timeout_ms: idle! * 1000,
       default_cooldown_failures: failures!,
       default_cooldown_seconds: cooldown!,
       account_max_inflight_calls: inflight!,

@@ -318,7 +318,7 @@ func (s *Routes) Set(ctx context.Context, accountID, keyID string, pref routing.
 		q := New(tx)
 		saved, err := q.UpsertRoutePref(ctx, UpsertRoutePrefParams{
 			AccountID: accountID, ApiKeyID: scopeKey(keyID), ModelID: pref.ModelID, Mode: string(pref.Mode),
-			MaxAttempts: pref.MaxAttempts, TtftTimeoutMs: pref.TTFTTimeoutMS,
+			MaxAttempts: pref.MaxAttempts, TtftTimeoutMs: pref.TTFTTimeoutMS, IdleTimeoutMs: pref.IdleTimeoutMS, RequestTimeoutMs: pref.RequestTimeoutMS,
 		})
 		if err != nil {
 			return err
@@ -391,7 +391,7 @@ func (s *Routes) list(ctx context.Context, q *Queries, accountID, keyID, modelID
 		updated := row.UpdatedAt
 		pref := routing.Pref{
 			ModelID: row.ModelID, Source: source, Mode: routing.Mode(row.Mode), Order: []string{}, Excluded: []string{},
-			MaxAttempts: row.MaxAttempts, TTFTTimeoutMS: row.TtftTimeoutMs, UpdatedAt: &updated,
+			MaxAttempts: row.MaxAttempts, TTFTTimeoutMS: row.TtftTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, UpdatedAt: &updated,
 		}
 		for _, link := range channels {
 			if link.RoutePrefID != row.ID {
@@ -457,7 +457,7 @@ func (s *Routes) LoadPrefs(ctx context.Context) ([]routing.Scoped, error) {
 		updated := row.UpdatedAt
 		pref := routing.Pref{
 			ModelID: row.ModelID, Source: source, Mode: routing.Mode(row.Mode), Order: []string{}, Excluded: []string{},
-			MaxAttempts: row.MaxAttempts, TTFTTimeoutMS: row.TtftTimeoutMs, UpdatedAt: &updated,
+			MaxAttempts: row.MaxAttempts, TTFTTimeoutMS: row.TtftTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, UpdatedAt: &updated,
 		}
 		for index, channelID := range row.ChannelIds {
 			pref.Order = append(pref.Order, channelID)

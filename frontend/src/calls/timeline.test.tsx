@@ -79,7 +79,7 @@ describe('attempt timeline segments', () => {
       upstream_error: '上游错误',
       connect_error: '连接失败',
       timeout_ttft: '首字超时',
-      timeout_total: '总超时',
+      timeout_total: '请求超时',
       client_error: '请求错误',
       client_disconnected: '客户端断开',
       interrupted: '中断',

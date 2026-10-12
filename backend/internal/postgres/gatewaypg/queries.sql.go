@@ -336,7 +336,7 @@ const listAllCandidates = `-- name: ListAllCandidates :many
 SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -364,7 +364,8 @@ type ListAllCandidatesRow struct {
 	RpmLimit                            *int32
 	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
-	TotalTimeoutMs                      *int32
+	RequestTimeoutMs                    *int32
+	IdleTimeoutMs                       *int32
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
 	UpstreamModel                       string
@@ -407,7 +408,8 @@ func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow
 			&i.RpmLimit,
 			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
-			&i.TotalTimeoutMs,
+			&i.RequestTimeoutMs,
+			&i.IdleTimeoutMs,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
 			&i.UpstreamModel,
@@ -493,7 +495,7 @@ func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.total_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -524,7 +526,8 @@ type ListCandidatesRow struct {
 	RpmLimit                            *int32
 	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
-	TotalTimeoutMs                      *int32
+	RequestTimeoutMs                    *int32
+	IdleTimeoutMs                       *int32
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
 	UpstreamModel                       string
@@ -560,7 +563,8 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.RpmLimit,
 			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
-			&i.TotalTimeoutMs,
+			&i.RequestTimeoutMs,
+			&i.IdleTimeoutMs,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
 			&i.UpstreamModel,
