@@ -142,6 +142,7 @@
 .password-input { position: relative; display: block; }
 .password-input .input { padding-right: 48px; }
 .password-toggle { position: absolute; top: 0; right: 0; }
+.password-toggle:hover:not(:disabled) { color: var(--mustard-text); background: transparent; }
 
 .field-message { color: var(--muted); font-size: var(--text-xs); line-height: 1.45; }
 .field-error { color: var(--danger); }
