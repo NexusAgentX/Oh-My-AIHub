@@ -163,3 +163,10 @@ func (m *Metrics) SetFeedHealth(busDropped, feedDropped, readFailures func() uin
 		m.registry.MustRegister(prometheus.NewCounterFunc(prometheus.CounterOpts{Name: v.name, Help: v.help}, func() float64 { return float64(v.read()) }))
 	}
 }
+
+func (m *Metrics) SetDiagnosticHealth(dropped, failed func() uint64) {
+	m.registry.MustRegister(
+		prometheus.NewCounterFunc(prometheus.CounterOpts{Name: "aihub_diagnostic_timings_dropped_total", Help: "Post-commit timing samples dropped by the bounded diagnostic queue."}, func() float64 { return float64(dropped()) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{Name: "aihub_diagnostic_timings_failed_total", Help: "Post-commit timing samples whose batch write failed."}, func() float64 { return float64(failed()) }),
+	)
+}

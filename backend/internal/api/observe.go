@@ -185,6 +185,11 @@ func writeObserveError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, observe.ErrNotRepairable):
 		writeError(w, http.StatusConflict, "not_repairable", "该调用已记账或不属于可补记的范围")
+	case errors.Is(err, observe.ErrAnalysisBusy):
+		w.Header().Set("Retry-After", "15")
+		writeError(w, http.StatusTooManyRequests, "analysis_busy", "分析繁忙，请稍后重试")
+	case errors.Is(err, observe.ErrAnalysisTimeout):
+		writeError(w, http.StatusServiceUnavailable, "analysis_timeout", "分析超时，请缩小时间范围或增加筛选")
 	case errors.Is(err, observe.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, "invalid_request", "查询参数无效")
 	default:

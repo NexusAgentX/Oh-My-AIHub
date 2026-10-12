@@ -24,9 +24,10 @@ import (
 )
 
 type Store struct {
-	pool  *pgxpool.Pool
-	q     *Queries
-	books *ledgerpg.Books
+	pool          *pgxpool.Pool
+	q             *Queries
+	books         *ledgerpg.Books
+	analysisSlots chan struct{}
 }
 
 // NewStore builds the store; the repair of a missed posting reports to books
@@ -35,7 +36,7 @@ func NewStore(pool *pgxpool.Pool, books *ledgerpg.Books) *Store {
 	if books == nil {
 		books = ledgerpg.NewBooks()
 	}
-	return &Store{pool: pool, q: New(pool), books: books}
+	return &Store{pool: pool, q: New(pool), books: books, analysisSlots: make(chan struct{}, 2)}
 }
 
 var _ observe.Store = (*Store)(nil)

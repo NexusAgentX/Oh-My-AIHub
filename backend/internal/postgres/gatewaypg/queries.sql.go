@@ -140,8 +140,8 @@ UPDATE calls SET
     ttft_ms = $14, duration_ms = $15, output_tokens_per_second = $16,
     inter_token_p50_ms = $17, inter_token_p95_ms = $18,
     response_bytes = $19, upstream_response_id = $20,
-    completed_at = now()
-WHERE id = $21 AND outcome = 'in_progress'
+    diagnostics = $21, completed_at = clock_timestamp()
+WHERE id = $22 AND outcome = 'in_progress'
 `
 
 type FinishCallParams struct {
@@ -165,6 +165,7 @@ type FinishCallParams struct {
 	InterTokenP95Ms    *int32
 	ResponseBytes      *int64
 	UpstreamResponseID *string
+	Diagnostics        []byte
 	ID                 string
 }
 
@@ -191,6 +192,7 @@ func (q *Queries) FinishCall(ctx context.Context, arg FinishCallParams) (int64, 
 		arg.InterTokenP95Ms,
 		arg.ResponseBytes,
 		arg.UpstreamResponseID,
+		arg.Diagnostics,
 		arg.ID,
 	)
 	if err != nil {
@@ -849,20 +851,6 @@ func (q *Queries) ResponseChannel(ctx context.Context, arg ResponseChannelParams
 	return final_channel_id, err
 }
 
-const setCallDiagnostics = `-- name: SetCallDiagnostics :exec
-UPDATE calls SET diagnostics=$2, completed_at=clock_timestamp() WHERE id=$1
-`
-
-type SetCallDiagnosticsParams struct {
-	ID          string
-	Diagnostics []byte
-}
-
-func (q *Queries) SetCallDiagnostics(ctx context.Context, arg SetCallDiagnosticsParams) error {
-	_, err := q.db.Exec(ctx, setCallDiagnostics, arg.ID, arg.Diagnostics)
-	return err
-}
-
 const setCallLedgerTx = `-- name: SetCallLedgerTx :exec
 UPDATE calls SET ledger_tx_id = $2 WHERE id = $1
 `
@@ -874,6 +862,25 @@ type SetCallLedgerTxParams struct {
 
 func (q *Queries) SetCallLedgerTx(ctx context.Context, arg SetCallLedgerTxParams) error {
 	_, err := q.db.Exec(ctx, setCallLedgerTx, arg.ID, arg.LedgerTxID)
+	return err
+}
+
+const setCallSettlements = `-- name: SetCallSettlements :exec
+UPDATE calls c SET diagnostics = jsonb_set(c.diagnostics, '{stages}',
+    coalesce(c.diagnostics->'stages', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('stage', 'settlement', 'duration_ms', d.duration_ms)))
+FROM (SELECT unnest($1::uuid[]) AS id,
+             unnest($2::double precision[]) AS duration_ms) d
+WHERE c.id = d.id AND c.outcome <> 'in_progress' AND c.diagnostics IS NOT NULL
+    AND NOT (coalesce(c.diagnostics->'stages', '[]'::jsonb) @> '[{"stage":"settlement"}]'::jsonb)
+`
+
+type SetCallSettlementsParams struct {
+	Ids       []string
+	Durations []float64
+}
+
+func (q *Queries) SetCallSettlements(ctx context.Context, arg SetCallSettlementsParams) error {
+	_, err := q.db.Exec(ctx, setCallSettlements, arg.Ids, arg.Durations)
 	return err
 }
 

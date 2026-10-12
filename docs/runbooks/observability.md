@@ -57,3 +57,7 @@ docker compose -f compose.yaml -f compose.observability.yaml stop prometheus gra
 进程重启清空计数与在途 gauge，Prometheus rate 会处理计数器重置，但抓取中断可能损失增量；数据库才是调用/账务长期事实。未接 OTel、正文采集或推送告警。
 
 配置格式参考 [Grafana provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/) 与 [Prometheus getting started](https://prometheus.io/docs/prometheus/latest/getting_started/)。
+
+调用分析繁忙（429）时等待后重试；超时（503）时缩小时间窗或增加筛选，不会显示部分扫描的统计。实时模式每 15 秒刷新共享筛选窗口。
+
+调用详情的结算耗时在提交后批量补写，通常在下一次 250ms 刷新后可见；队列饱和、写失败或进程异常退出时可能缺失，应解释为未知。主要诊断事实与账本仍在同一事务持久化。排查 `aihub_diagnostic_timings_dropped_total`（队列丢弃）和 `aihub_diagnostic_timings_failed_total`（补写失败）是否增长；二者不表示漏记账。后台写入不重试，避免数据库故障时积压反压到网关。

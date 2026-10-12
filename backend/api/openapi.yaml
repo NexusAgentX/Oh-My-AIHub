@@ -1697,6 +1697,13 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503':
+          description: 分析超过资源预算，请缩小时间范围或增加筛选
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+
   /api/calls:
     get:
       operationId: listCalls
@@ -2804,6 +2811,13 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503':
+          description: 分析超过资源预算，请缩小时间范围或增加筛选
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+
   /api/admin/calls:
     get:
       operationId: listAdminCalls

@@ -121,6 +121,7 @@ it('keeps filtered live calls bounded and ignores incomplete event rows', async 
   await waitForUI(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(20))
   await click('下一页')
   await waitForUI(() => expect(host.textContent).toContain('第 2 页'))
+  vi.useFakeTimers()
   await act(async () => (host.querySelector('[role="switch"]') as HTMLElement).click())
   expect(host.textContent).toContain('第 1 页')
   await act(async () => {
@@ -133,7 +134,9 @@ it('keeps filtered live calls bounded and ignores incomplete event rows', async 
   const reads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/calls?')).length
   const before = reads()
   // 开放结束时间的渠道查询参数不变，仍应定时刷新服务端筛选结果。
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3100)) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(3100) })
+  expect(reads()).toBe(before)
+  await act(async () => { await vi.advanceTimersByTimeAsync(12_000) })
   expect(reads()).toBeGreaterThan(before)
 })
 
