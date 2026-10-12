@@ -341,7 +341,7 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	}
 	update := map[string]any{
 		"fee_rate_nano": 2_000_000, "c2c_payment_timeout_minutes": 15, "default_credit_limit": "20",
-		"default_max_attempts": 2, "default_ttft_timeout_ms": 20000, "default_total_timeout_ms": 300000,
+		"default_max_attempts": 2, "default_ttft_timeout_ms": 20000, "default_request_timeout_ms": 300000, "default_idle_timeout_ms": 15000,
 		"default_cooldown_failures": 5, "default_cooldown_seconds": 60, "account_max_inflight_calls": 0, "extra_blocked_hosts": []string{"Evil.Example"},
 		"usd_cny_rate": "7.25", "fx_auto_sync": true, "fx_sync_minute": 600,
 	}
@@ -354,20 +354,20 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	// Ordinary members can read current defaults, without receiving admin-only settings.
 	member, _ := newMember(t, spec, admin.handler, admin, "defaults-reader")
 	defaults := member.expect(t, http.StatusOK, http.MethodGet, "/api/form-defaults", nil)
-	for _, key := range []string{"default_max_attempts", "default_ttft_timeout_ms", "default_total_timeout_ms", "default_cooldown_failures", "default_cooldown_seconds"} {
+	for _, key := range []string{"default_max_attempts", "default_ttft_timeout_ms", "default_request_timeout_ms", "default_idle_timeout_ms", "default_cooldown_failures", "default_cooldown_seconds"} {
 		if defaults[key] != saved[key] {
 			t.Fatalf("default %s = %v, want %v", key, defaults[key], saved[key])
 		}
 	}
-	if len(defaults) != 5 {
+	if len(defaults) != 6 {
 		t.Fatalf("unexpected exposed settings: %v", defaults)
 	}
 	member.expect(t, http.StatusUnauthorized, http.MethodGet, "/api/form-defaults", nil, withoutCookie)
-	update["default_total_timeout_ms"] = 1000
+	update["default_request_timeout_ms"] = 999
 	if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid settings = %d", recorder.Code)
 	}
-	update["default_total_timeout_ms"] = 300000
+	update["default_request_timeout_ms"] = 300000
 	for _, limit := range []int{-1, 1001} {
 		update["account_max_inflight_calls"] = limit
 		if recorder := admin.call(t, http.MethodPut, "/api/admin/settings", update); recorder.Code != http.StatusUnprocessableEntity {

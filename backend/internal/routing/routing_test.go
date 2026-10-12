@@ -21,3 +21,20 @@ func TestValidateNormalizesAndRejectsBadPreferences(t *testing.T) {
 		t.Fatal("default preference must be cheapest-first")
 	}
 }
+
+func TestTimeoutOverridesAcceptIndependentBounds(t *testing.T) {
+	for _, value := range []int32{999, 1000, 3600000, 3600001} {
+		for _, field := range []string{"idle", "request"} {
+			pref := Pref{Mode: ModeCheapest}
+			if field == "idle" {
+				pref.IdleTimeoutMS = &value
+			} else {
+				pref.RequestTimeoutMS = &value
+			}
+			_, err := Validate(pref)
+			if (err == nil) != (value >= 1000 && value <= 3600000) {
+				t.Fatalf("%s %d: %v", field, value, err)
+			}
+		}
+	}
+}

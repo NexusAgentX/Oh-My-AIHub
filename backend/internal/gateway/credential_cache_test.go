@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -81,7 +82,7 @@ func (r *credentialRun) attempt(channelID string, sealed channel.EncryptedCreden
 	call := &callState{format: channel.FormatOpenAIChat}
 	candidate := Candidate{ChannelID: channelID, BaseURL: "https://relay.example", UpstreamModel: "gpt-up", Credential: sealed}
 	result := r.engine.attempt(context.Background(), request, call, candidate, Limits{},
-		settings.Settings{DefaultTotalTimeoutMS: 600000, DefaultTTFTTimeoutMS: 600000}, r.engine.Outbound, body, scan, authBearer, 0)
+		settings.Settings{DefaultRequestTimeoutMS: 600000, DefaultIdleTimeoutMS: 600000, DefaultTTFTTimeoutMS: 600000}, r.engine.Outbound, body, scan, authBearer, attemptTimeouts{request: 600 * time.Second, idle: 600 * time.Second, ttft: 600 * time.Second})
 	if result.cancel != nil {
 		r.t.Cleanup(func() { result.cancel(nil) })
 	}

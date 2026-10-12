@@ -76,10 +76,15 @@ func TestKeysAndRoutingPreferences(t *testing.T) {
 	// 账户级偏好与 Key 级覆盖。
 	other := "30000000-0000-4000-8000-0000000000c1"
 	account := alice.expect(t, http.StatusOK, http.MethodPut, "/api/routing/deepseek-chat", map[string]any{
-		"mode": "manual", "order": []string{other}, "excluded": []string{}, "max_attempts": 2, "ttft_timeout_ms": 5000,
+		"mode": "manual", "order": []string{other}, "excluded": []string{}, "max_attempts": 2, "ttft_timeout_ms": 5000, "idle_timeout_ms": 2000, "request_timeout_ms": 15000,
 	})
 	if account["source"] != "account" || account["mode"] != "manual" || account["order"].([]any)[0] != other {
 		t.Fatalf("account routing = %v", account)
+	}
+	for field, want := range map[string]float64{"ttft_timeout_ms": 5000, "idle_timeout_ms": 2000, "request_timeout_ms": 15000} {
+		if account[field] != want {
+			t.Fatalf("account %s = %v", field, account[field])
+		}
 	}
 	if recorder := alice.call(t, http.MethodPut, "/api/routing/missing-model", map[string]any{"mode": "cheapest"}); recorder.Code != http.StatusNotFound {
 		t.Fatalf("routing for unknown model = %d", recorder.Code)
@@ -87,8 +92,8 @@ func TestKeysAndRoutingPreferences(t *testing.T) {
 	if recorder := alice.call(t, http.MethodPut, "/api/routing/deepseek-chat", map[string]any{"mode": "random"}); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid routing mode = %d", recorder.Code)
 	}
-	override := alice.expect(t, http.StatusOK, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "fastest"})
-	if override["source"] != "key" || override["order"].([]any) == nil {
+	override := alice.expect(t, http.StatusOK, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "fastest", "idle_timeout_ms": 3000, "request_timeout_ms": 20000})
+	if override["source"] != "key" || override["order"].([]any) == nil || override["ttft_timeout_ms"] != nil || override["idle_timeout_ms"] != float64(3000) || override["request_timeout_ms"] != float64(20000) {
 		t.Fatalf("key routing = %v", override)
 	}
 	if recorder := bob.call(t, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "fastest"}); recorder.Code != http.StatusNotFound {

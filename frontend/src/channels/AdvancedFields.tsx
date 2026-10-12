@@ -2,7 +2,7 @@ import { useFormDefaults } from '../settings/queries'
 import { Button, Icon, IconButton, TextField } from '../ui'
 import type { AdvancedForm } from './channelForm'
 
-/** 渠道高级设置：留空即平台默认。 */
+/** 渠道高级设置：超时留空继承消费者模型路由，再回落平台默认。 */
 export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChange: (form: AdvancedForm) => void }) {
   const { data: defaults, isError } = useFormDefaults()
   const pending = isError ? '默认值加载失败' : '加载默认值…'
@@ -10,7 +10,8 @@ export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChang
     concurrency: '不限',
     rpm: '不限',
     ttftTimeout: defaults ? String(defaults.default_ttft_timeout_ms) : pending,
-    totalTimeout: defaults ? String(defaults.default_total_timeout_ms) : pending,
+    requestTimeout: defaults ? String(defaults.default_request_timeout_ms) : pending,
+    idleTimeout: defaults ? String(defaults.default_idle_timeout_ms) : pending,
     cooldownFailures: defaults ? String(defaults.default_cooldown_failures) : pending,
     cooldownMinutes: defaults ? String(defaults.default_cooldown_seconds / 60) : pending,
   }
@@ -80,9 +81,11 @@ export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChang
         {int('每分钟请求数', 'rpm')}
         <TextField inputMode="decimal" label="每日收入上限" onChange={(event) => set({ dailyCap: event.target.value.trim() })} placeholder="不限" value={form.dailyCap} />
       </div>
+      <p className="muted-copy">超时留空时使用消费者的模型路由设置，未设置则使用平台默认。</p>
       <div className="field-row">
-        {int('首字超时（毫秒）', 'ttftTimeout')}
-        {int('总超时（毫秒）', 'totalTimeout')}
+        {int('首字超时（毫秒）', 'ttftTimeout', '流式：等待响应体首字节')}
+        {int('空闲超时（毫秒）', 'idleTimeout', '流式：两次数据之间的最长间隔')}
+        {int('请求超时（毫秒）', 'requestTimeout', '非流式：从请求到读完整个响应')}
       </div>
       <div className="field-row">
         {int('连续失败次数', 'cooldownFailures', '达到后进入冷却')}

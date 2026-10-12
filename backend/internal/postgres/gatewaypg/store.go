@@ -133,22 +133,22 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 // candidateColumns are the columns ListCandidates and ListAllCandidates have
 // in common.
 type candidateColumns struct {
-	ID, OwnerID, Name, BaseUrl          string
-	ApiKeyCiphertext, ApiKeyNonce       []byte
-	ApiKeyKeyID                         string
-	UserAgent                           *string
-	HeaderRules                         []byte
-	ConcurrencyLimit, RpmLimit          *int32
-	DailyRevenueCapNano                 *money.Amount
-	TtftTimeoutMs, TotalTimeoutMs       *int32
-	CooldownFailures, CooldownSeconds   *int32
-	UpstreamModel                       string
-	MultiplierNano                      int64
-	FxDiscount, IsCustom                bool
-	CustomInputPriceNanoPerMillion      *money.Amount
-	CustomOutputPriceNanoPerMillion     *money.Amount
-	CustomCacheWritePriceNanoPerMillion *money.Amount
-	CustomCacheReadPriceNanoPerMillion  *money.Amount
+	ID, OwnerID, Name, BaseUrl                     string
+	ApiKeyCiphertext, ApiKeyNonce                  []byte
+	ApiKeyKeyID                                    string
+	UserAgent                                      *string
+	HeaderRules                                    []byte
+	ConcurrencyLimit, RpmLimit                     *int32
+	DailyRevenueCapNano                            *money.Amount
+	TtftTimeoutMs, RequestTimeoutMs, IdleTimeoutMs *int32
+	CooldownFailures, CooldownSeconds              *int32
+	UpstreamModel                                  string
+	MultiplierNano                                 int64
+	FxDiscount, IsCustom                           bool
+	CustomInputPriceNanoPerMillion                 *money.Amount
+	CustomOutputPriceNanoPerMillion                *money.Amount
+	CustomCacheWritePriceNanoPerMillion            *money.Amount
+	CustomCacheReadPriceNanoPerMillion             *money.Amount
 }
 
 func candidate(row candidateColumns) gateway.Candidate {
@@ -162,7 +162,7 @@ func candidate(row candidateColumns) gateway.Candidate {
 	_ = json.Unmarshal(row.HeaderRules, &rules)
 	advanced := channel.Advanced{
 		UserAgent: row.UserAgent, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit,
-		DailyRevenueCap: row.DailyRevenueCapNano, TTFTTimeoutMS: row.TtftTimeoutMs, TotalTimeoutMS: row.TotalTimeoutMs,
+		DailyRevenueCap: row.DailyRevenueCapNano, TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
 		CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
 		HeaderRules: channel.HeaderRules{Remove: rules.Remove},
 	}
@@ -196,7 +196,7 @@ func (s *Store) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, 
 			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseUrl: row.BaseUrl, ApiKeyCiphertext: row.ApiKeyCiphertext,
 			ApiKeyNonce: row.ApiKeyNonce, ApiKeyKeyID: row.ApiKeyKeyID, UserAgent: row.UserAgent, HeaderRules: row.HeaderRules,
 			ConcurrencyLimit: row.ConcurrencyLimit, RpmLimit: row.RpmLimit, DailyRevenueCapNano: row.DailyRevenueCapNano,
-			TtftTimeoutMs: row.TtftTimeoutMs, TotalTimeoutMs: row.TotalTimeoutMs, CooldownFailures: row.CooldownFailures,
+			TtftTimeoutMs: row.TtftTimeoutMs, RequestTimeoutMs: row.RequestTimeoutMs, IdleTimeoutMs: row.IdleTimeoutMs, CooldownFailures: row.CooldownFailures,
 			CooldownSeconds: row.CooldownSeconds, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano,
 			FxDiscount: row.FxDiscount, IsCustom: row.IsCustom,
 			CustomInputPriceNanoPerMillion: row.CustomInputPriceNanoPerMillion, CustomOutputPriceNanoPerMillion: row.CustomOutputPriceNanoPerMillion,

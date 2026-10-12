@@ -17,6 +17,8 @@ function defaultPreference(model: string): RoutingPreference {
     excluded: [],
     max_attempts: null,
     ttft_timeout_ms: null,
+    idle_timeout_ms: null,
+    request_timeout_ms: null,
     updated_at: null,
   }
 }

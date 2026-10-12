@@ -37,6 +37,8 @@ const preference = (patch: Partial<RoutingPreference>): RoutingPreference => ({
   excluded: [],
   max_attempts: null,
   ttft_timeout_ms: null,
+  idle_timeout_ms: null,
+  request_timeout_ms: null,
   updated_at: null,
   ...patch,
 })
@@ -66,7 +68,7 @@ describe('routing editor logic', () => {
   it('unchecks channels in any mode and only submits an order for manual', () => {
     let draft = draftFromPreference(preference({}), channels)
     draft = setUsed(draft, 'b', false)
-    expect(toRoutingInput(draft)).toEqual({ mode: 'cheapest', order: [], excluded: ['b'], max_attempts: null, ttft_timeout_ms: null })
+    expect(toRoutingInput(draft)).toEqual({ mode: 'cheapest', order: [], excluded: ['b'], max_attempts: null, ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null })
     draft = changeMode(draft, 'manual', channels)
     expect(toRoutingInput(draft).order).toEqual(['a', 'b', 'c'])
     expect(setUsed(draft, 'b', true).excluded).toEqual([])
@@ -92,4 +94,11 @@ describe('channel state label', () => {
     expect(channelStateLabel({ ...channel('a'), state: 'cooldown', cooldown_remaining_seconds: 90 }).label).toBe('冷却中 2 分钟')
     expect(channelStateLabel(channel('a')).label).toBe('在线')
   })
+})
+
+it('round-trips all timeout overrides independently and counts them', () => {
+  const draft = draftFromPreference(preference({ ttft_timeout_ms: 60000, idle_timeout_ms: 2000, request_timeout_ms: 10000 }), channels)
+  expect(toRoutingInput(draft)).toMatchObject({ ttft_timeout_ms: 60000, idle_timeout_ms: 2000, request_timeout_ms: 10000 })
+  expect(advancedChanged(draft)).toBe(3)
+  expect(toRoutingInput({ ...draft, idle_timeout_ms: null })).toMatchObject({ ttft_timeout_ms: 60000, idle_timeout_ms: null, request_timeout_ms: 10000 })
 })

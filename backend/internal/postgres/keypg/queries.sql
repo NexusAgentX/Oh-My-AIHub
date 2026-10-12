@@ -63,11 +63,11 @@ GROUP BY api_key_id;
 SELECT api_key_id, model_id FROM route_prefs WHERE api_key_id = ANY(sqlc.arg(key_ids)::uuid[]) ORDER BY model_id;
 
 -- name: UpsertRoutePref :one
-INSERT INTO route_prefs (account_id, api_key_id, model_id, mode, max_attempts, ttft_timeout_ms)
-VALUES ($1, sqlc.narg(api_key_id), $2, $3, $4, $5)
+INSERT INTO route_prefs (account_id, api_key_id, model_id, mode, max_attempts, ttft_timeout_ms, idle_timeout_ms, request_timeout_ms)
+VALUES ($1, sqlc.narg(api_key_id), $2, $3, $4, $5, sqlc.narg(idle_timeout_ms), sqlc.narg(request_timeout_ms))
 ON CONFLICT (account_id, api_key_id, model_id)
 DO UPDATE SET mode = EXCLUDED.mode, max_attempts = EXCLUDED.max_attempts,
-              ttft_timeout_ms = EXCLUDED.ttft_timeout_ms, updated_at = now()
+              ttft_timeout_ms = EXCLUDED.ttft_timeout_ms, idle_timeout_ms = EXCLUDED.idle_timeout_ms, request_timeout_ms = EXCLUDED.request_timeout_ms, updated_at = now()
 RETURNING id, updated_at;
 
 -- name: ClearRoutePrefChannels :exec
@@ -82,7 +82,7 @@ WHERE account_id = $1 AND api_key_id IS NOT DISTINCT FROM sqlc.narg(api_key_id) 
 
 -- Scope-exact lookups: key-level rows when api_key_id is given, account-level rows otherwise.
 -- name: ListRoutePrefs :many
-SELECT id, model_id, mode, max_attempts, ttft_timeout_ms, updated_at, api_key_id
+SELECT id, model_id, mode, max_attempts, ttft_timeout_ms, idle_timeout_ms, request_timeout_ms, updated_at, api_key_id
 FROM route_prefs
 WHERE account_id = $1 AND api_key_id IS NOT DISTINCT FROM sqlc.narg(api_key_id)
   AND (sqlc.arg(model_id)::text = '' OR model_id = sqlc.arg(model_id))
@@ -98,7 +98,7 @@ ORDER BY route_pref_id, position;
 -- routing snapshot (ADR-0040). One statement, so the preferences and their
 -- channel lists are read together.
 -- name: ListAllRoutePrefs :many
-SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.updated_at,
+SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.idle_timeout_ms, rp.request_timeout_ms, rp.updated_at,
        coalesce(array_agg(rpc.channel_id ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::uuid[] AS channel_ids,
        coalesce(array_agg(rpc.excluded ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::boolean[] AS excluded_flags
 FROM route_prefs rp

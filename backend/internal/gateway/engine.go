@@ -484,10 +484,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if pref.MaxAttempts != nil {
 		maxAttempts = int(*pref.MaxAttempts)
 	}
-	ttftTimeout := time.Duration(defaults.DefaultTTFTTimeoutMS) * time.Millisecond
-	if pref.TTFTTimeoutMS != nil {
-		ttftTimeout = time.Duration(*pref.TTFTTimeoutMS) * time.Millisecond
-	}
+	timeouts := resolveTimeouts(defaults, pref)
 
 	candidates, err := e.Store.Candidates(ctx, call.modelID, format)
 	if err != nil {
@@ -536,7 +533,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		candidate, limits, release := slot.candidate, slot.limits, slot.release
 		tried++
 		call.lastChannelID = candidate.ChannelID
-		result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, ttftTimeout)
+		result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, timeouts)
 		call.attempts = append(call.attempts, result.record)
 		e.publishAttempt(call, candidate, result.record)
 		if result.response == nil {
@@ -831,13 +828,13 @@ func fallbackStatus(status int) bool {
 // call; the request context r.Context() tells whether the client is still
 // there. Every deadline of the exchange is a timer on the attempt's context
 // (the outbound client has none of its own), so a stream that keeps producing
-// output is never cut off by the total timeout, only by the call limit:
+// output is never cut off by the non-streaming request timeout, only by the call limit:
 //
-//   - stream: the first-byte timeout until the first byte, then the total
-//     timeout as an idle timeout between two reads that returned data;
-//   - non-streaming: the total timeout for the whole exchange.
+//   - stream: the first-byte timeout until the first byte, then the idle
+//     timeout between two reads that returned data;
+//   - non-streaming: the request timeout for the whole exchange.
 func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, candidate Candidate, limits Limits, defaults settings.Settings,
-	policy channel.Outbound, body []byte, scan objectScan, location authLocation, ttft time.Duration) attemptResult {
+	policy channel.Outbound, body []byte, scan objectScan, location authLocation, timeouts attemptTimeouts) attemptResult {
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}}}
 	// closeFailed writes the failure into the attempt record; fail also counts
 	// it against the channel.
@@ -882,13 +879,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 	result.secret = secret
 
-	total := time.Duration(defaults.DefaultTotalTimeoutMS) * time.Millisecond
-	if candidate.Advanced.TotalTimeoutMS != nil {
-		total = time.Duration(*candidate.Advanced.TotalTimeoutMS) * time.Millisecond
-	}
-	if candidate.Advanced.TTFTTimeoutMS != nil {
-		ttft = time.Duration(*candidate.Advanced.TTFTTimeoutMS) * time.Millisecond
-	}
+	timeouts = timeouts.withChannel(candidate.Advanced)
 	client, err := policy.GatewayClient(ctx, candidate.BaseURL)
 	if err != nil {
 		return fail(EndConnectError, "egress_blocked", "出站校验未通过", nil)
@@ -926,13 +917,13 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 	result.upstream, result.cancel, result.watch = attemptCtx, cancel, watch
 	// Only a stream promises an early first byte; a non-streaming completion
-	// answers when generation ends and is bounded by the total timeout alone,
+	// answers when generation ends and is bounded by the request timeout alone,
 	// which here runs from the request to the last byte.
 	var firstByte *time.Timer
 	if call.stream {
-		firstByte = arm(ttft, errTTFT)
+		firstByte = arm(timeouts.ttft, errTTFT)
 	} else {
-		arm(total, errTotal)
+		arm(timeouts.request, errTotal)
 	}
 	stopFirstByte := func() {
 		if firstByte != nil {
@@ -1009,9 +1000,9 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		}
 		stopFirstByte()
 		if call.stream {
-			// From the first byte on, the stream may stay silent for the total
+			// From the first byte on, the stream may stay silent for the idle
 			// timeout at most; streamBack restarts this clock on every read.
-			result.idle, result.idleAfter = arm(total, errIdle), total
+			result.idle, result.idleAfter = arm(timeouts.idle, errIdle), timeouts.idle
 		}
 		result.ttft = e.Now().Sub(result.started)
 		result.record.TTFTMS = millis(result.ttft)
@@ -1021,9 +1012,9 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 
 	stopFirstByte()
 	if call.stream {
-		// The answer is an HTTP error: its body is bounded by the total timeout
+		// The answer is an HTTP error: its body is bounded by the request timeout
 		// like a non-streaming answer is.
-		arm(total, errTotal)
+		arm(timeouts.request, errTotal)
 	}
 	payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody+int64(secretguard.MaxEncodedLen(secret))))
 	response.Body.Close()

@@ -126,8 +126,9 @@ function SettingsEditor({ settings }: { settings: Settings }) {
             {field('defaultMaxAttempts', '默认最多尝试渠道数', { inputMode: 'numeric' })}
           </div>
           <div className="field-row">
-            {field('defaultTtftSeconds', '默认首字超时（秒）', { inputMode: 'numeric' })}
-            {field('defaultTotalSeconds', '默认总超时（秒）', { inputMode: 'numeric' })}
+            {field('defaultTtftSeconds', '默认首字超时（秒）', { inputMode: 'numeric', hint: '流式：等待响应体首字节' })}
+            {field('defaultIdleSeconds', '默认空闲超时（秒）', { inputMode: 'numeric', hint: '流式：两次数据之间的最长间隔' })}
+            {field('defaultRequestSeconds', '默认请求超时（秒）', { inputMode: 'numeric', hint: '非流式：从请求到读完整个响应' })}
           </div>
           <div className="field-row">
             {field('defaultCooldownFailures', '冷却：连续失败次数', { inputMode: 'numeric' })}

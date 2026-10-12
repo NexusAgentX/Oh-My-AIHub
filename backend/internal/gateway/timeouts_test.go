@@ -3,6 +3,9 @@ package gateway
 import (
 	"context"
 	"errors"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"testing"
 	"time"
 )
@@ -67,6 +70,30 @@ func TestInterruptionOfBlamesTheChannelExceptForTheCallLimit(t *testing.T) {
 			got := interruptionOf(tc.cause)
 			if got.code != tc.code || got.channelFault != tc.fault || got.message == "" {
 				t.Fatalf("interruption = %+v", got)
+			}
+		})
+	}
+}
+
+func TestTimeoutStagesResolveIndependently(t *testing.T) {
+	ms := func(value int32) *int32 { return &value }
+	defaults := settings.Settings{DefaultTTFTTimeoutMS: 30000, DefaultIdleTimeoutMS: 600000, DefaultRequestTimeoutMS: 500000}
+	for _, tc := range []struct {
+		name     string
+		pref     routing.Pref
+		advanced channel.Advanced
+		want     attemptTimeouts
+	}{
+		{name: "platform", want: attemptTimeouts{30 * time.Second, 600 * time.Second, 500 * time.Second}},
+		{name: "model", pref: routing.Pref{TTFTTimeoutMS: ms(60000), IdleTimeoutMS: ms(2000), RequestTimeoutMS: ms(10000)}, want: attemptTimeouts{60 * time.Second, 2 * time.Second, 10 * time.Second}},
+		{name: "channel", pref: routing.Pref{TTFTTimeoutMS: ms(60000), IdleTimeoutMS: ms(2000), RequestTimeoutMS: ms(10000)}, advanced: channel.Advanced{TTFTTimeoutMS: ms(15000), IdleTimeoutMS: ms(5000), RequestTimeoutMS: ms(20000)}, want: attemptTimeouts{15 * time.Second, 5 * time.Second, 20 * time.Second}},
+		{name: "mixed sources", pref: routing.Pref{IdleTimeoutMS: ms(2000)}, advanced: channel.Advanced{TTFTTimeoutMS: ms(15000)}, want: attemptTimeouts{15 * time.Second, 2 * time.Second, 500 * time.Second}},
+		{name: "channel without model", advanced: channel.Advanced{RequestTimeoutMS: ms(1000)}, want: attemptTimeouts{30 * time.Second, 600 * time.Second, time.Second}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveTimeouts(defaults, tc.pref).withChannel(tc.advanced)
+			if got != tc.want {
+				t.Fatalf("timeouts = %+v, want %+v", got, tc.want)
 			}
 		})
 	}

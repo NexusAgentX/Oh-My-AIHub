@@ -76,7 +76,7 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 		},
 		"advanced": map[string]any{
 			"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "daily_revenue_cap": "50", "ttft_timeout_ms": 5000,
-			"total_timeout_ms": 20000, "cooldown_failures": 4, "cooldown_seconds": 60,
+			"request_timeout_ms": 20000, "idle_timeout_ms": 3000, "cooldown_failures": 4, "cooldown_seconds": 60,
 			"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-A", "value": "1"}}, "remove": []any{"X-B"}},
 		},
 	})
@@ -127,8 +127,8 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{
 		"mode": "manual", "order": []string{w.channels["b"], w.channels["a"]}, "excluded": []string{w.channels["c"]}, "max_attempts": 4,
 	})
-	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/my-custom", map[string]any{"mode": "reliable", "ttft_timeout_ms": 7000})
-	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+w.keyIDs["rich"]+"/routing/gpt-test", map[string]any{"mode": "fastest", "max_attempts": 2, "ttft_timeout_ms": 5000})
+	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/my-custom", map[string]any{"mode": "reliable", "ttft_timeout_ms": 7000, "idle_timeout_ms": 2000, "request_timeout_ms": 12000})
+	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+w.keyIDs["rich"]+"/routing/gpt-test", map[string]any{"mode": "fastest", "max_attempts": 2, "ttft_timeout_ms": 5000, "idle_timeout_ms": 3000, "request_timeout_ms": 15000})
 	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+defaultID+"/routing/usd-model", map[string]any{"mode": "manual", "order": []string{w.channels["b"]}})
 	e.apiJSON(w.sharerA, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "cheapest", "excluded": []string{w.channels["b"]}})
 	return w

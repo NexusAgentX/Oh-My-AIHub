@@ -45,7 +45,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"id": "7", "actor": nil, "detail": emptyObject,
 		}},
 		{"unconfigured routing preference", newRoutingPreferenceJSON(routing.Pref{}), map[string]any{
-			"order": emptyList, "excluded": emptyList, "max_attempts": nil, "ttft_timeout_ms": nil, "updated_at": nil,
+			"order": emptyList, "excluded": emptyList, "max_attempts": nil, "ttft_timeout_ms": nil, "idle_timeout_ms": nil, "request_timeout_ms": nil, "updated_at": nil,
 		}},
 		{"model without tiers or prices", newAdminModelJSON(catalog.Model{}), map[string]any{
 			"price_tiers": emptyList, "context_window": nil, "max_output_tokens": nil,
@@ -101,7 +101,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"suspended_reason": nil, "cooldown_until": nil, "models": emptyList,
 			"advanced": map[string]any{
 				"user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
-				"daily_revenue_cap": nil, "ttft_timeout_ms": nil, "total_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
+				"daily_revenue_cap": nil, "ttft_timeout_ms": nil, "request_timeout_ms": nil, "idle_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
 			},
 			"today": map[string]any{"revenue": "0", "calls": float64(0), "success_rate": nil},
 		}},

@@ -166,6 +166,7 @@ export function RoutingEditor({
         {announcement}
       </span>
       <Disclosure changed={advancedChanged(draft)} title="高级">
+        <p className="muted-copy">超时留空使用平台默认；渠道明确设置时优先使用渠道值。</p>
         <div className="field-row">
           <TextField
             hint="留空使用平台默认"
@@ -177,16 +178,24 @@ export function RoutingEditor({
             type="number"
             value={draft.max_attempts ?? ''}
           />
-          <TextField
-            hint="毫秒，留空使用平台默认"
-            inputMode="numeric"
-            label="首字超时"
-            placeholder={defaults ? String(defaults.default_ttft_timeout_ms) : pending}
-            min={1}
-            onChange={(event) => onChange({ ...draft, ttft_timeout_ms: parseOptionalInt(event.target.value) })}
-            type="number"
-            value={draft.ttft_timeout_ms ?? ''}
-          />
+          {([
+            ['ttft_timeout_ms', '首字超时（毫秒）', '流式：等待响应体首字节', 600000],
+            ['idle_timeout_ms', '空闲超时（毫秒）', '流式：两次数据之间的最长间隔', 3600000],
+            ['request_timeout_ms', '请求超时（毫秒）', '非流式：从请求到读完整个响应', 3600000],
+          ] as const).map(([key, label, hint, max]) => (
+            <TextField
+              hint={hint}
+              inputMode="numeric"
+              key={key}
+              label={label}
+              min={1000}
+              max={max}
+              onChange={(event) => onChange({ ...draft, [key]: parseOptionalInt(event.target.value) })}
+              placeholder="平台默认"
+              type="number"
+              value={draft[key] ?? ''}
+            />
+          ))}
         </div>
       </Disclosure>
     </div>

@@ -2003,6 +2003,8 @@ export interface components {
             /** @description null 使用平台默认。 */
             max_attempts: number | null;
             ttft_timeout_ms: number | null;
+            idle_timeout_ms: number | null;
+            request_timeout_ms: number | null;
             updated_at: components["schemas"]["NullableTimestamp"];
         };
         RoutingPreferenceInput: {
@@ -2011,6 +2013,8 @@ export interface components {
             excluded?: string[];
             max_attempts?: number | null;
             ttft_timeout_ms?: number | null;
+            idle_timeout_ms?: number | null;
+            request_timeout_ms?: number | null;
         };
         ModelDetail: {
             model: components["schemas"]["CatalogModel"];
@@ -2112,7 +2116,8 @@ export interface components {
             rpm_limit: number | null;
             daily_revenue_cap: components["schemas"]["NullableAmount"];
             ttft_timeout_ms: number | null;
-            total_timeout_ms: number | null;
+            idle_timeout_ms: number | null;
+            request_timeout_ms: number | null;
             cooldown_failures: number | null;
             cooldown_seconds: number | null;
         };
@@ -2123,7 +2128,8 @@ export interface components {
             rpm_limit?: number | null;
             daily_revenue_cap?: components["schemas"]["NullableAmount"];
             ttft_timeout_ms?: number | null;
-            total_timeout_ms?: number | null;
+            idle_timeout_ms?: number | null;
+            request_timeout_ms?: number | null;
             cooldown_failures?: number | null;
             cooldown_seconds?: number | null;
         };
@@ -2726,7 +2732,8 @@ export interface components {
             default_credit_limit: components["schemas"]["Amount"];
             default_max_attempts: number;
             default_ttft_timeout_ms: number;
-            default_total_timeout_ms: number;
+            default_idle_timeout_ms: number;
+            default_request_timeout_ms: number;
             default_cooldown_failures: number;
             default_cooldown_seconds: number;
             /** @description 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。 */
@@ -2757,7 +2764,8 @@ export interface components {
             default_credit_limit: components["schemas"]["Amount"];
             default_max_attempts: number;
             default_ttft_timeout_ms: number;
-            default_total_timeout_ms: number;
+            default_idle_timeout_ms: number;
+            default_request_timeout_ms: number;
             default_cooldown_failures: number;
             default_cooldown_seconds: number;
             /** @description 每个账号同时在途的网关调用数上限，超过时以 429 拒绝；0 表示不限，默认 20。 */
@@ -2772,7 +2780,8 @@ export interface components {
         FormDefaults: {
             default_max_attempts: number;
             default_ttft_timeout_ms: number;
-            default_total_timeout_ms: number;
+            default_idle_timeout_ms: number;
+            default_request_timeout_ms: number;
             default_cooldown_failures: number;
             default_cooldown_seconds: number;
         };

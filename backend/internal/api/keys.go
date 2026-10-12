@@ -96,14 +96,16 @@ type apiKeySecretJSON struct {
 
 // routingPreferenceJSON is the OpenAPI RoutingPreference schema.
 type routingPreferenceJSON struct {
-	ModelID       string         `json:"model_id"`
-	Source        routing.Source `json:"source"`
-	Mode          routing.Mode   `json:"mode"`
-	Order         []string       `json:"order"`
-	Excluded      []string       `json:"excluded"`
-	MaxAttempts   *int32         `json:"max_attempts"`
-	TTFTTimeoutMS *int32         `json:"ttft_timeout_ms"`
-	UpdatedAt     *time.Time     `json:"updated_at"`
+	ModelID          string         `json:"model_id"`
+	Source           routing.Source `json:"source"`
+	Mode             routing.Mode   `json:"mode"`
+	Order            []string       `json:"order"`
+	Excluded         []string       `json:"excluded"`
+	MaxAttempts      *int32         `json:"max_attempts"`
+	TTFTTimeoutMS    *int32         `json:"ttft_timeout_ms"`
+	IdleTimeoutMS    *int32         `json:"idle_timeout_ms"`
+	RequestTimeoutMS *int32         `json:"request_timeout_ms"`
+	UpdatedAt        *time.Time     `json:"updated_at"`
 }
 
 func newApiKeyJSON(key apikey.Key) apiKeyJSON {
@@ -142,8 +144,8 @@ func newRoutingPreferenceJSON(pref routing.Pref) routingPreferenceJSON {
 		Order:         order,
 		Excluded:      excluded,
 		MaxAttempts:   pref.MaxAttempts,
-		TTFTTimeoutMS: pref.TTFTTimeoutMS,
-		UpdatedAt:     pref.UpdatedAt,
+		TTFTTimeoutMS: pref.TTFTTimeoutMS, IdleTimeoutMS: pref.IdleTimeoutMS, RequestTimeoutMS: pref.RequestTimeoutMS,
+		UpdatedAt: pref.UpdatedAt,
 	}
 }
 
@@ -328,11 +330,13 @@ func (a *app) getKeySecret(w http.ResponseWriter, r *http.Request) {
 }
 
 type routingRequest struct {
-	Mode          routing.Mode `json:"mode"`
-	Order         []string     `json:"order"`
-	Excluded      []string     `json:"excluded"`
-	MaxAttempts   *int32       `json:"max_attempts"`
-	TTFTTimeoutMS *int32       `json:"ttft_timeout_ms"`
+	Mode             routing.Mode `json:"mode"`
+	Order            []string     `json:"order"`
+	Excluded         []string     `json:"excluded"`
+	MaxAttempts      *int32       `json:"max_attempts"`
+	TTFTTimeoutMS    *int32       `json:"ttft_timeout_ms"`
+	IdleTimeoutMS    *int32       `json:"idle_timeout_ms"`
+	RequestTimeoutMS *int32       `json:"request_timeout_ms"`
 }
 
 // saveRouting stores the preference of the account (keyID empty) or of a key.
@@ -350,7 +354,7 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 	}
 	pref, err := routing.Validate(routing.Pref{
 		ModelID: modelID, Mode: request.Mode, Order: request.Order, Excluded: request.Excluded,
-		MaxAttempts: request.MaxAttempts, TTFTTimeoutMS: request.TTFTTimeoutMS,
+		MaxAttempts: request.MaxAttempts, TTFTTimeoutMS: request.TTFTTimeoutMS, IdleTimeoutMS: request.IdleTimeoutMS, RequestTimeoutMS: request.RequestTimeoutMS,
 	})
 	if err != nil {
 		writeDomainError(w, err)

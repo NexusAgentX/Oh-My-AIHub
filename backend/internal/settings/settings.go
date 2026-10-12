@@ -40,7 +40,8 @@ type Settings struct {
 	DefaultCreditLimit       money.Amount
 	DefaultMaxAttempts       int32
 	DefaultTTFTTimeoutMS     int32
-	DefaultTotalTimeoutMS    int32
+	DefaultRequestTimeoutMS  int32
+	DefaultIdleTimeoutMS     int32
 	DefaultCooldownFailures  int32
 	DefaultCooldownSeconds   int32
 	// AccountMaxInflightCalls is how many gateway calls one account may have
@@ -124,8 +125,8 @@ func Validate(value Settings) error {
 		value.DefaultCreditLimit < 0,
 		value.DefaultMaxAttempts < 1 || value.DefaultMaxAttempts > 10,
 		value.DefaultTTFTTimeoutMS < 1000 || value.DefaultTTFTTimeoutMS > 600000,
-		value.DefaultTotalTimeoutMS < 1000 || value.DefaultTotalTimeoutMS > 3600000,
-		value.DefaultTotalTimeoutMS < value.DefaultTTFTTimeoutMS,
+		value.DefaultRequestTimeoutMS < 1000 || value.DefaultRequestTimeoutMS > 3600000,
+		value.DefaultIdleTimeoutMS < 1000 || value.DefaultIdleTimeoutMS > 3600000,
 		value.DefaultCooldownFailures < 1 || value.DefaultCooldownFailures > 100,
 		value.DefaultCooldownSeconds < 10 || value.DefaultCooldownSeconds > 86400,
 		value.AccountMaxInflightCalls < 0 || value.AccountMaxInflightCalls > MaxAccountInflightCalls,

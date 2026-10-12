@@ -42,7 +42,8 @@ type channelAdvancedJSON struct {
 	RPMLimit         *int32          `json:"rpm_limit"`
 	DailyRevenueCap  *string         `json:"daily_revenue_cap"`
 	TTFTTimeoutMS    *int32          `json:"ttft_timeout_ms"`
-	TotalTimeoutMS   *int32          `json:"total_timeout_ms"`
+	RequestTimeoutMS *int32          `json:"request_timeout_ms"`
+	IdleTimeoutMS    *int32          `json:"idle_timeout_ms"`
 	CooldownFailures *int32          `json:"cooldown_failures"`
 	CooldownSeconds  *int32          `json:"cooldown_seconds"`
 }
@@ -212,7 +213,7 @@ func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
 		RPMLimit:         advanced.RPMLimit,
 		DailyRevenueCap:  nullableAmount(advanced.DailyRevenueCap),
 		TTFTTimeoutMS:    advanced.TTFTTimeoutMS,
-		TotalTimeoutMS:   advanced.TotalTimeoutMS,
+		RequestTimeoutMS: advanced.RequestTimeoutMS, IdleTimeoutMS: advanced.IdleTimeoutMS,
 		CooldownFailures: advanced.CooldownFailures,
 		CooldownSeconds:  advanced.CooldownSeconds,
 	}
@@ -327,7 +328,8 @@ type advancedRequest struct {
 	RPMLimit         *int32              `json:"rpm_limit"`
 	DailyRevenueCap  *string             `json:"daily_revenue_cap"`
 	TTFTTimeoutMS    *int32              `json:"ttft_timeout_ms"`
-	TotalTimeoutMS   *int32              `json:"total_timeout_ms"`
+	RequestTimeoutMS *int32              `json:"request_timeout_ms"`
+	IdleTimeoutMS    *int32              `json:"idle_timeout_ms"`
 	CooldownFailures *int32              `json:"cooldown_failures"`
 	CooldownSeconds  *int32              `json:"cooldown_seconds"`
 }
@@ -335,7 +337,7 @@ type advancedRequest struct {
 func (r advancedRequest) advanced() (channel.Advanced, error) {
 	advanced := channel.Advanced{
 		UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
-		TotalTimeoutMS: r.TotalTimeoutMS, CooldownFailures: r.CooldownFailures, CooldownSeconds: r.CooldownSeconds,
+		RequestTimeoutMS: r.RequestTimeoutMS, IdleTimeoutMS: r.IdleTimeoutMS, CooldownFailures: r.CooldownFailures, CooldownSeconds: r.CooldownSeconds,
 	}
 	if r.DailyRevenueCap != nil {
 		cap, err := money.Parse(*r.DailyRevenueCap)

@@ -66,15 +66,15 @@ func stallAfter(t *testing.T, write func(http.ResponseWriter)) func(http.Respons
 	}
 }
 
-// A stream is cut off only when it falls silent: the total timeout is the
-// longest pause between two reads, not a limit on the whole answer.
-func TestGatewayStreamOutlivesTheTotalTimeoutWhileOutputKeepsFlowing(t *testing.T) {
+// A stream can outlive both its idle and non-streaming request timeout
+// while output keeps arriving.
+func TestGatewayStreamOutlivesTheRequestTimeoutWhileOutputKeepsFlowing(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	steady := newUpstream(t, pacedChatStream(8, 500*time.Millisecond))
 	id := e.createChannel(sharer, channelSpec{name: "steady", upstream: steady, advanced: map[string]any{
-		"ttft_timeout_ms": 1000, "total_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
+		"ttft_timeout_ms": 1000, "request_timeout_ms": 1000, "idle_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
 	started := time.Now()
@@ -104,7 +104,7 @@ func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) 
 		_, _ = io.WriteString(w, chatFrame)
 	}))
 	id := e.createChannel(sharer, channelSpec{name: "silent", upstream: silent, advanced: map[string]any{
-		"ttft_timeout_ms": 1000, "total_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
+		"ttft_timeout_ms": 1000, "request_timeout_ms": 60000, "idle_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
 	started := time.Now()
@@ -126,14 +126,14 @@ func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) 
 	e.assertZeroSum()
 }
 
-func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheTotalTimeout(t *testing.T) {
+func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheRequestTimeout(t *testing.T) {
 	e := newEnvWith(t, slowCloseOutbound)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	slow := newUpstream(t, stallAfter(t, func(http.ResponseWriter) {}))
 	fast := okUpstream(t)
 	slowID := e.createChannel(sharer, channelSpec{name: "slow", upstream: slow, multiplier: "1", advanced: map[string]any{
-		"total_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
+		"request_timeout_ms": 1500, "idle_timeout_ms": 60000, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
@@ -167,7 +167,7 @@ func TestGatewayInterruptsANonStreamingAnswerThatStallsMidBody(t *testing.T) {
 		_, _ = io.WriteString(w, chatBody[:20])
 	}))
 	id := e.createChannel(sharer, channelSpec{name: "half", upstream: half, advanced: map[string]any{
-		"total_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
+		"request_timeout_ms": 1500, "idle_timeout_ms": 60000, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
 	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)

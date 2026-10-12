@@ -299,7 +299,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) ([]KeySpendR
 }
 
 const listAllRoutePrefs = `-- name: ListAllRoutePrefs :many
-SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.updated_at,
+SELECT rp.account_id, rp.api_key_id, rp.model_id, rp.mode, rp.max_attempts, rp.ttft_timeout_ms, rp.idle_timeout_ms, rp.request_timeout_ms, rp.updated_at,
        coalesce(array_agg(rpc.channel_id ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::uuid[] AS channel_ids,
        coalesce(array_agg(rpc.excluded ORDER BY rpc.position) FILTER (WHERE rpc.channel_id IS NOT NULL), '{}')::boolean[] AS excluded_flags
 FROM route_prefs rp
@@ -309,15 +309,17 @@ ORDER BY rp.account_id, rp.api_key_id NULLS FIRST, rp.model_id
 `
 
 type ListAllRoutePrefsRow struct {
-	AccountID     string
-	ApiKeyID      *string
-	ModelID       string
-	Mode          string
-	MaxAttempts   *int32
-	TtftTimeoutMs *int32
-	UpdatedAt     time.Time
-	ChannelIds    []string
-	ExcludedFlags []bool
+	AccountID        string
+	ApiKeyID         *string
+	ModelID          string
+	Mode             string
+	MaxAttempts      *int32
+	TtftTimeoutMs    *int32
+	IdleTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	UpdatedAt        time.Time
+	ChannelIds       []string
+	ExcludedFlags    []bool
 }
 
 // Every stored routing preference with its channels in position order, for the
@@ -339,6 +341,8 @@ func (q *Queries) ListAllRoutePrefs(ctx context.Context) ([]ListAllRoutePrefsRow
 			&i.Mode,
 			&i.MaxAttempts,
 			&i.TtftTimeoutMs,
+			&i.IdleTimeoutMs,
+			&i.RequestTimeoutMs,
 			&i.UpdatedAt,
 			&i.ChannelIds,
 			&i.ExcludedFlags,
@@ -476,7 +480,7 @@ func (q *Queries) ListRoutePrefChannels(ctx context.Context, prefIds []string) (
 }
 
 const listRoutePrefs = `-- name: ListRoutePrefs :many
-SELECT id, model_id, mode, max_attempts, ttft_timeout_ms, updated_at, api_key_id
+SELECT id, model_id, mode, max_attempts, ttft_timeout_ms, idle_timeout_ms, request_timeout_ms, updated_at, api_key_id
 FROM route_prefs
 WHERE account_id = $1 AND api_key_id IS NOT DISTINCT FROM $2
   AND ($3::text = '' OR model_id = $3)
@@ -490,13 +494,15 @@ type ListRoutePrefsParams struct {
 }
 
 type ListRoutePrefsRow struct {
-	ID            string
-	ModelID       string
-	Mode          string
-	MaxAttempts   *int32
-	TtftTimeoutMs *int32
-	UpdatedAt     time.Time
-	ApiKeyID      *string
+	ID               string
+	ModelID          string
+	Mode             string
+	MaxAttempts      *int32
+	TtftTimeoutMs    *int32
+	IdleTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	UpdatedAt        time.Time
+	ApiKeyID         *string
 }
 
 // Scope-exact lookups: key-level rows when api_key_id is given, account-level rows otherwise.
@@ -515,6 +521,8 @@ func (q *Queries) ListRoutePrefs(ctx context.Context, arg ListRoutePrefsParams) 
 			&i.Mode,
 			&i.MaxAttempts,
 			&i.TtftTimeoutMs,
+			&i.IdleTimeoutMs,
+			&i.RequestTimeoutMs,
 			&i.UpdatedAt,
 			&i.ApiKeyID,
 		); err != nil {
@@ -607,21 +615,23 @@ func (q *Queries) UpdateKey(ctx context.Context, arg UpdateKeyParams) error {
 }
 
 const upsertRoutePref = `-- name: UpsertRoutePref :one
-INSERT INTO route_prefs (account_id, api_key_id, model_id, mode, max_attempts, ttft_timeout_ms)
-VALUES ($1, $6, $2, $3, $4, $5)
+INSERT INTO route_prefs (account_id, api_key_id, model_id, mode, max_attempts, ttft_timeout_ms, idle_timeout_ms, request_timeout_ms)
+VALUES ($1, $6, $2, $3, $4, $5, $7, $8)
 ON CONFLICT (account_id, api_key_id, model_id)
 DO UPDATE SET mode = EXCLUDED.mode, max_attempts = EXCLUDED.max_attempts,
-              ttft_timeout_ms = EXCLUDED.ttft_timeout_ms, updated_at = now()
+              ttft_timeout_ms = EXCLUDED.ttft_timeout_ms, idle_timeout_ms = EXCLUDED.idle_timeout_ms, request_timeout_ms = EXCLUDED.request_timeout_ms, updated_at = now()
 RETURNING id, updated_at
 `
 
 type UpsertRoutePrefParams struct {
-	AccountID     string
-	ModelID       string
-	Mode          string
-	MaxAttempts   *int32
-	TtftTimeoutMs *int32
-	ApiKeyID      *string
+	AccountID        string
+	ModelID          string
+	Mode             string
+	MaxAttempts      *int32
+	TtftTimeoutMs    *int32
+	ApiKeyID         *string
+	IdleTimeoutMs    *int32
+	RequestTimeoutMs *int32
 }
 
 type UpsertRoutePrefRow struct {
@@ -637,6 +647,8 @@ func (q *Queries) UpsertRoutePref(ctx context.Context, arg UpsertRoutePrefParams
 		arg.MaxAttempts,
 		arg.TtftTimeoutMs,
 		arg.ApiKeyID,
+		arg.IdleTimeoutMs,
+		arg.RequestTimeoutMs,
 	)
 	var i UpsertRoutePrefRow
 	err := row.Scan(&i.ID, &i.UpdatedAt)
