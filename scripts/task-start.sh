@@ -31,7 +31,7 @@ resolve_main_workspace
 branch="$TASK_BRANCH"
 worktree_path="$WORKTREES_DIR/$TASK_DIR"
 
-git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "“$branch”不是合法的分支名。"
+git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "“${branch}”不是合法的分支名。"
 if git -C "$MAIN_WS" show-ref --verify --quiet "refs/heads/$branch"; then
   die "本地分支 $branch 已存在。恢复已有任务请直接进入它的 worktree（git worktree list 查看）；否则换一个任务名。"
 fi
@@ -46,7 +46,7 @@ fi
 require_main_ready
 fetch_origin
 if git -C "$MAIN_WS" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-  die "远端已存在分支 origin/$branch。恢复已有任务请 fetch 后沿用它；否则换一个任务名。"
+  die "远端已存在分支 origin/${branch}。恢复已有任务请 fetch 后沿用它；否则换一个任务名。"
 fi
 fast_forward_main
 
@@ -55,7 +55,7 @@ git -C "$MAIN_WS" worktree add --no-track -b "$branch" "$worktree_path" origin/m
   || die "git worktree add 失败，请检查 git worktree list 与分支状态。"
 actual="$(git -C "$worktree_path" rev-parse HEAD)"
 if [ "$actual" != "$expected" ]; then
-  die "worktree 起点校验失败：HEAD 为 $actual，期望 origin/main 为 $expected。已保留 $worktree_path 供检查，未做任何强制处理。"
+  die "worktree 起点校验失败：HEAD 为 ${actual}，期望 origin/main 为 ${expected}。已保留 $worktree_path 供检查，未做任何强制处理。"
 fi
 
 echo "已创建任务 worktree："
