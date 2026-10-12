@@ -37,9 +37,9 @@
 
 .trade-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 .trade-facts { padding: 0; }
-.trade-timeline { display: grid; gap: var(--space-3); margin: 0; padding: 0 0 0 var(--space-4); border-left: 2px solid var(--hairline); list-style: none; }
+.trade-timeline { display: grid; gap: var(--space-3); margin: 0; padding: 0 0 0 var(--space-4); border-left: var(--stroke) solid var(--hairline); list-style: none; }
 .trade-timeline li { position: relative; display: grid; gap: 2px; }
-.trade-timeline li::before { position: absolute; top: 6px; left: calc(-1 * var(--space-4) - 6px); width: 12px; height: 12px; border: 1.5px solid var(--line); border-radius: 50%; background: var(--mustard); content: ""; }
+.trade-timeline li::before { position: absolute; top: 6px; left: calc(-1 * var(--space-4) - var(--stroke) / 2); width: 12px; height: 12px; border: 1.5px solid var(--line); border-radius: 50%; background: var(--mustard); transform: translateX(-50%); content: ""; }
 .trade-statements { display: grid; gap: var(--space-3); margin: var(--space-4) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--hairline); }
 .trade-statements dt { color: var(--muted); font-size: var(--text-xs); }
 .trade-statements dd { margin: 2px 0 0; white-space: pre-wrap; }
