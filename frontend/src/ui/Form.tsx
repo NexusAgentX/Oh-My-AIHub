@@ -112,6 +112,8 @@ export function PasswordField({
         />
         <IconButton
           className="password-toggle"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
           icon={<Icon name={visible ? 'eye-off' : 'eye'} />}
           label={visible ? '隐藏密码' : '显示密码'}
           onClick={() => setVisible((current) => !current)}
