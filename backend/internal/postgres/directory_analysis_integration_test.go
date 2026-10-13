@@ -100,3 +100,40 @@ func TestDirectoryQualityAggregationAndVisibility(t *testing.T) {
 	exec("UPDATE suppliers SET visible=false WHERE id=$1", supplierID)
 	o.apiJSON(o.outsider, 404, http.MethodGet, path+window, nil)
 }
+
+func TestDirectoryCacheQualityUsesMeasuredFinalAttempts(t *testing.T) {
+	o := newObserved(t)
+	ctx := context.Background()
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := o.pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The two final attempts have unequal input sizes. 900 / (1000 + 2000)
+	// is 30%, not the average of channel/request percentages (45%).
+	exec("UPDATE calls SET input_tokens=100,cache_read_tokens=900,cache_write_tokens=0,diagnostics=jsonb_set(coalesce(diagnostics,'{}'),'{usage_status}','\"reported\"') WHERE id=$1", o.fellBack)
+	exec("UPDATE calls SET input_tokens=1900,cache_read_tokens=0,cache_write_tokens=100,diagnostics=jsonb_set(coalesce(diagnostics,'{}'),'{usage_status}','\"reported\"') WHERE id=$1", o.succeeded)
+	window := "?from=" + url.QueryEscape(time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)) + "&to=" + url.QueryEscape(time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+	read := func(id string) map[string]any {
+		return asMap(t, o.get(o.outsider, "/api/channel-hall/"+id+"/analysis"+window)["current"])
+	}
+	v := read(o.goodID)
+	if v["cache_samples"] != float64(2) || v["cache_read_ratio"] != float64(30) || v["cache_hit_rate"] != float64(50) {
+		t.Fatalf("weighted cache=%v", v)
+	}
+	broken := read(o.brokenID)
+	if broken["cache_samples"] != float64(0) || broken["cache_read_ratio"] != nil || broken["cache_hit_rate"] != nil {
+		t.Fatalf("cache credited to failed fallback=%v", broken)
+	}
+	exec("UPDATE calls SET diagnostics=jsonb_set(diagnostics,'{usage_status}','\"missing\"') WHERE id=$1", o.succeeded)
+	v = read(o.goodID)
+	if v["cache_samples"] != float64(1) || v["cache_read_ratio"] != float64(90) || v["cache_hit_rate"] != float64(100) {
+		t.Fatalf("missing usage counted as miss=%v", v)
+	}
+	exec("UPDATE calls SET input_tokens=0,cache_read_tokens=0,cache_write_tokens=0 WHERE id=$1", o.fellBack)
+	v = read(o.goodID)
+	if v["cache_samples"] != float64(0) || v["cache_hit_rate"] != nil {
+		t.Fatalf("zero input counted as miss=%v", v)
+	}
+}

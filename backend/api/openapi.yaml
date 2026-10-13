@@ -6385,8 +6385,11 @@ components:
     DirectoryValues:
       type: object
       additionalProperties: false
-      required: [attempts, counted, succeeded, failed, excluded, streamed, ttft_samples, duration_samples, speed_samples, gap_samples, ttft_p50, ttft_p95, ttft_p99, duration_p50, duration_p95, duration_p99, speed_p10, speed_p50, speed_p95, gap_p50, gap_p95, gap_p99]
+      required: [cache_samples, cache_read_ratio, cache_hit_rate, attempts, counted, succeeded, failed, excluded, streamed, ttft_samples, duration_samples, speed_samples, gap_samples, ttft_p50, ttft_p95, ttft_p99, duration_p50, duration_p95, duration_p99, speed_p10, speed_p50, speed_p95, gap_p50, gap_p95, gap_p99]
       properties:
+        cache_samples: {type: integer}
+        cache_read_ratio: {type: [number, 'null']}
+        cache_hit_rate: {type: [number, 'null']}
         attempts: {type: integer}
         counted: {type: integer}
         succeeded: {type: integer}

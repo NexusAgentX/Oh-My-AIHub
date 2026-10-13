@@ -3494,6 +3494,9 @@ export interface components {
             fx_discount: boolean;
         };
         DirectoryValues: {
+            cache_samples: number;
+            cache_read_ratio: number | null;
+            cache_hit_rate: number | null;
             attempts: number;
             counted: number;
             succeeded: number;

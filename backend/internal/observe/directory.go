@@ -9,6 +9,9 @@ import (
 // DirectoryValues is a deliberately public, aggregate-only projection. Never add
 // account identifiers, billing, raw upstream errors or call diagnostics here.
 type DirectoryValues struct {
+	CacheSamples    int64    `json:"cache_samples"`
+	CacheReadRatio  *float64 `json:"cache_read_ratio"`
+	CacheHitRate    *float64 `json:"cache_hit_rate"`
 	Attempts        int64    `json:"attempts"`
 	Counted         int64    `json:"counted"`
 	Succeeded       int64    `json:"succeeded"`

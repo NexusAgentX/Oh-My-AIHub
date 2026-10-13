@@ -428,10 +428,18 @@ WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
  CASE WHEN c.stream AND att->>'end_reason'='completed' THEN (att->>'ttft_ms')::double precision END AS ttft,
  -- Call-level speed/gap belongs only to its last, successful streaming attempt.
  CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN c.output_tokens_per_second END AS speed,
- CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN (c.diagnostics->>'max_frame_gap_ms')::double precision END AS gap
- FROM calls c CROSS JOIN LATERAL jsonb_array_elements(c.attempts) WITH ORDINALITY t(att,n)
- JOIN visible_channels ch ON ch.id::text=att->'channel'->>'id'
- WHERE c.created_at >= sqlc.arg(previous_from)::timestamptz AND c.created_at < sqlc.arg(to_time)::timestamptz
+ CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN (c.diagnostics->>'max_frame_gap_ms')::double precision END AS gap,
+ -- Cache quality uses measured input of final successful attempts, across both
+ -- streaming and non-streaming. Missing usage and zero input are not misses.
+ CASE WHEN att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id
+   AND c.diagnostics->>'usage_status'='reported' AND c.input_tokens+c.cache_read_tokens+c.cache_write_tokens>0
+   THEN c.input_tokens+c.cache_read_tokens+c.cache_write_tokens END AS cache_input,
+ CASE WHEN att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id
+   AND c.diagnostics->>'usage_status'='reported' AND c.input_tokens+c.cache_read_tokens+c.cache_write_tokens>0
+   THEN c.cache_read_tokens END AS cache_read
+ FROM visible_channels ch JOIN calls c ON c.attempts @> jsonb_build_array(jsonb_build_object('channel',jsonb_build_object('id',ch.id::text)))
+ CROSS JOIN LATERAL jsonb_array_elements(c.attempts) WITH ORDINALITY t(att,n)
+ WHERE ch.id::text=att->'channel'->>'id' AND c.created_at >= sqlc.arg(previous_from)::timestamptz AND c.created_at < sqlc.arg(to_time)::timestamptz
  AND (sqlc.arg(channel)::text='' OR ch.id::text=sqlc.arg(channel)::text)
  AND (sqlc.arg(model)::text='' OR coalesce(c.model_id,c.requested_model)=sqlc.arg(model)::text)
  AND (sqlc.arg(format)::text='' OR c.format=sqlc.arg(format)::text)
@@ -459,6 +467,9 @@ SELECT kind, key, max(label)::text AS label,
  count(duration)::bigint AS duration_samples,
  count(speed)::bigint AS speed_samples,
  count(gap)::bigint AS gap_samples,
+ count(cache_input)::bigint AS cache_samples,
+ coalesce(100.0*sum(cache_read)/nullif(sum(cache_input),0),-1)::double precision AS cache_read_ratio,
+ coalesce(100.0*count(*) FILTER (WHERE cache_read>0)/nullif(count(cache_input),0),-1)::double precision AS cache_hit_rate,
  coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p50,
  coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p95,
  coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p99,
