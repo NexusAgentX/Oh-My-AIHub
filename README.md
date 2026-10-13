@@ -1,173 +1,83 @@
 # Oh-My-AIHub
 
-Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台。用户可以共享自己已经充值的 API 中转渠道，消费者通过平台 API Key 聚合多个渠道并按优先级故障转移；成功调用使用中心化零和账本结算，共享者可以在 C2C 市场挂卖单出售所得积分。
-
-当前提供受邀账户、模型目录、渠道共享、平台 API Key 与四种原生协议的透明网关、积分结算、C2C 卖单市场，以及成员论坛与私密工单。
+Oh-My-AIHub 是面向受邀小圈子的 API 资源共享与内部积分清算平台：成员共享自己已充值的 API 中转渠道，消费者持平台 API Key 经透明网关聚合调用、按优先级故障转移，成功调用由中心化零和账本清算积分，另含 C2C 卖单市场、成员论坛与私密工单。
 
 ## 文档导航
 
-- [产品说明](PRODUCT.md)：产品定位、范围与规则。
-- [产品路线图](ROADMAP.md)：接下来交付的结果与顺序。
-- [架构说明](ARCHITECTURE.md)：系统结构、模块边界与不变量。
-- [设计规范](DESIGN.md)：视觉风格、主题、组件与品牌规则。
-- [安全策略](SECURITY.md)：漏洞报告方式与安全边界。
-- [变更日志](CHANGELOG.md)：各版本的重要变化。
-- [Agent 开发指南](AGENTS.md)：任务流程、分支、验证、迁移与发版规则。
-- [架构决策记录](docs/adr/README.md)：长期技术决策及其原因。
-- [运维手册](docs/runbooks/)：部署、发布、备份恢复与故障处理。
+| 文档 | 内容 |
+| --- | --- |
+| [产品说明](PRODUCT.md) | 产品定位、范围与规则 |
+| [产品路线图](ROADMAP.md) | 接下来交付的结果与顺序（由维护者填写） |
+| [架构说明](ARCHITECTURE.md) | 系统结构、模块边界、不变量与安全边界 |
+| [设计规范](DESIGN.md) | 视觉风格、主题、组件与品牌规则 |
+| [安全策略](SECURITY.md) | 漏洞报告方式与处理原则 |
+| [变更日志](CHANGELOG.md) | 各版本的重要变化 |
+| [Agent 开发指南](AGENTS.md) | 任务流程、分支、验证、迁移与发版规则 |
+| [架构决策记录](docs/adr/README.md) | 长期技术决策及其原因 |
+| [运维手册](docs/runbooks/) | 部署、发布、备份恢复、观测与故障处理 |
+
+向本仓库提交改动前，先读 [AGENTS.md](AGENTS.md)。
 
 ## 技术栈
 
-- 前端：React 19、TypeScript、Vite、React Router 与 TanStack Query。
-- 后端：Go `net/http`、pgx 与 sqlc。
+- 前端：React 19、TypeScript、Vite、React Router、TanStack Query。
+- 后端：Go `net/http`、pgx、sqlc；无第三方 Web 框架。
 - 数据库：PostgreSQL 18，Goose 嵌入式编号迁移。
 - 契约：`backend/api/openapi.yaml`（OpenAPI 3.1）是前后端唯一契约，前端类型由它生成。
-- 工具与运行：mise 固定工具版本；Docker Compose 运行数据库、迁移、后端，以及由 Nginx 提供的前端。
+- 工具与运行：mise 固定工具版本；Docker Compose 编排数据库、迁移、后端与 Nginx 前端。
 
 ## 环境要求
 
 - [mise](https://mise.jdx.dev/)
 - 支持 Compose 的 Docker 环境
 
-## 本地开发
-
-每个任务使用独立的 Git worktree：`mise run task-start <type>/<slug>`（如 `fix/251-key-layout`，type 为 `feat fix docs refactor perf test ci chore` 之一）同步 `main`，并创建同名分支与 `../Oh-My-AIHub-worktrees/<type>-<slug>`；PR 合并后用 `mise run task-finish <type>/<slug>` 清理（规则见 `AGENTS.md`）。
-
-安装工具链和前端依赖：
+## 快速开始
 
 ```bash
-mise install
-mise run install
-```
+mise install          # 工具链（Go、Node、sqlc）
+mise run install      # 前端依赖
+mise run dev-database # 启动 PostgreSQL 并执行迁移
 
-启动数据库并执行迁移：
-
-```bash
-mise run dev-database
-```
-
-迁移为 Goose 嵌入式编号脚本，已发布的迁移只追加（见 `AGENTS.md`）。升级既有环境的注意事项见[发布手册](docs/runbooks/release.md)，不要通过删除生产数据卷处理升级。
-
-首次运行时，启动后端与前端后访问 `/initialize`，在网页上创建唯一的初始管理员。
-
-启动后端：
-
-```bash
 export UPSTREAM_CREDENTIAL_KEYRING='v1=<32 字节密钥的 Base64>'
 export UPSTREAM_CREDENTIAL_ACTIVE_KEY_ID='v1'
 export C2C_PRIVATE_DATA_KEYRING='v1=<另一把 32 字节密钥的 Base64>'
 export C2C_PRIVATE_DATA_ACTIVE_KEY_ID='v1'
-mise run dev-backend
+
+mise run dev-backend   # 终端 A：后端 :8080，指标 :9090
+mise run dev-frontend  # 终端 B：前端 :5173
 ```
 
-`UPSTREAM_CREDENTIAL_KEYRING` 使用逗号分隔的 `key-id=base64-key`，每把密钥解码后必须正好 32 字节。已有密文引用的旧密钥必须继续保留（暂无重加密工具，旧 key id 不能移除）；密钥环和数据库备份必须配套保存，不能每次启动临时生成。渠道的上游 Key 与平台 API Key 使用它加密；服务启动时校验密钥环格式，并逐条解密库中全部未删除渠道的上游 Key 与未删除的平台 API Key，缺少对应 key id 或密文损坏时拒绝启动，日志列出记录类型与 ID。默认只允许上游 HTTPS 443 端口；如确需其他端口可用 `UPSTREAM_ALLOWED_PORTS` 显式追加，禁用域名可用 `UPSTREAM_BLOCKED_HOSTS` 配置；不内置任何供应商域名禁用项。
+浏览器访问 <http://localhost:5173/initialize> 创建首个管理员。
 
-`C2C_PRIVATE_DATA_KEYRING` 采用相同的 `key-id=base64-key` 语法，但必须使用与上游凭据不同的密钥，用于加密 C2C 收款方式文字（Feature C）。服务启动时校验密钥环格式，并逐条解密全部 C2C 卖单（含已关闭、已成交的）的收款方式，缺少对应 key id 或密文损坏时拒绝启动；任何仍被库存引用的旧密钥都必须保留。该密钥环同样必须与数据库备份配套保存，不得每次启动临时生成。
+一条命令的替代（仍需先导出上面四个密钥环变量）：`mise run up-dev` 用 Docker Compose 整栈启动，入口 <http://localhost:3000>（仅绑定回环地址）。
 
-在另一个终端启动前端：
+两组密钥环各加密一类数据（渠道上游 Key / 平台 API Key 与 C2C 收款方式），必须互不相同、与数据库备份配套保存、保留全部历史 key id；服务启动时会逐条解密全部存量密文，缺 key id 或密文损坏即拒绝启动。细节见[部署手册](docs/runbooks/deployment.md)。
+
+## 常用命令
 
 ```bash
-mise run dev-frontend
+mise run lint                 # 前端 oxlint + 后端 staticcheck
+mise run test                 # 前后端测试与前端构建
+mise run generate             # 改 OpenAPI 契约或 SQL 后重新生成代码
+mise run dev-database         # 只启动数据库
+mise run down                 # 停止 Compose 栈
 ```
 
-前端开发服务器位于 <http://localhost:5173>，公开落地页位于 <http://localhost:5173/>（`/welcome` 同样可达），并将 `/api`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1beta/models/...` 请求代理到 <http://localhost:8080>。后端改用其他端口（`PORT`）时，可用 `AIHUB_BACKEND_ORIGIN=http://127.0.0.1:<端口>` 覆盖 Vite 的代理目标。
-
-外部模型 API 入口（OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini 与两个模型列表）已实现：用首页给出的平台 API Key 指向后端地址即可调用，请求按原生格式透传，不做格式转换。
-
-本地开发默认不信任客户端提供的转发头。Compose 通过 `BACKEND_TRUSTED_PROXY_CIDRS` 配置后端可采信的内部 Nginx 源网段；未配置时后端忽略全部转发头。外层代理到 Nginx 的信任边界使用 `TRUSTED_PROXY_CIDR` 单一网段配置。
-
-## 查看指标
-
-后端在独立的内网端口提供 Prometheus 指标（`METRICS_ADDR`，默认 `:9090`，只有 `GET /metrics`）。Compose 只在容器网络内 `expose` 该端口，不发布到宿主机，Nginx 也不代理；同一 Compose 网络内的 Prometheus 可以抓取 `backend:9090`。本地开发时直接访问：
-
-```bash
-curl http://127.0.0.1:9090/metrics | grep '^aihub_'
-```
-
-可选 Prometheus / Grafana 看板、指标口径与排障见[观测手册](docs/runbooks/observability.md)。调用计数与耗时直接记录于网关完成路径，独立于实时 UI 的消息丢失。
-
-指标不带用户或 Key 标签：`aihub_requests_total`、`aihub_active_requests`、`aihub_upstream_attempts_total`、`aihub_upstream_latency_seconds`、`aihub_first_token_latency_seconds`、`aihub_inter_token_latency_seconds`、`aihub_tokens_total`、`aihub_cost_points_total`、`aihub_channel_up`、`aihub_channel_cooldowns_total`，网关出站连接池的 `aihub_upstream_connections_new_total`、`aihub_upstream_connections_reused_total`、`aihub_upstream_dns_lookups_total{result}`（命中率为 `hit / (hit + miss)`），以及积分与核对类的 `aihub_points_*`、`aihub_ledger_imbalance`（应恒为 0）、`aihub_ledger_transactions_total`、`aihub_ledger_amount_total`、`aihub_settlement_failures_total`、`aihub_reconciliation_failed{check}`。积分类指标每分钟计算一次。`aihub_points_platform_revenue` 是累计手续费，不含管理员调账；调账净额（正数表示平台向用户发放）单列为 `aihub_points_admin_adjustments`。
-
-## Docker Compose 运行
-
-本机 HTTP 开发使用显式开发入口：
-
-```bash
-mise run up-dev
-```
-
-访问 <http://localhost:3000>。`mise run up-dev` 和 `mise run up` 都要求显式提供两套互不复用的 `UPSTREAM_CREDENTIAL_*` 与 `C2C_PRIVATE_DATA_*` 密钥环变量。面向 HTTPS 环境使用 `mise run up` 时，该入口不会关闭 Secure Cookie，并额外强制要求独立的 `POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR` 与 `BACKEND_TRUSTED_PROXY_CIDRS`。Compose 只把前端绑定到宿主机回环地址 `127.0.0.1:${FRONTEND_PORT:-3000}`；唯一公网入口应是同机 TLS 反向代理，不要另行暴露该明文端口。
-
-`TRUSTED_PROXY_CIDR` 必须填写前端容器实际观察到的 TLS 代理源地址，而不是想当然地使用 `127.0.0.1/32`；Docker NAT 后该地址会因运行环境而异。可以先在受限环境以 `mise run up-dev` 启动，让同机代理发起一次请求，再从 `docker compose logs frontend` 的访问日志首列取得源 IP，并以最窄的 CIDR（通常为单地址 `/32` 或 `/128`）配置安全入口。
-
-`BACKEND_TRUSTED_PROXY_CIDRS` 应填写当前 Compose 项目网络的实际子网。可先运行 `docker compose create` 只创建容器与网络，再通过 `docker inspect` 取得前端容器所连接的 Network ID，并用 `docker network inspect` 读取其 IPAM 子网；不要硬编码假定的 `172.16.0.0/12`。安全栈启动后运行以下自检；返回 `proxy trust check passed` 才说明“宿主 TLS 代理 → Nginx → Go”整条 HTTPS `Origin` 写入链路可用：
-
-```bash
-mise run check-proxy-trust
-```
-
-数据库密码通过 `PGPASSWORD` 传给客户端，可以包含 URL 保留字符，无需手动 URI 编码；仓库默认值只用于本机开发。停止服务：
-
-```bash
-mise run down
-```
-
-## 验证
-
-```bash
-mise run test
-mise run lint # 前端 oxlint（React Hooks 与正确性规则）与后端 staticcheck；CI gates 同样执行
-mise run check-sqlc # 修改 queries.sql 或迁移后，先 mise run generate 重新生成并提交
-mise run check-api-types # 修改 backend/api/openapi.yaml 后，先 mise run generate 重新生成前端 API 类型并提交
-mise run test-backend-integration # 需要 Docker；直接 go test 且未设置 TEST_DATABASE_URL 时这些测试会跳过
-mise run check-migrations # 已发布迁移（最新正式 tag）只允许新增，不得修改、删除或重命名
-mise run check-migration-upgrade # 最新正式 tag 建库后，用当前代码升级到最新迁移版本；需要 Docker
-mise run test-ci-scripts # 修改 CI 改动范围判定（scripts/ci-changes.sh）、汇总判定（scripts/ci-gate.sh）或发版复用判定（scripts/ci-reuse-check.sh）后运行
-docker compose config --quiet
-mise run check-proxy-trust # 需要已按上文启动安全栈
-```
-
-CI（`.github/workflows/ci.yml`）先由 `changes` 任务按改动文件判定范围（规则写在 `scripts/ci-changes.sh` 开头），再按需并行运行 `frontend`、`backend`、`integration`、`images`，最后由 `gates` 汇总：纯文档改动不运行检查，只改前端不跑后端与集成测试，只改后端不跑前端；`backend/api/openapi.yaml`、`.github/`、`mise.toml`、`scripts/`、`compose.yaml` 等共享输入变化时全部运行。`main` 规则集的必需检查是 `gates` 与 `integration`：被跳过的任务在分支保护中按成功处理，`gates` 则核对每个应当运行的任务都成功，失败、取消或被连带跳过都会使 `gates` 失败。`images` 在 Dockerfile、`.dockerignore`、`frontend/nginx.conf`、依赖清单与锁文件，或 CI 与 Compose 定义变化时（只改 Dockerfile 或 `.dockerignore` 时仅运行 `images`），构建前后端镜像（仅 `linux/amd64`，不推送），并用渲染后的 Nginx 模板执行 `nginx -T` 校验；发版时的多架构构建见 `release.yml`。
-
-推送到 `main` 时不再一律全量运行，但有一个前提：推送前的 `main` 提交（父提交）必须已有成功的 `ci` 运行（`head_sha=<before>`、push 事件、`main` 分支，取最新一次，已完成且 success；由 `changes` 查询，判定复用发版用的同一份 `scripts/ci-reuse-check.sh`，`changes` 因此需要 `actions: read`）。父提交没有运行、在排队或进行中、失败、取消，或查询出错时，一律全量运行（`reason=full-parent-unverified`，失败时关闭）；连续合并时后一个合并常因父提交的运行还没结束而全量运行，这是有意的代价。父提交已成功时：合并提交的第一个父提交是 PR 头的祖先（合并时 PR 已同步 `main`）且代码树与 PR 头相同时，PR 上已验证过同一份代码，所有任务跳过，`gates` 直接通过；其余推送只按 `before..after` 带来的改动运行受影响的任务（判定顺序见 `scripts/ci-changes.sh --push` 的注释），`before` 缺失、全零或不是 `after` 的祖先时全量运行。这样 `main` 上任何绿色提交沿第一父提交向前一路是绿的，直到某次全量运行，红色提交之后不会被文档合并或已验证合并“洗绿”。范围化运行信任父提交已有结论，所以 `main` 上每个提交使用独立的并发组、从不被取消（PR 上同一引用的新提交仍取消旧运行）。发版时 `release.yml` 的 `gates` 先查询标签提交在 `main` 上的 `ci` 运行：最新一次已成功就复用其结果并在摘要中记录运行网址（这条结果背后是上述完整验证过的链），否则（没有、进行中、失败、取消或查询出错）照常运行 `mise run check-release`。
-
-CI 的 `integration` 任务使用 `postgres:18-alpine` 服务，以 `-race` 运行 `./internal/postgres` 与 `./internal/database` 的数据库集成测试，并执行上述两项迁移检查。CI 设置了 `AIHUB_REQUIRE_TEST_DATABASE=1`：缺少 `TEST_DATABASE_URL` 时集成测试失败而不是跳过；本地不设置该变量时仍然跳过。迁移检查依赖完整 Git 历史与 tag（浅克隆请先 `git fetch --tags --unshallow`）。
+全部任务见 `mise.toml`；验证矩阵与 CI 门禁说明见 [AGENTS.md](AGENTS.md)。
 
 ## 目录结构
 
 ```text
 .
-├── backend/       Go 后端
-├── frontend/      React 前端
-├── scripts/       任务开工与收尾、数据库加密备份、隔离恢复演练与迁移检查脚本
-├── docs/adr/      架构决策记录
-├── docs/runbooks/ 部署、发布、备份恢复与故障处理操作手册
-├── compose.yaml   容器编排配置
-└── mise.toml      工具版本与常用任务
+├── backend/         Go 后端（cmd/server、cmd/migrate、internal/ 按领域分包）
+├── frontend/        React 单页应用（src/ 按业务域分目录）
+├── scripts/         任务开工收尾、备份恢复、迁移与 CI 守卫脚本
+├── docs/adr/        架构决策记录
+├── docs/runbooks/   运维手册
+├── compose.yaml     容器编排
+└── mise.toml        工具版本与任务定义
 ```
 
-## Markdown 组件
+## 许可
 
-`frontend/src/markdown` 提供 `MarkdownEditor` 与 `MarkdownContent`。编辑器采用 [Vditor 4.0.0](https://github.com/Vanessa219/vditor)（MIT），默认源码＋预览分屏，窄屏上下排列。两种展示都复用 Vditor 的 [Lute 引擎](https://github.com/88250/lute)（Mulan PSL v2），使用 [DOMPurify 3.4.16](https://github.com/cure53/DOMPurify)（Apache-2.0 / MPL-2.0）净化、[highlight.js 11.11.1](https://github.com/highlightjs/highlight.js)（BSD-3-Clause）高亮常用代码语言。依赖版本锁定在 `frontend/package-lock.json`；`jsdom` 仅用于组件与渲染测试。许可副本随前端部署到 `/licenses/markdown.txt`。
-
-`MarkdownEditor` 接收 `value`、`onChange(value)`、可选 `upload(file): Promise<{ url, name, isImage }>`、`onUploadingChange(boolean)`、`disabled`、`label` 与 `placeholder`；`MarkdownContent` 接收 `value` 和可选 `className`。上传函数负责调用业务 API，结果地址必须为 `/api/forum/attachments/{uuid}`。提交按钮应随上传状态禁用，页面切换帖子、工单或草稿时应以其 ID 作为编辑器的 React `key`，避免复用未完成上传与撤销历史。编辑器不使用本地草稿缓存，上传成功才插入 Markdown，文件名按 Markdown 转义。
-
-Lute、中文资源和图标通过 Vite 的 `?url&no-inline` 生成本站静态文件，不调用外部 CDN、不生成 data URL 脚本。编辑区只接收 Markdown 文本和上传文件；阅读与预览禁用原始 HTML、外站图片、危险链接以及图表/数学/媒体的额外脚本。保留表格、任务列表与代码块等常用语法。页面接入应使用路由懒加载：Lute 静态脚本约 3.74 MB（未压缩），无需让其他页面提前下载。
-
-聚焦验证：`npm --prefix frontend test -- src/markdown`，类型及集成构建：`npm --prefix frontend run build`。
-
-## 字体
-
-标题与数字使用自托管字体（规则见 `DESIGN.md`），不调用外部字体服务：
-
-- [Baloo 2](https://github.com/EkType/Baloo2)（SIL OFL 1.1）：拉丁字母与数字，取 `@fontsource/baloo-2` 5.3.0 的 latin 800 字重，未改动。
-- [源泉圓體](https://github.com/ButTaiwan/gensen-font)（SIL OFL 1.1）：中文，取 GenSenMaruGothic TW TTF 1.301 的 Bold 字重。
-  - 按 `unicode-range` 切成约 80 个 WOFF2 切片，浏览器只下载页面用到的字。
-  - 字体文件位于 `frontend/public/fonts/`，共约 6 MiB。
-
-`frontend/src/styles/fonts.css` 与字体文件由 `python3 frontend/tools/fonts/build.py` 生成：
-- 脚本需要 `fonttools` 与 `brotli`。
-- 字体包从 npm 下载，按固定的 sha512 校验。
-- 前端文案大量变动后可重新生成，让常用字留在前几个切片。
-
-许可副本随前端部署到 `/licenses/fonts.txt`。
+第三方字体与组件的来源和许可见 [DESIGN.md](DESIGN.md) 与前端 `/licenses/` 页面。项目本身的许可证待维护者补充。
