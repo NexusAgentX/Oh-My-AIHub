@@ -343,6 +343,171 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 	return items, nil
 }
 
+const analyzeDirectory = `-- name: AnalyzeDirectory :many
+WITH visible_channels AS MATERIALIZED (
+SELECT c.id, c.name FROM channels c JOIN accounts a ON a.id=c.owner_id
+WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND ((NOT $1::boolean AND c.id=$2::uuid)
+ OR ($1::boolean AND EXISTS (SELECT 1 FROM supplier_endpoints e JOIN suppliers s ON s.id=e.supplier_id WHERE s.id=$2::uuid AND s.visible AND e.base_url=c.base_url)))
+), samples AS MATERIALIZED (
+ SELECT c.created_at, coalesce(c.model_id,c.requested_model) AS model, ch.id::text AS channel, ch.name AS channel_name,
+ c.format, c.stream::text AS stream,
+ CASE WHEN att->>'end_reason' IN ('completed','upstream_error','connect_error','timeout_ttft','timeout_total','client_error','client_disconnected','interrupted') THEN att->>'end_reason' ELSE 'unknown' END AS result,
+ coalesce(att->>'status_code','none') AS status,
+ (att->>'duration_ms')::double precision AS duration,
+ CASE WHEN c.stream AND att->>'end_reason'='completed' THEN (att->>'ttft_ms')::double precision END AS ttft,
+ -- Call-level speed/gap belongs only to its last, successful streaming attempt.
+ CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN c.output_tokens_per_second END AS speed,
+ CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN (c.diagnostics->>'max_frame_gap_ms')::double precision END AS gap
+ FROM calls c CROSS JOIN LATERAL jsonb_array_elements(c.attempts) WITH ORDINALITY t(att,n)
+ JOIN visible_channels ch ON ch.id::text=att->'channel'->>'id'
+ WHERE c.created_at >= $3::timestamptz AND c.created_at < $4::timestamptz
+ AND ($5::text='' OR ch.id::text=$5::text)
+ AND ($6::text='' OR coalesce(c.model_id,c.requested_model)=$6::text)
+ AND ($7::text='' OR c.format=$7::text)
+ AND ($8::text='' OR c.stream::text=$8::text)
+), filtered AS MATERIALIZED (
+ SELECT created_at, model, channel, channel_name, format, stream, result, status, duration, ttft, speed, gap, result NOT IN ('client_error','client_disconnected') AS counted,
+ CASE $9::text WHEN 'model' THEN model WHEN 'channel' THEN channel WHEN 'format' THEN format WHEN 'stream' THEN stream WHEN 'result' THEN result WHEN 'status' THEN status ELSE '' END AS group_key
+ FROM samples WHERE ($10::text='' OR result=$10::text)
+ AND ($11::text='' OR status=$11::text)
+), expanded AS (
+ SELECT f.created_at, f.model, f.channel, f.channel_name, f.format, f.stream, f.result, f.status, f.duration, f.ttft, f.speed, f.gap, f.counted, f.group_key, 'summary'::text AS kind, CASE WHEN created_at>=$12::timestamptz THEN 'current' ELSE 'previous' END::text AS key, ''::text AS label FROM filtered f
+ UNION ALL
+ SELECT f.created_at, f.model, f.channel, f.channel_name, f.format, f.stream, f.result, f.status, f.duration, f.ttft, f.speed, f.gap, f.counted, f.group_key, 'group', group_key, CASE WHEN $9::text='channel' THEN channel_name ELSE group_key END FROM filtered f WHERE created_at>=$12::timestamptz
+ UNION ALL
+ SELECT f.created_at, f.model, f.channel, f.channel_name, f.format, f.stream, f.result, f.status, f.duration, f.ttft, f.speed, f.gap, f.counted, f.group_key, 'time', to_char(date_bin(($13::int::text || ' seconds')::interval,created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'), '' FROM filtered f WHERE created_at>=$12::timestamptz
+)
+SELECT kind, key, max(label)::text AS label,
+ count(*)::bigint AS attempts,
+ count(*) FILTER (WHERE counted)::bigint AS counted,
+ count(*) FILTER (WHERE result='completed')::bigint AS succeeded,
+ count(*) FILTER (WHERE counted AND result<>'completed')::bigint AS failed,
+ count(*) FILTER (WHERE NOT counted)::bigint AS excluded,
+ count(*) FILTER (WHERE stream='true')::bigint AS streamed,
+ count(ttft)::bigint AS ttft_samples,
+ count(duration)::bigint AS duration_samples,
+ count(speed)::bigint AS speed_samples,
+ count(gap)::bigint AS gap_samples,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p99,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p99,
+ coalesce(percentile_cont(0.1) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p10,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p95,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p99
+FROM expanded GROUP BY kind,key ORDER BY kind,key LIMIT 2002
+`
+
+type AnalyzeDirectoryParams struct {
+	Supplier      bool
+	TargetID      string
+	PreviousFrom  time.Time
+	ToTime        time.Time
+	Channel       string
+	Model         string
+	Format        string
+	Stream        string
+	GroupBy       string
+	Result        string
+	Status        string
+	FromTime      time.Time
+	BucketSeconds int32
+}
+
+type AnalyzeDirectoryRow struct {
+	Kind            string
+	Key             string
+	Label           string
+	Attempts        int64
+	Counted         int64
+	Succeeded       int64
+	Failed          int64
+	Excluded        int64
+	Streamed        int64
+	TtftSamples     int64
+	DurationSamples int64
+	SpeedSamples    int64
+	GapSamples      int64
+	TtftP50         float64
+	TtftP95         float64
+	TtftP99         float64
+	DurationP50     float64
+	DurationP95     float64
+	DurationP99     float64
+	SpeedP10        float64
+	SpeedP50        float64
+	SpeedP95        float64
+	GapP50          float64
+	GapP95          float64
+	GapP99          float64
+}
+
+func (q *Queries) AnalyzeDirectory(ctx context.Context, arg AnalyzeDirectoryParams) ([]AnalyzeDirectoryRow, error) {
+	rows, err := q.db.Query(ctx, analyzeDirectory,
+		arg.Supplier,
+		arg.TargetID,
+		arg.PreviousFrom,
+		arg.ToTime,
+		arg.Channel,
+		arg.Model,
+		arg.Format,
+		arg.Stream,
+		arg.GroupBy,
+		arg.Result,
+		arg.Status,
+		arg.FromTime,
+		arg.BucketSeconds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AnalyzeDirectoryRow
+	for rows.Next() {
+		var i AnalyzeDirectoryRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.Key,
+			&i.Label,
+			&i.Attempts,
+			&i.Counted,
+			&i.Succeeded,
+			&i.Failed,
+			&i.Excluded,
+			&i.Streamed,
+			&i.TtftSamples,
+			&i.DurationSamples,
+			&i.SpeedSamples,
+			&i.GapSamples,
+			&i.TtftP50,
+			&i.TtftP95,
+			&i.TtftP99,
+			&i.DurationP50,
+			&i.DurationP95,
+			&i.DurationP99,
+			&i.SpeedP10,
+			&i.SpeedP50,
+			&i.SpeedP95,
+			&i.GapP50,
+			&i.GapP95,
+			&i.GapP99,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const callStats = `-- name: CallStats :one
 SELECT count(*)::bigint AS calls,
        count(*) FILTER (WHERE c.outcome IN ('succeeded', 'succeeded_unbilled'))::bigint AS succeeded,
@@ -914,6 +1079,26 @@ func (q *Queries) ChannelStatusCodes(ctx context.Context, arg ChannelStatusCodes
 		return nil, err
 	}
 	return items, nil
+}
+
+const directoryTargetExists = `-- name: DirectoryTargetExists :one
+SELECT CASE WHEN $1::boolean THEN
+ EXISTS(SELECT 1 FROM suppliers WHERE id=$2::uuid AND visible)
+ ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id WHERE c.id=$2::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active') END::boolean AS visible
+`
+
+type DirectoryTargetExistsParams struct {
+	Supplier bool
+	TargetID string
+}
+
+// Directory existence and aggregates share a repeatable-read snapshot, so hiding
+// a supplier/channel cannot leave an unscoped aggregate behind.
+func (q *Queries) DirectoryTargetExists(ctx context.Context, arg DirectoryTargetExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, directoryTargetExists, arg.Supplier, arg.TargetID)
+	var visible bool
+	err := row.Scan(&visible)
+	return visible, err
 }
 
 const getCall = `-- name: GetCall :one

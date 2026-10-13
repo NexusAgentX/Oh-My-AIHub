@@ -405,3 +405,70 @@ FROM filtered
 GROUP BY group_key,split_key
 ORDER BY group_key,split_key
 LIMIT 1001;
+
+-- Directory existence and aggregates share a repeatable-read snapshot, so hiding
+-- a supplier/channel cannot leave an unscoped aggregate behind.
+-- name: DirectoryTargetExists :one
+SELECT CASE WHEN sqlc.arg(supplier)::boolean THEN
+ EXISTS(SELECT 1 FROM suppliers WHERE id=sqlc.arg(target_id)::uuid AND visible)
+ ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id WHERE c.id=sqlc.arg(target_id)::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active') END::boolean AS visible;
+
+-- name: AnalyzeDirectory :many
+WITH visible_channels AS MATERIALIZED (
+SELECT c.id, c.name FROM channels c JOIN accounts a ON a.id=c.owner_id
+WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND ((NOT sqlc.arg(supplier)::boolean AND c.id=sqlc.arg(target_id)::uuid)
+ OR (sqlc.arg(supplier)::boolean AND EXISTS (SELECT 1 FROM supplier_endpoints e JOIN suppliers s ON s.id=e.supplier_id WHERE s.id=sqlc.arg(target_id)::uuid AND s.visible AND e.base_url=c.base_url)))
+), samples AS MATERIALIZED (
+ SELECT c.created_at, coalesce(c.model_id,c.requested_model) AS model, ch.id::text AS channel, ch.name AS channel_name,
+ c.format, c.stream::text AS stream,
+ CASE WHEN att->>'end_reason' IN ('completed','upstream_error','connect_error','timeout_ttft','timeout_total','client_error','client_disconnected','interrupted') THEN att->>'end_reason' ELSE 'unknown' END AS result,
+ coalesce(att->>'status_code','none') AS status,
+ (att->>'duration_ms')::double precision AS duration,
+ CASE WHEN c.stream AND att->>'end_reason'='completed' THEN (att->>'ttft_ms')::double precision END AS ttft,
+ -- Call-level speed/gap belongs only to its last, successful streaming attempt.
+ CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN c.output_tokens_per_second END AS speed,
+ CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN (c.diagnostics->>'max_frame_gap_ms')::double precision END AS gap
+ FROM calls c CROSS JOIN LATERAL jsonb_array_elements(c.attempts) WITH ORDINALITY t(att,n)
+ JOIN visible_channels ch ON ch.id::text=att->'channel'->>'id'
+ WHERE c.created_at >= sqlc.arg(previous_from)::timestamptz AND c.created_at < sqlc.arg(to_time)::timestamptz
+ AND (sqlc.arg(channel)::text='' OR ch.id::text=sqlc.arg(channel)::text)
+ AND (sqlc.arg(model)::text='' OR coalesce(c.model_id,c.requested_model)=sqlc.arg(model)::text)
+ AND (sqlc.arg(format)::text='' OR c.format=sqlc.arg(format)::text)
+ AND (sqlc.arg(stream)::text='' OR c.stream::text=sqlc.arg(stream)::text)
+), filtered AS MATERIALIZED (
+ SELECT *, result NOT IN ('client_error','client_disconnected') AS counted,
+ CASE sqlc.arg(group_by)::text WHEN 'model' THEN model WHEN 'channel' THEN channel WHEN 'format' THEN format WHEN 'stream' THEN stream WHEN 'result' THEN result WHEN 'status' THEN status ELSE '' END AS group_key
+ FROM samples WHERE (sqlc.arg(result)::text='' OR result=sqlc.arg(result)::text)
+ AND (sqlc.arg(status)::text='' OR status=sqlc.arg(status)::text)
+), expanded AS (
+ SELECT f.*, 'summary'::text AS kind, CASE WHEN created_at>=sqlc.arg(from_time)::timestamptz THEN 'current' ELSE 'previous' END::text AS key, ''::text AS label FROM filtered f
+ UNION ALL
+ SELECT f.*, 'group', group_key, CASE WHEN sqlc.arg(group_by)::text='channel' THEN channel_name ELSE group_key END FROM filtered f WHERE created_at>=sqlc.arg(from_time)::timestamptz
+ UNION ALL
+ SELECT f.*, 'time', to_char(date_bin((sqlc.arg(bucket_seconds)::int::text || ' seconds')::interval,created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'), '' FROM filtered f WHERE created_at>=sqlc.arg(from_time)::timestamptz
+)
+SELECT kind, key, max(label)::text AS label,
+ count(*)::bigint AS attempts,
+ count(*) FILTER (WHERE counted)::bigint AS counted,
+ count(*) FILTER (WHERE result='completed')::bigint AS succeeded,
+ count(*) FILTER (WHERE counted AND result<>'completed')::bigint AS failed,
+ count(*) FILTER (WHERE NOT counted)::bigint AS excluded,
+ count(*) FILTER (WHERE stream='true')::bigint AS streamed,
+ count(ttft)::bigint AS ttft_samples,
+ count(duration)::bigint AS duration_samples,
+ count(speed)::bigint AS speed_samples,
+ count(gap)::bigint AS gap_samples,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft),-1)::double precision AS ttft_p99,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration),-1)::double precision AS duration_p99,
+ coalesce(percentile_cont(0.1) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p10,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY speed),-1)::double precision AS speed_p95,
+ coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p50,
+ coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p95,
+ coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY gap),-1)::double precision AS gap_p99
+FROM expanded GROUP BY kind,key ORDER BY kind,key LIMIT 2002;

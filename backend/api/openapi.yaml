@@ -25,6 +25,148 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/channel-hall/{channelID}/analysis:
+    get:
+      operationId: analyzeHallChannel
+      tags: [channels]
+      summary: 浏览聚合质量统计（当前可见渠道、尝试口径）
+      x-access: ready
+      x-feature: '407'
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: channelID
+          required: true
+          schema: {type: string, format: uuid}
+        - in: query
+          name: from
+          required: true
+          schema: {type: string, format: date-time}
+        - in: query
+          name: to
+          required: true
+          schema: {type: string, format: date-time}
+        - in: query
+          name: model
+          required: false
+          schema: {type: string}
+        - in: query
+          name: format
+          required: false
+          schema: {type: string}
+        - in: query
+          name: stream
+          required: false
+          schema: {type: string}
+        - in: query
+          name: channel
+          required: false
+          schema: {type: string}
+        - in: query
+          name: result
+          required: false
+          schema: {type: string}
+        - in: query
+          name: status
+          required: false
+          schema: {type: string}
+        - in: query
+          name: group_by
+          required: false
+          schema: {type: string, enum: [model, channel, format, stream, result, status]}
+        - in: query
+          name: bucket_seconds
+          required: false
+          schema: {type: integer, enum: [0, 300, 900, 3600, 21600, 86400]}
+      responses:
+        '200':
+          description: 聚合质量报告，最多 90 天；不包含账单和调用明细
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirectoryReport'}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: 分析查询超时
+  /api/suppliers/{supplierID}/analysis:
+    get:
+      operationId: analyzeSupplier
+      tags: [suppliers]
+      summary: 浏览聚合质量统计（当前可见渠道、尝试口径）
+      x-access: ready
+      x-feature: '407'
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: supplierID
+          required: true
+          schema: {type: string, format: uuid}
+        - in: query
+          name: from
+          required: true
+          schema: {type: string, format: date-time}
+        - in: query
+          name: to
+          required: true
+          schema: {type: string, format: date-time}
+        - in: query
+          name: model
+          required: false
+          schema: {type: string}
+        - in: query
+          name: format
+          required: false
+          schema: {type: string}
+        - in: query
+          name: stream
+          required: false
+          schema: {type: string}
+        - in: query
+          name: channel
+          required: false
+          schema: {type: string}
+        - in: query
+          name: result
+          required: false
+          schema: {type: string}
+        - in: query
+          name: status
+          required: false
+          schema: {type: string}
+        - in: query
+          name: group_by
+          required: false
+          schema: {type: string, enum: [model, channel, format, stream, result, status]}
+        - in: query
+          name: bucket_seconds
+          required: false
+          schema: {type: integer, enum: [0, 300, 900, 3600, 21600, 86400]}
+      responses:
+        '200':
+          description: 聚合质量报告，最多 90 天；不包含账单和调用明细
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirectoryReport'}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: 分析查询超时
   /api/admin/suppliers/preview:
     post:
       operationId: previewSupplierImpact
@@ -6240,6 +6382,56 @@ components:
         - effective_multiplier
         - fx_discount
       additionalProperties: false
+    DirectoryValues:
+      type: object
+      additionalProperties: false
+      required: [attempts, counted, succeeded, failed, excluded, streamed, ttft_samples, duration_samples, speed_samples, gap_samples, ttft_p50, ttft_p95, ttft_p99, duration_p50, duration_p95, duration_p99, speed_p10, speed_p50, speed_p95, gap_p50, gap_p95, gap_p99]
+      properties:
+        attempts: {type: integer}
+        counted: {type: integer}
+        succeeded: {type: integer}
+        failed: {type: integer}
+        excluded: {type: integer}
+        streamed: {type: integer}
+        ttft_samples: {type: integer}
+        duration_samples: {type: integer}
+        speed_samples: {type: integer}
+        gap_samples: {type: integer}
+        ttft_p50: {type: [number, 'null']}
+        ttft_p95: {type: [number, 'null']}
+        ttft_p99: {type: [number, 'null']}
+        duration_p50: {type: [number, 'null']}
+        duration_p95: {type: [number, 'null']}
+        duration_p99: {type: [number, 'null']}
+        speed_p10: {type: [number, 'null']}
+        speed_p50: {type: [number, 'null']}
+        speed_p95: {type: [number, 'null']}
+        gap_p50: {type: [number, 'null']}
+        gap_p95: {type: [number, 'null']}
+        gap_p99: {type: [number, 'null']}
+    DirectoryRow:
+      type: object
+      additionalProperties: false
+      required: [key, label, values]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        values: {$ref: '#/components/schemas/DirectoryValues'}
+    DirectoryReport:
+      type: object
+      additionalProperties: false
+      required: [from, to, previous_from, previous_to, bucket_seconds, group_by, current, previous, groups, trend]
+      properties:
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        previous_from: {type: string, format: date-time}
+        previous_to: {type: string, format: date-time}
+        bucket_seconds: {type: integer}
+        group_by: {type: string}
+        current: {$ref: '#/components/schemas/DirectoryValues'}
+        previous: {$ref: '#/components/schemas/DirectoryValues'}
+        groups: {type: array, items: {$ref: '#/components/schemas/DirectoryRow'}}
+        trend: {type: array, items: {$ref: '#/components/schemas/DirectoryRow'}}
     HallChannel:
       type: object
       properties:

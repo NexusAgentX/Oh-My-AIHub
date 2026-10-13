@@ -6,6 +6,7 @@ import { shortMultiplier } from '../money/MultiplierText'
 import { formatMultiplier, formatPoints } from '../money/format'
 import { Badge, Button, ButtonLink, Card, EmptyState, PageHeader, QueryBoundary, SelectField, Tabs, TextField } from '../ui'
 import { ChannelCard, ChannelMetrics, ChannelState, SharingNav, SupplierCard, SupplierIcon } from './components'
+import { QualityStats } from './QualityStats'
 import { useHall, useHallChannel, useSupplier, useSuppliers } from './queries'
 
 export function ChannelHallPage() {
@@ -31,6 +32,7 @@ export function HallChannelPage() {
     <PageHeader title={channel.name} back={{ to: '/channel-hall', label: '渠道大厅' }} actions={channel.is_mine ? <ButtonLink to={`/channels/${channel.id}`} variant="secondary">管理渠道</ButtonLink> : undefined} />
     <Card><div className="sharing-line"><ChannelState channel={channel} /><span>由 {channel.owner.display_name} 提供</span>{channel.is_mine && <Badge tone="accent">我的渠道</Badge>}</div>{channel.summary && <p>{channel.summary}</p>}<ChannelMetrics channel={channel} /></Card>
     {channel.supplier ? <SupplierCard supplier={channel.supplier} /> : <p className="muted-copy">未识别供应商</p>}
+    <QualityStats key={channel.id} path={`/api/channel-hall/${channel.id}`} />
     <section aria-label="渠道模型"><h2>模型 · {channel.models.length}</h2>
       <ModelCatalog key={channel.id} models={channel.models.map((offer) => offer.model)} priceLabel="参考价" renderDetails={(model) => {
         const offer = channel.models.find((item) => item.model.id === model.id)!
@@ -55,13 +57,13 @@ export function SuppliersPage() {
 export function SupplierDetailPage() {
   const { id = '' } = useParams()
   const query = useSupplier(id)
-  const [tab, setTab] = useState<'models' | 'channels'>('models')
+  const [tab, setTab] = useState<'stats' | 'models' | 'channels'>('stats')
   return <QueryBoundary query={query} errorFallback="供应商不存在或已隐藏">{({ supplier, channels, models }) => <>
     <PageHeader title={supplier.name} back={{ to: '/suppliers', label: '供应商' }} /><Card><div className="sharing-title"><SupplierIcon supplier={supplier} /><Badge tone="info">{supplier.kind === 'official' ? '官方 API' : '中转站'}</Badge></div>{supplier.summary && <p>{supplier.summary}</p>}
       <div className="sharing-line">{[[supplier.website_url, '官网'], [supplier.docs_url, '文档'], [supplier.status_url, '服务状态']].filter(([url]) => url).map(([url, label]) => <a href={url} key={label} target="_blank" rel="noopener noreferrer">{label} ↗</a>)}</div>
       {supplier.description && <MarkdownContent value={supplier.description} />}<p className="muted-copy">资料更新于 {new Date(supplier.updated_at).toLocaleDateString()}</p>
     </Card>
-    <Tabs label="供应商详情" value={tab} onChange={setTab} items={[{ key: 'models', label: `模型 ${models.length}` }, { key: 'channels', label: `关联渠道 ${channels.length}` }]}>
-    {tab === 'models' ? <ModelCatalog key={supplier.id} models={models} /> : channels.length ? <div className="sharing-grid">{channels.map((channel) => <ChannelCard key={channel.id} channel={channel} />)}</div> : <EmptyState title="暂无站内渠道" />}</Tabs>
+    <Tabs label="供应商详情" value={tab} onChange={setTab} items={[{ key: 'stats', label: '质量统计' }, { key: 'models', label: `模型 ${models.length}` }, { key: 'channels', label: `关联渠道 ${channels.length}` }]}>
+    {tab === 'stats' ? <QualityStats key={supplier.id} path={`/api/suppliers/${supplier.id}`} channels={channels} /> : tab === 'models' ? <ModelCatalog key={supplier.id} models={models} /> : channels.length ? <div className="sharing-grid">{channels.map((channel) => <ChannelCard key={channel.id} channel={channel} />)}</div> : <EmptyState title="暂无站内渠道" />}</Tabs>
   </>}</QueryBoundary>
 }
