@@ -89,10 +89,11 @@ Oh-My-AIHub 的视觉规则。
   - 余额等签名数字可以超出阶梯，由组件定义。
 - **字重**：display 字体用 800。正文 400，标签与按钮 600 到 700。
 - **数字**：一律用等宽数字（`.num` 或 `tabular-nums`）。
-- **加载**：字体自托管，不从外部服务加载（来源、版本与重新生成见 README“字体”）。
+- **加载**：字体自托管，不从外部服务加载。
   - 源泉圆体只用 Bold 一个字重，`@font-face` 声明为 700 到 900，标题的 800 也用它。字重越粗，字形自动处理的错误越多，所以不用 Heavy。
   - 中文按 `unicode-range` 切片，常用标点与界面用字排在前面，只下载用到的字。
   - `font-display: swap`，加载完成前与加载失败时用 `--font-sans`。
+- **构建**：`frontend/src/styles/fonts.css` 与字体文件由 `python3 frontend/tools/fonts/build.py` 生成，依赖 `fonttools` 与 `brotli`；字体包从 npm 下载并按固定的 sha512 校验。前端文案大量变动后可重新生成，让常用字留在前几个切片。Baloo 2 取 `@fontsource/baloo-2` 的 latin 800 字重（未改动），源泉圆体取 GenSenMaruGothic TW TTF 的 Bold 字重；字体文件位于 `frontend/public/fonts/`。许可副本随前端部署到 `/licenses/fonts.txt`。
 
 ## 贴纸
 
@@ -231,7 +232,7 @@ Oh-My-AIHub 的视觉规则。
   - 只借风格，不复用它的样式代码、色值与标志性组件，比如撕页日历、重置热力图。
   - 主色是我们的芥末。
 - **早期规则**：来自 Airtable 设计分析（[ADR-0004](docs/adr/archive/0004-adopt-airtable-design-analysis.md)，已归档），已被取代。保留“每屏一个主按钮”和本文的写法。
-- **字体**：Baloo 2 与源泉圆体均为 SIL OFL 1.1，许可随前端发布。
+- **字体**：[Baloo 2](https://github.com/EkType/Baloo2) 与[源泉圆体](https://github.com/ButTaiwan/gensen-font)（GenSenMaruGothic TW）均为 SIL OFL 1.1，许可随前端发布。
 
 ## 已知空白
 
