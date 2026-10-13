@@ -122,9 +122,8 @@ function presetWindow(days: string) {
     to: to.toISOString(),
   }
 }
-function localInput(iso: string) {
-  const date = new Date(iso)
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+function shanghaiInput(iso: string) {
+  return new Date(new Date(iso).getTime() + 8 * 3600000)
     .toISOString()
     .slice(0, 16)
 }
@@ -138,8 +137,8 @@ export function QualityStats({
   const [range, setRange] = useState('7')
   const [window, setWindow] = useState(() => presetWindow('7'))
   const [dates, setDates] = useState(() => ({
-    from: localInput(window.from),
-    to: localInput(window.to),
+    from: shanghaiInput(window.from),
+    to: shanghaiInput(window.to),
   }))
   const [draft, setDraft] = useState<Filters>(initialFilters)
   const [filters, setFilters] = useState<Filters>(initialFilters)
@@ -186,8 +185,8 @@ export function QualityStats({
     setDraft((d) => ({ ...d, [key]: value }))
   const apply = () => {
     if (range === 'custom') {
-      const from = new Date(dates.from),
-        to = new Date(dates.to)
+      const from = new Date(`${dates.from}+08:00`),
+        to = new Date(`${dates.to}+08:00`)
       if (
         !Number.isFinite(from.getTime()) ||
         !Number.isFinite(to.getTime()) ||
@@ -223,8 +222,8 @@ export function QualityStats({
                 const next = presetWindow(value)
                 setWindow(next)
                 setDates({
-                  from: localInput(next.from),
-                  to: localInput(next.to),
+                  from: shanghaiInput(next.from),
+                  to: shanghaiInput(next.to),
                 })
                 setPage(0)
                 setError('')
@@ -240,6 +239,7 @@ export function QualityStats({
             <>
               <TextField
                 label="开始时间"
+                hint="北京时间"
                 type="datetime-local"
                 value={dates.from}
                 onChange={(e) =>
@@ -248,6 +248,7 @@ export function QualityStats({
               />
               <TextField
                 label="结束时间"
+                hint="北京时间"
                 type="datetime-local"
                 value={dates.to}
                 onChange={(e) =>
@@ -651,6 +652,7 @@ function QualityTrend({
                   ? new Date(row.key).toLocaleDateString('zh-CN', {
                       month: 'numeric',
                       day: 'numeric',
+                      timeZone: 'Asia/Shanghai',
                     })
                   : ''}
               </span>

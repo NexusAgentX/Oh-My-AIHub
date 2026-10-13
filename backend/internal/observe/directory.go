@@ -80,7 +80,7 @@ func (s *Service) DirectoryAnalysis(ctx context.Context, f DirectoryFilter) (Dir
 			f.Bucket = 86400
 		}
 	}
-	if !slices.Contains([]int{300, 900, 3600, 21600, 86400}, f.Bucket) || f.To.Sub(f.From)/time.Duration(f.Bucket)/time.Second > 998 {
+	if !slices.Contains([]int{300, 900, 3600, 21600, 86400}, f.Bucket) || f.To.Sub(f.From) > time.Duration(998*f.Bucket)*time.Second {
 		return DirectoryReport{}, ErrInvalidInput
 	}
 	return s.store.DirectoryAnalysis(ctx, f)
