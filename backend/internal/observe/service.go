@@ -88,6 +88,7 @@ type Snapshot struct {
 
 // Store is the persistence of the observation queries (observepg).
 type Store interface {
+	DirectoryAnalysis(context.Context, DirectoryFilter) (DirectoryReport, error)
 	Analyze(context.Context, CallFilter, string, string, int) (AnalysisReport, error)
 	ListCalls(ctx context.Context, filter CallFilter, after *CallCursor, limit int) ([]CallRow, error)
 	CallStats(ctx context.Context, filter CallFilter) (CallStats, error)

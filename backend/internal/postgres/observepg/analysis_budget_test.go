@@ -54,3 +54,13 @@ func TestAnalysisBudgetBoundsWholeReport(t *testing.T) {
 		}
 	})
 }
+
+func TestDirectoryAnalysisSharesExistingBudget(t *testing.T) {
+	s := NewStore(nil, nil)
+	s.analysisSlots <- struct{}{}
+	s.analysisSlots <- struct{}{}
+	_, err := s.DirectoryAnalysis(context.Background(), observe.DirectoryFilter{})
+	if !errors.Is(err, observe.ErrAnalysisBusy) {
+		t.Fatalf("directory bypassed shared budget: %v", err)
+	}
+}

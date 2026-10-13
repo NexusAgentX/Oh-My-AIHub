@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/channel-hall/{channelID}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 浏览聚合质量统计（当前可见渠道、尝试口径） */
+        get: operations["analyzeHallChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/{supplierID}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 浏览聚合质量统计（当前可见渠道、尝试口径） */
+        get: operations["analyzeSupplier"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/suppliers/preview": {
         parameters: {
             query?: never;
@@ -3459,6 +3493,54 @@ export interface components {
             effective_multiplier: string;
             fx_discount: boolean;
         };
+        DirectoryValues: {
+            cache_samples: number;
+            cache_read_ratio: number | null;
+            cache_hit_rate: number | null;
+            attempts: number;
+            counted: number;
+            succeeded: number;
+            failed: number;
+            excluded: number;
+            streamed: number;
+            ttft_samples: number;
+            duration_samples: number;
+            speed_samples: number;
+            gap_samples: number;
+            ttft_p50: number | null;
+            ttft_p95: number | null;
+            ttft_p99: number | null;
+            duration_p50: number | null;
+            duration_p95: number | null;
+            duration_p99: number | null;
+            speed_p10: number | null;
+            speed_p50: number | null;
+            speed_p95: number | null;
+            gap_p50: number | null;
+            gap_p95: number | null;
+            gap_p99: number | null;
+        };
+        DirectoryRow: {
+            key: string;
+            label: string;
+            values: components["schemas"]["DirectoryValues"];
+        };
+        DirectoryReport: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            previous_from: string;
+            /** Format: date-time */
+            previous_to: string;
+            bucket_seconds: number;
+            group_by: string;
+            current: components["schemas"]["DirectoryValues"];
+            previous: components["schemas"]["DirectoryValues"];
+            groups: components["schemas"]["DirectoryRow"][];
+            trend: components["schemas"]["DirectoryRow"][];
+        };
         HallChannel: {
             /** Format: uuid */
             id: string;
@@ -3702,6 +3784,96 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    analyzeHallChannel: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                model?: string;
+                format?: string;
+                stream?: string;
+                channel?: string;
+                result?: string;
+                status?: string;
+                group_by?: "model" | "channel" | "format" | "stream" | "result" | "status";
+                bucket_seconds?: 0 | 300 | 900 | 3600 | 21600 | 86400;
+            };
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 聚合质量报告，最多 90 天；不包含账单和调用明细 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            /** @description 分析查询超时 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    analyzeSupplier: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                model?: string;
+                format?: string;
+                stream?: string;
+                channel?: string;
+                result?: string;
+                status?: string;
+                group_by?: "model" | "channel" | "format" | "stream" | "result" | "status";
+                bucket_seconds?: 0 | 300 | 900 | 3600 | 21600 | 86400;
+            };
+            header?: never;
+            path: {
+                supplierID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 聚合质量报告，最多 90 天；不包含账单和调用明细 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            /** @description 分析查询超时 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     previewSupplierImpact: {
         parameters: {
             query?: never;

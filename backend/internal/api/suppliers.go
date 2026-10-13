@@ -488,6 +488,8 @@ func (a *app) registerSupplierRoutes(r *router) {
 	r.implement("407", "POST /api/suppliers/recognize", accessReady, a.recognizeSupplier)
 	r.implement("407", "GET /api/channel-hall", accessReady, a.listHall)
 	r.implement("407", "GET /api/channel-hall/{channelID}", accessReady, a.getHallChannel)
+	r.implement("407", "GET /api/channel-hall/{channelID}/analysis", accessReady, a.analyzeHallChannel)
+	r.implement("407", "GET /api/suppliers/{supplierID}/analysis", accessReady, a.analyzeSupplier)
 	r.implement("407", "GET /api/admin/suppliers", accessAdmin, a.adminSuppliers)
 	r.implement("407", "POST /api/admin/suppliers", accessAdmin, a.saveSupplier)
 	r.implement("407", "PUT /api/admin/suppliers/{supplierID}", accessAdmin, a.saveSupplier)
