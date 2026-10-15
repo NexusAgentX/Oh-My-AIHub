@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 )
 
 // The side-channel reader decides what to decode by a cheap look at the member
@@ -44,8 +45,21 @@ func legacyStateOf(o *legacyObserver) readerState {
 		Speed:     o.anthropicSpeed, Tier: o.anthropicTier, Qwen: o.qwenObserved}
 }
 
-// sameReading feeds the events to both readers and fails at the first event
-// after which they differ, then compares what each makes of the whole answer.
+func metadataState(s readerState) readerState {
+	d := s.Detail.(ledger.UsageDetail)
+	d.Tokens = nil
+	d.Notes = nil
+	d.ToolPromptTokens = 0
+	s.Usage = nil
+	s.Found = false
+	s.Anthropic = [4]int64{}
+	s.Detail = d
+	return s
+}
+
+// sameReading preserves the pre-optimization metadata contract. Usage and token
+// detail semantics intentionally changed in #457 and are covered independently
+// by usage_compatibility_test.go; comparing those to a frozen bug is invalid.
 func sameReading(t testing.TB, format channel.Format, qwen bool, events []string) {
 	t.Helper()
 	current := NewObserver(format, true, "text/event-stream")
@@ -54,13 +68,15 @@ func sameReading(t testing.TB, format channel.Format, qwen bool, events []string
 	for index, event := range events {
 		current.absorb([]byte(event))
 		original.absorb([]byte(event))
-		if got, want := stateOf(current), legacyStateOf(original); !reflect.DeepEqual(got, want) {
+		if got, want := metadataState(stateOf(current)), metadataState(legacyStateOf(original)); !reflect.DeepEqual(got, want) {
 			t.Fatalf("%s: after event %d %q\nreads  %+v\nwas    %+v", format, index, event, got, want)
 		}
 	}
 	got, want := current.Finish(), original.Finish()
 	// Diagnostics are new; usage equivalence remains checked against the original reader.
 	got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
+	got.Usage, want.Usage = ledger.Usage{}, ledger.Usage{}
+	got.Found, want.Found = false, false
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%s: the whole answer %q\nreads  %+v\nwas    %+v", format, events, got, want)
 	}
