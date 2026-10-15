@@ -152,6 +152,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  confirmDisabled,
   danger,
   busy,
   error,
@@ -162,6 +163,7 @@ export function ConfirmDialog({
   onConfirm: () => void
   title: string
   description?: string
+  confirmDisabled?: boolean
   confirmLabel: string
   danger?: boolean
   busy?: boolean
@@ -177,7 +179,7 @@ export function ConfirmDialog({
           <Button disabled={busy} onClick={onClose} type="button" variant="secondary">
             取消
           </Button>
-          <Button loading={busy} onClick={onConfirm} type="button" variant={danger ? 'danger' : 'primary'}>
+          <Button disabled={confirmDisabled} loading={busy} onClick={onConfirm} type="button" variant={danger ? 'danger' : 'primary'}>
             {confirmLabel}
           </Button>
         </>

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import type { CatalogModel } from '../api/types'
 import { FormatTags, formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
@@ -8,16 +8,20 @@ import { contextText } from './pricing'
 
 import { capabilities, contextFilterError, defaultFilters, filterModels, priceFilterError, type ModelFilters } from './filters'
 
+const catalogScroll = new Map<string, number>()
+
 type CatalogOptions = {
   priceLabel?: string
   renderDetails?: (model: CatalogModel) => ReactNode
 }
 
 function ModelCard({ model, priceLabel = '最低参考价', renderDetails }: { model: CatalogModel } & CatalogOptions) {
+  const location = useLocation()
   const context = contextText(model.context_window)
   const output = contextText(model.max_output_tokens)
   return (
-    <Link className="model-card" to={`/models/${encodeURIComponent(model.id)}`}>
+    <Link className="model-card" to={`/models/${encodeURIComponent(model.id)}`} state={{ catalogReturn: location.pathname + location.search, catalogKey: location.key }}
+      onClick={() => catalogScroll.set(location.key, window.scrollY)}>
       <header>
         <strong>{model.display_name || model.id}</strong>
         {model.current_tier && <Badge tone="accent">{model.current_tier.name}</Badge>}
@@ -39,7 +43,7 @@ function ModelCard({ model, priceLabel = '最低参考价', renderDetails }: { m
           <dt>{priceLabel} 入/出</dt>
           <dd className="num">
             {model.lowest_prices
-      ? `${formatPoints(model.lowest_prices.input, { digits: 2 })} / ${formatPoints(model.lowest_prices.output, { digits: 2 })}`
+      ? `${formatPoints(model.lowest_prices.input, { digits: 9 })} / ${formatPoints(model.lowest_prices.output, { digits: 9 })}`
       : '—'}
           </dd>
         </div>
@@ -60,7 +64,30 @@ const formatOptions = [
 ]
 
 export function ModelCatalog({ models, priceLabel, renderDetails }: { models: CatalogModel[] } & CatalogOptions) {
-  const [filters, setFilters] = useState<ModelFilters>(defaultFilters)
+  const location = useLocation()
+  const [search, setSearch] = useSearchParams()
+  const filters = { ...defaultFilters }
+  for (const key of Object.keys(defaultFilters) as (keyof ModelFilters)[]) {
+    const value = search.get(`model_${key}`)
+    if (value !== null) Object.assign(filters, { [key]: typeof defaultFilters[key] === 'boolean' ? value === 'true' : value })
+  }
+  const setFilters = (next: ModelFilters | ((current: ModelFilters) => ModelFilters)) => {
+    const updated = typeof next === 'function' ? next(filters) : next
+    const params = new URLSearchParams(search)
+    for (const key of Object.keys(defaultFilters) as (keyof ModelFilters)[]) {
+      if (updated[key] === defaultFilters[key]) params.delete(`model_${key}`)
+      else params.set(`model_${key}`, String(updated[key]))
+    }
+    setSearch(params, { replace: true })
+  }
+  const restored = useRef(false)
+  useLayoutEffect(() => {
+    if (!models.length || restored.current) return
+    restored.current = true
+    const key = location.state?.catalogKey ?? location.key
+    const scroll = catalogScroll.get(key)
+    if (scroll !== undefined) window.scrollTo(0, scroll)
+  }, [models.length, location.key, location.state])
   const update = <K extends keyof ModelFilters>(key: K, value: ModelFilters[K]) =>
     setFilters((current) => ({ ...current, [key]: value }))
   const advancedCount = [filters.provider, filters.minContext, filters.maxInput, filters.maxOutput,
@@ -75,7 +102,7 @@ export function ModelCatalog({ models, priceLabel, renderDetails }: { models: Ca
         <SearchInput label="搜索模型" onChange={(event) => update('query', event.target.value)} placeholder="搜索模型" value={filters.query} />
         <Segmented label="按格式筛选" onChange={(value) => update('format', value)} options={formatOptions} value={filters.format} />
       </Toolbar>
-      <Disclosure title="更多筛选" changed={advancedCount}>
+      <Disclosure title="更多筛选" changed={advancedCount} defaultOpen={advancedCount > 0}>
         <div className="model-filters">
           <SelectField label="提供商" value={filters.provider} onChange={(event) => update('provider', event.target.value)}>
             <option value="">全部提供商</option>

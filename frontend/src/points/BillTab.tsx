@@ -29,7 +29,7 @@ function relatedLink(entry: PointsEntry) {
 
 const columns: Column<PointsEntry>[] = [
   { key: 'time', header: '时间', cell: (entry) => <span className="num">{formatTime(entry.created_at)}</span> },
-  { key: 'type', header: '类型', primary: true, cell: (entry) => transactionTypeLabels[entry.type] },
+  { key: 'type', header: '类型', primary: true, cell: (entry) => entry.type === 'api_call' ? (amountSign(entry.amount) > 0 ? '渠道收入' : '调用支出') : transactionTypeLabels[entry.type] },
   {
     key: 'reason',
     header: '说明',

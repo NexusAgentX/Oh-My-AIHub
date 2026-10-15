@@ -1,4 +1,6 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useContext, useRef, useState, type ReactNode } from 'react'
+import { UNSAFE_DataRouterContext } from 'react-router-dom'
+import { UnsavedBodyGuard } from './UnsavedBodyGuard'
 import { errorMessage } from '../api/query'
 import { MarkdownEditor } from '../markdown'
 import { Button, InlineError } from '../ui'
@@ -11,7 +13,11 @@ export function ContentComposer({ initialBody = '', initialAttachments = [], onS
   initialBody?: string; initialAttachments?: Attachment[]; onSave: (body: string, attachmentIDs: string[]) => Promise<unknown>;
   onCancel?: () => void; submitLabel: string; children?: ReactNode; validate?: () => string;
 }) {
+  const discard = useRef(false)
+  const router = useContext(UNSAFE_DataRouterContext)
+  const [savedBody, setSavedBody] = useState(initialBody)
   const [body, setBody] = useState(initialBody)
+  const dirty = body.trim() !== savedBody.trim()
   const [attachments, setAttachments] = useState(initialAttachments)
   const currentAttachments = useRef(attachments)
   currentAttachments.current = attachments
@@ -31,9 +37,10 @@ export function ContentComposer({ initialBody = '', initialAttachments = [], onS
     if (saving || uploading) return
     const message = validate?.() || contentError(body, attachments)
     if (message) { setError(message); return }
-    setError(''); setSaving(true)
-    void onSave(body, attachments.map((item) => item.id)).catch((cause) => setError(errorMessage(cause, '保存失败，请重试'))).finally(() => setSaving(false))
+    setError(''); setSaving(true); discard.current = true
+    void onSave(body, attachments.map((item) => item.id)).then(() => setSavedBody(body)).catch((cause) => { discard.current = false; setError(errorMessage(cause, '保存失败，请重试')) }).finally(() => setSaving(false))
   }}>
+    {router && <UnsavedBodyGuard dirty={dirty && !saving} discard={discard} />}
     <fieldset disabled={saving}>
       {children}
       <MarkdownEditor value={body} onChange={setBody} upload={upload} onUploadingChange={setUploading} disabled={saving} />
@@ -45,7 +52,7 @@ export function ContentComposer({ initialBody = '', initialAttachments = [], onS
       <InlineError>{error}</InlineError>
       <div className="forum-form-actions">
         <Button type="submit" loading={saving} disabled={uploading}>{submitLabel}</Button>
-        {onCancel && <Button type="button" variant="secondary" disabled={saving || uploading} onClick={onCancel}>取消</Button>}
+        {onCancel && <Button type="button" variant="secondary" disabled={saving || uploading} onClick={() => { if (!dirty || window.confirm('丢弃未保存的正文？')) { discard.current = true; setSavedBody(body); onCancel() } }}>取消</Button>}
       </div>
     </fieldset>
   </form>

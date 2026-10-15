@@ -280,3 +280,7 @@
     background: var(--canvas);
   }
 }
+
+html { scroll-padding-top: calc(var(--topbar-height) + var(--space-3)); }
+.model-card { scroll-margin-block: var(--space-3); }
+@media (max-width: 767px) { html { scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + var(--space-3)); } }

@@ -31,11 +31,12 @@
 .key-row-budget .progress { margin-top: 2px; }
 .key-row-status { display: flex; align-self: center; align-items: center; gap: var(--space-2); color: var(--muted); }
 
-.key-model-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 var(--space-3); max-height: 240px; overflow-y: auto; }
+.key-model-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 var(--space-3);  }
 .alias-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; }
 .key-expiry { display: flex; align-items: flex-end; gap: var(--space-2); }
 .key-expiry .field { flex: 1; }
-.key-form-actions { justify-content: space-between; }
+.key-form-actions { justify-content: space-between; position: sticky; bottom: 0; padding: var(--space-3) 0; background: var(--canvas); border-top: 1px solid var(--hairline); z-index: 1; }
+.key-model-picks .mono { overflow-wrap: anywhere; min-width: 0; }
 .key-routing { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 .key-route { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); }
 .key-route-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }

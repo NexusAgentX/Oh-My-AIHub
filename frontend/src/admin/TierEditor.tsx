@@ -102,6 +102,7 @@ function TierEditForm({
   }
   return (
     <div className="tier-form" role="group" aria-label="编辑价格档">
+      <p className="muted-copy">应用后仍需保存模型；取消本档会丢弃本档编辑。</p>
       <TextField
         error={errors.name}
         label="档位名称"
@@ -221,10 +222,10 @@ function TierEditForm({
       />
       <div className="form-actions">
         <Button onClick={onCancel} size="sm" type="button" variant="secondary">
-          取消
+          取消本档
         </Button>
-        <Button onClick={save} size="sm" type="button">
-          保存此档
+        <Button onClick={save} size="sm" type="button" variant="secondary">
+          应用到模型
         </Button>
       </div>
     </div>
@@ -239,15 +240,18 @@ export function TierEditor({
   tiers,
   onChange,
   basePrices,
+  onEditingChange,
   unit = '积分/百万 token',
 }: {
+  onEditingChange?: (editing: boolean) => void
   tiers: PriceTierInput[]
   onChange: (tiers: PriceTierInput[]) => void
   basePrices: PricesForm
   /** 单价单位，随模型币种变化 */
   unit?: string
 }) {
-  const [editing, setEditing] = useState<number | 'new' | null>(null)
+  const [editing, setEditingState] = useState<number | 'new' | null>(null)
+  const setEditing = (value: number | 'new' | null) => { setEditingState(value); onEditingChange?.(value !== null) }
   if (editing !== null) {
     const initial =
       editing === 'new' ? emptyTier(basePrices) : tierToForm({ ...tiers[editing], seq: editing + 1 } as PriceTier)

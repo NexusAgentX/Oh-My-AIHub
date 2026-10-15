@@ -88,6 +88,11 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       event.stopPropagation()
       if (!latest.current.disabled) void uploadRef.current(Array.from(event.dataTransfer?.files || []))
     }
+    const keydown = (event: KeyboardEvent) => {
+      // Preserve native form focus traversal before Vditor handles indentation.
+      if (event.key === 'Tab' && event.target instanceof HTMLTextAreaElement) event.stopPropagation()
+    }
+    container.addEventListener('keydown', keydown, true)
     container.addEventListener('paste', paste, true)
     container.addEventListener('drop', drop, true)
     loadMarkdownRuntime().then(() => {
@@ -130,6 +135,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       // lifetime 是代际计数器而非 DOM ref：清理时必须读取并递增最新值，使进行中的异步回调失效。
       // oxlint-disable-next-line react/exhaustive-deps
       ++lifetime.current
+      container.removeEventListener('keydown', keydown, true)
       container.removeEventListener('paste', paste, true)
       container.removeEventListener('drop', drop, true)
       editor.current = null

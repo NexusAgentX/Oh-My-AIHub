@@ -63,5 +63,8 @@
 
 @media (max-width: 767px) {
   .tab { min-height: 44px; }
-  .segmented-item { min-height: 38px; }
+  .segmented-item { min-height: 44px; min-width: 44px; }
 }
+
+.segmented-scroll { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; }
+.segmented-scroll-arrow { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--ink); font-size: var(--text-xl); cursor: pointer; }

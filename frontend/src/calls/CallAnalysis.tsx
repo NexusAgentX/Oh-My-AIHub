@@ -163,6 +163,7 @@ export function CallAnalysis({
   const [split, setSplit] = useState('all')
   const [bucket, setBucket] = useState('0')
   const [page, setPage] = useState(0)
+  const [trendIndex, setTrendIndex] = useState(0)
   const metrics = metricGroups[category]
   const metric = metrics.find((m) => m.key === selected) ?? metrics[0]
   const eligible = Boolean(params.from && params.to && !params.request_id)
@@ -264,6 +265,8 @@ export function CallAnalysis({
           )
           const activePage = Math.min(page, Math.max(0, Math.ceil(groups.length / 10) - 1))
           const maximum = Math.max(1, ...report.trend.map((r) => trendRead(r) ?? 0))
+          const activeTrend = Math.min(trendIndex, Math.max(0, report.trend.length - 1))
+          const point = report.trend[activeTrend]
           return (
             <>
               <div className="analysis-metrics">
@@ -294,26 +297,22 @@ export function CallAnalysis({
                 <>
                   <h3>{metric.label}趋势</h3>
                   <div className="analysis-trend" role="group" aria-label={`${metric.label}趋势`}>
-                    {report.trend.map((row) => {
+                    {report.trend.map((row, index) => {
                       const value = trendRead(row)
                       return (
                         <button
                           key={row.key}
-                          aria-label={`${formatDateTime(row.key)} · ${display(value, metric.unit)} · 查看调用`}
-                          title={`${formatDateTime(row.key)} · ${display(value, metric.unit)} · 点击查看调用`}
-                          onClick={() => {
-                            const end = new Date(
-                              Math.min(
-                                new Date(row.key).getTime() + report.bucket_seconds * 1000,
-                                new Date(report.to).getTime(),
-                              ),
-                            ).toISOString()
-                            onDrill({
-                              from: new Date(
-                                Math.max(new Date(row.key).getTime(), new Date(report.from).getTime()),
-                              ).toISOString(),
-                              to: end,
-                            }, `${formatDateTime(row.key)} — ${formatDateTime(end)}`)
+                          tabIndex={index === activeTrend ? 0 : -1}
+                          aria-pressed={index === activeTrend}
+                          aria-label={`${formatDateTime(row.key)} · ${metric.label} ${display(value, metric.unit)}`}
+                          onFocus={() => setTrendIndex(index)}
+                          onClick={() => setTrendIndex(index)}
+                          onKeyDown={(event) => {
+                            const next = event.key === 'ArrowRight' ? Math.min(index + 1, report.trend.length - 1) : event.key === 'ArrowLeft' ? Math.max(0, index - 1) : event.key === 'Home' ? 0 : event.key === 'End' ? report.trend.length - 1 : -1
+                            if (next < 0) return
+                            event.preventDefault()
+                            setTrendIndex(next)
+                            event.currentTarget.parentElement?.querySelectorAll('button')[next]?.focus()
                           }}
                         >
                           <span
@@ -329,6 +328,23 @@ export function CallAnalysis({
                       )
                     })}
                   </div>
+                  {point && <div className="analysis-reading">
+                    <output aria-live="polite">{formatDateTime(point.key)} · {metric.label} {display(trendRead(point), metric.unit)}</output>
+                    <Button variant="secondary" onClick={() => {
+                            const end = new Date(
+                              Math.min(
+                                new Date(point.key).getTime() + report.bucket_seconds * 1000,
+                                new Date(report.to).getTime(),
+                              ),
+                            ).toISOString()
+                            onDrill({
+                              from: new Date(
+                                Math.max(new Date(point.key).getTime(), new Date(report.from).getTime()),
+                              ).toISOString(),
+                              to: end,
+                            }, `${formatDateTime(point.key)} — ${formatDateTime(end)}`)
+                    }}>查看此时段调用</Button>
+                  </div>}
                   <div className="analysis-axis">
                     <span>{formatDateTime(report.from)}</span>
                     <span>{formatDateTime(report.to)}</span>
@@ -339,11 +355,11 @@ export function CallAnalysis({
                 按{dimensions[group]}
                 {split !== 'all' ? ` × ${dimensions[split]}` : ''}对比
               </h3>
-              <div className="analysis-comparison">
+              <div className="analysis-comparison" data-count-metric={metric.key === 'calls'}>
                 <div className="analysis-comparison-head">
                   <span>分组</span>
                   <span>{metric.label}</span>
-                  <span>请求</span>
+                  {metric.key !== 'calls' && <span>请求</span>}
                   <span>成功率</span>
                 </div>
                 {groups.slice(activePage * 10, activePage * 10 + 10).map((row) => (
@@ -357,9 +373,9 @@ export function CallAnalysis({
                       {dimensionLabel(group, row.key, row.label)}
                       {split !== 'all' && <small>{dimensionLabel(split, row.split_key, row.split_label)}</small>}
                     </strong>
-                    <span className="num">{display(read(metric, row.values), metric.unit)}</span>
-                    <span className="num">{row.values.calls} 次</span>
-                    <span className="num">{display(ratio(row.values.succeeded, row.values.finished), '%')}</span>
+                    <span className="num"><small className="comparison-label">{metric.label}</small>{display(read(metric, row.values), metric.unit)}</span>
+                    {metric.key !== 'calls' && <span className="num"><small className="comparison-label">请求</small>{row.values.calls} 次</span>}
+                    <span className="num"><small className="comparison-label">成功率</small>{display(ratio(row.values.succeeded, row.values.finished), '%')}</span>
                   </button>
                 ))}
               </div>

@@ -28,11 +28,11 @@ export function PaymentInfo({ trade }: { trade: C2CTrade }) {
     <div className="payment-info">
       <dl className="payment-amount">
         <div>
-          <dt>应付</dt>
+          <dt>{trade.viewer_role === 'seller' ? '应收' : '应付'}</dt>
           <dd className="num">{formatFen(trade.total_fen)}</dd>
         </div>
         <div>
-          <dt>获得</dt>
+          <dt>{trade.viewer_role === 'seller' ? '卖出' : '获得'}</dt>
           <dd className="num">{formatPoints(trade.amount)} 积分</dd>
         </div>
       </dl>
@@ -144,15 +144,19 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
       <ConfirmDialog
         busy={action.isPending}
         confirmLabel="提交申诉"
+        confirmDisabled={!statement.trim() || Array.from(statement.trim()).length > 1000}
         danger
         description="管理员会根据双方陈述仲裁"
         error={error}
         onClose={() => setConfirm(null)}
-        onConfirm={() => statement.trim() && run('dispute', statement.trim())}
+        onConfirm={() => {
+          const text = statement.trim()
+          if (text && Array.from(text).length <= 1000) run('dispute', text)
+        }}
         open={confirm === 'dispute'}
         title="申诉"
       >
-        <TextareaField label="陈述" maxLength={2000} onChange={(event) => setStatement(event.target.value)} required rows={4} value={statement} />
+        <TextareaField label="陈述" hint={`${Array.from(statement.trim()).length} / 1000 字`} error={Array.from(statement.trim()).length > 1000 ? '陈述不能超过 1000 字' : undefined} onChange={(event) => setStatement(event.target.value)} required rows={4} value={statement} />
       </ConfirmDialog>
     </div>
   )

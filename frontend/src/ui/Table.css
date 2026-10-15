@@ -101,3 +101,5 @@
   .toolbar-end { width: 100%; }
   .search-form { width: 100%; }
 }
+
+@media (max-width: 767px) { .table-action .button, .table-action-group .button { min-height: 44px; min-width: 44px; } }

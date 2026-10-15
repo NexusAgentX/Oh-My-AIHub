@@ -422,7 +422,7 @@
   .call-filters > * {
     flex: 1 1 140px;
   }
-  .call-filters > .segmented {
+  .call-filters > .segmented-scroll {
     flex-basis: 100%;
   } /* 四个时间段占满一行，不被挤到半宽 */
   .filter-select .input,
@@ -621,4 +621,20 @@
   .call-route-decisions li {
     flex-direction: column;
   }
+}
+
+.mobile-analysis-toggle { display: none; }
+.analysis-comparison-row .comparison-label { display: none; }
+.analysis-comparison[data-count-metric='true'] :is(.analysis-comparison-head, .analysis-comparison-row) { grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr); }
+.analysis-trend button[aria-pressed='true'] { outline: 2px solid var(--focus); outline-offset: -2px; }
+.analysis-reading { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+@media (max-width: 767px) {
+  .mobile-analysis-toggle { display: block; }
+  .usage-analysis-collapsed { display: none; }
+  .call-explorer-bar > .call-filters > * { flex: 1 1 120px; }
+  .call-explorer-bar > .call-filters > .segmented-scroll { flex-basis: 100%; }
+  .call-explorer-bar > .live-toggle { flex: 0 0 auto; }
+  .analysis-comparison-row .comparison-label { display: block; }
+  .analysis-comparison[data-count-metric='true'] .analysis-comparison-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analysis-comparison-row > strong { grid-column: 1 / -1; }
 }
