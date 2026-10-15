@@ -60,7 +60,9 @@ type Observer struct {
 	stopReason     string
 	maxGap         time.Duration
 	// anthropic reports its fields in two events; track which were seen.
-	anthropic anthropicUsage
+	anthropic      anthropicUsage
+	openai         openAIUsageState
+	iterationsSeen bool
 	// members is the scratch space the members of an event's objects are
 	// listed in (see objectOf).
 	members []jsonMember
@@ -232,53 +234,105 @@ func (o *Observer) absorb(raw []byte) {
 	o.absorbDetails(raw, keys)
 }
 
+// OpenAI-compatible usage is cumulative, but each field can arrive separately.
+// Pointers distinguish omitted/null from explicit zero; aliases never add up.
 type tokenDetails struct {
-	CachedTokens     int64 `json:"cached_tokens"`
-	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	CachedTokens             *int64          `json:"cached_tokens"`
+	CacheWriteTokens         *int64          `json:"cache_write_tokens"`
+	CacheCreationTokens      json.RawMessage `json:"cache_creation_tokens"`
+	CacheCreationInputTokens json.RawMessage `json:"cache_creation_input_tokens"`
+}
+type responsesUsage struct {
+	InputTokens        *int64          `json:"input_tokens"`
+	OutputTokens       *int64          `json:"output_tokens"`
+	InputTokensDetails *tokenDetails   `json:"input_tokens_details"`
+	CacheRead          json.RawMessage `json:"cache_read_input_tokens"`
+	CacheWrite         json.RawMessage `json:"cache_creation_input_tokens"`
+	CacheHit           json.RawMessage `json:"prompt_cache_hit_tokens"`
+}
+type openAIUsageState struct{ input, output, read, write int64 }
+
+func (o *Observer) aliasRaw(raw []byte) *int64 {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	n, ok := count(raw)
+	if !ok {
+		o.note("兼容用量字段无效，使用可靠字段")
+		return nil
+	}
+	return &n
 }
 
+func (o *Observer) alias(values ...*int64) *int64 {
+	var selected *int64
+	for _, v := range values {
+		if v == nil {
+			continue
+		}
+		if *v < 0 {
+			o.note("负用量无效，保留此前可靠字段")
+			continue
+		}
+		if selected == nil {
+			selected = v
+		} else if *selected != *v {
+			o.note("同义用量冲突，使用优先字段")
+		}
+	}
+	return selected
+}
+func (o *Observer) setResponsesUsage(u *responsesUsage) {
+	if u == nil {
+		return
+	}
+	read, write := o.aliasRaw(u.CacheRead), o.aliasRaw(u.CacheWrite)
+	if d := u.InputTokensDetails; d != nil {
+		read = o.alias(d.CachedTokens, read)
+		write = o.alias(d.CacheWriteTokens, o.aliasRaw(d.CacheCreationTokens), o.aliasRaw(d.CacheCreationInputTokens), write)
+	}
+	// DeepSeek is only a fallback when standard details are absent.
+	if u.InputTokensDetails == nil {
+		read = o.alias(read, o.aliasRaw(u.CacheHit))
+	}
+	for _, item := range []struct {
+		value *int64
+		dest  *int64
+	}{
+		{u.InputTokens, &o.openai.input}, {u.OutputTokens, &o.openai.output}, {read, &o.openai.read}, {write, &o.openai.write},
+	} {
+		if v := o.alias(item.value); v != nil {
+			*item.dest = *v
+		}
+	}
+	readCount, writeCount := o.openai.read, o.openai.write
+	if readCount > o.openai.input || writeCount > o.openai.input-readCount {
+		// Inconsistent cache facts cannot define mutually exclusive buckets.
+		o.note("缓存用量超过输入总量，使用通用输入价")
+		readCount, writeCount = 0, 0
+	}
+	o.usage = ledger.Usage{InputTokens: o.openai.input - readCount - writeCount, OutputTokens: o.openai.output, CacheReadTokens: readCount, CacheWriteTokens: writeCount}
+	o.found = true
+}
 func (o *Observer) absorbChat(raw []byte) {
 	if !bytes.Contains(raw, []byte(`"usage"`)) {
 		return
 	}
 	var value struct {
 		Usage *struct {
-			PromptTokens        int64         `json:"prompt_tokens"`
-			CompletionTokens    int64         `json:"completion_tokens"`
-			PromptTokensDetails *tokenDetails `json:"prompt_tokens_details"`
+			PromptTokens        *int64          `json:"prompt_tokens"`
+			CompletionTokens    *int64          `json:"completion_tokens"`
+			PromptTokensDetails *tokenDetails   `json:"prompt_tokens_details"`
+			CacheRead           json.RawMessage `json:"cache_read_input_tokens"`
+			CacheWrite          json.RawMessage `json:"cache_creation_input_tokens"`
+			CacheHit            json.RawMessage `json:"prompt_cache_hit_tokens"`
 		} `json:"usage"`
 	}
 	if json.Unmarshal(raw, &value) != nil || value.Usage == nil {
 		return
 	}
-	cached, written := int64(0), int64(0)
-	if value.Usage.PromptTokensDetails != nil {
-		cached = value.Usage.PromptTokensDetails.CachedTokens
-		written = value.Usage.PromptTokensDetails.CacheWriteTokens
-	}
-	o.usage = ledger.Usage{
-		InputTokens: clamp(value.Usage.PromptTokens - cached - written), OutputTokens: clamp(value.Usage.CompletionTokens), CacheReadTokens: clamp(cached), CacheWriteTokens: clamp(written),
-	}
-	o.found = true
-}
-
-type responsesUsage struct {
-	InputTokens        int64         `json:"input_tokens"`
-	OutputTokens       int64         `json:"output_tokens"`
-	InputTokensDetails *tokenDetails `json:"input_tokens_details"`
-}
-
-func (o *Observer) setResponsesUsage(usage *responsesUsage) {
-	if usage == nil {
-		return
-	}
-	cached, written := int64(0), int64(0)
-	if usage.InputTokensDetails != nil {
-		cached = usage.InputTokensDetails.CachedTokens
-		written = usage.InputTokensDetails.CacheWriteTokens
-	}
-	o.usage = ledger.Usage{InputTokens: clamp(usage.InputTokens - cached - written), OutputTokens: clamp(usage.OutputTokens), CacheReadTokens: clamp(cached), CacheWriteTokens: clamp(written)}
-	o.found = true
+	u := value.Usage
+	o.setResponsesUsage(&responsesUsage{InputTokens: u.PromptTokens, OutputTokens: u.CompletionTokens, InputTokensDetails: u.PromptTokensDetails, CacheRead: u.CacheRead, CacheWrite: u.CacheWrite, CacheHit: u.CacheHit})
 }
 
 func (o *Observer) absorbResponses(raw []byte) {
@@ -312,14 +366,71 @@ func (o *Observer) absorbResponses(raw []byte) {
 }
 
 type anthropicFields struct {
-	InputTokens     *int64 `json:"input_tokens"`
-	OutputTokens    *int64 `json:"output_tokens"`
-	CacheCreation   *int64 `json:"cache_creation_input_tokens"`
-	CacheReadInputs *int64 `json:"cache_read_input_tokens"`
+	InputTokens          *int64            `json:"input_tokens"`
+	OutputTokens         *int64            `json:"output_tokens"`
+	CacheCreation        *int64            `json:"cache_creation_input_tokens"`
+	CacheReadInputs      *int64            `json:"cache_read_input_tokens"`
+	Iterations           []anthropicFields `json:"iterations"`
+	CacheCreationDetails *struct {
+		Five *int64 `json:"ephemeral_5m_input_tokens"`
+		Hour *int64 `json:"ephemeral_1h_input_tokens"`
+	} `json:"cache_creation"`
 }
 
 func (o *Observer) applyAnthropic(fields *anthropicFields) {
 	if fields == nil {
+		return
+	}
+	// Anthropic compaction usage replaces (rather than adds to) top-level usage:
+	// https://platform.claude.com/docs/en/build-with-claude/compaction-threshold#understanding-usage
+	if len(fields.Iterations) > 0 {
+		var totals anthropicUsage
+		five, hour := int64(0), int64(0)
+		ttlValid := true
+		valid := true
+		for _, iteration := range fields.Iterations {
+			for _, pair := range []struct {
+				v    *int64
+				dest *int64
+			}{{iteration.InputTokens, &totals.input}, {iteration.OutputTokens, &totals.output}, {iteration.CacheCreation, &totals.cacheWrite}, {iteration.CacheReadInputs, &totals.cacheRead}} {
+				if pair.v == nil {
+					continue
+				}
+				if *pair.v < 0 || *pair.v > int64(^uint64(0)>>1)-*pair.dest {
+					valid = false
+					break
+				}
+				*pair.dest += *pair.v
+			}
+			if iteration.CacheCreationDetails == nil && iteration.CacheCreation != nil && *iteration.CacheCreation > 0 {
+				o.note("迭代缓存TTL未细分，余量使用通用缓存写价")
+			}
+			if iteration.CacheCreationDetails != nil {
+				d := iteration.CacheCreationDetails
+				if d.Five == nil || d.Hour == nil || *d.Five < 0 || *d.Hour < 0 || iteration.CacheCreation == nil || *d.Five > *iteration.CacheCreation || *d.Hour > *iteration.CacheCreation-*d.Five {
+					ttlValid = false
+				} else {
+					five += *d.Five
+					hour += *d.Hour
+				}
+			}
+		}
+		if valid {
+			o.anthropic = totals
+			o.iterationsSeen = true
+			o.usage = ledger.Usage{InputTokens: totals.input, OutputTokens: totals.output, CacheWriteTokens: totals.cacheWrite, CacheReadTokens: totals.cacheRead}
+			o.found = true
+			o.setBucket("cache_write_", nil, totals.cacheWrite)
+			if ttlValid && (five > 0 || hour > 0) {
+				o.setBucket("cache_write_", map[string]int64{"cache_write_5m": five, "cache_write_1h": hour}, totals.cacheWrite)
+			} else if !ttlValid {
+				o.note("迭代缓存TTL无效，使用通用缓存写价")
+			}
+			return
+		}
+		o.note("迭代用量无效，使用顶层可靠用量")
+	}
+	if o.iterationsSeen {
 		return
 	}
 	if fields.InputTokens != nil {
@@ -364,22 +475,68 @@ func (o *Observer) absorbGemini(raw []byte) {
 	if !bytes.Contains(raw, []byte(`"usageMetadata"`)) {
 		return
 	}
-	var value struct {
-		UsageMetadata *struct {
-			PromptTokenCount        int64 `json:"promptTokenCount"`
-			CandidatesTokenCount    int64 `json:"candidatesTokenCount"`
-			ThoughtsTokenCount      int64 `json:"thoughtsTokenCount"`
-			CachedContentTokenCount int64 `json:"cachedContentTokenCount"`
-		} `json:"usageMetadata"`
-	}
-	if json.Unmarshal(raw, &value) != nil || value.UsageMetadata == nil {
+	// Read numeric facts in place: Gemini can repeat usage on every token.
+	// Keeping this in Observer scratch avoids a larger decoded struct per frame.
+	if !json.Valid(raw) {
 		return
 	}
-	usage := value.UsageMetadata
-	o.usage = ledger.Usage{
-		InputTokens:     clamp(usage.PromptTokenCount - usage.CachedContentTokenCount),
-		OutputTokens:    clamp(usage.CandidatesTokenCount + usage.ThoughtsTokenCount),
-		CacheReadTokens: clamp(usage.CachedContentTokenCount),
+	o.members = o.members[:0]
+	root := o.objectOf(raw)
+	fields := o.objectOf(root.get("usageMetadata"))
+	if fields == nil {
+		return
 	}
+	var usage struct{ PromptTokenCount, CandidatesTokenCount, ThoughtsTokenCount, TotalTokenCount, ToolUsePromptTokenCount, CachedContentTokenCount int64 }
+	for _, field := range []struct {
+		name string
+		dest *int64
+	}{
+		{"promptTokenCount", &usage.PromptTokenCount}, {"candidatesTokenCount", &usage.CandidatesTokenCount}, {"thoughtsTokenCount", &usage.ThoughtsTokenCount}, {"totalTokenCount", &usage.TotalTokenCount}, {"toolUsePromptTokenCount", &usage.ToolUsePromptTokenCount}, {"cachedContentTokenCount", &usage.CachedContentTokenCount},
+	} {
+		v := fields.get(field.name)
+		if len(v) == 0 || string(v) == "null" {
+			continue
+		}
+		n, ok := count(v)
+		if !ok {
+			return
+		}
+		*field.dest = n
+	}
+	output, ok := sumTokens(usage.CandidatesTokenCount, usage.ThoughtsTokenCount)
+	if !ok {
+		output = clamp(usage.CandidatesTokenCount)
+		o.note("思考或输出用量无效，使用可靠候选输出")
+	}
+	// Native total = prompt + tool prompt + candidates + thoughts:
+	// https://ai.google.dev/api/generate-content#UsageMetadata
+	// Only a complete, overflow-safe total equation proves inclusive thoughts.
+	if usage.ThoughtsTokenCount > 0 && usage.TotalTokenCount > 0 {
+		base, valid := sumTokens(usage.PromptTokenCount, usage.CandidatesTokenCount, usage.ToolUsePromptTokenCount)
+		exclusive, complete := sumTokens(base, usage.ThoughtsTokenCount)
+		if valid && usage.TotalTokenCount == base {
+			output = clamp(usage.CandidatesTokenCount)
+		} else if !valid || !complete || usage.TotalTokenCount != exclusive {
+			o.note("思考总量关系不明确，沿用独立思考字段")
+		}
+	}
+	prompt, cached := clamp(usage.PromptTokenCount), usage.CachedContentTokenCount
+	if cached < 0 || cached > prompt {
+		cached = 0
+		o.note("缓存用量超过输入总量或为负，使用通用输入价")
+	}
+	o.usage = ledger.Usage{InputTokens: prompt - cached, OutputTokens: output, CacheReadTokens: cached}
 	o.found = true
+}
+
+// sumTokens rejects malformed counts and overflow before arithmetic.
+func sumTokens(values ...int64) (int64, bool) {
+	var total int64
+	for _, n := range values {
+		if n < 0 || n > int64(^uint64(0)>>1)-total {
+			return 0, false
+		}
+		total += n
+	}
+	return total, true
 }

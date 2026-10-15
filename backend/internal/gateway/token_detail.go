@@ -113,6 +113,9 @@ func (o *Observer) note(note string) {
 	o.detail.Notes = append(o.detail.Notes, note)
 }
 func (o *Observer) setBucket(prefix string, values map[string]int64, total int64) {
+	if o.detail.Tokens == nil {
+		o.detail.Tokens = map[string]int64{}
+	}
 	for key := range o.detail.Tokens {
 		if strings.HasPrefix(key, prefix) {
 			delete(o.detail.Tokens, key)
@@ -142,15 +145,24 @@ func modalityCounts(raw json.RawMessage) (map[string]int64, bool) {
 		return nil, false
 	}
 	result := map[string]int64{}
+	seen := map[string]bool{}
 	for _, item := range items {
-		key := strings.ToLower(item.Modality)
-		if _, ok := result[key]; ok || item.TokenCount == nil || *item.TokenCount < 0 {
+		original := strings.ToLower(item.Modality)
+		key := original
+		if key == "document" {
+			key = "text"
+		}
+		if seen[original] || item.TokenCount == nil || *item.TokenCount < 0 {
 			return nil, false
 		}
 		if ledger.TokenBucket("input_"+key) < 0 {
 			return nil, false
 		}
-		result[key] = *item.TokenCount
+		if *item.TokenCount > int64(^uint64(0)>>1)-result[key] {
+			return nil, false
+		}
+		seen[original] = true
+		result[key] += *item.TokenCount
 	}
 	return result, true
 }
@@ -218,6 +230,9 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		if o.anthropicSpeed == "fast" {
 			o.detail.ServiceTier = "anthropic:fast"
 		}
+		if raw := usage.get("iterations"); len(raw) > 0 && string(raw) != "[]" && string(raw) != "null" {
+			break
+		}
 		if usage.has("cache_creation_input_tokens") {
 			old := map[string]int64{}
 			for key, n := range o.detail.Tokens {
@@ -250,13 +265,50 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		if len(usage) == 0 {
 			return
 		}
-		o.setBucket("input_", nil, o.usage.InputTokens)
-		o.setBucket("output_", nil, o.usage.OutputTokens)
 		inField, outField := "prompt_tokens_details", "completion_tokens_details"
 		if o.format == channel.FormatOpenAIResponses {
 			inField, outField = "input_tokens_details", "output_tokens_details"
 		}
 		inputs, outputs := o.objectOf(usage.get(inField)), o.objectOf(usage.get(outField))
+		// Missing/null fields retain prior detail; a new detail object replaces it.
+		// Total-only updates revalidate the retained counts against the new bucket.
+		for _, bucket := range []struct {
+			prefix  string
+			total   int64
+			replace bool
+		}{
+			{"input_", o.usage.InputTokens, inputs != nil}, {"cache_read_", o.usage.CacheReadTokens, inputs != nil},
+			{"output_", o.usage.OutputTokens, outputs != nil}, {"cache_write_", o.usage.CacheWriteTokens, false},
+		} {
+			old := map[string]int64{}
+			if !bucket.replace {
+				for key, n := range o.detail.Tokens {
+					if strings.HasPrefix(key, bucket.prefix) {
+						old[key] = n
+					}
+				}
+			}
+			o.setBucket(bucket.prefix, old, bucket.total)
+		}
+
+		if ttl := inputs.get("cache_creation_token_details"); ttl != nil {
+			d := o.objectOf(ttl)
+			values := map[string]int64{}
+			valid := true
+			for key, field := range map[string]string{"cache_write_5m": "ephemeral_5m_input_tokens", "cache_write_1h": "ephemeral_1h_input_tokens"} {
+				if n, ok := count(d.get(field)); ok {
+					values[key] = n
+				} else {
+					valid = false
+				}
+			}
+			o.setBucket("cache_write_", nil, o.usage.CacheWriteTokens)
+			if valid {
+				o.setBucket("cache_write_", values, o.usage.CacheWriteTokens)
+			} else {
+				o.note("缓存TTL未细分，使用通用缓存写价")
+			}
+		}
 		inValues, outValues := map[string]int64{}, map[string]int64{}
 		for _, mod := range []string{"text", "image", "audio", "video"} {
 			if n, ok := count(inputs.get(mod + "_tokens")); ok {
@@ -270,8 +322,33 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 			if o.usage.CacheReadTokens == 0 && o.usage.CacheWriteTokens == 0 {
 				o.setBucket("input_", inValues, o.usage.InputTokens)
 			} else {
-				o.setBucket("input_", nil, o.usage.InputTokens)
-				o.note("输入模态与缓存交集未知，使用通用输入及缓存价")
+				cached := o.objectOf(inputs.get("cached_tokens_details"))
+				fresh, cache := map[string]int64{}, map[string]int64{}
+				remaining := o.usage.CacheReadTokens
+				valid := len(cached) > 0 && o.usage.CacheWriteTokens == 0
+				for _, mod := range []string{"text", "image", "audio", "video"} {
+					n, ok := count(cached.get(mod + "_tokens"))
+					if !ok {
+						continue
+					}
+					if n < 0 || n > remaining || n > inValues["input_"+mod] {
+						valid = false
+						break
+					}
+					remaining -= n
+					cache["cache_read_"+mod] = n
+				}
+				for key, n := range inValues {
+					fresh[key] = n - cache["cache_read_"+strings.TrimPrefix(key, "input_")]
+				}
+				if valid && remaining == 0 {
+					o.setBucket("input_", fresh, o.usage.InputTokens)
+					o.setBucket("cache_read_", cache, o.usage.CacheReadTokens)
+				} else {
+					o.setBucket("input_", nil, o.usage.InputTokens)
+					o.setBucket("cache_read_", nil, o.usage.CacheReadTokens)
+					o.note("输入模态与缓存交集未知，使用通用输入及缓存价")
+				}
 			}
 		}
 		if len(outValues) > 0 {
