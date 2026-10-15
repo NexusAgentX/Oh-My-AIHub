@@ -60,9 +60,11 @@ type Observer struct {
 	stopReason     string
 	maxGap         time.Duration
 	// anthropic reports its fields in two events; track which were seen.
-	anthropic      anthropicUsage
-	openai         openAIUsageState
-	iterationsSeen bool
+	anthropic       anthropicUsage
+	openai          openAIUsageState
+	iterationsSeen  bool
+	iterationOffset anthropicUsage
+	iterationMask   uint8
 	// members is the scratch space the members of an event's objects are
 	// listed in (see objectOf).
 	members []jsonMember
@@ -418,6 +420,20 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 		if valid {
 			o.anthropic = totals
 			o.iterationsSeen = true
+			o.iterationMask = 0
+			for index, pair := range []struct {
+				top    *int64
+				total  int64
+				offset *int64
+			}{
+				{fields.InputTokens, totals.input, &o.iterationOffset.input}, {fields.OutputTokens, totals.output, &o.iterationOffset.output}, {fields.CacheCreation, totals.cacheWrite, &o.iterationOffset.cacheWrite}, {fields.CacheReadInputs, totals.cacheRead, &o.iterationOffset.cacheRead},
+			} {
+				if pair.top != nil && *pair.top >= 0 && *pair.top <= pair.total {
+					*pair.offset = pair.total - *pair.top
+					o.iterationMask |= 1 << index
+				}
+			}
+
 			o.usage = ledger.Usage{InputTokens: totals.input, OutputTokens: totals.output, CacheWriteTokens: totals.cacheWrite, CacheReadTokens: totals.cacheRead}
 			o.found = true
 			o.setBucket("cache_write_", nil, totals.cacheWrite)
@@ -431,6 +447,29 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 		o.note("迭代用量无效，使用顶层可靠用量")
 	}
 	if o.iterationsSeen {
+		// An earlier cumulative iterations list can precede later top-level deltas.
+		// Keep its extra iterations, replacing only the known top-level component.
+		for index, pair := range []struct {
+			top    *int64
+			offset int64
+			total  *int64
+		}{
+			{fields.InputTokens, o.iterationOffset.input, &o.anthropic.input}, {fields.OutputTokens, o.iterationOffset.output, &o.anthropic.output}, {fields.CacheCreation, o.iterationOffset.cacheWrite, &o.anthropic.cacheWrite}, {fields.CacheReadInputs, o.iterationOffset.cacheRead, &o.anthropic.cacheRead},
+		} {
+			if pair.top == nil {
+				continue
+			}
+			if o.iterationMask&(1<<index) == 0 {
+				o.note("迭代后部分用量缺少顶层基准，保留迭代事实")
+				continue
+			}
+			if total, ok := sumTokens(pair.offset, *pair.top); ok {
+				*pair.total = total
+			} else {
+				o.note("迭代后用量无效，保留迭代事实")
+			}
+		}
+		o.usage = ledger.Usage{InputTokens: o.anthropic.input, OutputTokens: o.anthropic.output, CacheWriteTokens: o.anthropic.cacheWrite, CacheReadTokens: o.anthropic.cacheRead}
 		return
 	}
 	if fields.InputTokens != nil {

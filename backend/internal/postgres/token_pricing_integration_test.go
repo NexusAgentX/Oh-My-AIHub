@@ -71,3 +71,61 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 		t.Fatal("historical snapshot changed")
 	}
 }
+
+// The new alias/partial-frame shapes must reach the same atomic persistence,
+// budget accounting and immutable snapshot path as native usage.
+func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	consumer := e.member("compat-consumer", "100")
+	sharer := e.member("compat-sharer", "0")
+	input, output, write, read := mustAmount(t, "10"), mustAmount(t, "20"), mustAmount(t, "30"), mustAmount(t, "40")
+	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output, CacheWritePrice: &write, CacheReadPrice: &read}); err != nil {
+		t.Fatal(err)
+	}
+	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: " + `{"usage":{"prompt_tokens":1000,"prompt_tokens_details":{"cached_tokens":300,"cache_creation_tokens":100,"cache_creation_token_details":{"ephemeral_5m_input_tokens":40,"ephemeral_1h_input_tokens":60}}}}` + "\n\ndata: " + `{"usage":{"completion_tokens":500}}` + "\n\ndata: [DONE]\n\n"))
+	})
+	e.createChannel(sharer, channelSpec{name: "compat-relay", upstream: relay, multiplier: "1"})
+	keyID, secret := e.defaultKey(consumer)
+	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.031"})
+	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true,"stream_options":{"include_usage":true}}`), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("call %d %s", rec.Code, rec.Body.String())
+	}
+	id := rec.Header().Get("X-AIHub-Request-Id")
+	row := e.callRow(id)
+	// .006 fresh input + .010 output + .003 write + .012 read.
+	if row.CostNano != 31_000_000 {
+		t.Fatalf("normalized cost %+v", row)
+	}
+	if got := e.balance(consumer); got != "-0.031031" {
+		t.Fatalf("balance %s", got)
+	}
+	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	if second.Code != http.StatusPaymentRequired {
+		t.Fatalf("budget was not exhausted: %d", second.Code)
+	}
+	var before []byte
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	var snap struct {
+		Detail ledger.UsageDetail `json:"detail"`
+	}
+	if err := json.Unmarshal(before, &snap); err != nil || snap.Detail.Tokens["cache_write_5m"] != 40 || snap.Detail.Tokens["cache_write_1h"] != 60 {
+		t.Fatalf("snapshot %s err=%v", before, err)
+	}
+	input = mustAmount(t, "100")
+	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input}); err != nil {
+		t.Fatal(err)
+	}
+	var after []byte
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("historical snapshot recalculated")
+	}
+}
