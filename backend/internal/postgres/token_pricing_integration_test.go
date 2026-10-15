@@ -97,7 +97,7 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 	id := rec.Header().Get("X-AIHub-Request-Id")
 	row := e.callRow(id)
 	// .006 fresh input + .010 output + .003 write + .012 read.
-	if row.CostNano != 31_000_000 {
+	if row.CostNano != 31_000_000 || row.Input != 600 || row.Output != 500 || !row.HasLedgerTx {
 		t.Fatalf("normalized cost %+v", row)
 	}
 	if got := e.balance(consumer); got != "-0.031031" {

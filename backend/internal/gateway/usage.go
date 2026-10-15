@@ -391,6 +391,9 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 		ttlValid := true
 		valid := true
 		for _, iteration := range fields.Iterations {
+			if iteration.InputTokens == nil && iteration.OutputTokens == nil && iteration.CacheCreation == nil && iteration.CacheReadInputs == nil {
+				valid = false
+			}
 			for _, pair := range []struct {
 				v    *int64
 				dest *int64
