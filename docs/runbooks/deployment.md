@@ -17,7 +17,7 @@
 2. 准备 `.env` 或密钥管理方式，至少包含：`POSTGRES_PASSWORD`、`TRUSTED_PROXY_CIDR`、`BACKEND_TRUSTED_PROXY_CIDRS`、两组密钥环与激活 key id。
    - `TRUSTED_PROXY_CIDR` 必须填写前端容器实际观察到的 TLS 代理源地址，而不是想当然地使用 `127.0.0.1/32`；Docker NAT 后该地址因运行环境而异。可以先在受限环境以 `mise run up-dev` 启动，让同机代理发起一次请求，再从 `docker compose logs frontend` 的访问日志首列取得源 IP，并以最窄的 CIDR（通常为单地址 `/32` 或 `/128`）配置安全入口。
    - `BACKEND_TRUSTED_PROXY_CIDRS` 应填写当前 Compose 项目网络的实际子网。可先运行 `docker compose create` 只创建容器与网络，再通过 `docker inspect` 取得前端容器所连接的 Network ID，并用 `docker network inspect` 读取其 IPAM 子网；不要硬编码假定的 `172.16.0.0/12`。
-3. `mise install && mise run install`。
+3. `mise install && mise run install`。按[观测手册](observability.md#请求链路地图)配置网关部署位置和在线定位开关；默认启用在线查询。
 4. `mise run up` 启动安全栈：一次性 migration 容器先执行迁移，后端启动时校验两组密钥环格式与出站配置，并逐条解密数据库里全部存量密文；密钥环缺少仍被引用的 key id 或存在损坏的密文时后端拒绝启动，日志（`docker compose logs backend`）列出记录类型与 ID。新库没有密文，直接通过。
 5. 启动后立即用浏览器访问部署地址的 `/initialize`，在网页上创建唯一管理员（ADR-0037）。密码由你自设，创建成功即登录，无需首次改密。若页面显示实例已初始化而管理员不是你创建的，视为部署失败：停止服务，按故障处理 Runbook 排查。
 6. 按需创建受邀账户。

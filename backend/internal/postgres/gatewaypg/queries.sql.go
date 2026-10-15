@@ -130,6 +130,27 @@ func (q *Queries) CustomModelOnline(ctx context.Context, modelID string) (bool, 
 	return exists, err
 }
 
+const enrichCallLocations = `-- name: EnrichCallLocations :exec
+UPDATE calls SET diagnostics = jsonb_set(
+ jsonb_set(diagnostics, '{network,client,location}',
+  COALESCE($2::jsonb -> (diagnostics #>> '{network,client,ip}'), diagnostics #> '{network,client,location}', 'null'::jsonb)),
+ '{network,attempts}',
+ COALESCE((SELECT jsonb_agg(jsonb_set(item, '{node,location}',
+  COALESCE($2::jsonb -> (item #>> '{node,ip}'), item #> '{node,location}', 'null'::jsonb)) ORDER BY ord)
+ FROM jsonb_array_elements(diagnostics #> '{network,attempts}') WITH ORDINALITY AS a(item, ord)), '[]'::jsonb))
+WHERE id = $1 AND diagnostics #> '{network,client}' IS NOT NULL
+`
+
+type EnrichCallLocationsParams struct {
+	ID        string
+	Locations []byte
+}
+
+func (q *Queries) EnrichCallLocations(ctx context.Context, arg EnrichCallLocationsParams) error {
+	_, err := q.db.Exec(ctx, enrichCallLocations, arg.ID, arg.Locations)
+	return err
+}
+
 const finishCall = `-- name: FinishCall :execrows
 UPDATE calls SET
     outcome = $1, model_id = $2, final_channel_id = $3,
@@ -789,6 +810,37 @@ func (q *Queries) ListRecentCalls(ctx context.Context, arg ListRecentCallsParams
 	return items, nil
 }
 
+const loadGeoCache = `-- name: LoadGeoCache :many
+SELECT ip, location, expires_at FROM geoip_cache
+WHERE expires_at > now() ORDER BY updated_at DESC LIMIT 4096
+`
+
+type LoadGeoCacheRow struct {
+	Ip        string
+	Location  []byte
+	ExpiresAt time.Time
+}
+
+func (q *Queries) LoadGeoCache(ctx context.Context) ([]LoadGeoCacheRow, error) {
+	rows, err := q.db.Query(ctx, loadGeoCache)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LoadGeoCacheRow
+	for rows.Next() {
+		var i LoadGeoCacheRow
+		if err := rows.Scan(&i.Ip, &i.Location, &i.ExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lookupKey = `-- name: LookupKey :one
 SELECT k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
        k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
@@ -833,6 +885,25 @@ func (q *Queries) LookupKey(ctx context.Context, keyHash []byte) (LookupKeyRow, 
 	return i, err
 }
 
+const reserveGeoLookup = `-- name: ReserveGeoLookup :one
+INSERT INTO geoip_daily_usage (day, queries) VALUES ($1, 1)
+ON CONFLICT (day) DO UPDATE SET queries = geoip_daily_usage.queries + 1
+WHERE geoip_daily_usage.queries < $2::integer
+RETURNING queries
+`
+
+type ReserveGeoLookupParams struct {
+	Day        time.Time
+	DailyLimit int32
+}
+
+func (q *Queries) ReserveGeoLookup(ctx context.Context, arg ReserveGeoLookupParams) (int32, error) {
+	row := q.db.QueryRow(ctx, reserveGeoLookup, arg.Day, arg.DailyLimit)
+	var queries int32
+	err := row.Scan(&queries)
+	return queries, err
+}
+
 const responseChannel = `-- name: ResponseChannel :one
 SELECT final_channel_id FROM calls
 WHERE upstream_response_id = $1 AND account_id = $2 AND final_channel_id IS NOT NULL
@@ -849,6 +920,22 @@ func (q *Queries) ResponseChannel(ctx context.Context, arg ResponseChannelParams
 	var final_channel_id *string
 	err := row.Scan(&final_channel_id)
 	return final_channel_id, err
+}
+
+const saveGeoCache = `-- name: SaveGeoCache :exec
+INSERT INTO geoip_cache (ip, location, expires_at) VALUES ($1, $2, $3)
+ON CONFLICT (ip) DO UPDATE SET location = EXCLUDED.location, expires_at = EXCLUDED.expires_at, updated_at = now()
+`
+
+type SaveGeoCacheParams struct {
+	Ip        string
+	Location  []byte
+	ExpiresAt time.Time
+}
+
+func (q *Queries) SaveGeoCache(ctx context.Context, arg SaveGeoCacheParams) error {
+	_, err := q.db.Exec(ctx, saveGeoCache, arg.Ip, arg.Location, arg.ExpiresAt)
+	return err
 }
 
 const setCallLedgerTx = `-- name: SetCallLedgerTx :exec
@@ -908,5 +995,25 @@ type TouchKeyParams struct {
 
 func (q *Queries) TouchKey(ctx context.Context, arg TouchKeyParams) error {
 	_, err := q.db.Exec(ctx, touchKey, arg.ID, arg.LastUsedAt)
+	return err
+}
+
+const trimGeoCache = `-- name: TrimGeoCache :exec
+DELETE FROM geoip_cache WHERE ip IN (
+ SELECT ip FROM geoip_cache ORDER BY updated_at DESC, ip OFFSET 4096
+)
+`
+
+func (q *Queries) TrimGeoCache(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, trimGeoCache)
+	return err
+}
+
+const trimGeoUsage = `-- name: TrimGeoUsage :exec
+DELETE FROM geoip_daily_usage WHERE day < now() - interval '7 days'
+`
+
+func (q *Queries) TrimGeoUsage(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, trimGeoUsage)
 	return err
 }

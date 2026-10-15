@@ -9,6 +9,7 @@ import (
 // Diagnostics contains only bounded metadata; never payloads, URLs or credentials.
 // Nil on old records means unmeasured, not zero.
 type Diagnostics struct {
+	Network        *Network        `json:"network"`
 	Stages         []StageTiming   `json:"stages"`
 	Routing        []RouteDecision `json:"routing"`
 	StopReason     string          `json:"stop_reason"`
@@ -22,8 +23,9 @@ type Diagnostics struct {
 	DrainTimeoutMS int             `json:"drain_timeout_ms"`
 }
 type StageTiming struct {
-	Stage      string  `json:"stage"`
-	DurationMS float64 `json:"duration_ms"`
+	OffsetMS   *float64 `json:"offset_ms"`
+	Stage      string   `json:"stage"`
+	DurationMS float64  `json:"duration_ms"`
 }
 type RouteDecision struct {
 	Channel AttemptChannel `json:"channel"`
@@ -86,20 +88,26 @@ func (c *callState) stage(name string, since time.Time, now time.Time) {
 	}
 	for i := range c.diagnostics.Stages {
 		if c.diagnostics.Stages[i].Stage == name {
+			c.diagnostics.Stages[i].OffsetMS = nil // repeated disjoint work is an aggregate, not one span
 			c.diagnostics.Stages[i].DurationMS += float64(now.Sub(since)) / float64(time.Millisecond)
 			return
 		}
 	}
-	c.diagnostics.Stages = append(c.diagnostics.Stages, StageTiming{Stage: name, DurationMS: float64(now.Sub(since)) / float64(time.Millisecond)})
+	offset := max(0, float64(since.Sub(c.started))/float64(time.Millisecond))
+	c.diagnostics.Stages = append(c.diagnostics.Stages, StageTiming{Stage: name, OffsetMS: &offset, DurationMS: float64(now.Sub(since)) / float64(time.Millisecond)})
 }
 func (e *Engine) finishCall(ctx context.Context, call *callState, finish CallFinish) (FinishResult, error) {
 	if call.phase != "" {
 		call.stage(call.phase, call.phaseAt, e.Now())
 	}
+	e.resolveNetwork(call.diagnostics.Network)
 	finish.Diagnostics = &call.diagnostics
 	call.finish = finish
 	at := e.Now()
 	result, err := e.Store.FinishCall(ctx, finish)
+	if err == nil && result.Finished {
+		e.scheduleNetwork(finish.ID, call.diagnostics.Network)
+	}
 	call.stage("settlement", at, e.Now())
 	call.booked = err == nil && result.TxID != ""
 	return result, err

@@ -4948,9 +4948,49 @@ components:
         total_ms: {type: integer}
       required: [first_byte_ms, idle_ms, total_ms]
       additionalProperties: false
+    NetworkLocation:
+      type: object
+      properties:
+        label: {type: string}
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+      required: [label, latitude, longitude]
+      additionalProperties: false
+    NetworkNode:
+      type: object
+      properties:
+        ip: {type: string}
+        location: {anyOf: [{$ref: '#/components/schemas/NetworkLocation'}, {type: 'null'}]}
+      required: [ip, location]
+      additionalProperties: false
+    NetworkPhase:
+      type: object
+      properties:
+        stage: {type: string, enum: [prepare, connection, tls, send, headers]}
+        offset_ms: {type: number, minimum: 0}
+        duration_ms: {type: number, minimum: 0}
+      required: [stage, offset_ms, duration_ms]
+      additionalProperties: false
+    NetworkAttempt:
+      type: object
+      properties:
+        node: {$ref: '#/components/schemas/NetworkNode'}
+        phases: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/NetworkPhase'}}
+      required: [node, phases]
+      additionalProperties: false
+    CallNetwork:
+      type: object
+      properties:
+        client: {$ref: '#/components/schemas/NetworkNode'}
+        gateway: {$ref: '#/components/schemas/NetworkNode'}
+        attempts: {type: array, items: {$ref: '#/components/schemas/NetworkAttempt'}}
+        location_source: {type: string}
+      required: [client, gateway, attempts, location_source]
+      additionalProperties: false
     StageTiming:
       type: object
       properties:
+        offset_ms: {type: [number, 'null'], description: 相对调用起点；null 表示聚合或未采集。}
         stage: {type: string}
         duration_ms: {type: number}
       required: [stage, duration_ms]
@@ -4966,6 +5006,7 @@ components:
     CallDiagnostics:
       type: object
       properties:
+        network: {anyOf: [{$ref: '#/components/schemas/CallNetwork'}, {type: 'null'}]}
         stages: {type: array, items: {$ref: '#/components/schemas/StageTiming'}}
         routing: {type: array, items: {$ref: '#/components/schemas/RouteDecision'}}
         stop_reason: {type: string}
