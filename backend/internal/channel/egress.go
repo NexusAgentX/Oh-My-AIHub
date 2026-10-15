@@ -213,7 +213,7 @@ func (e *egressPool) client(ctx context.Context, p *OutboundPolicy, host, port s
 	if leader {
 		// The resolution outlives the caller that started it: the others
 		// waiting for the same name must not fail because that one left.
-		go e.resolve(p.resolver, host, flight, context.WithoutCancel(ctx))
+		go e.resolve(p, host, flight, context.WithoutCancel(ctx))
 	}
 	select {
 	case <-flight.done:
@@ -237,10 +237,10 @@ func (e *egressPool) client(ctx context.Context, p *OutboundPolicy, host, port s
 
 // resolve resolves host, validates the answer and publishes the outcome to the
 // cache and to everyone waiting on the flight.
-func (e *egressPool) resolve(resolver Resolver, host string, flight *dnsFlight, ctx context.Context) {
+func (e *egressPool) resolve(policy *OutboundPolicy, host string, flight *dnsFlight, ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, dnsLookupTimeout)
 	defer cancel()
-	addresses, err := validatedLookup(ctx, resolver, host)
+	addresses, err := policy.lookup(ctx, host)
 	now := e.now()
 	var closing []*http.Transport
 	e.mu.Lock()

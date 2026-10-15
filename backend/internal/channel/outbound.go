@@ -33,10 +33,11 @@ func (r netResolver) LookupNetIP(ctx context.Context, network, host string) ([]n
 }
 
 type OutboundPolicy struct {
-	resolver     Resolver
-	dialContext  func(context.Context, string, string) (net.Conn, error)
-	allowedPorts map[string]struct{}
-	blockedHosts []string
+	allowLocalhost bool
+	resolver       Resolver
+	dialContext    func(context.Context, string, string) (net.Conn, error)
+	allowedPorts   map[string]struct{}
+	blockedHosts   []string
 	// blockedKey identifies blockedHosts; the egress pool serves a policy only
 	// while it is the pool's current key (see egressPool.setBlocked).
 	blockedKey string
@@ -86,6 +87,35 @@ func NewOutboundPolicyWithResolver(allowedPorts, additionalBlockedHosts []string
 	}, nil
 }
 
+// WithLocalhostForDevelopment returns an isolated policy that permits HTTP and
+// HTTPS to localhost, pinned to 127.0.0.1 without DNS. It leaves the original
+// policy and its connection pool unchanged. Ports and host bans still apply.
+func (p *OutboundPolicy) WithLocalhostForDevelopment() *OutboundPolicy {
+	copied := *p
+	copied.allowLocalhost = true
+	copied.egress = newEgressPool(copied.blockedKey)
+	return &copied
+}
+
+// lookup keeps the localhost exception identical for fresh and pooled clients.
+// Other names always pass the complete production DNS/address validation.
+func (p *OutboundPolicy) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
+	if p.allowLocalhost && host == "localhost" {
+		return []netip.Addr{netip.MustParseAddr("127.0.0.1")}, nil
+	}
+	return validatedLookup(ctx, p.resolver, host)
+}
+
+func upstreamPort(parsed *url.URL) string {
+	if port := parsed.Port(); port != "" {
+		return port
+	}
+	if parsed.Scheme == "http" {
+		return "80"
+	}
+	return "443"
+}
+
 func (p *OutboundPolicy) ValidateBaseURL(ctx context.Context, raw string) (string, error) {
 	normalized, err := p.NormalizeBaseURL(raw)
 	if err != nil {
@@ -102,17 +132,18 @@ func (p *OutboundPolicy) ValidateBaseURL(ctx context.Context, raw string) (strin
 func (p *OutboundPolicy) NormalizeBaseURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.Contains(raw, "\\") {
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.Contains(raw, "\\") {
 		return "", ErrInvalidInput
 	}
 	hostname, err := normalizeHostname(parsed.Hostname())
 	if err != nil || net.ParseIP(hostname) != nil || p.hostBlocked(hostname) {
 		return "", ErrInvalidInput
 	}
-	port := parsed.Port()
-	if port == "" {
-		port = "443"
+	localHTTP := p.allowLocalhost && hostname == "localhost" && parsed.Scheme == "http"
+	if parsed.Scheme != "https" && !localHTTP {
+		return "", ErrInvalidInput
 	}
+	port := upstreamPort(parsed)
 	if _, allowed := p.allowedPorts[port]; !allowed {
 		return "", ErrInvalidInput
 	}
@@ -120,13 +151,12 @@ func (p *OutboundPolicy) NormalizeBaseURL(raw string) (string, error) {
 	if err != nil {
 		return "", ErrInvalidInput
 	}
-	parsed.Scheme = "https"
 	parsed.User = nil
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	parsed.RawPath = ""
 	parsed.Path = prefix
-	if port == "443" {
+	if (parsed.Scheme == "https" && port == "443") || (parsed.Scheme == "http" && port == "80") {
 		parsed.Host = hostname
 	} else {
 		parsed.Host = net.JoinHostPort(hostname, port)
@@ -200,7 +230,7 @@ func (p *OutboundPolicy) ValidateResolution(ctx context.Context, normalizedBaseU
 	if err != nil || parsed.Hostname() == "" {
 		return nil, ErrUnsafeUpstream
 	}
-	return validatedLookup(ctx, p.resolver, parsed.Hostname())
+	return p.lookup(ctx, parsed.Hostname())
 }
 
 // errProtectedAddress is why validateAddresses refuses an answer.
@@ -397,10 +427,7 @@ func (p *OutboundPolicy) ClientForGateway(ctx context.Context, normalizedBaseURL
 	if err != nil || parsed.Hostname() == "" {
 		return nil, ErrUnsafeUpstream
 	}
-	port := parsed.Port()
-	if port == "" {
-		port = "443"
-	}
+	port := upstreamPort(parsed)
 	client, err := p.egress.client(ctx, p, parsed.Hostname(), port)
 	if err != nil {
 		return nil, err
@@ -460,10 +487,7 @@ func (p *OutboundPolicy) clientFor(ctx context.Context, normalizedBaseURL string
 	if err != nil {
 		return nil, err
 	}
-	port := parsed.Port()
-	if port == "" {
-		port = "443"
-	}
+	port := upstreamPort(parsed)
 	host := parsed.Hostname()
 	transport := &http.Transport{
 		Proxy:                  nil,

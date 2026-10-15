@@ -51,6 +51,8 @@ mise run dev-frontend  # 终端 B：前端 :5173
 
 一条命令的替代（仍需先导出上面四个密钥环变量）：`mise run up-dev` 用 Docker Compose 整栈启动，入口 <http://localhost:3000>（仅绑定回环地址）。
 
+本地模拟上游可显式设置 `UPSTREAM_ALLOW_LOCALHOST=true`，并通过 `UPSTREAM_ALLOWED_PORTS` 放行模拟服务端口，例如 `UPSTREAM_ALLOWED_PORTS=18081` 后使用 `http://localhost:18081`。开关默认关闭，仅支持主机名 `localhost`（固定连接 `127.0.0.1`），不支持 IP 字面量或其他内网主机；HTTPS 仍校验证书。容器内的 localhost 指向容器自身，模拟上游运行在宿主机时使用上面的本地后端启动方式。完整边界见 [系统结构](ARCHITECTURE.md#安全边界)。
+
 两组密钥环各加密一类数据（渠道上游 Key / 平台 API Key 与 C2C 收款方式），必须互不相同、与数据库备份配套保存、保留全部历史 key id；服务启动时会逐条解密全部存量密文，缺 key id 或密文损坏即拒绝启动。细节见[部署手册](docs/runbooks/deployment.md)。
 
 ## 常用命令
