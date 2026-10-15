@@ -9,7 +9,7 @@ import (
 
 func (s *Store) Analyze(ctx context.Context, f observe.CallFilter, group, split string, bucket int) (observe.AnalysisReport, error) {
 	report := observe.AnalysisReport{From: *f.From, To: *f.To, PreviousFrom: f.From.Add(-f.To.Sub(*f.From)), PreviousTo: *f.From, GroupBy: group, SplitBy: split, BucketSeconds: bucket, Groups: []observe.AnalysisRow{}, Trend: []observe.AnalysisRow{}}
-	err := s.withAnalysisBudget(ctx, func(ctx context.Context) error {
+	err := s.withAnalysisBudget(ctx, 15*time.Second, func(ctx context.Context) error {
 		p := callListParams(f)
 		// A single SELECT provides one snapshot for the entire report.
 		rows, err := s.q.AnalyzeCalls(ctx, AnalyzeCallsParams{Dimension: p.Dimension, DimensionValue: p.DimensionValue, SecondDimension: p.SecondDimension, SecondValue: p.SecondValue, GroupBy: group, SplitBy: split, BucketSeconds: int32(bucket), AccountID: p.AccountID, ScopeChannelID: p.ScopeChannelID, ScopeChannelText: p.ScopeChannelText, FinalChannelID: p.FinalChannelID, ApiKeyID: p.ApiKeyID, Model: p.Model, Format: p.Format, Outcome: p.Outcome, Tag: p.Tag, RequestID: p.RequestID, PreviousFrom: report.PreviousFrom, FromTime: report.From, ToTime: report.To, MinDuration: p.MinDuration, MaxDuration: p.MaxDuration, MinTokens: p.MinTokens, MaxTokens: p.MaxTokens, MinCharged: p.MinCharged, MaxCharged: p.MaxCharged, Stream: p.Stream, MinAttempts: p.MinAttempts, MaxAttempts: p.MaxAttempts, StatusCode: p.StatusCode, Billed: p.Billed, Delivery: p.Delivery, UsageStatus: p.UsageStatus, ErrorCode: p.ErrorCode, EndReason: p.EndReason, AttemptChannel: p.AttemptChannel})
@@ -72,14 +72,14 @@ func fillTrend(report observe.AnalysisReport) []observe.AnalysisRow {
 
 // Analytics shares the gateway pool. Admit at most two scans, with no waiting
 // queue, and bound the entire report (including the directory transaction).
-func (s *Store) withAnalysisBudget(ctx context.Context, read func(context.Context) error) error {
+func (s *Store) withAnalysisBudget(ctx context.Context, budget time.Duration, read func(context.Context) error) error {
 	select {
 	case s.analysisSlots <- struct{}{}:
 		defer func() { <-s.analysisSlots }()
 	default:
 		return observe.ErrAnalysisBusy
 	}
-	bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+	bounded, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	err := read(bounded)
 	if errors.Is(bounded.Err(), context.DeadlineExceeded) {

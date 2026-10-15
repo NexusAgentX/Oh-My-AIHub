@@ -8,7 +8,7 @@ import (
 
 func (s *Store) DirectoryAnalysis(ctx context.Context, f observe.DirectoryFilter) (observe.DirectoryReport, error) {
 	report := observe.DirectoryReport{From: f.From, To: f.To, PreviousFrom: f.From.Add(-f.To.Sub(f.From)), PreviousTo: f.From, BucketSeconds: f.Bucket, GroupBy: f.Group, Groups: []observe.DirectoryRow{}, Trend: []observe.DirectoryRow{}}
-	err := s.withAnalysisBudget(ctx, func(ctx context.Context) error {
+	err := s.withAnalysisBudget(ctx, 3*time.Second, func(ctx context.Context) error {
 		return s.snapshot(ctx, func(q *Queries) error {
 			visible, err := q.DirectoryTargetExists(ctx, DirectoryTargetExistsParams{Supplier: f.Supplier, TargetID: f.TargetID})
 			if err != nil {
