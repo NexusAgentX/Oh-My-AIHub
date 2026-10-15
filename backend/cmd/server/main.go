@@ -72,6 +72,17 @@ func main() {
 		fatal(logger, "invalid upstream outbound policy", err)
 	}
 
+	if value := os.Getenv("UPSTREAM_ALLOW_LOCALHOST"); value != "" {
+		allow, err := strconv.ParseBool(value)
+		if err != nil {
+			fatal(logger, "UPSTREAM_ALLOW_LOCALHOST must be true or false", err)
+		}
+		if allow {
+			outboundPolicy = outboundPolicy.WithLocalhostForDevelopment()
+			logger.Warn("localhost upstreams enabled for local development; HTTP to localhost is allowed")
+		}
+	}
+
 	c2cKeyring, err := c2c.ParseKeyring(
 		os.Getenv("C2C_PRIVATE_DATA_KEYRING"),
 		os.Getenv("C2C_PRIVATE_DATA_ACTIVE_KEY_ID"),
