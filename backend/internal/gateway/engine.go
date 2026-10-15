@@ -634,7 +634,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			release()
 			return
 		case result.response != nil:
-			e.Runtime.Success(candidate.ChannelID)
 			e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
 			release()
 			return
@@ -1356,23 +1355,34 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
+	case observation.ProtocolError:
+		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
+		if observation.ProtocolClientError {
+			endReason = EndClientError
+		}
 	case clientGone:
 		// Whatever stopped the reading after the client left is no fault of the
 		// channel, and neither is the client's leaving.
 		outcome, endReason = OutcomeClientDisconnect, EndClientDisconnected
 	case stopped != nil:
 		outcome, endReason = OutcomeInterrupted, EndInterrupted
-		if stopped.channelFault {
-			e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), EndInterrupted)
-		}
 	case !observation.Found:
 		outcome = OutcomeUnbilled
+	}
+	// A 2xx status is provisional: clearing failures before the body ends
+	// would prevent consecutive protocol failures from ever reaching cooldown.
+	if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
+		e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
+	} else {
+		e.Runtime.Success(candidate.ChannelID)
 	}
 	record := &call.attempts[len(call.attempts)-1]
 	record.EndReason = endReason
 	record.DurationMS = millis(e.Now().Sub(result.started))
 	record.ResponseByte = &written
-	if stopped != nil {
+	if observation.ProtocolError {
+		record.ErrorCode, record.ErrorMessage = stringPointer(codeProtocolError), stringPointer(messageProtocolError)
+	} else if stopped != nil {
 		record.ErrorCode, record.ErrorMessage = stringPointer(stopped.code), stringPointer(stopped.message)
 	}
 	e.recordAttempt(call, candidate, *record)
@@ -1402,9 +1412,13 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if err != nil {
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
-			finish.Cost, finish.Fee = priced.Cost, priced.Fee
 			finish.PriceSnapshot = priceSnapshot(model, priced, candidate, defaults.USDCNYRateNano, feeRate, observation.Usage, call.started)
-			if !self && priced.Cost+priced.Fee > 0 {
+			// Explicit upstream failure is not charged (PRODUCT.md), but reliable
+			// usage and its contemporaneous price snapshot remain diagnostic facts.
+			if !observation.ProtocolError {
+				finish.Cost, finish.Fee = priced.Cost, priced.Fee
+			}
+			if !observation.ProtocolError && !self && priced.Cost+priced.Fee > 0 {
 				finish.Bill = &Billing{ConsumerID: call.key.OwnerID, ProviderID: candidate.OwnerID, Cost: priced.Cost, Fee: priced.Fee}
 			}
 		}

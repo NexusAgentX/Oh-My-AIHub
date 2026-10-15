@@ -1,16 +1,12 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 )
 
 // Inspect only known envelope members. Unknown provider values become "other";
 // no arbitrary strings from response content are persisted.
 func (o *Observer) observeStop(raw []byte) {
-	if !bytes.Contains(raw, []byte("finish_reason")) && !bytes.Contains(raw, []byte("stop_reason")) && !bytes.Contains(raw, []byte("finishReason")) && !bytes.Contains(raw, []byte("response.completed")) && !bytes.Contains(raw, []byte("response.incomplete")) && !bytes.Contains(raw, []byte(`"status"`)) {
-		return
-	}
 	var value struct {
 		Choices []struct {
 			Reason string `json:"finish_reason"`
