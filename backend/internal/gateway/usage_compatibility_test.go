@@ -127,6 +127,19 @@ func TestUsageCompatibilityUpdates(t *testing.T) {
 	}
 }
 
+func TestIterationTTLDoesNotBecomeLastIterationTTL(t *testing.T) {
+	o := NewObserver(channel.FormatAnthropic, true, "text/event-stream")
+	o.absorb([]byte(`{"usage":{"cache_creation_input_tokens":10,"iterations":[{"input_tokens":10,"cache_creation_input_tokens":10,"cache_creation":{"ephemeral_5m_input_tokens":10,"ephemeral_1h_input_tokens":0}},{"input_tokens":20,"cache_creation_input_tokens":10,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":10}}]}}`))
+	if o.detail.Tokens["cache_write_5m"] != 10 || o.detail.Tokens["cache_write_1h"] != 10 {
+		t.Fatalf("initial TTL %+v", o.detail)
+	}
+	o.absorb([]byte(`{"usage":{"cache_creation_input_tokens":5,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":5}}}`))
+	got := o.Finish()
+	if got.Usage.CacheWriteTokens != 15 || len(got.Usage.Detail.Tokens) != 0 || len(got.Usage.Detail.Notes) == 0 {
+		t.Fatalf("last iteration cannot replace aggregate TTL: %+v", got)
+	}
+}
+
 func TestUsageCompatibilityIterationsAndGeminiBounds(t *testing.T) {
 	cases := []struct {
 		name   string

@@ -244,6 +244,11 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		}
 		if raw := usage.get("cache_creation"); raw != nil {
 			o.setBucket("cache_write_", nil, o.usage.CacheWriteTokens)
+			if o.iterationsSeen {
+				o.note("迭代后顶层TTL缺少聚合交集，使用通用缓存写价")
+				break
+			}
+
 			details := o.objectOf(raw)
 			values := map[string]int64{}
 			valid := true
