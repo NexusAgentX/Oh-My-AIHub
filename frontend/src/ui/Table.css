@@ -102,4 +102,4 @@
   .search-form { width: 100%; }
 }
 
-@media (max-width: 767px) { .table-action .button, .table-action-group .button { min-height: 44px; min-width: 44px; } }
+@media (max-width: 767px) { .table-action .button, .table-action-group .button { min-height: var(--touch-target); min-width: var(--touch-target); } }

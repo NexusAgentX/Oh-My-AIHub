@@ -62,9 +62,9 @@
 .segmented-item.active { color: var(--on-color); background: var(--mustard); box-shadow: inset 0 0 0 var(--stroke) var(--line); }
 
 @media (max-width: 767px) {
-  .tab { min-height: 44px; }
-  .segmented-item { min-height: 44px; min-width: 44px; }
+  .tab { min-height: var(--touch-target); }
+  .segmented-item { min-height: var(--touch-target); min-width: var(--touch-target); }
 }
 
 .segmented-scroll { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; }
-.segmented-scroll-arrow { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--ink); font-size: var(--text-xl); cursor: pointer; }
+.segmented-scroll-arrow { flex: 0 0 auto; min-width: var(--touch-target); min-height: var(--touch-target); border: 0; background: transparent; color: var(--ink); font-size: var(--text-xl); cursor: pointer; }

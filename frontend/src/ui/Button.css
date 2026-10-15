@@ -73,9 +73,9 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 767px) {
-  .button, .icon-button { min-height: 44px; }
+  .button, .icon-button { min-height: var(--touch-target); }
   .button-sm { min-height: 36px; }
   .icon-button { width: 44px; height: 44px; }
 }
 
-@media (max-width: 767px) { .button, .table-action .button, .icon-button { min-width: 44px; min-height: 44px; } }
+@media (max-width: 767px) { .button, .table-action .button, .icon-button { min-width: var(--touch-target); min-height: var(--touch-target); } }

@@ -75,6 +75,6 @@ body > svg:has(> defs > #vditor-icon-bold) {
   .markdown-editor-preview { border-left: 0; border-top: 1px solid var(--hairline); max-height: 360px; }
 }
 
-@media (max-width: 767px) { .markdown-editor-source .vditor-toolbar button { min-width: 44px; min-height: 44px; } }
+@media (max-width: 767px) { .markdown-editor-source .vditor-toolbar button { min-width: var(--touch-target); min-height: var(--touch-target); } }
 
 .markdown-table-hint { text-align: left; color: var(--muted); font-size: var(--text-xs); padding-block: var(--space-2); }
