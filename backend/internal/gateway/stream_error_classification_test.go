@@ -48,7 +48,11 @@ func TestProtocolRequestErrorsUseExistingHealthExclusion(t *testing.T) {
 				}
 			}
 			failure := "data: " + tc.failure + "\n\n"
-			run := startDrainRun(t, tc.format, time.Second, content+usage+failure, func(r *drainRun) { r.call.modelID = "m" })
+			run := startDrainRun(t, tc.format, time.Second, content+usage+failure, func(r *drainRun) {
+				r.call.modelID = "m"
+				status := 200
+				r.call.attempts[0].StatusCode = &status
+			})
 			run.waitWritten(1)
 			run.end()
 			run.wait(time.Second)
@@ -60,11 +64,18 @@ func TestProtocolRequestErrorsUseExistingHealthExclusion(t *testing.T) {
 			if finish.Outcome != OutcomeUpstreamFailed || len(finish.Attempts) != 1 || finish.Attempts[0].EndReason != wantEnd || finish.Bill != nil || finish.Cost != 0 || finish.Fee != 0 {
 				t.Fatalf("failure classification=%+v", finish)
 			}
+			if finish.Attempts[0].StatusCode == nil || *finish.Attempts[0].StatusCode != 200 {
+				t.Fatal("actual HTTP 200 was rewritten")
+			}
 			if finish.Usage.InputTokens != 7 || finish.Usage.OutputTokens != 3 || len(finish.PriceSnapshot) == 0 || run.client.received() != content+usage+failure {
 				t.Fatal("usage, snapshot or original response lost")
 			}
 			if run.channelFailed() == tc.request {
 				t.Fatalf("request error=%v channel failed=%v", tc.request, run.channelFailed())
+			}
+			view := run.engine.StatsBook.view(time.Now())
+			if tc.request && (len(view.models["m"]) != 1 || view.models["m"][0].client != 1) {
+				t.Fatal("normalized request error lost from anomaly sample")
 			}
 			stats, listed := run.engine.Stats()["channel"]
 			if tc.request && listed || !tc.request && (stats.Attempts != 1 || stats.Successes != 0) {
