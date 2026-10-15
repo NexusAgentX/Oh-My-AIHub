@@ -22,6 +22,7 @@ const (
 
 // Observation is what the side-channel reader learned about a response.
 type Observation struct {
+	ProtocolError bool
 	StopReason    string
 	UsageStatus   string
 	MaxFrameGapMS *int
@@ -58,6 +59,7 @@ type Observer struct {
 	found          bool
 	responseID     string
 	stopReason     string
+	protocolError  bool
 	maxGap         time.Duration
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
@@ -180,7 +182,7 @@ func (o *Observer) Finish() Observation {
 	} else if o.overflow || o.parseLimited {
 		status = "parse_limit"
 	}
-	observation := Observation{StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
+	observation := Observation{ProtocolError: o.protocolError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
 		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
@@ -208,7 +210,8 @@ func clamp(value int64) int64 {
 func (o *Observer) absorb(raw []byte) {
 	// One look at the member names decides what is worth decoding at all.
 	keys := scanFrameKeys(raw)
-	if keys&keyStop != 0 || o.format == channel.FormatOpenAIResponses {
+	o.observeProtocolError(raw, keys)
+	if keys&(keyStop|keyEnvelope) != 0 {
 		o.observeStop(raw)
 	}
 	switch o.format {

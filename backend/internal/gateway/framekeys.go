@@ -27,9 +27,12 @@ const (
 	// keyID: an "id" member, where an OpenAI Responses event names its response.
 	keyID
 	keyStop
+	keyError
+	// keyEnvelope marks only recognized type/status values, not ordinary deltas.
+	keyEnvelope
 
 	// nullableKeys are the keys that are ignored when their value is null.
-	nullableKeys = keyUsage | keyUsageMetadata | keyServiceTier | keyStop
+	nullableKeys = keyUsage | keyUsageMetadata | keyServiceTier | keyStop | keyError | keyEnvelope
 	// detailKeys are the keys absorbDetails reads anything under. The objects
 	// it looks into on the way (response, message, choices, delta) are not
 	// among them: they only lead to these.
@@ -44,6 +47,8 @@ var frameKeyNames = [...]struct {
 	keys frameKeys
 }{
 	{"id", keyID},
+	{"error", keyError},
+	{"type", keyEnvelope}, {"status", keyEnvelope},
 	{"finish_reason", keyStop}, {"stop_reason", keyStop}, {"finishreason", keyStop},
 	{"usage", keyUsage},
 	{"service_tier", keyServiceTier},
@@ -88,6 +93,12 @@ func scanFrameKeys(text []byte) frameKeys {
 				value++
 			}
 			if bytes.HasPrefix(text[value:], []byte("null")) {
+				continue
+			}
+		}
+		if keys == keyEnvelope {
+			value := skipSpace(text, colon+1)
+			if !envelopeMarkerValue(text[value:]) {
 				continue
 			}
 		}
@@ -159,4 +170,30 @@ func equalLower(name []byte, lower string) bool {
 		}
 	}
 	return true
+}
+
+// envelopeMarkerValue reads only the type/status string already located by the
+// member scan. Ordinary content events need no further whole-frame searches.
+func envelopeMarkerValue(raw []byte) bool {
+	if len(raw) == 0 || raw[0] != '"' {
+		return false
+	}
+	end, escaped, ok := stringEnd(raw, 1)
+	if !ok {
+		return false
+	}
+	if !escaped {
+		return isEnvelopeMarker(string(raw[1:end]))
+	}
+	var value string
+	return json.Unmarshal(raw[:end+1], &value) == nil && isEnvelopeMarker(value)
+}
+
+func isEnvelopeMarker(value string) bool {
+	switch value {
+	case "error", "response.failed", "failed", "response.completed", "completed", "response.incomplete", "incomplete":
+		return true
+	default:
+		return false
+	}
 }

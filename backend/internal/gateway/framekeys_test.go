@@ -14,6 +14,21 @@ func TestScanFrameKeys(t *testing.T) {
 		want frameKeys
 	}{
 		{"plain chunk with null usage", `{"id":"c","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}],"usage":null}`, keyID},
+		{"normal type", `{"type":"response.output_text.delta"}`, 0},
+		{"failed type", `{"type":"response.failed"}`, keyEnvelope},
+		{"error type", `{"type":"error"}`, keyEnvelope},
+		{"completed status", `{"status":"completed"}`, keyEnvelope},
+		{"incomplete type", `{"type":"response.incomplete"}`, keyEnvelope},
+		{"escaped type value", `{"type":"response.fa\u0069led"}`, keyEnvelope},
+		{"escaped type key", `{"t\u0079pe":"error"}`, keyEnvelope},
+		{"case folded type key", `{"TYPE":"error"}`, keyEnvelope},
+		{"null marker", `{"type":null,"status":null}`, 0},
+		{"nonstring marker", `{"type":42,"status":false}`, 0},
+		{"object marker", `{"type":{},"status":[]}`, 0},
+		{"nested marker", `{"item":{"status":"failed"}}`, keyEnvelope},
+		{"tool failure type", `{"type":"response.mcp_call.failed"}`, 0},
+		{"error member", `{"error":{}}`, keyError},
+		{"null error", `{"error":null}`, 0},
 		{"usage object", `{"choices":[],"usage":{"prompt_tokens":1}}`, keyUsage},
 		{"usage after spaces", `{"usage"  :  {"a":1}}`, keyUsage},
 		{"null usage after spaces", `{"usage"  :  null  }`, 0},
@@ -89,7 +104,7 @@ func keysByDecoding(text []byte) (frameKeys, bool) {
 			switch value {
 			case '{', '[':
 				if pendingKey != 0 && !pendingNullable {
-					found |= pendingKey
+					found |= pendingKey &^ keyEnvelope
 				}
 				pendingKey = 0
 				stack = append(stack, frame{object: value == '{', expectKey: value == '{'})
@@ -110,13 +125,16 @@ func keysByDecoding(text []byte) (frameKeys, bool) {
 				continue
 			}
 			if pendingKey != 0 {
-				found |= pendingKey
+				found |= pendingKey &^ keyEnvelope
+				if pendingKey&keyEnvelope != 0 && isEnvelopeMarker(value) {
+					found |= keyEnvelope
+				}
 				pendingKey = 0
 			}
 			valueDone()
 		default:
 			if pendingKey != 0 && !(value == nil && pendingNullable) {
-				found |= pendingKey
+				found |= pendingKey &^ keyEnvelope
 			}
 			pendingKey = 0
 			valueDone()
