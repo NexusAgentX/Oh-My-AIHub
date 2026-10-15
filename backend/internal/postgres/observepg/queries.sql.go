@@ -13,18 +13,58 @@ import (
 )
 
 const analyzeCalls = `-- name: AnalyzeCalls :many
-WITH filtered AS (
- SELECT c.id, c.account_id, c.api_key_id, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.client_user_agent, c.routing_mode, c.routing_source, c.outcome, c.final_channel_id, c.attempts, c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens, c.price_snapshot, c.cost_nano, c.fee_nano, c.ttft_ms, c.duration_ms, c.output_tokens_per_second, c.inter_token_p50_ms, c.inter_token_p95_ms, c.response_bytes, c.upstream_response_id, c.ledger_tx_id, c.created_at, c.completed_at, c.diagnostics, CASE $1::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS group_key, CASE $2::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS split_key,
- coalesce(ch.name,'') AS channel_name,coalesce(k.name,'') AS key_name,a.display_name AS account_name,
+WITH samples AS MATERIALIZED (
+ SELECT c.created_at, c.outcome, c.stream, c.duration_ms, c.ttft_ms,
+ c.output_tokens_per_second, c.inter_token_p95_ms,
+ c.input_tokens, c.output_tokens, c.cache_read_tokens, c.cache_write_tokens, c.fee_nano,
+ c.ledger_tx_id IS NOT NULL AS billed,
+ c.diagnostics->>'delivery' AS delivery, c.diagnostics->>'usage_status' AS usage_status,
+ (c.diagnostics->>'max_frame_gap_ms')::double precision AS max_frame_gap_ms,
+ c.attempts->0->>'end_reason'='completed' AS first_succeeded,
+ CASE $1::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS group_key, CASE $2::text WHEN 'all' THEN '' WHEN 'time' THEN to_char(date_bin(($3::int::text || ' seconds')::interval,c.created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END AS split_key,
+ coalesce(ch.name,'') AS channel_name, coalesce(k.name,'') AS key_name, a.display_name AS account_name,
  CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano+c.fee_nano END AS charged,
- (SELECT coalesce(sum((t.value->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) WITH ORDINALITY t(value,position) WHERE t.position<jsonb_array_length(c.attempts)) AS fallback_ms,
  jsonb_array_length(c.attempts) AS attempt_count,
- (SELECT count(*) FROM jsonb_array_elements(c.attempts) t WHERE t->>'end_reason'='completed') AS attempt_success,
- (SELECT coalesce(sum((t->>'duration_ms')::int),0) FROM jsonb_array_elements(c.attempts) t) AS upstream_ms
+ attempts.fallback_ms, attempts.attempt_success, attempts.upstream_ms,
+ stages.authentication_ms,
+ stages.request_ms,
+ stages.open_call_ms,
+ stages.admission_ms,
+ stages.routing_ms,
+ stages.pricing_ms,
+ stages.settlement_ms,
+ stages.client_write_ms
  FROM calls c
  LEFT JOIN channels ch ON ch.id=c.final_channel_id
  LEFT JOIN api_keys k ON k.id=c.api_key_id
  JOIN accounts a ON a.id=c.account_id
+ CROSS JOIN LATERAL (
+  SELECT coalesce(sum(t.duration_ms) FILTER (WHERE t.position<jsonb_array_length(c.attempts)),0) AS fallback_ms,
+   count(*) FILTER (WHERE t.end_reason='completed') AS attempt_success,
+   coalesce(sum(t.duration_ms),0) AS upstream_ms
+  FROM ROWS FROM (jsonb_to_recordset(c.attempts) AS (duration_ms int, end_reason text))
+   WITH ORDINALITY t(duration_ms,end_reason,position)
+ ) attempts
+ CROSS JOIN LATERAL (
+  -- Decode the array once into typed records. Keep the first occurrence of each
+  -- stage, including a null duration, matching the original LIMIT 1 semantics.
+  SELECT
+   max(t.duration_ms) FILTER (WHERE t.stage='authentication') AS authentication_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='request') AS request_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='open_call') AS open_call_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='admission') AS admission_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='routing') AS routing_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='pricing') AS pricing_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='settlement') AS settlement_ms,
+   max(t.duration_ms) FILTER (WHERE t.stage='client_write') AS client_write_ms
+  FROM (
+   SELECT DISTINCT ON (stage) stage,duration_ms
+   FROM ROWS FROM (
+    jsonb_to_recordset(coalesce(c.diagnostics->'stages','[]'::jsonb)) AS (stage text, duration_ms double precision)
+   ) WITH ORDINALITY s(stage,duration_ms,position)
+   ORDER BY stage,position
+  ) t
+ ) stages
  WHERE ($4::uuid IS NULL OR c.account_id = $4::uuid)
   AND ($5::uuid IS NULL
        OR c.final_channel_id = $5::uuid
@@ -51,18 +91,30 @@ WITH filtered AS (
       AND ($26::text IS NULL OR att->>'end_reason'=$26::text)
       AND ($27::text IS NULL OR att->'channel'->>'id'=$27::text)
       AND ($6::text IS NULL OR att->'channel'->>'id'=$6::text)))
-  AND ($28::timestamptz IS NULL OR c.created_at >= $28::timestamptz)
-  AND ($29::timestamptz IS NULL OR c.created_at < $29::timestamptz)
+  AND c.created_at >= $28::timestamptz
+  AND c.created_at < $29::timestamptz
   AND ($30::int IS NULL OR c.duration_ms >= $30::int)
   AND ($31::int IS NULL OR c.duration_ms <= $31::int)
   AND ($32::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $32::bigint)
   AND ($33::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $33::bigint)
   AND ($34::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $34::bigint)
   AND ($35::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $35::bigint)
+), prepared AS (
+ -- GROUPING SETS reuses each scalar row without tripling a wide sample stream.
+ -- Previous-period group/time keys are NULL so HAVING can discard those sets;
+ -- an empty string remains a valid current group (for example group_by=all).
+ SELECT s.created_at, s.outcome, s.stream, s.duration_ms, s.ttft_ms, s.output_tokens_per_second, s.inter_token_p95_ms, s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_write_tokens, s.fee_nano, s.billed, s.delivery, s.usage_status, s.max_frame_gap_ms, s.first_succeeded, s.group_key, s.split_key, s.channel_name, s.key_name, s.account_name, s.charged, s.attempt_count, s.fallback_ms, s.attempt_success, s.upstream_ms, s.authentication_ms, s.request_ms, s.open_call_ms, s.admission_ms, s.routing_ms, s.pricing_ms, s.settlement_ms, s.client_write_ms, created_at>=$36::timestamptz AS is_current,
+  CASE WHEN created_at>=$36::timestamptz THEN group_key END AS current_group,
+  CASE WHEN created_at>=$36::timestamptz THEN split_key END AS current_split,
+  CASE WHEN created_at>=$36::timestamptz THEN
+   to_char(date_bin(($3::int::text || ' seconds')::interval,created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') END AS time_key
+ FROM samples s
 )
-SELECT group_key,split_key,
- CASE $1::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE group_key END::text AS label,
- CASE $2::text WHEN 'channel' THEN max(channel_name) WHEN 'key' THEN max(key_name) WHEN 'account' THEN max(account_name) ELSE split_key END::text AS split_label,
+SELECT (CASE WHEN GROUPING(is_current)=0 THEN 'summary' WHEN GROUPING(time_key)=0 THEN 'time' ELSE 'group' END)::text AS kind,
+ (CASE WHEN GROUPING(is_current)=0 THEN CASE WHEN is_current THEN 'current' ELSE 'previous' END WHEN GROUPING(time_key)=0 THEN time_key ELSE current_group END)::text AS group_key,
+ (CASE WHEN GROUPING(current_split)=0 THEN current_split ELSE '' END)::text AS split_key,
+ (CASE WHEN GROUPING(current_group)=0 THEN max(CASE $1::text WHEN 'channel' THEN channel_name WHEN 'key' THEN key_name WHEN 'account' THEN account_name ELSE current_group END) ELSE '' END)::text AS label,
+ (CASE WHEN GROUPING(current_split)=0 THEN max(CASE $2::text WHEN 'channel' THEN channel_name WHEN 'key' THEN key_name WHEN 'account' THEN account_name ELSE current_split END) ELSE '' END)::text AS split_label,
  (count(*) FILTER (WHERE attempt_count>0 AND outcome<>'in_progress'))::bigint AS attempted,
  (count(*) FILTER (WHERE stream AND outcome<>'in_progress'))::bigint AS stream_finished,
  (count(*) FILTER (WHERE stream AND outcome IN ('interrupted','client_disconnected')))::bigint AS stream_interrupted,
@@ -71,23 +123,23 @@ SELECT group_key,split_key,
  (count(*))::bigint AS calls,
  (count(*) FILTER (WHERE outcome<>'in_progress'))::bigint AS finished,
  (count(*) FILTER (WHERE outcome IN ('succeeded','succeeded_unbilled')))::bigint AS succeeded,
- (count(*) FILTER (WHERE attempts->0->>'end_reason'='completed'))::bigint AS first_succeeded,
- (count(*) FILTER (WHERE jsonb_array_length(attempts)>1))::bigint AS retried,
- (count(*) FILTER (WHERE jsonb_array_length(attempts)>1 AND outcome IN ('succeeded','succeeded_unbilled')))::bigint AS recovered,
+ (count(*) FILTER (WHERE first_succeeded))::bigint AS first_succeeded,
+ (count(*) FILTER (WHERE attempt_count>1))::bigint AS retried,
+ (count(*) FILTER (WHERE attempt_count>1 AND outcome IN ('succeeded','succeeded_unbilled')))::bigint AS recovered,
  (coalesce(sum(attempt_count),0))::bigint AS attempts,
  (coalesce(sum(attempt_success),0))::bigint AS attempt_succeeded,
- (count(*) FILTER (WHERE diagnostics->>'delivery'='complete'))::bigint AS delivered,
- (count(*) FILTER (WHERE diagnostics->>'delivery' IN ('complete','interrupted','client_disconnected')))::bigint AS delivery_known,
- (count(*) FILTER (WHERE ledger_tx_id IS NOT NULL))::bigint AS billed,
- (count(*) FILTER (WHERE diagnostics->>'usage_status'='reported'))::bigint AS usage_reported,
- (count(*) FILTER (WHERE diagnostics->>'usage_status' IN ('missing','parse_limit')))::bigint AS usage_missing,
+ (count(*) FILTER (WHERE delivery='complete'))::bigint AS delivered,
+ (count(*) FILTER (WHERE delivery IN ('complete','interrupted','client_disconnected')))::bigint AS delivery_known,
+ (count(*) FILTER (WHERE billed))::bigint AS billed,
+ (count(*) FILTER (WHERE usage_status='reported'))::bigint AS usage_reported,
+ (count(*) FILTER (WHERE usage_status IN ('missing','parse_limit')))::bigint AS usage_missing,
  (count(*) FILTER (WHERE stream))::bigint AS streamed,
  (coalesce(sum(input_tokens),0))::bigint AS input_tokens,
  (coalesce(sum(output_tokens),0))::bigint AS output_tokens,
  (coalesce(sum(cache_read_tokens),0))::bigint AS cache_read_tokens,
  (coalesce(sum(cache_write_tokens),0))::bigint AS cache_write_tokens,
  (coalesce(sum(charged),0))::bigint AS charged_nano,
- (coalesce(sum(CASE WHEN ledger_tx_id IS NOT NULL THEN fee_nano ELSE 0 END),0))::bigint AS fee_nano,
+ (coalesce(sum(CASE WHEN billed THEN fee_nano ELSE 0 END),0))::bigint AS fee_nano,
  (count(*) FILTER (WHERE outcome='interrupted'))::bigint AS interrupted,
  (count(*) FILTER (WHERE outcome='client_disconnected'))::bigint AS disconnected,
  (count(*) FILTER (WHERE outcome='succeeded_unbilled'))::bigint AS unbilled,
@@ -103,26 +155,27 @@ SELECT group_key,split_key,
  (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p50,
  (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p95,
  (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY inter_token_p95_ms) FILTER (WHERE stream),-1))::double precision AS gap_p99,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (diagnostics->>'max_frame_gap_ms')::double precision) FILTER (WHERE stream),-1))::double precision AS max_gap_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY max_frame_gap_ms) FILTER (WHERE stream),-1))::double precision AS max_gap_p95,
  (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p50,
  (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p95,
  (coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY charged/1000000000.0) FILTER (WHERE outcome<>'in_progress'),-1))::double precision AS cost_p99,
- (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p50,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY jsonb_array_length(attempts)-1) FILTER (WHERE jsonb_array_length(attempts)>0),-1))::double precision AS retry_p95,
+ (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY attempt_count-1) FILTER (WHERE attempt_count>0),-1))::double precision AS retry_p50,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY attempt_count-1) FILTER (WHERE attempt_count>0),-1))::double precision AS retry_p95,
  (coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p50,
  (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY greatest(0,duration_ms-upstream_ms)) FILTER (WHERE duration_ms IS NOT NULL),-1))::double precision AS overhead_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='authentication' LIMIT 1)),-1))::double precision AS authentication_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='request' LIMIT 1)),-1))::double precision AS request_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='open_call' LIMIT 1)),-1))::double precision AS open_call_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='admission' LIMIT 1)),-1))::double precision AS admission_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='routing' LIMIT 1)),-1))::double precision AS routing_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='pricing' LIMIT 1)),-1))::double precision AS pricing_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='settlement' LIMIT 1)),-1))::double precision AS settlement_p95,
- (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (SELECT (s->>'duration_ms')::double precision FROM jsonb_array_elements(coalesce(diagnostics->'stages','[]'::jsonb)) s WHERE s->>'stage'='client_write' LIMIT 1)),-1))::double precision AS client_write_p95
-FROM filtered
-GROUP BY group_key,split_key
-ORDER BY group_key,split_key
-LIMIT 1001
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY authentication_ms),-1))::double precision AS authentication_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY request_ms),-1))::double precision AS request_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY open_call_ms),-1))::double precision AS open_call_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY admission_ms),-1))::double precision AS admission_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY routing_ms),-1))::double precision AS routing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY pricing_ms),-1))::double precision AS pricing_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY settlement_ms),-1))::double precision AS settlement_p95,
+ (coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY client_write_ms),-1))::double precision AS client_write_p95
+FROM prepared
+GROUP BY GROUPING SETS ((is_current),(current_group,current_split),(time_key))
+HAVING GROUPING(is_current)=0 OR (GROUPING(current_group)=0 AND current_group IS NOT NULL) OR (GROUPING(time_key)=0 AND time_key IS NOT NULL)
+ORDER BY kind,group_key,split_key
+LIMIT 2003
 `
 
 type AnalyzeCallsParams struct {
@@ -153,17 +206,19 @@ type AnalyzeCallsParams struct {
 	ErrorCode        *string
 	EndReason        *string
 	AttemptChannel   *string
-	FromTime         *time.Time
-	ToTime           *time.Time
+	PreviousFrom     time.Time
+	ToTime           time.Time
 	MinDuration      *int32
 	MaxDuration      *int32
 	MinTokens        *int64
 	MaxTokens        *int64
 	MinCharged       *int64
 	MaxCharged       *int64
+	FromTime         time.Time
 }
 
 type AnalyzeCallsRow struct {
+	Kind              string
 	GroupKey          string
 	SplitKey          string
 	Label             string
@@ -226,6 +281,10 @@ type AnalyzeCallsRow struct {
 	ClientWriteP95    float64
 }
 
+// Expand each JSON array once and materialize only scalar samples. All four
+// report sections share these samples and the same statement snapshot; percentiles
+// still use raw samples, never averages of pre-aggregated percentiles.
+// Two summaries, at most 1000 groups and 1000 buckets, plus one overflow row.
 func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]AnalyzeCallsRow, error) {
 	rows, err := q.db.Query(ctx, analyzeCalls,
 		arg.GroupBy,
@@ -255,7 +314,7 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 		arg.ErrorCode,
 		arg.EndReason,
 		arg.AttemptChannel,
-		arg.FromTime,
+		arg.PreviousFrom,
 		arg.ToTime,
 		arg.MinDuration,
 		arg.MaxDuration,
@@ -263,6 +322,7 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 		arg.MaxTokens,
 		arg.MinCharged,
 		arg.MaxCharged,
+		arg.FromTime,
 	)
 	if err != nil {
 		return nil, err
@@ -272,6 +332,7 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 	for rows.Next() {
 		var i AnalyzeCallsRow
 		if err := rows.Scan(
+			&i.Kind,
 			&i.GroupKey,
 			&i.SplitKey,
 			&i.Label,
