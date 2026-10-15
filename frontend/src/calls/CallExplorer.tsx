@@ -59,6 +59,7 @@ export function CallExplorer<T extends CallRowBase>({
   openCallId?: string | null
   onOpenCall?: (id: string | null) => void
 }) {
+  const [showAnalysis, setShowAnalysis] = useState(false)
   const [live, setLive] = useState(false)
   const [liveAt, setLiveAt] = useState(0)
   useEffect(() => {
@@ -134,6 +135,8 @@ export function CallExplorer<T extends CallRowBase>({
           </Button>
         </div>
       )}
+      {listPath === '/api/calls' && <div className="mobile-analysis-toggle"><Button variant="secondary" aria-expanded={showAnalysis} aria-controls="usage-analysis" onClick={() => setShowAnalysis(!showAnalysis)}>{showAnalysis ? '收起分析' : '展开分析'}</Button></div>}
+      <div id="usage-analysis" className={listPath === '/api/calls' && !showAnalysis ? 'usage-analysis-collapsed' : undefined}>
       {(listPath === '/api/calls' || listPath === '/api/admin/calls') && (
         <CallAnalysis
           path={listPath}
@@ -146,6 +149,7 @@ export function CallExplorer<T extends CallRowBase>({
         />
       )}
       {summary && <CallStatsBar chargedLabel={chargedLabel} stats={summary} />}
+      </div>
       <QueryBoundary errorFallback="调用记录加载失败" query={{ ...pages, data: pages.data ? rows : undefined }}>
         {(data) => (
           <>

@@ -32,6 +32,8 @@ import { KeyRoutingSection } from './KeyRouting'
 
 /** 高级设置中的可用模型、预算、别名与过期时间。 */
 function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form: KeyForm) => void }) {
+  const [search, setSearch] = useState('')
+  const [selectedOnly, setSelectedOnly] = useState(false)
   const models = useModels()
   const catalog = models.data?.items.map((model) => model.id) ?? []
   const modelSuggestions = catalog.map((model) => ({ value: model }))
@@ -53,8 +55,11 @@ function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form:
           (models.isError ? (
             <p className="muted-copy">{errorMessage(models.error, '模型列表加载失败')}</p>
           ) : (
-            <div className="key-model-picks">
-              {[...new Set([...catalog, ...form.allowedModels])].map((model) => (
+            <div>
+              <TextField label="检索模型" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="模型名称片段" />
+              <Switch label={`只看已选（${form.allowedModels.length}）`} checked={selectedOnly} onChange={setSelectedOnly} />
+              <div className="key-model-picks">
+              {[...new Set([...catalog, ...form.allowedModels])].filter((model) => model.toLowerCase().includes(search.trim().toLowerCase()) && (!selectedOnly || form.allowedModels.includes(model))).map((model) => (
                 <label className="checkbox-control" key={model}>
                   <input
                     checked={form.allowedModels.includes(model)}
@@ -70,6 +75,8 @@ function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form:
                   <span className="mono">{model}</span>
                 </label>
               ))}
+              </div>
+              {![...catalog, ...form.allowedModels].some((model) => model.toLowerCase().includes(search.trim().toLowerCase()) && (!selectedOnly || form.allowedModels.includes(model))) && <p role="status">没有匹配的模型</p>}
             </div>
           ))}
       </fieldset>
@@ -252,6 +259,7 @@ function KeyEditForm({ detail, initialSecret, onDeleted }: { detail: ApiKeyDetai
       <InlineError>{error}</InlineError>
       <SuccessMessage>{dirty ? '' : message}</SuccessMessage>
       <div className="form-actions key-form-actions">
+        <span role="status">{dirty ? '有未保存修改' : '已保存'}</span>
         <Button icon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)} type="button" variant="danger">
           删除
         </Button>

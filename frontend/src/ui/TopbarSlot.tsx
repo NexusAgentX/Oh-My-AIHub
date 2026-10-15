@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Icon } from './Icon'
 
 /** 详情页的上一级：顶栏左侧显示“‹ 名称”，点击回到 to。 */
-export type PageBack = { to: string; label: string }
+export type PageBack = { to: string; label: string; state?: unknown }
 
 /** 外壳把顶栏左侧的位置交给页面标题区；没有外壳时（测试、独立页面）返回入口留在标题上方。 */
 export const TopbarSlot = createContext<HTMLElement | null>(null)
@@ -34,7 +34,7 @@ export function TopbarContext({ back, title, heading }: { back?: PageBack; title
   const slot = useContext(TopbarSlot)
   const scrolledPast = useScrolledPast(heading, slot)
   const link = back && (
-    <Link aria-label={`返回${back.label}`} className="page-back" to={back.to}>
+    <Link aria-label={`返回${back.label}`} className="page-back" to={back.to} state={back.state}>
       <Icon name="chevron-left" />
       {back.label}
     </Link>

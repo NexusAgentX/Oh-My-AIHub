@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { ModelDetail } from '../api/types'
 import { FormatTags } from '../calls'
@@ -24,8 +24,8 @@ function PriceLine({
 }) {
   return (
     <span className="num">
-      输入 {formatPoints(prices.input, { digits: 2 })} / 输出 {formatPoints(prices.output, { digits: 2 })} · 缓存读{' '}
-      {formatPoints(prices.cache_read, { digits: 2 })} / 写 {formatPoints(prices.cache_write, { digits: 2 })}
+      输入 {formatPoints(prices.input, { digits: 9 })} / 输出 {formatPoints(prices.output, { digits: 9 })} · 缓存读{' '}
+      {formatPoints(prices.cache_read, { digits: 9 })} / 写 {formatPoints(prices.cache_write, { digits: 9 })}
       {Object.entries(prices.token_prices ?? {}).map(([key, value]) => (
         <small key={key}>
           {' '}
@@ -108,6 +108,7 @@ function RoutingCard({ detail }: { detail: ModelDetail }) {
 }
 
 export function ModelDetailPage() {
+  const location = useLocation()
   const { model = '' } = useParams()
   const query = useModel(model)
   return (
@@ -117,14 +118,14 @@ export function ModelDetailPage() {
         return (
           <>
             <PageHeader
-              back={{ to: '/models', label: '模型' }}
+              back={{ to: location.state?.catalogReturn || '/models', state: { catalogKey: location.state?.catalogKey }, label: '模型' }}
               title={detail.model.display_name || detail.model.id}
             />
             <div className="model-summary">
               {detail.model.custom && <Badge tone="info">自定义模型</Badge>}
               <Badge tone="accent">
-                参考价（实际按调用条件）：{detail.model.custom ? '最低渠道价' : current.name} · 输入 {formatPoints(current.prices.input, { digits: 2 })} /
-                输出 {formatPoints(current.prices.output, { digits: 2 })}
+                参考价（实际按调用条件）：{detail.model.custom ? '最低渠道价' : current.name} · 输入 {formatPoints(current.prices.input, { digits: 9 })} /
+                输出 {formatPoints(current.prices.output, { digits: 9 })}
               </Badge>
               <span className="model-summary-formats">
                 <span className="muted">可用格式</span>

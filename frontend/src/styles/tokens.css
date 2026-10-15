@@ -102,6 +102,7 @@
   --topbar-height: 60px;
   --bottom-bar-height: 62px;
   --control-height: 40px;
+  --touch-target: 44px;
   --content-max: 1240px;
   --z-topbar: 20;
   --z-sidebar: 30;

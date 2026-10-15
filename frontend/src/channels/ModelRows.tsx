@@ -55,7 +55,7 @@ function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: F
             type="button"
           >
             {passed && <Icon name="check" size={12} />}
-            {formatLabels[format]}
+            {formatLabels[format]}{passed === false && ' · 失败'}
           </button>
         )
       })}
@@ -119,7 +119,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
   const priceOf = (row: ModelRow) => {
     if (row.custom) {
       const { input, output } = row.customPrices
-      return input && output ? `${formatPoints(input, { digits: 2 })} / ${formatPoints(output, { digits: 2 })}` : '—'
+      return input && output ? `${formatPoints(input, { digits: 9 })} / ${formatPoints(output, { digits: 9 })}` : '—'
     }
     const detail = details[ids.indexOf(row.modelId)]?.data
     if (!detail) return '—'
@@ -127,7 +127,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
     const multiplier = row.multiplier || '1'
     const input = channelPrice(prices.input, multiplier, row.fxDiscount, usdRate(row))
     const output = channelPrice(prices.output, multiplier, row.fxDiscount, usdRate(row))
-    return input && output ? `${formatPoints(input, { digits: 2 })} / ${formatPoints(output, { digits: 2 })}` : '—'
+    return input && output ? `${formatPoints(input, { digits: 9 })} / ${formatPoints(output, { digits: 9 })}` : '—'
   }
   const update = (key: string, patch: Partial<ModelRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -197,6 +197,10 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
           </div>
           <div className="model-row-formats">
             <FormatToggles onChange={(next) => update(row.key, { formats: next })} row={row} />
+            {formats.some((format) => row.passed[format] === false) && <details className="format-test-errors">
+              <summary>查看测试失败原因</summary>
+              <ul>{formats.filter((format) => row.passed[format] === false).map((format) => <li key={format}><strong>{formatLabels[format]}</strong>：{row.errors?.[format] || '测试未通过'}</li>)}</ul>
+            </details>}
           </div>
           <div className="model-row-multiplier">
             {row.custom ? (

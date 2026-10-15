@@ -74,6 +74,7 @@ function ModelEditor({
   const creating = model === null
   const [form, setForm] = useState<ModelForm>(() => (model ? modelToForm(model) : emptyModelForm()))
   const [errors, setErrors] = useState<ModelErrors>({})
+  const [editingTier, setEditingTier] = useState(false)
   const save = useSaveModel()
   const settings = useAdminSettings()
   const rate = settings.data?.settings.usd_cny_rate
@@ -82,6 +83,7 @@ function ModelEditor({
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    if (editingTier) return
     const found = validateModelForm(form, creating)
     setErrors(found)
     if (Object.keys(found).length > 0) return
@@ -200,6 +202,7 @@ function ModelEditor({
       </Collapsible>
       <Collapsible badge={form.tiers.length > 0 ? `${form.tiers.length} 档` : undefined} defaultOpen={form.tiers.length > 0} title="条件价格档">
         <TierEditor
+          onEditingChange={setEditingTier}
           basePrices={form.prices}
           onChange={(tiers) => set({ tiers })}
           tiers={form.tiers}
@@ -212,7 +215,7 @@ function ModelEditor({
         <Button onClick={onDone} type="button" variant="secondary">
           取消
         </Button>
-        <Button loading={save.isPending}>{creating ? '上架模型' : '保存'}</Button>
+        <Button disabled={editingTier} loading={save.isPending}>{creating ? '上架模型' : '保存模型'}</Button>
       </div>
     </form>
   )
@@ -230,7 +233,7 @@ const columns: Column<AdminModel>[] = [
     cell: (model) => (
       <>
         <strong className="mono">{model.id}</strong>
-        <small>{model.display_name}</small>
+        {model.display_name !== model.id && <small>{model.display_name}</small>}
       </>
     ),
   },

@@ -47,6 +47,14 @@ export function sanitizeMarkdownHTML(html: string) {
       element.className = 'hljs'
     }
   })
+  fragment.querySelectorAll('table').forEach((table) => {
+    table.tabIndex = 0
+    table.setAttribute('aria-label', '数据表格，可横向滚动')
+    const caption = document.createElement('caption')
+    caption.className = 'markdown-table-hint'
+    caption.textContent = '表格可横向滚动'
+    table.prepend(caption)
+  })
   const container = document.createElement('div')
   container.append(fragment)
   return container.innerHTML

@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 export type TabItem<K extends string> = {
   key: K
@@ -96,8 +96,34 @@ export function Segmented<K extends string>({
   value: K
   onChange: (key: K) => void
 }) {
+  const container = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ before: false, after: false })
+  const measure = () => {
+    const node = container.current
+    if (node) setEdges({ before: node.scrollLeft > 1, after: node.scrollLeft + node.clientWidth < node.scrollWidth - 1 })
+  }
+  useEffect(() => {
+    const node = container.current!
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    measure()
+    return () => observer.disconnect()
+  }, [])
+  useEffect(() => {
+    const node = container.current!
+    const selected = node.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (selected) {
+      const bounds = node.getBoundingClientRect(), item = selected.getBoundingClientRect()
+      if (item.left < bounds.left) node.scrollLeft -= bounds.left - item.left
+      else if (item.right > bounds.right) node.scrollLeft += item.right - bounds.right
+    }
+    measure()
+  }, [value])
   return (
-    <div aria-label={label} className="segmented" role="group">
+    <div className="segmented-scroll">
+      {edges.before && <button type="button" className="segmented-scroll-arrow" aria-label={`${label}：向前滚动`} onClick={() => container.current?.scrollBy({ left: -180 })}>‹</button>}
+    <div ref={container} onScroll={measure} aria-label={label} className="segmented" role="group">
       {options.map((option) => (
         <button
           aria-pressed={option.key === value}
@@ -109,6 +135,8 @@ export function Segmented<K extends string>({
           {option.label}
         </button>
       ))}
+    </div>
+      {edges.after && <button type="button" className="segmented-scroll-arrow" aria-label={`${label}：向后滚动`} onClick={() => container.current?.scrollBy({ left: 180 })}>›</button>}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { ContentComposer } from './ContentComposer'
 import { NewTicketPage } from './TopicEditorPage'
 import { forumApi } from './queries'
 import { ApiError } from '../api/client'
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 
 const state = vi.hoisted(() => ({ editor: {} as MarkdownEditorProps, save: vi.fn() }))
 vi.mock('../markdown', () => ({ MarkdownEditor: (props: MarkdownEditorProps) => { state.editor = props; return <textarea value={props.value} readOnly /> } }))
@@ -70,5 +70,42 @@ describe('forum content submission', () => {
     await act(async () => { host.querySelector<HTMLButtonElement>('#leave')!.click() })
     await act(async () => finish({ id: 'old' }))
     expect(host.textContent).toContain('Elsewhere'); expect(host.textContent).not.toContain('Old topic')
+  })
+})
+
+
+describe('unsaved forum navigation', () => {
+  it('blocks links and history back, keeps a cancelled draft and permits confirmed discard', async () => {
+    const router = createMemoryRouter([
+      { path: '/edit', element: <ContentComposer onSave={vi.fn()} submitLabel="Save" /> },
+      { path: '/away', element: <p>Away</p> },
+    ], { initialEntries: ['/away', '/edit'] })
+    await act(async () => root.render(<RouterProvider router={router} />))
+    await act(async () => state.editor.onChange('unsaved body'))
+    await act(async () => { void router.navigate(-1) })
+    expect(host.textContent).toContain('丢弃未保存的正文')
+    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '取消')!.click() })
+    expect(state.editor.value).toBe('unsaved body')
+    expect(router.state.location.pathname).toBe('/edit')
+    await act(async () => { void router.navigate('/away') })
+    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '丢弃并离开')!.click() })
+    expect(router.state.location.pathname).toBe('/away')
+  })
+  it('allows blank drafts and successful submit navigation without a discard dialog', async () => {
+    let router: ReturnType<typeof createMemoryRouter>
+    const save = vi.fn(async () => { await router.navigate('/away') })
+    router = createMemoryRouter([
+      { path: '/edit', element: <ContentComposer onSave={save} submitLabel="Save" /> },
+      { path: '/away', element: <p>Away</p> },
+    ], { initialEntries: ['/edit'] })
+    await act(async () => root.render(<RouterProvider router={router} />))
+    await act(async () => state.editor.onChange('   '))
+    await act(async () => { await router.navigate('/away') })
+    expect(router.state.location.pathname).toBe('/away')
+    await act(async () => { await router.navigate('/edit') })
+    await act(async () => state.editor.onChange('ready to submit'))
+    await submit()
+    expect(save).toHaveBeenCalledOnce()
+    expect(router.state.location.pathname).toBe('/away')
   })
 })

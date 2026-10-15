@@ -12,7 +12,7 @@ describe('shared Markdown rendering', () => {
   it('renders GFM tables, task lists and highlighted code through the real Lute engine', () => {
     const html = renderMarkdown('# Heading\n\n| A | B |\n| - | - |\n| a | b |\n\n- [x] Done\n\n```js\nconst x = "ok"\n```')
     expect(html).toContain('<h1>Heading</h1>')
-    expect(html).toContain('<table>')
+    expect(html).toContain('<table tabindex="0" aria-label="数据表格，可横向滚动">')
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('disabled')
     expect(html).toContain('hljs-keyword')
