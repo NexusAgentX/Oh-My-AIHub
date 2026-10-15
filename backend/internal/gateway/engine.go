@@ -1357,6 +1357,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	switch {
 	case observation.ProtocolError:
 		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
+		if observation.ProtocolClientError {
+			endReason = EndClientError
+		}
 	case clientGone:
 		// Whatever stopped the reading after the client left is no fault of the
 		// channel, and neither is the client's leaving.
@@ -1368,7 +1371,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	}
 	// A 2xx status is provisional: clearing failures before the body ends
 	// would prevent consecutive protocol failures from ever reaching cooldown.
-	if observation.ProtocolError || stopped != nil && stopped.channelFault {
+	if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
 		e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
 	} else {
 		e.Runtime.Success(candidate.ChannelID)

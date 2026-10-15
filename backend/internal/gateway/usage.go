@@ -22,14 +22,15 @@ const (
 
 // Observation is what the side-channel reader learned about a response.
 type Observation struct {
-	ProtocolError bool
-	StopReason    string
-	UsageStatus   string
-	MaxFrameGapMS *int
-	Usage         ledger.Usage
-	Found         bool
-	ResponseID    string
-	Frames        int
+	ProtocolError       bool
+	ProtocolClientError bool
+	StopReason          string
+	UsageStatus         string
+	MaxFrameGapMS       *int
+	Usage               ledger.Usage
+	Found               bool
+	ResponseID          string
+	Frames              int
 	// IntervalP50MS and IntervalP95MS describe the gaps between data frames.
 	IntervalP50MS *int
 	IntervalP95MS *int
@@ -51,16 +52,17 @@ type Observer struct {
 	intervals    []time.Duration
 	frames       int
 
-	detail         ledger.UsageDetail
-	qwenObserved   bool
-	anthropicSpeed string
-	anthropicTier  string
-	usage          ledger.Usage
-	found          bool
-	responseID     string
-	stopReason     string
-	protocolError  bool
-	maxGap         time.Duration
+	detail              ledger.UsageDetail
+	qwenObserved        bool
+	anthropicSpeed      string
+	anthropicTier       string
+	usage               ledger.Usage
+	found               bool
+	responseID          string
+	stopReason          string
+	protocolError       bool
+	protocolClientError bool
+	maxGap              time.Duration
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic anthropicUsage
 	// members is the scratch space the members of an event's objects are
@@ -182,7 +184,7 @@ func (o *Observer) Finish() Observation {
 	} else if o.overflow || o.parseLimited {
 		status = "parse_limit"
 	}
-	observation := Observation{ProtocolError: o.protocolError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
+	observation := Observation{ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
 	if len(o.intervals) > 0 {
 		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
