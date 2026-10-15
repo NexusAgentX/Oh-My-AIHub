@@ -47,17 +47,16 @@ func TestNormalizedUsageReachesAtomicSettlementAndSnapshot(t *testing.T) {
 	}
 }
 
-func TestGeminiCumulativeUsageHasBoundedAllocation(t *testing.T) {
-	frame := `data: {"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":50,"thoughtsTokenCount":20,"totalTokenCount":170}}` + "\n\n"
-	body := []byte(strings.Repeat(frame, 1000))
-	allocations := testing.AllocsPerRun(5, func() {
-		o := NewObserver(channel.FormatGemini, true, "text/event-stream")
-		o.Write(body, time.Unix(0, 0))
-		o.Finish()
-	})
-	// Fixed scratch, line, histogram and detail storage; never one decoded usage
-	// struct per frame. Leave headroom for bounded buffer capacity growth.
-	if allocations > 40 {
-		t.Fatalf("1000 cumulative usage frames allocated %.0f times", allocations)
+// Keep the repeated-frame correctness check in race builds as well. Allocation
+// accounting is tested separately because race instrumentation changes escape costs.
+func TestGeminiCumulativeUsage(t *testing.T) {
+	body := []byte(strings.Repeat(geminiCumulativeUsageFrame, 1000))
+	o := NewObserver(channel.FormatGemini, true, "text/event-stream")
+	o.Write(body, time.Unix(0, 0))
+	got := o.Finish()
+	if !got.Found || got.Usage.InputTokens != 100 || got.Usage.OutputTokens != 70 || got.Frames != 1000 {
+		t.Fatalf("repeated cumulative frames: %+v", got)
 	}
 }
+
+const geminiCumulativeUsageFrame = `data: {"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":50,"thoughtsTokenCount":20,"totalTokenCount":170}}` + "\n\n"
