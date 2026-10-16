@@ -339,6 +339,12 @@ func (o *Observer) observeImageGeneration(item jsonObject, id string, eventStatu
 		child.absorb(append(append([]byte(`{"usage":`), raw...), '}'))
 		if child.found {
 			usage := child.Finish().Usage
+			// Finish points at a field inside the observer. Detach the facts so
+			// retaining a child usage cannot retain its borrowed JSON scratch.
+			if usage.Detail != nil {
+				detail := *usage.Detail
+				usage.Detail = &detail
+			}
 			// Repeated summaries may omit previously reported token subdivisions.
 			if image.Usage == nil {
 				image.Usage = &usage
