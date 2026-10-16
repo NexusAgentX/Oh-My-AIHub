@@ -46,15 +46,21 @@ func (scan objectScan) billingHints(body []byte, format channel.Format) billingH
 					Memory string `json:"memory_limit"`
 				}
 				if json.Unmarshal(tool.Container, &container) == nil && container.Type == "auto" {
-					hints.ContainerMemory = container.Memory
-					if hints.ContainerMemory == "" {
+					switch container.Memory {
+					case "":
 						hints.ContainerMemory = "1g"
+					case "1g", "1gb", "4g", "4gb", "16g", "16gb", "64g", "64gb":
+						hints.ContainerMemory = container.Memory
 					}
 				}
 			case "image_generation":
-				hints.ImageModel = tool.Model
+				if catalog.ValidModelID(tool.Model) {
+					hints.ImageModel = tool.Model
+				}
 			case "advisor_20260301":
-				hints.Submodels = append(hints.Submodels, tool.Model)
+				if catalog.ValidModelID(tool.Model) {
+					hints.Submodels = append(hints.Submodels, tool.Model)
+				}
 			}
 		}
 	}

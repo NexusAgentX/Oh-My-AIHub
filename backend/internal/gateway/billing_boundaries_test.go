@@ -123,6 +123,16 @@ func TestImageSubmodelUsageIsObservedButNeverCharged(t *testing.T) {
 	}
 }
 
+func TestBillingHintsDoNotRetainArbitraryToolContent(t *testing.T) {
+	body := []byte(`{"tools":[{"type":"image_generation","model":"private prompt text"},{"type":"advisor_20260301","model":"private advisor text"},{"type":"code_interpreter","container":{"type":"auto","memory_limit":"private container text"}}]}`)
+	_, scan, _ := ScanRequest(body)
+	hints := scan.billingHints(body, channel.FormatOpenAIResponses)
+	raw, err := json.Marshal(hints)
+	if err != nil || strings.Contains(string(raw), "private") || hints.ImageModel != "" || hints.ContainerMemory != "" || len(hints.Submodels) != 0 {
+		t.Fatalf("unreliable tool configuration must forward without being retained: %s err=%v", raw, err)
+	}
+}
+
 func TestRegionalEndpointRecognitionAndResponsePriority(t *testing.T) {
 	for _, tc := range []struct{ url, want string }{
 		{"https://us.api.openai.com", "us"},
