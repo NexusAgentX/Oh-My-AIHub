@@ -400,9 +400,7 @@ func validTokenPrices(prices map[string]money.Amount) bool {
 
 func validModalities(values []string) bool {
 	for _, value := range values {
-		switch value {
-		case "text", "image", "audio", "video":
-		default:
+		if value == "file" {
 			return false
 		}
 	}

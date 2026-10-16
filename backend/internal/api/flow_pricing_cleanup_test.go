@@ -25,6 +25,10 @@ func TestModelConfigurationRejectsRetiredPricingFields(t *testing.T) {
 			t.Fatalf("body=%v status=%d want=%d response=%s", tc.body, rec.Code, tc.code, rec.Body.String())
 		}
 	}
+	// Removing file must not reject custom modality labels accepted before.
+	admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/models/pricing-cleanup", map[string]any{
+		"input_modalities": []string{"document"}, "output_modalities": []string{"custom"},
+	})
 	for _, serviceTier := range []string{"openai:fast", "openai:ultrafast", "anthropic:priority", "gemini:priority"} {
 		model := admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/models/pricing-cleanup", map[string]any{
 			"price_tiers":      []any{map[string]any{"service_tier": serviceTier, "prices": prices}},

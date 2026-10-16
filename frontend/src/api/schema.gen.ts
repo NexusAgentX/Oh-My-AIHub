@@ -2147,8 +2147,8 @@ export interface components {
             provider: string;
             context_window: number | null;
             max_output_tokens: number | null;
-            input_modalities: ("text" | "image" | "audio" | "video")[];
-            output_modalities: ("text" | "image" | "audio" | "video")[];
+            input_modalities: string[];
+            output_modalities: string[];
             supports_tools: boolean;
             supports_structured_output: boolean;
             supports_vision: boolean;
@@ -2175,8 +2175,8 @@ export interface components {
             provider?: string;
             context_window?: number | null;
             max_output_tokens?: number | null;
-            input_modalities?: ("text" | "image" | "audio" | "video")[];
-            output_modalities?: ("text" | "image" | "audio" | "video")[];
+            input_modalities?: string[];
+            output_modalities?: string[];
             supports_tools?: boolean;
             supports_structured_output?: boolean;
             supports_vision?: boolean;
@@ -2194,8 +2194,8 @@ export interface components {
             provider?: string;
             context_window?: number | null;
             max_output_tokens?: number | null;
-            input_modalities?: ("text" | "image" | "audio" | "video")[];
-            output_modalities?: ("text" | "image" | "audio" | "video")[];
+            input_modalities?: string[];
+            output_modalities?: string[];
             supports_tools?: boolean;
             supports_structured_output?: boolean;
             supports_vision?: boolean;
@@ -2208,8 +2208,8 @@ export interface components {
             provider: string;
             context_window: number | null;
             max_output_tokens: number | null;
-            input_modalities: ("text" | "image" | "audio" | "video")[];
-            output_modalities: ("text" | "image" | "audio" | "video")[];
+            input_modalities: string[];
+            output_modalities: string[];
             supports_tools: boolean;
             supports_structured_output: boolean;
             supports_vision: boolean;
