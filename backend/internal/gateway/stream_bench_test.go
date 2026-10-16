@@ -169,3 +169,29 @@ func BenchmarkUsageFrameFilter(b *testing.B) {
 		filter.Flush()
 	}
 }
+
+// BenchmarkJSONSettlement isolates nonstream Responses parsing, pricing and
+// settlement from network, database and their pools. One op includes a bill.
+
+func BenchmarkJSONSettlement(b *testing.B) {
+	upstream := gatewaybench.NewUpstream(gatewaybench.Profile{Tokens: 64, InputTokens: 50})
+	rec := httptest.NewRecorder()
+	upstream.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"m"}`)))
+	raw := rec.Body.Bytes()
+	store := &speedStore{}
+	engine := NewEngine(Dependencies{Store: store, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	model := catalog.Model{ID: "m", PriceCurrency: "CNY", InputPrice: 1_000_000_000, OutputPrice: 1_000_000_000}
+	candidate := Candidate{ChannelID: "channel", OwnerID: "sharer", MultiplierNano: 1_000_000_000, RateNano: 1_000_000_000}
+	defaults := settings.Settings{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		response := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(""))}
+		call := &callState{id: "call", started: time.Now(), format: channel.FormatOpenAIResponses, key: KeyAuth{OwnerID: "consumer"}, attempts: []Attempt{{}}}
+		client := &nullClient{header: http.Header{}}
+		engine.streamBack(client, call, model, candidate, attemptResult{response: response, first: raw, firstErr: io.EOF, upstream: context.Background(), cancel: func(error) {}, watch: watchClient(context.Background(), func(error) {}, drainWindow), started: time.Now()}, defaults)
+		if client.writes == 0 || store.finish.Bill == nil || store.finish.Cost != 114000 {
+			b.Fatalf("response was not billed: %+v", store.finish)
+		}
+	}
+}
