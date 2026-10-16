@@ -441,7 +441,7 @@ it('shows per-inference usage and no tool surcharge', () => {
   const part = { base_prices: prices, prices, tier: null, multiplier: '1', fee_rate_nano: 0,
     detail: { inference_geo: 'us' }, selected_prices: { ...prices, geo_multipliers: { us: '1.1' } } }
   const markup = renderToStaticMarkup(<PriceSnapshotView snapshot={{ ...part,
-    detail: { units_nano: { container_1gb: 1000000000 } },
+    detail: { units_nano: { container_1gb: 1000000000, image_generation: 1000000000 } },
     components: [{ model: 'advisor', kind: 'advisor_message', usage: { input_tokens: 17, output_tokens: 23, cache_read_tokens: 0, cache_write_tokens: 0 }, price_snapshot: part }],
   }} />)
   expect(markup).toContain('按各次推理分别选档')
@@ -450,4 +450,5 @@ it('shows per-inference usage and no tool surcharge', () => {
   expect(markup).toContain('23')
   expect(markup).toContain('token 倍率 1.1')
   expect(markup).toContain('暂不收取工具附加费')
+  expect(markup).toContain('图像生成 / 次')
 })

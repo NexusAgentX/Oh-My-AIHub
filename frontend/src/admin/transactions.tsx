@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { tokenPriceLabels,unitPriceLabels } from '../models/tokenPricing'
+import { tokenPriceLabels, unitPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { MultiplierText } from '../money/MultiplierText'

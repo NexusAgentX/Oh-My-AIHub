@@ -5,21 +5,27 @@ import (
 	"encoding/json"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 )
 
 type billingHints struct {
-	Background      bool
-	ContainerMemory string
-	ImageModel      string
-	Submodels       []string
+	Background              bool
+	ContainerMemory         string
+	ImageModel              string
+	Submodels               []string
+	GeminiToolInputBillable bool
 }
 
-func (scan objectScan) billingHints(body []byte) billingHints {
+func (scan objectScan) billingHints(body []byte, format channel.Format) billingHints {
 	var hints billingHints
 	if member, ok := scan.last("background"); ok {
 		hints.Background = string(body[member.start:member.end]) == "true"
 	}
 	if member, ok := scan.last("tools"); ok {
+		if format == channel.FormatGemini {
+			hints.GeminiToolInputBillable = geminiBillableTools(body[member.start:member.end])
+			return hints
+		}
 		var tools []struct {
 			Type      string          `json:"type"`
 			Model     string          `json:"model"`
@@ -47,13 +53,40 @@ func (scan objectScan) billingHints(body []byte) billingHints {
 				}
 			case "image_generation":
 				hints.ImageModel = tool.Model
-				hints.Submodels = append(hints.Submodels, tool.Model)
 			case "advisor_20260301":
 				hints.Submodels = append(hints.Submodels, tool.Model)
 			}
 		}
 	}
 	return hints
+}
+
+// Only explicitly configured, exclusively non-grounding server tools establish
+// a billable source. Unknown, mixed and oversized configurations still forward.
+func geminiBillableTools(raw []byte) bool {
+	if len(raw) > 1<<20 {
+		return false
+	}
+	var tools []map[string]json.RawMessage
+	if json.Unmarshal(raw, &tools) != nil || len(tools) == 0 || len(tools) > maxBillingItems {
+		return false
+	}
+	for _, tool := range tools {
+		if len(tool) != 1 {
+			return false
+		}
+		for name, config := range tool {
+			switch name {
+			case "code_execution", "codeExecution", "url_context", "urlContext", "file_search", "fileSearch":
+				if len(config) == 0 || config[0] != '{' {
+					return false
+				}
+			default:
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (e *Engine) captureSubmodels(ctx context.Context, hints billingHints) ([]catalog.Model, error) {
@@ -70,13 +103,6 @@ func (e *Engine) captureSubmodels(ctx context.Context, hints billingHints) ([]ca
 		for _, name := range hints.Submodels {
 			if model.ID == name {
 				match = true
-			}
-			if name == "" {
-				for _, modality := range model.OutputModalities {
-					if modality == "image" {
-						match = true
-					}
-				}
 			}
 		}
 		if match && len(result) < maxBillingItems {

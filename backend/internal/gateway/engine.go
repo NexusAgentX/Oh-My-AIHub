@@ -432,7 +432,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// scan rejects only means there are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
-	call.hints = scan.billingHints(body)
+	call.hints = scan.billingHints(body, format)
 	if call.hints.Background {
 		call.upstreamHeaders = http.Header{}
 		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
@@ -514,16 +514,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 
-	for _, submodel := range call.hints.Submodels {
-		if len(key.AllowedModels) > 0 && !containsString(key.AllowedModels, submodel) {
-			e.finishRejected(w, call, OutcomeRejectedModel, 403, "model_not_allowed", "该 API Key 不允许使用子模型")
-			return
-		}
-	}
 	call.submodels, err = e.captureSubmodels(ctx, call.hints)
 	if err != nil {
-		e.internalError(w, call, err)
-		return
+		e.Logger.Warn("gateway: submodel prices unavailable; forwarding without submodel charges", "request_id", call.id)
 	}
 	// Balance and budgets are checked, never reserved (Epic #170 decision 6).
 	points, err := e.Store.Points(ctx, key.OwnerID)
@@ -1347,6 +1340,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
+	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
 	observer.configureThinkingPricing(model.PriceTiers, call.thinkingRequested)
 	var written, upstreamBytes int64
 	var clientWriteTime time.Duration

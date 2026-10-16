@@ -77,12 +77,13 @@ type Observer struct {
 	protocolClientError bool
 	maxGap              time.Duration
 	// anthropic reports its fields in two events; track which were seen.
-	anthropic       anthropicUsage
-	openai          openAIUsageState
-	geminiToolAdded int64
-	iterationsSeen  bool
-	iterationOffset anthropicUsage
-	iterationMask   uint8
+	anthropic               anthropicUsage
+	openai                  openAIUsageState
+	geminiToolAdded         int64
+	geminiToolInputBillable bool
+	iterationsSeen          bool
+	iterationOffset         anthropicUsage
+	iterationMask           uint8
 	// members is the scratch space the members of an event's objects are
 	// listed in (see objectOf).
 	members []jsonMember

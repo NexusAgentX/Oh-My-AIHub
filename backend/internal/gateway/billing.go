@@ -76,8 +76,12 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 		}
 	}
 	for _, iteration := range d.Iterations {
+		if iteration.Type == "image_generation_call" {
+			d.Notes = appendNote(d.Notes, "图像工具仅作观察，暂不收取图像子模型费用")
+			continue
+		}
 		m := model
-		if iteration.Type == "advisor_message" || iteration.Type == "image_generation_call" || iteration.Model != "" && iteration.Model != model.ID && iteration.Model != candidate.UpstreamModel {
+		if iteration.Type == "advisor_message" || iteration.Model != "" && iteration.Model != model.ID && iteration.Model != candidate.UpstreamModel {
 			found := false
 			for _, child := range call.submodels {
 				if child.ID == iteration.Model {
@@ -118,7 +122,8 @@ func boundedModelName(value string) string {
 }
 
 func endpointGeo(base string) string {
-	if !strings.Contains(base, "us.api.openai.com") && !strings.Contains(base, "eu.api.openai.com") && !strings.Contains(base, "aiplatform.googleapis.com") {
+	lower := strings.ToLower(base)
+	if !strings.Contains(lower, "us.api.openai.com") && !strings.Contains(lower, "eu.api.openai.com") && !strings.Contains(lower, "aiplatform.googleapis.com") {
 		return ""
 	}
 	parsed, err := url.Parse(base)

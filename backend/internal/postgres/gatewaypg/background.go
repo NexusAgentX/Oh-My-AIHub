@@ -47,9 +47,9 @@ func (s *Store) RetryBackground(ctx context.Context, id string, at time.Time) er
 // VerifyBackgroundCredentials pages all retained ciphertext snapshots, including
 // completed jobs that the follow-up API can still retrieve.
 func (s *Store) VerifyBackgroundCredentials(ctx context.Context, keyring *channel.Keyring) error {
-	after := ""
+	after := "00000000-0000-0000-0000-000000000000"
 	for {
-		rows, err := s.pool.Query(ctx, `SELECT call_id::text, metadata FROM gateway_background_jobs WHERE call_id::text>$1 ORDER BY call_id::text LIMIT 128`, after)
+		rows, err := s.pool.Query(ctx, `SELECT call_id::text, metadata FROM gateway_background_jobs WHERE call_id>$1::uuid ORDER BY call_id LIMIT 128`, after)
 		if err != nil {
 			return err
 		}

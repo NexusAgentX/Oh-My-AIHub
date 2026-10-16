@@ -13,6 +13,7 @@ export const tokenPriceLabels: Record<string, string> = {
 
 export const unitPriceLabels: Record<string, string> = {
   web_search: '网页搜索 / 次',
+  image_generation: '图像生成 / 次',
   file_search: '文件搜索 / 次',
   google_search_query: 'Google 搜索 / 查询',
   google_search_prompt: 'Google 搜索 / 请求',

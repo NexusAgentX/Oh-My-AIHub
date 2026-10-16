@@ -123,7 +123,7 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		current := o.detail.Units[key] / ledger.FixedPointScale
 		o.unit(key, current+1)
 	case "code_interpreter_call":
-		// container IDs are charged once per call, never once per output chunk.
+		// Observe each container once, never once per output chunk.
 		container := textValue(item.get("container_id"))
 		if container == "" {
 			o.note("容器规格缺失，未按规格统计")
@@ -161,6 +161,8 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		o.unit(key, o.detail.Units[key]/ledger.FixedPointScale+1)
 
 	case "image_generation_call":
+		o.unit("image_generation", o.detail.Units["image_generation"]/ledger.FixedPointScale+1)
+		o.note("图像工具仅作观察，暂不收取图像子模型费用")
 		model := textValue(item.get("model"))
 		if model == "" {
 			model = o.imageModel
@@ -214,7 +216,7 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 		o.usage.InputTokens -= o.geminiToolAdded
 		o.geminiToolAdded = 0
 	}
-	if n > 0 && !grounded {
+	if n > 0 && !grounded && o.geminiToolInputBillable {
 		// usage summaries are cumulative; absorbGemini replaced the input first.
 		if total, valid := sumTokens(o.usage.InputTokens, n); valid {
 			o.usage.InputTokens = total
@@ -223,6 +225,8 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 		} else {
 			o.note("工具输入总量无效，未计价")
 		}
+	} else if n > 0 && !grounded {
+		o.note("工具输入来源未确认，未另行计价")
 	}
 }
 

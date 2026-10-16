@@ -40,7 +40,7 @@ func TestBillingGeminiTrafficAndGrounding(t *testing.T) {
 	}{
 		{"flex", `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"trafficType":"ON_DEMAND_FLEX"}}`, "gemini:flex", 100, ""},
 		{"actual service wins", `{"usageMetadata":{"promptTokenCount":100,"serviceTier":"STANDARD","trafficType":"ON_DEMAND_FLEX"}}`, "gemini:STANDARD", 100, ""},
-		{"code", `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"toolUsePromptTokenCount":30,"totalTokenCount":150}}`, "", 130, ""},
+		{"unattributed tool input", `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"toolUsePromptTokenCount":30,"totalTokenCount":150}}`, "", 100, ""},
 		{"search", `{"candidates":[{"groundingMetadata":{"webSearchQueries":["q"]}}],"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"toolUsePromptTokenCount":30}}`, "", 100, "google_search_query"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
