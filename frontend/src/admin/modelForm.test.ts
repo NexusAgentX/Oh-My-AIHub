@@ -179,20 +179,10 @@ it('keeps explicit zero, omits inherited detail prices and accepts response cond
   expect(formToTierInput(form).service_tier).toBe('openai:default')
 })
 
-it('preserves free units and geography, and rejects duplicate grounding charges', () => {
-  const form = tier({
-    minPromptTokens: '1',
-    prices: { input: '1', output: '2', cache_read: '0', cache_write: '0',
-      unit_prices: { web_search: '0', google_search_query: '0.014', file_search: '' },
-      geo_multipliers: { us: '1.1', eu: '' },
-    },
-  })
+it('preserves explicit region multipliers and rejects invalid rates', () => {
+  const form = tier({ minPromptTokens: '1', prices: { input: '1', output: '2', cache_read: '0', cache_write: '0', geo_multipliers: { us: '1.1', eu: '0', global: '' } } })
   expect(validateTier(form)).toEqual({})
-  expect(formToTierInput(form).prices.unit_prices).toEqual({ web_search: '0', google_search_query: '0.014' })
-  expect(formToTierInput(form).prices.geo_multipliers).toEqual({ us: '1.1' })
-  form.prices.unit_prices!.google_search_prompt = '0.035'
-  expect(validateTier(form).prices).toBeTruthy()
-  delete form.prices.unit_prices!.google_search_prompt
+  expect(formToTierInput(form).prices.geo_multipliers).toEqual({ us: '1.1', eu: '0' })
   form.prices.geo_multipliers!.us = '101'
   expect(validateTier(form).prices).toBeTruthy()
 })

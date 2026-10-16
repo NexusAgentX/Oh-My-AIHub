@@ -5,8 +5,8 @@ import "strings"
 // UsageDetail contains billing and observation facts, never prompt or reasoning content.
 // Tokens are disjoint subsets of the four summary buckets, not extra usage.
 type UsageDetail struct {
-	InferenceGeo         string           `json:"inference_geo,omitempty"`
-	UnitEvents           []UnitEvent      `json:"unit_events,omitempty"`
+	InferenceGeo string `json:"inference_geo,omitempty"`
+
 	Units                map[string]int64 `json:"units_nano,omitempty"`
 	Iterations           []UsageIteration `json:"iterations,omitempty"`
 	RequestedServiceTier string           `json:"requested_service_tier,omitempty"`
@@ -40,11 +40,4 @@ type UsageIteration struct {
 	Type  string `json:"type"`
 	Model string `json:"model,omitempty"`
 	Usage Usage  `json:"usage"`
-}
-
-// UnitEvent identifies a provider resource charged once across calls.
-type UnitEvent struct {
-	Unit         string `json:"unit"`
-	ID           string `json:"id"`
-	QuantityNano int64  `json:"quantity_nano"`
 }

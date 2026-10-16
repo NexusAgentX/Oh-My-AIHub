@@ -13,13 +13,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
-func unitPriceStrings(values map[string]money.Amount) map[string]string {
-	out := map[string]string{}
-	for k, v := range values {
-		out[k] = v.String()
-	}
-	return out
-}
 func geoPriceStrings(values map[string]int64) map[string]string {
 	out := map[string]string{}
 	for k, v := range values {
@@ -29,14 +22,16 @@ func geoPriceStrings(values map[string]int64) map[string]string {
 }
 
 func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Candidate, usage ledger.Usage, defaults settings.Settings, feeRate int64) (ledger.PriceResult, []byte, error) {
-	if usage.Detail == nil {
-		usage.Detail = &ledger.UsageDetail{}
-	}
-	if usage.Detail.InferenceGeo == "" {
-		usage.Detail.InferenceGeo = endpointGeo(candidate.BaseURL)
+	if usage.Detail == nil || usage.Detail.InferenceGeo == "" {
+		if geo := endpointGeo(candidate.BaseURL); geo != "" {
+			if usage.Detail == nil {
+				usage.Detail = &ledger.UsageDetail{}
+			}
+			usage.Detail.InferenceGeo = geo
+		}
 	}
 	// The ordinary path still performs one pricing calculation and no catalog lookups.
-	if len(usage.Detail.Iterations) == 0 {
+	if usage.Detail == nil || len(usage.Detail.Iterations) == 0 {
 		noteSelectedUnpriced(usage, model, call.started)
 		priced, err := ledger.CalculatePriceAt(usage, model.BasePrices(), model.PriceTiers, call.started, candidate.MultiplierNano, candidate.RateNano, feeRate)
 		if err != nil {
@@ -46,7 +41,8 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 	}
 	d := usage.Detail
 	type component struct {
-		Model    string          `json:"model"`
+		Model string `json:"model"`
+
 		Kind     string          `json:"kind"`
 		Usage    ledger.Usage    `json:"usage"`
 		Snapshot json.RawMessage `json:"price_snapshot"`
@@ -70,7 +66,7 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 	}
 	// Anthropic iterations replace the aggregate tokens. Other sub-inferences
 	// (Responses image tools) supplement the main model's own usage.
-	if call.format != "anthropic" {
+	if call.format != "anthropic" || len(d.Iterations) == 0 {
 		base := usage
 		copyDetail := *d
 		copyDetail.Iterations = nil
@@ -99,12 +95,7 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 			return ledger.PriceResult{}, nil, err
 		}
 	}
-	if call.format == "anthropic" && len(d.Units) > 0 {
-		u := ledger.Usage{Detail: &ledger.UsageDetail{Units: d.Units}}
-		if err := appendPart(model, u, "tools"); err != nil {
-			return ledger.PriceResult{}, nil, err
-		}
-	}
+
 	priced, err := ledger.CombinePrices(parts, feeRate)
 	if err != nil {
 		return priced, nil, err
@@ -127,6 +118,9 @@ func boundedModelName(value string) string {
 }
 
 func endpointGeo(base string) string {
+	if !strings.Contains(base, "us.api.openai.com") && !strings.Contains(base, "eu.api.openai.com") && !strings.Contains(base, "aiplatform.googleapis.com") {
+		return ""
+	}
 	parsed, err := url.Parse(base)
 	if err != nil {
 		return ""
@@ -149,25 +143,11 @@ func endpointGeo(base string) string {
 	return ""
 }
 func noteUnpriced(d *ledger.UsageDetail, prices ledger.Prices) {
-	for key, quantity := range d.Units {
-		if quantity > 0 {
-			if _, ok := prices.UnitPrices[key]; !ok {
-				d.Notes = appendNote(d.Notes, "工具 "+key+" 未配置单价，未计价")
-			}
-		}
-	}
 	if d.InferenceGeo != "" && d.InferenceGeo != "global" {
 		if _, ok := prices.GeoMultipliers[d.InferenceGeo]; !ok {
 			d.Notes = appendNote(d.Notes, "地域 "+d.InferenceGeo+" 未配置倍率，按基础价格")
 		}
 	}
-}
-
-func feeRateFor(call *callState, candidate Candidate, defaults settings.Settings) int64 {
-	if call.key.OwnerID == candidate.OwnerID {
-		return 0
-	}
-	return defaults.FeeRateNano
 }
 
 func appendNote(notes []string, note string) []string {

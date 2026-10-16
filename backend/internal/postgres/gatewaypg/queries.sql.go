@@ -152,31 +152,6 @@ func (q *Queries) ClaimBackground(ctx context.Context, now time.Time) ([]Gateway
 	return items, nil
 }
 
-const claimUnitReceipt = `-- name: ClaimUnitReceipt :execrows
-INSERT INTO gateway_unit_receipts (channel_id,unit,reference_id,call_id)
-VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING
-`
-
-type ClaimUnitReceiptParams struct {
-	ChannelID   string
-	Unit        string
-	ReferenceID string
-	CallID      string
-}
-
-func (q *Queries) ClaimUnitReceipt(ctx context.Context, arg ClaimUnitReceiptParams) (int64, error) {
-	result, err := q.db.Exec(ctx, claimUnitReceipt,
-		arg.ChannelID,
-		arg.Unit,
-		arg.ReferenceID,
-		arg.CallID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const customModelOnline = `-- name: CustomModelOnline :one
 SELECT EXISTS (
     SELECT 1
@@ -904,17 +879,6 @@ func (q *Queries) LoadGeoCache(ctx context.Context) ([]LoadGeoCacheRow, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const lockBillableCall = `-- name: LockBillableCall :one
-SELECT id FROM calls WHERE id=$1 AND outcome='in_progress' FOR UPDATE
-`
-
-func (q *Queries) LockBillableCall(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRow(ctx, lockBillableCall, id)
-	var id_2 string
-	err := row.Scan(&id_2)
-	return id_2, err
 }
 
 const lookupBackground = `-- name: LookupBackground :one

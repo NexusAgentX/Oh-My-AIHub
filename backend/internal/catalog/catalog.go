@@ -45,12 +45,12 @@ type Model struct {
 	// PriceCurrency is the currency of every price of the model (base prices,
 	// fine-grained prices and tiers): ledger.CurrencyCNY prices are points,
 	// ledger.CurrencyUSD prices are converted at the platform exchange rate.
-	PriceCurrency            string
-	InputPrice               money.Amount
-	OutputPrice              money.Amount
-	CacheWritePrice          money.Amount
-	CacheReadPrice           money.Amount
-	UnitPrices               map[string]money.Amount
+	PriceCurrency   string
+	InputPrice      money.Amount
+	OutputPrice     money.Amount
+	CacheWritePrice money.Amount
+	CacheReadPrice  money.Amount
+
 	GeoMultipliers           map[string]int64
 	TokenPrices              map[string]money.Amount
 	PriceTiers               []ledger.PriceTier
@@ -95,13 +95,11 @@ func (m Model) InPoints(usdRateNano int64) Model {
 	converted.InputPrice, converted.OutputPrice = convert(m.InputPrice), convert(m.OutputPrice)
 	converted.CacheWritePrice, converted.CacheReadPrice = convert(m.CacheWritePrice), convert(m.CacheReadPrice)
 	converted.TokenPrices = convertMap(m.TokenPrices)
-	converted.UnitPrices = convertMap(m.UnitPrices)
 	converted.PriceTiers = make([]ledger.PriceTier, len(m.PriceTiers))
 	for index, tier := range m.PriceTiers {
 		tier.InputPrice, tier.OutputPrice = convert(tier.InputPrice), convert(tier.OutputPrice)
 		tier.CacheWritePrice, tier.CacheReadPrice = convert(tier.CacheWritePrice), convert(tier.CacheReadPrice)
 		tier.TokenPrices = convertMap(tier.TokenPrices)
-		tier.UnitPrices = convertMap(tier.UnitPrices)
 		converted.PriceTiers[index] = tier
 	}
 	return converted
@@ -110,7 +108,7 @@ func (m Model) InPoints(usdRateNano int64) Model {
 // BasePrices projects the four base prices into the pricing formula input.
 func (m Model) BasePrices() ledger.Prices {
 	return ledger.Prices{
-		UnitPrices: m.UnitPrices, GeoMultipliers: m.GeoMultipliers,
+		GeoMultipliers:  m.GeoMultipliers,
 		TokenPrices:     m.TokenPrices,
 		InputPerMillion: m.InputPrice, OutputPerMillion: m.OutputPrice,
 		CacheWritePerMillion: m.CacheWritePrice, CacheReadPerMillion: m.CacheReadPrice,
@@ -119,13 +117,13 @@ func (m Model) BasePrices() ledger.Prices {
 
 // ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
 type ModelPatch struct {
-	DisplayName              *string
-	PriceCurrency            *string
-	InputPrice               *money.Amount
-	OutputPrice              *money.Amount
-	CacheWritePrice          *money.Amount
-	CacheReadPrice           *money.Amount
-	UnitPrices               *map[string]money.Amount
+	DisplayName     *string
+	PriceCurrency   *string
+	InputPrice      *money.Amount
+	OutputPrice     *money.Amount
+	CacheWritePrice *money.Amount
+	CacheReadPrice  *money.Amount
+
 	GeoMultipliers           *map[string]int64
 	TokenPrices              *map[string]money.Amount
 	PriceTiers               *[]ledger.PriceTier
@@ -169,9 +167,6 @@ func (p ModelPatch) Apply(model Model) Model {
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
 	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
-	if p.UnitPrices != nil {
-		model.UnitPrices = *p.UnitPrices
-	}
 	if p.GeoMultipliers != nil {
 		model.GeoMultipliers = *p.GeoMultipliers
 	}
@@ -356,7 +351,7 @@ func Validate(model Model) error {
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
-	if !validBillingPrices(model.UnitPrices, model.GeoMultipliers) || !validTokenPrices(model.TokenPrices) {
+	if !validGeoPrices(model.GeoMultipliers) || !validTokenPrices(model.TokenPrices) {
 		return ErrInvalidInput
 	}
 	return validatePriceTiers(model.PriceTiers)
@@ -367,7 +362,7 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
-		if !validBillingPrices(tier.UnitPrices, tier.GeoMultipliers) || !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
+		if !validGeoPrices(tier.GeoMultipliers) || !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
 			return ErrInvalidInput
 		}
 		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
@@ -411,21 +406,9 @@ func validTokenPrices(prices map[string]money.Amount) bool {
 
 var geoPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 
-func validBillingPrices(units map[string]money.Amount, geo map[string]int64) bool {
-	if len(units) > 32 || len(geo) > 32 {
+func validGeoPrices(geo map[string]int64) bool {
+	if len(geo) > 32 {
 		return false
-	}
-	for _, pair := range [][2]string{{"google_search_query", "google_search_prompt"}, {"google_maps_query", "google_maps_prompt"}} {
-		_, a := units[pair[0]]
-		_, b := units[pair[1]]
-		if a && b {
-			return false
-		}
-	}
-	for key, value := range units {
-		if !ledger.ValidUnit(key) || !validPrice(value) {
-			return false
-		}
 	}
 	for key, value := range geo {
 		if !geoPattern.MatchString(key) || value < 0 || value > 100*ledger.FixedPointScale {

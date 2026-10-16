@@ -12,7 +12,7 @@ export type PricesForm = {
   output: string
   cache_write: string
   cache_read: string
-  unit_prices?: Record<string, string>
+
   geo_multipliers?: Record<string, string>
   token_prices?: Record<string, string>
 }
@@ -121,7 +121,6 @@ function trimPrices(prices: PricesForm): ModelPrices {
     Object.entries(values).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, value.trim()]),
   )
   return {
-    ...(prices.unit_prices ? { unit_prices: clean(prices.unit_prices) } : {}),
     ...(prices.geo_multipliers ? { geo_multipliers: clean(prices.geo_multipliers) } : {}),
     ...(prices.token_prices
       ? {
@@ -165,17 +164,11 @@ export function validatePrices(prices: PricesForm) {
       return '地域倍率为 0～100，最多 9 位小数'
     }
   }
-  for (const pair of [['google_search_query', 'google_search_prompt'], ['google_maps_query', 'google_maps_prompt']]) {
-    if (pair.every((key) => (prices.unit_prices?.[key] ?? '').trim() !== '')) {
-      return '同一种 grounding 只能选择按查询或按请求收费'
-    }
-  }
   return [
     prices.input,
     prices.output,
     prices.cache_read,
     prices.cache_write,
-    ...Object.values(prices.unit_prices ?? {}).filter((value) => value.trim() !== ''),
     ...Object.values(prices.token_prices ?? {}).filter((v) => v.trim() !== ''),
   ].every(isValidPrice)
     ? ''

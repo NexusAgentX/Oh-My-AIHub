@@ -45,20 +45,24 @@ type BackgroundStore interface {
 }
 
 type backgroundMetadata struct {
-	Started     time.Time
-	Key         KeyAuth
-	Candidate   Candidate
-	Model       catalog.Model
-	Submodels   []catalog.Model
-	Settings    settings.Settings
-	Requested   string
-	ModelID     string
-	Stream      bool
-	Attempts    []Attempt
-	Diagnostics Diagnostics
-	Hints       billingHints
-	Location    authLocation
-	Headers     http.Header
+	RequestedServiceTier string
+	ThinkingRequested    *bool
+	Mode                 routing.Mode
+	Source               routing.Source
+	Started              time.Time
+	Key                  KeyAuth
+	Candidate            Candidate
+	Model                catalog.Model
+	Submodels            []catalog.Model
+	Settings             settings.Settings
+	Requested            string
+	ModelID              string
+	Stream               bool
+	Attempts             []Attempt
+	Diagnostics          Diagnostics
+	Hints                billingHints
+	Location             authLocation
+	Headers              http.Header
 }
 
 type backgroundLease struct{ account, channel func() }
@@ -122,14 +126,28 @@ func terminalResponse(status string) bool {
 	return false
 }
 
-func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate Candidate, defaults settings.Settings, id string) error {
+func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate Candidate, defaults settings.Settings, id string) (saveErr error) {
 	if call.pending || call.polling {
 		return nil
 	}
 	if e.Jobs == nil || !responseIDPattern.MatchString(id) {
 		return errors.New("invalid background response metadata")
 	}
-	metadata := backgroundMetadata{Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, ThinkingRequested: call.thinkingRequested, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	defer func() {
+		if saveErr == nil {
+			return
+		}
+		// A failed durable registration must not silently leave provider work running.
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		response, _, err := e.backgroundExchange(ctx, metadata, id, http.MethodPost, "cancel", "")
+		if err == nil {
+			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxFailureBody))
+			response.Body.Close()
+		}
+	}()
+
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return err
@@ -205,7 +223,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		e.Logger.Error("gateway: invalid task metadata", "request_id", job.CallID)
 		return
 	}
-	call := &callState{id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, thinkingRequested: metadata.ThinkingRequested, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
 	if !e.Now().Before(job.Deadline) {
 		// Cancellation may return final usage. Feed it through normal settlement
 		// before falling back to an interrupted call without reliable usage.

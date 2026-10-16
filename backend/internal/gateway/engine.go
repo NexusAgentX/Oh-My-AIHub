@@ -1396,6 +1396,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			if err := e.keepBackground(call, model, candidate, defaults, observer.responseID); err != nil {
 				e.Logger.Error("gateway: saving background response failed", "request_id", call.id, "error", err)
 				result.cancel(err)
+				undelivered = true
+				watch.left()
+				return
 			}
 		}
 		if strip != nil {
@@ -1447,6 +1450,22 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	duration := int(e.Now().Sub(call.started).Milliseconds())
 	ttftFromStart := int(result.started.Sub(call.started).Milliseconds()) + int(result.ttft.Milliseconds())
+	if call.polling && len(call.attempts) > 0 {
+		previous := call.attempts[len(call.attempts)-1]
+		if previous.TTFTMS != nil {
+			ttftFromStart = *previous.TTFTMS
+			if previous.OffsetMS != nil {
+				ttftFromStart += *previous.OffsetMS
+			}
+		}
+		// Polling sees the final object, not the original client's delivery or
+		// generation cadence. Do not publish invented streaming measurements.
+		call.diagnostics.Frames = 0
+		call.diagnostics.MaxFrameGapMS = nil
+		call.diagnostics.Delivery = "not_observed"
+		written = 0
+		observation.IntervalP50MS, observation.IntervalP95MS = nil, nil
+	}
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
@@ -1492,7 +1511,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.stream {
 		speedMillis -= ttftFromStart
 	}
-	if observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
+	if !call.polling && observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
 		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
 		finish.TokensPerSecond = &speed
 	}
@@ -1519,12 +1538,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		}
 	}
 	call.stage("pricing", pricingAt, e.Now())
-	if observation.Usage.Detail != nil && len(observation.Usage.Detail.UnitEvents) > 0 {
-		finish.Reprice = func(usage ledger.Usage) (money.Amount, money.Amount, []byte, error) {
-			p, snapshot, err := e.priceUsage(call, model, candidate, usage, defaults, feeRateFor(call, candidate, defaults))
-			return p.Cost, p.Fee, snapshot, err
-		}
-	}
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
 
@@ -1537,14 +1550,6 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 	outcome, err := e.finishCall(ctx, call, finish)
 	closed := err == nil
 	finished := outcome.Finished
-	if outcome.Adjusted != nil {
-		finish.Cost, finish.Fee, finish.PriceSnapshot, finish.Usage = outcome.Adjusted.Cost, outcome.Adjusted.Fee, outcome.Adjusted.Snapshot, outcome.Adjusted.Usage
-		if finish.Bill != nil {
-			copyBill := *finish.Bill
-			copyBill.Cost, copyBill.Fee = finish.Cost, finish.Fee
-			finish.Bill = &copyBill
-		}
-	}
 
 	if err != nil {
 		e.Logger.Error("gateway: booking call failed", "request_id", call.id, "error", err)
@@ -1599,11 +1604,11 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 			"input": price(model.InputPrice), "output": price(model.OutputPrice),
 			"cache_write": price(model.CacheWritePrice), "cache_read": price(model.CacheReadPrice),
 		},
-		"detail":      usage.Detail,
-		"unit_prices": unitPriceStrings(model.UnitPrices), "geo_multipliers": geoPriceStrings(model.GeoMultipliers),
+		"detail":               usage.Detail,
+		"geo_multipliers":      geoPriceStrings(model.GeoMultipliers),
 		"token_prices":         map[string]string{},
 		"base_token_prices":    map[string]string{},
-		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}, "unit_prices": unitPriceStrings(effective.UnitPrices), "geo_multipliers": geoPriceStrings(effective.GeoMultipliers)},
+		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}, "geo_multipliers": geoPriceStrings(effective.GeoMultipliers)},
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,

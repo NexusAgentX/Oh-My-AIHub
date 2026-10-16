@@ -1972,10 +1972,6 @@ export interface components {
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
-            /** @description 按单位计价的工具费用；缺失不收费，零为免费，使用模型币种。键与单位见产品计费规则。 */
-            unit_prices?: {
-                [key: string]: components["schemas"]["Price"];
-            };
             /** @description 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。 */
             geo_multipliers?: {
                 [key: string]: string;
@@ -2740,17 +2736,21 @@ export interface components {
             ttft_ms: number | null;
             duration_ms: number | null;
         };
+        InferenceUsage: {
+            input_tokens: number;
+            output_tokens: number;
+            cache_read_tokens: number;
+            cache_write_tokens: number;
+            detail?: Record<string, never>;
+        };
         /** @description 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。 */
         PriceSnapshot: {
             components?: {
                 model: string;
                 kind: string;
-                usage: Record<string, never>;
+                usage: components["schemas"]["InferenceUsage"];
                 price_snapshot: components["schemas"]["PriceSnapshot"];
             }[];
-            unit_prices?: {
-                [key: string]: string;
-            };
             geo_multipliers?: {
                 [key: string]: string;
             };
@@ -2776,7 +2776,6 @@ export interface components {
                 /** @description 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。 */
                 thinking_observed?: boolean;
                 inference_geo?: string;
-                unit_events?: Record<string, never>[];
                 units_nano?: {
                     [key: string]: number;
                 };

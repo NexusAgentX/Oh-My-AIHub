@@ -263,10 +263,3 @@ UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_
 
 -- name: SettleBackground :exec
 UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL;
-
--- name: LockBillableCall :one
-SELECT id FROM calls WHERE id=$1 AND outcome='in_progress' FOR UPDATE;
-
--- name: ClaimUnitReceipt :execrows
-INSERT INTO gateway_unit_receipts (channel_id,unit,reference_id,call_id)
-VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING;

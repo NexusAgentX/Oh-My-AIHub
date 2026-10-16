@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -78,18 +79,19 @@ func TestBillingAdvisorAndPerIterationThreshold(t *testing.T) {
 	}
 }
 
-func TestBillingToolsAndGeoAreOrthogonal(t *testing.T) {
+func TestBillingObservedToolsDoNotAddFees(t *testing.T) {
 	usage := ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{InferenceGeo: "us", Units: map[string]int64{"web_search": 2 * ledger.FixedPointScale}}}
-	prices := ledger.Prices{InputPerMillion: 1_000_000_000, UnitPrices: map[string]money.Amount{"web_search": 10_000_000}, GeoMultipliers: map[string]int64{"us": 1_100_000_000}}
+	prices := ledger.Prices{InputPerMillion: 1_000_000_000, GeoMultipliers: map[string]int64{"us": 1_100_000_000}}
 	priced, err := ledger.CalculatePriceAt(usage, prices, nil, time.Time{}, ledger.FixedPointScale, ledger.UnitRate, 1_000_000)
-	if err != nil || priced.Cost.String() != "1.12" || priced.Fee.String() != "0.00112" {
-		t.Fatalf("tools incorrectly geo-scaled: %+v %v", priced, err)
+	if err != nil || priced.Cost.String() != "1.1" || priced.Fee.String() != "0.0011" {
+		t.Fatalf("unexpected tool surcharge: %+v %v", priced, err)
 	}
 }
 
 // In-memory durable metadata store; the fake ledger closes calls once, like
 // PostgreSQL's in_progress predicate and unique call idempotency key.
 type backgroundFixture struct {
+	saveErr error
 	Store
 	mu       sync.Mutex
 	jobs     map[string]BackgroundJob
@@ -98,6 +100,9 @@ type backgroundFixture struct {
 }
 
 func (s *backgroundFixture) SaveBackground(_ context.Context, j BackgroundJob) error {
+	if s.saveErr != nil {
+		return s.saveErr
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.jobs[j.CallID] = j
@@ -240,7 +245,7 @@ func TestBillingImageToolRetainsModalityDetailsAndDeduplicatesItems(t *testing.T
 
 func TestBillingReliableToolsWithoutTokenSummary(t *testing.T) {
 	got := observe(channel.FormatOpenAIResponses, false, "application/json", `{"id":"resp_tools","output":[{"id":"ws_one","type":"web_search_call"}]}`, 7)
-	if !got.Found || got.Usage.Detail == nil || got.Usage.Detail.Units["web_search"] != ledger.FixedPointScale {
+	if got.Found || got.Usage.Detail == nil || got.Usage.Detail.Units["web_search"] != ledger.FixedPointScale {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -280,5 +285,31 @@ func TestBackgroundDeadlineSettlesCancellationUsage(t *testing.T) {
 	got, exists := fixture.finished[job.CallID]
 	if !exists || got.Cost.String() != "0.0002" || got.Bill == nil {
 		t.Fatalf("cancel usage lost: %+v", got)
+	}
+}
+
+func TestBackgroundRegistrationFailureCancelsProviderWork(t *testing.T) {
+	fixture := &backgroundFixture{jobs: map[string]BackgroundJob{}, saveErr: errors.New("database unavailable")}
+	keyring, err := channel.ParseKeyring("v1="+base64.StdEncoding.EncodeToString(make([]byte, 32)), "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential, err := keyring.Encrypt("channel", 1, "synthetic-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cancelled atomic.Bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cancelled.Store(r.Method == http.MethodPost && r.URL.Path == "/v1/responses/resp_unregistered/cancel")
+		io.WriteString(w, `{"status":"cancelled"}`)
+	}))
+	defer upstream.Close()
+	engine := NewEngine(Dependencies{Jobs: fixture, Keyring: keyring})
+	engine.settingsSnap.Store(&settingsSnapshot{outbound: backgroundOutbound{client: upstream.Client()}})
+	call := &callState{id: "failed", started: time.Now()}
+	engine.reserveBackground(call.id)
+	err = engine.keepBackground(call, catalog.Model{}, Candidate{ChannelID: "channel", BaseURL: upstream.URL, Credential: credential}, settings.Settings{}, "resp_unregistered")
+	if err == nil || !cancelled.Load() || call.pending || len(engine.jobs) != 0 {
+		t.Fatalf("registration failure leaked work: %v cancelled=%v pending=%v", err, cancelled.Load(), call.pending)
 	}
 }

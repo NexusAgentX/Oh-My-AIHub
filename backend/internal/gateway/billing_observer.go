@@ -103,7 +103,7 @@ func (o *Observer) observeResponseItem(raw []byte) {
 	}
 	id := textValue(item.get("id"))
 	if id == "" || len(id) > 256 {
-		o.note("工具结果缺少可靠标识，未独立计价")
+		o.note("工具结果缺少可靠标识，未完整统计")
 		return
 	}
 	if o.billedItems == nil {
@@ -113,7 +113,7 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		return
 	}
 	if len(o.billedItems) >= maxBillingItems {
-		o.note("工具结果超过解析上限，附加费用未完整计价")
+		o.note("工具结果超过解析上限，未完整统计")
 		return
 	}
 	o.billedItems[id] = struct{}{}
@@ -126,7 +126,7 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		// container IDs are charged once per call, never once per output chunk.
 		container := textValue(item.get("container_id"))
 		if container == "" {
-			o.note("容器规格缺失，容器费用未计价")
+			o.note("容器规格缺失，未按规格统计")
 			return
 		}
 		marker := "container:" + container
@@ -155,11 +155,10 @@ func (o *Observer) observeResponseItem(raw []byte) {
 			key = "container_64gb"
 		}
 		if key == "" || len(container) > 256 {
-			o.note("容器规格缺失，容器费用未计价")
+			o.note("容器规格缺失，未按规格统计")
 			return
 		}
 		o.unit(key, o.detail.Units[key]/ledger.FixedPointScale+1)
-		o.detail.UnitEvents = append(o.detail.UnitEvents, ledger.UnitEvent{Unit: key, ID: container, QuantityNano: ledger.FixedPointScale})
 
 	case "image_generation_call":
 		model := textValue(item.get("model"))
@@ -204,7 +203,7 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 	}
 	if maps > 0 {
 		// Grounding chunks establish a grounded prompt, not a query count.
-		o.note("Maps 仅提供检索片段，无法确认查询次数；按次查询费用未计价")
+		o.note("Maps 检索片段不能确认查询次数")
 		o.unit("google_maps_prompt", 1)
 	}
 	if n > 0 && o.detail.Units["google_search_prompt"] == 0 && o.detail.Units["google_maps_prompt"] == 0 {

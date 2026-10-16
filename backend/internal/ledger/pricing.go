@@ -13,11 +13,11 @@ const FixedPointScale int64 = 1_000_000_000
 
 // Usage is the four normalized token buckets of one call.
 type Usage struct {
-	InputTokens      int64
-	OutputTokens     int64
-	CacheWriteTokens int64
-	CacheReadTokens  int64
-	Detail           *UsageDetail
+	InputTokens      int64        `json:"input_tokens"`
+	OutputTokens     int64        `json:"output_tokens"`
+	CacheWriteTokens int64        `json:"cache_write_tokens"`
+	CacheReadTokens  int64        `json:"cache_read_tokens"`
+	Detail           *UsageDetail `json:"detail,omitempty"`
 }
 
 // Prices are four per-million-token prices in nano-points.
@@ -26,7 +26,6 @@ type Prices struct {
 	OutputPerMillion     money.Amount
 	CacheWritePerMillion money.Amount
 	CacheReadPerMillion  money.Amount
-	UnitPrices           map[string]money.Amount
 	GeoMultipliers       map[string]int64
 	TokenPrices          map[string]money.Amount
 }
@@ -109,26 +108,9 @@ func calculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time
 	if geo < 0 {
 		return PriceResult{}, ErrInvalidInput
 	}
-	extended := geo != FixedPointScale || usage.Detail != nil && len(usage.Detail.Units) > 0
+	extended := geo != FixedPointScale
 	if extended {
 		weightedUsage.Mul(weightedUsage, big.NewInt(geo))
-	}
-	// Token numerator denominator includes the geography fixed-point factor.
-	// Unit quantities are nano-units: normalize into the same weighted sum.
-	if usage.Detail != nil {
-		for key, quantity := range usage.Detail.Units {
-			if quantity < 0 {
-				return PriceResult{}, ErrInvalidInput
-			}
-			if price, ok := prices.UnitPrices[key]; ok {
-				if price < 0 {
-					return PriceResult{}, ErrInvalidInput
-				}
-				unit := new(big.Int).Mul(big.NewInt(quantity), big.NewInt(price.Nano()))
-				unit.Mul(unit, big.NewInt(1_000_000))
-				weightedUsage.Add(weightedUsage, unit)
-			}
-		}
 	}
 	numerator := new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano))
 	numerator.Mul(numerator, big.NewInt(rateNano))

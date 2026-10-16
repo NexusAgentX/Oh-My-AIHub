@@ -234,17 +234,14 @@ func (o *Observer) Finish() Observation {
 	if o.thinkingSeen {
 		o.detail.ThinkingObserved = &o.thinkingNonempty
 	}
+	if len(o.detail.Units) > 0 {
+		o.note("工具用量仅作观察，暂不收取工具附加费")
+	}
 	if len(o.detail.Units) > 0 || len(o.detail.Iterations) > 0 || o.detail.InferenceGeo != "" || o.detail.ToolPromptTokens > 0 || len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || o.detail.ThinkingObserved != nil || len(o.detail.Notes) > 0 {
 		o.usage.Detail = &o.detail
 	}
 	if len(o.detail.Iterations) > 0 {
 		o.found = true
-	}
-	for _, quantity := range o.detail.Units {
-		if quantity > 0 {
-			o.found = true
-			break
-		}
 	}
 	status := "missing"
 	if o.found {

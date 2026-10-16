@@ -28,7 +28,7 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool, q: New(pool
 
 func toModel(row Model, tiers []ModelPriceTier) catalog.Model {
 	model := catalog.Model{
-		ID: row.ID, DisplayName: row.DisplayName, PriceCurrency: row.PriceCurrency, TokenPrices: decodePrices(row.TokenPrices), UnitPrices: decodePrices(row.UnitPrices), GeoMultipliers: decodeGeo(row.GeoMultipliers),
+		ID: row.ID, DisplayName: row.DisplayName, PriceCurrency: row.PriceCurrency, TokenPrices: decodePrices(row.TokenPrices), GeoMultipliers: decodeGeo(row.GeoMultipliers),
 		InputPrice: row.InputPriceNanoPerMillion, OutputPrice: row.OutputPriceNanoPerMillion,
 		CacheWritePrice: row.CacheWritePriceNanoPerMillion, CacheReadPrice: row.CacheReadPriceNanoPerMillion,
 		Enabled: row.Enabled, SortOrder: row.SortOrder, Provider: row.Provider, ContextWindow: row.ContextWindow, MaxOutputTokens: row.MaxOutputTokens,
@@ -42,7 +42,7 @@ func toModel(row Model, tiers []ModelPriceTier) catalog.Model {
 			weekdays = append(weekdays, int(weekday))
 		}
 		model.PriceTiers = append(model.PriceTiers, ledger.PriceTier{
-			TokenPrices: decodePrices(tier.TokenPrices), UnitPrices: decodePrices(tier.UnitPrices), GeoMultipliers: decodeGeo(tier.GeoMultipliers), ServiceTier: tier.ServiceTier, ThinkingMode: tier.ThinkingMode,
+			TokenPrices: decodePrices(tier.TokenPrices), GeoMultipliers: decodeGeo(tier.GeoMultipliers), ServiceTier: tier.ServiceTier, ThinkingMode: tier.ThinkingMode,
 			Name: tier.Name, MinPromptTokens: tier.MinPromptTokens, MaxPromptTokens: tier.MaxPromptTokens,
 			Timezone: tier.Timezone, Weekdays: weekdays, StartMinute: tier.StartMinuteOfDay, EndMinute: tier.EndMinuteOfDay,
 			InputPrice: tier.InputPriceNanoPerMillion, OutputPrice: tier.OutputPriceNanoPerMillion,
@@ -115,7 +115,7 @@ func replaceTiers(ctx context.Context, q *Queries, modelID string, tiers []ledge
 			Timezone: tier.Timezone, Weekdays: weekdays, StartMinuteOfDay: tier.StartMinute, EndMinuteOfDay: tier.EndMinute,
 			InputPriceNanoPerMillion: tier.InputPrice, OutputPriceNanoPerMillion: tier.OutputPrice,
 			CacheWritePriceNanoPerMillion: tier.CacheWritePrice, CacheReadPriceNanoPerMillion: tier.CacheReadPrice,
-			UnitPrices: encodePrices(tier.UnitPrices), GeoMultipliers: encodeGeo(tier.GeoMultipliers), TokenPrices: encodePrices(tier.TokenPrices), ServiceTier: tier.ServiceTier, ThinkingMode: tier.ThinkingMode,
+			GeoMultipliers: encodeGeo(tier.GeoMultipliers), TokenPrices: encodePrices(tier.TokenPrices), ServiceTier: tier.ServiceTier, ThinkingMode: tier.ThinkingMode,
 		}); err != nil {
 			return mapError(err)
 		}
@@ -131,7 +131,7 @@ func (s *Store) CreateModel(ctx context.Context, actorID string, model catalog.M
 			return err
 		}
 		row, err := q.InsertModel(ctx, InsertModelParams{
-			ID: model.ID, DisplayName: model.DisplayName, PriceCurrency: model.PriceCurrency, UnitPrices: encodePrices(model.UnitPrices), GeoMultipliers: encodeGeo(model.GeoMultipliers), TokenPrices: encodePrices(model.TokenPrices),
+			ID: model.ID, DisplayName: model.DisplayName, PriceCurrency: model.PriceCurrency, GeoMultipliers: encodeGeo(model.GeoMultipliers), TokenPrices: encodePrices(model.TokenPrices),
 			InputPriceNanoPerMillion: model.InputPrice, OutputPriceNanoPerMillion: model.OutputPrice,
 			CacheWritePriceNanoPerMillion: model.CacheWritePrice, CacheReadPriceNanoPerMillion: model.CacheReadPrice,
 			Enabled: model.Enabled, SortOrder: model.SortOrder, Provider: model.Provider, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
@@ -188,7 +188,7 @@ func (s *Store) UpdateModel(ctx context.Context, actorID, id string, mutate func
 			return err
 		}
 		saved, err := q.UpdateModel(ctx, UpdateModelParams{
-			ID: id, DisplayName: next.DisplayName, PriceCurrency: next.PriceCurrency, UnitPrices: encodePrices(next.UnitPrices), GeoMultipliers: encodeGeo(next.GeoMultipliers), TokenPrices: encodePrices(next.TokenPrices),
+			ID: id, DisplayName: next.DisplayName, PriceCurrency: next.PriceCurrency, GeoMultipliers: encodeGeo(next.GeoMultipliers), TokenPrices: encodePrices(next.TokenPrices),
 			InputPriceNanoPerMillion: next.InputPrice, OutputPriceNanoPerMillion: next.OutputPrice,
 			CacheWritePriceNanoPerMillion: next.CacheWritePrice, CacheReadPriceNanoPerMillion: next.CacheReadPrice,
 			Enabled: next.Enabled, SortOrder: next.SortOrder, Provider: next.Provider, ContextWindow: next.ContextWindow, MaxOutputTokens: next.MaxOutputTokens,
@@ -261,14 +261,14 @@ func auditView(model catalog.Model) map[string]any {
 			"name": tier.Name, "min_prompt_tokens": tier.MinPromptTokens, "max_prompt_tokens": tier.MaxPromptTokens,
 			"timezone": tier.Timezone, "weekdays": tier.Weekdays, "start_minute_of_day": tier.StartMinute, "end_minute_of_day": tier.EndMinute,
 			"input_price": tier.InputPrice.String(), "output_price": tier.OutputPrice.String(),
-			"unit_prices": tier.UnitPrices, "geo_multipliers": tier.GeoMultipliers, "token_prices": tier.TokenPrices, "service_tier": tier.ServiceTier, "thinking_mode": tier.ThinkingMode,
+			"geo_multipliers": tier.GeoMultipliers, "token_prices": tier.TokenPrices, "service_tier": tier.ServiceTier, "thinking_mode": tier.ThinkingMode,
 			"cache_write_price": tier.CacheWritePrice.String(), "cache_read_price": tier.CacheReadPrice.String(),
 		})
 	}
 	return map[string]any{
 		"display_name": model.DisplayName, "enabled": model.Enabled, "price_currency": model.PriceCurrency,
 		"input_price": model.InputPrice.String(), "output_price": model.OutputPrice.String(),
-		"unit_prices": model.UnitPrices, "geo_multipliers": model.GeoMultipliers, "token_prices": model.TokenPrices,
+		"geo_multipliers": model.GeoMultipliers, "token_prices": model.TokenPrices,
 		"cache_write_price": model.CacheWritePrice.String(), "cache_read_price": model.CacheReadPrice.String(),
 		"price_tiers": tiers,
 	}

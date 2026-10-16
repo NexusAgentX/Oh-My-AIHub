@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -135,9 +134,10 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 // candidateColumns are the columns ListCandidates and ListAllCandidates have
 // in common.
 type candidateColumns struct {
-	ID, OwnerID, Name, BaseUrl                     string
-	ApiKeyCiphertext, ApiKeyNonce                  []byte
-	ApiKeyKeyID                                    string
+	ID, OwnerID, Name, BaseUrl    string
+	ApiKeyCiphertext, ApiKeyNonce []byte
+	ApiKeyKeyID                   string
+
 	UserAgent                                      *string
 	HeaderRules                                    []byte
 	ConcurrencyLimit, RpmLimit                     *int32
@@ -274,54 +274,6 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	}
 	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := New(tx)
-		if finish.Reprice != nil && finish.Bill != nil && finish.Usage.Detail != nil && len(finish.Usage.Detail.UnitEvents) > 0 {
-			if _, err := q.LockBillableCall(ctx, finish.ID); errors.Is(err, pgx.ErrNoRows) {
-				return nil
-			} else if err != nil {
-				return err
-			}
-			detail := *finish.Usage.Detail
-			detail.Units = make(map[string]int64, len(finish.Usage.Detail.Units))
-			for key, value := range finish.Usage.Detail.Units {
-				detail.Units[key] = value
-			}
-			events := append([]ledger.UnitEvent(nil), detail.UnitEvents...)
-			sort.Slice(events, func(i, j int) bool {
-				if events[i].Unit != events[j].Unit {
-					return events[i].Unit < events[j].Unit
-				}
-				return events[i].ID < events[j].ID
-			})
-			changed := false
-			for _, event := range events {
-				inserted, err := q.ClaimUnitReceipt(ctx, ClaimUnitReceiptParams{CallID: finish.ID, ChannelID: finish.ChannelID, Unit: event.Unit, ReferenceID: event.ID})
-				if err != nil {
-					return err
-				}
-				if inserted == 0 {
-					if event.QuantityNano < 0 || event.QuantityNano > detail.Units[event.Unit] {
-						return ledger.ErrInvalidInput
-					}
-					detail.Units[event.Unit] -= event.QuantityNano
-					changed = true
-				}
-			}
-			if changed {
-				finish.Usage.Detail = &detail
-				cost, fee, snapshot, err := finish.Reprice(finish.Usage)
-				if err != nil {
-					return err
-				}
-				finish.Cost, finish.Fee, finish.PriceSnapshot = cost, fee, snapshot
-				bill := *finish.Bill
-				bill.Cost, bill.Fee = cost, fee
-				finish.Bill = &bill
-				if cost+fee == 0 {
-					finish.Bill = nil
-				}
-				result.Adjusted = &gateway.ChargeAdjustment{Cost: cost, Fee: fee, Snapshot: snapshot, Usage: finish.Usage}
-			}
-		}
 		affected, err := q.FinishCall(ctx, FinishCallParams{
 			Diagnostics: raw, ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),
 			RoutingMode: optional(finish.RoutingMode), RoutingSource: optional(finish.RoutingSource), Attempts: attempts,
