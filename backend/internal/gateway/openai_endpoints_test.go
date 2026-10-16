@@ -385,3 +385,40 @@ func TestCompactionStateRetainsItsUpstreamScope(t *testing.T) {
 		t.Fatalf("%d %s", out.Code, out.Body.String())
 	}
 }
+
+type oneByteResourceBody struct{ io.Reader }
+
+func (b oneByteResourceBody) Read(p []byte) (int, error) { return b.Reader.Read(p[:min(len(p), 1)]) }
+func (oneByteResourceBody) Close() error                 { return nil }
+
+type resourceTransport func(*http.Request) (*http.Response, error)
+
+func (f resourceTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type registeredDelivery struct {
+	*httptest.ResponseRecorder
+	check func()
+}
+
+func (w registeredDelivery) Write(p []byte) (int, error) {
+	w.check()
+	return w.ResponseRecorder.Write(p)
+}
+func TestStoredChatPersistsBeforeAnyFragmentedStreamDelivery(t *testing.T) {
+	e, s := newResourceFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected HTTP upstream") })
+	payload := "data: {\"id\":\"chat_fragmented\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\n" +
+		"data: {\"id\":\"chat_fragmented\",\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":2}}\n\n" + "data: [DONE]\n\n"
+	e.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: 1}, outbound: fakeOutbound{transport: resourceTransport(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: oneByteResourceBody{strings.NewReader(payload)}, Request: r}, nil
+	})}})
+	recorder := httptest.NewRecorder()
+	writer := registeredDelivery{recorder, func() {
+		if len(s.rows) != 1 || s.rows[0].ID != "chat_fragmented" {
+			t.Fatal("identifier delivered before registration")
+		}
+	}}
+	e.Serve(writer, resourceRequest("POST", "/v1/chat/completions", `{"model":"gpt-test","store":true,"stream":true,"stream_options":{"include_usage":true}}`), channel.FormatOpenAIChat, "", false)
+	if recorder.Code != 200 || recorder.Body.String() != payload || len(s.finished) != 1 || s.finished[0].Usage.OutputTokens != 2 {
+		t.Fatalf("%d %s", recorder.Code, recorder.Body.String())
+	}
+}
