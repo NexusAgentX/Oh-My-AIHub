@@ -80,7 +80,7 @@ func TestBackgroundImageObservationsPersistWithoutUsageOrCharges(t *testing.T) {
 			if withUsage {
 				usage = `,"usage":{"input_tokens":100,"output_tokens":20}`
 			}
-			response := `{"id":"resp_followup","status":"completed","output":[{"id":"ig_final","type":"image_generation_call","status":"failed","size":"1024x1536","quality":"medium","model":"image-model","error":{"message":"PRIVATE_ERROR"}}]` + usage + `}`
+			response := `{"id":"resp_followup","status":"completed","output":[{"id":"ig_final","type":"image_generation_call","status":"failed","size":"1024x1536","quality":"medium","model":"image-model","usage":{"input_tokens":1000000,"output_tokens":1000000},"error":{"message":"PRIVATE_ERROR"}}]` + usage + `}`
 			e, store, job := followupFixture(t, func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				fmt.Fprint(w, response)
