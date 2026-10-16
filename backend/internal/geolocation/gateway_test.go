@@ -33,12 +33,12 @@ func TestGatewayDiscoveryRefreshesWithoutMovingCapturedSnapshots(t *testing.T) {
 		go func() { s.Run(ctx); close(done) }()
 		synctest.Wait()
 		first := s.Gateway()
-		if first.IP != "8.8.8.8" || first.Location == nil || store.used != 1 {
-			t.Fatalf("first discovery: %+v, budget=%d", first, store.used)
+		if first.IP != "8.8.8.8" || first.Location == nil || store.queries() != 1 {
+			t.Fatalf("first discovery: %+v, budget=%d", first, store.queries())
 		}
 		time.Sleep(gatewayRefresh)
 		synctest.Wait()
-		if s.Gateway().IP != "1.1.1.1" || calls != 2 || store.used != 2 {
+		if s.Gateway().IP != "1.1.1.1" || calls != 2 || store.queries() != 2 {
 			t.Fatal("periodic discovery did not share quota")
 		}
 		if first.IP != "8.8.8.8" || first.Location.Label == "" {
@@ -71,7 +71,7 @@ func TestDiscoverySharesRateLimitWithExplicitQueries(t *testing.T) {
 		})
 		s.discoverGateway(context.Background())
 		s.resolve(context.Background(), "1.1.1.1")
-		if len(times) != 2 || times[1].Sub(times[0]) < 2*time.Second || store.used != 2 {
+		if len(times) != 2 || times[1].Sub(times[0]) < 2*time.Second || store.queries() != 2 {
 			t.Fatal("self-discovery bypassed shared throttle")
 		}
 	})
@@ -93,7 +93,7 @@ func TestGatewayDiscoveryFailuresExpireAndBackOff(t *testing.T) {
 		before := calls
 		s.discoverGateway(context.Background())
 		s.resolve(context.Background(), "1.1.1.1")
-		if calls != before || store.used != 2 || s.blockedUntil.IsZero() {
+		if calls != before || store.queries() != 2 || s.blockedUntil.IsZero() {
 			t.Fatal("429 backoff was not shared")
 		}
 		if captured.IP != "8.8.8.8" {
