@@ -84,19 +84,26 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 		if depth > 4 {
 			return
 		}
-		var items []json.RawMessage
-		if json.Unmarshal(raw, &items) != nil {
-			return
-		}
-		for _, item := range items {
-			var tool struct {
-				Type  string          `json:"type"`
-				Tools json.RawMessage `json:"tools"`
+		eachElement(raw, func(item []byte) {
+			var kind string
+			var tools []byte
+			_, err := walkObject(item, 0, func(key []byte, start, end int) {
+				switch string(key) {
+				case "type":
+					value := item[start:end]
+					if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' && bytes.IndexByte(value, '\\') < 0 {
+						kind = string(value[1 : len(value)-1])
+					} else {
+						_ = json.Unmarshal(value, &kind)
+					}
+				case "tools":
+					tools = item[start:end]
+				}
+			})
+			if err != nil {
+				return
 			}
-			if json.Unmarshal(item, &tool) != nil {
-				continue
-			}
-			switch tool.Type {
+			switch kind {
 			case "web_search", "web_search_preview", "web_search_preview_2025_03_11":
 				add("web_search")
 			case "image_generation":
@@ -106,9 +113,9 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 				op = "compact_v2"
 			case "additional_tools":
 				add("responses_lite")
-				visit(tool.Tools, depth+1)
+				visit(tools, depth+1)
 			}
-		}
+		})
 	}
 	for _, field := range []string{"tools", "input"} {
 		if member, ok := scan.last(field); ok {
