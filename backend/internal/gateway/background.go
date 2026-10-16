@@ -224,6 +224,10 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		return
 	}
 	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, thinkingRequested: metadata.ThinkingRequested, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	if e.Resources != nil {
+		call.resourceKind, call.resourceRegistered = "response", true
+		call.upstreamHeaders = protocolHeaders(metadata.Headers)
+	}
 	if !e.Now().Before(job.Deadline) {
 		// Cancellation may return final usage. Feed it through normal settlement
 		// before falling back to an interrupted call without reliable usage.
@@ -358,12 +362,23 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	// Apply the ordinary gateway credential/hop-header rules to live follow-ups.
 	// Preserve opaque protocol headers, body and query parameters; UpstreamURL
 	// removes the platform's key parameter before adding any upstream credential.
+	resourceHeaders := protocolHeaders(metadata.Headers)
 	headers := metadata.Headers.Clone()
 	if headers == nil {
 		headers = make(http.Header)
 	}
 	for name, values := range r.Header {
 		headers[name] = values
+	}
+	if e.Resources != nil {
+		// Item ownership must describe the same upstream scope that was read.
+		// A live follow-up cannot replace the creation project/organization.
+		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
+			headers.Del(name)
+			if value := resourceHeaders.Get(name); value != "" {
+				headers.Set(name, value)
+			}
+		}
 	}
 	metadata.Headers = headers
 	var body io.Reader
@@ -397,6 +412,18 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 		newUpstreamFailure(response, payload, secret).write(w, job.CallID)
 		return
+	}
+	if e.Resources != nil {
+		raw, err := json.Marshal(resourceRoute{Candidate: metadata.Candidate, Headers: resourceHeaders})
+		if err != nil {
+			resourceError(w, err)
+			return
+		}
+		parent := Resource{AccountID: job.AccountID, KeyID: job.KeyID, Kind: "response", ID: id, CallID: job.CallID, ChannelID: job.ChannelID, ModelID: metadata.ModelID, Metadata: raw}
+		if err := e.registerResponseItems(ctx, parent, response); err != nil {
+			resourceError(w, err)
+			return
+		}
 	}
 	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 		w.Header()[name] = values

@@ -1607,9 +1607,18 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		stopped = interruptionOf(context.Cause(result.upstream))
 	}
 	clientGone := undelivered || (left && !ended)
+	observation := observer.Finish()
+	if call.polling && call.resourceKind != "" && !call.itemsRegistered && ended && terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
+		if err := e.keepItems(result.upstream, call, candidate, observation.ResponseID, observer.resourceItems); err != nil {
+			// Keep the durable job pending so a registry outage cannot permanently
+			// orphan its output items or close the bill before registration succeeds.
+			e.Logger.Error("gateway: saving background output items failed", "request_id", call.id, "error", err)
+			return
+		}
+		call.itemsRegistered = true
+	}
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
-	observation := observer.Finish()
 	if call.resourceKind != "" && !call.resourceRegistered && resourceErr == nil && !call.polling {
 		resourceErr = errors.New("upstream did not return a resource id")
 	}

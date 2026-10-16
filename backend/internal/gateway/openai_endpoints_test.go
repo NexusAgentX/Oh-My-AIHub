@@ -23,11 +23,12 @@ import (
 
 type resourceFixture struct {
 	serveStore
-	candidate Candidate
-	rows      []Resource
-	key       KeyAuth
-	saveErr   error
-	formats   []channel.Format
+	candidate   Candidate
+	rows        []Resource
+	key         KeyAuth
+	saveErr     error
+	itemBatches int
+	formats     []channel.Format
 }
 
 func (s *resourceFixture) LookupKey(context.Context, []byte) (KeyAuth, error) { return s.key, nil }
@@ -324,7 +325,14 @@ func TestGetModelUsesSameListItemAndAliasVisibility(t *testing.T) {
 }
 
 func (s *resourceFixture) SaveResourceItems(ctx context.Context, parent Resource, ids []string) error {
+	s.itemBatches++
+	if s.saveErr != nil {
+		return s.saveErr
+	}
 	for _, id := range ids {
+		if _, err := s.LookupResource(ctx, parent.AccountID, parent.KeyID, "item", id); err == nil {
+			continue
+		}
 		row := parent
 		row.Kind = "item"
 		row.ID = id
@@ -459,5 +467,166 @@ func TestStoredChatPersistsBeforeAnyFragmentedStreamDelivery(t *testing.T) {
 	e.Serve(writer, resourceRequest("POST", "/v1/chat/completions", `{"model":"gpt-test","store":true,"stream":true,"stream_options":{"include_usage":true}}`), channel.FormatOpenAIChat, "", false)
 	if recorder.Code != 200 || recorder.Body.String() != payload || len(s.finished) != 1 || s.finished[0].Usage.OutputTokens != 2 {
 		t.Fatalf("%d %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestBackgroundOutputItemsCanBeReferencedAfterReadOrPoll(t *testing.T) {
+	for _, mode := range []string{"get", "stream", "poll"} {
+		t.Run(mode, func(t *testing.T) {
+			completed := `{"id":"resp_job","status":"completed","output":[{"id":"msg_background","type":"message","content":[{"type":"output_text","text":"private output"}]}],"usage":{"input_tokens":10,"output_tokens":5}}`
+			e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/responses/resp_job" {
+					if r.Header.Get("OpenAI-Project") != "original-project" {
+						t.Error("read changed project")
+					}
+					if r.URL.Query().Get("stream") == "true" {
+						w.Header().Set("Content-Type", "text/event-stream")
+						io.WriteString(w, "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":"+completed+"}\n\n")
+					} else {
+						w.Header().Set("Content-Type", "application/json")
+						io.WriteString(w, completed)
+					}
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				io.WriteString(w, `{"id":"resp_next","status":"completed","usage":{"input_tokens":5,"output_tokens":1}}`)
+			})
+			model, _ := resourceModels{}.Get(context.Background(), "gpt-test")
+			metadata := backgroundMetadata{Started: time.Now(), Key: s.key, Candidate: s.candidate, Model: model, ModelID: "gpt-test", Hints: billingHints{Background: true}, Attempts: []Attempt{{}}, Headers: http.Header{"Openai-Project": []string{"original-project"}}}
+			metadata.Candidate.RateNano = ledger.UnitRate
+			raw, _ := json.Marshal(metadata)
+			job := BackgroundJob{CallID: "background-call", AccountID: s.key.OwnerID, KeyID: s.key.KeyID, ChannelID: s.candidate.ChannelID, ResponseID: "resp_job", Metadata: raw, Deadline: time.Now().Add(time.Hour), Settled: mode != "poll"}
+			e.Jobs = &backgroundFixture{jobs: map[string]BackgroundJob{job.CallID: job}}
+			if mode == "stream" {
+				e.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: 1}, outbound: fakeOutbound{transport: resourceTransport(func(r *http.Request) (*http.Response, error) {
+					response, err := http.DefaultTransport.RoundTrip(r)
+					if err == nil {
+						response.Body = oneByteResourceBody{response.Body}
+					}
+					return response, err
+				})}})
+			}
+			if mode == "poll" {
+				s.saveErr = errors.New("registry unavailable")
+				e.pollBackgroundJob(context.Background(), job)
+				if len(s.finished) != 0 {
+					t.Fatal("poll settled despite registration failure")
+				}
+				s.saveErr = nil
+				e.pollBackgroundJob(context.Background(), job)
+			} else {
+				path := "/v1/responses/resp_job"
+				if mode == "stream" {
+					path += "?stream=true"
+				}
+				r := resourceRequest("GET", path, "")
+				r.SetPathValue("responseID", job.ResponseID)
+				r.Header.Set("OpenAI-Project", "other-project")
+				out := httptest.NewRecorder()
+				e.ServeOpenAIResponse(out, r)
+				expected := completed
+				if mode == "stream" {
+					expected = "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + completed + "}\n\n"
+				}
+				if out.Code != 200 || out.Body.String() != expected {
+					t.Fatalf("read: %d %s", out.Code, out.Body.String())
+				}
+				if s.itemBatches != 1 {
+					t.Fatalf("read issued %d item batches", s.itemBatches)
+				}
+				again := httptest.NewRecorder()
+				e.ServeOpenAIResponse(again, r.Clone(context.Background()))
+				if again.Code != 200 || again.Body.String() != expected {
+					t.Fatalf("repeat: %d %s", again.Code, again.Body.String())
+				}
+			}
+			if mode != "poll" && len(s.finished) != 0 {
+				t.Fatal("read charged again")
+			}
+			if mode == "poll" && (len(s.finished) != 1 || s.finished[0].Cost == 0) {
+				t.Fatal("poll did not settle reliable usage once")
+			}
+			row, err := s.LookupResource(context.Background(), s.key.OwnerID, s.key.KeyID, "item", "msg_background")
+			if err != nil {
+				t.Fatalf("output item not registered after %s: %v", mode, err)
+			}
+			if bytes.Contains(row.Metadata, []byte("private output")) {
+				t.Fatal("output content persisted")
+			}
+			var route resourceRoute
+			if json.Unmarshal(row.Metadata, &route) != nil || route.Headers.Get("OpenAI-Project") != "original-project" {
+				t.Fatal("original project lost")
+			}
+			for _, foreign := range []bool{false, true} {
+				if foreign {
+					s.key.KeyID = "other-key"
+				}
+				out := httptest.NewRecorder()
+				e.Serve(out, resourceRequest("POST", "/v1/responses", `{"model":"gpt-test","store":false,"input":[{"type":"item_reference","id":"msg_background"}]}`), channel.FormatOpenAIResponses, "", false)
+				want := 200
+				if foreign {
+					want = 404
+				}
+				if out.Code != want {
+					t.Fatalf("resume foreign=%v: %d %s", foreign, out.Code, out.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestRetrievedSingleConversationItemCanBeReferenced(t *testing.T) {
+	e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/conversations":
+			io.WriteString(w, `{"id":"conv_owned","object":"conversation"}`)
+		case "/v1/conversations/conv_owned/items/msg_single":
+			io.WriteString(w, `{"id":"msg_single","type":"message","role":"user","content":[{"type":"input_text","text":"private item"}]}`)
+		default:
+			io.WriteString(w, `{"id":"resp_next","status":"completed","usage":{"input_tokens":5,"output_tokens":1}}`)
+		}
+	})
+	e.Serve(httptest.NewRecorder(), resourceRequest("POST", "/v1/conversations", `{"items":[]}`), channel.FormatOpenAIResponses, "", false)
+	r := resourceRequest("GET", "/v1/conversations/conv_owned/items/msg_single", "")
+	r.SetPathValue("resourceID", "conv_owned")
+	r.SetPathValue("itemID", "msg_single")
+	s.saveErr = errors.New("registry unavailable")
+	denied := httptest.NewRecorder()
+	e.ServeResource(denied, r.Clone(context.Background()), "conversation")
+	if denied.Code != 503 || strings.Contains(denied.Body.String(), "msg_single") {
+		t.Fatalf("registration failure exposed item: %d %s", denied.Code, denied.Body.String())
+	}
+	s.saveErr = nil
+	out := httptest.NewRecorder()
+	e.ServeResource(out, r, "conversation")
+	if out.Code != 200 {
+		t.Fatalf("read: %d %s", out.Code, out.Body.String())
+	}
+	again := httptest.NewRecorder()
+	e.ServeResource(again, r.Clone(context.Background()), "conversation")
+	if again.Code != 200 || again.Body.String() != out.Body.String() {
+		t.Fatal("repeat item retrieval changed response")
+	}
+	row, err := s.LookupResource(context.Background(), s.key.OwnerID, s.key.KeyID, "item", "msg_single")
+	if err != nil {
+		t.Fatalf("single item not registered: %v", err)
+	}
+	if bytes.Contains(row.Metadata, []byte("private item")) {
+		t.Fatal("item content persisted")
+	}
+	for _, foreign := range []bool{false, true} {
+		if foreign {
+			s.key.KeyID = "other-key"
+		}
+		out = httptest.NewRecorder()
+		e.Serve(out, resourceRequest("POST", "/v1/responses", `{"model":"gpt-test","store":false,"input":[{"type":"item_reference","id":"msg_single"}]}`), channel.FormatOpenAIResponses, "", false)
+		want := 200
+		if foreign {
+			want = 404
+		}
+		if out.Code != want {
+			t.Fatalf("resume foreign=%v: %d %s", foreign, out.Code, out.Body.String())
+		}
 	}
 }

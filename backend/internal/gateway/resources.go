@@ -256,13 +256,27 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 			_ = e.Resources.DeleteResource(r.Context(), key.OwnerID, key.KeyID, kind, id)
 		}
 	}
-	if kind == "conversation" || strings.HasSuffix(r.URL.Path, "/input_items") {
+	if kind == "response" && !strings.HasSuffix(r.URL.Path, "/input_items") && r.Method != http.MethodDelete {
+		if err := e.registerResponseItems(r.Context(), row, response); err != nil {
+			resourceError(w, err)
+			return
+		}
+	} else if kind == "conversation" || strings.HasSuffix(r.URL.Path, "/input_items") {
 		payload, err := io.ReadAll(io.LimitReader(response.Body, maxRequestBytes+1))
 		if err != nil || len(payload) > maxRequestBytes || !json.Valid(payload) {
 			resourceError(w, errors.New("resource response exceeds budget"))
 			return
 		}
-		if ids := itemIDs(payload); len(ids) > 0 {
+		ids := itemIDs(payload)
+		if kind == "conversation" && r.PathValue("itemID") != "" && r.Method == http.MethodGet {
+			var item struct {
+				ID string `json:"id"`
+			}
+			if json.Unmarshal(payload, &item) == nil && item.ID == r.PathValue("itemID") {
+				ids = []string{item.ID}
+			}
+		}
+		if len(ids) > 0 {
 			if err := e.Resources.SaveResourceItems(r.Context(), row, ids); err != nil {
 				resourceError(w, err)
 				return
@@ -292,6 +306,64 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 			return
 		}
 	}
+}
+
+// Follow-up reads can reveal items that were absent from the creation ack.
+// JSON is staged within the existing resource-read budget. SSE keeps the
+// bounded observer only, with one ID batch before terminal delivery (or EOF).
+func (e *Engine) registerResponseItems(ctx context.Context, parent Resource, response *http.Response) error {
+	if e.Resources == nil {
+		return nil
+	}
+	if strings.Contains(response.Header.Get("Content-Type"), "text/event-stream") {
+		o := NewObserver(channel.FormatOpenAIResponses, true, response.Header.Get("Content-Type"))
+		o.trackResource = true
+		response.Body = &responseItemsBody{ReadCloser: response.Body, observer: o, now: e.Now, save: func(ids []string) error {
+			return e.Resources.SaveResourceItems(ctx, parent, ids)
+		}}
+		return nil
+	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, maxRequestBytes+1))
+	if err != nil || len(payload) > maxRequestBytes || !json.Valid(payload) {
+		return errors.New("resource response exceeds budget")
+	}
+	if ids := itemIDs(payload); len(ids) > 0 {
+		if err := e.Resources.SaveResourceItems(ctx, parent, ids); err != nil {
+			return err
+		}
+	}
+	response.Body = io.NopCloser(bytes.NewReader(payload))
+	return nil
+}
+
+type responseItemsBody struct {
+	io.ReadCloser
+	observer *Observer
+	now      func() time.Time
+	save     func([]string) error
+	saved    bool
+}
+
+func (b *responseItemsBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if b.saved {
+		return n, err
+	}
+	if n > 0 {
+		b.observer.Write(p[:n], b.now())
+	}
+	if err == io.EOF {
+		b.observer.Finish()
+	}
+	if terminalResponse(b.observer.responseStatus) || err == io.EOF {
+		if len(b.observer.resourceItems) > 0 {
+			if saveErr := b.save(b.observer.resourceItems); saveErr != nil {
+				return 0, saveErr
+			}
+		}
+		b.saved = true
+	}
+	return n, err
 }
 func (e *Engine) acquireFollowup(w http.ResponseWriter) bool {
 	select {
