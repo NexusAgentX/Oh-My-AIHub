@@ -5593,6 +5593,25 @@ components:
             thinking_observed: {type: boolean, description: 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。}
             inference_geo: {type: string}
             units_nano: {type: object, additionalProperties: {type: integer}}
+            image_generations:
+              type: array
+              maxItems: 128
+              description: 图像工具观察信息，不参与计费；不保存提示词或图片。兼容上游的独立用量缺失时不推算。
+              items:
+                type: object
+                properties:
+                  id: {type: string, maxLength: 256}
+                  status: {type: string, enum: [in_progress, generating, completed, failed]}
+                  model: {type: string}
+                  model_source: {type: string, enum: [request, response]}
+                  size: {type: string, maxLength: 11}
+                  quality: {type: string, enum: [low, medium, high, xhigh, max, auto]}
+                  output_format: {type: string, enum: [png, webp, jpeg]}
+                  background: {type: string, enum: [transparent, opaque, auto]}
+                  action: {type: string, enum: [generate, edit, auto]}
+                  usage: {$ref: '#/components/schemas/InferenceUsage'}
+                required: [id]
+                additionalProperties: false
             iterations:
               type: array
               items: {type: object}
