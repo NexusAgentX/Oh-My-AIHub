@@ -23,6 +23,7 @@ import {
   type SettingsErrors,
   type SettingsForm,
 } from './settingsForm'
+import { CodexEditor, emptyCodex } from './CodexEditor'
 import type { Settings } from './types'
 
 function SettingsEditor({ settings }: { settings: Settings }) {
@@ -53,7 +54,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
   }
 
   const field = (
-    key: Exclude<keyof SettingsForm, 'fxAutoSync'>,
+    key: Exclude<keyof SettingsForm, 'fxAutoSync' | 'codex'>,
     label: string,
     props: Record<string, unknown> = {},
   ) => (
@@ -150,6 +151,8 @@ function SettingsEditor({ settings }: { settings: Settings }) {
           />
         </div>
       </Collapsible>
+      <CodexEditor value={form.codex ?? emptyCodex} saved={settings.codex ?? emptyCodex} onChange={codex => setForm(current => ({...current, codex}))} />
+      <InlineError>{errors.codex}</InlineError>
       <InlineError>{update.isError ? errorMessage(update.error, '保存失败，请重试') : ''}</InlineError>
       <SuccessMessage>{message}</SuccessMessage>
       <div className="form-actions">

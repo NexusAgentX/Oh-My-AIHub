@@ -105,7 +105,7 @@ func newResourceFixture(t *testing.T, h http.HandlerFunc) (*Engine, *resourceFix
 	run := newCredentialRun(t, 200)
 	server := httptest.NewServer(h)
 	t.Cleanup(server.Close)
-	s := &resourceFixture{key: KeyAuth{KeyID: "key", OwnerID: "consumer", Enabled: true, AccountActive: true}, candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: server.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "original-secret")}}
+	s := &resourceFixture{key: KeyAuth{KeyID: "key", OwnerID: "consumer", Enabled: true, AccountActive: true}, candidate: Candidate{Capabilities: append([]string(nil), channel.ModelCapabilities...), ChannelID: "upstream", OwnerID: "provider", BaseURL: server.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "original-secret")}}
 	e := newServeFixture(t, 10, defaultRouting{}).engine
 	e.Store, e.Resources, e.Keyring, e.Catalog = s, s, run.keyring, resourceModels{}
 	e.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: 1}, outbound: fakeOutbound{transport: http.DefaultTransport}})
@@ -400,7 +400,7 @@ func TestStoredResponseItemReferencesAreRegisteredWithoutContent(t *testing.T) {
 	}
 }
 
-func TestCompactionStateRetainsItsUpstreamScope(t *testing.T) {
+func TestCompleteCompactionIsPortableAndIDReferencesRemainOwned(t *testing.T) {
 	e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/v1/responses/compact" {
@@ -428,8 +428,13 @@ func TestCompactionStateRetainsItsUpstreamScope(t *testing.T) {
 	s.key.KeyID = "foreign-key"
 	out = httptest.NewRecorder()
 	e.Serve(out, resourceRequest("POST", "/v1/responses", input), channel.FormatOpenAIResponses, "", false)
-	if out.Code != 404 {
+	if out.Code != 200 {
 		t.Fatalf("%d %s", out.Code, out.Body.String())
+	}
+	out = httptest.NewRecorder()
+	e.Serve(out, resourceRequest("POST", "/v1/responses", `{"model":"gpt-test","store":false,"input":[{"type":"item_reference","id":"cmp_owned"}]}`), channel.FormatOpenAIResponses, "", false)
+	if out.Code != 404 {
+		t.Fatalf("foreign reference: %d %s", out.Code, out.Body.String())
 	}
 }
 

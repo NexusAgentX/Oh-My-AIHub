@@ -13,7 +13,7 @@ DELETE FROM supplier_endpoints WHERE supplier_id=$1;
 INSERT INTO supplier_endpoints (supplier_id,base_url,label) VALUES ($1,$2,$3);
 -- name: ListChannelListings :many
 SELECT c.id,c.name,c.summary,c.description,c.base_url,c.owner_id,a.display_name AS owner_name,
- c.concurrency_limit,c.rpm_limit,c.daily_revenue_cap_nano,c.cooldown_seconds
+ c.capabilities,c.concurrency_limit,c.rpm_limit,c.daily_revenue_cap_nano,c.cooldown_seconds
 FROM channels c JOIN accounts a ON a.id=c.owner_id
 WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
 ORDER BY c.id;

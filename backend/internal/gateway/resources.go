@@ -50,7 +50,7 @@ func protocolHeaders(h http.Header) http.Header {
 }
 func resourceKind(f channel.Format, op operation) string {
 	switch op {
-	case operationCount:
+	case operationCount, operationSearch:
 		return ""
 	case operationConversation:
 		return "conversation"
@@ -547,13 +547,17 @@ func inputReferences(body []byte, scan objectScan) ([]string, error) {
 	var failure error
 	eachElement(raw, func(item []byte) {
 		var ref struct {
-			Type string `json:"type"`
-			ID   string `json:"id"`
+			Type             string `json:"type"`
+			ID               string `json:"id"`
+			EncryptedContent string `json:"encrypted_content"`
 		}
 		if json.Unmarshal(item, &ref) != nil {
 			return
 		}
 		if ref.Type != "item_reference" && ref.Type != "compaction" {
+			return
+		}
+		if ref.Type == "compaction" && ref.EncryptedContent != "" {
 			return
 		}
 		if len(ids) >= maxBillingItems || !responseIDPattern.MatchString(ref.ID) {

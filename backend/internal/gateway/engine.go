@@ -262,6 +262,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	requestPath          string
 	operation            operation
 	itemsRegistered      bool
 	resourceKind         string
@@ -376,7 +377,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// (clientWatch), because an answer already under way is read to its end.
 	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
-	call := &callState{operation: operationOf(r.URL.Path), started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call := &callState{requestPath: r.URL.Path, operation: operationOf(r.URL.Path), started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
 	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
 	observed := &observedWriter{ResponseWriter: w}
 	w = observed
@@ -457,10 +458,11 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
+	call.diagnostics.Operation, call.diagnostics.RequiredCapabilities = identifyCapabilities(r.URL.Path, format, body, scan, facts.ServiceTier)
 	if call.multipartModel == nil {
 		call.hints = scan.billingHints(body, format)
 	}
-	if r.URL.Path != "/v1/responses" {
+	if r.URL.Path != "/v1/responses" && r.URL.Path != "/backend-api/codex/responses" {
 		call.hints.Background = false
 	}
 	if e.Resources != nil {
@@ -675,7 +677,23 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.internalError(w, call, err)
 		return
 	}
+	if len(call.diagnostics.RequiredCapabilities) > 0 {
+		eligible := candidates[:0]
+		for _, candidate := range candidates {
+			if supportsCapabilities(candidate, call.diagnostics.RequiredCapabilities) {
+				eligible = append(eligible, candidate)
+			} else {
+				call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: "missing_capability"})
+			}
+		}
+		candidates = eligible
+		if len(candidates) == 0 {
+			e.finishRejected(w, call, OutcomeRejectedNoChannel, 503, "capability_unavailable", "没有满足所需能力的渠道")
+			return
+		}
+	}
 	if call.boundResource != nil {
+		call.diagnostics.BoundResource = true
 		var route resourceRoute
 		if err := json.Unmarshal(call.boundResource.Metadata, &route); err != nil {
 			e.internalError(w, call, err)

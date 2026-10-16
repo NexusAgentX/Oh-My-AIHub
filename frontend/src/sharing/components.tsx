@@ -1,5 +1,6 @@
 import { NavLink, Link } from 'react-router-dom'
 import type { components } from '../api/schema.gen'
+import { CapabilityTags } from '../channels/Capabilities'
 import { FormatTags } from '../calls'
 import { formatMs, formatRatio } from '../money/format'
 import { Badge, Card } from '../ui'
@@ -31,6 +32,6 @@ export function ChannelMetrics({ channel }: { channel: HallChannel }) {
 export function ChannelCard({ channel }: { channel: HallChannel }) {
   return <Card className="hall-card"><div className="sharing-title"><SupplierIcon supplier={channel.supplier} /><div><Link className="sharing-name" to={`/channel-hall/${channel.id}`}>{channel.name}</Link><div className="muted-copy">由 {channel.owner.display_name} 提供</div></div></div>
     <div className="sharing-line"><ChannelState channel={channel} />{channel.supplier ? <Link to={`/suppliers/${channel.supplier.id}`}>{channel.supplier.name}</Link> : <span className="muted-copy">未识别供应商</span>}</div>
-    {channel.summary && <p>{channel.summary}</p>}<ChannelMetrics channel={channel} /><FormatTags formats={channel.formats} />
+    {channel.summary && <p>{channel.summary}</p>}<ChannelMetrics channel={channel} /><FormatTags formats={channel.formats} /><CapabilityTags values={[...new Set([...(channel.capabilities ?? []), ...channel.models.flatMap(m => m.capabilities ?? [])])]} />
   </Card>
 }

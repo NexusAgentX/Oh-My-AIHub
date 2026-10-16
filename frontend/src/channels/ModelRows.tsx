@@ -1,3 +1,4 @@
+import { CapabilityToggles, modelCapabilities } from './Capabilities'
 import { useEffect, useRef } from 'react'
 import type { Format } from '../api/types'
 import { formatLabels, formats } from '../calls'
@@ -197,6 +198,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
           </div>
           <div className="model-row-formats">
             <FormatToggles onChange={(next) => update(row.key, { formats: next })} row={row} />
+            {row.formats.includes('openai_responses') && <details><summary>扩展能力</summary><CapabilityToggles values={row.capabilities} options={modelCapabilities} onChange={capabilities => update(row.key, {capabilities})} /></details>}
             {formats.some((format) => row.passed[format] === false) && <details className="format-test-errors">
               <summary>查看测试失败原因</summary>
               <ul>{formats.filter((format) => row.passed[format] === false).map((format) => <li key={format}><strong>{formatLabels[format]}</strong>：{row.errors?.[format] || '测试未通过'}</li>)}</ul>

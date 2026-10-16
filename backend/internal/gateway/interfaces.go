@@ -1,9 +1,12 @@
 package gateway
 
-import "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"strings"
+)
 
 // Protocol formats describe the wire contract. Operations remain internal to
-// the gateway: users do not configure every Responses sub-endpoint per model.
+// the gateway: advanced operations declare their required capabilities separately.
 type operation uint8
 
 const (
@@ -11,10 +14,14 @@ const (
 	operationCompact
 	operationCount
 	operationConversation
+	operationSearch
 )
 
 func operationOf(path string) operation {
+	path = strings.Replace(path, "/backend-api/codex/", "/v1/", 1)
 	switch path {
+	case "/v1/alpha/search":
+		return operationSearch
 	case "/v1/responses/compact":
 		return operationCompact
 	case "/v1/responses/input_tokens":

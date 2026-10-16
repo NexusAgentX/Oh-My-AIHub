@@ -54,6 +54,7 @@ type HeaderRules struct {
 // Advanced holds the optional per-channel overrides; nil means the platform
 // default.
 type Advanced struct {
+	Capabilities     []string
 	UserAgent        *string
 	HeaderRules      HeaderRules
 	ConcurrencyLimit *int32
@@ -105,6 +106,7 @@ func (p CustomPrices) Model(id string) catalog.Model {
 // price multiplier and the formats the upstream actually serves. A model with
 // Custom prices is not in the catalog (ADR-0034).
 type Model struct {
+	Capabilities   []string
 	ModelID        string
 	UpstreamModel  string
 	MultiplierNano int64
@@ -267,6 +269,9 @@ func hasControl(value string) bool {
 // ValidateAdvanced checks the overrides against the database ranges and the
 // header rule restrictions.
 func ValidateAdvanced(advanced Advanced) error {
+	if !ValidCapabilities(advanced.Capabilities, ChannelCapabilities) {
+		return ErrInvalidInput
+	}
 	if advanced.UserAgent != nil && (*advanced.UserAgent == "" || utf8.RuneCountInString(*advanced.UserAgent) > 512 || hasControl(*advanced.UserAgent)) {
 		return ErrInvalidInput
 	}
@@ -330,6 +335,9 @@ func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
 			model.Custom = &prices
 			model.MultiplierNano, model.FXDiscount, model.PendingMultiplier = money.Scale, false, false
 		} else if !known(model.ModelID) {
+			return nil, ErrInvalidInput
+		}
+		if !ValidCapabilities(model.Capabilities, ModelCapabilities) {
 			return nil, ErrInvalidInput
 		}
 		seen[model.ModelID] = true

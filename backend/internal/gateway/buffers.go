@@ -1,8 +1,11 @@
 package gateway
 
 import (
+	"fmt"
+	"github.com/klauspost/compress/zstd"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -40,6 +43,28 @@ const bodyFirstStage = 64 << 10
 // always was (and fails at the limit the same way).
 func readRequestBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	reader := http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	encoding := strings.TrimSpace(strings.ToLower(r.Header.Get("Content-Encoding")))
+	if encoding != "" && encoding != "identity" {
+		if encoding != "zstd" {
+			return nil, fmt.Errorf("unsupported content encoding")
+		}
+		decoder, err := zstd.NewReader(reader, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxMemory(64<<20), zstd.WithDecoderMaxWindow(32<<20))
+		if err != nil {
+			return nil, err
+		}
+		defer decoder.Close()
+		body, err := io.ReadAll(io.LimitReader(decoder, maxRequestBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(body) > maxRequestBytes {
+			return nil, fmt.Errorf("decoded request exceeds limit")
+		}
+		r.Header.Del("Content-Encoding")
+		r.Header.Del("Content-Length")
+		r.ContentLength = int64(len(body))
+		return body, nil
+	}
 	size := r.ContentLength
 	if size <= 0 || size > maxRequestBytes {
 		return io.ReadAll(reader)

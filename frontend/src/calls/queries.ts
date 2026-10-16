@@ -7,6 +7,7 @@ import type { CallDetail, UsageReport } from '../api/types'
  * 用户（/api/calls）、渠道（/api/channels/{id}/calls）与管理员（/api/admin/calls）共用。
  */
 export type CallListParams = {
+ operation?: string
  dimension?: string
  dimension_value?: string
  second_dimension?: string

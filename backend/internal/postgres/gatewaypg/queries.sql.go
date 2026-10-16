@@ -421,7 +421,7 @@ SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       c.capabilities AS channel_capabilities, cm.capabilities, cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
@@ -452,6 +452,8 @@ type ListAllCandidatesRow struct {
 	IdleTimeoutMs                       *int32
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
+	ChannelCapabilities                 []string
+	Capabilities                        []string
 	UpstreamModel                       string
 	MultiplierNano                      int64
 	FxDiscount                          bool
@@ -496,6 +498,8 @@ func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow
 			&i.IdleTimeoutMs,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
+			&i.ChannelCapabilities,
+			&i.Capabilities,
 			&i.UpstreamModel,
 			&i.MultiplierNano,
 			&i.FxDiscount,
@@ -580,7 +584,7 @@ const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       c.capabilities AS channel_capabilities, cm.capabilities, cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
@@ -614,6 +618,8 @@ type ListCandidatesRow struct {
 	IdleTimeoutMs                       *int32
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
+	ChannelCapabilities                 []string
+	Capabilities                        []string
 	UpstreamModel                       string
 	MultiplierNano                      int64
 	FxDiscount                          bool
@@ -651,6 +657,8 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.IdleTimeoutMs,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
+			&i.ChannelCapabilities,
+			&i.Capabilities,
 			&i.UpstreamModel,
 			&i.MultiplierNano,
 			&i.FxDiscount,
@@ -672,7 +680,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       c.capabilities AS channel_capabilities, cm.capabilities, cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -689,6 +697,8 @@ type ListOnlineChannelModelsRow struct {
 	ChannelName                         string
 	OwnerID                             string
 	OwnerName                           string
+	ChannelCapabilities                 []string
+	Capabilities                        []string
 	Formats                             []string
 	MultiplierNano                      int64
 	FxDiscount                          bool
@@ -719,6 +729,8 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 			&i.ChannelName,
 			&i.OwnerID,
 			&i.OwnerName,
+			&i.ChannelCapabilities,
+			&i.Capabilities,
 			&i.Formats,
 			&i.MultiplierNano,
 			&i.FxDiscount,

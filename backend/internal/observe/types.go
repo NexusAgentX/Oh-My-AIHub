@@ -81,6 +81,7 @@ func IsSuccess(outcome string) bool { return outcome == OutcomeSucceeded || outc
 
 // CallFilter selects calls. Empty strings and nil pointers mean "no filter".
 type CallFilter struct {
+	Operation                                               string
 	Dimension, DimensionValue, SecondDimension, SecondValue string
 	Stream                                                  *bool
 	MinAttempts, MaxAttempts, StatusCode                    *int
@@ -116,6 +117,7 @@ type CallCursor struct {
 
 // CallRow is one call in a list or a live-stream message.
 type CallRow struct {
+	Operation      string
 	ID             string
 	CreatedAt      time.Time
 	CompletedAt    *time.Time

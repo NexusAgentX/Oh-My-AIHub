@@ -72,41 +72,42 @@ WITH samples AS MATERIALIZED (
   AND ($7::uuid IS NULL OR c.final_channel_id = $7::uuid)
   AND ($8::uuid IS NULL OR c.api_key_id = $8::uuid)
   AND ($9::text IS NULL OR c.model_id = $9::text OR c.requested_model = $9::text)
-  AND ($10::text IS NULL OR c.format = $10::text)
-  AND ($11::text IS NULL OR c.outcome = $11::text)
-  AND ($12::text IS NULL OR c.tag = $12::text)
-  AND ($13::uuid IS NULL OR c.id = $13::uuid)
-  AND ($14::text = '' OR (CASE $14::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $15::text)
-  AND ($16::text = '' OR (CASE $16::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $17::text)
-  AND ($18::boolean IS NULL OR c.stream=$18::boolean)
-  AND ($19::int IS NULL OR jsonb_array_length(c.attempts)>=$19::int)
-  AND ($20::int IS NULL OR jsonb_array_length(c.attempts)<=$20::int)
-  AND ($21::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$21::boolean)
-  AND ($22::text IS NULL OR c.diagnostics->>'delivery'=$22::text)
-  AND ($23::text IS NULL OR c.diagnostics->>'usage_status'=$23::text)
-  AND (($24::int IS NULL AND $25::text IS NULL AND $26::text IS NULL AND $27::text IS NULL)
+  AND ($10::text IS NULL OR c.diagnostics->>'operation' = $10::text)
+  AND ($11::text IS NULL OR c.format = $11::text)
+  AND ($12::text IS NULL OR c.outcome = $12::text)
+  AND ($13::text IS NULL OR c.tag = $13::text)
+  AND ($14::uuid IS NULL OR c.id = $14::uuid)
+  AND ($15::text = '' OR (CASE $15::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $16::text)
+  AND ($17::text = '' OR (CASE $17::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $18::text)
+  AND ($19::boolean IS NULL OR c.stream=$19::boolean)
+  AND ($20::int IS NULL OR jsonb_array_length(c.attempts)>=$20::int)
+  AND ($21::int IS NULL OR jsonb_array_length(c.attempts)<=$21::int)
+  AND ($22::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$22::boolean)
+  AND ($23::text IS NULL OR c.diagnostics->>'delivery'=$23::text)
+  AND ($24::text IS NULL OR c.diagnostics->>'usage_status'=$24::text)
+  AND (($25::int IS NULL AND $26::text IS NULL AND $27::text IS NULL AND $28::text IS NULL)
     OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
-      WHERE ($24::int IS NULL OR (att->>'status_code')::int=$24::int)
-      AND ($25::text IS NULL OR att->>'error_code'=$25::text)
-      AND ($26::text IS NULL OR att->>'end_reason'=$26::text)
-      AND ($27::text IS NULL OR att->'channel'->>'id'=$27::text)
+      WHERE ($25::int IS NULL OR (att->>'status_code')::int=$25::int)
+      AND ($26::text IS NULL OR att->>'error_code'=$26::text)
+      AND ($27::text IS NULL OR att->>'end_reason'=$27::text)
+      AND ($28::text IS NULL OR att->'channel'->>'id'=$28::text)
       AND ($6::text IS NULL OR att->'channel'->>'id'=$6::text)))
-  AND c.created_at >= $28::timestamptz
-  AND c.created_at < $29::timestamptz
-  AND ($30::int IS NULL OR c.duration_ms >= $30::int)
-  AND ($31::int IS NULL OR c.duration_ms <= $31::int)
-  AND ($32::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $32::bigint)
-  AND ($33::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $33::bigint)
-  AND ($34::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $34::bigint)
-  AND ($35::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $35::bigint)
+  AND c.created_at >= $29::timestamptz
+  AND c.created_at < $30::timestamptz
+  AND ($31::int IS NULL OR c.duration_ms >= $31::int)
+  AND ($32::int IS NULL OR c.duration_ms <= $32::int)
+  AND ($33::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $33::bigint)
+  AND ($34::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $34::bigint)
+  AND ($35::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $35::bigint)
+  AND ($36::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $36::bigint)
 ), prepared AS (
  -- GROUPING SETS reuses each scalar row without tripling a wide sample stream.
  -- Previous-period group/time keys are NULL so HAVING can discard those sets;
  -- an empty string remains a valid current group (for example group_by=all).
- SELECT s.created_at, s.outcome, s.stream, s.duration_ms, s.ttft_ms, s.output_tokens_per_second, s.inter_token_p95_ms, s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_write_tokens, s.fee_nano, s.billed, s.delivery, s.usage_status, s.max_frame_gap_ms, s.first_succeeded, s.group_key, s.split_key, s.channel_name, s.key_name, s.account_name, s.charged, s.attempt_count, s.fallback_ms, s.attempt_success, s.upstream_ms, s.authentication_ms, s.request_ms, s.open_call_ms, s.admission_ms, s.routing_ms, s.pricing_ms, s.settlement_ms, s.client_write_ms, created_at>=$36::timestamptz AS is_current,
-  CASE WHEN created_at>=$36::timestamptz THEN group_key END AS current_group,
-  CASE WHEN created_at>=$36::timestamptz THEN split_key END AS current_split,
-  CASE WHEN created_at>=$36::timestamptz THEN
+ SELECT s.created_at, s.outcome, s.stream, s.duration_ms, s.ttft_ms, s.output_tokens_per_second, s.inter_token_p95_ms, s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_write_tokens, s.fee_nano, s.billed, s.delivery, s.usage_status, s.max_frame_gap_ms, s.first_succeeded, s.group_key, s.split_key, s.channel_name, s.key_name, s.account_name, s.charged, s.attempt_count, s.fallback_ms, s.attempt_success, s.upstream_ms, s.authentication_ms, s.request_ms, s.open_call_ms, s.admission_ms, s.routing_ms, s.pricing_ms, s.settlement_ms, s.client_write_ms, created_at>=$37::timestamptz AS is_current,
+  CASE WHEN created_at>=$37::timestamptz THEN group_key END AS current_group,
+  CASE WHEN created_at>=$37::timestamptz THEN split_key END AS current_split,
+  CASE WHEN created_at>=$37::timestamptz THEN
    to_char(date_bin(($3::int::text || ' seconds')::interval,created_at,'2000-01-01 00:00:00+00'::timestamptz) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') END AS time_key
  FROM samples s
 )
@@ -188,6 +189,7 @@ type AnalyzeCallsParams struct {
 	FinalChannelID   *string
 	ApiKeyID         *string
 	Model            *string
+	Operation        *string
 	Format           *string
 	Outcome          *string
 	Tag              *string
@@ -296,6 +298,7 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 		arg.FinalChannelID,
 		arg.ApiKeyID,
 		arg.Model,
+		arg.Operation,
 		arg.Format,
 		arg.Outcome,
 		arg.Tag,
@@ -604,33 +607,34 @@ WHERE ($1::uuid IS NULL OR c.account_id = $1::uuid)
   AND ($4::uuid IS NULL OR c.final_channel_id = $4::uuid)
   AND ($5::uuid IS NULL OR c.api_key_id = $5::uuid)
   AND ($6::text IS NULL OR c.model_id = $6::text OR c.requested_model = $6::text)
-  AND ($7::text IS NULL OR c.format = $7::text)
-  AND ($8::text IS NULL OR c.outcome = $8::text)
-  AND ($9::text IS NULL OR c.tag = $9::text)
-  AND ($10::uuid IS NULL OR c.id = $10::uuid)
-  AND ($11::text = '' OR (CASE $11::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $12::text)
-  AND ($13::text = '' OR (CASE $13::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $14::text)
-  AND ($15::boolean IS NULL OR c.stream=$15::boolean)
-  AND ($16::int IS NULL OR jsonb_array_length(c.attempts)>=$16::int)
-  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)<=$17::int)
-  AND ($18::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$18::boolean)
-  AND ($19::text IS NULL OR c.diagnostics->>'delivery'=$19::text)
-  AND ($20::text IS NULL OR c.diagnostics->>'usage_status'=$20::text)
-  AND (($21::int IS NULL AND $22::text IS NULL AND $23::text IS NULL AND $24::text IS NULL)
+  AND ($7::text IS NULL OR c.diagnostics->>'operation' = $7::text)
+  AND ($8::text IS NULL OR c.format = $8::text)
+  AND ($9::text IS NULL OR c.outcome = $9::text)
+  AND ($10::text IS NULL OR c.tag = $10::text)
+  AND ($11::uuid IS NULL OR c.id = $11::uuid)
+  AND ($12::text = '' OR (CASE $12::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $13::text)
+  AND ($14::text = '' OR (CASE $14::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $15::text)
+  AND ($16::boolean IS NULL OR c.stream=$16::boolean)
+  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)>=$17::int)
+  AND ($18::int IS NULL OR jsonb_array_length(c.attempts)<=$18::int)
+  AND ($19::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$19::boolean)
+  AND ($20::text IS NULL OR c.diagnostics->>'delivery'=$20::text)
+  AND ($21::text IS NULL OR c.diagnostics->>'usage_status'=$21::text)
+  AND (($22::int IS NULL AND $23::text IS NULL AND $24::text IS NULL AND $25::text IS NULL)
     OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
-      WHERE ($21::int IS NULL OR (att->>'status_code')::int=$21::int)
-      AND ($22::text IS NULL OR att->>'error_code'=$22::text)
-      AND ($23::text IS NULL OR att->>'end_reason'=$23::text)
-      AND ($24::text IS NULL OR att->'channel'->>'id'=$24::text)
+      WHERE ($22::int IS NULL OR (att->>'status_code')::int=$22::int)
+      AND ($23::text IS NULL OR att->>'error_code'=$23::text)
+      AND ($24::text IS NULL OR att->>'end_reason'=$24::text)
+      AND ($25::text IS NULL OR att->'channel'->>'id'=$25::text)
       AND ($3::text IS NULL OR att->'channel'->>'id'=$3::text)))
-  AND ($25::timestamptz IS NULL OR c.created_at >= $25::timestamptz)
-  AND ($26::timestamptz IS NULL OR c.created_at < $26::timestamptz)
-  AND ($27::int IS NULL OR c.duration_ms >= $27::int)
-  AND ($28::int IS NULL OR c.duration_ms <= $28::int)
-  AND ($29::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $29::bigint)
-  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $30::bigint)
-  AND ($31::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $31::bigint)
-  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $32::bigint)
+  AND ($26::timestamptz IS NULL OR c.created_at >= $26::timestamptz)
+  AND ($27::timestamptz IS NULL OR c.created_at < $27::timestamptz)
+  AND ($28::int IS NULL OR c.duration_ms >= $28::int)
+  AND ($29::int IS NULL OR c.duration_ms <= $29::int)
+  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $30::bigint)
+  AND ($31::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $31::bigint)
+  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $32::bigint)
+  AND ($33::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $33::bigint)
 `
 
 type CallStatsParams struct {
@@ -640,6 +644,7 @@ type CallStatsParams struct {
 	FinalChannelID   *string
 	ApiKeyID         *string
 	Model            *string
+	Operation        *string
 	Format           *string
 	Outcome          *string
 	Tag              *string
@@ -688,6 +693,7 @@ func (q *Queries) CallStats(ctx context.Context, arg CallStatsParams) (CallStats
 		arg.FinalChannelID,
 		arg.ApiKeyID,
 		arg.Model,
+		arg.Operation,
 		arg.Format,
 		arg.Outcome,
 		arg.Tag,
@@ -1267,7 +1273,7 @@ func (q *Queries) GetChannelBrief(ctx context.Context, id string) (GetChannelBri
 const listCalls = `-- name: ListCalls :many
 
 SELECT c.id, c.created_at, c.completed_at, c.account_id, a.username AS account_username, a.display_name AS account_display_name,
-       c.api_key_id, k.name AS api_key_name, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.outcome,
+       c.api_key_id, k.name AS api_key_name, c.model_id, c.requested_model, coalesce(c.diagnostics->>'operation','')::text AS operation, c.format, c.stream, c.tag, c.outcome,
        c.final_channel_id, ch.name AS channel_name,
        c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens,
        c.cost_nano, c.fee_nano, c.ledger_tx_id, c.ttft_ms, c.duration_ms,
@@ -1285,36 +1291,37 @@ WHERE ($2::uuid IS NULL OR c.account_id = $2::uuid)
   AND ($4::uuid IS NULL OR c.final_channel_id = $4::uuid)
   AND ($5::uuid IS NULL OR c.api_key_id = $5::uuid)
   AND ($6::text IS NULL OR c.model_id = $6::text OR c.requested_model = $6::text)
-  AND ($7::text IS NULL OR c.format = $7::text)
-  AND ($8::text IS NULL OR c.outcome = $8::text)
-  AND ($9::text IS NULL OR c.tag = $9::text)
-  AND ($10::uuid IS NULL OR c.id = $10::uuid)
-  AND ($11::text = '' OR (CASE $11::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $12::text)
-  AND ($13::text = '' OR (CASE $13::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $14::text)
-  AND ($15::boolean IS NULL OR c.stream=$15::boolean)
-  AND ($16::int IS NULL OR jsonb_array_length(c.attempts)>=$16::int)
-  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)<=$17::int)
-  AND ($18::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$18::boolean)
-  AND ($19::text IS NULL OR c.diagnostics->>'delivery'=$19::text)
-  AND ($20::text IS NULL OR c.diagnostics->>'usage_status'=$20::text)
-  AND (($21::int IS NULL AND $22::text IS NULL AND $23::text IS NULL AND $24::text IS NULL)
+  AND ($7::text IS NULL OR c.diagnostics->>'operation' = $7::text)
+  AND ($8::text IS NULL OR c.format = $8::text)
+  AND ($9::text IS NULL OR c.outcome = $9::text)
+  AND ($10::text IS NULL OR c.tag = $10::text)
+  AND ($11::uuid IS NULL OR c.id = $11::uuid)
+  AND ($12::text = '' OR (CASE $12::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $13::text)
+  AND ($14::text = '' OR (CASE $14::text WHEN 'all' THEN '' WHEN 'model' THEN coalesce(c.model_id,c.requested_model) WHEN 'channel' THEN coalesce(c.final_channel_id::text,'') WHEN 'format' THEN c.format WHEN 'stream' THEN c.stream::text WHEN 'key' THEN coalesce(c.api_key_id::text,'') WHEN 'tag' THEN coalesce(c.tag,'') WHEN 'account' THEN c.account_id::text WHEN 'outcome' THEN c.outcome WHEN 'error' THEN coalesce(c.attempts->-1->>'end_reason','none') WHEN 'error_code' THEN coalesce(c.attempts->-1->>'error_code','none') WHEN 'status' THEN coalesce(c.attempts->-1->>'status_code','none') WHEN 'stop' THEN coalesce(c.diagnostics->>'stop_reason','') WHEN 'service_tier' THEN coalesce(c.price_snapshot->'detail'->>'service_tier','') ELSE '' END) = $15::text)
+  AND ($16::boolean IS NULL OR c.stream=$16::boolean)
+  AND ($17::int IS NULL OR jsonb_array_length(c.attempts)>=$17::int)
+  AND ($18::int IS NULL OR jsonb_array_length(c.attempts)<=$18::int)
+  AND ($19::boolean IS NULL OR (c.ledger_tx_id IS NOT NULL)=$19::boolean)
+  AND ($20::text IS NULL OR c.diagnostics->>'delivery'=$20::text)
+  AND ($21::text IS NULL OR c.diagnostics->>'usage_status'=$21::text)
+  AND (($22::int IS NULL AND $23::text IS NULL AND $24::text IS NULL AND $25::text IS NULL)
     OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.attempts) att
-      WHERE ($21::int IS NULL OR (att->>'status_code')::int=$21::int)
-      AND ($22::text IS NULL OR att->>'error_code'=$22::text)
-      AND ($23::text IS NULL OR att->>'end_reason'=$23::text)
-      AND ($24::text IS NULL OR att->'channel'->>'id'=$24::text)
+      WHERE ($22::int IS NULL OR (att->>'status_code')::int=$22::int)
+      AND ($23::text IS NULL OR att->>'error_code'=$23::text)
+      AND ($24::text IS NULL OR att->>'end_reason'=$24::text)
+      AND ($25::text IS NULL OR att->'channel'->>'id'=$25::text)
       AND ($1::text IS NULL OR att->'channel'->>'id'=$1::text)))
-  AND ($25::timestamptz IS NULL OR c.created_at >= $25::timestamptz)
-  AND ($26::timestamptz IS NULL OR c.created_at < $26::timestamptz)
-  AND ($27::int IS NULL OR c.duration_ms >= $27::int)
-  AND ($28::int IS NULL OR c.duration_ms <= $28::int)
-  AND ($29::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $29::bigint)
-  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $30::bigint)
-  AND ($31::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $31::bigint)
-  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $32::bigint)
-  AND ($33::timestamptz IS NULL OR (c.created_at, c.id) < ($33::timestamptz, $34::uuid))
+  AND ($26::timestamptz IS NULL OR c.created_at >= $26::timestamptz)
+  AND ($27::timestamptz IS NULL OR c.created_at < $27::timestamptz)
+  AND ($28::int IS NULL OR c.duration_ms >= $28::int)
+  AND ($29::int IS NULL OR c.duration_ms <= $29::int)
+  AND ($30::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens >= $30::bigint)
+  AND ($31::bigint IS NULL OR c.input_tokens + c.output_tokens + c.cache_write_tokens + c.cache_read_tokens <= $31::bigint)
+  AND ($32::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) >= $32::bigint)
+  AND ($33::bigint IS NULL OR (CASE WHEN c.ledger_tx_id IS NULL THEN 0 ELSE c.cost_nano + c.fee_nano END) <= $33::bigint)
+  AND ($34::timestamptz IS NULL OR (c.created_at, c.id) < ($34::timestamptz, $35::uuid))
 ORDER BY c.created_at DESC, c.id DESC
-LIMIT $35
+LIMIT $36
 `
 
 type ListCallsParams struct {
@@ -1324,6 +1331,7 @@ type ListCallsParams struct {
 	FinalChannelID   *string
 	ApiKeyID         *string
 	Model            *string
+	Operation        *string
 	Format           *string
 	Outcome          *string
 	Tag              *string
@@ -1366,6 +1374,7 @@ type ListCallsRow struct {
 	ApiKeyName         *string
 	ModelID            *string
 	RequestedModel     string
+	Operation          string
 	Format             string
 	Stream             bool
 	Tag                *string
@@ -1396,6 +1405,7 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]ListCal
 		arg.FinalChannelID,
 		arg.ApiKeyID,
 		arg.Model,
+		arg.Operation,
 		arg.Format,
 		arg.Outcome,
 		arg.Tag,
@@ -1444,6 +1454,7 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]ListCal
 			&i.ApiKeyName,
 			&i.ModelID,
 			&i.RequestedModel,
+			&i.Operation,
 			&i.Format,
 			&i.Stream,
 			&i.Tag,

@@ -68,7 +68,7 @@ func toChannel(row GetChannelRow) channel.Channel {
 		ID: row.ID, Owner: channel.Owner{ID: row.OwnerID, Username: row.OwnerUsername, DisplayName: row.OwnerDisplayName},
 		Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, Status: channel.Status(row.Status), SuspendedReason: row.SuspendedReason,
 		Advanced: channel.Advanced{
-			UserAgent: row.UserAgent, HeaderRules: decodeRules(row.HeaderRules),
+			Capabilities: row.Capabilities, UserAgent: row.UserAgent, HeaderRules: decodeRules(row.HeaderRules),
 			ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
 			TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
 			CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
@@ -79,7 +79,7 @@ func toChannel(row GetChannelRow) channel.Channel {
 
 func toModel(row ChannelModel) channel.Model {
 	model := channel.Model{
-		ModelID: row.ModelID, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
+		Capabilities: row.Capabilities, ModelID: row.ModelID, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
 		Enabled: row.Enabled, FormatTests: map[channel.Format]channel.FormatTest{}, PendingMultiplier: row.PendingMultiplier,
 	}
 	if row.IsCustom {
@@ -188,7 +188,7 @@ func insertModels(ctx context.Context, q *Queries, channelID string, models []ch
 		}
 		params := InsertChannelModelParams{
 			ChannelID: channelID, ModelID: model.ModelID, UpstreamModel: model.UpstreamModel, MultiplierNano: model.MultiplierNano,
-			Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
+			Capabilities: channel.CapabilityList(model.Capabilities), Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
 			PendingMultiplier: model.PendingMultiplier,
 		}
 		if prices := model.Custom; prices != nil {
@@ -239,7 +239,7 @@ func (s *Store) Create(ctx context.Context, in channel.NewChannel) (channel.Chan
 		if err := q.InsertChannel(ctx, InsertChannelParams{
 			ID: in.ID, OwnerID: in.OwnerID, Name: in.Name, Summary: in.Summary, Description: in.Description, BaseUrl: in.BaseURL,
 			ApiKeyCiphertext: in.Credential.Ciphertext, ApiKeyNonce: in.Credential.Nonce, ApiKeyKeyID: in.Credential.KeyID,
-			Status: string(in.Status), UserAgent: in.Advanced.UserAgent, HeaderRules: rules,
+			Capabilities: channel.CapabilityList(in.Advanced.Capabilities), Status: string(in.Status), UserAgent: in.Advanced.UserAgent, HeaderRules: rules,
 			ConcurrencyLimit: in.Advanced.ConcurrencyLimit, RpmLimit: in.Advanced.RPMLimit, DailyRevenueCapNano: in.Advanced.DailyRevenueCap,
 			TtftTimeoutMs: in.Advanced.TTFTTimeoutMS, RequestTimeoutMs: in.Advanced.RequestTimeoutMS, IdleTimeoutMs: in.Advanced.IdleTimeoutMS,
 			CooldownFailures: in.Advanced.CooldownFailures, CooldownSeconds: in.Advanced.CooldownSeconds,
@@ -345,7 +345,7 @@ func (s *Store) Update(ctx context.Context, id string, update channel.Update) (c
 				return err
 			}
 			if err := q.UpdateChannelAdvanced(ctx, UpdateChannelAdvancedParams{
-				ID: id, UserAgent: advanced.UserAgent, HeaderRules: rules, ConcurrencyLimit: advanced.ConcurrencyLimit,
+				ID: id, Capabilities: channel.CapabilityList(advanced.Capabilities), UserAgent: advanced.UserAgent, HeaderRules: rules, ConcurrencyLimit: advanced.ConcurrencyLimit,
 				RpmLimit: advanced.RPMLimit, DailyRevenueCapNano: advanced.DailyRevenueCap, TtftTimeoutMs: advanced.TTFTTimeoutMS,
 				RequestTimeoutMs: advanced.RequestTimeoutMS, IdleTimeoutMs: advanced.IdleTimeoutMS, CooldownFailures: advanced.CooldownFailures, CooldownSeconds: advanced.CooldownSeconds,
 			}); err != nil {

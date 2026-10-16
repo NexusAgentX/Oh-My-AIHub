@@ -70,6 +70,24 @@ func (a *app) registerGatewayRoutes(r *router) {
 	for _, method := range []string{"GET", "DELETE"} {
 		r.implement("B", method+" /v1/conversations/{resourceID}/items/{itemID}", accessGatewayKey, resource("conversation"))
 	}
+	for _, path := range []string{"/v1/user-auth-credential/whoami", "/backend-api/wham/accounts/check", "/backend-api/codex/models"} {
+		r.implement("B", "GET "+path, accessGatewayKey, a.gateway.ServeCodexConfig)
+	}
+	for path, format := range map[string]channel.Format{
+		"/backend-api/codex/responses":              channel.FormatOpenAIResponses,
+		"/backend-api/codex/responses/input_tokens": channel.FormatOpenAIResponses,
+		"/backend-api/codex/responses/compact":      channel.FormatOpenAIResponses,
+		"/backend-api/codex/alpha/search":           channel.FormatOpenAIResponses,
+		"/backend-api/codex/images/generations":     channel.FormatOpenAIImages,
+		"/backend-api/codex/images/edits":           channel.FormatOpenAIImages,
+	} {
+		r.implement("B", "POST "+path, accessGatewayKey, serve(format))
+	}
+	r.implement("B", "GET /backend-api/codex/responses/{responseID}", accessGatewayKey, a.gateway.ServeOpenAIResponse)
+	r.implement("B", "POST /backend-api/codex/responses/{responseID}/cancel", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) { a.gateway.ServeResponse(w, r, true) })
+	r.implement("B", "DELETE /backend-api/codex/responses/{responseID}", accessGatewayKey, resource("response"))
+	r.implement("B", "GET /backend-api/codex/responses/{responseID}/input_items", accessGatewayKey, resource("response"))
+	r.mux.HandleFunc("/backend-api/", unsupportedEndpoint)
 	r.mux.HandleFunc("/v1/", unsupportedEndpoint)
 	r.mux.HandleFunc("/v1beta/", unsupportedEndpoint)
 }

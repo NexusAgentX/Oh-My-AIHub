@@ -9,18 +9,21 @@ import (
 // Diagnostics contains only bounded metadata; never payloads, URLs or credentials.
 // Nil on old records means unmeasured, not zero.
 type Diagnostics struct {
-	Network        *Network        `json:"network"`
-	Stages         []StageTiming   `json:"stages"`
-	Routing        []RouteDecision `json:"routing"`
-	StopReason     string          `json:"stop_reason"`
-	UsageStatus    string          `json:"usage_status"`
-	Delivery       string          `json:"delivery"`
-	Frames         int             `json:"frames"`
-	MaxFrameGapMS  *int            `json:"max_frame_gap_ms"`
-	UpstreamBytes  int64           `json:"upstream_bytes"`
-	MaxAttempts    int             `json:"max_attempts"`
-	CallTimeoutMS  int             `json:"call_timeout_ms"`
-	DrainTimeoutMS int             `json:"drain_timeout_ms"`
+	Operation            string          `json:"operation,omitempty"`
+	RequiredCapabilities []string        `json:"required_capabilities,omitempty"`
+	BoundResource        bool            `json:"bound_resource,omitempty"`
+	Network              *Network        `json:"network"`
+	Stages               []StageTiming   `json:"stages"`
+	Routing              []RouteDecision `json:"routing"`
+	StopReason           string          `json:"stop_reason"`
+	UsageStatus          string          `json:"usage_status"`
+	Delivery             string          `json:"delivery"`
+	Frames               int             `json:"frames"`
+	MaxFrameGapMS        *int            `json:"max_frame_gap_ms"`
+	UpstreamBytes        int64           `json:"upstream_bytes"`
+	MaxAttempts          int             `json:"max_attempts"`
+	CallTimeoutMS        int             `json:"call_timeout_ms"`
+	DrainTimeoutMS       int             `json:"drain_timeout_ms"`
 }
 type StageTiming struct {
 	OffsetMS   *float64 `json:"offset_ms"`

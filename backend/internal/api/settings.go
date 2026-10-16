@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,25 +14,26 @@ import (
 
 // settingsJSON is the OpenAPI Settings schema.
 type settingsJSON struct {
-	FeeRateNano              int64      `json:"fee_rate_nano"`
-	C2CPaymentTimeoutMinutes int32      `json:"c2c_payment_timeout_minutes"`
-	DefaultCreditLimit       string     `json:"default_credit_limit"`
-	DefaultMaxAttempts       int32      `json:"default_max_attempts"`
-	DefaultTTFTTimeoutMS     int32      `json:"default_ttft_timeout_ms"`
-	DefaultRequestTimeoutMS  int32      `json:"default_request_timeout_ms"`
-	DefaultIdleTimeoutMS     int32      `json:"default_idle_timeout_ms"`
-	DefaultCooldownFailures  int32      `json:"default_cooldown_failures"`
-	DefaultCooldownSeconds   int32      `json:"default_cooldown_seconds"`
-	AccountMaxInflightCalls  int32      `json:"account_max_inflight_calls"`
-	ExtraBlockedHosts        []string   `json:"extra_blocked_hosts"`
-	USDCNYRate               string     `json:"usd_cny_rate"`
-	FXAutoSync               bool       `json:"fx_auto_sync"`
-	FXSyncMinute             int32      `json:"fx_sync_minute"`
-	USDCNYRateSource         string     `json:"usd_cny_rate_source"`
-	USDCNYRateUpdatedAt      time.Time  `json:"usd_cny_rate_updated_at"`
-	FXSyncAttemptedAt        *time.Time `json:"fx_sync_attempted_at"`
-	FXSyncError              *string    `json:"fx_sync_error"`
-	UpdatedAt                time.Time  `json:"updated_at"`
+	Codex                    settings.Codex `json:"codex"`
+	FeeRateNano              int64          `json:"fee_rate_nano"`
+	C2CPaymentTimeoutMinutes int32          `json:"c2c_payment_timeout_minutes"`
+	DefaultCreditLimit       string         `json:"default_credit_limit"`
+	DefaultMaxAttempts       int32          `json:"default_max_attempts"`
+	DefaultTTFTTimeoutMS     int32          `json:"default_ttft_timeout_ms"`
+	DefaultRequestTimeoutMS  int32          `json:"default_request_timeout_ms"`
+	DefaultIdleTimeoutMS     int32          `json:"default_idle_timeout_ms"`
+	DefaultCooldownFailures  int32          `json:"default_cooldown_failures"`
+	DefaultCooldownSeconds   int32          `json:"default_cooldown_seconds"`
+	AccountMaxInflightCalls  int32          `json:"account_max_inflight_calls"`
+	ExtraBlockedHosts        []string       `json:"extra_blocked_hosts"`
+	USDCNYRate               string         `json:"usd_cny_rate"`
+	FXAutoSync               bool           `json:"fx_auto_sync"`
+	FXSyncMinute             int32          `json:"fx_sync_minute"`
+	USDCNYRateSource         string         `json:"usd_cny_rate_source"`
+	USDCNYRateUpdatedAt      time.Time      `json:"usd_cny_rate_updated_at"`
+	FXSyncAttemptedAt        *time.Time     `json:"fx_sync_attempted_at"`
+	FXSyncError              *string        `json:"fx_sync_error"`
+	UpdatedAt                time.Time      `json:"updated_at"`
 }
 
 // settingsEnvelopeJSON is the OpenAPI SettingsEnvelope schema.
@@ -45,6 +47,7 @@ func newSettingsJSON(value settings.Settings) settingsJSON {
 		hosts = []string{}
 	}
 	return settingsJSON{
+		Codex:                    value.Codex,
 		FeeRateNano:              value.FeeRateNano,
 		C2CPaymentTimeoutMinutes: value.C2CPaymentTimeoutMinutes,
 		DefaultCreditLimit:       value.DefaultCreditLimit.String(),
@@ -104,20 +107,21 @@ func (a *app) getAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	var request struct {
-		FeeRateNano              *int64    `json:"fee_rate_nano"`
-		C2CPaymentTimeoutMinutes *int32    `json:"c2c_payment_timeout_minutes"`
-		DefaultCreditLimit       *string   `json:"default_credit_limit"`
-		DefaultMaxAttempts       *int32    `json:"default_max_attempts"`
-		DefaultTTFTTimeoutMS     *int32    `json:"default_ttft_timeout_ms"`
-		DefaultRequestTimeoutMS  *int32    `json:"default_request_timeout_ms"`
-		DefaultIdleTimeoutMS     *int32    `json:"default_idle_timeout_ms"`
-		DefaultCooldownFailures  *int32    `json:"default_cooldown_failures"`
-		DefaultCooldownSeconds   *int32    `json:"default_cooldown_seconds"`
-		AccountMaxInflightCalls  *int32    `json:"account_max_inflight_calls"`
-		ExtraBlockedHosts        *[]string `json:"extra_blocked_hosts"`
-		USDCNYRate               *string   `json:"usd_cny_rate"`
-		FXAutoSync               *bool     `json:"fx_auto_sync"`
-		FXSyncMinute             *int32    `json:"fx_sync_minute"`
+		Codex                    *settings.Codex `json:"codex"`
+		FeeRateNano              *int64          `json:"fee_rate_nano"`
+		C2CPaymentTimeoutMinutes *int32          `json:"c2c_payment_timeout_minutes"`
+		DefaultCreditLimit       *string         `json:"default_credit_limit"`
+		DefaultMaxAttempts       *int32          `json:"default_max_attempts"`
+		DefaultTTFTTimeoutMS     *int32          `json:"default_ttft_timeout_ms"`
+		DefaultRequestTimeoutMS  *int32          `json:"default_request_timeout_ms"`
+		DefaultIdleTimeoutMS     *int32          `json:"default_idle_timeout_ms"`
+		DefaultCooldownFailures  *int32          `json:"default_cooldown_failures"`
+		DefaultCooldownSeconds   *int32          `json:"default_cooldown_seconds"`
+		AccountMaxInflightCalls  *int32          `json:"account_max_inflight_calls"`
+		ExtraBlockedHosts        *[]string       `json:"extra_blocked_hosts"`
+		USDCNYRate               *string         `json:"usd_cny_rate"`
+		FXAutoSync               *bool           `json:"fx_auto_sync"`
+		FXSyncMinute             *int32          `json:"fx_sync_minute"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
 		writeInvalidJSON(w)
@@ -141,8 +145,19 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, settings.ErrInvalidInput)
 		return
 	}
+	codex := settings.Codex{}
+	if request.Codex != nil {
+		codex = *request.Codex
+	} else {
+		current, err := a.settings.Get(r.Context())
+		if err != nil {
+			writeDomainError(w, err)
+			return
+		}
+		codex = current.Codex
+	}
 	updated, err := a.settings.Update(r.Context(), accountFromContext(r.Context()).ID, settings.Settings{
-		FeeRateNano: *request.FeeRateNano, C2CPaymentTimeoutMinutes: *request.C2CPaymentTimeoutMinutes,
+		Codex: codex, FeeRateNano: *request.FeeRateNano, C2CPaymentTimeoutMinutes: *request.C2CPaymentTimeoutMinutes,
 		DefaultCreditLimit: creditLimit, DefaultMaxAttempts: *request.DefaultMaxAttempts,
 		DefaultTTFTTimeoutMS: *request.DefaultTTFTTimeoutMS, DefaultRequestTimeoutMS: *request.DefaultRequestTimeoutMS,
 		DefaultIdleTimeoutMS:    *request.DefaultIdleTimeoutMS,
@@ -151,6 +166,10 @@ func (a *app) updateAdminSettings(w http.ResponseWriter, r *http.Request) {
 		USDCNYRateNano: rate.Nano(), FXAutoSync: *request.FXAutoSync, FXSyncMinute: *request.FXSyncMinute,
 	})
 	if err != nil {
+		if errors.Is(err, settings.ErrInvalidInput) {
+			writeError(w, 422, "invalid_input", err.Error())
+			return
+		}
 		writeDomainError(w, err)
 		return
 	}

@@ -24,4 +24,5 @@ type ChannelModel struct {
 	CustomCacheReadPriceNanoPerMillion  *money.Amount
 	PendingMultiplier                   bool
 	CatalogModelID                      *string
+	Capabilities                        []string
 }

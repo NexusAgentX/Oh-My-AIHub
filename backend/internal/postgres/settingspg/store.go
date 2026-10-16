@@ -3,6 +3,9 @@ package settingspg
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,7 +30,10 @@ func toSettings(row Setting) settings.Settings {
 	if hosts == nil {
 		hosts = []string{}
 	}
+	var codex settings.Codex
+	_ = json.Unmarshal(row.Codex, &codex)
 	return settings.Settings{
+		Codex:                    codex,
 		FeeRateNano:              row.FeeRateNano,
 		C2CPaymentTimeoutMinutes: row.C2cPaymentTimeoutMinutes,
 		DefaultCreditLimit:       row.DefaultCreditLimitNano,
@@ -72,7 +78,12 @@ func (s *Store) UpdateSettings(ctx context.Context, actorID string, value settin
 		if err != nil {
 			return err
 		}
+		codex, err := json.Marshal(value.Codex)
+		if err != nil {
+			return err
+		}
 		row, err := q.UpdateSettings(ctx, UpdateSettingsParams{
+			Codex:                    codex,
 			FeeRateNano:              value.FeeRateNano,
 			C2cPaymentTimeoutMinutes: value.C2CPaymentTimeoutMinutes,
 			DefaultCreditLimitNano:   value.DefaultCreditLimit,
@@ -102,6 +113,7 @@ func (s *Store) UpdateSettings(ctx context.Context, actorID string, value settin
 
 func auditView(value settings.Settings) map[string]any {
 	return map[string]any{
+		"codex_sha256":                fmt.Sprintf("%x", sha256.Sum256([]byte(value.Codex.Whoami+"\x00"+value.Codex.Accounts+"\x00"+value.Codex.Models))),
 		"fee_rate_nano":               value.FeeRateNano,
 		"c2c_payment_timeout_minutes": value.C2CPaymentTimeoutMinutes,
 		"default_credit_limit":        value.DefaultCreditLimit.String(),

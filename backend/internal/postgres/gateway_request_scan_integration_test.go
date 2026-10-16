@@ -17,7 +17,7 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
+	e.createChannel(sharer, channelSpec{capabilities: []string{"priority"}, name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
 
 	snapshotDetail := func(id string) ledger.UsageDetail {

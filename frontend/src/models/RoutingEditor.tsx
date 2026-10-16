@@ -1,3 +1,4 @@
+import { CapabilityTags } from '../channels/Capabilities'
 import { Link } from 'react-router-dom'
 import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
@@ -130,7 +131,7 @@ export function RoutingEditor({
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
                     <Badge tone={state.tone}>{state.label}</Badge>
                   </span>
-                  <FormatTags formats={channel.formats} />
+                  <FormatTags formats={channel.formats} /><CapabilityTags values={channel.capabilities} />
                 </div>
                 <dl className="routing-metrics">
                   <div>

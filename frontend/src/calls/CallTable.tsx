@@ -1,3 +1,4 @@
+import { operationLabels } from './operations'
 import type { ReactNode } from 'react'
 import type { CallOutcome, CallSummary, ChannelCall, Format, Usage } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
@@ -8,6 +9,7 @@ import { OutcomeBadge } from './OutcomeBadge'
 
 /** 各类调用记录（用户、渠道所有者、管理员）共有的字段。 */
 export type CallRowBase = {
+  operation?: string
   id: string
   created_at: string
   model_id: string | null
@@ -54,6 +56,7 @@ export const callColumns = {
     cell: (row) => (
       <span className="call-format">
         {formatLabels[row.format]}
+        {row.operation && <small>{operationLabels[row.operation] ?? row.operation}</small>}
         {row.stream && <small>流式</small>}
       </span>
     ),
