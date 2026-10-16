@@ -78,8 +78,8 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
  ('55555555-5555-4555-8555-555555555555','11111111-1111-4111-8111-111111111111','openai_responses','in_progress','{}');
  INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at) VALUES
  ('55555555-5555-4555-8555-555555555555','11111111-1111-4111-8111-111111111111','66666666-6666-4666-8666-666666666666','33333333-3333-4333-8333-333333333333','resp_pending','{}',now()+interval '1 hour');
- INSERT INTO models(id,display_name,input_modalities,output_modalities,geo_multipliers) VALUES
- ('migration-model','Migration model',ARRAY['text','file','image'],ARRAY['file'],'{"us":1100000000}');
+ INSERT INTO models(id,display_name,input_price_nano_per_million,output_price_nano_per_million,cache_write_price_nano_per_million,cache_read_price_nano_per_million,input_modalities,output_modalities,geo_multipliers) VALUES
+ ('migration-model','Migration model',0,0,0,0,ARRAY['text','file','image'],ARRAY['file'],'{"us":1100000000}');
  INSERT INTO model_price_tiers(model_id,seq,name,service_tier,thinking_mode,min_prompt_tokens,input_price_nano_per_million,output_price_nano_per_million,cache_write_price_nano_per_million,cache_read_price_nano_per_million,geo_multipliers) VALUES
  ('migration-model',1,'legacy-priority','openai:priority','',NULL,3,4,0,0,'{"us":1200000000}'),
  ('migration-model',2,'thinking-only','','qwen_thinking',NULL,5,6,0,0,'{}'),
