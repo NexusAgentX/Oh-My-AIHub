@@ -1,0 +1,87 @@
+package gateway
+
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+)
+
+type billingHints struct {
+	Background      bool
+	ContainerMemory string
+	ImageModel      string
+	Submodels       []string
+}
+
+func (scan objectScan) billingHints(body []byte) billingHints {
+	var hints billingHints
+	if member, ok := scan.last("background"); ok {
+		hints.Background = string(body[member.start:member.end]) == "true"
+	}
+	if member, ok := scan.last("tools"); ok {
+		var tools []struct {
+			Type      string          `json:"type"`
+			Model     string          `json:"model"`
+			Container json.RawMessage `json:"container"`
+		}
+		// tools is bounded independently; an oversized configuration still forwards.
+		if member.end-member.start > 1<<20 {
+			return hints
+		}
+		if json.Unmarshal(body[member.start:member.end], &tools) != nil || len(tools) > 128 {
+			return hints
+		}
+		for _, tool := range tools {
+			switch tool.Type {
+			case "code_interpreter":
+				var container struct {
+					Type   string `json:"type"`
+					Memory string `json:"memory_limit"`
+				}
+				if json.Unmarshal(tool.Container, &container) == nil && container.Type == "auto" {
+					hints.ContainerMemory = container.Memory
+					if hints.ContainerMemory == "" {
+						hints.ContainerMemory = "1g"
+					}
+				}
+			case "image_generation":
+				hints.ImageModel = tool.Model
+				hints.Submodels = append(hints.Submodels, tool.Model)
+			case "advisor_20260301":
+				hints.Submodels = append(hints.Submodels, tool.Model)
+			}
+		}
+	}
+	return hints
+}
+
+func (e *Engine) captureSubmodels(ctx context.Context, hints billingHints) ([]catalog.Model, error) {
+	if len(hints.Submodels) == 0 {
+		return nil, nil
+	}
+	models, err := e.Catalog.List(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	result := []catalog.Model{}
+	for _, model := range models {
+		match := false
+		for _, name := range hints.Submodels {
+			if model.ID == name {
+				match = true
+			}
+			if name == "" {
+				for _, modality := range model.OutputModalities {
+					if modality == "image" {
+						match = true
+					}
+				}
+			}
+		}
+		if match && len(result) < maxBillingItems {
+			result = append(result, model)
+		}
+	}
+	return result, nil
+}

@@ -21,8 +21,8 @@ INSERT INTO models (
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
     supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices, price_currency,
-    max_output_tokens
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    max_output_tokens, unit_prices, geo_multipliers
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 RETURNING *;
 
 -- name: UpdateModel :one
@@ -45,6 +45,7 @@ UPDATE models SET
     token_prices = $17,
     price_currency = $18,
     max_output_tokens = $19,
+    unit_prices = $20, geo_multipliers = $21,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -57,8 +58,8 @@ INSERT INTO model_price_tiers (
     model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
     start_minute_of_day, end_minute_of_day,
     input_price_nano_per_million, output_price_nano_per_million,
-    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier, thinking_mode
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier, thinking_mode, unit_prices, geo_multipliers
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
 
 -- A currency switch resets the FX discount of every channel offering the model
 -- to "on" for USD: a model whose figures were dollars all along keeps its prices.

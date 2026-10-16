@@ -156,6 +156,8 @@ type Billing struct {
 // CallFinish closes a call record and, when Bill is set, books the ledger
 // transaction "call:<id>" in the same database transaction.
 type CallFinish struct {
+	Reprice            func(ledger.Usage) (money.Amount, money.Amount, []byte, error) `json:"-"`
+	Background         bool
 	Diagnostics        *Diagnostics
 	ID                 string
 	AccountID          string
@@ -181,7 +183,15 @@ type CallFinish struct {
 
 // FinishResult tells whether this call ended the record (false when it had
 // already ended, in which case nothing was booked again).
+type ChargeAdjustment struct {
+	Cost     money.Amount
+	Fee      money.Amount
+	Snapshot []byte
+	Usage    ledger.Usage
+}
+
 type FinishResult struct {
+	Adjusted *ChargeAdjustment
 	Finished bool
 	TxID     string
 }

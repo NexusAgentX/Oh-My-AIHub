@@ -3171,6 +3171,45 @@ paths:
             schema: {type: object, description: 原生请求正文。}
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
+  /v1/responses/{responseID}:
+    get:
+      operationId: retrieveOpenAIResponse
+      tags: [gateway]
+      summary: 查询后台响应或恢复流
+      description: 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      responses:
+        default: {description: 原生响应（含流式）与原生错误。}
+  /v1/responses/{responseID}/cancel:
+    post:
+      operationId: cancelOpenAIResponse
+      tags: [gateway]
+      summary: 取消后台响应
+      description: 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        default: {description: 原生响应（含流式）与原生错误。}
   /v1/messages:
     post:
       operationId: proxyAnthropicMessages
@@ -4078,6 +4117,16 @@ components:
       properties:
         input: {$ref: '#/components/schemas/Price'}
         output: {$ref: '#/components/schemas/Price'}
+        unit_prices:
+          description: 按单位计价的工具费用；缺失不收费，零为免费，使用模型币种。键与单位见产品计费规则。
+          type: object
+          maxProperties: 32
+          additionalProperties: {$ref: '#/components/schemas/Price'}
+        geo_multipliers:
+          description: 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。
+          type: object
+          maxProperties: 32
+          additionalProperties: {type: string, pattern: '^(0|[1-9][0-9]{0,2})(\.[0-9]{1,9})?$'}
         token_prices:
           description: 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。
           type: object
@@ -5163,6 +5212,19 @@ components:
       type: object
       description: 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。
       properties:
+        components:
+          type: array
+          items:
+            type: object
+            properties:
+              model: {type: string}
+              kind: {type: string}
+              usage: {type: object}
+              price_snapshot: {$ref: '#/components/schemas/PriceSnapshot'}
+            required: [model, kind, usage, price_snapshot]
+            additionalProperties: false
+        unit_prices: {type: object, additionalProperties: {type: string}}
+        geo_multipliers: {type: object, additionalProperties: {type: string}}
         selected_prices: {$ref: '#/components/schemas/ModelPrices'}
         token_prices: {type: object, additionalProperties: {type: string}}
         base_token_prices: {type: object, additionalProperties: {type: string}}
@@ -5175,6 +5237,14 @@ components:
             thinking_mode: {type: string}
             thinking_mode_basis: {type: string, enum: [bailian_condition], description: 当前模型显式配置百炼条件档；历史快照缺少此依据。}
             thinking_observed: {type: boolean, description: 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。}
+            inference_geo: {type: string}
+            unit_events:
+              type: array
+              items: {type: object}
+            units_nano: {type: object, additionalProperties: {type: integer}}
+            iterations:
+              type: array
+              items: {type: object}
             tool_prompt_tokens: {type: integer}
             notes: {type: array, items: {type: string}}
           additionalProperties: false

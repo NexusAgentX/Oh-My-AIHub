@@ -97,6 +97,7 @@ func (c *callState) stage(name string, since time.Time, now time.Time) {
 	c.diagnostics.Stages = append(c.diagnostics.Stages, StageTiming{Stage: name, OffsetMS: &offset, DurationMS: float64(now.Sub(since)) / float64(time.Millisecond)})
 }
 func (e *Engine) finishCall(ctx context.Context, call *callState, finish CallFinish) (FinishResult, error) {
+	finish.Background = call.pending
 	if call.phase != "" {
 		call.stage(call.phase, call.phaseAt, e.Now())
 	}

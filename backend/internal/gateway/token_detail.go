@@ -241,6 +241,12 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		value = o.objectOf(nested)
 	}
 	usage := o.objectOf(value.get("usage"))
+	if geo := textValue(usage.get("inference_geo")); validGeo(geo) {
+		o.detail.InferenceGeo = geo
+	}
+	if o.format != channel.FormatGemini {
+		o.observeServerTools(usage)
+	}
 	if tier := textValue(usage.get("service_tier")); tier != "" {
 		o.setServiceTier(prefix + tier)
 	}
@@ -394,6 +400,15 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		o.setBucket("output_", nil, o.usage.OutputTokens)
 		if tier := textValue(usage.get("serviceTier")); tier != "" {
 			o.setServiceTier(prefix + tier)
+		} else if traffic := textValue(usage.get("trafficType")); traffic != "" {
+			switch traffic {
+			case "ON_DEMAND_PRIORITY":
+				o.setServiceTier(prefix + "priority")
+			case "ON_DEMAND_FLEX", "FLEX", "BATCH":
+				o.setServiceTier(prefix + "flex")
+			case "ON_DEMAND":
+				o.setServiceTier(prefix + "standard")
+			}
 		}
 		prompt, pok := modalityCounts(usage.get("promptTokensDetails"))
 		cached, cok := modalityCounts(usage.get("cacheTokensDetails"))
@@ -441,10 +456,7 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 			candidates, _ := count(usage.get("candidatesTokenCount"))
 			o.setBucket("output_", values, candidates)
 		}
-		if n, ok := count(usage.get("toolUsePromptTokenCount")); ok && n > 0 {
-			o.detail.ToolPromptTokens = n
-			o.note("工具提示token已观察，独立计价语义未覆盖")
-		}
+		o.observeGeminiTools(value, usage)
 	}
 }
 

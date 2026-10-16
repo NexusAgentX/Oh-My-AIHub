@@ -12,6 +12,8 @@ export type PricesForm = {
   output: string
   cache_write: string
   cache_read: string
+  unit_prices?: Record<string, string>
+  geo_multipliers?: Record<string, string>
   token_prices?: Record<string, string>
 }
 
@@ -115,7 +117,12 @@ export function formToTierInput(form: TierForm): PriceTierInput {
 }
 
 function trimPrices(prices: PricesForm): ModelPrices {
+  const clean = (values: Record<string, string>) => Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, value.trim()]),
+  )
   return {
+    ...(prices.unit_prices ? { unit_prices: clean(prices.unit_prices) } : {}),
+    ...(prices.geo_multipliers ? { geo_multipliers: clean(prices.geo_multipliers) } : {}),
     ...(prices.token_prices
       ? {
           token_prices: Object.fromEntries(
@@ -153,11 +160,22 @@ export function isValidTimezone(timezone: string) {
 export type TierErrors = Partial<Record<'name' | 'tokens' | 'time' | 'timezone' | 'prices' | 'condition', string>>
 
 export function validatePrices(prices: PricesForm) {
+  for (const [key, value] of Object.entries(prices.geo_multipliers ?? {})) {
+    if (value.trim() !== '' && (!/^[a-z][a-z0-9_-]{0,31}$/.test(key) || !isValidPrice(value) || Number(value) > 100)) {
+      return '地域倍率为 0～100，最多 9 位小数'
+    }
+  }
+  for (const pair of [['google_search_query', 'google_search_prompt'], ['google_maps_query', 'google_maps_prompt']]) {
+    if (pair.every((key) => (prices.unit_prices?.[key] ?? '').trim() !== '')) {
+      return '同一种 grounding 只能选择按查询或按请求收费'
+    }
+  }
   return [
     prices.input,
     prices.output,
     prices.cache_read,
     prices.cache_write,
+    ...Object.values(prices.unit_prices ?? {}).filter((value) => value.trim() !== ''),
     ...Object.values(prices.token_prices ?? {}).filter((v) => v.trim() !== ''),
   ].every(isValidPrice)
     ? ''

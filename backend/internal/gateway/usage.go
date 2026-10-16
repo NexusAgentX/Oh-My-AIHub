@@ -29,6 +29,8 @@ type Observation struct {
 	MaxFrameGapMS       *int
 	Usage               ledger.Usage
 	Found               bool
+	ResponseStatus      string
+	Background          bool
 	ResponseID          string
 	Frames              int
 	// IntervalP50MS and IntervalP95MS describe the gaps between data frames.
@@ -43,8 +45,11 @@ type Observer struct {
 	stream bool
 	sse    bool
 
+	eventData    []byte
+	eventSkip    bool
 	line         []byte
 	skipLine     bool
+	pendingCR    bool
 	buffer       []byte
 	overflow     bool
 	parseLimited bool
@@ -61,6 +66,11 @@ type Observer struct {
 	anthropicTier       string
 	usage               ledger.Usage
 	found               bool
+	responseStatus      string
+	background          bool
+	billedItems         map[string]struct{}
+	containerMemory     string
+	imageModel          string
 	responseID          string
 	stopReason          string
 	protocolError       bool
@@ -120,11 +130,20 @@ func (o *Observer) frame(at time.Time) {
 
 func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 	for len(chunk) > 0 {
-		newline := bytes.IndexByte(chunk, '\n')
+		if o.pendingCR {
+			o.pendingCR = false
+			if chunk[0] == '\n' {
+				chunk = chunk[1:]
+				if len(chunk) == 0 {
+					return
+				}
+			}
+		}
+		newline := bytes.IndexAny(chunk, "\r\n")
 		if newline < 0 {
 			if !o.skipLine {
 				if len(o.line)+len(chunk) > maxLineBuffer {
-					o.skipLine, o.line, o.parseLimited = true, nil, true
+					o.skipLine, o.line, o.parseLimited, o.eventSkip = true, nil, true, true
 				} else {
 					o.line = append(o.line, chunk...)
 				}
@@ -136,26 +155,43 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 				o.line = append(o.line, chunk[:newline]...)
 				o.handleLine(o.line, at)
 			} else {
-				o.parseLimited = true
+				o.parseLimited, o.eventSkip = true, true
 			}
 		}
 		o.line, o.skipLine = o.line[:0], false
+		o.pendingCR = chunk[newline] == '\r'
 		chunk = chunk[newline+1:]
 	}
 }
 
 func (o *Observer) handleLine(line []byte, at time.Time) {
 	line = bytes.TrimSuffix(line, []byte("\r"))
+	if len(line) == 0 {
+		o.finishEvent(at)
+		return
+	}
 	payload, ok := bytes.CutPrefix(line, []byte("data:"))
-	if !ok {
+	if !ok || o.eventSkip {
 		return
 	}
-	payload = bytes.TrimSpace(payload)
-	if len(payload) == 0 || payload[0] != '{' {
+	payload = bytes.TrimPrefix(payload, []byte(" "))
+	if len(o.eventData)+len(payload)+1 > maxLineBuffer {
+		o.eventSkip, o.parseLimited = true, true
+		o.eventData = o.eventData[:0]
 		return
 	}
-	o.frame(at)
-	o.absorb(payload)
+	o.eventData = append(o.eventData, payload...)
+	o.eventData = append(o.eventData, '\n')
+}
+
+func (o *Observer) finishEvent(at time.Time) {
+	payload := bytes.TrimSpace(o.eventData)
+	if !o.eventSkip && len(payload) > 0 && payload[0] == '{' {
+		o.frame(at)
+		o.absorb(payload)
+	}
+	o.eventData = o.eventData[:0]
+	o.eventSkip = false
 }
 
 // Finish parses whatever was buffered (non-event-stream bodies) and returns
@@ -164,6 +200,9 @@ func (o *Observer) Finish() Observation {
 	if o.sse && len(o.line) > 0 && !o.skipLine {
 		o.handleLine(o.line, o.last)
 		o.line = nil
+	}
+	if o.sse {
+		o.finishEvent(o.last)
 	}
 	if !o.sse && !o.overflow && len(o.buffer) > 0 {
 		body := bytes.TrimSpace(o.buffer)
@@ -188,7 +227,7 @@ func (o *Observer) Finish() Observation {
 	if o.thinkingSeen {
 		o.detail.ThinkingObserved = &o.thinkingNonempty
 	}
-	if len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || o.detail.ThinkingObserved != nil || len(o.detail.Notes) > 0 {
+	if len(o.detail.Units) > 0 || len(o.detail.Iterations) > 0 || o.detail.InferenceGeo != "" || o.detail.ToolPromptTokens > 0 || len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || o.detail.ThinkingObserved != nil || len(o.detail.Notes) > 0 {
 		o.usage.Detail = &o.detail
 	}
 	status := "missing"
@@ -197,7 +236,7 @@ func (o *Observer) Finish() Observation {
 	} else if o.overflow || o.parseLimited {
 		status = "parse_limit"
 	}
-	observation := Observation{ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, Frames: o.frames}
+	observation := Observation{ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, ResponseStatus: o.responseStatus, Background: o.background, Frames: o.frames}
 	if len(o.intervals) > 0 {
 		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
@@ -351,17 +390,30 @@ func (o *Observer) absorbChat(raw []byte) {
 	o.setResponsesUsage(&responsesUsage{InputTokens: u.PromptTokens, OutputTokens: u.CompletionTokens, InputTokensDetails: u.PromptTokensDetails, CacheRead: u.CacheRead, CacheWrite: u.CacheWrite, CacheHit: u.CacheHit})
 }
 
+// borrowedJSON is used only during a synchronous side-channel decode. It
+// avoids copying generated output that the observer never retains.
+type borrowedJSON []byte
+
+func (b *borrowedJSON) UnmarshalJSON(raw []byte) error { *b = raw; return nil }
+
 func (o *Observer) absorbResponses(raw []byte) {
 	if !bytes.Contains(raw, []byte(`"usage"`)) && !bytes.Contains(raw, []byte(`"id"`)) {
 		return
 	}
 	var value struct {
-		Type     string          `json:"type"`
-		ID       string          `json:"id"`
-		Usage    *responsesUsage `json:"usage"`
-		Response *struct {
-			ID    string          `json:"id"`
-			Usage *responsesUsage `json:"usage"`
+		Type       string          `json:"type"`
+		ID         string          `json:"id"`
+		Usage      *responsesUsage `json:"usage"`
+		Status     string          `json:"status"`
+		Background bool            `json:"background"`
+		Output     borrowedJSON    `json:"output"`
+		Item       borrowedJSON    `json:"item"`
+		Response   *struct {
+			ID         string          `json:"id"`
+			Usage      *responsesUsage `json:"usage"`
+			Status     string          `json:"status"`
+			Background bool            `json:"background"`
+			Output     borrowedJSON    `json:"output"`
 		} `json:"response"`
 	}
 	if json.Unmarshal(raw, &value) != nil {
@@ -372,16 +424,28 @@ func (o *Observer) absorbResponses(raw []byte) {
 			o.responseID = value.Response.ID
 		}
 		o.setResponsesUsage(value.Response.Usage)
+		o.responseStatus, o.background = value.Response.Status, value.Response.Background
+		o.observeResponseItems(value.Response.Output)
 	}
 	if value.Type == "" {
 		if value.ID != "" {
 			o.responseID = value.ID
 		}
 		o.setResponsesUsage(value.Usage)
+		o.responseStatus, o.background = value.Status, value.Background
+		o.observeResponseItems(value.Output)
+	}
+	if value.Type == "response.output_item.done" {
+		o.observeResponseItem(value.Item)
 	}
 }
 
 type anthropicFields struct {
+	Type                 string            `json:"type"`
+	Model                string            `json:"model"`
+	InferenceGeo         string            `json:"inference_geo"`
+	ServiceTier          string            `json:"service_tier"`
+	Speed                string            `json:"speed"`
 	InputTokens          *int64            `json:"input_tokens"`
 	OutputTokens         *int64            `json:"output_tokens"`
 	CacheCreation        *int64            `json:"cache_creation_input_tokens"`
@@ -399,6 +463,10 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 	}
 	// Anthropic compaction usage replaces (rather than adds to) top-level usage:
 	// https://platform.claude.com/docs/en/build-with-claude/compaction-threshold#understanding-usage
+	if len(fields.Iterations) > maxBillingItems {
+		o.note("迭代用量超过解析上限，子推理未完整计价")
+		fields.Iterations = nil
+	}
 	if len(fields.Iterations) > 0 {
 		var totals anthropicUsage
 		five, hour := int64(0), int64(0)
@@ -436,6 +504,7 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 		}
 		if valid {
 			o.anthropic = totals
+			o.detail.Iterations = anthropicIterations(fields.Iterations, fields)
 			o.iterationsSeen = true
 			o.iterationMask = 0
 			for index, pair := range []struct {
@@ -464,6 +533,7 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 		o.note("迭代用量无效，使用顶层可靠用量")
 	}
 	if o.iterationsSeen {
+		old := o.usage
 		// An earlier cumulative iterations list can precede later top-level deltas.
 		// Keep its extra iterations, replacing only the known top-level component.
 		for index, pair := range []struct {
@@ -487,6 +557,7 @@ func (o *Observer) applyAnthropic(fields *anthropicFields) {
 			}
 		}
 		o.usage = ledger.Usage{InputTokens: o.anthropic.input, OutputTokens: o.anthropic.output, CacheWriteTokens: o.anthropic.cacheWrite, CacheReadTokens: o.anthropic.cacheRead}
+		o.updateIterationTotals(old, o.usage)
 		return
 	}
 	if fields.InputTokens != nil {

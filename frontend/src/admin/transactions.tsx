@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { tokenPriceLabels } from '../models/tokenPricing'
+import { tokenPriceLabels,unitPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { MultiplierText } from '../money/MultiplierText'
@@ -137,6 +137,13 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   const thinking = thinkingModeLabels[detail?.thinking_mode ?? '']
   const notes = pricingNotes(detail?.notes ?? [], Object.keys(detail?.tokens ?? {}).length > 0)
   const items: Array<[string, ReactNode]> = [['价格档', snapshot.tier?.name ?? '基准价']]
+  if (detail?.inference_geo) {
+    const geo = detail.inference_geo
+    items.push(['实际推理地域', `${geo} · token 倍率 ${snapshot.selected_prices?.geo_multipliers?.[geo] ?? '1'}`])
+  }
+  for (const [key, quantity] of Object.entries(detail?.units_nano ?? {})) {
+    items.push([unitPriceLabels[key] ?? key, `${quantity / 1e9} · 原单价 ${snapshot.selected_prices?.unit_prices?.[key] ?? '未配置'}`])
+  }
   if (detail?.service_tier) items.push(['实际服务档位', detail.service_tier])
   if (detail?.requested_service_tier) items.push(['请求服务档位', detail.requested_service_tier])
   if (detail?.thinking_observed !== undefined) {
@@ -193,7 +200,17 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
         : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
     ])
   }
-  return <DetailList items={items} />
+  return (
+    <>
+      <DetailList items={items} />
+      {(snapshot.components ?? []).map((component, index) => (
+        <details key={index}>
+          <summary>{component.model} · {component.kind}</summary>
+          <PriceSnapshotView snapshot={component.price_snapshot} />
+        </details>
+      ))}
+    </>
+  )
 }
 
 export function TransactionDetail({ transaction }: { transaction: LedgerTransaction }) {

@@ -50,6 +50,9 @@ func metadataState(s readerState) readerState {
 	d.Tokens = nil
 	d.Notes = nil
 	d.ToolPromptTokens = 0
+	d.InferenceGeo = ""
+	d.Units = nil
+	d.Iterations = nil
 	// #467 deliberately separates generic observations from Bailian modes.
 	d.ThinkingMode, d.ThinkingModeBasis, d.ThinkingObserved = "", "", nil
 	s.Qwen = false
@@ -78,8 +81,10 @@ func sameReading(t testing.TB, format channel.Format, qwen bool, events []string
 	got, want := current.Finish(), original.Finish()
 	// Diagnostics are new; usage equivalence remains checked against the original reader.
 	got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
+	got.ResponseStatus, got.Background = "", false
 	got.Usage, want.Usage = ledger.Usage{}, ledger.Usage{}
 	got.Found, want.Found = false, false
+	got.ResponseStatus, got.Background = "", false
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%s: the whole answer %q\nreads  %+v\nwas    %+v", format, events, got, want)
 	}
@@ -393,6 +398,7 @@ func TestObserverMatchesTheOriginalOnFramedStreams(t *testing.T) {
 				}
 				got, want := current.Finish(), original.Finish()
 				got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
+				got.ResponseStatus, got.Background = "", false
 				if !reflect.DeepEqual(got, want) || !got.Found {
 					t.Fatalf("%s chunk %d:\nreads %+v\nwas   %+v", format, chunk, got, want)
 				}

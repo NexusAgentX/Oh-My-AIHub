@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { tokenPriceLabels } from '../models/tokenPricing'
+import { tokenPriceLabels, unitPriceLabels } from '../models/tokenPricing'
 import { Button, Checkbox, IconButton, Icon, InlineError, SelectField, TextField } from '../ui'
 import {
   emptyTier,
@@ -25,6 +25,9 @@ const serviceTierPresets = [
   { value: 'openai:flex', label: 'OpenAI Flex' },
   { value: 'anthropic:standard', label: 'Anthropic 标准' },
   { value: 'anthropic:priority', label: 'Anthropic 优先' },
+  { value: 'gemini:standard', label: 'Gemini 标准（trafficType）' },
+  { value: 'gemini:priority', label: 'Gemini 优先（trafficType）' },
+  { value: 'gemini:flex', label: 'Gemini Flex（trafficType）' },
   { value: 'gemini:STANDARD', label: 'Gemini 标准' },
   { value: 'gemini:PRIORITY', label: 'Gemini 优先' },
   { value: 'gemini:FLEX', label: 'Gemini Flex' },
@@ -41,6 +44,7 @@ export function PriceFields({
   error?: string
   legend: string
 }) {
+  const [geoKey, setGeoKey] = useState('')
   const field = (key: 'input' | 'output' | 'cache_read' | 'cache_write', label: string) => (
     <TextField
       inputMode="decimal"
@@ -74,6 +78,45 @@ export function PriceFields({
               }
             />
           ))}
+        </div>
+      </details>
+      <details>
+        <summary>工具单价与地域倍率</summary>
+        <p className="muted-copy">工具单价按每个标签的单位与本组币种填写；留空不收费，0 为免费。条件档留空沿用基准配置。</p>
+        <div className="field-row price-grid">
+          {Object.entries(unitPriceLabels).map(([key, label]) => (
+            <TextField
+              key={key}
+              label={label}
+              inputMode="decimal"
+              value={prices.unit_prices?.[key] ?? ''}
+              placeholder="未配置"
+              onChange={(event) => onChange({ ...prices, unit_prices: { ...prices.unit_prices, [key]: event.target.value } })}
+            />
+          ))}
+        </div>
+        <div className="field-row price-grid">
+          {Object.entries({ us: '', eu: '', ...prices.geo_multipliers }).map(([key, value]) => (
+            <TextField
+              key={key}
+              label={`地域 ${key} · token 倍率`}
+              inputMode="decimal"
+              value={value}
+              placeholder="1"
+              onChange={(event) => onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [key]: event.target.value } })}
+            />
+          ))}
+        </div>
+        <div className="field-row">
+          <TextField label="其他地域" placeholder="例如 us-central1" value={geoKey} onChange={(event) => setGeoKey(event.target.value)} />
+          <Button
+            type="button" size="sm" variant="secondary"
+            disabled={!/^[a-z][a-z0-9_-]{0,31}$/.test(geoKey)}
+            onClick={() => {
+              onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [geoKey]: '' } })
+              setGeoKey('')
+            }}
+          >添加地域</Button>
         </div>
       </details>
       <InlineError>{error}</InlineError>

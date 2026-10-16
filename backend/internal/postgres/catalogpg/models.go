@@ -32,6 +32,8 @@ type Model struct {
 	UpdatedAt                     time.Time
 	PriceCurrency                 string
 	MaxOutputTokens               *int64
+	UnitPrices                    []byte
+	GeoMultipliers                []byte
 }
 
 type ModelPriceTier struct {
@@ -51,4 +53,6 @@ type ModelPriceTier struct {
 	OutputPriceNanoPerMillion     money.Amount
 	CacheWritePriceNanoPerMillion money.Amount
 	CacheReadPriceNanoPerMillion  money.Amount
+	UnitPrices                    []byte
+	GeoMultipliers                []byte
 }

@@ -50,7 +50,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"model without tiers or prices", newAdminModelJSON(catalog.Model{}), map[string]any{
 			"price_tiers": emptyList, "context_window": nil, "max_output_tokens": nil,
 			"base_prices": map[string]any{
-				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject,
+				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject, "unit_prices": emptyObject, "geo_multipliers": emptyObject,
 			},
 		}},
 		{"price tier without weekday predicate", newPriceTierJSON(1, ledger.PriceTier{Weekdays: []int{}}), map[string]any{

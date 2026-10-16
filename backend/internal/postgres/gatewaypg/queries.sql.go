@@ -112,6 +112,71 @@ func (q *Queries) ChannelRevenue(ctx context.Context, arg ChannelRevenueParams) 
 	return column_1, err
 }
 
+const claimBackground = `-- name: ClaimBackground :many
+WITH due AS (
+ SELECT call_id FROM gateway_background_jobs
+ WHERE settled_at IS NULL AND next_poll_at <= $1::timestamptz
+ ORDER BY next_poll_at,call_id LIMIT 16 FOR UPDATE SKIP LOCKED
+)
+UPDATE gateway_background_jobs j SET next_poll_at=$1::timestamptz + interval '30 seconds'
+FROM due WHERE j.call_id=due.call_id RETURNING j.call_id, j.account_id, j.key_id, j.channel_id, j.response_id, j.metadata, j.next_poll_at, j.deadline_at, j.settled_at
+`
+
+func (q *Queries) ClaimBackground(ctx context.Context, now time.Time) ([]GatewayBackgroundJob, error) {
+	rows, err := q.db.Query(ctx, claimBackground, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GatewayBackgroundJob
+	for rows.Next() {
+		var i GatewayBackgroundJob
+		if err := rows.Scan(
+			&i.CallID,
+			&i.AccountID,
+			&i.KeyID,
+			&i.ChannelID,
+			&i.ResponseID,
+			&i.Metadata,
+			&i.NextPollAt,
+			&i.DeadlineAt,
+			&i.SettledAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const claimUnitReceipt = `-- name: ClaimUnitReceipt :execrows
+INSERT INTO gateway_unit_receipts (channel_id,unit,reference_id,call_id)
+VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING
+`
+
+type ClaimUnitReceiptParams struct {
+	ChannelID   string
+	Unit        string
+	ReferenceID string
+	CallID      string
+}
+
+func (q *Queries) ClaimUnitReceipt(ctx context.Context, arg ClaimUnitReceiptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimUnitReceipt,
+		arg.ChannelID,
+		arg.Unit,
+		arg.ReferenceID,
+		arg.CallID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const customModelOnline = `-- name: CustomModelOnline :one
 SELECT EXISTS (
     SELECT 1
@@ -841,6 +906,44 @@ func (q *Queries) LoadGeoCache(ctx context.Context) ([]LoadGeoCacheRow, error) {
 	return items, nil
 }
 
+const lockBillableCall = `-- name: LockBillableCall :one
+SELECT id FROM calls WHERE id=$1 AND outcome='in_progress' FOR UPDATE
+`
+
+func (q *Queries) LockBillableCall(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, lockBillableCall, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lookupBackground = `-- name: LookupBackground :one
+SELECT call_id, account_id, key_id, channel_id, response_id, metadata, next_poll_at, deadline_at, settled_at FROM gateway_background_jobs WHERE account_id=$1 AND key_id=$2 AND response_id=$3
+`
+
+type LookupBackgroundParams struct {
+	AccountID  string
+	KeyID      string
+	ResponseID string
+}
+
+func (q *Queries) LookupBackground(ctx context.Context, arg LookupBackgroundParams) (GatewayBackgroundJob, error) {
+	row := q.db.QueryRow(ctx, lookupBackground, arg.AccountID, arg.KeyID, arg.ResponseID)
+	var i GatewayBackgroundJob
+	err := row.Scan(
+		&i.CallID,
+		&i.AccountID,
+		&i.KeyID,
+		&i.ChannelID,
+		&i.ResponseID,
+		&i.Metadata,
+		&i.NextPollAt,
+		&i.DeadlineAt,
+		&i.SettledAt,
+	)
+	return i, err
+}
+
 const lookupKey = `-- name: LookupKey :one
 SELECT k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
        k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
@@ -885,6 +988,40 @@ func (q *Queries) LookupKey(ctx context.Context, keyHash []byte) (LookupKeyRow, 
 	return i, err
 }
 
+const pendingBackground = `-- name: PendingBackground :many
+SELECT call_id, account_id, key_id, channel_id, response_id, metadata, next_poll_at, deadline_at, settled_at FROM gateway_background_jobs WHERE settled_at IS NULL ORDER BY call_id LIMIT 257
+`
+
+func (q *Queries) PendingBackground(ctx context.Context) ([]GatewayBackgroundJob, error) {
+	rows, err := q.db.Query(ctx, pendingBackground)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GatewayBackgroundJob
+	for rows.Next() {
+		var i GatewayBackgroundJob
+		if err := rows.Scan(
+			&i.CallID,
+			&i.AccountID,
+			&i.KeyID,
+			&i.ChannelID,
+			&i.ResponseID,
+			&i.Metadata,
+			&i.NextPollAt,
+			&i.DeadlineAt,
+			&i.SettledAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reserveGeoLookup = `-- name: ReserveGeoLookup :one
 INSERT INTO geoip_daily_usage (day, queries) VALUES ($1, 1)
 ON CONFLICT (day) DO UPDATE SET queries = geoip_daily_usage.queries + 1
@@ -920,6 +1057,49 @@ func (q *Queries) ResponseChannel(ctx context.Context, arg ResponseChannelParams
 	var final_channel_id *string
 	err := row.Scan(&final_channel_id)
 	return final_channel_id, err
+}
+
+const retryBackground = `-- name: RetryBackground :exec
+UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_at IS NULL
+`
+
+type RetryBackgroundParams struct {
+	CallID     string
+	NextPollAt time.Time
+}
+
+func (q *Queries) RetryBackground(ctx context.Context, arg RetryBackgroundParams) error {
+	_, err := q.db.Exec(ctx, retryBackground, arg.CallID, arg.NextPollAt)
+	return err
+}
+
+const saveBackground = `-- name: SaveBackground :exec
+INSERT INTO gateway_background_jobs (call_id, account_id, key_id, channel_id, response_id, metadata, deadline_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+ON CONFLICT (call_id) DO NOTHING
+`
+
+type SaveBackgroundParams struct {
+	CallID     string
+	AccountID  string
+	KeyID      string
+	ChannelID  string
+	ResponseID string
+	Metadata   []byte
+	DeadlineAt time.Time
+}
+
+func (q *Queries) SaveBackground(ctx context.Context, arg SaveBackgroundParams) error {
+	_, err := q.db.Exec(ctx, saveBackground,
+		arg.CallID,
+		arg.AccountID,
+		arg.KeyID,
+		arg.ChannelID,
+		arg.ResponseID,
+		arg.Metadata,
+		arg.DeadlineAt,
+	)
+	return err
 }
 
 const saveGeoCache = `-- name: SaveGeoCache :exec
@@ -971,9 +1151,19 @@ func (q *Queries) SetCallSettlements(ctx context.Context, arg SetCallSettlements
 	return err
 }
 
+const settleBackground = `-- name: SettleBackground :exec
+UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL
+`
+
+func (q *Queries) SettleBackground(ctx context.Context, callID string) error {
+	_, err := q.db.Exec(ctx, settleBackground, callID)
+	return err
+}
+
 const sweepStaleCalls = `-- name: SweepStaleCalls :execrows
 UPDATE calls SET outcome = 'interrupted', completed_at = now()
 WHERE outcome = 'in_progress' AND created_at < $1
+AND NOT EXISTS (SELECT 1 FROM gateway_background_jobs j WHERE j.call_id=calls.id AND j.settled_at IS NULL)
 `
 
 func (q *Queries) SweepStaleCalls(ctx context.Context, createdAt time.Time) (int64, error) {

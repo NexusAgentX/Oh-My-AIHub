@@ -35,6 +35,8 @@ func (a *app) registerGatewayRoutes(r *router) {
 	}
 	r.implement("B", "POST /v1/chat/completions", accessGatewayKey, serve(channel.FormatOpenAIChat))
 	r.implement("B", "POST /v1/responses", accessGatewayKey, serve(channel.FormatOpenAIResponses))
+	r.implement("B", "GET /v1/responses/{responseID}", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) { a.gateway.ServeResponse(w, r, false) })
+	r.implement("B", "POST /v1/responses/{responseID}/cancel", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) { a.gateway.ServeResponse(w, r, true) })
 	r.implement("B", "POST /v1/messages", accessGatewayKey, serve(channel.FormatAnthropic))
 	r.implement("B", "POST /v1beta/models/{model}", accessGatewayKey, a.serveGemini)
 	r.implement("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
