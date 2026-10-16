@@ -255,7 +255,7 @@ type OnlineModel struct {
 
 // OnlineChannel is one listed channel offering one model, for browsing.
 type OnlineChannel struct {
- Capabilities []string
+	Capabilities   []string
 	ModelID        string
 	ChannelID      string
 	ChannelName    string

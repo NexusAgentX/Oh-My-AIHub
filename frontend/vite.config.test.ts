@@ -8,7 +8,7 @@ describe('gateway proxy log safety', () => {
 		expect(nginx).not.toContain('log_format gateway_safe')
 		expect(nginx).toContain('access_log off;')
 		expect(nginx).toContain('error_log /dev/null emerg;')
-		expect(nginx).toContain('location ~* ^/v1(?:beta)?(?:/|$)')
+		expect(nginx).toContain('location ~* ^/(?:v1(?:beta)?|backend-api)(?:/|$)')
 	})
 
 	it('replaces dynamic path and query secrets in Vite proxy error URLs', () => {
@@ -22,7 +22,7 @@ describe('gateway proxy log safety', () => {
   it('registers the sanitizer before Vite can add its default listener', () => {
     const listeners: Array<{ event: string; listener: (...args: any[]) => void }> = []
     const proxy = { on: vi.fn((event: string, listener: (...args: any[]) => void) => listeners.push({ event, listener })) }
-		const entry = config.server?.proxy?.['^/v1(?:beta)?(?:/|$)']
+		const entry = config.server?.proxy?.['^/(?:v1(?:beta)?|backend-api)(?:/|$)']
     expect(entry && typeof entry !== 'string').toBe(true)
     if (!entry || typeof entry === 'string') throw new Error('missing Gemini proxy')
     entry.configure?.(proxy as never, entry as never)
