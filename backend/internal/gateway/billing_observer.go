@@ -175,7 +175,13 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		child := NewObserver(channel.FormatOpenAIResponses, false, "application/json")
 		child.absorb(append(append([]byte(`{"usage":`), usage...), '}'))
 		if child.found && len(o.detail.Iterations) < maxBillingItems {
-			o.detail.Iterations = append(o.detail.Iterations, ledger.UsageIteration{Type: "image_generation_call", Model: model, Usage: child.Finish().Usage})
+			facts := child.Finish().Usage
+			if facts.Detail != nil {
+				// Detach the facts from the Observer and its borrowed JSON scratch.
+				detail := *facts.Detail
+				facts.Detail = &detail
+			}
+			o.detail.Iterations = append(o.detail.Iterations, ledger.UsageIteration{Type: "image_generation_call", Model: model, Usage: facts})
 		} else {
 			o.note("图像工具用量缺失，子模型费用未计价")
 		}

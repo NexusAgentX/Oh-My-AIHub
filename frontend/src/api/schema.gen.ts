@@ -1972,10 +1972,6 @@ export interface components {
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
-            /** @description 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。 */
-            geo_multipliers?: {
-                [key: string]: string;
-            };
             /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
             token_prices?: {
                 [key: string]: components["schemas"]["Price"];
@@ -2107,10 +2103,8 @@ export interface components {
         /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
         PriceTier: {
             seq: number;
-            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
             service_tier?: string;
-            /** @enum {string} */
-            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens: number | null;
@@ -2126,10 +2120,8 @@ export interface components {
             prices: components["schemas"]["ModelPrices"];
         };
         PriceTierInput: {
-            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
             service_tier?: string;
-            /** @enum {string} */
-            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name?: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens?: number | null;
@@ -2743,6 +2735,19 @@ export interface components {
             cache_write_tokens: number;
             detail?: Record<string, never>;
         };
+        /** @description 历史账单价格；可含已移除的地域倍率，不能用于模型配置。 */
+        SnapshotPrices: {
+            input: components["schemas"]["Price"];
+            output: components["schemas"]["Price"];
+            cache_write: components["schemas"]["Price"];
+            cache_read: components["schemas"]["Price"];
+            token_prices?: {
+                [key: string]: components["schemas"]["Price"];
+            };
+            geo_multipliers?: {
+                [key: string]: string;
+            };
+        };
         /** @description 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。 */
         PriceSnapshot: {
             components?: {
@@ -2754,7 +2759,7 @@ export interface components {
             geo_multipliers?: {
                 [key: string]: string;
             };
-            selected_prices?: components["schemas"]["ModelPrices"];
+            selected_prices?: components["schemas"]["SnapshotPrices"];
             token_prices?: {
                 [key: string]: string;
             };
@@ -2769,7 +2774,7 @@ export interface components {
                 service_tier?: string;
                 thinking_mode?: string;
                 /**
-                 * @description 当前模型显式配置百炼条件档；历史快照缺少此依据。
+                 * @description 旧版模型显式配置百炼条件档的历史依据；新调用不再生成。
                  * @enum {string}
                  */
                 thinking_mode_basis?: "bailian_condition";
@@ -2783,7 +2788,7 @@ export interface components {
                 tool_prompt_tokens?: number;
                 notes?: string[];
             } | null;
-            base_prices: components["schemas"]["ModelPrices"];
+            base_prices: components["schemas"]["SnapshotPrices"];
             tier: components["schemas"]["TierRef"] | null;
             multiplier: components["schemas"]["Multiplier"];
             currency?: components["schemas"]["PriceCurrency"];

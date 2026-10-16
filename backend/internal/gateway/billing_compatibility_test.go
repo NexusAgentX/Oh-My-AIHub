@@ -81,9 +81,9 @@ func TestBillingAdvisorAndPerIterationThreshold(t *testing.T) {
 
 func TestBillingObservedToolsDoNotAddFees(t *testing.T) {
 	usage := ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{InferenceGeo: "us", Units: map[string]int64{"web_search": 2 * ledger.FixedPointScale}}}
-	prices := ledger.Prices{InputPerMillion: 1_000_000_000, GeoMultipliers: map[string]int64{"us": 1_100_000_000}}
+	prices := ledger.Prices{InputPerMillion: 1_000_000_000}
 	priced, err := ledger.CalculatePriceAt(usage, prices, nil, time.Time{}, ledger.FixedPointScale, ledger.UnitRate, 1_000_000)
-	if err != nil || priced.Cost.String() != "1.1" || priced.Fee.String() != "0.0011" {
+	if err != nil || priced.Cost.String() != "1" || priced.Fee.String() != "0.001" {
 		t.Fatalf("unexpected tool surcharge: %+v %v", priced, err)
 	}
 }

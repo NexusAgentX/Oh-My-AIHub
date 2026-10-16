@@ -26,7 +26,6 @@ type Prices struct {
 	OutputPerMillion     money.Amount
 	CacheWritePerMillion money.Amount
 	CacheReadPerMillion  money.Amount
-	GeoMultipliers       map[string]int64
 	TokenPrices          map[string]money.Amount
 }
 
@@ -99,25 +98,9 @@ func calculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time
 			}
 		}
 	}
-	geo := int64(FixedPointScale)
-	if usage.Detail != nil && usage.Detail.InferenceGeo != "" {
-		if v, ok := prices.GeoMultipliers[usage.Detail.InferenceGeo]; ok {
-			geo = v
-		}
-	}
-	if geo < 0 {
-		return PriceResult{}, ErrInvalidInput
-	}
-	extended := geo != FixedPointScale
-	if extended {
-		weightedUsage.Mul(weightedUsage, big.NewInt(geo))
-	}
 	numerator := new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano))
 	numerator.Mul(numerator, big.NewInt(rateNano))
 	denominator := new(big.Int).Mul(big.NewInt(1_000_000), new(big.Int).Mul(big.NewInt(FixedPointScale), big.NewInt(FixedPointScale)))
-	if extended {
-		denominator.Mul(denominator, big.NewInt(FixedPointScale))
-	}
 	cost, err := ceilNonNegative(numerator, denominator)
 	if err != nil {
 		return PriceResult{}, err

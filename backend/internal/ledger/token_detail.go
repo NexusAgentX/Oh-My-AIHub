@@ -13,10 +13,11 @@ type UsageDetail struct {
 	ToolPromptTokens     int64            `json:"tool_prompt_tokens,omitempty"`
 	Tokens               map[string]int64 `json:"tokens,omitempty"`
 	ServiceTier          string           `json:"service_tier,omitempty"`
-	ThinkingMode         string           `json:"thinking_mode,omitempty"`
-	ThinkingModeBasis    string           `json:"thinking_mode_basis,omitempty"`
-	ThinkingObserved     *bool            `json:"thinking_observed,omitempty"`
-	Notes                []string         `json:"notes,omitempty"`
+	// Retained for decoding historical snapshots; new calls never set these.
+	ThinkingMode      string   `json:"thinking_mode,omitempty"`
+	ThinkingModeBasis string   `json:"thinking_mode_basis,omitempty"`
+	ThinkingObserved  *bool    `json:"thinking_observed,omitempty"`
+	Notes             []string `json:"notes,omitempty"`
 }
 
 func TokenBucket(key string) int {

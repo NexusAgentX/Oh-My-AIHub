@@ -275,12 +275,12 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := New(tx)
 		affected, err := q.FinishCall(ctx, FinishCallParams{
-			Diagnostics: raw, ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), ChannelID: optional(finish.ChannelID),
+			Diagnostics: raw, ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), FinalChannelID: optional(finish.ChannelID),
 			RoutingMode: optional(finish.RoutingMode), RoutingSource: optional(finish.RoutingSource), Attempts: attempts,
 			InputTokens: finish.Usage.InputTokens, OutputTokens: finish.Usage.OutputTokens,
 			CacheWriteTokens: finish.Usage.CacheWriteTokens, CacheReadTokens: finish.Usage.CacheReadTokens,
 			PriceSnapshot: finish.PriceSnapshot, CostNano: finish.Cost, FeeNano: finish.Fee, TtftMs: int32Pointer(finish.TTFTMS),
-			DurationMs: &duration, TokensPerSecond: finish.TokensPerSecond, InterTokenP50Ms: int32Pointer(finish.IntervalP50MS),
+			DurationMs: &duration, OutputTokensPerSecond: finish.TokensPerSecond, InterTokenP50Ms: int32Pointer(finish.IntervalP50MS),
 			InterTokenP95Ms: int32Pointer(finish.IntervalP95MS), ResponseBytes: &bytesRead, UpstreamResponseID: optional(finish.UpstreamResponseID),
 		})
 		if err != nil {

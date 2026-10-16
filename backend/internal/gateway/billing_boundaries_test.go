@@ -149,10 +149,10 @@ func TestRegionalEndpointRecognitionAndResponsePriority(t *testing.T) {
 			t.Errorf("%s: geo=%q want=%q", tc.url, got, tc.want)
 		}
 	}
-	model := catalog.Model{ID: "main", InputPrice: 1_000_000_000, GeoMultipliers: map[string]int64{"us": 1_100_000_000, "eu": 1_200_000_000}}
+	model := catalog.Model{ID: "main", InputPrice: 1_000_000_000}
 	for _, tc := range []struct{ geo, endpoint, want string }{
-		{"eu", "https://us.api.openai.com", "1.2"},
-		{"", "https://us.api.openai.com", "1.1"},
+		{"eu", "https://us.api.openai.com", "1"},
+		{"", "https://us.api.openai.com", "1"},
 		{"unknown", "https://us.api.openai.com", "1"},
 		{"", "https://relay.example", "1"},
 	} {

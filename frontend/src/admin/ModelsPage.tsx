@@ -43,8 +43,8 @@ function ModalityPicker({
   onChange,
 }: {
   legend: string
-  values: string[]
-  onChange: (values: string[]) => void
+  values: AdminModel['input_modalities']
+  onChange: (values: AdminModel['input_modalities']) => void
 }) {
   const options = [...new Set([...modalityOptions, ...values])]
   return (

@@ -5,21 +5,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
-
-func geoPriceStrings(values map[string]int64) map[string]string {
-	out := map[string]string{}
-	for k, v := range values {
-		out[k] = money.FromNano(v).String()
-	}
-	return out
-}
 
 func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Candidate, usage ledger.Usage, defaults settings.Settings, feeRate int64) (ledger.PriceResult, []byte, error) {
 	if usage.Detail == nil || usage.Detail.InferenceGeo == "" {
@@ -32,7 +22,6 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 	}
 	// The ordinary path still performs one pricing calculation and no catalog lookups.
 	if usage.Detail == nil || len(usage.Detail.Iterations) == 0 {
-		noteSelectedUnpriced(usage, model, call.started)
 		priced, err := ledger.CalculatePriceAt(usage, model.BasePrices(), model.PriceTiers, call.started, candidate.MultiplierNano, candidate.RateNano, feeRate)
 		if err != nil {
 			return priced, nil, err
@@ -53,7 +42,6 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 		if u.Detail != nil && u.Detail.InferenceGeo == "" {
 			u.Detail.InferenceGeo = d.InferenceGeo
 		}
-		noteSelectedUnpriced(u, m, call.started)
 		c := candidate
 		c.RateNano = ledger.ChannelRate(m.PriceCurrency, c.FXDiscount, defaults.USDCNYRateNano)
 		priced, err := ledger.CalculatePriceComponentAt(u, m.BasePrices(), m.PriceTiers, call.started, c.MultiplierNano, c.RateNano)
@@ -147,14 +135,6 @@ func endpointGeo(base string) string {
 	}
 	return ""
 }
-func noteUnpriced(d *ledger.UsageDetail, prices ledger.Prices) {
-	if d.InferenceGeo != "" && d.InferenceGeo != "global" {
-		if _, ok := prices.GeoMultipliers[d.InferenceGeo]; !ok {
-			d.Notes = appendNote(d.Notes, "地域 "+d.InferenceGeo+" 未配置倍率，按基础价格")
-		}
-	}
-}
-
 func appendNote(notes []string, note string) []string {
 	for _, existing := range notes {
 		if existing == note {
@@ -165,12 +145,4 @@ func appendNote(notes []string, note string) []string {
 		return notes
 	}
 	return append(notes, note)
-}
-func noteSelectedUnpriced(u ledger.Usage, m catalog.Model, at time.Time) {
-	if u.Detail == nil {
-		return
-	}
-	prompt, _ := ledger.PromptSideTokens(u)
-	prices, _ := ledger.SelectPriceTier(m.BasePrices(), m.PriceTiers, prompt, at, u.Detail)
-	noteUnpriced(u.Detail, prices)
 }

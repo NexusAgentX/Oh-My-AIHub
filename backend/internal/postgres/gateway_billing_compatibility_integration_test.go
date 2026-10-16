@@ -304,14 +304,13 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	}
 }
 
-func TestRegionalPricesFreezeAtCallStartAndPersistInSnapshot(t *testing.T) {
+func TestServiceTierPricesFreezeAtCallStartAndRegionRemainsObservation(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	consumer, sharer := e.member("region-consumer", "100"), e.member("region-sharer", "0")
-	geo := map[string]int64{"us": 1_100_000_000}
-	tiers := []ledger.PriceTier{{Name: "priority us", ServiceTier: "anthropic:priority", InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2"), GeoMultipliers: map[string]int64{"us": 1_200_000_000}}}
-	saved, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{GeoMultipliers: &geo, PriceTiers: &tiers})
-	if err != nil || saved.GeoMultipliers["us"] != geo["us"] || saved.PriceTiers[0].GeoMultipliers["us"] != 1_200_000_000 {
+	tiers := []ledger.PriceTier{{Name: "priority us", ServiceTier: "anthropic:priority", InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2")}}
+	saved, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers})
+	if err != nil || len(saved.PriceTiers) != 1 || saved.PriceTiers[0].ServiceTier != "anthropic:priority" {
 		t.Fatalf("save=%+v %v", saved, err)
 	}
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -339,15 +338,14 @@ func TestRegionalPricesFreezeAtCallStartAndPersistInSnapshot(t *testing.T) {
 		close(release)
 		t.Fatal("upstream was not reached")
 	}
-	empty := map[string]int64{}
-	_, err = e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{GeoMultipliers: &empty, PriceTiers: &[]ledger.PriceTier{}})
+	_, err = e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &[]ledger.PriceTier{}})
 	close(release)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := <-done
 	row := e.callRow(id)
-	if !row.HasLedgerTx || row.CostNano != mustAmount(t, "0.0024").Nano() {
+	if !row.HasLedgerTx || row.CostNano != mustAmount(t, "0.002").Nano() {
 		t.Fatalf("price did not freeze: %+v", row)
 	}
 	var raw []byte
@@ -360,10 +358,10 @@ func TestRegionalPricesFreezeAtCallStartAndPersistInSnapshot(t *testing.T) {
 			Geo map[string]string `json:"geo_multipliers"`
 		} `json:"selected_prices"`
 	}
-	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Detail.InferenceGeo != "us" || snapshot.Selected.Geo["us"] != "1.2" || snapshot.Detail.Units["web_search"] != 2*ledger.FixedPointScale {
+	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Detail.InferenceGeo != "us" || len(snapshot.Selected.Geo) != 0 || snapshot.Detail.Units["web_search"] != 2*ledger.FixedPointScale {
 		t.Fatalf("snapshot=%s err=%v", raw, err)
 	}
-	if e.balance(consumer) != "-0.0024024" {
+	if e.balance(consumer) != "-0.002002" {
 		t.Fatalf("unexpected tool fee: %s", e.balance(consumer))
 	}
 	e.assertZeroSum()

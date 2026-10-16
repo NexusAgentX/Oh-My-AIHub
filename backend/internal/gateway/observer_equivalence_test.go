@@ -36,7 +36,7 @@ type readerState struct {
 func stateOf(o *Observer) readerState {
 	return readerState{Usage: o.usage, Found: o.found, ResponseID: o.responseID, Detail: o.detail,
 		Anthropic: [4]int64{o.anthropic.input, o.anthropic.output, o.anthropic.cacheWrite, o.anthropic.cacheRead},
-		Speed:     o.anthropicSpeed, Tier: o.anthropicTier, Qwen: o.qwenObserved}
+		Speed:     o.anthropicSpeed, Tier: o.anthropicTier}
 }
 
 func legacyStateOf(o *legacyObserver) readerState {
@@ -70,7 +70,7 @@ func sameReading(t testing.TB, format channel.Format, qwen bool, events []string
 	t.Helper()
 	current := NewObserver(format, true, "text/event-stream")
 	original := legacyNewObserver(format, true, "text/event-stream")
-	current.qwenObserved, original.qwenObserved = qwen, qwen
+	original.qwenObserved = qwen
 	for index, event := range events {
 		current.absorb([]byte(event))
 		original.absorb([]byte(event))

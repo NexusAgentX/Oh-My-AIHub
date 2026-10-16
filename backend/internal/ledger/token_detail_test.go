@@ -26,19 +26,18 @@ func TestDetailedPricesAreDisjointAndRoundOnce(t *testing.T) {
 	}
 }
 func TestResponseFactsSelectTierAndInheritWinningGenericPrice(t *testing.T) {
-	tiers := []PriceTier{{ServiceTier: "openai:priority", InputPrice: 3}, {ServiceTier: "openai:default", InputPrice: 2}, {ThinkingMode: "qwen_thinking", InputPrice: 4}}
+	tiers := []PriceTier{{ServiceTier: "openai:fast", InputPrice: 3}, {ServiceTier: "openai:default", InputPrice: 2}, {ServiceTier: "openai:ultrafast", InputPrice: 4}}
 	usage := Usage{InputTokens: 1_000_000, Detail: &UsageDetail{ServiceTier: "openai:default", Tokens: map[string]int64{"input_audio": 1_000_000}}}
 	got, err := CalculatePriceV2(usage, Prices{InputPerMillion: 1, TokenPrices: map[string]money.Amount{"input_audio": 0}}, tiers, time.Now(), FixedPointScale, 0)
 	if err != nil || got.Cost != 2 || got.TierSeq != 2 {
 		t.Fatalf("tier inheritance %+v %v", got, err)
 	}
-	usage.Detail.ServiceTier = ""
-	usage.Detail.ThinkingMode = "qwen_thinking"
+	usage.Detail.ServiceTier = "openai:ultrafast"
 	got, _ = CalculatePriceV2(usage, Prices{}, tiers, time.Now(), FixedPointScale, 0)
 	if got.TierSeq != 3 {
 		t.Fatal(got)
 	}
-	usage.Detail.ThinkingMode = ""
+	usage.Detail.ServiceTier = ""
 	got, _ = CalculatePriceV2(usage, Prices{}, tiers, time.Now(), FixedPointScale, 0)
 	if got.TierSeq != 0 {
 		t.Fatal("unknown matched", got)

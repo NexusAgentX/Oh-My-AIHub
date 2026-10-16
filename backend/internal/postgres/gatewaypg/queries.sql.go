@@ -195,66 +195,69 @@ const finishCall = `-- name: FinishCall :execrows
 UPDATE calls SET
     outcome = $1, model_id = $2, final_channel_id = $3,
     routing_mode = $4, routing_source = $5,
-    attempts = $6, input_tokens = $7, output_tokens = $8,
-    cache_write_tokens = $9, cache_read_tokens = $10,
-    price_snapshot = $11, cost_nano = $12, fee_nano = $13,
-    ttft_ms = $14, duration_ms = $15, output_tokens_per_second = $16,
-    inter_token_p50_ms = $17, inter_token_p95_ms = $18,
-    response_bytes = $19, upstream_response_id = $20,
-    diagnostics = $21, completed_at = clock_timestamp()
-WHERE id = $22 AND outcome = 'in_progress'
+    attempts = $21, input_tokens = $6, output_tokens = $7,
+    cache_write_tokens = $8, cache_read_tokens = $9,
+    price_snapshot = $22, cost_nano = $10, fee_nano = $11,
+    ttft_ms = $12, duration_ms = $13, output_tokens_per_second = $14,
+    inter_token_p50_ms = $15, inter_token_p95_ms = $16,
+    response_bytes = $17, upstream_response_id = $18,
+    diagnostics = $20, completed_at = clock_timestamp()
+WHERE id = $19 AND outcome = 'in_progress'
 `
 
 type FinishCallParams struct {
-	Outcome            string
-	ModelID            *string
-	ChannelID          *string
-	RoutingMode        *string
-	RoutingSource      *string
-	Attempts           []byte
-	InputTokens        int64
-	OutputTokens       int64
-	CacheWriteTokens   int64
-	CacheReadTokens    int64
-	PriceSnapshot      []byte
-	CostNano           money.Amount
-	FeeNano            money.Amount
-	TtftMs             *int32
-	DurationMs         *int32
-	TokensPerSecond    *float64
-	InterTokenP50Ms    *int32
-	InterTokenP95Ms    *int32
-	ResponseBytes      *int64
-	UpstreamResponseID *string
-	Diagnostics        []byte
-	ID                 string
+	Outcome               string
+	ModelID               *string
+	FinalChannelID        *string
+	RoutingMode           *string
+	RoutingSource         *string
+	InputTokens           int64
+	OutputTokens          int64
+	CacheWriteTokens      int64
+	CacheReadTokens       int64
+	CostNano              money.Amount
+	FeeNano               money.Amount
+	TtftMs                *int32
+	DurationMs            *int32
+	OutputTokensPerSecond *float64
+	InterTokenP50Ms       *int32
+	InterTokenP95Ms       *int32
+	ResponseBytes         *int64
+	UpstreamResponseID    *string
+	ID                    string
+	Diagnostics           []byte
+	Attempts              []byte
+	PriceSnapshot         []byte
 }
 
 // Closes a call exactly once: a call already out of in_progress is left alone.
+// Keep scalar parameters before the JSON payloads and the snapshot last:
+// pgx appends encoded parameters to one buffer, so a smaller snapshot must not
+// cause another buffer growth when encoding the following scalar values.
 func (q *Queries) FinishCall(ctx context.Context, arg FinishCallParams) (int64, error) {
 	result, err := q.db.Exec(ctx, finishCall,
 		arg.Outcome,
 		arg.ModelID,
-		arg.ChannelID,
+		arg.FinalChannelID,
 		arg.RoutingMode,
 		arg.RoutingSource,
-		arg.Attempts,
 		arg.InputTokens,
 		arg.OutputTokens,
 		arg.CacheWriteTokens,
 		arg.CacheReadTokens,
-		arg.PriceSnapshot,
 		arg.CostNano,
 		arg.FeeNano,
 		arg.TtftMs,
 		arg.DurationMs,
-		arg.TokensPerSecond,
+		arg.OutputTokensPerSecond,
 		arg.InterTokenP50Ms,
 		arg.InterTokenP95Ms,
 		arg.ResponseBytes,
 		arg.UpstreamResponseID,
-		arg.Diagnostics,
 		arg.ID,
+		arg.Diagnostics,
+		arg.Attempts,
+		arg.PriceSnapshot,
 	)
 	if err != nil {
 		return 0, err

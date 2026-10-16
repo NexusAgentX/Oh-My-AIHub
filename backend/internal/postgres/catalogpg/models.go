@@ -32,7 +32,6 @@ type Model struct {
 	UpdatedAt                     time.Time
 	PriceCurrency                 string
 	MaxOutputTokens               *int64
-	GeoMultipliers                []byte
 }
 
 type ModelPriceTier struct {
@@ -40,7 +39,6 @@ type ModelPriceTier struct {
 	Seq                           int32
 	TokenPrices                   []byte
 	ServiceTier                   string
-	ThinkingMode                  string
 	Name                          string
 	MinPromptTokens               *int64
 	MaxPromptTokens               *int64
@@ -52,5 +50,4 @@ type ModelPriceTier struct {
 	OutputPriceNanoPerMillion     money.Amount
 	CacheWritePriceNanoPerMillion money.Amount
 	CacheReadPriceNanoPerMillion  money.Amount
-	GeoMultipliers                []byte
 }

@@ -167,21 +167,6 @@ func modalityCounts(raw json.RawMessage) (map[string]int64, bool) {
 	return result, true
 }
 
-// A configured Bailian predicate is the administrator's explicit opt-in to its
-// actual-output semantics. No model name, provider label or alias implies it.
-func (o *Observer) configureThinkingPricing(tiers []ledger.PriceTier, requested *bool) {
-	if o.format != channel.FormatOpenAIChat {
-		return
-	}
-	for _, tier := range tiers {
-		if tier.ThinkingMode == "qwen_thinking" || tier.ThinkingMode == "qwen_non_thinking" {
-			o.bailianPricing = true
-			o.qwenObserved = requested != nil && !*requested
-			return
-		}
-	}
-}
-
 // absorbDetails runs for every event, including reasoning/service events without usage.
 // keys are the member names scanFrameKeys found in raw: an event with none of
 // the members below changes nothing here, and is not decoded.
@@ -226,12 +211,6 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 					if isString {
 						o.thinkingSeen = true
 						o.thinkingNonempty = o.thinkingNonempty || nonempty
-					}
-					if o.bailianPricing && key == "reasoning_content" && (isString || string(raw) == "null") {
-						o.qwenObserved = true
-						if nonempty {
-							o.detail.ThinkingMode = "qwen_thinking"
-						}
 					}
 				}
 			}

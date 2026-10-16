@@ -58,7 +58,7 @@ func (q *Queries) DeleteTiers(ctx context.Context, modelID string) error {
 }
 
 const getModel = `-- name: GetModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens, geo_multipliers FROM models WHERE id = $1
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens FROM models WHERE id = $1
 `
 
 func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
@@ -86,7 +86,6 @@ func (q *Queries) GetModel(ctx context.Context, id string) (Model, error) {
 		&i.UpdatedAt,
 		&i.PriceCurrency,
 		&i.MaxOutputTokens,
-		&i.GeoMultipliers,
 	)
 	return i, err
 }
@@ -113,9 +112,9 @@ INSERT INTO models (
     cache_write_price_nano_per_million, cache_read_price_nano_per_million,
     enabled, sort_order, provider, context_window, input_modalities, output_modalities,
     supports_tools, supports_structured_output, supports_vision, parameter_info, token_prices, price_currency,
-    max_output_tokens, geo_multipliers
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens, geo_multipliers
+    max_output_tokens
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens
 `
 
 type InsertModelParams struct {
@@ -138,7 +137,6 @@ type InsertModelParams struct {
 	TokenPrices                   []byte
 	PriceCurrency                 string
 	MaxOutputTokens               *int64
-	GeoMultipliers                []byte
 }
 
 func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model, error) {
@@ -162,7 +160,6 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		arg.TokenPrices,
 		arg.PriceCurrency,
 		arg.MaxOutputTokens,
-		arg.GeoMultipliers,
 	)
 	var i Model
 	err := row.Scan(
@@ -187,7 +184,6 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) (Model
 		&i.UpdatedAt,
 		&i.PriceCurrency,
 		&i.MaxOutputTokens,
-		&i.GeoMultipliers,
 	)
 	return i, err
 }
@@ -197,8 +193,8 @@ INSERT INTO model_price_tiers (
     model_id, seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays,
     start_minute_of_day, end_minute_of_day,
     input_price_nano_per_million, output_price_nano_per_million,
-    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier, thinking_mode, geo_multipliers
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, service_tier
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 `
 
 type InsertTierParams struct {
@@ -217,8 +213,6 @@ type InsertTierParams struct {
 	CacheReadPriceNanoPerMillion  money.Amount
 	TokenPrices                   []byte
 	ServiceTier                   string
-	ThinkingMode                  string
-	GeoMultipliers                []byte
 }
 
 func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
@@ -238,14 +232,12 @@ func (q *Queries) InsertTier(ctx context.Context, arg InsertTierParams) error {
 		arg.CacheReadPriceNanoPerMillion,
 		arg.TokenPrices,
 		arg.ServiceTier,
-		arg.ThinkingMode,
-		arg.GeoMultipliers,
 	)
 	return err
 }
 
 const listModels = `-- name: ListModels :many
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens, geo_multipliers FROM models
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens FROM models
 WHERE enabled OR $1::boolean
 ORDER BY sort_order, id
 `
@@ -281,7 +273,6 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 			&i.UpdatedAt,
 			&i.PriceCurrency,
 			&i.MaxOutputTokens,
-			&i.GeoMultipliers,
 		); err != nil {
 			return nil, err
 		}
@@ -294,7 +285,7 @@ func (q *Queries) ListModels(ctx context.Context, includeDisabled bool) ([]Model
 }
 
 const listTiers = `-- name: ListTiers :many
-SELECT model_id, seq, token_prices, service_tier, thinking_mode, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, geo_multipliers FROM model_price_tiers
+SELECT model_id, seq, token_prices, service_tier, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million FROM model_price_tiers
 WHERE model_id = ANY($1::text[])
 ORDER BY model_id, seq
 `
@@ -313,7 +304,6 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 			&i.Seq,
 			&i.TokenPrices,
 			&i.ServiceTier,
-			&i.ThinkingMode,
 			&i.Name,
 			&i.MinPromptTokens,
 			&i.MaxPromptTokens,
@@ -325,7 +315,6 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 			&i.OutputPriceNanoPerMillion,
 			&i.CacheWritePriceNanoPerMillion,
 			&i.CacheReadPriceNanoPerMillion,
-			&i.GeoMultipliers,
 		); err != nil {
 			return nil, err
 		}
@@ -338,7 +327,7 @@ func (q *Queries) ListTiers(ctx context.Context, modelIds []string) ([]ModelPric
 }
 
 const lockModel = `-- name: LockModel :one
-SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens, geo_multipliers FROM models WHERE id = $1 FOR UPDATE
+SELECT id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens FROM models WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
@@ -366,7 +355,6 @@ func (q *Queries) LockModel(ctx context.Context, id string) (Model, error) {
 		&i.UpdatedAt,
 		&i.PriceCurrency,
 		&i.MaxOutputTokens,
-		&i.GeoMultipliers,
 	)
 	return i, err
 }
@@ -417,10 +405,9 @@ UPDATE models SET
     token_prices = $17,
     price_currency = $18,
     max_output_tokens = $19,
-    geo_multipliers = $20,
     updated_at = now()
 WHERE id = $1
-RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens, geo_multipliers
+RETURNING id, display_name, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million, token_prices, enabled, sort_order, provider, context_window, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at, price_currency, max_output_tokens
 `
 
 type UpdateModelParams struct {
@@ -443,7 +430,6 @@ type UpdateModelParams struct {
 	TokenPrices                   []byte
 	PriceCurrency                 string
 	MaxOutputTokens               *int64
-	GeoMultipliers                []byte
 }
 
 func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model, error) {
@@ -467,7 +453,6 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		arg.TokenPrices,
 		arg.PriceCurrency,
 		arg.MaxOutputTokens,
-		arg.GeoMultipliers,
 	)
 	var i Model
 	err := row.Scan(
@@ -492,7 +477,6 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) (Model
 		&i.UpdatedAt,
 		&i.PriceCurrency,
 		&i.MaxOutputTokens,
-		&i.GeoMultipliers,
 	)
 	return i, err
 }

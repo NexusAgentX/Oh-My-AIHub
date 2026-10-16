@@ -144,31 +144,20 @@ func FuzzScanAndSplice(f *testing.F) {
 
 // ---- the pricing members ----
 
-// decodedPricing is what the gateway used to read the two pricing members with:
-// a full decode of the body by encoding/json. ScanRequest must give the same.
-func decodedPricing(body []byte) (*bool, string) {
+// decodedPricing is the reference interpretation of the request service tier.
+func decodedPricing(body []byte) string {
 	var request struct {
-		EnableThinking *bool  `json:"enable_thinking"`
-		ServiceTier    string `json:"service_tier"`
+		ServiceTier string `json:"service_tier"`
 	}
 	_ = json.Unmarshal(body, &request)
-	return request.EnableThinking, request.ServiceTier
-}
-
-func describeFlag(flag *bool) string {
-	if flag == nil {
-		return "unset"
-	}
-	return map[bool]string{true: "true", false: "false"}[*flag]
+	return request.ServiceTier
 }
 
 func checkPricing(t testing.TB, body []byte) {
 	t.Helper()
 	facts, _, _ := ScanRequest(body)
-	wantThinking, wantTier := decodedPricing(body)
-	if describeFlag(facts.EnableThinking) != describeFlag(wantThinking) || facts.ServiceTier != wantTier {
-		t.Fatalf("%q:\nscan   enable_thinking=%s service_tier=%q\ndecode enable_thinking=%s service_tier=%q",
-			body, describeFlag(facts.EnableThinking), facts.ServiceTier, describeFlag(wantThinking), wantTier)
+	if want := decodedPricing(body); facts.ServiceTier != want {
+		t.Fatalf("%q: service_tier=%q want=%q", body, facts.ServiceTier, want)
 	}
 }
 
@@ -198,7 +187,7 @@ func TestScanRequestReadsThePricingMembersLikeEncodingJSON(t *testing.T) {
 		checkPricing(t, []byte(body))
 	}
 	facts, _, err := ScanRequest([]byte(`{"model":"m","enable_thinking":false,"service_tier":"flex"}`))
-	if err != nil || facts.EnableThinking == nil || *facts.EnableThinking || facts.ServiceTier != "flex" {
+	if err != nil || facts.ServiceTier != "flex" {
 		t.Fatalf("facts = %+v, err = %v", facts, err)
 	}
 }

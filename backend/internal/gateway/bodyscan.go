@@ -220,12 +220,8 @@ type RequestFacts struct {
 	HasModel           bool
 	Stream             bool
 	PreviousResponseID string
-	// EnableThinking and ServiceTier are the two members that pick a price
-	// (ADR-0030). They hold exactly what decoding the body with encoding/json
-	// into struct{ EnableThinking *bool; ServiceTier string } would leave in
-	// them, mismatched types and duplicate or differently cased keys included.
-	EnableThinking *bool
-	ServiceTier    string
+	// Requested service tier is observed separately from the actual response tier.
+	ServiceTier string
 }
 
 // ScanRequest reads the facts and returns the scan for later splicing. Only the
@@ -251,67 +247,33 @@ func ScanRequest(body []byte) (RequestFacts, objectScan, error) {
 			facts.PreviousResponseID = id
 		}
 	}
-	facts.EnableThinking, facts.ServiceTier = scan.pricingFields(body)
+	facts.ServiceTier = scan.requestedServiceTier(body)
 	return facts, scan, nil
 }
 
-// pricingFields reads the top-level enable_thinking and service_tier the way
-//
-//	json.Unmarshal(body, &struct {
-//		EnableThinking *bool  `json:"enable_thinking"`
-//		ServiceTier    string `json:"service_tier"`
-//	}{})
-//
-// does, without decoding the rest of the body (which can be megabytes). The
-// rules it follows are encoding/json's:
-//
-//   - keys match without regard to case, and every matching member counts, in
-//     order, so a later one overrides an earlier one;
-//   - enable_thinking: true and false set it, null clears it, and a value of any
-//     other type allocates it as false unless an earlier member already set it;
-//   - service_tier: a string sets it, anything else (null included) leaves it;
-//   - a body that is not valid JSON as a whole (the scan is more lenient than
-//     encoding/json) yields nothing.
-//
-// Validity is only checked when a member matches, so a body without them costs
-// nothing beyond the scan.
-func (s objectScan) pricingFields(body []byte) (thinking *bool, tier string) {
-	const thinkingKey, tierKey = "enable_thinking", "service_tier"
+// requestedServiceTier matches encoding/json's case-insensitive member matching,
+// duplicate-key order and type handling without decoding the rest of the body.
+func (s objectScan) requestedServiceTier(body []byte) (tier string) {
 	checked := false
 	for _, member := range s.entries {
-		isThinking := strings.EqualFold(member.key, thinkingKey)
-		if !isThinking && !strings.EqualFold(member.key, tierKey) {
+		if !strings.EqualFold(member.key, "service_tier") {
 			continue
 		}
 		if !checked {
 			if !json.Valid(body) {
-				return nil, ""
+				return ""
 			}
 			checked = true
 		}
 		value := body[member.start:member.end]
-		switch {
-		case isThinking && string(value) == "null":
-			thinking = nil
-		case isThinking && string(value) == "true":
-			flag := true
-			thinking = &flag
-		case isThinking && string(value) == "false":
-			flag := false
-			thinking = &flag
-		case isThinking:
-			if thinking == nil {
-				flag := false
-				thinking = &flag
-			}
-		case value[0] == '"':
+		if value[0] == '"' {
 			var text string
 			if json.Unmarshal(value, &text) == nil {
 				tier = text
 			}
 		}
 	}
-	return thinking, tier
+	return tier
 }
 
 // encodeString returns the JSON text of value, as encoding/json writes it

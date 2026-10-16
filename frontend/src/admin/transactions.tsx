@@ -142,7 +142,8 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   const items: Array<[string, ReactNode]> = [['价格档', components.length ? '按各次推理分别选档' : snapshot.tier?.name ?? '基准价']]
   if (detail?.inference_geo) {
     const geo = detail.inference_geo
-    items.push(['实际推理地域', components.length ? geo : `${geo} · token 倍率 ${snapshot.selected_prices?.geo_multipliers?.[geo] ?? '1'}`])
+    const legacyMultiplier = snapshot.selected_prices?.geo_multipliers?.[geo]
+    items.push(['实际推理地域', !components.length && legacyMultiplier !== undefined ? `${geo} · 历史 token 倍率 ${legacyMultiplier}` : geo])
   }
   for (const [key, quantity] of Object.entries(detail?.units_nano ?? {})) {
     items.push([unitPriceLabels[key] ?? key, `${quantity / 1e9}（暂不收取工具附加费）`])

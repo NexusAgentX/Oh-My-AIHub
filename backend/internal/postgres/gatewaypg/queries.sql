@@ -111,18 +111,21 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, sqlc.arg(outcome)::text,
 RETURNING id;
 
 -- Closes a call exactly once: a call already out of in_progress is left alone.
+-- Keep scalar parameters before the JSON payloads and the snapshot last:
+-- pgx appends encoded parameters to one buffer, so a smaller snapshot must not
+-- cause another buffer growth when encoding the following scalar values.
 -- name: FinishCall :execrows
 UPDATE calls SET
-    outcome = sqlc.arg(outcome), model_id = sqlc.narg(model_id), final_channel_id = sqlc.narg(channel_id),
-    routing_mode = sqlc.narg(routing_mode), routing_source = sqlc.narg(routing_source),
-    attempts = sqlc.arg(attempts), input_tokens = sqlc.arg(input_tokens), output_tokens = sqlc.arg(output_tokens),
-    cache_write_tokens = sqlc.arg(cache_write_tokens), cache_read_tokens = sqlc.arg(cache_read_tokens),
-    price_snapshot = sqlc.narg(price_snapshot), cost_nano = sqlc.arg(cost_nano), fee_nano = sqlc.arg(fee_nano),
-    ttft_ms = sqlc.narg(ttft_ms), duration_ms = sqlc.arg(duration_ms), output_tokens_per_second = sqlc.narg(tokens_per_second),
-    inter_token_p50_ms = sqlc.narg(inter_token_p50_ms), inter_token_p95_ms = sqlc.narg(inter_token_p95_ms),
-    response_bytes = sqlc.arg(response_bytes), upstream_response_id = sqlc.narg(upstream_response_id),
-    diagnostics = sqlc.narg(diagnostics), completed_at = clock_timestamp()
-WHERE id = sqlc.arg(id) AND outcome = 'in_progress';
+    outcome = $1, model_id = $2, final_channel_id = $3,
+    routing_mode = $4, routing_source = $5,
+    attempts = $21, input_tokens = $6, output_tokens = $7,
+    cache_write_tokens = $8, cache_read_tokens = $9,
+    price_snapshot = $22, cost_nano = $10, fee_nano = $11,
+    ttft_ms = $12, duration_ms = $13, output_tokens_per_second = $14,
+    inter_token_p50_ms = $15, inter_token_p95_ms = $16,
+    response_bytes = $17, upstream_response_id = $18,
+    diagnostics = $20, completed_at = clock_timestamp()
+WHERE id = $19 AND outcome = 'in_progress';
 
 -- name: SetCallSettlements :exec
 UPDATE calls c SET diagnostics = jsonb_set(c.diagnostics, '{stages}',
