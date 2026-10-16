@@ -65,6 +65,12 @@
   --shadow-md: 4px 4px 0 var(--shadow-ink); /* 卡片 */
   --shadow-lg: 6px 6px 0 var(--shadow-ink); /* 浮层、悬停抬起 */
 
+  /* 请求链路地图标识（SVG 坐标） */
+  --network-marker-radius: 8px;
+  --network-marker-radius-narrow: 12px;
+  --network-marker-text: 10px;
+  --network-marker-text-narrow: 16px;
+
   /* 字体与字号 */
   --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     "Noto Sans CJK SC", "Segoe UI", ui-sans-serif, system-ui, sans-serif;

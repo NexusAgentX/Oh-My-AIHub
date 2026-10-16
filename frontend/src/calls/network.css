@@ -13,10 +13,10 @@
 .network-flow.is-active { opacity: 1; }
 .is-playing .network-flow.is-active { animation: network-travel 1s linear infinite; }
 .direction-response .network-flow { animation-direction: reverse; stroke: var(--positive); }
-.network-node { stroke: var(--ink); stroke-width: 2; fill: var(--canvas); }
+.network-node { r: var(--network-marker-radius); stroke: var(--ink); stroke-width: calc(var(--stroke) * .75); fill: var(--canvas); }
 .network-node.node-1 { fill: var(--mustard); }
 .node-1 + .network-node-number { fill: var(--on-color); }
-.network-node-number { fill: var(--ink); font: 700 11px var(--font-sans); }
+.network-node-number { fill: var(--ink); font: 700 var(--network-marker-text) var(--font-sans); font-variant-numeric: tabular-nums; }
 .network-nodes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); list-style: none; padding: 0; margin: 0; }
 .network-nodes li { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
 .network-nodes code { font-size: var(--text-xs); }
@@ -36,9 +36,8 @@
 @keyframes network-travel { to { stroke-dashoffset: -40; } }
 @media (prefers-reduced-motion: reduce) { .is-playing .network-flow.is-active { animation: none; } }
 @container (max-width: 560px) {
-  .network-node { r: 16px; }
-  .network-node.node-1 { r: 20px; }
-  .network-node-number { font-size: 22px; }
+  .network-node { r: var(--network-marker-radius-narrow); }
+  .network-node-number { font-size: var(--network-marker-text-narrow); }
   .network-nodes { grid-template-columns: 1fr; }
   .network-nodes li { padding-bottom: var(--space-2); border-bottom: 1px solid var(--hairline); }
 }

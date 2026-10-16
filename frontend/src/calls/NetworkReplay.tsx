@@ -79,7 +79,7 @@ export default function NetworkReplay({ call }: { call: CallDetail }) {
         })}
         {points.map((p, i) => <g key={i} transform={`translate(${Math.max(12, Math.min(708, p.x))} ${Math.max(12, p.y)})`}>
           <path d={`M${originalPoints[i].x - p.x} ${originalPoints[i].y - p.y}L0 0`} className="network-link" />
-          <circle r={i === 1 ? 12 : 9} className={`network-node node-${i}`} />
+          <circle className={`network-node node-${i}`} />
           <text dominantBaseline="central" textAnchor="middle" className="network-node-number">{i + 1}</text>
         </g>)}
       </svg>
