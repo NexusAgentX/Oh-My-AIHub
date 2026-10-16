@@ -254,12 +254,18 @@ func TestResourceRegistrationFailureDoesNotExposeIdentifier(t *testing.T) {
 			}
 		})
 		s.saveErr = errors.New("db unavailable")
+		snapshot := e.settingsSnap.Load()
+		snapshot.value.DefaultCooldownFailures = 1
+		snapshot.value.DefaultCooldownSeconds = 60
 		body := `{"model":"gpt-test","store":true}`
 		if stream {
 			body = `{"model":"gpt-test","store":true,"stream":true}`
 		}
 		w := httptest.NewRecorder()
 		e.Serve(w, resourceRequest("POST", "/v1/responses", body), channel.FormatOpenAIResponses, "", false)
+		if !e.Runtime.CooldownUntil("upstream", e.Now()).IsZero() {
+			t.Fatal("local registry failure cooled down upstream")
+		}
 		if strings.Contains(w.Body.String(), "resp_hidden") || w.Code < 500 {
 			t.Fatalf("stream=%v: %d %s", stream, w.Code, w.Body.String())
 		}

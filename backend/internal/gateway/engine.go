@@ -1656,6 +1656,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
+	case resourceErr != nil:
+		outcome, endReason = OutcomeInterrupted, EndInterrupted
 	case observation.ProtocolError:
 		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
 		if observation.ProtocolClientError {
@@ -1674,16 +1676,21 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	}
 	// A 2xx status is provisional: clearing failures before the body ends
 	// would prevent consecutive protocol failures from ever reaching cooldown.
-	if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
-		e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
-	} else {
-		e.Runtime.Success(candidate.ChannelID)
+	if resourceErr == nil {
+		if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
+			e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
+		} else {
+			e.Runtime.Success(candidate.ChannelID)
+		}
 	}
 	record := &call.attempts[len(call.attempts)-1]
 	record.EndReason = endReason
 	record.DurationMS = millis(e.Now().Sub(result.started))
 	record.ResponseByte = &written
-	if observation.ProtocolError {
+	if resourceErr != nil {
+		record.ErrorCode, record.ErrorMessage = stringPointer("resource_registration_failed"), stringPointer("上游资源登记失败")
+		call.diagnostics.Delivery = "interrupted"
+	} else if observation.ProtocolError {
 		record.ErrorCode, record.ErrorMessage = stringPointer(codeProtocolError), stringPointer(messageProtocolError)
 	} else if stopped != nil {
 		record.ErrorCode, record.ErrorMessage = stringPointer(stopped.code), stringPointer(stopped.message)
