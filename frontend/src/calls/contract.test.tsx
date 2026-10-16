@@ -85,16 +85,3 @@ describe('call stats bar', () => {
     expect(markup).toContain('1,700')
   })
 })
-
-it('shows operation labels even when the format column is hidden', () => {
-  const columns = summaryColumns({showFormat: false})
-  const model = columns.find(column => column.key === 'model')!
-  const markup = renderToStaticMarkup(<>{model.cell({...call(1), operation: 'compact_v2'})}</>)
-  expect(markup).toContain('远程压缩 · V2')
-})
-
-it('keeps live rows inside the selected operation', () => {
-  const row = {...call(1), operation: 'compact_v2'} as unknown as Parameters<typeof matchesFilters>[0]
-  expect(matchesFilters(row, {operation: 'compact_v2'})).toBe(true)
-  expect(matchesFilters(row, {operation: 'inference'})).toBe(false)
-})

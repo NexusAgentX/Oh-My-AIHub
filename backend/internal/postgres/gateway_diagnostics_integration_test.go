@@ -51,9 +51,8 @@ func TestGatewayDiagnosticsKeepLedgerLockTailAtTwoStatements(t *testing.T) {
 	sharer := e.member("sharer", "0")
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	counter.WatchHold("LockLedgerAccounts")
-	response := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	response := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if response.Code != http.StatusOK {
 		t.Fatal(response.Body.String())
 	}
@@ -91,7 +90,6 @@ func TestGatewaySettlesWhileCallAnalysesCompete(t *testing.T) {
 	sharer := e.member("sharer", "0")
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	from, to := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	ctx, cancel := context.WithCancel(context.Background())
 	var readers sync.WaitGroup
@@ -116,7 +114,7 @@ func TestGatewaySettlesWhileCallAnalysesCompete(t *testing.T) {
 	}
 	defer func() { cancel(); readers.Wait() }()
 	for i := 0; i < 10; i++ {
-		response := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+		response := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 		if response.Code != http.StatusOK {
 			t.Fatalf("gateway under analysis load: %d %s", response.Code, response.Body.String())
 		}

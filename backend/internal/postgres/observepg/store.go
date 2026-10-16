@@ -123,7 +123,7 @@ func callListParams(filter observe.CallFilter) ListCallsParams {
 		Stream: filter.Stream, MinAttempts: int32Of(filter.MinAttempts), MaxAttempts: int32Of(filter.MaxAttempts), StatusCode: int32Of(filter.StatusCode), Billed: filter.Billed, Delivery: nonEmpty(filter.Delivery), UsageStatus: nonEmpty(filter.UsageStatus), ErrorCode: nonEmpty(filter.ErrorCode), EndReason: nonEmpty(filter.EndReason), AttemptChannel: nonEmpty(filter.AttemptChannelID),
 		AccountID: nonEmpty(filter.AccountID), ScopeChannelID: nonEmpty(filter.ScopeChannelID), ScopeChannelText: nonEmpty(filter.ScopeChannelID),
 		FinalChannelID: nonEmpty(filter.FinalChannelID), ApiKeyID: nonEmpty(filter.APIKeyID), Model: nonEmpty(filter.Model),
-		Operation: nonEmpty(filter.Operation), Format: nonEmpty(filter.Format), Outcome: nonEmpty(filter.Outcome), Tag: nonEmpty(filter.Tag), RequestID: nonEmpty(filter.RequestID),
+		Format: nonEmpty(filter.Format), Outcome: nonEmpty(filter.Outcome), Tag: nonEmpty(filter.Tag), RequestID: nonEmpty(filter.RequestID),
 		FromTime: filter.From, ToTime: filter.To, MinDuration: int32Of(filter.MinDurationMS), MaxDuration: int32Of(filter.MaxDurationMS),
 		MinTokens: filter.MinTokens, MaxTokens: filter.MaxTokens, MinCharged: nanoOf(filter.MinCharged), MaxCharged: nanoOf(filter.MaxCharged),
 	}
@@ -144,7 +144,7 @@ func (s *Store) ListCalls(ctx context.Context, filter observe.CallFilter, after 
 		call := observe.CallRow{
 			ID: row.ID, CreatedAt: row.CreatedAt, CompletedAt: row.CompletedAt,
 			Account: observe.AccountRef{ID: row.AccountID, Username: row.AccountUsername, DisplayName: row.AccountDisplayName},
-			ModelID: row.ModelID, RequestedModel: row.RequestedModel, Operation: row.Operation, Format: row.Format, Stream: row.Stream, Tag: row.Tag, Outcome: row.Outcome,
+			ModelID: row.ModelID, RequestedModel: row.RequestedModel, Format: row.Format, Stream: row.Stream, Tag: row.Tag, Outcome: row.Outcome,
 			Usage: observe.Usage{InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, CacheWriteTokens: row.CacheWriteTokens, CacheReadTokens: row.CacheReadTokens},
 			Cost:  row.CostNano, Fee: row.FeeNano, LedgerTxID: row.LedgerTxID, TTFTMS: intOf(row.TtftMs), DurationMS: intOf(row.DurationMs),
 			AttemptCount: int(row.AttemptCount), ScopeAttempts: parseAttempts(row.ScopeAttempts),
@@ -173,7 +173,7 @@ func (s *Store) CallStats(ctx context.Context, filter observe.CallFilter) (obser
 	row, err := s.q.CallStats(ctx, CallStatsParams{Dimension: list.Dimension, DimensionValue: list.DimensionValue, SecondDimension: list.SecondDimension, SecondValue: list.SecondValue,
 		Stream: list.Stream, MinAttempts: list.MinAttempts, MaxAttempts: list.MaxAttempts, StatusCode: list.StatusCode, Billed: list.Billed, Delivery: list.Delivery, UsageStatus: list.UsageStatus, ErrorCode: list.ErrorCode, EndReason: list.EndReason, AttemptChannel: list.AttemptChannel,
 		AccountID: list.AccountID, ScopeChannelID: list.ScopeChannelID, ScopeChannelText: list.ScopeChannelText, FinalChannelID: list.FinalChannelID,
-		ApiKeyID: list.ApiKeyID, Model: list.Model, Operation: list.Operation, Format: list.Format, Outcome: list.Outcome, Tag: list.Tag, RequestID: list.RequestID,
+		ApiKeyID: list.ApiKeyID, Model: list.Model, Format: list.Format, Outcome: list.Outcome, Tag: list.Tag, RequestID: list.RequestID,
 		FromTime: list.FromTime, ToTime: list.ToTime, MinDuration: list.MinDuration, MaxDuration: list.MaxDuration,
 		MinTokens: list.MinTokens, MaxTokens: list.MaxTokens, MinCharged: list.MinCharged, MaxCharged: list.MaxCharged,
 	})
@@ -213,9 +213,6 @@ func (s *Store) GetCall(ctx context.Context, id string) (observe.CallRecord, err
 		if err := json.Unmarshal(call.Diagnostics, &record.Diagnostics); err != nil {
 			return observe.CallRecord{}, err
 		}
-	}
-	if record.Diagnostics != nil {
-		record.Operation = record.Diagnostics.Operation
 	}
 	record.AttemptCount = len(record.Attempts)
 	if call.ApiKeyID != nil {

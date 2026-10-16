@@ -18,8 +18,7 @@ func TestGeoCacheQuotaAndEnrichmentPreserveCallFacts(t *testing.T) {
 	sharer := e.member("sharer", "0")
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
-	response := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	response := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if response.Code != http.StatusOK {
 		t.Fatal(response.Body.String())
 	}

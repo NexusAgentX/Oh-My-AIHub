@@ -256,7 +256,7 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 				t.Errorf("%s: %s 路由须声明 sessionCookie", key, access)
 			}
 		case "gateway_key":
-			if len(security) == 0 || !isExternalGatewayPath(operation.path) {
+			if len(security) == 0 || !strings.HasPrefix(operation.path, "/v1") {
 				t.Errorf("%s: 外部 API 入口须位于 /v1、/v1beta 下并声明 Key 认证", key)
 			}
 			if _, hasBody := operation.body["requestBody"]; hasBody != (operation.method == "POST") {

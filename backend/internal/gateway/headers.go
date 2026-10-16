@@ -28,7 +28,7 @@ var hopByHop = map[string]bool{
 // the transport's job, credentials are replaced, and forwarding headers would
 // reveal the client's network address to a third party.
 var requestHeadersNeverForwarded = map[string]bool{
-	"Chatgpt-Account-Id": true, "Host": true, "Content-Length": true, "Cookie": true, "Accept-Encoding": true,
+	"Host": true, "Content-Length": true, "Cookie": true, "Accept-Encoding": true,
 	"Authorization": true, "X-Api-Key": true, "X-Goog-Api-Key": true, "X-Aihub-Tag": true,
 	"X-Forwarded-For": true, "X-Forwarded-Host": true, "X-Forwarded-Proto": true, "X-Forwarded-Port": true,
 	"X-Real-Ip": true, "Forwarded": true, "Via": true,
@@ -97,11 +97,7 @@ func UpstreamURL(baseURL string, requestPath, rawQuery string, format channel.Fo
 			requestPath = "/v1beta/models/" + upstreamModel + requestPath[index:]
 		}
 	}
-	basePath := strings.TrimSuffix(target.Path, "/")
-	if strings.HasPrefix(requestPath, "/backend-api/codex/") && strings.HasSuffix(basePath, "/backend-api/codex") {
-		requestPath = strings.TrimPrefix(requestPath, "/backend-api/codex")
-	}
-	target.Path = basePath + requestPath
+	target.Path = strings.TrimSuffix(target.Path, "/") + requestPath
 	target.RawPath = ""
 	var kept []string
 	for _, pair := range strings.Split(rawQuery, "&") {

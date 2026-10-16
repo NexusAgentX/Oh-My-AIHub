@@ -37,11 +37,8 @@ export function ChannelStatusBadge({ channel }: { channel: Pick<AdminChannel, 's
 const formatLabels: Record<string, string> = {
   openai_chat: 'OpenAI Chat',
   openai_responses: 'Responses',
-  codex: 'Codex',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
-  openai_images: 'OpenAI Images',
-
 }
 
 const columns: Column<AdminChannel>[] = [

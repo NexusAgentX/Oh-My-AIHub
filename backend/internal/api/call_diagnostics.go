@@ -26,28 +26,25 @@ type routeDecisionJSON struct {
 	Rank    int            `json:"rank"`
 }
 type callDiagnosticsJSON struct {
-	Operation            string              `json:"operation,omitempty"`
-	RequiredCapabilities []string            `json:"required_capabilities,omitempty"`
-	BoundResource        bool                `json:"bound_resource,omitempty"`
-	Network              *gateway.Network    `json:"network"`
-	Stages               []stageTimingJSON   `json:"stages"`
-	Routing              []routeDecisionJSON `json:"routing"`
-	StopReason           string              `json:"stop_reason"`
-	UsageStatus          string              `json:"usage_status"`
-	Delivery             string              `json:"delivery"`
-	Frames               int                 `json:"frames"`
-	MaxFrameGapMS        *int                `json:"max_frame_gap_ms"`
-	UpstreamBytes        int64               `json:"upstream_bytes"`
-	MaxAttempts          int                 `json:"max_attempts"`
-	CallTimeoutMS        int                 `json:"call_timeout_ms"`
-	DrainTimeoutMS       int                 `json:"drain_timeout_ms"`
+	Network        *gateway.Network    `json:"network"`
+	Stages         []stageTimingJSON   `json:"stages"`
+	Routing        []routeDecisionJSON `json:"routing"`
+	StopReason     string              `json:"stop_reason"`
+	UsageStatus    string              `json:"usage_status"`
+	Delivery       string              `json:"delivery"`
+	Frames         int                 `json:"frames"`
+	MaxFrameGapMS  *int                `json:"max_frame_gap_ms"`
+	UpstreamBytes  int64               `json:"upstream_bytes"`
+	MaxAttempts    int                 `json:"max_attempts"`
+	CallTimeoutMS  int                 `json:"call_timeout_ms"`
+	DrainTimeoutMS int                 `json:"drain_timeout_ms"`
 }
 
 func newCallDiagnosticsJSON(v *gateway.Diagnostics) *callDiagnosticsJSON {
 	if v == nil {
 		return nil
 	}
-	d := &callDiagnosticsJSON{Operation: v.Operation, RequiredCapabilities: v.RequiredCapabilities, BoundResource: v.BoundResource, Network: v.Network, Stages: []stageTimingJSON{}, Routing: []routeDecisionJSON{}, StopReason: v.StopReason, UsageStatus: v.UsageStatus, Delivery: v.Delivery, Frames: v.Frames, MaxFrameGapMS: v.MaxFrameGapMS, UpstreamBytes: v.UpstreamBytes, MaxAttempts: v.MaxAttempts, CallTimeoutMS: v.CallTimeoutMS, DrainTimeoutMS: v.DrainTimeoutMS}
+	d := &callDiagnosticsJSON{Network: v.Network, Stages: []stageTimingJSON{}, Routing: []routeDecisionJSON{}, StopReason: v.StopReason, UsageStatus: v.UsageStatus, Delivery: v.Delivery, Frames: v.Frames, MaxFrameGapMS: v.MaxFrameGapMS, UpstreamBytes: v.UpstreamBytes, MaxAttempts: v.MaxAttempts, CallTimeoutMS: v.CallTimeoutMS, DrainTimeoutMS: v.DrainTimeoutMS}
 	for _, s := range v.Stages {
 		d.Stages = append(d.Stages, stageTimingJSON{OffsetMS: s.OffsetMS, Stage: s.Stage, DurationMS: s.DurationMS})
 	}

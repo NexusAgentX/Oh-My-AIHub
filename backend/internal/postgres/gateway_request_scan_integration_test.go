@@ -17,9 +17,8 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	e.createChannel(sharer, channelSpec{capabilities: []string{"responses/fast"}, name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
+	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 
 	snapshotDetail := func(id string) ledger.UsageDetail {
 		t.Helper()
@@ -35,18 +34,21 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 		}
 		return snapshot.Detail
 	}
+	anthropic := map[string]string{"anthropic-version": "2023-06-01"}
 	for _, tc := range []struct {
 		name, path, body string
 		headers          map[string]string
 		thinkingMode     string
 		tier             string
 	}{
-		{"chat, thinking off", "/v1/responses", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "", "priority"},
-		{"chat, thinking on", "/v1/responses", `{"model":"gpt-test","enable_thinking":true,"service_tier":"flex"}`, nil, "", "flex"},
-		{"chat, neither", "/v1/responses", `{"model":"gpt-test"}`, nil, "", ""},
-		{"chat, later member wins, other case", "/v1/responses", `{"enable_thinking":true,"model":"gpt-test","Enable_Thinking":false,"service_tier":"a","SERVICE_TIER":"scale"}`, nil, "", "scale"},
-		{"chat, a service tier that is no string", "/v1/responses", `{"model":"gpt-test","enable_thinking":null,"service_tier":5}`, nil, "", ""},
+		{"chat, thinking off", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "", "priority"},
+		{"chat, thinking on", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":true,"service_tier":"flex"}`, nil, "", "flex"},
+		{"chat, neither", "/v1/chat/completions", `{"model":"gpt-test"}`, nil, "", ""},
+		{"chat, later member wins, other case", "/v1/chat/completions", `{"enable_thinking":true,"model":"gpt-test","Enable_Thinking":false,"service_tier":"a","SERVICE_TIER":"scale"}`, nil, "", "scale"},
+		{"chat, a service tier that is no string", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":null,"service_tier":5}`, nil, "", ""},
 		{"responses", "/v1/responses", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "", "priority"},
+		{"anthropic", "/v1/messages", `{"model":"gpt-test","max_tokens":10,"service_tier":"auto"}`, anthropic, "", "auto"},
+		{"gemini", "/v1beta/models/gpt-test:generateContent?key=" + secret, `{"contents":[],"service_tier":"priority"}`, map[string]string{"Authorization": ""}, "", "priority"},
 	} {
 		recorder := e.call(secret, http.MethodPost, tc.path, []byte(tc.body), tc.headers)
 		if recorder.Code != http.StatusOK {
@@ -69,14 +71,15 @@ func TestGatewayForwardsLargeRequestBodiesUnchanged(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 
 	for _, size := range []int{100, 70_000, 300_000, 2_000_000} {
 		filler := strings.Repeat(`word \"model\": "x" é `, size/22+1)
 		body := `{ "model" : "gpt-test", "stream":true, "messages":[{"role":"user","content":"` + filler + `"}], "service_tier":"priority" }`
-		want := strings.Replace(body, `"gpt-test"`, `"gpt-up"`, 1)
+		want := `{ "model" : "gpt-up", "stream":true, "messages":[{"role":"user","content":"` + filler + `"}], "service_tier":"priority" ,"stream_options":{"include_usage":true}}`
+		// The splice adds the option after the last member, whitespace and all.
+		want = strings.Replace(want, `"priority" ,"stream_options":{"include_usage":true}}`, `"priority","stream_options":{"include_usage":true} }`, 1)
 		before := len(relay.inference())
-		recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(body), nil)
+		recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(body), nil)
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("%d bytes: %d %s", len(body), recorder.Code, recorder.Body.String())
 		}

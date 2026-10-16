@@ -369,8 +369,6 @@ func BuildEndpoint(baseURL string, format Format, upstreamModelID string, stream
 		suffix = "/v1/chat/completions"
 	case FormatOpenAIResponses:
 		suffix = "/v1/responses"
-	case FormatOpenAIImages:
-		suffix = "/v1/images/generations"
 	case FormatAnthropic:
 		suffix = "/v1/messages"
 	case FormatGemini:

@@ -22,8 +22,6 @@ type RequestSpec struct {
 	MaxTokens int
 	// PreviousResponseID continues an OpenAI Responses conversation.
 	PreviousResponseID string
-	// StoreFalse avoids populating resource tables while priming ledger data.
-	StoreFalse bool
 }
 
 // Build returns the request for the given base URL (scheme, host and port).
@@ -44,9 +42,6 @@ func (s RequestSpec) Build(baseURL string) Request {
 	case channel.FormatOpenAIResponses:
 		path = "/v1/responses"
 		body.WriteString(`{"model":"` + model + `","input":"Say hello.","max_output_tokens":` + limit)
-		if s.StoreFalse {
-			body.WriteString(`,"store":false`)
-		}
 		if s.PreviousResponseID != "" {
 			body.WriteString(`,"previous_response_id":"` + s.PreviousResponseID + `"`)
 		}

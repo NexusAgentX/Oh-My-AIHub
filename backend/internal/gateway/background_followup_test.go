@@ -343,7 +343,3 @@ func TestBackgroundCapacityRestoreAndRelease(t *testing.T) {
 		t.Fatal("restored reservations leaked")
 	}
 }
-
-func (s *backgroundFixture) Candidates(context.Context, string, channel.Format) ([]Candidate, error) {
-	return []Candidate{{ChannelID: "channel", Advanced: channel.Advanced{Capabilities: channel.ChannelCapabilities}}}, nil
-}

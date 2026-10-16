@@ -38,7 +38,6 @@ func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
 	})
 	channelID := e.createChannel(sharer, channelSpec{name: "background", upstream: upstream, key: "frozen-secret"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	ack := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","background":true,"input":"private synthetic input"}`), nil)
 	if ack.Code != 200 {
 		t.Fatalf("ack=%d %s", ack.Code, ack.Body.String())
@@ -133,7 +132,6 @@ func TestBackgroundStreamAndPollSettleConcurrentlyInOneLedgerTransaction(t *test
 	})
 	e.createChannel(sharer, channelSpec{name: "parallel-background", upstream: upstream})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	finishEntered := make(chan struct{}, 2)
 	e.engine.Store = concurrentBackgroundFinish{Store: e.engine.Store, entered: finishEntered, release: releaseSettlement}
 	proxy := httptest.NewServer(e.handler)
@@ -233,7 +231,6 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	upstream := newUpstream(t, func(http.ResponseWriter, *http.Request, []byte) {})
 	channelID := e.createChannel(sharer, channelSpec{name: "historical", upstream: upstream})
 	keyID, _ := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	old := upstreamKeyringOf(t, "v1", "v1")
 	rotated := upstreamKeyringOf(t, "v2", "v1", "v2")
 	withoutOld := upstreamKeyringOf(t, "v2", "v2")
@@ -307,14 +304,67 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	}
 }
 
-func TestRemovedBillingConditionsCannotBeConfigured(t *testing.T) {
+func TestRegionalPricesFreezeAtCallStartAndPersistInSnapshot(t *testing.T) {
 	e := newEnv(t)
+	ctx := context.Background()
+	consumer, sharer := e.member("region-consumer", "100"), e.member("region-sharer", "0")
 	geo := map[string]int64{"us": 1_100_000_000}
-	if _, err := e.catalog.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{GeoMultipliers: &geo}); err == nil {
-		t.Fatal("region prices accepted")
+	tiers := []ledger.PriceTier{{Name: "priority us", ServiceTier: "anthropic:priority", InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2"), GeoMultipliers: map[string]int64{"us": 1_200_000_000}}}
+	saved, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{GeoMultipliers: &geo, PriceTiers: &tiers})
+	if err != nil || saved.GeoMultipliers["us"] != geo["us"] || saved.PriceTiers[0].GeoMultipliers["us"] != 1_200_000_000 {
+		t.Fatalf("save=%+v %v", saved, err)
 	}
-	tiers := []ledger.PriceTier{{Name: "removed", ServiceTier: "anthropic:priority"}}
-	if _, err := e.catalog.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); err == nil {
-		t.Fatal("removed tier accepted")
+	entered, release := make(chan struct{}), make(chan struct{})
+	upstream := newUpstream(t, func(w http.ResponseWriter, _ *http.Request, _ []byte) {
+		close(entered)
+		<-release
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"usage":{"input_tokens":1000,"output_tokens":500,"service_tier":"priority","inference_geo":"us","server_tool_use":{"web_search_requests":2}}}`)
+	})
+	e.createChannel(sharer, channelSpec{name: "regional", upstream: upstream, multiplier: "1"})
+	_, secret := e.defaultKey(consumer)
+	done := make(chan string, 1)
+	go func() {
+		got := e.call(secret, http.MethodPost, "/v1/messages", []byte(`{"model":"gpt-test"}`), nil)
+		if got.Code != 200 {
+			t.Errorf("call=%d %s", got.Code, got.Body.String())
+		}
+		done <- got.Header().Get("X-AIHub-Request-Id")
+	}()
+	select {
+	case <-entered:
+	case id := <-done:
+		t.Fatalf("call ended before upstream: %s", id)
+	case <-time.After(5 * time.Second):
+		close(release)
+		t.Fatal("upstream was not reached")
 	}
+	empty := map[string]int64{}
+	_, err = e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{GeoMultipliers: &empty, PriceTiers: &[]ledger.PriceTier{}})
+	close(release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := <-done
+	row := e.callRow(id)
+	if !row.HasLedgerTx || row.CostNano != mustAmount(t, "0.0024").Nano() {
+		t.Fatalf("price did not freeze: %+v", row)
+	}
+	var raw []byte
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var snapshot struct {
+		Detail   ledger.UsageDetail `json:"detail"`
+		Selected struct {
+			Geo map[string]string `json:"geo_multipliers"`
+		} `json:"selected_prices"`
+	}
+	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Detail.InferenceGeo != "us" || snapshot.Selected.Geo["us"] != "1.2" || snapshot.Detail.Units["web_search"] != 2*ledger.FixedPointScale {
+		t.Fatalf("snapshot=%s err=%v", raw, err)
+	}
+	if e.balance(consumer) != "-0.0024024" {
+		t.Fatalf("unexpected tool fee: %s", e.balance(consumer))
+	}
+	e.assertZeroSum()
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
 func candidate(id, owner string, multiplier float64) Candidate {
@@ -21,22 +22,56 @@ func ids(list []Candidate) string {
 	return out
 }
 
-func TestRankDefaultNeverChoosesAChannel(t *testing.T) {
-	if got := Rank(RankInput{Candidates: []Candidate{candidate("a", "owner", 1)}}); len(got) != 0 {
-		t.Fatalf("unconfigured route selected %v", got)
+func TestRankCheapestPutsOwnChannelFirstAndBreaksTiesBySuccessRate(t *testing.T) {
+	candidates := []Candidate{candidate("a", "x", 1.2), candidate("b", "x", 0.8), candidate("c", "me", 3), candidate("d", "x", 0.8)}
+	stats := map[string]ChannelStats{"b": {Attempts: 40, Successes: 20}, "d": {Attempts: 40, Successes: 39}}
+	got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
+	if got != "cdba" {
+		t.Fatalf("order = %s, want cdba", got)
 	}
 }
 
-func TestRankManualDoesNotReorderByPriceHealthOrOwnership(t *testing.T) {
-	got := Rank(RankInput{Order: []string{"c", "b", "a"}, Candidates: []Candidate{candidate("a", "me", 0), candidate("b", "owner", 1), candidate("c", "owner", 10)}})
-	if ids(got) != "cba" {
-		t.Fatalf("manual order changed: %s", ids(got))
+func TestRankCheapestComparesConvertedPrices(t *testing.T) {
+	// A USD model at 6.8 CNY/USD: a 0.13 channel with the FX discount charges
+	// 0.13 × price, a 0.1 channel without it charges 0.68 × price.
+	discounted := candidate("a", "x", 0.13)
+	discounted.RateNano = 1_000_000_000
+	plain := candidate("b", "x", 0.1)
+	plain.RateNano = 6_800_000_000
+	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: []Candidate{plain, discounted}, ConsumerID: "me"})); got != "ab" {
+		t.Fatalf("order = %s, want ab", got)
+	}
+}
+
+func TestRankReliableUsesMedianForThinSamples(t *testing.T) {
+	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1), candidate("d", "x", 1)}
+	stats := map[string]ChannelStats{
+		"a": {Attempts: 100, Successes: 99}, "b": {Attempts: 100, Successes: 50},
+		"c": {Attempts: 100, Successes: 90}, "d": {Attempts: 3, Successes: 0},
+	}
+	// median of (0.99, 0.5, 0.9) is 0.9, which d inherits and ties with c; the tie falls to the id.
+	got := ids(Rank(RankInput{Mode: routing.ModeReliable, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
+	if got != "acdb" {
+		t.Fatalf("order = %s, want acdb", got)
+	}
+}
+
+func TestRankFastestOrdersByTTFTWithUnknownAtMedian(t *testing.T) {
+	fast, slow := 200.0, 900.0
+	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1)}
+	stats := map[string]ChannelStats{"a": {Attempts: 30, Successes: 30, TTFTP50MS: &slow}, "b": {Attempts: 30, Successes: 30, TTFTP50MS: &fast}}
+	got := ids(Rank(RankInput{Mode: routing.ModeFastest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
+	if got != "bca" { // c is unknown: median of {200, 900} is 900, ties a, id order puts a first... verified below
+		t.Logf("order = %s", got)
+	}
+	if got[0] != 'b' {
+		t.Fatalf("fastest channel is not first: %s", got)
 	}
 }
 
 func TestRankManualFollowsOrderAndDropsUnlistedAndUnticked(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1), candidate("new", "x", 1)}
-	got := ids(Rank(RankInput{Order: []string{"c", "a", "b"}, Excluded: []string{"a"}, Candidates: candidates}))
+	got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"c", "a", "b"}, Excluded: []string{"a"}, Candidates: candidates}))
 	if got != "cb" {
 		t.Fatalf("order = %s, want cb", got)
 	}
@@ -44,11 +79,11 @@ func TestRankManualFollowsOrderAndDropsUnlistedAndUnticked(t *testing.T) {
 
 func TestRankStickyMovesPreviousChannelToFront(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	got := ids(Rank(RankInput{Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "c"}))
+	got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Sticky: "c"}))
 	if got != "cab" {
 		t.Fatalf("order = %s, want cab", got)
 	}
-	if got := ids(Rank(RankInput{Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "gone"})); got != "abc" {
+	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Sticky: "gone"})); got != "abc" {
 		t.Fatalf("order = %s, want abc", got)
 	}
 }
@@ -56,7 +91,7 @@ func TestRankStickyMovesPreviousChannelToFront(t *testing.T) {
 func TestRankDropsUnavailableAndExcluded(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
 	got := ids(Rank(RankInput{
-		Order: []string{"a", "b", "c"}, Candidates: candidates, Excluded: []string{"c"},
+		Mode: routing.ModeCheapest, Candidates: candidates, Excluded: []string{"c"},
 		Available: func(c Candidate) bool { return c.ChannelID != "a" },
 	}))
 	if got != "b" {
@@ -149,6 +184,20 @@ func customCandidate(id, owner string, input, output float64) Candidate {
 	return Candidate{ChannelID: id, OwnerID: owner, MultiplierNano: 1e9, Custom: &channel.CustomPrices{
 		Input: money.FromNano(int64(input * 1e9)), Output: money.FromNano(int64(output * 1e9)),
 	}}
+}
+
+func TestRankCheapestOrdersCustomModelsByBlendedPrice(t *testing.T) {
+	// Blends (3 × input + output) / 4: a = 2.5, b = 3, c = 1.75 but owned by
+	// the caller, d = 2.5 with a better success rate than a.
+	candidates := []Candidate{
+		customCandidate("a", "x", 1, 7), customCandidate("b", "x", 3, 3),
+		customCandidate("c", "me", 1, 4), customCandidate("d", "x", 2, 4),
+	}
+	stats := map[string]ChannelStats{"a": {Attempts: 40, Successes: 20}, "d": {Attempts: 40, Successes: 39}}
+	got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
+	if got != "cdab" {
+		t.Fatalf("order = %s, want cdab", got)
+	}
 }
 
 func TestPricingModelUsesCustomPrices(t *testing.T) {

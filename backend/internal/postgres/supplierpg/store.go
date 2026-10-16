@@ -91,7 +91,7 @@ func (s *Store) Listings(ctx context.Context) ([]supplier.Listing, error) {
 	}
 	values := make([]supplier.Listing, 0, len(rows))
 	for _, row := range rows {
-		values = append(values, supplier.Listing{ID: row.ID, Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, OwnerID: row.OwnerID, OwnerName: row.OwnerName, Advanced: channel.Advanced{Capabilities: row.Capabilities, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano, CooldownSeconds: row.CooldownSeconds}})
+		values = append(values, supplier.Listing{ID: row.ID, Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, OwnerID: row.OwnerID, OwnerName: row.OwnerName, Advanced: channel.Advanced{ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano, CooldownSeconds: row.CooldownSeconds}})
 	}
 	return values, nil
 }

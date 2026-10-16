@@ -19,38 +19,14 @@ import (
 // coverageExceptions 是门禁的显式例外清单：operation（“METHOD /path”，与规范一致）到不在本包验证的原因。
 // 新增例外必须写明原因；例外被覆盖或不再存在于规范时门禁同样失败，保证清单只会变短。
 var coverageExceptions = map[string]string{
-	"GET /backend-api/codex/responses/{responseID}":             gatewayPassthrough,
-	"DELETE /backend-api/codex/responses/{responseID}":          gatewayPassthrough,
-	"POST /backend-api/codex/responses/{responseID}/cancel":     gatewayPassthrough,
-	"GET /backend-api/codex/responses/{responseID}/input_items": gatewayPassthrough,
-	"POST /backend-api/codex/responses/input_tokens":            gatewayPassthrough,
-
-	"GET /v1/user-auth-credential/whoami":        gatewayPassthrough,
-	"GET /backend-api/wham/accounts/check":       gatewayPassthrough,
-	"GET /backend-api/codex/models":              gatewayPassthrough,
-	"POST /backend-api/codex/responses":          gatewayPassthrough,
-	"POST /backend-api/codex/responses/compact":  gatewayPassthrough,
-	"POST /backend-api/codex/alpha/search":       gatewayPassthrough,
-	"POST /backend-api/codex/images/generations": gatewayPassthrough,
-	"POST /backend-api/codex/images/edits":       gatewayPassthrough,
-
-	"GET /v1/models/{model}":                               gatewayPassthrough,
-	"DELETE /v1/responses/{responseID}":                    gatewayPassthrough,
-	"GET /v1/responses/{responseID}/input_items":           gatewayPassthrough,
-	"POST /v1/responses/compact":                           gatewayPassthrough,
-	"POST /v1/responses/input_tokens":                      gatewayPassthrough,
-	"POST /v1/conversations":                               gatewayPassthrough,
-	"GET /v1/conversations/{resourceID}":                   gatewayPassthrough,
-	"POST /v1/conversations/{resourceID}":                  gatewayPassthrough,
-	"DELETE /v1/conversations/{resourceID}":                gatewayPassthrough,
-	"GET /v1/conversations/{resourceID}/items":             gatewayPassthrough,
-	"POST /v1/conversations/{resourceID}/items":            gatewayPassthrough,
-	"GET /v1/conversations/{resourceID}/items/{itemID}":    gatewayPassthrough,
-	"DELETE /v1/conversations/{resourceID}/items/{itemID}": gatewayPassthrough,
-	"POST /v1/responses":                                   gatewayPassthrough,
-	"GET /v1/responses/{responseID}":                       gatewayPassthrough,
-	"POST /v1/responses/{responseID}/cancel":               gatewayPassthrough,
-	"GET /v1/models":                                       gatewayPassthrough,
+	"POST /v1/chat/completions":              gatewayPassthrough,
+	"POST /v1/responses":                     gatewayPassthrough,
+	"GET /v1/responses/{responseID}":         gatewayPassthrough,
+	"POST /v1/responses/{responseID}/cancel": gatewayPassthrough,
+	"POST /v1/messages":                      gatewayPassthrough,
+	"POST /v1beta/models/{model}":            gatewayPassthrough,
+	"GET /v1/models":                         gatewayPassthrough,
+	"GET /v1beta/models":                     gatewayPassthrough,
 }
 
 // gatewayPassthrough 说明外部模型 API 入口为何不在本包验证：规范只登记 default 的原生透传响应，

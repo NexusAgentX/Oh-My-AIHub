@@ -17,7 +17,6 @@ export function matchesFilters(row: CallRowBase & Record<string, unknown>, param
   if (params.request_id && row.id !== params.request_id) return false
   if (params.model && row.model_id !== params.model) return false
   if (params.outcome && row.outcome !== params.outcome) return false
-  if (params.operation && row.operation !== params.operation) return false
   if (params.format && row.format !== params.format) return false
   if (params.tag && row.tag !== params.tag) return false
   if (params.api_key_id) {

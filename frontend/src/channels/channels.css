@@ -129,22 +129,8 @@
 .channel-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
 .channel-save-bar { position: sticky; top: calc(var(--topbar-height) + var(--space-2)); z-index: 10; padding: var(--space-3); border: var(--sticker-border); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--shadow-sm); }
 .channel-save-bar .form-actions { margin: 0; }
-.channel-save-actions { display: flex; align-items: center; gap: var(--space-3); }
-.channel-save-actions .success-message { padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); font-size: var(--text-sm); white-space: nowrap; }
-.channel-save-bar > .inline-error { margin-top: var(--space-3); }
 .channel-record-pages { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); }
 .channel-record-pages > span { font-size: var(--text-xs); }
 @media (max-width: 960px) {
   .channel-chart-grid { grid-template-columns: minmax(0, 1fr); }
 }
-
-.compatibility-matrix { max-height: 28rem; overflow: auto; }
-.compatibility-matrix table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-.compatibility-matrix th, .compatibility-matrix td { padding: var(--space-2); border-bottom: 1px solid var(--hairline); text-align: left; }
-.compatibility-matrix thead { position: sticky; top: 0; background: var(--canvas); }
-.compatibility-matrix td > span { display: inline-flex; align-items: center; gap: var(--space-1); }
-.compatibility-matrix .checkbox-label { font-size: 0; }
-.compatibility-matrix td label { min-height: 44px; min-width: 44px; }
-.compatibility-matrix td label span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.compatibility-pass { color: var(--positive); }
-.compatibility-fail { color: var(--danger); }

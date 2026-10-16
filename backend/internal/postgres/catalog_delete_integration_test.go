@@ -16,7 +16,6 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	keyID, _ := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	exec := func(sql string, args ...any) {
 		t.Helper()
 		if _, err := e.pool.Exec(ctx, sql, args...); err != nil {
@@ -43,7 +42,7 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 		t.Fatalf("finish: %+v %v", finish, err)
 	}
 	exec(`INSERT INTO channels(id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id) VALUES ('00000000-0000-4000-8000-000000000188', $1, 'test', 'https://example.com', '\x01', '\x01', 'test')`, sharer.id)
-	exec(`INSERT INTO channel_models(channel_id, model_id, upstream_model) VALUES ('00000000-0000-4000-8000-000000000188', 'gpt-test', 'gpt-test')`)
+	exec(`INSERT INTO channel_models(channel_id, model_id, upstream_model, formats) VALUES ('00000000-0000-4000-8000-000000000188', 'gpt-test', 'gpt-test', ARRAY['openai_chat'])`)
 	e.apiJSON(consumer, http.StatusForbidden, http.MethodDelete, "/api/admin/models/gpt-test", nil)
 	e.apiJSON(e.admin, http.StatusConflict, http.MethodDelete, "/api/admin/models/gpt-test", nil)
 	count(`SELECT count(*) FROM route_prefs WHERE model_id = 'gpt-test'`, 2)

@@ -53,14 +53,7 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time, facts ...*UsageDeta
 	if len(facts) > 0 {
 		detail = facts[0]
 	}
-	actualTier := ""
-	if detail != nil {
-		actualTier = detail.ServiceTier
-	}
-	if actualTier == "openai:priority" && t.ServiceTier == "openai:fast" {
-		actualTier = "openai:fast"
-	}
-	if t.ServiceTier != "" && t.ServiceTier != actualTier {
+	if t.ServiceTier != "" && (detail == nil || t.ServiceTier != detail.ServiceTier) {
 		return false
 	}
 	if t.ThinkingMode != "" && (detail == nil || t.ThinkingMode != detail.ThinkingMode) {

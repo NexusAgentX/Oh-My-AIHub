@@ -83,7 +83,6 @@ func TestGatewayDoesNotShowTheConsumerTheKeyAnUpstreamEchoesInAnError(t *testing
 				relay := echoingUpstream(t, tc.status, tc.escapeSlashes)
 				e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, key: echoKeyA})
 				_, secret := e.defaultKey(consumer)
-				e.selectFixtureChannels(consumer)
 
 				recorder := e.call(secret, http.MethodPost, request.path, []byte(request.body), request.headers)
 				body := recorder.Body.String()
@@ -135,11 +134,10 @@ func TestGatewayHidesAKeyTheUpstreamQuotesFromTheRequestURL(t *testing.T) {
 	relay := echoingUpstream(t, http.StatusBadRequest, false)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, key: echoKeyA})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 
 	// The client authenticates with ?key=, so the upstream key goes back into
 	// the query of the upstream URL, percent-encoded.
-	recorder := e.call("", http.MethodPost, "/v1/responses?key="+url.QueryEscape(secret), []byte(allFormats[0].body), nil)
+	recorder := e.call("", http.MethodPost, "/v1beta/models/gpt-test:generateContent?key="+url.QueryEscape(secret), []byte(allFormats[3].body), nil)
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("answer = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -164,9 +162,8 @@ func TestGatewayHidesEachChannelsKeyWhenEveryCandidateFails(t *testing.T) {
 	e.createChannel(sharer, channelSpec{name: "first", upstream: first, key: echoKeyA, multiplier: "1"})
 	e.createChannel(sharer, channelSpec{name: "last", upstream: last, key: echoKeyB, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 
-	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	body := recorder.Body.String()
 	// The answer is the last candidate's, and neither key is in it.
 	if recorder.Code != http.StatusBadGateway || len(first.inference()) != 1 || len(last.inference()) != 1 {
@@ -209,8 +206,7 @@ func TestGatewayLeavesAnErrorWithoutTheKeyUntouchedEvenWhenItLooksLikeOne(t *tes
 	})
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, key: echoKeyA})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
-	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusBadRequest || recorder.Body.String() != answer {
 		t.Fatalf("answer = %d %q", recorder.Code, recorder.Body.String())
 	}

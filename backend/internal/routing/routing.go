@@ -25,7 +25,7 @@ const (
 )
 
 func (m Mode) Valid() bool {
-	return m == ModeManual
+	return m == ModeCheapest || m == ModeReliable || m == ModeFastest || m == ModeManual
 }
 
 type Source string
@@ -37,7 +37,7 @@ const (
 )
 
 // Pref is one resolved preference. Without any stored row the preference is
-// the default: manual order, no channel selected, platform defaults.
+// the default: cheapest first, every channel ticked, platform defaults.
 type Pref struct {
 	ModelID          string
 	Source           Source
@@ -53,7 +53,7 @@ type Pref struct {
 
 // Default is the preference of a model nobody configured.
 func Default(modelID string) Pref {
-	return Pref{ModelID: modelID, Source: SourceDefault, Mode: ModeManual, Order: []string{}, Excluded: []string{}}
+	return Pref{ModelID: modelID, Source: SourceDefault, Mode: ModeCheapest, Order: []string{}, Excluded: []string{}}
 }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

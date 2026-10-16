@@ -104,9 +104,9 @@ func newTestCache(loader *fakeLoader) *Cache {
 func TestBuildFleetIndexesByModelAndFormatInChannelOrder(t *testing.T) {
 	custom := &channel.CustomPrices{}
 	records := []gateway.CandidateRecord{
-		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat, channel.FormatAnthropic}, Candidate: gateway.Candidate{ChannelID: "c1", Advanced: channel.Advanced{Capabilities: []string{"responses/inference", "codex/inference"}}}},
-		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: gateway.Candidate{ChannelID: "c2", Advanced: channel.Advanced{Capabilities: []string{"responses/inference"}}}},
-		{ModelID: "b", Formats: []channel.Format{channel.FormatGemini}, Candidate: gateway.Candidate{ChannelID: "c1", Custom: custom, Advanced: channel.Advanced{Capabilities: []string{"codex/inference"}}}},
+		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat, channel.FormatAnthropic}, Candidate: gateway.Candidate{ChannelID: "c1"}},
+		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: gateway.Candidate{ChannelID: "c2"}},
+		{ModelID: "b", Formats: []channel.Format{channel.FormatGemini}, Candidate: gateway.Candidate{ChannelID: "c1", Custom: custom}},
 	}
 	fleet := buildFleet(records)
 
@@ -121,8 +121,8 @@ func TestBuildFleetIndexesByModelAndFormatInChannelOrder(t *testing.T) {
 		t.Fatalf("a/gemini = %+v, want none", got)
 	}
 	want := []gateway.OnlineModel{
-		{ID: "a", Formats: []channel.Format{channel.FormatCodex, channel.FormatOpenAIResponses}},
-		{ID: "b", Custom: true, Formats: []channel.Format{channel.FormatCodex}},
+		{ID: "a", Formats: []channel.Format{channel.FormatAnthropic, channel.FormatOpenAIChat}},
+		{ID: "b", Custom: true, Formats: []channel.Format{channel.FormatGemini}},
 	}
 	if !reflect.DeepEqual(fleet.online, want) {
 		t.Fatalf("online = %+v, want %+v", fleet.online, want)

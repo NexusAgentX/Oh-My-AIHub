@@ -1,4 +1,3 @@
-import { cellsMatrix, matrixCells } from './Capabilities'
 import type {
   Channel,
   ChannelAdvanced,
@@ -12,7 +11,6 @@ import { isPositiveAmount } from '../money/format'
 
 /** 选模型表格的一行。key 为本地稳定标识。 */
 export type ModelRow = {
- capabilities?: string[]
   key: string
   sell: boolean
   /** 平台模型；上游模型不在目录里时为空，需手动选择 */
@@ -23,8 +21,8 @@ export type ModelRow = {
   /** 汇率优惠：只对美元模型生效，按「美元价 × 倍率」扣积分 */
   fxDiscount: boolean
   /** 每种格式最近一次测试是否通过 */
-  passed: Record<string, boolean>
-  errors?: Record<string, string>
+  passed: Partial<Record<Format, boolean>>
+  errors?: Partial<Record<Format, string>>
   /** 自定义模型：不在目录中，modelId 为自定的模型名，按 customPrices 直接计费 */
   custom: boolean
   customPrices: CustomPriceForm
@@ -55,7 +53,6 @@ export function customNameFrom(upstream: string) {
 export type HeaderSetRow = { name: string; value: string }
 
 export type AdvancedForm = {
- capabilities?: string[]
   userAgent: string
   headerSet: HeaderSetRow[]
   headerRemove: string[]
@@ -112,7 +109,7 @@ export function rowsFromChannel(channel: Channel): ModelRow[] {
     sell: model.enabled,
     modelId: model.model_id,
     upstream: model.upstream_model,
-    capabilities: matrixCells(model.compatibility), formats: model.formats,
+    formats: model.formats,
     // 待设倍率的模型须重新填写倍率。
     multiplier: model.pending_multiplier ? '' : model.multiplier,
     fxDiscount: model.fx_discount,
@@ -141,18 +138,13 @@ export function applyTestResults(rows: ModelRow[], results: ChannelTestResult[])
     if (mine.length === 0) return row
     const passed = { ...row.passed }
     const errors = { ...row.errors }
-    let capabilities = [...(row.capabilities ?? [])]
     for (const result of mine) {
-      if (result.scope !== 'model') continue
-      if (result.skipped) { errors[`${result.protocol}/${result.capability}`] = result.error || '未验证，请手动确认'; continue }
-      const cell = `${result.protocol}/${result.capability}`
-      passed[cell] = result.ok
-      capabilities = capabilities.filter(v => v !== cell)
-      if (result.ok) { capabilities.push(cell); delete errors[cell] }
-      else errors[cell] = result.error || '探测未通过'
+      passed[result.format] = result.ok
+      if (result.ok) delete errors[result.format]
+      else errors[result.format] = result.error || '测试未通过'
     }
-    return { ...row, passed, errors, capabilities }
-
+    const ok = mine.filter((result) => result.ok).map((result) => result.format)
+    return { ...row, passed, errors, formats: ok.length > 0 ? ok : row.formats }
   })
 }
 
@@ -164,7 +156,7 @@ export function modelsInput(rows: ModelRow[]): ChannelModelInput[] {
   return rows
     .filter((row) => row.modelId)
     .map((row): ChannelModelInput => {
-      const base = { compatibility: cellsMatrix(row.capabilities) as ChannelModelInput['compatibility'], model_id: row.modelId, upstream_model: row.upstream.trim() || row.modelId, enabled: row.sell }
+      const base = { model_id: row.modelId, upstream_model: row.upstream.trim() || row.modelId, formats: row.formats, enabled: row.sell }
       if (row.custom) {
         const prices = row.customPrices
         return {
@@ -180,6 +172,7 @@ export function validateRows(rows: ModelRow[]) {
   const selling = rows.filter((row) => row.sell)
   if (selling.length === 0) return '至少勾选一个要卖的模型'
   if (selling.some((row) => !row.modelId)) return '勾选的模型需要选择平台模型或设为自定义模型'
+  if (selling.some((row) => row.formats.length === 0)) return '每个勾选的模型至少选择一种格式'
   const ids = rows.filter((row) => row.modelId).map((row) => row.modelId)
   if (new Set(ids).size !== ids.length) return '同一个模型只能出现一次'
   const custom = rows.filter((row) => row.custom && row.modelId)
@@ -203,7 +196,7 @@ function numberOrEmpty(value: number | null) {
 
 export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
   return {
-    capabilities: matrixCells(advanced.compatibility), userAgent: advanced.user_agent ?? '',
+    userAgent: advanced.user_agent ?? '',
     headerSet: advanced.header_rules.set.map((rule) => ({ ...rule })),
     headerRemove: advanced.header_rules.remove.slice(),
     concurrency: numberOrEmpty(advanced.concurrency_limit),
@@ -220,7 +213,7 @@ export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
 /** 已改项数：UA、请求头规则、并发、RPM、每日收入上限、超时、失败冷却（各算一项）。 */
 export function advancedChangedCount(form: AdvancedForm) {
   return [
-    form.capabilities?.length, form.userAgent.trim(),
+    form.userAgent.trim(),
     form.headerSet.some((row) => row.name.trim()) || form.headerRemove.some((name) => name.trim()),
     form.concurrency,
     form.rpm,
@@ -256,7 +249,7 @@ export function validateAdvanced(form: AdvancedForm) {
 
 export function advancedInput(form: AdvancedForm): ChannelAdvancedInput {
   return {
-    compatibility: cellsMatrix(form.capabilities) as ChannelAdvancedInput['compatibility'], user_agent: form.userAgent.trim() || null,
+    user_agent: form.userAgent.trim() || null,
     header_rules: {
       set: form.headerSet.filter((row) => row.name.trim()).map((row) => ({ name: row.name.trim(), value: row.value })),
       remove: form.headerRemove.map((name) => name.trim()).filter(Boolean),

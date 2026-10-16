@@ -12,7 +12,7 @@ function defaultPreference(model: string): RoutingPreference {
   return {
     model_id: model,
     source: 'default',
-    mode: 'manual',
+    mode: 'cheapest',
     order: [],
     excluded: [],
     max_attempts: null,

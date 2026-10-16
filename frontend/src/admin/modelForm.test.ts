@@ -179,7 +179,10 @@ it('keeps explicit zero, omits inherited detail prices and accepts response cond
   expect(formToTierInput(form).service_tier).toBe('openai:default')
 })
 
-it('offers only supported modalities', () => {
-  expect(emptyModelForm().inputModalities).toEqual(['text'])
-  expect(validateModelForm({ ...emptyModelForm(), id: 'm', displayName: 'm' }, true).id).toBeUndefined()
+it('preserves explicit region multipliers and rejects invalid rates', () => {
+  const form = tier({ minPromptTokens: '1', prices: { input: '1', output: '2', cache_read: '0', cache_write: '0', geo_multipliers: { us: '1.1', eu: '0', global: '' } } })
+  expect(validateTier(form)).toEqual({})
+  expect(formToTierInput(form).prices.geo_multipliers).toEqual({ us: '1.1', eu: '0' })
+  form.prices.geo_multipliers!.us = '101'
+  expect(validateTier(form).prices).toBeTruthy()
 })

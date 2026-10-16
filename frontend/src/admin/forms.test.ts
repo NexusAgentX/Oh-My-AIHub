@@ -120,10 +120,3 @@ describe('independent timeout stages', () => {
     expect(changedAdvancedCount(form)).toBe(3)
   })
 })
-
-it('preserves Codex response documents and rejects malformed JSON before submission', () => {
-  const codex = {whoami: '{"chatgpt_account_id":"local"}', accounts: '', models: '{\n "models": []\n}'}
-  const form = settingsToForm({...settings, codex})
-  expect(formToSettings(form).body?.codex).toEqual(codex)
-  expect(formToSettings({...form, codex: {...codex, models: '{'}}).errors?.codex).toContain('models')
-})

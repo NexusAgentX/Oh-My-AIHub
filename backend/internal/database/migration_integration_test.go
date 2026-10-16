@@ -81,25 +81,6 @@ COMMIT;`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Upgrade the fixture to the last released schema, then exercise the real
-	// populated 0016 -> 0017 transition rather than only an empty installation.
-	if _, err := provider.UpTo(ctx, 16); err != nil {
-		t.Fatal(err)
-	}
-	_, err = db.ExecContext(ctx, `INSERT INTO models (id,display_name,input_price_nano_per_million,output_price_nano_per_million,cache_write_price_nano_per_million,cache_read_price_nano_per_million,input_modalities,output_modalities,geo_multipliers)
- SELECT name,name,1,2,0,0,ARRAY['text','file'],ARRAY['file'],'{"us":1100000000}'::jsonb FROM unnest(ARRAY['migration-model','migration-manual']) name;
- INSERT INTO model_price_tiers (model_id,seq,service_tier,thinking_mode,input_price_nano_per_million,output_price_nano_per_million,cache_write_price_nano_per_million,cache_read_price_nano_per_million,geo_multipliers)
- VALUES ('migration-model',1,'openai:priority','',1,2,0,0,'{"us":1100000000}'),('migration-model',2,'anthropic:priority','',3,4,0,0,'{}'),('migration-model',3,'','qwen_thinking',5,6,0,0,'{}');
- INSERT INTO channels (id,owner_id,name,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,capabilities)
- VALUES ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','migration','https://migration.example','\x00','\x00','v1',ARRAY['codex_backend','codex_search']);
- INSERT INTO channel_models (channel_id,model_id,upstream_model,formats,capabilities)
- VALUES ('33333333-3333-4333-8333-333333333333','migration-model','upstream',ARRAY['openai_responses','anthropic'],ARRAY['web_search','priority']);
- INSERT INTO route_prefs (account_id,model_id,mode) VALUES ('11111111-1111-4111-8111-111111111111','migration-model','cheapest'),('11111111-1111-4111-8111-111111111111','migration-manual','manual');
- INSERT INTO route_pref_channels (route_pref_id,channel_id,position) SELECT id,'33333333-3333-4333-8333-333333333333',0 FROM route_prefs;
- INSERT INTO calls (account_id,requested_model,format,outcome,price_snapshot) VALUES ('11111111-1111-4111-8111-111111111111','migration-model','openai_chat','succeeded_unbilled','{"selected_prices":{"geo_multipliers":{"us":"1.1"}}}');`)
-	if err != nil {
-		t.Fatal(err)
-	}
 	snapshot := func() string {
 		t.Helper()
 		var value string
@@ -109,7 +90,7 @@ COMMIT;`)
  'ledger_transactions', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
  'ledger_entries', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
  'settings', (SELECT jsonb_agg(to_jsonb(a) - ARRAY['usd_cny_rate_nano', 'usd_cny_rate_source', 'usd_cny_rate_updated_at',
-   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls', 'default_total_timeout_ms', 'default_request_timeout_ms', 'default_idle_timeout_ms', 'codex']) FROM settings a))::text`).Scan(&value)
+   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls', 'default_total_timeout_ms', 'default_request_timeout_ms', 'default_idle_timeout_ms']) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,19 +104,6 @@ COMMIT;`)
 		if after := snapshot(); after != before {
 			t.Fatal("upgrade changed existing account, ledger or settings data")
 		}
-	}
-	var routesReset, pricesClean, matricesMoved, historyIntact bool
-	if err := db.QueryRowContext(ctx, `SELECT
- (SELECT count(*)=2 AND bool_and(mode='manual') FROM route_prefs) AND NOT EXISTS(SELECT 1 FROM route_pref_channels),
- (SELECT bool_and(geo_multipliers='{}' AND NOT ('file'=ANY(input_modalities)) AND NOT ('file'=ANY(output_modalities))) FROM models) AND (SELECT count(*)=1 AND bool_and(service_tier='openai:fast' AND thinking_mode='' AND geo_multipliers='{}') FROM model_price_tiers),
- (SELECT capabilities @> ARRAY['responses/inference','codex/inference','codex/search'] FROM channels LIMIT 1) AND (SELECT capabilities @> ARRAY['responses/web_search','codex/fast'] FROM channel_models LIMIT 1) AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='channel_models' AND column_name='formats'),
- (SELECT format='openai_chat' AND price_snapshot->'selected_prices'->'geo_multipliers'->>'us'='1.1' FROM calls WHERE requested_model='migration-model' LIMIT 1)`).Scan(&routesReset, &pricesClean, &matricesMoved, &historyIntact); err != nil || !routesReset || !pricesClean || !matricesMoved || !historyIntact {
-		t.Fatalf("0017 transition routes=%v prices=%v matrix=%v history=%v err=%v", routesReset, pricesClean, matricesMoved, historyIntact, err)
-	}
-	// 0016 adds disabled Codex documents without changing existing settings.
-	var codexEmpty bool
-	if err := db.QueryRowContext(ctx, `SELECT codex = '{}'::jsonb FROM settings`).Scan(&codexEmpty); err != nil || !codexEmpty {
-		t.Fatalf("Codex compatibility must start unconfigured: empty=%v err=%v", codexEmpty, err)
 	}
 	// 0003 adds the exchange rate with a manual 6.8 default and keeps every
 	// existing model a CNY (points) model.

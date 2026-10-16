@@ -1,1 +1,0 @@
-export const operationLabels: Record<string, string> = {inference: '模型推理', compact_v1: '远程压缩 · V1', compact_v2: '远程压缩 · V2', codex_search: '独立搜索', image_generation: '生图', input_tokens: 'Token 计数', conversation: '会话资源'}

@@ -223,7 +223,6 @@ func newPerfStack(t *testing.T, channels, consumers int, dnsDelay time.Duration)
 	withLabel("gateway", func() {
 		quiet := slog.New(slog.NewJSONHandler(io.Discard, nil))
 		s.e = newEnvOn(t, s.pool, store, func(d *gateway.Dependencies) {
-			d.Resources = store.Gateway
 			d.Outbound = policy
 			d.Logger = quiet
 		})
@@ -278,7 +277,6 @@ func (s *perfStack) populate(channels, consumers int) {
 	for i := range consumers {
 		consumer := e.member(fmt.Sprintf("consumer%d", i), "1000000")
 		_, secret := e.defaultKey(consumer)
-		e.selectFixtureChannels(consumer)
 		budget := e.apiJSON(consumer, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{
 			"name": "budget", "budget_daily": "100000", "budget_monthly": "100000", "budget_total": "100000",
 		})

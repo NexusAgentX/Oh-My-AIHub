@@ -4,7 +4,7 @@
 
 -- name: ListCalls :many
 SELECT c.id, c.created_at, c.completed_at, c.account_id, a.username AS account_username, a.display_name AS account_display_name,
-       c.api_key_id, k.name AS api_key_name, c.model_id, c.requested_model, coalesce(c.diagnostics->>'operation','')::text AS operation, c.format, c.stream, c.tag, c.outcome,
+       c.api_key_id, k.name AS api_key_name, c.model_id, c.requested_model, c.format, c.stream, c.tag, c.outcome,
        c.final_channel_id, ch.name AS channel_name,
        c.input_tokens, c.output_tokens, c.cache_write_tokens, c.cache_read_tokens,
        c.cost_nano, c.fee_nano, c.ledger_tx_id, c.ttft_ms, c.duration_ms,
@@ -22,7 +22,6 @@ WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_i
   AND (sqlc.narg(final_channel_id)::uuid IS NULL OR c.final_channel_id = sqlc.narg(final_channel_id)::uuid)
   AND (sqlc.narg(api_key_id)::uuid IS NULL OR c.api_key_id = sqlc.narg(api_key_id)::uuid)
   AND (sqlc.narg(model)::text IS NULL OR c.model_id = sqlc.narg(model)::text OR c.requested_model = sqlc.narg(model)::text)
-  AND (sqlc.narg(operation)::text IS NULL OR c.diagnostics->>'operation' = sqlc.narg(operation)::text)
   AND (sqlc.narg(format)::text IS NULL OR c.format = sqlc.narg(format)::text)
   AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
   AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)
@@ -72,7 +71,6 @@ WHERE (sqlc.narg(account_id)::uuid IS NULL OR c.account_id = sqlc.narg(account_i
   AND (sqlc.narg(final_channel_id)::uuid IS NULL OR c.final_channel_id = sqlc.narg(final_channel_id)::uuid)
   AND (sqlc.narg(api_key_id)::uuid IS NULL OR c.api_key_id = sqlc.narg(api_key_id)::uuid)
   AND (sqlc.narg(model)::text IS NULL OR c.model_id = sqlc.narg(model)::text OR c.requested_model = sqlc.narg(model)::text)
-  AND (sqlc.narg(operation)::text IS NULL OR c.diagnostics->>'operation' = sqlc.narg(operation)::text)
   AND (sqlc.narg(format)::text IS NULL OR c.format = sqlc.narg(format)::text)
   AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
   AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)
@@ -359,7 +357,6 @@ WITH samples AS MATERIALIZED (
   AND (sqlc.narg(final_channel_id)::uuid IS NULL OR c.final_channel_id = sqlc.narg(final_channel_id)::uuid)
   AND (sqlc.narg(api_key_id)::uuid IS NULL OR c.api_key_id = sqlc.narg(api_key_id)::uuid)
   AND (sqlc.narg(model)::text IS NULL OR c.model_id = sqlc.narg(model)::text OR c.requested_model = sqlc.narg(model)::text)
-  AND (sqlc.narg(operation)::text IS NULL OR c.diagnostics->>'operation' = sqlc.narg(operation)::text)
   AND (sqlc.narg(format)::text IS NULL OR c.format = sqlc.narg(format)::text)
   AND (sqlc.narg(outcome)::text IS NULL OR c.outcome = sqlc.narg(outcome)::text)
   AND (sqlc.narg(tag)::text IS NULL OR c.tag = sqlc.narg(tag)::text)

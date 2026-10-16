@@ -73,7 +73,7 @@ func (q *Queries) InsertSupplier(ctx context.Context, arg InsertSupplierParams) 
 
 const listChannelListings = `-- name: ListChannelListings :many
 SELECT c.id,c.name,c.summary,c.description,c.base_url,c.owner_id,a.display_name AS owner_name,
- c.capabilities,c.concurrency_limit,c.rpm_limit,c.daily_revenue_cap_nano,c.cooldown_seconds
+ c.concurrency_limit,c.rpm_limit,c.daily_revenue_cap_nano,c.cooldown_seconds
 FROM channels c JOIN accounts a ON a.id=c.owner_id
 WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
 ORDER BY c.id
@@ -87,7 +87,6 @@ type ListChannelListingsRow struct {
 	BaseUrl             string
 	OwnerID             string
 	OwnerName           string
-	Capabilities        []string
 	ConcurrencyLimit    *int32
 	RpmLimit            *int32
 	DailyRevenueCapNano *money.Amount
@@ -111,7 +110,6 @@ func (q *Queries) ListChannelListings(ctx context.Context) ([]ListChannelListing
 			&i.BaseUrl,
 			&i.OwnerID,
 			&i.OwnerName,
-			&i.Capabilities,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
 			&i.DailyRevenueCapNano,
