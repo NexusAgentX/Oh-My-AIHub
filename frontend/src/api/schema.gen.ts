@@ -1573,7 +1573,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 列出当前 Key 的已存储补全 */
+        get: operations["listStoredChats"];
         put?: never;
         /**
          * OpenAI Chat Completions
@@ -1614,13 +1615,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 查询后台响应或恢复流
-         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         * 查询已存储响应或恢复后台流
+         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
          */
         get: operations["retrieveOpenAIResponse"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** 删除上游响应 */
+        delete: operations["deleteStoredResponse"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1637,9 +1639,236 @@ export interface paths {
         put?: never;
         /**
          * 取消后台响应
-         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
          */
         post: operations["cancelOpenAIResponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/{model}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 本地模型详情 */
+        get: operations["getGatewayModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/completions/{resourceID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 已存储补全管理 */
+        get: operations["getStoredChat"];
+        put?: never;
+        /** 已存储补全管理 */
+        post: operations["updateStoredChat"];
+        /** 已存储补全管理 */
+        delete: operations["deleteStoredChat"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/completions/{resourceID}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 已存储补全消息 */
+        get: operations["listStoredChatMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/{responseID}/input_items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询响应输入项 */
+        get: operations["listResponseInputItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 压缩上下文 */
+        post: operations["compactResponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/input_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 统计输入 token */
+        post: operations["countResponseInputTokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建上游会话 */
+        post: operations["createConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{resourceID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 上游会话管理 */
+        get: operations["getConversation"];
+        put?: never;
+        /** 上游会话管理 */
+        post: operations["updateConversation"];
+        /** 上游会话管理 */
+        delete: operations["deleteConversation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{resourceID}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询会话条目 */
+        get: operations["listConversationItems"];
+        put?: never;
+        /** 添加会话条目 */
+        post: operations["createConversationItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{resourceID}/items/{itemID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询会话条目 */
+        get: operations["getConversationItem"];
+        put?: never;
+        post?: never;
+        /** 删除会话条目 */
+        delete: operations["deleteConversationItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 图片生成 */
+        post: operations["generateImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 图片编辑 */
+        post: operations["editImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/variations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 图片变体 */
+        post: operations["varyImages"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1870,10 +2099,10 @@ export interface components {
          */
         Date: string;
         /**
-         * @description 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini。网关不做格式转换。
+         * @description 原生协议格式。compact、输入 token 计数和 Conversations 复用 OpenAI Responses；三种 OpenAI 图片操作统一使用 OpenAI Images。具体操作以上游实际支持为准，网关不做格式转换。
          * @enum {string}
          */
-        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini";
+        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
         /**
          * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
          * @enum {string}
@@ -7252,6 +7481,24 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listStoredChats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     proxyOpenAIChat: {
         parameters: {
             query?: never;
@@ -7316,6 +7563,26 @@ export interface operations {
             };
         };
     };
+    deleteStoredResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     cancelOpenAIResponse: {
         parameters: {
             query?: never;
@@ -7332,6 +7599,414 @@ export interface operations {
         };
         responses: {
             /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getGatewayModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getStoredChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateStoredChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteStoredChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listStoredChatMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listResponseInputItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    compactResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    countResponseInputTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listConversationItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createConversationItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getConversationItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+                itemID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteConversationItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resourceID: string;
+                itemID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generateImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    editImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+                "multipart/form-data": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    varyImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+                "multipart/form-data": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
                 headers: {
                     [name: string]: unknown;

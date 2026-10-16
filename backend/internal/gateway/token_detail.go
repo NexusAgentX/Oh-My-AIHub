@@ -346,6 +346,11 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 			}
 		}
 		inValues, outValues := map[string]int64{}, map[string]int64{}
+		// The Images API reports output_tokens for generated images. An
+		// explicit output breakdown, when present, remains authoritative.
+		if o.image && outputs == nil {
+			outValues["output_image"] = o.usage.OutputTokens
+		}
 		for _, mod := range []string{"text", "image", "audio", "video"} {
 			if n, ok := count(inputs.get(mod + "_tokens")); ok {
 				inValues["input_"+mod] = n

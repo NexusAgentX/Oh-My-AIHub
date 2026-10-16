@@ -18,11 +18,15 @@ const (
 // A 200 only confirms the stream opened, not that the model ran successfully.
 func validateTestResponse(response *http.Response, format Format) error {
 	if !strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
-		body, err := io.ReadAll(io.LimitReader(response.Body, testBodyLimit+1))
+		limit := testBodyLimit
+		if format == FormatOpenAIImages {
+			limit = 32 << 20
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))
 		if err != nil {
 			return fmt.Errorf("读取测试响应失败: %w", err)
 		}
-		if len(body) > testBodyLimit {
+		if len(body) > limit {
 			return errors.New("测试响应超过大小限制")
 		}
 		var value map[string]json.RawMessage

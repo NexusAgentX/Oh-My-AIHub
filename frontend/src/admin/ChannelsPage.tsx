@@ -39,6 +39,8 @@ const formatLabels: Record<string, string> = {
   openai_responses: 'Responses',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
+  openai_images: 'OpenAI Images',
+
 }
 
 const columns: Column<AdminChannel>[] = [

@@ -31,8 +31,8 @@ const (
 	StatusSuspended Status = "suspended"
 )
 
-// Formats lists the four native API formats in display order.
-var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini}
+// Formats lists native protocol formats in display order.
+var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini, FormatOpenAIImages}
 
 func (f Format) Valid() bool { return slices.Contains(Formats, f) }
 

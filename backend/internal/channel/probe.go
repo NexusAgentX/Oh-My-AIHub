@@ -236,6 +236,8 @@ func SuggestFormats(modelID string) []Format {
 	switch {
 	case strings.HasPrefix(name, "claude"):
 		return []Format{FormatOpenAIChat, FormatAnthropic}
+	case strings.HasPrefix(name, "gpt-image"), strings.HasPrefix(name, "dall-e"):
+		return []Format{FormatOpenAIImages}
 	case strings.HasPrefix(name, "gpt"), openAIReasoning.MatchString(name):
 		return []Format{FormatOpenAIChat, FormatOpenAIResponses}
 	case strings.HasPrefix(name, "gemini"):
@@ -250,6 +252,8 @@ func testBody(format Format, upstreamModel string) []byte {
 	switch format {
 	case FormatOpenAIResponses:
 		return []byte(fmt.Sprintf(`{"model":%s,"input":"hi","max_output_tokens":16,"stream":true}`, model))
+	case FormatOpenAIImages:
+		return []byte(fmt.Sprintf(`{"model":%s,"prompt":"A black dot","n":1,"size":"1024x1024","quality":"low"}`, model))
 	case FormatAnthropic:
 		return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":true}`, model))
 	case FormatGemini:
@@ -275,7 +279,7 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 	}
 	formats := request.Formats
 	if len(formats) == 0 {
-		formats = Formats
+		formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini}
 	}
 	for _, format := range formats {
 		if !format.Valid() {
@@ -291,7 +295,15 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 		if len(request.ModelIDs) > 0 && !slices.Contains(request.ModelIDs, model.ModelID) {
 			continue
 		}
-		for _, format := range uniqueFormats(formats) {
+		selected := formats
+		if len(request.Formats) == 0 {
+			for _, declared := range model.Formats {
+				if declared == FormatOpenAIImages {
+					selected = append(slices.Clone(selected), declared)
+				}
+			}
+		}
+		for _, format := range uniqueFormats(selected) {
 			jobs = append(jobs, job{model: model, format: format})
 		}
 	}

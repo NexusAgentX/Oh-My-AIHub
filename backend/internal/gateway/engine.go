@@ -69,6 +69,7 @@ type Dependencies struct {
 	Geo               *geolocation.Service
 	GatewayLocation   *geolocation.Location
 	LocationSource    string
+	Resources         ResourceStore
 	Jobs              BackgroundStore
 	Store             Store
 	Catalog           Models
@@ -261,6 +262,13 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	operation            operation
+	itemsRegistered      bool
+	resourceKind         string
+	resourceRegistered   bool
+	boundResource        *Resource
+	multipartModel       *entry
+	unmetered            bool
 	phase                string
 	phaseAt              time.Time
 	diagnostics          Diagnostics
@@ -368,7 +376,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// (clientWatch), because an answer already under way is read to its end.
 	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
-	call := &callState{started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call := &callState{operation: operationOf(r.URL.Path), started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
 	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
 	observed := &observedWriter{ResponseWriter: w}
 	w = observed
@@ -431,16 +439,44 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// validated here (its model and stream flag are in the path), so a body the
 	// scan rejects only means there are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
+	if imageFormat(format) && multipartType(r.Header.Get("Content-Type")) {
+		facts, call.multipartModel, scanErr = multipartFacts(body, r.Header.Get("Content-Type"))
+	}
+	call.unmetered = call.operation == operationCount || call.operation == operationConversation
+	if call.operation == operationConversation && scanErr == nil {
+		names, err := e.availableModels(ctx, key, []channel.Format{channel.FormatOpenAIResponses})
+		if err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		if len(names) == 0 {
+			e.reject(w, call, OutcomeRejectedNoChannel, 503, "no_channel_available", "没有可用的 OpenAI Responses 渠道")
+			return
+		}
+		facts.Model, facts.HasModel = names[0].id, true
+	}
+
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
-	call.hints = scan.billingHints(body, format)
-	if call.hints.Background {
-		call.upstreamHeaders = http.Header{}
-		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
-			if v := r.Header.Get(name); v != "" {
-				call.upstreamHeaders.Set(name, v)
-			}
+	if call.multipartModel == nil {
+		call.hints = scan.billingHints(body, format)
+	}
+	if r.URL.Path != "/v1/responses" {
+		call.hints.Background = false
+	}
+	if e.Resources != nil {
+		store := true
+		if member, ok := scan.last("store"); ok {
+			store = string(body[member.start:member.end]) != "false"
+		}
+		if format == channel.FormatOpenAIChat {
+			member, ok := scan.last("store")
+			store = ok && string(body[member.start:member.end]) == "true"
+		}
+		if store {
+			call.resourceKind = resourceKind(format, call.operation)
 		}
 	}
+	call.upstreamHeaders = protocolHeaders(r.Header)
 
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
@@ -457,6 +493,52 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 
+	if e.Resources != nil && format == channel.FormatOpenAIResponses {
+		kind, id := "response", stickyResponseID
+		if member, ok := scan.last("conversation"); ok && string(body[member.start:member.end]) != "null" {
+			var raw struct {
+				ID string `json:"id"`
+			}
+			var text string
+			data := body[member.start:member.end]
+			if json.Unmarshal(data, &text) == nil {
+				id = text
+			} else if json.Unmarshal(data, &raw) == nil {
+				id = raw.ID
+			} else {
+				e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "conversation 无效")
+				return
+			}
+			kind = "conversation"
+		}
+		if id != "" {
+			row, err := e.ownedResource(ctx, key, kind, id)
+			if err != nil {
+				e.reject(w, call, OutcomeRejectedModel, 404, "resource_not_found", "资源不存在或不可访问")
+				return
+			}
+			call.boundResource = &row
+		}
+	}
+	if e.Resources != nil && format == channel.FormatOpenAIResponses {
+		refs, err := inputReferences(body, scan)
+		if err != nil {
+			e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "条目引用无效或过多")
+			return
+		}
+		for _, id := range refs {
+			item, err := e.ownedResource(ctx, key, "item", id)
+			if err != nil {
+				e.reject(w, call, OutcomeRejectedModel, 404, "resource_not_found", "引用条目不存在或不可访问")
+				return
+			}
+			if call.boundResource != nil && !sameResourceScope(*call.boundResource, item) {
+				e.reject(w, call, OutcomeRejectedModel, 400, "resource_scope_mismatch", "引用条目属于不同上游资源范围")
+				return
+			}
+			call.boundResource = &item
+		}
+	}
 	call.stage("request", prepareAt, e.Now())
 	openAt := e.Now()
 	call.phase, call.phaseAt = "open_call", openAt
@@ -593,6 +675,33 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.internalError(w, call, err)
 		return
 	}
+	if call.boundResource != nil {
+		var route resourceRoute
+		if err := json.Unmarshal(call.boundResource.Metadata, &route); err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		bound := make([]Candidate, 0, 1)
+		for _, candidate := range candidates {
+			if candidate.ChannelID == route.Candidate.ChannelID {
+				candidate.BaseURL = route.Candidate.BaseURL
+				candidate.Credential = route.Candidate.Credential
+				candidate.Advanced.HeaderRules = route.Candidate.Advanced.HeaderRules
+				candidate.Advanced.UserAgent = route.Candidate.Advanced.UserAgent
+				bound = append(bound, candidate)
+			}
+		}
+		candidates = bound
+		r = r.Clone(r.Context())
+		r.Header = r.Header.Clone()
+		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
+			r.Header.Del(name)
+		}
+		for name, values := range route.Headers {
+			r.Header[name] = values
+		}
+		call.upstreamHeaders = route.Headers
+	}
 	for index := range candidates {
 		pricing := candidates[index].PricingModel(model)
 		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
@@ -608,7 +717,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	sticky := ""
-	if stickyResponseID != "" {
+	if call.boundResource != nil {
+		sticky = call.boundResource.ChannelID
+	} else if stickyResponseID != "" {
 		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
 			sticky = channelID
 		}
@@ -1035,7 +1146,9 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 
 	upstreamBody := body
-	if call.format != channel.FormatGemini {
+	if call.multipartModel != nil {
+		upstreamBody = applySplices(body, []splice{{start: call.multipartModel.start, end: call.multipartModel.end, value: []byte(candidate.UpstreamModel)}})
+	} else if call.format != channel.FormatGemini {
 		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream)
 	}
 	target, err := UpstreamURL(candidate.BaseURL, r.URL.Path, r.URL.RawQuery, call.format, candidate.UpstreamModel, location, secret)
@@ -1303,13 +1416,42 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	defer response.Body.Close()
 	defer result.cancel(nil)
 
+	if call.resourceKind != "" && !call.stream && !call.polling {
+		payload, err := stageBackground(&result)
+		if err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		var envelope struct {
+			ID string `json:"id"`
+		}
+		initial := call.observer(false, response.Header.Get("Content-Type"))
+		initial.Write(payload, e.Now())
+		initialObservation := initial.Finish()
+		if initialObservation.ProtocolError {
+			call.resourceKind = ""
+		} else if json.Unmarshal(payload, &envelope) != nil || envelope.ID == "" {
+			e.internalError(w, call, errors.New("missing resource id"))
+			return
+		}
+		if err := e.keepResource(result.upstream, call, candidate, envelope.ID); call.resourceKind != "" && err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		call.resourceRegistered = true
+		if err := e.keepItems(result.upstream, call, candidate, envelope.ID, itemIDs(payload)); err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		call.itemsRegistered = true
+	}
 	if call.hints.Background && !call.polling && !call.stream {
 		payload, err := stageBackground(&result)
 		if err != nil {
 			e.internalError(w, call, err)
 			return
 		}
-		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
+		initial := call.observer(false, response.Header.Get("Content-Type"))
 		initial.Write(payload, e.Now())
 		ack := initial.Finish()
 		if ack.ResponseID != "" {
@@ -1335,9 +1477,13 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	}
 	w.Header().Set("X-AIHub-Request-Id", call.id)
 	_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
-	w.WriteHeader(response.StatusCode)
+	headersStarted := call.resourceKind == ""
+	if headersStarted {
+		w.WriteHeader(response.StatusCode)
+	}
 
-	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
+	observer := call.observer(call.stream, response.Header.Get("Content-Type"))
+	observer.trackResource = call.resourceKind != ""
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
 	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
@@ -1356,6 +1502,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		}
 		_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
 		writeAt := e.Now()
+		if !headersStarted {
+			w.WriteHeader(response.StatusCode)
+			headersStarted = true
+		}
 		n, err := w.Write(chunk)
 		written += int64(n)
 		if err == nil {
@@ -1378,6 +1528,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.usageInjected && call.format == channel.FormatOpenAIChat && call.stream && observer.sse {
 		strip = &usageFrameFilter{}
 	}
+	var resourcePrefix []byte
+	var resourceErr error
 	deliver := func(chunk []byte) {
 		if len(chunk) == 0 {
 			return
@@ -1386,6 +1538,28 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		// or not: that is what makes the usage at the end billable.
 		upstreamBytes += int64(len(chunk))
 		observer.Write(chunk, e.Now())
+		if call.resourceKind != "" && !call.resourceRegistered && call.stream {
+			if len(resourcePrefix)+len(chunk) > maxJSONBuffer {
+				resourceErr = errors.New("resource prefix exceeds budget")
+				result.cancel(resourceErr)
+				undelivered = true
+				watch.left()
+				return
+			}
+			resourcePrefix = append(resourcePrefix, chunk...)
+			if observer.responseID == "" && !observer.protocolError {
+				return
+			}
+			if err := e.keepResource(result.upstream, call, candidate, observer.responseID); !observer.protocolError && err != nil {
+				resourceErr = err
+				result.cancel(err)
+				undelivered = true
+				watch.left()
+				return
+			}
+			call.resourceRegistered = true
+			chunk = resourcePrefix
+		}
 		if call.hints.Background && !call.pending && !call.polling && observer.responseID != "" {
 			if err := e.keepBackground(call, model, candidate, defaults, observer.responseID); err != nil {
 				e.Logger.Error("gateway: saving background response failed", "request_id", call.id, "error", err)
@@ -1394,6 +1568,16 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 				watch.left()
 				return
 			}
+		}
+		if call.resourceKind != "" && call.resourceRegistered && !call.itemsRegistered && terminalResponse(observer.responseStatus) {
+			if err := e.keepItems(result.upstream, call, candidate, observer.responseID, observer.resourceItems); err != nil {
+				resourceErr = err
+				result.cancel(err)
+				undelivered = true
+				watch.left()
+				return
+			}
+			call.itemsRegistered = true
 		}
 		if strip != nil {
 			chunk = strip.Filter(chunk)
@@ -1423,9 +1607,28 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		stopped = interruptionOf(context.Cause(result.upstream))
 	}
 	clientGone := undelivered || (left && !ended)
+	observation := observer.Finish()
+	if call.polling && call.resourceKind != "" && !call.itemsRegistered && ended && terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
+		if err := e.keepItems(result.upstream, call, candidate, observation.ResponseID, observer.resourceItems); err != nil {
+			// Keep the durable job pending so a registry outage cannot permanently
+			// orphan its output items or close the bill before registration succeeds.
+			e.Logger.Error("gateway: saving background output items failed", "request_id", call.id, "error", err)
+			return
+		}
+		call.itemsRegistered = true
+	}
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
-	observation := observer.Finish()
+	if call.resourceKind != "" && !call.resourceRegistered && resourceErr == nil && !call.polling {
+		resourceErr = errors.New("upstream did not return a resource id")
+	}
+	if resourceErr != nil {
+		observation.ProtocolError = true
+		if !headersStarted {
+			w.Header().Del("Content-Length")
+			WriteError(w, call.dialect, 502, "resource_registration_failed", "无法登记上游资源", call.id)
+		}
+	}
 	if call.hints.Background && call.pending && !terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
 		return
 	}
@@ -1463,6 +1666,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
+	case resourceErr != nil:
+		outcome, endReason = OutcomeInterrupted, EndInterrupted
 	case observation.ProtocolError:
 		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
 		if observation.ProtocolClientError {
@@ -1476,21 +1681,26 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		outcome, endReason = OutcomeClientDisconnect, EndClientDisconnected
 	case stopped != nil:
 		outcome, endReason = OutcomeInterrupted, EndInterrupted
-	case !observation.Found:
+	case !observation.Found && !call.unmetered:
 		outcome = OutcomeUnbilled
 	}
 	// A 2xx status is provisional: clearing failures before the body ends
 	// would prevent consecutive protocol failures from ever reaching cooldown.
-	if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
-		e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
-	} else {
-		e.Runtime.Success(candidate.ChannelID)
+	if resourceErr == nil {
+		if observation.ProtocolError && !observation.ProtocolClientError || !observation.ProtocolError && stopped != nil && stopped.channelFault {
+			e.Runtime.Failure(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), e.Now(), endReason)
+		} else {
+			e.Runtime.Success(candidate.ChannelID)
+		}
 	}
 	record := &call.attempts[len(call.attempts)-1]
 	record.EndReason = endReason
 	record.DurationMS = millis(e.Now().Sub(result.started))
 	record.ResponseByte = &written
-	if observation.ProtocolError {
+	if resourceErr != nil {
+		record.ErrorCode, record.ErrorMessage = stringPointer("resource_registration_failed"), stringPointer("上游资源登记失败")
+		call.diagnostics.Delivery = "interrupted"
+	} else if observation.ProtocolError {
 		record.ErrorCode, record.ErrorMessage = stringPointer(codeProtocolError), stringPointer(messageProtocolError)
 	} else if stopped != nil {
 		record.ErrorCode, record.ErrorMessage = stringPointer(stopped.code), stringPointer(stopped.message)
@@ -1512,7 +1722,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		finish.TokensPerSecond = &speed
 	}
 	pricingAt := e.Now()
-	if observation.Found {
+	if observation.Found && !call.unmetered {
 		self := candidate.OwnerID == call.key.OwnerID
 		feeRate := defaults.FeeRateNano
 		if self {

@@ -263,3 +263,28 @@ UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_
 
 -- name: SettleBackground :exec
 UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL;
+
+-- name: SaveResource :execrows
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING;
+
+-- name: LookupResource :one
+SELECT * FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4;
+
+-- name: ListResources :many
+SELECT r.* FROM gateway_resources r
+WHERE r.account_id=sqlc.arg(account_id) AND r.key_id=sqlc.arg(key_id) AND r.kind=sqlc.arg(kind)
+AND (sqlc.arg(after_id)::text='' OR
+ (sqlc.arg(descending)::boolean AND (r.created_at,r.resource_id)<(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=sqlc.arg(after_id))) OR
+ (NOT sqlc.arg(descending)::boolean AND (r.created_at,r.resource_id)>(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=sqlc.arg(after_id))))
+ORDER BY CASE WHEN sqlc.arg(descending)::boolean THEN r.created_at END DESC, CASE WHEN sqlc.arg(descending)::boolean THEN r.resource_id END DESC,
+ CASE WHEN NOT sqlc.arg(descending)::boolean THEN r.created_at END ASC, CASE WHEN NOT sqlc.arg(descending)::boolean THEN r.resource_id END ASC
+LIMIT sqlc.arg(page_limit);
+
+-- name: DeleteResource :exec
+DELETE FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4;
+
+-- name: SaveResourceItems :exec
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+SELECT $1,$2,'item',unnest(sqlc.arg(item_ids)::text[]),$3,$4,$5,$6
+ON CONFLICT DO NOTHING;

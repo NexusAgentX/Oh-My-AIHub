@@ -28,6 +28,7 @@ func TestMatchModelIsExactThenCaseInsensitiveThenDateStripped(t *testing.T) {
 func TestSuggestFormatsFollowTheModelFamily(t *testing.T) {
 	cases := map[string][]Format{
 		"claude-sonnet-4-5": {FormatOpenAIChat, FormatAnthropic}, "anthropic/claude-3-opus": {FormatOpenAIChat, FormatAnthropic},
+		"gpt-image-1": {FormatOpenAIImages}, "openai/gpt-image-1": {FormatOpenAIImages}, "dall-e-3": {FormatOpenAIImages},
 		"gpt-5": {FormatOpenAIChat, FormatOpenAIResponses}, "o3-mini": {FormatOpenAIChat, FormatOpenAIResponses},
 		"gemini-2.5-pro": {FormatOpenAIChat, FormatGemini}, "deepseek-chat": {FormatOpenAIChat}, "ollama-x": {FormatOpenAIChat},
 	}

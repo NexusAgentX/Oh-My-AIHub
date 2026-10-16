@@ -123,7 +123,7 @@ func (s *Service) SetClock(now func() time.Time) { s.now = now }
 // ---- calls ----
 
 var (
-	formats  = []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
+	formats  = []string{"openai_chat", "openai_responses", "anthropic", "gemini", "openai_images"}
 	outcomes = []string{
 		"rejected_balance", "rejected_budget", "rejected_key", "rejected_model", "rejected_format", "rejected_no_channel", "rejected_inflight",
 		"upstream_failed", "interrupted", "client_disconnected", "succeeded", "succeeded_unbilled", "in_progress",

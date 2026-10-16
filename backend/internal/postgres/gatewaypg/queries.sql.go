@@ -170,6 +170,27 @@ func (q *Queries) CustomModelOnline(ctx context.Context, modelID string) (bool, 
 	return exists, err
 }
 
+const deleteResource = `-- name: DeleteResource :exec
+DELETE FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4
+`
+
+type DeleteResourceParams struct {
+	AccountID  string
+	KeyID      string
+	Kind       string
+	ResourceID string
+}
+
+func (q *Queries) DeleteResource(ctx context.Context, arg DeleteResourceParams) error {
+	_, err := q.db.Exec(ctx, deleteResource,
+		arg.AccountID,
+		arg.KeyID,
+		arg.Kind,
+		arg.ResourceID,
+	)
+	return err
+}
+
 const enrichCallLocations = `-- name: EnrichCallLocations :exec
 UPDATE calls SET diagnostics = jsonb_set(
  jsonb_set(diagnostics, '{network,client,location}',
@@ -850,6 +871,63 @@ func (q *Queries) ListRecentCalls(ctx context.Context, arg ListRecentCallsParams
 	return items, nil
 }
 
+const listResources = `-- name: ListResources :many
+SELECT r.account_id, r.key_id, r.kind, r.resource_id, r.call_id, r.channel_id, r.model_id, r.metadata, r.created_at FROM gateway_resources r
+WHERE r.account_id=$1 AND r.key_id=$2 AND r.kind=$3
+AND ($4::text='' OR
+ ($5::boolean AND (r.created_at,r.resource_id)<(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=$4)) OR
+ (NOT $5::boolean AND (r.created_at,r.resource_id)>(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=$4)))
+ORDER BY CASE WHEN $5::boolean THEN r.created_at END DESC, CASE WHEN $5::boolean THEN r.resource_id END DESC,
+ CASE WHEN NOT $5::boolean THEN r.created_at END ASC, CASE WHEN NOT $5::boolean THEN r.resource_id END ASC
+LIMIT $6
+`
+
+type ListResourcesParams struct {
+	AccountID  string
+	KeyID      string
+	Kind       string
+	AfterID    string
+	Descending bool
+	PageLimit  int32
+}
+
+func (q *Queries) ListResources(ctx context.Context, arg ListResourcesParams) ([]GatewayResource, error) {
+	rows, err := q.db.Query(ctx, listResources,
+		arg.AccountID,
+		arg.KeyID,
+		arg.Kind,
+		arg.AfterID,
+		arg.Descending,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GatewayResource
+	for rows.Next() {
+		var i GatewayResource
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.KeyID,
+			&i.Kind,
+			&i.ResourceID,
+			&i.CallID,
+			&i.ChannelID,
+			&i.ModelID,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const loadGeoCache = `-- name: LoadGeoCache :many
 SELECT ip, location, expires_at FROM geoip_cache
 WHERE expires_at > now() ORDER BY updated_at DESC LIMIT 4096
@@ -948,6 +1026,39 @@ func (q *Queries) LookupKey(ctx context.Context, keyHash []byte) (LookupKeyRow, 
 		&i.BudgetTotalNano,
 		&i.ModelAliases,
 		&i.AccountStatus,
+	)
+	return i, err
+}
+
+const lookupResource = `-- name: LookupResource :one
+SELECT account_id, key_id, kind, resource_id, call_id, channel_id, model_id, metadata, created_at FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4
+`
+
+type LookupResourceParams struct {
+	AccountID  string
+	KeyID      string
+	Kind       string
+	ResourceID string
+}
+
+func (q *Queries) LookupResource(ctx context.Context, arg LookupResourceParams) (GatewayResource, error) {
+	row := q.db.QueryRow(ctx, lookupResource,
+		arg.AccountID,
+		arg.KeyID,
+		arg.Kind,
+		arg.ResourceID,
+	)
+	var i GatewayResource
+	err := row.Scan(
+		&i.AccountID,
+		&i.KeyID,
+		&i.Kind,
+		&i.ResourceID,
+		&i.CallID,
+		&i.ChannelID,
+		&i.ModelID,
+		&i.Metadata,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -1079,6 +1190,68 @@ type SaveGeoCacheParams struct {
 
 func (q *Queries) SaveGeoCache(ctx context.Context, arg SaveGeoCacheParams) error {
 	_, err := q.db.Exec(ctx, saveGeoCache, arg.Ip, arg.Location, arg.ExpiresAt)
+	return err
+}
+
+const saveResource = `-- name: SaveResource :execrows
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING
+`
+
+type SaveResourceParams struct {
+	AccountID  string
+	KeyID      string
+	Kind       string
+	ResourceID string
+	CallID     string
+	ChannelID  string
+	ModelID    string
+	Metadata   []byte
+}
+
+func (q *Queries) SaveResource(ctx context.Context, arg SaveResourceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveResource,
+		arg.AccountID,
+		arg.KeyID,
+		arg.Kind,
+		arg.ResourceID,
+		arg.CallID,
+		arg.ChannelID,
+		arg.ModelID,
+		arg.Metadata,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const saveResourceItems = `-- name: SaveResourceItems :exec
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+SELECT $1,$2,'item',unnest($7::text[]),$3,$4,$5,$6
+ON CONFLICT DO NOTHING
+`
+
+type SaveResourceItemsParams struct {
+	AccountID string
+	KeyID     string
+	CallID    string
+	ChannelID string
+	ModelID   string
+	Metadata  []byte
+	ItemIds   []string
+}
+
+func (q *Queries) SaveResourceItems(ctx context.Context, arg SaveResourceItemsParams) error {
+	_, err := q.db.Exec(ctx, saveResourceItems,
+		arg.AccountID,
+		arg.KeyID,
+		arg.CallID,
+		arg.ChannelID,
+		arg.ModelID,
+		arg.Metadata,
+		arg.ItemIds,
+	)
 	return err
 }
 
