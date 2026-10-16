@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { CallNetwork } from './CallNetwork'
 import { CallDiagnostics } from './CallDiagnostics'
 import { PriceSnapshotView } from '../admin/transactions'
 import type { CallDetail } from '../api/types'
@@ -44,7 +45,7 @@ export function CallResponseMetrics({ call }: { call: CallDetail }) {
 }
 
 /** 调用详情内容：请求信息、计价、尝试时间线。抽屉与独立页面共用。 */
-export function CallDetailView({ call }: { call: CallDetail }) {
+export function CallDetailView({ call, onRefresh }: { call: CallDetail; onRefresh?: () => unknown }) {
   const snapshot = call.price_snapshot
   const admin = useLocation().pathname.startsWith('/admin/')
   return (
@@ -135,6 +136,7 @@ export function CallDetailView({ call }: { call: CallDetail }) {
           </span>
         </Row>
       </dl>
+      {call.diagnostics && <CallNetwork call={call} onRefresh={onRefresh} />}
       {call.diagnostics && <CallDiagnostics data={call.diagnostics} />}
       {snapshot && (
         <section className="call-detail-section" aria-label="计价明细">
@@ -163,7 +165,7 @@ export function CallDetailDrawer({
   return (
     <Drawer onClose={onClose} open={open} title="调用详情">
       <QueryBoundary errorFallback="调用详情加载失败" query={query}>
-        {(call) => <CallDetailView call={call} />}
+        {(call) => <CallDetailView call={call} onRefresh={query.refetch} />}
       </QueryBoundary>
     </Drawer>
   )

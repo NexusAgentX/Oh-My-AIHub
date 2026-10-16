@@ -13,7 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/httptrace"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -26,6 +26,8 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -63,17 +65,21 @@ var (
 
 // Dependencies wires the gateway.
 type Dependencies struct {
-	Store     Store
-	Catalog   Models
-	Settings  *settings.Service
-	Routing   routing.Store
-	Keyring   *channel.Keyring
-	Outbound  channel.Outbound
-	Events    Publisher
-	Telemetry Telemetry
-	Logger    *slog.Logger
-	Runtime   *Runtime
-	Now       func() time.Time
+	TrustedProxyCIDRs []netip.Prefix
+	Geo               *geolocation.Service
+	GatewayLocation   *geolocation.Location
+	LocationSource    string
+	Store             Store
+	Catalog           Models
+	Settings          *settings.Service
+	Routing           routing.Store
+	Keyring           *channel.Keyring
+	Outbound          channel.Outbound
+	Events            Publisher
+	Telemetry         Telemetry
+	Logger            *slog.Logger
+	Runtime           *Runtime
+	Now               func() time.Time
 	// StatsBook holds the channel statistics (rolling 24-hour windows). Nil
 	// means a new, empty one; tests pass their own to seed it.
 	StatsBook *StatsBook
@@ -380,6 +386,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	call.key = key
+	call.diagnostics.Network = &Network{Client: NetworkNode{IP: clientip.Address(r, e.TrustedProxyCIDRs)}, Gateway: NetworkNode{Location: e.GatewayLocation}, Attempts: []*NetworkAttempt{}, LocationSource: e.LocationSource}
 
 	if !key.AccountActive || !keyUsable(key, started) {
 		status, code, message := http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期"
@@ -911,6 +918,12 @@ func fallbackStatus(status int) bool {
 func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, candidate Candidate, limits Limits, defaults settings.Settings,
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, timeouts attemptTimeouts) attemptResult {
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, UpstreamModel: candidate.UpstreamModel, OffsetMS: millis(e.Now().Sub(call.started))}}
+	var network *NetworkAttempt
+	if call.diagnostics.Network != nil {
+		network = &NetworkAttempt{Phases: make([]NetworkPhase, 0, 5)}
+		call.diagnostics.Network.Attempts = append(call.diagnostics.Network.Attempts, network)
+	}
+
 	// closeFailed writes the failure into the attempt record; fail also counts
 	// it against the channel.
 	closeFailed := func(endReason, code, message string, status *int) attemptResult {
@@ -1012,13 +1025,12 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 			firstByte.Stop()
 		}
 	}
-	var connected time.Time
-	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) {
-		connected = e.Now()
-		reused := info.Reused
-		result.record.ReusedConnection = &reused
-	}}
-	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
+	trace := &networkTrace{now: e.Now, origin: result.started, start: e.Now()}
+	if network != nil {
+		network.Phases = append(network.Phases, phase("prepare", result.started, result.started, trace.start))
+	}
+
+	request, err := http.NewRequestWithContext(withNetworkTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
 	if err != nil {
 		cancel(nil)
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
@@ -1027,6 +1039,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	request.ContentLength = int64(len(upstreamBody))
 
 	response, err := client.Do(request)
+	trace.freeze(e.Now(), &result.record, network)
 	if err != nil {
 		stopFirstByte()
 		cause := context.Cause(attemptCtx)
@@ -1048,9 +1061,6 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		default:
 			return fail(EndConnectError, "connect_error", message, nil)
 		}
-	}
-	if !connected.IsZero() {
-		result.record.ConnectMS = millis(connected.Sub(result.started))
 	}
 	status := response.StatusCode
 	result.record.StatusCode = &status

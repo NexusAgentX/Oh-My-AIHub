@@ -2517,7 +2517,34 @@ export interface components {
             idle_ms: number;
             total_ms: number;
         };
+        NetworkLocation: {
+            label: string;
+            latitude: number;
+            longitude: number;
+        };
+        NetworkNode: {
+            ip: string;
+            location: components["schemas"]["NetworkLocation"] | null;
+        };
+        NetworkPhase: {
+            /** @enum {string} */
+            stage: "prepare" | "connection" | "tls" | "send" | "headers";
+            offset_ms: number;
+            duration_ms: number;
+        };
+        NetworkAttempt: {
+            node: components["schemas"]["NetworkNode"];
+            phases: components["schemas"]["NetworkPhase"][];
+        };
+        CallNetwork: {
+            client: components["schemas"]["NetworkNode"];
+            gateway: components["schemas"]["NetworkNode"];
+            attempts: components["schemas"]["NetworkAttempt"][];
+            location_source: string;
+        };
         StageTiming: {
+            /** @description 相对调用起点；null 表示聚合或未采集。 */
+            offset_ms?: number | null;
             stage: string;
             duration_ms: number;
         };
@@ -2527,6 +2554,7 @@ export interface components {
             rank: number;
         };
         CallDiagnostics: {
+            network?: components["schemas"]["CallNetwork"] | null;
             stages: components["schemas"]["StageTiming"][];
             routing: components["schemas"]["RouteDecision"][];
             stop_reason: string;

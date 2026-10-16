@@ -22,6 +22,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -166,7 +167,30 @@ func main() {
 		}()
 	})
 	platformMetrics = metrics.New(func(channelID string, now time.Time) bool { return !runtime.CooldownUntil(channelID, now).IsZero() })
+	gatewayLocation, err := geolocation.ParseLocation(os.Getenv("GATEWAY_LOCATION_LABEL"), os.Getenv("GATEWAY_LATITUDE"), os.Getenv("GATEWAY_LONGITUDE"))
+	if err != nil {
+		fatal(logger, "invalid gateway location", err)
+	}
+	var geo *geolocation.Service
+	geoEnabled := true
+	if value := os.Getenv("GEOIP_ENABLED"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			fatal(logger, "GEOIP_ENABLED must be true or false", err)
+		}
+		geoEnabled = parsed
+	}
+	if geoEnabled {
+		geo = geolocation.New(store.Gateway)
+		warmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := geo.Warm(warmCtx); err != nil {
+			logger.Warn("geolocation cache unavailable; background lookups will retry")
+		}
+		cancel()
+	}
+
 	engine := gateway.NewEngine(gateway.Dependencies{
+		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
 		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
@@ -176,6 +200,9 @@ func main() {
 	cached.Cache.OnChannelEdited(engine.ChannelEdited)
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
+	if geo != nil {
+		go geo.Run(engineContext)
+	}
 	// The channel statistics are counted in memory from here on; the database is
 	// asked once for the window they start from. Without it the gateway starts
 	// with every channel unrated, which ranks by price alone until it has seen
@@ -446,4 +473,11 @@ func runForumCleanup(ctx context.Context, service *forum.Service, logger *slog.L
 		case <-ticker.C:
 		}
 	}
+}
+
+func geoSource(enabled bool) string {
+	if enabled {
+		return "ipwho.is"
+	}
+	return ""
 }

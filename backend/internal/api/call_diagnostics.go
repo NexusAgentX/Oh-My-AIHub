@@ -16,8 +16,9 @@ func newAttemptTimeoutsJSON(v *gateway.AttemptTimeouts) *attemptTimeoutsJSON {
 }
 
 type stageTimingJSON struct {
-	Stage      string  `json:"stage"`
-	DurationMS float64 `json:"duration_ms"`
+	OffsetMS   *float64 `json:"offset_ms"`
+	Stage      string   `json:"stage"`
+	DurationMS float64  `json:"duration_ms"`
 }
 type routeDecisionJSON struct {
 	Channel channelRefJSON `json:"channel"`
@@ -25,6 +26,7 @@ type routeDecisionJSON struct {
 	Rank    int            `json:"rank"`
 }
 type callDiagnosticsJSON struct {
+	Network        *gateway.Network    `json:"network"`
 	Stages         []stageTimingJSON   `json:"stages"`
 	Routing        []routeDecisionJSON `json:"routing"`
 	StopReason     string              `json:"stop_reason"`
@@ -42,9 +44,9 @@ func newCallDiagnosticsJSON(v *gateway.Diagnostics) *callDiagnosticsJSON {
 	if v == nil {
 		return nil
 	}
-	d := &callDiagnosticsJSON{Stages: []stageTimingJSON{}, Routing: []routeDecisionJSON{}, StopReason: v.StopReason, UsageStatus: v.UsageStatus, Delivery: v.Delivery, Frames: v.Frames, MaxFrameGapMS: v.MaxFrameGapMS, UpstreamBytes: v.UpstreamBytes, MaxAttempts: v.MaxAttempts, CallTimeoutMS: v.CallTimeoutMS, DrainTimeoutMS: v.DrainTimeoutMS}
+	d := &callDiagnosticsJSON{Network: v.Network, Stages: []stageTimingJSON{}, Routing: []routeDecisionJSON{}, StopReason: v.StopReason, UsageStatus: v.UsageStatus, Delivery: v.Delivery, Frames: v.Frames, MaxFrameGapMS: v.MaxFrameGapMS, UpstreamBytes: v.UpstreamBytes, MaxAttempts: v.MaxAttempts, CallTimeoutMS: v.CallTimeoutMS, DrainTimeoutMS: v.DrainTimeoutMS}
 	for _, s := range v.Stages {
-		d.Stages = append(d.Stages, stageTimingJSON{s.Stage, s.DurationMS})
+		d.Stages = append(d.Stages, stageTimingJSON{OffsetMS: s.OffsetMS, Stage: s.Stage, DurationMS: s.DurationMS})
 	}
 	for _, s := range v.Routing {
 		d.Routing = append(d.Routing, routeDecisionJSON{channelRefJSON{s.Channel.ID, s.Channel.Name}, s.Reason, s.Rank})

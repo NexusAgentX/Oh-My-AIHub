@@ -54,6 +54,7 @@ func (p *platform) observeFixtures(consumer, channelID, keyID string) observatio
 	billed.RoutingMode, billed.RoutingSource, billed.ClientUserAgent = &mode, &source, &agent
 	billed.TokensPerSecond, billed.IntervalP50MS, billed.IntervalP95MS, billed.ResponseBytes = &speed, &intervalP50, &intervalP95, &responseBytes
 	billed.Diagnostics = &gateway.Diagnostics{StopReason: "stop", UsageStatus: "reported", Delivery: "complete", Stages: []gateway.StageTiming{{Stage: "routing", DurationMS: 1.25}}, Routing: []gateway.RouteDecision{{Channel: gateway.AttemptChannel{ID: channelID, Name: "阿里中转"}, Reason: "cheapest", Rank: 1}}}
+	billed.Diagnostics.Network = &gateway.Network{Client: gateway.NetworkNode{IP: "198.51.100.20"}, Attempts: []*gateway.NetworkAttempt{}, LocationSource: "ipwho.is"}
 	billed.UpstreamResponseID = &agent
 	billed.PriceSnapshot = json.RawMessage(priceSnapshotJSON)
 	billed.Attempts = []observe.Attempt{
@@ -119,6 +120,9 @@ func TestCallObservationReports(t *testing.T) {
 		t.Fatalf("bad call cursor = %d %s", recorder.Code, recorder.Body.String())
 	}
 	own := alice.expect(t, http.StatusOK, http.MethodGet, "/api/calls/"+ids.billed, nil)["call"].(map[string]any)
+	if own["diagnostics"].(map[string]any)["network"].(map[string]any)["client"].(map[string]any)["ip"] != "198.51.100.20" {
+		t.Fatal("caller lost private network metadata")
+	}
 	if len(own["attempts"].([]any)) != 2 || own["ledger_transaction_id"] != ids.transaction || own["price_snapshot"] == nil || own["api_key"] == nil {
 		t.Fatalf("call detail = %v", own)
 	}

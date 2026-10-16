@@ -102,6 +102,21 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 维护者的笔记本不安静（别的开发任务、内存换页、热压力、休眠、换网络），本机测出的延迟、CPU 与 QPS 可信度低。公开仓库用 GitHub 托管的标准 Linux x64 机器（`ubuntu-24.04`，4 vCPU、16 GB，与生产 VPS 同架构同核数同内存）不限时长，所以延迟、CPU 与 QPS 的前后对比放到那里测。工作流是 `.github/workflows/perf-baseline.yml`，只手动触发。
 
+### 日常 PR 选择最小相关场景
+
+完整矩阵用于较低频的全路径检查与大范围网关改动，不作为每次迭代的默认动作。普通 PR 先用相关回归测试或微基准守住 SQL、分配和持锁尾部成本，再为受影响的端到端路径选择最小场景集，仍保留 3 轮相对比较。已有完整矩阵发现特定退化时，优化后的复测先只选该场景；结果显示其他问题或改动扩大时才扩展场景。对外部网络、后台任务与高负载未覆盖的部分，在 PR 明确说明。
+
+例如只复测 Responses 粘性路由，可使用：
+
+```sh
+gh workflow run perf-baseline.yml \
+  -f base_ref=<基线提交> -f head_ref=<任务分支> \
+  -f scenarios=sticky -f repeat=3 -f jobs=1 \
+  -f 'tool_args=-perf.duration=10s -perf.warmup=1s -perf.profile=1s -perf.audit=50'
+```
+
+短 A/B 以约 3–5 分钟反馈为目标，排队、工具链编译与机器负载可能延长；它不能替代持续吞吐扫描或完整的容量结论。`perf.duration` 只是单次采样窗口：每个场景还会分别跑直连与经过网关、预热、等待在途请求结束与 SQL 审计，部分场景另外执行 profiling，再乘 base/head 与轮数。流式预热还有按单条回答时长计算的下限，因此仅缩短 duration 或 profile 不能让完整矩阵同等缩短。需要长流、并发或容量验证时显式选择对应场景，不为节省时间缩成无法覆盖改动的样本。
+
 ### 触发
 
 ```sh

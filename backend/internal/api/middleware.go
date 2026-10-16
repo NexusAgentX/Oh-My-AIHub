@@ -3,13 +3,12 @@ package api
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 )
 
@@ -80,28 +79,7 @@ func (a *app) requestScheme(r *http.Request) string {
 }
 
 func (a *app) trustsProxy(r *http.Request) bool {
-	remoteIP, ok := requestRemoteIP(r)
-	if !ok {
-		return false
-	}
-	for _, prefix := range a.trustedProxyCIDRs {
-		if prefix.Contains(remoteIP) {
-			return true
-		}
-	}
-	return false
-}
-
-func requestRemoteIP(r *http.Request) (netip.Addr, bool) {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	remoteIP, err := netip.ParseAddr(strings.Trim(host, "[]"))
-	if err != nil {
-		return netip.Addr{}, false
-	}
-	return remoteIP.Unmap(), true
+	return clientip.Trusted(r, a.trustedProxyCIDRs)
 }
 
 func (a *app) loginLimitKey(r *http.Request, username string) string {
@@ -109,13 +87,8 @@ func (a *app) loginLimitKey(r *http.Request, username string) string {
 }
 
 func (a *app) loginClientIP(r *http.Request) string {
-	if a.trustsProxy(r) {
-		if forwardedIP, err := netip.ParseAddr(strings.TrimSpace(r.Header.Get("X-Real-IP"))); err == nil {
-			return forwardedIP.Unmap().String()
-		}
-	}
-	if remoteIP, ok := requestRemoteIP(r); ok {
-		return remoteIP.String()
+	if ip := clientip.Address(r, a.trustedProxyCIDRs); ip != "" {
+		return ip
 	}
 	return "unknown"
 }

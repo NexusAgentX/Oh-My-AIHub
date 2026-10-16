@@ -204,3 +204,35 @@ LEFT JOIN channels ch ON ch.id = c.final_channel_id
 WHERE c.account_id = $1
 ORDER BY c.created_at DESC, c.id DESC
 LIMIT sqlc.arg(row_limit);
+
+-- name: LoadGeoCache :many
+SELECT ip, location, expires_at FROM geoip_cache
+WHERE expires_at > now() ORDER BY updated_at DESC LIMIT 4096;
+
+-- name: SaveGeoCache :exec
+INSERT INTO geoip_cache (ip, location, expires_at) VALUES ($1, $2, $3)
+ON CONFLICT (ip) DO UPDATE SET location = EXCLUDED.location, expires_at = EXCLUDED.expires_at, updated_at = now();
+
+-- name: TrimGeoCache :exec
+DELETE FROM geoip_cache WHERE ip IN (
+ SELECT ip FROM geoip_cache ORDER BY updated_at DESC, ip OFFSET 4096
+);
+
+-- name: ReserveGeoLookup :one
+INSERT INTO geoip_daily_usage (day, queries) VALUES ($1, 1)
+ON CONFLICT (day) DO UPDATE SET queries = geoip_daily_usage.queries + 1
+WHERE geoip_daily_usage.queries < sqlc.arg(daily_limit)::integer
+RETURNING queries;
+
+-- name: TrimGeoUsage :exec
+DELETE FROM geoip_daily_usage WHERE day < now() - interval '7 days';
+
+-- name: EnrichCallLocations :exec
+UPDATE calls SET diagnostics = jsonb_set(
+ jsonb_set(diagnostics, '{network,client,location}',
+  COALESCE(sqlc.arg(locations)::jsonb -> (diagnostics #>> '{network,client,ip}'), diagnostics #> '{network,client,location}', 'null'::jsonb)),
+ '{network,attempts}',
+ COALESCE((SELECT jsonb_agg(jsonb_set(item, '{node,location}',
+  COALESCE(sqlc.arg(locations)::jsonb -> (item #>> '{node,ip}'), item #> '{node,location}', 'null'::jsonb)) ORDER BY ord)
+ FROM jsonb_array_elements(diagnostics #> '{network,attempts}') WITH ORDINALITY AS a(item, ord)), '[]'::jsonb))
+WHERE id = $1 AND diagnostics #> '{network,client}' IS NOT NULL;
