@@ -417,7 +417,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 }
 
 const listAllCandidates = `-- name: ListAllCandidates :many
-SELECT cm.model_id, array_remove(ARRAY[CASE WHEN c.capabilities && ARRAY['responses/inference','codex/inference']::text[] THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[] AS formats,
+SELECT cm.model_id, array_remove(ARRAY[CASE WHEN cardinality(c.capabilities) > 0 THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[] AS formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
@@ -590,7 +590,7 @@ SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_non
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(array_remove(ARRAY[CASE WHEN c.capabilities && ARRAY['responses/inference','codex/inference']::text[] THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[])
+WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(array_remove(ARRAY[CASE WHEN cardinality(c.capabilities) > 0 THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[])
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id
 `

@@ -9,15 +9,15 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 )
 
-// A channel that answers a model with a 4xx every time goes last (G4b). Once its
-// owner has edited it, the 4xx answers it gave before are not held against it:
-// the gateway ranks it afresh before the edit returns, and after a restart too.
+// Channel edits clear anomaly evidence before returning and after a restart.
+// The diagnostic flag changes; the configured manual order remains unchanged.
 
 // anomalyPair is the usual setup: the cheaper channel answers every request
 // with a 400, the dearer one is fine, and both serve the same model.
 type anomalyPair struct {
 	e                   *env
 	secret              string
+	lastCall            string
 	owner               person
 	brokenID, healthyID string
 	broken, healthy     *scriptedUpstream
@@ -34,11 +34,14 @@ func newAnomalyPair(t *testing.T) *anomalyPair {
 	p.brokenID = p.e.createChannel(p.owner, channelSpec{name: "broken", upstream: p.broken.upstream, multiplier: "1"})
 	p.healthyID = p.e.createChannel(p.owner, channelSpec{name: "healthy", upstream: p.healthy.upstream, multiplier: "2"})
 	_, p.secret = p.e.defaultKey(consumer)
+	p.e.selectFixtureChannels(consumer)
 	return p
 }
 
 func (p *anomalyPair) call() int {
-	return p.e.call(p.secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code
+	response := p.e.call(p.secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	p.lastCall = response.Header().Get("X-AIHub-Request-Id")
+	return response.Code
 }
 
 // breakAndFlag sends the 20 calls the cheaper channel needs to be judged and
@@ -60,16 +63,15 @@ func (p *anomalyPair) expectFirst(name, when string) {
 	brokenBefore, healthyBefore := len(p.broken.inference()), len(p.healthy.inference())
 	code := p.call()
 	brokenGot, healthyGot := len(p.broken.inference())-brokenBefore, len(p.healthy.inference())-healthyBefore
-	switch name {
-	case "healthy":
-		if code != http.StatusOK || healthyGot != 1 || brokenGot != 0 {
-			p.e.t.Fatalf("%s: call = %d, healthy channel hit %d times, broken %d: want the healthy channel to go first", when, code, healthyGot, brokenGot)
-		}
-	case "broken":
-		if brokenGot != 1 || healthyGot != 0 {
-			p.e.t.Fatalf("%s: call = %d, healthy channel hit %d times, broken %d: want the cheaper channel to go first again", when, code, healthyGot, brokenGot)
-		}
+	if brokenGot != 1 || healthyGot != 0 {
+		p.e.t.Fatalf("%s: manual order changed: code %d healthy %d broken %d", when, code, healthyGot, brokenGot)
 	}
+	var flagged bool
+	err := p.e.pool.QueryRow(context.Background(), `SELECT EXISTS (SELECT 1 FROM jsonb_array_elements(diagnostics->'routing') d WHERE d->'channel'->>'id'=$2 AND d->>'reason'='anomalous') FROM calls WHERE id=$1`, p.lastCall, p.brokenID).Scan(&flagged)
+	if err != nil || flagged != (name == "healthy") {
+		p.e.t.Fatalf("%s: anomaly=%v want=%v err=%v", when, flagged, name == "healthy", err)
+	}
+
 }
 
 // fix makes the cheaper channel's upstream answer well, as if its owner had

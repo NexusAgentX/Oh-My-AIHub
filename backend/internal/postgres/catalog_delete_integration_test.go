@@ -33,7 +33,7 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 	exec(`INSERT INTO route_prefs(account_id, model_id) VALUES ($1, 'gpt-test')`, consumer.id)
 	exec(`INSERT INTO route_prefs(account_id, api_key_id, model_id) VALUES ($1, $2, 'gpt-test')`, consumer.id, keyID)
 	exec(`UPDATE api_keys SET allowed_models = ARRAY['gpt-test'], model_aliases = '{"alias":"gpt-test"}' WHERE id = $1`, keyID)
-	exec(`INSERT INTO model_price_tiers(model_id, seq, name, min_input_tokens, timezone, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million) VALUES ('gpt-test', 1, 'long', 100, 'UTC', 1, 1, 1, 1)`)
+	exec(`INSERT INTO model_price_tiers(model_id, seq, name, min_prompt_tokens, timezone, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million) VALUES ('gpt-test', 1, 'long', 100, 'UTC', 1, 1, 1, 1)`)
 	callID, err := e.store.Gateway.InsertCall(ctx, gateway.CallInsert{AccountID: consumer.id, RequestedModel: "gpt-test", Format: channel.FormatOpenAIChat, Outcome: gateway.OutcomeInProgress})
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 		t.Fatalf("finish: %+v %v", finish, err)
 	}
 	exec(`INSERT INTO channels(id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id) VALUES ('00000000-0000-4000-8000-000000000188', $1, 'test', 'https://example.com', '\x01', '\x01', 'test')`, sharer.id)
-	exec(`INSERT INTO channel_models(channel_id, model_id, upstream_model, formats) VALUES ('00000000-0000-4000-8000-000000000188', 'gpt-test', 'gpt-test', ARRAY['openai_chat'])`)
+	exec(`INSERT INTO channel_models(channel_id, model_id, upstream_model) VALUES ('00000000-0000-4000-8000-000000000188', 'gpt-test', 'gpt-test')`)
 	e.apiJSON(consumer, http.StatusForbidden, http.MethodDelete, "/api/admin/models/gpt-test", nil)
 	e.apiJSON(e.admin, http.StatusConflict, http.MethodDelete, "/api/admin/models/gpt-test", nil)
 	count(`SELECT count(*) FROM route_prefs WHERE model_id = 'gpt-test'`, 2)

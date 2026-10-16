@@ -17,6 +17,7 @@ func TestCustomModelsBillOwnPricesAndWaitForAMultiplierOnceOfficial(t *testing.T
 	channel := func(name, input, output string) string {
 		created := e.apiJSON(sharer, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 			"name": name, "base_url": relay.server.URL, "api_key": "upstream-key-" + name,
+			"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}}},
 			"models": []any{map[string]any{
 				"model_id":      "foo-1",
 				"custom_prices": map[string]string{"input": input, "output": output, "cache_write": "0", "cache_read": "0"},

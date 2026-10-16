@@ -111,3 +111,22 @@ func TestFunctionCompatibilityIncludesResultContinuation(t *testing.T) {
 		t.Fatalf("%+v calls=%d", result, calls)
 	}
 }
+
+func TestCodexProbeUsesNativeStreamingRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if r.URL.Path != "/backend-api/codex/responses" || string(body["stream"]) != "true" || string(body["store"]) != "false" || body["max_output_tokens"] != nil || body["instructions"] == nil || !strings.Contains(string(body["input"]), "input_text") {
+			t.Errorf("not a native Codex request: %s %v", r.URL.Path, body)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_probe\",\"status\":\"completed\",\"output\":[]}}\n\n")
+	}))
+	defer server.Close()
+	result := (&Service{}).probeCompatibilityCell(context.Background(), compatibilityTestOutbound{client: server.Client()}, Channel{BaseURL: server.URL}, compatibilityProbe{Model: Model{ModelID: "m", UpstreamModel: "up"}, Protocol: "codex", Feature: "inference", Scope: "channel"}, "synthetic-secret")
+	if !result.OK {
+		t.Fatal(result)
+	}
+}

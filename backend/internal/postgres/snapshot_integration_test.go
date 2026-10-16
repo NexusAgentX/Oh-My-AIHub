@@ -131,6 +131,7 @@ func TestNewKeysWorkAtOnce(t *testing.T) {
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
+	e.selectFixtureChannels(consumer)
 	p := probe{e: e, upstrms: []*upstream{relay}}
 
 	// A key made through the API.
@@ -143,6 +144,7 @@ func TestNewKeysWorkAtOnce(t *testing.T) {
 	for index := range 5 {
 		member := e.member(fmt.Sprintf("late%d", index), "100")
 		_, p.secret = e.defaultKey(member)
+		e.selectFixtureChannels(member)
 		p.expect(t, fmt.Sprintf("default key of member %d right after it was created", index), http.StatusOK, true)
 	}
 }
@@ -201,10 +203,11 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	late := func() *httptest.ResponseRecorder {
 		return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"late-model"}`), nil)
 	}
-	if got := late().Code; got != http.StatusServiceUnavailable {
+	if got := late().Code; got != http.StatusBadRequest {
 		t.Fatalf("new model without a channel = %d", got)
 	}
 	patchChannel(map[string]any{"models": append(models("1", allFormats, nil), map[string]any{"model_id": "late-model", "multiplier": "1"})})
+	e.selectFixtureChannels(consumer)
 	if got := late().Code; got != http.StatusOK {
 		t.Fatalf("new model once a channel offers it = %d", got)
 	}
@@ -222,9 +225,9 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	if got := cost("after a multiplier change", p.expect(t, "after a multiplier change", http.StatusOK, true)); got != 4*base {
 		t.Fatalf("cost with multiplier 2 and doubled prices = %d, want %d", got, 4*base)
 	}
-	patchChannel(map[string]any{"models": models("1", []string{"anthropic"}, nil)})
+	patchChannel(map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"codex": []string{"inference", "nonstream"}}}})
 	p.expect(t, "a format the channel no longer serves", http.StatusServiceUnavailable, false)
-	patchChannel(map[string]any{"models": models("1", allFormats, nil)})
+	patchChannel(map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}}}})
 	p.expect(t, "the format is served again", http.StatusOK, true)
 
 	patchChannel(map[string]any{"models": models("1", allFormats, map[string]any{"upstream_model": "renamed-upstream"})})
@@ -232,7 +235,7 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	if last := relay.inference(); !strings.Contains(string(last[len(last)-1].Body), `"renamed-upstream"`) {
 		t.Fatalf("the upstream received %s, want the renamed model", last[len(last)-1].Body)
 	}
-	patchChannel(map[string]any{"api_key": "rotated-upstream-key", "advanced": map[string]any{"user_agent": "relay-agent/2"}})
+	patchChannel(map[string]any{"api_key": "rotated-upstream-key", "advanced": map[string]any{"user_agent": "relay-agent/2", "compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}}}})
 	p.expect(t, "credential and user agent change", http.StatusOK, true)
 	last := relay.inference()
 	if seen := last[len(last)-1].Header; seen.Get("Authorization") != "Bearer rotated-upstream-key" || seen.Get("User-Agent") != "relay-agent/2" {

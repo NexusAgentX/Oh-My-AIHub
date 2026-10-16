@@ -80,6 +80,7 @@ func newObserved(t *testing.T) *observed {
 	o.brokenID = e.createChannel(o.flaky, channelSpec{name: "flaky-relay", upstream: broken, multiplier: "1"})
 	o.goodID = e.createChannel(o.sharer, channelSpec{name: "good-relay", upstream: good, multiplier: "2"})
 	o.keyID, o.secret = e.defaultKey(o.consumer)
+	e.selectFixtureChannels(o.consumer)
 	o.fellBack = e.chat(o.secret, map[string]string{"X-AIHub-Tag": "suite"})
 	// With the flaky channel in cooldown or still cheapest, further calls also pass the sharer.
 	o.succeeded = e.chat(o.secret, map[string]string{"X-AIHub-Tag": "second"})
@@ -110,7 +111,7 @@ func TestObserveCallListFiltersSummaryAndPaging(t *testing.T) {
 	}
 
 	for query, want := range map[string]int{
-		"?tag=suite": 1, "?model=gpt-test": 2, "?model=other": 0, "?outcome=succeeded": 2, "?outcome=upstream_failed": 0, "?format=openai_chat": 2, "?format=gemini": 0,
+		"?tag=suite": 1, "?model=gpt-test": 2, "?model=other": 0, "?outcome=succeeded": 2, "?outcome=upstream_failed": 0, "?format=openai_responses": 2, "?format=gemini": 0,
 		"?request_id=" + o.succeeded: 1, "?min_tokens=1500": 2, "?min_tokens=1501": 0, "?max_tokens=1499": 0, "?min_cost=0.04": 2, "?min_cost=0.05": 0,
 		"?channel_id=" + o.goodID: 2, "?channel_id=" + o.brokenID: 0, "?api_key_id=" + o.keyID: 2, "?min_duration_ms=0": 2, "?max_duration_ms=0": 0,
 	} {
@@ -164,7 +165,7 @@ func TestObserveCallDetailPermissions(t *testing.T) {
 	o := newObserved(t)
 	own := asMap(t, o.get(o.consumer, "/api/calls/"+o.fellBack)["call"])
 	attempts := asList(t, own["attempts"])
-	if len(attempts) != 2 || own["api_key"] == nil || own["tag"] != "suite" || own["price_snapshot"] == nil || own["ledger_transaction_id"] == nil || own["routing_mode"] != "cheapest" {
+	if len(attempts) != 2 || own["api_key"] == nil || own["tag"] != "suite" || own["price_snapshot"] == nil || own["ledger_transaction_id"] == nil || own["routing_mode"] != "manual" {
 		t.Fatalf("consumer detail = %v", own)
 	}
 	failed := asMap(t, attempts[0])
@@ -698,7 +699,7 @@ func (o *observed) insertUnbookedCall(account person, channelID, outcome string,
 	var id string
 	err := o.pool.QueryRow(context.Background(), `
 		INSERT INTO calls (account_id, requested_model, model_id, format, outcome, final_channel_id, cost_nano, fee_nano, input_tokens, output_tokens, completed_at)
-		VALUES ($1, 'gpt-test', 'gpt-test', 'openai_chat', $2, $3, $4, $5, 1000, 500, now()) RETURNING id`, account.id, outcome, channelID, cost, fee).Scan(&id)
+		VALUES ($1, 'gpt-test', 'gpt-test', 'openai_responses', $2, $3, $4, $5, 1000, 500, now()) RETURNING id`, account.id, outcome, channelID, cost, fee).Scan(&id)
 	if err != nil {
 		o.t.Fatal(err)
 	}
@@ -858,7 +859,7 @@ func TestObserveOverviewAttentionRules(t *testing.T) {
 		VALUES ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333', $1, $2, 1000000000, 100, 100, 'disputed', now(), now())`, o.consumer.id, o.sharer.id)
 	for index := 0; index < 21; index++ {
 		o.breakLedger(`INSERT INTO calls (account_id, requested_model, model_id, format, outcome, final_channel_id, completed_at)
-			VALUES ($1, 'gpt-test', 'gpt-test', 'openai_chat', 'succeeded_unbilled', $2, now())`, o.consumer.id, o.goodID)
+			VALUES ($1, 'gpt-test', 'gpt-test', 'openai_responses', 'succeeded_unbilled', $2, now())`, o.consumer.id, o.goodID)
 	}
 	attention = map[string]map[string]any{}
 	for _, item := range asList(t, o.get(o.admin, "/api/admin/overview")["attention"]) {
@@ -913,7 +914,7 @@ func TestObserveOverviewFlagsConsumersWithUnbilledCalls(t *testing.T) {
 	seed := func(p person, outcome, channelID string, count int, age string) {
 		e.t.Helper()
 		e.breakLedger(`INSERT INTO calls (account_id, requested_model, model_id, format, outcome, final_channel_id, created_at, completed_at)
-			SELECT $1, 'gpt-test', 'gpt-test', 'openai_chat', $2, $3, now() - $5::interval, now() - $5::interval FROM generate_series(1, $4)`,
+			SELECT $1, 'gpt-test', 'gpt-test', 'openai_responses', $2, $3, now() - $5::interval, now() - $5::interval FROM generate_series(1, $4)`,
 			p.id, outcome, channelID, count, age)
 	}
 	// heavy: 22 successes in 24 hours, 10 of them unbilled, 8 through alpha and 2 through beta.
@@ -1184,15 +1185,15 @@ func TestObserveMetricsExposeCoreSeriesWithoutUserLabels(t *testing.T) {
 		t.Fatalf("metrics = %d", recorder.Code)
 	}
 	for _, want := range []string{
-		`aihub_requests_total{format="openai_chat",model="gpt-test",outcome="succeeded"} 2`,
-		`aihub_requests_total{format="openai_chat",model="other",outcome="rejected_model"} 1`,
+		`aihub_requests_total{format="openai_responses",model="gpt-test",outcome="succeeded"} 2`,
+		`aihub_requests_total{format="openai_responses",model="other",outcome="rejected_model"} 1`,
 		`aihub_tokens_total{kind="input",model="gpt-test"} 2000`,
 		`aihub_tokens_total{kind="output",model="gpt-test"} 1000`,
 		`aihub_cost_points_total{model="gpt-test"} 0.08008`,
 		`aihub_upstream_attempts_total{channel="` + o.brokenID + `",result="error",status_class="5xx"} 2`,
 		`aihub_upstream_attempts_total{channel="` + o.goodID + `",result="success",status_class="2xx"} 2`,
-		`aihub_upstream_latency_seconds_count{channel="` + o.brokenID + `",format="openai_chat",model="gpt-test",stream="false"} 2`,
-		`aihub_upstream_latency_seconds_count{channel="` + o.goodID + `",format="openai_chat",model="gpt-test",stream="false"} 2`,
+		`aihub_upstream_latency_seconds_count{channel="` + o.brokenID + `",format="openai_responses",model="gpt-test",stream="false"} 2`,
+		`aihub_upstream_latency_seconds_count{channel="` + o.goodID + `",format="openai_responses",model="gpt-test",stream="false"} 2`,
 		`aihub_channel_up{channel="` + o.goodID + `"} 1`,
 		`aihub_points_circulating 0`,
 		`aihub_points_credit_issued 0.08008`,

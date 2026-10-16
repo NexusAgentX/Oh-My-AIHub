@@ -714,7 +714,7 @@ func TestHomeAndModelListShowTodayNumbers(t *testing.T) {
 			found = item.(map[string]any)
 		}
 	}
-	if found["online_channels"] != float64(1) || fmt.Sprint(found["formats"]) != "[openai_chat openai_responses anthropic gemini]" ||
+	if found["online_channels"] != float64(1) || fmt.Sprint(found["formats"]) != "[openai_responses]" ||
 		found["lowest_prices"].(map[string]any)["input"] != "20" {
 		t.Fatalf("model list entry = %v", found)
 	}

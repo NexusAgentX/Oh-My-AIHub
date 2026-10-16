@@ -112,15 +112,15 @@ func (sc perfScenario) answerTime() time.Duration {
 
 func namedScenarios() map[string]perfScenario {
 	scenarios := map[string]perfScenario{
-		"nonstream":  {name: "nonstream-small", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, profiled: true},
-		"stream":     {name: "stream-1k", format: channel.FormatOpenAIChat, stream: true, profile: longStream, qps: 20, cap: 4000, profiled: true},
-		"concurrent": {name: "concurrent-500", format: channel.FormatOpenAIChat, stream: true, profile: chatStream, workers: 500},
+		"nonstream":  {name: "nonstream-small", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, profiled: true},
+		"stream":     {name: "stream-1k", format: channel.FormatOpenAIResponses, stream: true, profile: longStream, qps: 20, cap: 4000, profiled: true},
+		"concurrent": {name: "concurrent-500", format: channel.FormatOpenAIResponses, stream: true, profile: chatStream, workers: 500},
 		// More workers than database connections, back to back: the rate at which
 		// the gateway can settle calls when nothing else limits it. The sweeps find
 		// the rate that holds a latency bound; this finds the ceiling itself and
 		// moves much less with the stalls of the machine's storage.
-		"saturate": {name: "nonstream-saturated", format: channel.FormatOpenAIChat, profile: quickAnswer, workers: 64},
-		"budget":   {name: "key-budget", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, budget: true},
+		"saturate": {name: "nonstream-saturated", format: channel.FormatOpenAIResponses, profile: quickAnswer, workers: 64},
+		"budget":   {name: "key-budget", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, budget: true},
 		"sticky":   {name: "responses-sticky", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, sticky: true},
 	}
 	for key, sc := range scenarios {
@@ -138,7 +138,7 @@ func namedScenarios() map[string]perfScenario {
 // formatScenarios covers every format, streamed and not, at a modest rate.
 func formatScenarios() []perfScenario {
 	var out []perfScenario
-	for _, format := range []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini} {
+	for _, format := range []channel.Format{channel.FormatOpenAIResponses} {
 		out = append(out,
 			perfScenario{name: "format-" + string(format), format: format, profile: quickAnswer, qps: 40, cap: 4000},
 			perfScenario{name: "format-" + string(format) + "-stream", format: format, stream: true,
@@ -702,7 +702,7 @@ func TestGatewayPerfBaseline(t *testing.T) {
 func (s *perfStack) smoke() {
 	t := s.t
 	s.upstream.SetProfile(gatewaybench.Profile{TTFT: time.Millisecond, Tokens: 4, InputTokens: 10})
-	for _, format := range []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini} {
+	for _, format := range []channel.Format{channel.FormatOpenAIResponses} {
 		for _, stream := range []bool{false, true} {
 			request := gatewaybench.RequestSpec{Format: format, Stream: stream, APIKey: s.keys[0]}.Build(s.frontURL)
 			before := s.upstream.Stats().Requests
@@ -734,7 +734,7 @@ func (s *perfStack) smoke() {
 // of any measurement.
 func (s *perfStack) prime() {
 	s.upstream.SetProfile(gatewaybench.Profile{TTFT: 2 * time.Millisecond, Tokens: 8, InputTokens: 20})
-	sc := perfScenario{name: "prime", format: channel.FormatOpenAIChat, workers: 4}
+	sc := perfScenario{name: "prime", format: channel.FormatOpenAIResponses, workers: 4}
 	plan := s.perfPlan(sc, true, nil)
 	plan.Warmup, plan.Duration, plan.MaxRequests = 0, 0, 2000
 	result := gatewaybench.Run(context.Background(), s.gateway, plan)

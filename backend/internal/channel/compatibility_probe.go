@@ -292,7 +292,18 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	if job.Protocol == "codex" {
 		root = "/backend-api/codex/responses"
 	}
-	body := map[string]any{"model": job.Model.UpstreamModel, "input": []any{map[string]any{"role": "user", "content": "Reply exactly OK."}}, "store": false, "stream": false, "max_output_tokens": 128}
+	message := func(role, text string) map[string]any {
+		kind := "input_text"
+		if role == "assistant" {
+			kind = "output_text"
+		}
+		return map[string]any{"role": role, "content": []any{map[string]any{"type": kind, "text": text}}}
+	}
+	body := map[string]any{"model": job.Model.UpstreamModel, "instructions": "You are a helpful assistant. Follow the compatibility check precisely.", "input": []any{message("user", "Reply exactly OK.")}, "store": false, "stream": job.Protocol == "codex"}
+	if job.Protocol != "codex" {
+		body["max_output_tokens"] = 128
+	}
+
 	lite := false
 	compressed := false
 	// One transport helper applies the exact saved channel header policy as the
@@ -354,7 +365,11 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 			if job.Feature == "nonstream" {
 				return value, errors.New("上游未遵守非流式请求")
 			}
-			reader := &io.LimitedReader{R: res.Body, N: testStreamLimit + 1}
+			streamLimit := int64(testStreamLimit)
+			if job.Feature == "image_generation" {
+				streamLimit = 32 << 20
+			}
+			reader := &io.LimitedReader{R: res.Body, N: streamLimit + 1}
 			scanner := bufio.NewScanner(reader)
 			scanner.Buffer(make([]byte, 4096), testEventLimit)
 			var data []string
@@ -430,7 +445,9 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	switch job.Feature {
 	case "tool_search", "file_search", "code_interpreter", "mcp", "computer", "shell", "apply_patch", "images_edit", "vision":
 		return skip()
-	case "inference", "nonstream":
+	case "inference":
+	case "nonstream":
+		body["stream"] = false
 	case "stream":
 		body["stream"] = true
 	case "zstd":
@@ -438,14 +455,14 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	case "function_tools", "tool_namespaces", "parallel_tools":
 		tools := []any{function("compat_echo")}
 		body["tool_choice"] = "required"
-		body["input"] = []any{map[string]any{"role": "user", "content": "Call compat_echo with value OK."}}
+		body["input"] = []any{message("user", "Call compat_echo with value OK.")}
 		if job.Feature == "tool_namespaces" {
 			tools = []any{map[string]any{"type": "namespace", "name": "compat", "description": "Compatibility probe tools", "tools": tools}}
 		}
 		if job.Feature == "parallel_tools" {
 			tools = []any{function("compat_a"), function("compat_b")}
 			body["parallel_tool_calls"] = true
-			body["input"] = []any{map[string]any{"role": "user", "content": "Call both compat_a and compat_b now with value OK. They are independent."}}
+			body["input"] = []any{message("user", "Call both compat_a and compat_b now with value OK. They are independent.")}
 		}
 		body["tools"] = tools
 	case "custom_tools":
@@ -465,10 +482,10 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 		lite = true
 		body["reasoning"] = map[string]any{"effort": "low", "context": "all_turns"}
 		body["parallel_tool_calls"] = false
-		body["input"] = []any{map[string]any{"type": "additional_tools", "role": "developer", "tools": []any{map[string]any{"type": "namespace", "name": "functions", "description": "Compatibility probe tools", "tools": []any{function("compat_echo")}}}}, map[string]any{"role": "user", "content": "Call compat_echo with value OK."}}
+		body["input"] = []any{map[string]any{"type": "additional_tools", "role": "developer", "tools": []any{map[string]any{"type": "namespace", "name": "functions", "description": "Compatibility probe tools", "tools": []any{function("compat_echo")}}}}, message("user", "Call compat_echo with value OK.")}
 		body["tool_choice"] = "required"
 	case "compact", "compact_v1", "compaction_input":
-		compactBody := map[string]any{"model": job.Model.UpstreamModel, "input": []any{map[string]any{"role": "user", "content": "Remember this compatibility check: OK."}, map[string]any{"role": "assistant", "content": "OK"}}}
+		compactBody := map[string]any{"model": job.Model.UpstreamModel, "input": []any{message("user", "Remember this compatibility check: OK."), message("assistant", "OK")}}
 		value, err := send(http.MethodPost, root+"/compact", compactBody)
 		if err != nil {
 			return finish(err)
@@ -483,7 +500,7 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 		for _, item := range value.Output {
 			items = append(items, item)
 		}
-		items = append(items, map[string]any{"role": "user", "content": "Reply OK."})
+		items = append(items, message("user", "Reply OK."))
 		body["input"] = items
 	case "compact_v2":
 		body["input"] = append(body["input"].([]any), map[string]any{"type": "compaction_trigger"})
@@ -494,11 +511,11 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	case "web_search":
 		body["tools"] = []any{map[string]any{"type": "web_search"}}
 		body["tool_choice"] = map[string]any{"type": "web_search"}
-		body["input"] = "Search for the official OpenAI website."
+		body["input"] = []any{message("user", "Search for the official OpenAI website.")}
 	case "image_generation":
 		body["tools"] = []any{map[string]any{"type": "image_generation", "quality": "low"}}
 		body["tool_choice"] = map[string]any{"type": "image_generation"}
-		body["input"] = "Generate a plain black dot on white."
+		body["input"] = []any{message("user", "Generate a plain black dot on white.")}
 	case "search":
 		endpoint := strings.TrimSuffix(root, "/responses") + "/alpha/search"
 		_, err := send(http.MethodPost, endpoint, map[string]any{
@@ -627,7 +644,7 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 			return errors.New("未返回要求的工具调用")
 		}
 		input = append(input, outputs...)
-		input = append(input, map[string]any{"role": "user", "content": "Print the value returned by the tool exactly. Do not call another tool."})
+		input = append(input, message("user", "Print the value returned by the tool exactly. Do not call another tool."))
 		next["input"], next["tool_choice"] = input, "none"
 		continuation, err := send(http.MethodPost, root, next)
 		if err != nil {

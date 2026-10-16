@@ -26,11 +26,13 @@ export function capabilityLabel(value: string) {
 }
 export function CapabilityToggles({ values = [], options, onChange, passed = {}, errors = {} }: { values?: string[]; options: string[]; onChange: (values: string[]) => void; passed?: Record<string, boolean>; errors?: Record<string, string> }) {
   const features = [...new Set(options.map(v => v.split('/')[1]))]
-  return <div className="compatibility-matrix"><table><caption className="sr-only">兼容性矩阵</caption><thead><tr><th scope="col">能力</th><th scope="col">Responses</th><th scope="col">Codex</th></tr></thead><tbody>{features.map(feature => <tr key={feature}><th scope="row">{featureLabels[feature] ?? feature}</th>{(['responses', 'codex'] as const).map(protocol => {
+  return <div className="compatibility-matrix"><table><caption className="visually-hidden">兼容性矩阵</caption><thead><tr><th scope="col">能力</th><th scope="col">Responses</th><th scope="col">Codex</th></tr></thead><tbody>{features.map(feature => <tr key={feature}><th scope="row">{featureLabels[feature] ?? feature}</th>{(['responses', 'codex'] as const).map(protocol => {
     const cell = `${protocol}/${feature}`
     return <td key={protocol}>{options.includes(cell) ? <span title={errors[cell] ?? (passed[cell] === undefined ? '未验证，可手动声明' : passed[cell] ? '探测通过' : '探测未通过')}><Checkbox aria-label={`${protocolLabels[protocol]} · ${featureLabels[feature] ?? feature}`} label={`${protocolLabels[protocol]} · ${featureLabels[feature] ?? feature}`} checked={values.includes(cell)} onChange={e => onChange(e.target.checked ? [...new Set([...values, cell])] : values.filter(v => v !== cell))} /><span aria-label={passed[cell] === undefined ? '未验证' : passed[cell] ? '探测通过' : '探测未通过'} className={passed[cell] === undefined ? 'muted' : passed[cell] ? 'compatibility-pass' : 'compatibility-fail'}>{passed[cell] === undefined ? '—' : passed[cell] ? '✓' : '×'}</span></span> : '—'}</td>
   })}</tr>)}</tbody></table></div>
 }
 export function CapabilityTags({ values = [] }: { values?: string[] }) {
-  return <span className="format-toggles">{values.map(value => <span className="badge badge-neutral" key={value}>{capabilityLabel(value)}</span>)}</span>
+  if (!values.length) return null
+  const tags = <span className="format-toggles">{values.map(value => <span className="badge badge-neutral" key={value}>{capabilityLabel(value)}</span>)}</span>
+  return values.length > 6 ? <details className="capability-summary"><summary>兼容性 · {values.length} 项</summary>{tags}</details> : tags
 }

@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -133,7 +134,7 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 	}
 }
 
-func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
+func TestResponsesReasoningDoesNotCreateBailianPriceFacts(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	consumer := e.member("thinking-consumer", "100")
@@ -142,7 +143,7 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output}); err != nil {
 		t.Fatal(err)
 	}
-	response := `{"choices":[{"message":{"reasoning_content":"private","reasoning":"private"}}],"usage":{"input_tokens":1000,"output_tokens":500,"output_tokens_details":{"reasoning_tokens":300}}}`
+	response := `{"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"private"}]}],"usage":{"input_tokens":1000,"output_tokens":500,"output_tokens_details":{"reasoning_tokens":300}}}`
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(response))
@@ -178,42 +179,22 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := snapshot.Detail
-	if d.ThinkingMode != "" || d.ThinkingModeBasis != "" || d.ThinkingObserved == nil || !*d.ThinkingObserved {
+	if d.ThinkingMode != "" || d.ThinkingModeBasis != "" || d.ThinkingObserved != nil {
 		t.Fatalf("generic snapshot: %s", before)
 	}
 	if strings.Contains(string(before), "private") {
 		t.Fatal("snapshot retained content")
 	}
 	tiers := []ledger.PriceTier{{ThinkingMode: "qwen_thinking", InputPrice: input, OutputPrice: mustAmount(t, "40")}}
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); err != nil {
-		t.Fatal(err)
+	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); !errors.Is(err, catalog.ErrInvalidInput) {
+		t.Fatalf("removed pricing predicate accepted: %v", err)
 	}
 	var after []byte
 	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
 		t.Fatal(err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("historical snapshot changed after opting in")
+		t.Fatal("historical snapshot changed after rejected configuration")
 	}
-	// A later call sees explicit configuration, while the previous one stays generic.
-	next := e.member("bailian-consumer", "100")
-	_, nextSecret := e.defaultKey(next)
-	e.selectFixtureChannels(next)
-	configured := e.call(nextSecret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
-	if configured.Code != http.StatusOK {
-		t.Fatalf("configured call %d %s", configured.Code, configured.Body.String())
-	}
-	id = configured.Header().Get("X-AIHub-Request-Id")
-	if row := e.callRow(id); row.CostNano != 30_000_000 {
-		t.Fatalf("configured cost %+v", row)
-	}
-	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(after, &snapshot); err != nil {
-		t.Fatal(err)
-	}
-	if snapshot.Detail.ThinkingMode != "qwen_thinking" || snapshot.Detail.ThinkingModeBasis != "bailian_condition" {
-		t.Fatalf("configured snapshot %s", after)
-	}
+
 }

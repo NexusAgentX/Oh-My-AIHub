@@ -39,6 +39,8 @@ UPDATE channel_models cm SET capabilities = ARRAY(
  WHERE (protocol='responses' AND 'openai_responses'=ANY(cm.formats))
  OR (protocol='codex' AND EXISTS (SELECT 1 FROM channels c WHERE c.id=cm.channel_id AND 'codex/inference'=ANY(c.capabilities)))
 );
+-- Old format probes do not establish the new feature-level contract.
+UPDATE channel_models SET format_tests = '{}';
 -- Protocol support is no longer independently configurable per model.
 ALTER TABLE channel_models DROP COLUMN formats;
 

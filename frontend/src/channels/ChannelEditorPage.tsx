@@ -540,7 +540,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
                 testingModel={testingModel}
               />
             </Card>
-            <fieldset className="form-section"><legend>渠道兼容性</legend><CapabilityToggles values={advanced.capabilities} options={channelCapabilities} onChange={capabilities => setAdvanced(current => ({ ...current, capabilities }))} /></fieldset>
+            <Card title="渠道兼容性"><CapabilityToggles values={advanced.capabilities} options={channelCapabilities} onChange={capabilities => setAdvanced(current => ({ ...current, capabilities }))} /></Card>
             <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
               <AdvancedFields form={advanced} onChange={setAdvanced} />
             </Disclosure>

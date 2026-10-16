@@ -23,7 +23,8 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 	channel := func(name, multiplier string, fxDiscount bool) string {
 		created := e.apiJSON(sharer, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 			"name": name, "base_url": relay.server.URL, "api_key": "upstream-key-" + name,
-			"models": []any{map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "fx_discount": fxDiscount}},
+			"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}}},
+			"models":   []any{map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "fx_discount": fxDiscount}},
 		})
 		return created["channel"].(map[string]any)["id"].(string)
 	}
