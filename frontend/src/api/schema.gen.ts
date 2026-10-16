@@ -2779,6 +2779,25 @@ export interface components {
                 units_nano?: {
                     [key: string]: number;
                 };
+                /** @description 图像工具观察信息，不参与计费；不保存提示词或图片。兼容上游的独立用量缺失时不推算。 */
+                image_generations?: {
+                    id: string;
+                    /** @enum {string} */
+                    status?: "in_progress" | "generating" | "completed" | "failed";
+                    model?: string;
+                    /** @enum {string} */
+                    model_source?: "request" | "response";
+                    size?: string;
+                    /** @enum {string} */
+                    quality?: "low" | "medium" | "high" | "xhigh" | "max" | "auto";
+                    /** @enum {string} */
+                    output_format?: "png" | "webp" | "jpeg";
+                    /** @enum {string} */
+                    background?: "transparent" | "opaque" | "auto";
+                    /** @enum {string} */
+                    action?: "generate" | "edit" | "auto";
+                    usage?: components["schemas"]["InferenceUsage"];
+                }[];
                 iterations?: Record<string, never>[];
                 tool_prompt_tokens?: number;
                 notes?: string[];

@@ -452,3 +452,25 @@ it('shows per-inference usage and no tool surcharge', () => {
   expect(markup).toContain('暂不收取工具附加费')
   expect(markup).toContain('图像生成 / 次')
 })
+
+it('shows image metadata and independent usage without treating it as a billed component', () => {
+  const prices = { input: '1', output: '2', cache_read: '0', cache_write: '0' }
+  const markup = renderToStaticMarkup(<PriceSnapshotView snapshot={{
+    base_prices: prices, prices, tier: null, multiplier: '1', fee_rate_nano: 0,
+    detail: { image_generations: [
+      { id: 'ig_complete', status: 'completed', model: 'configured-image', model_source: 'request', size: '1536x864', quality: 'high', output_format: 'webp', background: 'transparent', action: 'edit', usage: { input_tokens: 12, output_tokens: 34, cache_read_tokens: 5, cache_write_tokens: 0 } },
+      { id: 'ig_fail', status: 'failed', model: 'returned-image', model_source: 'response' },
+      { id: 'ig_unknown' },
+    ] },
+  }} />)
+  for (const text of ['图像生成 1', '已完成', '请求配置', '1536x864', '图片质量', 'WEBP', '透明', '编辑图片', '输入 12', '输出 34', '缓存读 5', '上游兼容字段', '失败', '上游返回 · 兼容字段', '上游未提供', '状态未知', '暂不收取']) expect(markup).toContain(text)
+  expect(markup).not.toContain('按各次推理分别选档')
+  expect(markup).not.toContain('图像子推理')
+})
+
+it('does not fabricate image observations for historical snapshots', () => {
+  const prices = { input: '1', output: '2', cache_read: '0', cache_write: '0' }
+  const markup = renderToStaticMarkup(<PriceSnapshotView snapshot={{ base_prices: prices, prices, tier: null, multiplier: '1', fee_rate_nano: 0 }} />)
+  expect(markup).not.toContain('画图模型')
+  expect(markup).not.toContain('图片尺寸')
+})

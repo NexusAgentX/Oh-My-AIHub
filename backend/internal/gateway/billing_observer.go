@@ -3,7 +3,9 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
@@ -106,6 +108,14 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		o.note("工具结果缺少可靠标识，未完整统计")
 		return
 	}
+	if kind == "image_generation_call" {
+		if validObservationID(id) {
+			o.observeImageGeneration(item, id, "")
+		} else {
+			o.note("图像调用标识无效，未完整统计")
+		}
+		return
+	}
 	if o.billedItems == nil {
 		o.billedItems = map[string]struct{}{}
 	}
@@ -160,25 +170,6 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		}
 		o.unit(key, o.detail.Units[key]/ledger.FixedPointScale+1)
 
-	case "image_generation_call":
-		o.unit("image_generation", o.detail.Units["image_generation"]/ledger.FixedPointScale+1)
-		o.note("图像工具仅作观察，暂不收取图像子模型费用")
-		model := textValue(item.get("model"))
-		if model == "" {
-			model = o.imageModel
-		}
-		if model == "" {
-			o.note("图像工具模型缺失，子模型费用未计价")
-			return
-		}
-		usage := item.get("usage")
-		child := NewObserver(channel.FormatOpenAIResponses, false, "application/json")
-		child.absorb(append(append([]byte(`{"usage":`), usage...), '}'))
-		if child.found && len(o.detail.Iterations) < maxBillingItems {
-			o.detail.Iterations = append(o.detail.Iterations, ledger.UsageIteration{Type: "image_generation_call", Model: model, Usage: child.Finish().Usage})
-		} else {
-			o.note("图像工具用量缺失，子模型费用未计价")
-		}
 	}
 }
 
@@ -259,4 +250,115 @@ func (o *Observer) updateIterationTotals(old, next ledger.Usage) {
 
 func hasGroundingMetadata(raw []byte) bool {
 	return bytes.Contains(raw, []byte(`"groundingMetadata"`)) || bytes.Contains(raw, []byte(`\u`))
+}
+
+// Only protocol identifiers, enums and dimensions are retained; generated
+// content, revised prompts and arbitrary error messages never enter snapshots.
+func validObservationID(value string) bool {
+	if len(value) == 0 || len(value) > 256 {
+		return false
+	}
+	for _, c := range value {
+		if c != '_' && c != '-' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func observationEnum(item jsonObject, key string, dest *string, values ...string) {
+	value := textValue(item.get(key))
+	for _, allowed := range values {
+		if value == allowed {
+			*dest = value
+			return
+		}
+	}
+}
+
+func (o *Observer) observeImageGeneration(item jsonObject, id string, eventStatus string) {
+	index := -1
+	for i := range o.detail.ImageGenerations {
+		if o.detail.ImageGenerations[i].ID == id {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		if len(o.billedItems) >= maxBillingItems {
+			o.note("工具结果超过解析上限，未完整统计")
+			return
+		}
+		if o.billedItems == nil {
+			o.billedItems = map[string]struct{}{}
+		}
+		if _, exists := o.billedItems[id]; exists {
+			return
+		}
+		o.billedItems[id] = struct{}{}
+		o.detail.ImageGenerations = append(o.detail.ImageGenerations, ledger.ImageGeneration{ID: id})
+		index = len(o.detail.ImageGenerations) - 1
+		o.unit("image_generation", o.detail.Units["image_generation"]/ledger.FixedPointScale+1)
+		o.note("图像工具仅作观察，暂不收取图像子模型费用")
+	}
+	image := &o.detail.ImageGenerations[index]
+	// Terminal states never regress when a cumulative or repeated frame arrives.
+	if image.Status != "completed" && image.Status != "failed" {
+		next := textValue(item.get("status"))
+		if next == "" {
+			next = eventStatus
+		}
+		if next != "in_progress" || image.Status != "generating" {
+			switch next {
+			case "in_progress", "generating", "completed", "failed":
+				image.Status = next
+			}
+		}
+	}
+	observationEnum(item, "quality", &image.Quality, "low", "medium", "high", "xhigh", "max", "auto")
+	observationEnum(item, "output_format", &image.OutputFormat, "png", "webp", "jpeg")
+	observationEnum(item, "background", &image.Background, "transparent", "opaque", "auto")
+	observationEnum(item, "action", &image.Action, "generate", "edit", "auto")
+	size := textValue(item.get("size"))
+	if len(size) <= 11 {
+		w, h, ok := strings.Cut(size, "x")
+		width, e1 := strconv.Atoi(w)
+		height, e2 := strconv.Atoi(h)
+		if ok && e1 == nil && e2 == nil && width > 0 && height > 0 && width <= 65536 && height <= 65536 && strconv.Itoa(width) == w && strconv.Itoa(height) == h {
+			image.Size = size
+		}
+	}
+	model := textValue(item.get("model"))
+	if catalog.ValidModelID(model) {
+		image.Model, image.ModelSource = model, "response"
+	} else if image.Model == "" && catalog.ValidModelID(o.imageModel) {
+		image.Model, image.ModelSource = o.imageModel, "request"
+	}
+	if raw := item.get("usage"); len(raw) > 0 {
+		child := NewObserver(channel.FormatOpenAIResponses, false, "application/json")
+		child.absorb(append(append([]byte(`{"usage":`), raw...), '}'))
+		if child.found {
+			usage := child.Finish().Usage
+			// Repeated summaries may omit previously reported token subdivisions.
+			if image.Usage == nil {
+				image.Usage = &usage
+			} else {
+				if usage.InputTokens > image.Usage.InputTokens {
+					image.Usage.InputTokens = usage.InputTokens
+				}
+				if usage.OutputTokens > image.Usage.OutputTokens {
+					image.Usage.OutputTokens = usage.OutputTokens
+				}
+				if usage.CacheReadTokens > image.Usage.CacheReadTokens {
+					image.Usage.CacheReadTokens = usage.CacheReadTokens
+				}
+				if usage.CacheWriteTokens > image.Usage.CacheWriteTokens {
+					image.Usage.CacheWriteTokens = usage.CacheWriteTokens
+				}
+				if usage.Detail != nil && len(usage.Detail.Tokens) > 0 {
+					image.Usage.Detail = usage.Detail
+				}
+			}
+		}
+	}
 }
