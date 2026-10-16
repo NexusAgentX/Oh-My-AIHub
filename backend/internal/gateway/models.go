@@ -63,6 +63,31 @@ func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool)
 	writeJSONBody(w, body)
 }
 
+// GetModel uses exactly the same visibility rules and representation as the
+// OpenAI model list; it never contacts an upstream.
+func (e *Engine) GetModel(w http.ResponseWriter, r *http.Request) {
+	key, _, ok := e.authenticate(w, r)
+	if !ok {
+		return
+	}
+	if !key.AccountActive || !keyUsable(key, e.Now()) {
+		WriteError(w, DialectOpenAI, http.StatusUnauthorized, "invalid_api_key", "API Key 或账号已停用或过期", "")
+		return
+	}
+	names, err := e.availableModels(r.Context(), key, listFormats(DialectOpenAI, false))
+	if err != nil {
+		WriteError(w, DialectOpenAI, 500, "internal_error", "读取模型失败", "")
+		return
+	}
+	at := indexOf(names, r.PathValue("model"))
+	if at < 0 {
+		WriteError(w, DialectOpenAI, 404, "model_not_found", "模型不存在或不可用", "")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	writeJSONBody(w, openAIModelList(names[at : at+1])["data"].([]map[string]any)[0])
+}
+
 // listFormats are the formats a model list is for: a model is listed when a
 // channel serves any of them. The OpenAI shape lists models reachable through
 // either OpenAI format; the other shapes list their own.
@@ -73,7 +98,7 @@ func listFormats(dialect Dialect, gemini bool) []channel.Format {
 	case dialect == DialectAnthropic:
 		return []channel.Format{channel.FormatAnthropic}
 	}
-	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}
+	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImageGeneration, channel.FormatOpenAIImageEdit, channel.FormatOpenAIImageVariation}
 }
 
 // openAIModelList is OpenAI's unpaged {"object":"list","data":[Model]}.

@@ -250,6 +250,16 @@ func testBody(format Format, upstreamModel string) []byte {
 	switch format {
 	case FormatOpenAIResponses:
 		return []byte(fmt.Sprintf(`{"model":%s,"input":"hi","max_output_tokens":16,"stream":true}`, model))
+	case FormatOpenAICompact, FormatOpenAICount:
+		return []byte(fmt.Sprintf(`{"model":%s,"input":[{"role":"user","content":"hi"}]}`, model))
+	case FormatOpenAIConversations:
+		return []byte(`{"items":[]}`)
+	case FormatOpenAIImageGeneration:
+		return []byte(fmt.Sprintf(`{"model":%s,"prompt":"A black dot","n":1,"size":"1024x1024","quality":"low"}`, model))
+	case FormatOpenAIImageEdit, FormatOpenAIImageVariation:
+		// These capabilities require a real input image; declare them explicitly
+		// rather than silently sending an invalid Chat request as a probe.
+		return nil
 	case FormatAnthropic:
 		return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":true}`, model))
 	case FormatGemini:

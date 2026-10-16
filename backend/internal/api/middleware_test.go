@@ -72,7 +72,7 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
 	for _, target := range []struct{ method, path string }{
-		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/images/generations"}, {http.MethodGet, "/v1/chat/completions"},
+		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/images/unsupported"}, {http.MethodGet, "/v1/chat/completions"},
 		{http.MethodPost, "/v1beta/models/gemini-2.5-flash:countTokens"}, {http.MethodPost, "/v1beta/other"},
 	} {
 		recorder := httptest.NewRecorder()

@@ -41,9 +41,10 @@ type Observation struct {
 // Observer scans a response as it streams past, without ever altering it and
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
-	format channel.Format
-	stream bool
-	sse    bool
+	trackResource bool
+	format        channel.Format
+	stream        bool
+	sse           bool
 
 	eventData    []byte
 	eventSkip    bool
@@ -94,7 +95,7 @@ type anthropicUsage struct{ input, output, cacheWrite, cacheRead int64 }
 // NewObserver starts a reader for one response of the given format.
 // stream reports whether the client asked for a streamed response.
 func NewObserver(format channel.Format, stream bool, contentType string) *Observer {
-	return &Observer{format: format, stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream")}
+	return &Observer{format: observationFormat(format), stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream")}
 }
 
 // Write feeds one chunk that arrived at the given time.
@@ -296,7 +297,7 @@ func (o *Observer) absorb(raw []byte) {
 	}
 	switch o.format {
 	case channel.FormatOpenAIChat:
-		if keys&keyUsage != 0 {
+		if keys&keyUsage != 0 || o.trackResource && o.responseID == "" && keys&keyID != 0 {
 			o.absorbChat(raw)
 		}
 	case channel.FormatOpenAIResponses:
@@ -399,10 +400,11 @@ func (o *Observer) setResponsesUsage(u *responsesUsage) {
 	o.found = true
 }
 func (o *Observer) absorbChat(raw []byte) {
-	if !bytes.Contains(raw, []byte(`"usage"`)) {
+	if !bytes.Contains(raw, []byte(`"usage"`)) && !(o.trackResource && o.responseID == "") {
 		return
 	}
 	var value struct {
+		ID    string `json:"id"`
 		Usage *struct {
 			PromptTokens        *int64          `json:"prompt_tokens"`
 			CompletionTokens    *int64          `json:"completion_tokens"`
@@ -412,7 +414,13 @@ func (o *Observer) absorbChat(raw []byte) {
 			CacheHit            json.RawMessage `json:"prompt_cache_hit_tokens"`
 		} `json:"usage"`
 	}
-	if json.Unmarshal(raw, &value) != nil || value.Usage == nil {
+	if json.Unmarshal(raw, &value) != nil {
+		return
+	}
+	if o.trackResource && value.ID != "" {
+		o.responseID = value.ID
+	}
+	if value.Usage == nil {
 		return
 	}
 	u := value.Usage
