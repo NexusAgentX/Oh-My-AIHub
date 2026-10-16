@@ -321,3 +321,71 @@ func TestBillingGeminiGroundingArrivesAfterUsage(t *testing.T) {
 		t.Fatalf("late grounding was double charged: %+v", got.Usage)
 	}
 }
+
+func TestBackgroundFollowupsPreserveOpaqueProtocolContent(t *testing.T) {
+	fixture := &backgroundFixture{jobs: map[string]BackgroundJob{}, finished: map[string]CallFinish{}, key: KeyAuth{KeyID: "key", OwnerID: "consumer", Enabled: true, AccountActive: true}}
+	keyring, err := channel.ParseKeyring("v1="+base64.StdEncoding.EncodeToString(make([]byte, 32)), "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential, err := keyring.Encrypt("channel", 1, "original-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exchanges atomic.Int64
+	opaque := []byte{0, 1, 2, 255}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		exchanges.Add(1)
+		if r.Header.Get("Authorization") != "Bearer original-secret" || r.Header.Get("X-Future-Header") != "keep" || r.URL.Query().Get("future_flag") != "keep" || r.URL.Query().Get("key") != "" {
+			t.Errorf("opaque followup changed: %s headers=%v", r.URL, r.Header)
+		}
+		if r.Header.Get("OpenAI-Project") != "original-project" || r.Header.Get("OpenAI-Organization") != "live-org" {
+			t.Error("followup lost frozen scope defaults or live overrides")
+		}
+		if r.Method == http.MethodPost {
+			raw, _ := io.ReadAll(r.Body)
+			if string(raw) != string(opaque) || r.Header.Get("Content-Type") != "application/octet-stream" {
+				t.Error("cancel body was rewritten")
+			}
+		}
+		io.WriteString(w, "opaque response")
+	}))
+	defer upstream.Close()
+	engine := NewEngine(Dependencies{Store: fixture, Jobs: fixture, Keyring: keyring})
+	engine.settingsSnap.Store(&settingsSnapshot{outbound: backgroundOutbound{client: upstream.Client()}})
+	metadata := backgroundMetadata{Candidate: Candidate{ChannelID: "channel", Credential: credential, BaseURL: upstream.URL}, ModelID: "main", Location: authBearer, Headers: http.Header{"Openai-Project": {"original-project"}, "Openai-Organization": {"original-org"}}}
+	raw, _ := json.Marshal(metadata)
+	fixture.jobs["call"] = BackgroundJob{CallID: "call", ResponseID: "resp_opaque", AccountID: "consumer", KeyID: "key", Metadata: raw}
+	invoke := func(method string, length int64) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(method, "/v1/responses/resp_opaque?future_flag=keep&key=sk-aih-test", strings.NewReader(string(opaque)))
+		request.ContentLength = length
+		request.SetPathValue("responseID", "resp_opaque")
+		request.Header.Set("Authorization", "Bearer sk-aih-test")
+		request.Header.Set("X-Future-Header", "keep")
+		request.Header.Set("OpenAI-Organization", "live-org")
+		request.Header.Set("Content-Type", "application/octet-stream")
+		response := httptest.NewRecorder()
+		engine.ServeResponse(response, request, method == http.MethodPost)
+		return response
+	}
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		got := invoke(method, int64(len(opaque)))
+		if got.Code != 200 || got.Body.String() != "opaque response" {
+			t.Fatalf("%s: %d %s", method, got.Code, got.Body.String())
+		}
+	}
+	if invoke(http.MethodPost, maxRequestBytes+1).Code != 413 {
+		t.Fatal("oversized followup accepted")
+	}
+	fixture.key.AllowedModels = []string{"other"}
+	if invoke(http.MethodGet, 0).Code != 403 {
+		t.Fatal("model revocation ignored")
+	}
+	fixture.key.Enabled = false
+	if invoke(http.MethodGet, 0).Code != 401 {
+		t.Fatal("key revocation ignored")
+	}
+	if exchanges.Load() != 2 || len(fixture.finished) != 0 {
+		t.Fatal("followup routed or settled unexpectedly")
+	}
+}

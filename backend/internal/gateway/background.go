@@ -141,7 +141,7 @@ func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate 
 		// A failed durable registration must not silently leave provider work running.
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		response, _, err := e.backgroundExchange(ctx, metadata, id, http.MethodPost, "cancel", "")
+		response, _, err := e.backgroundExchange(ctx, metadata, id, http.MethodPost, "cancel", "", nil)
 		if err == nil {
 			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxFailureBody))
 			response.Body.Close()
@@ -229,7 +229,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		// before falling back to an interrupted call without reliable usage.
 		cancelCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 		defer stop()
-		if response, secret, err := e.backgroundExchange(cancelCtx, metadata, job.ResponseID, http.MethodPost, "cancel", ""); err == nil {
+		if response, secret, err := e.backgroundExchange(cancelCtx, metadata, job.ResponseID, http.MethodPost, "cancel", "", nil); err == nil {
 			if response.StatusCode >= 200 && response.StatusCode < 300 {
 				watchCtx, watchCancel := context.WithCancel(context.Background())
 				result := attemptResult{response: response, started: metadata.Started, upstream: cancelCtx, cancel: func(error) {}, watch: watchClient(watchCtx, func(error) {}, e.DrainWindow), secret: secret}
@@ -249,7 +249,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 	}
 	pollCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 	defer stop()
-	response, secret, err := e.backgroundExchange(pollCtx, metadata, job.ResponseID, http.MethodGet, "", "")
+	response, secret, err := e.backgroundExchange(pollCtx, metadata, job.ResponseID, http.MethodGet, "", "", nil)
 	if err != nil {
 		return
 	}
@@ -277,7 +277,7 @@ func (d discardResponseWriter) Header() http.Header       { return d.header }
 func (discardResponseWriter) WriteHeader(int)             {}
 func (discardResponseWriter) Write(p []byte) (int, error) { return len(p), nil }
 
-func (e *Engine) backgroundExchange(ctx context.Context, m backgroundMetadata, id, method, operation, query string) (*http.Response, string, error) {
+func (e *Engine) backgroundExchange(ctx context.Context, m backgroundMetadata, id, method, operation, query string, body io.Reader) (*http.Response, string, error) {
 	if !responseIDPattern.MatchString(id) {
 		return nil, "", ErrBackgroundNotFound
 	}
@@ -301,7 +301,7 @@ func (e *Engine) backgroundExchange(ctx context.Context, m backgroundMetadata, i
 	if err != nil {
 		return nil, "", err
 	}
-	request, err := http.NewRequestWithContext(ctx, method, target, nil)
+	request, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return nil, "", err
 	}
@@ -355,13 +355,24 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	if cancel {
 		operation, method = "cancel", http.MethodPost
 	}
-	// These are the retrieval API's protocol parameters, never client credentials.
-	values := r.URL.Query()
-	values.Del("key")
-	for name := range values {
-		if name != "stream" && name != "starting_after" && name != "include" && name != "include[]" {
-			values.Del(name)
+	// Apply the ordinary gateway credential/hop-header rules to live follow-ups.
+	// Preserve opaque protocol headers, body and query parameters; UpstreamURL
+	// removes the platform's key parameter before adding any upstream credential.
+	headers := metadata.Headers.Clone()
+	if headers == nil {
+		headers = make(http.Header)
+	}
+	for name, values := range r.Header {
+		headers[name] = values
+	}
+	metadata.Headers = headers
+	var body io.Reader
+	if cancel && r.Body != nil && r.Body != http.NoBody {
+		if r.ContentLength > maxRequestBytes {
+			WriteError(w, DialectOf(r), 413, "request_too_large", "请求体过大", job.CallID)
+			return
 		}
+		body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 	}
 	ctx, stop := context.WithTimeout(r.Context(), e.CallTimeLimit)
 	defer stop()
@@ -371,8 +382,13 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		timer = time.AfterFunc(timeouts.ttft, stop)
 		defer timer.Stop()
 	}
-	response, secret, err := e.backgroundExchange(ctx, metadata, id, method, operation, values.Encode())
+	response, secret, err := e.backgroundExchange(ctx, metadata, id, method, operation, r.URL.RawQuery, body)
 	if err != nil {
+		var limitErr *http.MaxBytesError
+		if errors.As(err, &limitErr) {
+			WriteError(w, DialectOf(r), 413, "request_too_large", "请求体过大", job.CallID)
+			return
+		}
 		WriteError(w, DialectOf(r), 502, "upstream_failed", "读取上游响应失败", job.CallID)
 		return
 	}
@@ -390,7 +406,7 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	if timer != nil {
 		timer.Stop()
 	}
-	if timeouts.idle > 0 && values.Get("stream") == "true" {
+	if timeouts.idle > 0 && r.URL.Query().Get("stream") == "true" {
 		timer = time.AfterFunc(timeouts.idle, stop)
 		defer timer.Stop()
 	} else {
