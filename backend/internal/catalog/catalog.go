@@ -355,7 +355,7 @@ func Validate(model Model) error {
 	}
 	for _, modalities := range [][]string{model.InputModalities, model.OutputModalities} {
 		for _, value := range modalities {
-			if value != "text" && value != "image" && value != "audio" && value != "video" {
+			if value == "file" {
 				return ErrInvalidInput
 			}
 		}

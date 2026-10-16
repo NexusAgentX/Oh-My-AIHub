@@ -171,7 +171,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
           </div>
           <div className="model-row-formats">
             <details><summary>模型兼容性 · {row.capabilities?.length ?? 0} 项</summary><CapabilityToggles values={row.capabilities} options={modelCapabilities} passed={row.passed} errors={row.errors} onChange={capabilities => update(row.key, { capabilities })} /></details>
-            {Object.keys(row.errors ?? {}).length > 0 && <details className="format-test-errors"><summary>查看探测失败原因</summary><ul>{Object.entries(row.errors ?? {}).map(([cell, error]) => <li key={cell}><strong>{cell}</strong>：{error}</li>)}</ul></details>}
+            {Object.keys(row.errors ?? {}).length > 0 && <details className="format-test-errors"><summary>查看探测详情</summary><ul>{Object.entries(row.errors ?? {}).map(([cell, error]) => <li key={cell}><strong>{cell}</strong>：{error}</li>)}</ul></details>}
 
           </div>
           <div className="model-row-multiplier">
@@ -213,7 +213,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
             {usdRate(row) && row.fxDiscount && <small title={effectiveOf(row) ?? undefined}>实际倍率 {shortMultiplier(effectiveOf(row) ?? '—')}</small>}
           </span>
           <div className="model-row-actions">
-            <Button aria-label={`测试 ${row.modelId || row.upstream} 的格式`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">测试</Button>
+            <Button aria-label={`探测 ${row.modelId || row.upstream} 的兼容性`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">探测</Button>
             <IconButton icon={<Icon name="x" />} label="移除" onClick={() => onChange(rows.filter((item) => item.key !== row.key))} />
           </div>
         </li>

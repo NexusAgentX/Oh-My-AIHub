@@ -42,10 +42,11 @@ type probeResponse struct {
 		Context string `json:"context"`
 		Effort  string `json:"effort"`
 	} `json:"reasoning"`
-	Error       json.RawMessage   `json:"error"`
-	Output      []json.RawMessage `json:"output"`
-	Data        json.RawMessage   `json:"data"`
-	InputTokens *int64            `json:"input_tokens"`
+	Error        json.RawMessage   `json:"error"`
+	Output       []json.RawMessage `json:"output"`
+	Data         json.RawMessage   `json:"data"`
+	InputTokens  *int64            `json:"input_tokens"`
+	SearchOutput string            `json:"-"`
 }
 
 func (s *Service) testCompatibility(ctx context.Context, ownerID, id string, request TestRequest) ([]TestOutcome, Channel, error) {
@@ -350,7 +351,7 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 			return value, fmt.Errorf("HTTP %d %s", status, strings.TrimSpace(string(limited)))
 		}
 		if strings.HasPrefix(strings.ToLower(res.Header.Get("Content-Type")), "text/event-stream") {
-			if body["stream"] != true {
+			if job.Feature == "nonstream" {
 				return value, errors.New("上游未遵守非流式请求")
 			}
 			reader := &io.LimitedReader{R: res.Body, N: testStreamLimit + 1}
@@ -386,6 +387,9 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 			}
 			return value, errors.New("测试流未正常结束或超过大小限制")
 		}
+		if job.Feature == "stream" {
+			return value, errors.New("流式请求未返回 SSE")
+		}
 		// Image payloads are bounded too; no generated artifact is persisted.
 		limit := int64(testStreamLimit)
 		if strings.Contains(endpoint, "/images/") || job.Feature == "image_generation" {
@@ -394,6 +398,17 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 		raw, err = io.ReadAll(io.LimitReader(res.Body, limit+1))
 		if err != nil || int64(len(raw)) > limit {
 			return value, errors.New("响应读取失败或超过大小限制")
+		}
+		if job.Feature == "search" {
+			var search struct {
+				Output string          `json:"output"`
+				Error  json.RawMessage `json:"error"`
+			}
+			if json.Unmarshal(raw, &search) != nil || strings.TrimSpace(search.Output) == "" || len(search.Error) > 0 && string(search.Error) != "null" {
+				return value, errors.New("缺少有效搜索结果")
+			}
+			value.SearchOutput = search.Output
+			return value, nil
 		}
 		if json.Unmarshal(raw, &value) != nil {
 			return value, errors.New("响应不是有效 JSON")
@@ -413,9 +428,9 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 		return map[string]any{"type": "function", "name": name, "description": "Return the requested value.", "parameters": map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}, "required": []string{"value"}, "additionalProperties": false}, "strict": true}
 	}
 	switch job.Feature {
-	case "tool_search", "file_search", "code_interpreter", "mcp", "computer", "shell", "apply_patch", "images_edit", "search", "vision":
+	case "tool_search", "file_search", "code_interpreter", "mcp", "computer", "shell", "apply_patch", "images_edit", "vision":
 		return skip()
-	case "inference":
+	case "inference", "nonstream":
 	case "stream":
 		body["stream"] = true
 	case "zstd":
@@ -484,6 +499,13 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 		body["tools"] = []any{map[string]any{"type": "image_generation", "quality": "low"}}
 		body["tool_choice"] = map[string]any{"type": "image_generation"}
 		body["input"] = "Generate a plain black dot on white."
+	case "search":
+		endpoint := strings.TrimSuffix(root, "/responses") + "/alpha/search"
+		_, err := send(http.MethodPost, endpoint, map[string]any{
+			"id": "compatibility-probe", "model": job.Model.UpstreamModel,
+			"commands": map[string]any{"search_query": []any{map[string]any{"q": "OpenAI official website", "domains": []string{"openai.com"}}}, "response_length": "short"},
+		})
+		return finish(err)
 	case "images_generate":
 		endpoint := strings.TrimSuffix(root, "/responses") + "/images/generations"
 		value, err := send(http.MethodPost, endpoint, map[string]any{"model": job.Model.UpstreamModel, "prompt": "A black dot on white.", "n": 1, "quality": "low"})
@@ -568,9 +590,63 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	if err = validResponse(value); err != nil {
 		return finish(err)
 	}
+	verifyToolRoundTrip := func() error {
+		next := make(map[string]any, len(body))
+		for key, value := range body {
+			next[key] = value
+		}
+		input, ok := body["input"].([]any)
+		if !ok {
+			return errors.New("缺少工具调用输入")
+		}
+		input = slices.Clone(input)
+		outputs := make([]any, 0)
+		for _, raw := range value.Output {
+			input = append(input, raw)
+			var item struct {
+				Type   string `json:"type"`
+				CallID string `json:"call_id"`
+				Name   string `json:"name"`
+			}
+			if json.Unmarshal(raw, &item) != nil {
+				return errors.New("工具条目无效")
+			}
+			if item.Type != "function_call" && item.Type != "custom_tool_call" {
+				continue
+			}
+			if item.CallID == "" || !strings.HasPrefix(item.Name, "compat_") && !strings.Contains(item.Name, ".compat_") {
+				return errors.New("未返回要求的工具或 call_id")
+			}
+			kind := "function_call_output"
+			if item.Type == "custom_tool_call" {
+				kind = "custom_tool_call_output"
+			}
+			outputs = append(outputs, map[string]any{"type": kind, "call_id": item.CallID, "output": `{"value":"compatibility-result-17"}`})
+		}
+		if len(outputs) == 0 {
+			return errors.New("未返回要求的工具调用")
+		}
+		input = append(input, outputs...)
+		input = append(input, map[string]any{"role": "user", "content": "Print the value returned by the tool exactly. Do not call another tool."})
+		next["input"], next["tool_choice"] = input, "none"
+		continuation, err := send(http.MethodPost, root, next)
+		if err != nil {
+			return err
+		}
+		if err = validResponse(continuation); err != nil {
+			return err
+		}
+		if !strings.Contains(probeText(continuation.Output), "compatibility-result-17") {
+			return errors.New("工具结果回传未通过，未返回执行器提供的值")
+		}
+		return nil
+	}
 	require := func(ok bool, message string) TestOutcome {
 		if !ok {
 			return finish(errors.New(message))
+		}
+		if slices.Contains([]string{"function_tools", "custom_tools", "tool_namespaces", "parallel_tools", "responses_lite"}, job.Feature) {
+			return finish(verifyToolRoundTrip())
 		}
 		return finish(nil)
 	}
@@ -617,7 +693,15 @@ func (s *Service) probeCompatibilityCell(ctx context.Context, policy Outbound, c
 	case "web_search":
 		return require(probeOutputKind(value.Output, "web_search_call"), "未观察到服务端搜索调用")
 	case "image_generation":
-		return require(probeOutputKind(value.Output, "image_generation_call"), "未观察到生图调用")
+		complete := false
+		for _, raw := range value.Output {
+			var image struct{ Type, Status, Result string }
+			_ = json.Unmarshal(raw, &image)
+			if image.Type == "image_generation_call" && image.Status == "completed" && image.Result != "" {
+				complete = true
+			}
+		}
+		return require(complete, "未返回完成的生图结果")
 	}
 	return finish(nil)
 }

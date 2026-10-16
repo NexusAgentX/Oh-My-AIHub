@@ -31,7 +31,7 @@ describe('channel wizard', () => {
     ])
     expect(tested[0].capabilities).toEqual(['codex/vision', 'responses/function_tools'])
     expect(tested[0].passed).toEqual({ 'responses/function_tools': true })
-    expect(tested[0].errors).toEqual({})
+    expect(tested[0].errors).toEqual({ 'codex/vision': 'manual' })
   })
 
   it('rejects selling a model without a platform match or format', () => {

@@ -1,6 +1,7 @@
 package postgres_test
 
 import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"net/http"
 	"strings"
@@ -14,12 +15,14 @@ func TestCodexFixedSettingsAndCapabilityIsolation(t *testing.T) {
 	up := okUpstream(t)
 	e.createChannel(provider, channelSpec{name: "ordinary", upstream: up})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	request := []byte(`{"model":"gpt-test","store":false,"input":"hello"}`)
 	rejected := e.call(secret, http.MethodPost, "/backend-api/codex/responses", request, nil)
 	if rejected.Code != 503 || !strings.Contains(rejected.Body.String(), "capability_unavailable") {
 		t.Fatalf("%d %s", rejected.Code, rejected.Body.String())
 	}
-	e.createChannel(provider, channelSpec{name: "codex", upstream: up, advanced: map[string]any{"capabilities": []string{"codex_backend", "codex_search"}}, capabilities: []string{"responses_lite", "compact_v2"}})
+	codexID := e.createChannel(provider, channelSpec{name: "codex", upstream: up, advanced: map[string]any{"compatibility": channel.Matrix(channel.ChannelCapabilities)}, capabilities: []string{"codex/responses_lite", "codex/compact_v2"}})
+	e.apiJSON(consumer, 200, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "manual", "order": []string{codexID}})
 	accepted := e.call(secret, http.MethodPost, "/backend-api/codex/responses", request, nil)
 	if accepted.Code != 200 {
 		t.Fatalf("%d %s", accepted.Code, accepted.Body.String())

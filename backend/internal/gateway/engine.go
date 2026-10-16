@@ -786,14 +786,13 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			if state != StateAvailable {
 				reason = why
 			} else if _, bad := stats.anomalies[call.modelID][candidate.ChannelID]; bad {
-				reason = "demoted"
+				reason = "anomalous"
 			}
 		}
 		call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: reason})
 	}
 	ordered := Rank(RankInput{
-		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
-		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
+		Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Sticky: sticky,
 		Available: func(c Candidate) bool {
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
 			return state == StateAvailable

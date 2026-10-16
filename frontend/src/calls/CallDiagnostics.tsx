@@ -34,6 +34,7 @@ const labels: Record<string, string> = {
   revenue: '收入上限',
   daily_revenue: '收入上限',
   demoted: '异常降级',
+  anomalous: '4xx 异常',
   sticky: '沿用上次渠道',
   cheapest: '价格优先',
   reliable: '稳定优先',

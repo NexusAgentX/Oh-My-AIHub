@@ -23,7 +23,7 @@ import (
 // from the invalidation that call made.
 
 func chatRequest(e *env, secret string) *httptest.ResponseRecorder {
-	return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 }
 
 // probe sends a chat request and reports what happened: the status, and
@@ -61,6 +61,7 @@ func TestSecurityChangesTakeEffectBeforeTheAdminCallReturns(t *testing.T) {
 	relay := okUpstream(t)
 	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	p := probe{e: e, secret: secret, upstrms: []*upstream{relay}}
 	p.expect(t, "before any change", http.StatusOK, true)
 
@@ -156,6 +157,7 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	other := okUpstream(t)
 	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	p := probe{e: e, secret: secret, upstrms: []*upstream{relay, other}}
 	cost := func(step string, recorder *httptest.ResponseRecorder) int64 {
 		t.Helper()
@@ -169,7 +171,7 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 		e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, body)
 	}
 	models := func(multiplier string, formats []string, extra map[string]any) []any {
-		model := map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "formats": formats}
+		model := map[string]any{"model_id": "gpt-test", "multiplier": multiplier}
 		for name, value := range extra {
 			model[name] = value
 		}
@@ -197,12 +199,12 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 		"id": "late-model", "display_name": "Late", "base_prices": map[string]string{"input": "1", "output": "1", "cache_write": "0", "cache_read": "0"},
 	})
 	late := func() *httptest.ResponseRecorder {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"late-model"}`), nil)
+		return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"late-model"}`), nil)
 	}
 	if got := late().Code; got != http.StatusServiceUnavailable {
 		t.Fatalf("new model without a channel = %d", got)
 	}
-	patchChannel(map[string]any{"models": append(models("1", allFormats, nil), map[string]any{"model_id": "late-model", "multiplier": "1", "formats": []string{"openai_chat"}})})
+	patchChannel(map[string]any{"models": append(models("1", allFormats, nil), map[string]any{"model_id": "late-model", "multiplier": "1"})})
 	if got := late().Code; got != http.StatusOK {
 		t.Fatalf("new model once a channel offers it = %d", got)
 	}
@@ -248,11 +250,11 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"allowed_models": []string{"claude-test"}})
 	p.expect(t, "model outside the allowed list", http.StatusForbidden, false)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"allowed_models": []string{}, "model_aliases": map[string]string{"my-gpt": "gpt-test"}})
-	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"my-gpt"}`), nil).Code; got != http.StatusOK {
+	if got := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"my-gpt"}`), nil).Code; got != http.StatusOK {
 		t.Fatalf("alias = %d", got)
 	}
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"model_aliases": map[string]string{}})
-	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"my-gpt"}`), nil).Code; got != http.StatusNotFound {
+	if got := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"my-gpt"}`), nil).Code; got != http.StatusNotFound {
 		t.Fatalf("removed alias = %d", got)
 	}
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"expires_at": time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)})
@@ -323,8 +325,10 @@ func TestKeyStateChangesAreSeenAtOnceUnderLoad(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	bystander := e.member("bystander", "1000")
 	_, bystanderSecret := e.defaultKey(bystander)
+	e.selectFixtureChannels(bystander)
 
 	stop := make(chan struct{})
 	var traffic sync.WaitGroup
@@ -366,6 +370,7 @@ func TestPeriodicRebuildPicksUpChangesMadeBehindTheServer(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "100")
 	keyID, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	fast := e.store.Cached(slog.New(slog.NewTextHandler(io.Discard, nil)), func(c *snapshot.Config) { c.Interval = 50 * time.Millisecond })
 	ctx := context.Background()
 	if err := fast.Cache.Load(ctx); err != nil {

@@ -1,4 +1,4 @@
-import { matrixCells } from './Capabilities'
+import { matrixCells, channelCapabilities, CapabilityToggles } from './Capabilities'
 import { SupplierRecognition } from '../sharing/SupplierRecognition'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -274,6 +274,7 @@ function ChannelWizard() {
               testing={testing}
               testingModel={testingModel}
             />
+            <fieldset className="form-section"><legend>渠道兼容性</legend><CapabilityToggles values={advanced.capabilities} options={channelCapabilities} onChange={capabilities => setAdvanced(current => ({ ...current, capabilities }))} /></fieldset>
             <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
               <AdvancedFields form={advanced} onChange={setAdvanced} />
             </Disclosure>
@@ -306,9 +307,9 @@ function ChannelWizard() {
                 <dd>{selling.length} 个</dd>
               </div>
               <div>
-                <dt>格式</dt>
+                <dt>协议</dt>
                 <dd>
-                  <FormatTags formats={[...new Set(selling.flatMap((row) => row.formats))]} />
+                  <FormatTags formats={[...(advanced.capabilities?.includes('responses/inference') ? ['openai_responses' as const] : []), ...(advanced.capabilities?.includes('codex/inference') ? ['codex' as const] : [])]} />
                 </dd>
               </div>
               <div>
@@ -539,6 +540,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
                 testingModel={testingModel}
               />
             </Card>
+            <fieldset className="form-section"><legend>渠道兼容性</legend><CapabilityToggles values={advanced.capabilities} options={channelCapabilities} onChange={capabilities => setAdvanced(current => ({ ...current, capabilities }))} /></fieldset>
             <Disclosure changed={advancedChangedCount(advanced)} title="高级设置">
               <AdvancedFields form={advanced} onChange={setAdvanced} />
             </Disclosure>

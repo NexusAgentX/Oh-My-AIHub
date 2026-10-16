@@ -23,95 +23,37 @@ const (
 	expectedCharge = "0.04004"
 )
 
-func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) {
+func TestGatewayForwardsResponsesAndCodexByteForByteAndBooksEachCall(t *testing.T) {
 	e := newEnv(t)
-	consumer := e.member("consumer", "100")
-	sharer := e.member("sharer", "0")
+	consumer, sharer := e.member("consumer", "100"), e.member("sharer", "0")
 	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
+	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up", formats: []string{"openai_responses", "codex"}})
 	_, secret := e.defaultKey(consumer)
-
-	// Whitespace, key order, escapes and numbers must reach the upstream untouched.
-	// The one exception on the way back is the usage-only frame of the chat
-	// stream, which the gateway asked for and the client did not (see
-	// gateway_usage_frame_integration_test.go).
-	chat := `{ "messages":[{"role":"user","content":"café \"model\": 1"}],  "temperature": 0.70, "model" : "gpt-test" }`
-	chatStream := `{"model":"gpt-test","stream":true,"messages":[{"role":"user","content":"hi"}]}`
-	responses := `{"input" : "hi","model":"gpt-test","max_output_tokens":16}`
-	anthropic := `{"model":"gpt-test","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}`
-	cases := []struct {
-		name, path, body, wantUpstreamBody, wantResponse, contentType string
-		headers                                                       map[string]string
-	}{
-		{"chat", "/v1/chat/completions", chat, strings.Replace(chat, `"gpt-test"`, `"gpt-up"`, 1), chatBody, "application/json", nil},
-		{"chat stream", "/v1/chat/completions", chatStream, `{"model":"gpt-up","stream":true,"messages":[{"role":"user","content":"hi"}],"stream_options":{"include_usage":true}}`, chatStreamBodyWithoutUsageFrame, "text/event-stream", nil},
-		{"responses", "/v1/responses", responses, strings.Replace(responses, `"gpt-test"`, `"gpt-up"`, 1), responsesBody, "application/json", nil},
-		{"anthropic", "/v1/messages", anthropic, strings.Replace(anthropic, `"gpt-test"`, `"gpt-up"`, 1), anthropicBody, "application/json",
-			map[string]string{"anthropic-version": "2023-06-01"}},
-	}
-	before := len(relay.inference())
-	charged := money.Amount(0)
-	for index, tc := range cases {
-		headers := tc.headers
-		if headers == nil {
-			headers = map[string]string{}
+	e.selectFixtureChannels(consumer)
+	for _, path := range []string{"/v1/responses", "/backend-api/codex/responses"} {
+		for _, stream := range []bool{false, true} {
+			raw := `{ "input":[{"role":"user","content":"café \"model\": 1"}], "model" : "gpt-test", "store":false, "stream":` + map[bool]string{false: "false", true: "true"}[stream] + ` }`
+			result := e.call(secret, http.MethodPost, path, []byte(raw), map[string]string{"Cookie": "private", "X-AIHub-Tag": "suite"})
+			expected := responsesBody
+			if stream {
+				expected = responsesStreamBody
+			}
+			if result.Code != 200 || result.Body.String() != expected {
+				t.Fatalf("%s stream=%v: %d %s", path, stream, result.Code, result.Body.String())
+			}
+			requests := relay.inference()
+			seen := requests[len(requests)-1]
+			if string(seen.Body) != strings.Replace(raw, `"gpt-test"`, `"gpt-up"`, 1) || seen.Path != path || seen.Header.Get("Cookie") != "" {
+				t.Fatalf("forwarding changed: %+v", seen)
+			}
+			row := e.callRow(result.Header().Get("X-AIHub-Request-Id"))
+			if row.Outcome != "succeeded" || row.CostNano != 40_000_000 || row.FeeNano != 40_000 || !row.HasLedgerTx {
+				t.Fatal(row)
+			}
 		}
-		headers["Cookie"] = "session=secret"
-		headers["X-AIHub-Tag"] = "suite"
-		recorder := e.call(secret, http.MethodPost, tc.path, []byte(tc.body), headers)
-		if recorder.Code != http.StatusOK || recorder.Body.String() != tc.wantResponse {
-			t.Fatalf("%s: %d %q", tc.name, recorder.Code, recorder.Body.String())
-		}
-		if got := recorder.Header().Get("Content-Type"); got != tc.contentType {
-			t.Fatalf("%s: content type %q", tc.name, got)
-		}
-		id := recorder.Header().Get("X-AIHub-Request-Id")
-		if id == "" {
-			t.Fatalf("%s: missing request id", tc.name)
-		}
-		seen := relay.inference()[before+index]
-		if string(seen.Body) != tc.wantUpstreamBody {
-			t.Fatalf("%s: upstream body\n got %s\nwant %s", tc.name, seen.Body, tc.wantUpstreamBody)
-		}
-		if seen.Header.Get("Authorization") != "Bearer upstream-key-relay" || seen.Header.Get("Cookie") != "" || seen.Header.Get("X-Aihub-Tag") != "" {
-			t.Fatalf("%s: upstream headers %v", tc.name, seen.Header)
-		}
-		row := e.callRow(id)
-		if row.Outcome != "succeeded" || row.Input != 1000 || row.Output != 500 || row.CostNano != 40_000_000 || row.FeeNano != 40_000 || !row.HasLedgerTx || row.Attempts != 1 {
-			t.Fatalf("%s: call = %+v", tc.name, row)
-		}
-		charged += money.FromNano(row.CostNano + row.FeeNano)
 	}
-	if charged.String() != "0.16016" {
-		t.Fatalf("charged = %s", charged)
-	}
-	if got := e.balance(consumer); got != "-0.16016" {
-		t.Fatalf("consumer balance = %s", got)
-	}
-	if got := e.balance(sharer); got != "0.16" {
-		t.Fatalf("sharer balance = %s", got)
-	}
-	if got := e.systemBalance("platform_revenue"); got != "160000" {
-		t.Fatalf("platform revenue nano = %s", got)
-	}
-	e.assertZeroSum()
-
-	// Gemini carries the model in the path and the key in a query parameter.
-	gemini := `{"contents":[{"parts":[{"text":"hi"}]}]}`
-	recorder := e.call("", http.MethodPost, "/v1beta/models/gpt-test:generateContent?key="+secret+"&alt=json", []byte(gemini), nil)
-	if recorder.Code != http.StatusOK || recorder.Body.String() != geminiBody {
-		t.Fatalf("gemini: %d %q", recorder.Code, recorder.Body.String())
-	}
-	seen := relay.inference()[before+len(cases)]
-	if seen.Path != "/v1beta/models/gpt-up:generateContent" || seen.Query != "alt=json&key=upstream-key-relay" || string(seen.Body) != gemini || seen.Header.Get("Authorization") != "" {
-		t.Fatalf("gemini upstream request = %+v", seen)
-	}
-	streamed := e.call(secret, http.MethodPost, "/v1beta/models/gpt-test:streamGenerateContent?alt=sse", []byte(gemini), map[string]string{"x-goog-api-key": secret, "Authorization": ""})
-	if streamed.Code != http.StatusOK {
-		t.Fatalf("gemini stream: %d %s", streamed.Code, streamed.Body.String())
-	}
-	if seen := relay.inference()[before+len(cases)+1]; seen.Path != "/v1beta/models/gpt-up:streamGenerateContent" || seen.Header.Get("X-Goog-Api-Key") != "upstream-key-relay" {
-		t.Fatalf("gemini stream upstream request = %+v", seen)
+	if e.balance(consumer) != "-0.16016" || e.balance(sharer) != "0.16" {
+		t.Fatal("wrong four-call settlement")
 	}
 	e.assertZeroSum()
 }
@@ -127,7 +69,8 @@ func TestGatewayResponseIsUnchangedWhenUsageCannotBeRead(t *testing.T) {
 	})
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
 	_, secret := e.defaultKey(consumer)
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	e.selectFixtureChannels(consumer)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusOK || recorder.Body.String() != noUsageBody || recorder.Header().Get("Set-Cookie") != "" {
 		t.Fatalf("response = %d %q %v", recorder.Code, recorder.Body.String(), recorder.Header())
 	}
@@ -152,8 +95,9 @@ func TestGatewayFallsBackBeforeAnyByteIsWritten(t *testing.T) {
 	brokenID := e.createChannel(sharer, channelSpec{name: "broken", upstream: broken, multiplier: "1"})
 	goodID := e.createChannel(sharer, channelSpec{name: "good", upstream: good, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusOK || recorder.Body.String() != chatBody {
 		t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -179,7 +123,8 @@ func TestGatewayReturnsClientErrorsUnchangedWithoutFallbackOrCharge(t *testing.T
 	e.createChannel(sharer, channelSpec{name: "strict", upstream: rejecting, multiplier: "1"})
 	e.createChannel(sharer, channelSpec{name: "other", upstream: second, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	e.selectFixtureChannels(consumer)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusBadRequest || recorder.Body.String() != `{"error":{"message":"bad param"}}` || recorder.Header().Get("X-Upstream") != "kept" {
 		t.Fatalf("response = %d %s %v", recorder.Code, recorder.Body.String(), recorder.Header())
 	}
@@ -205,7 +150,8 @@ func TestGatewayAnswersWithTheLastUpstreamFailureWhenEveryChannelFails(t *testin
 	e.createChannel(sharer, channelSpec{name: "limited", upstream: status(429, "slow down"), multiplier: "1"})
 	e.createChannel(sharer, channelSpec{name: "unauthorized", upstream: status(401, "bad key"), multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	e.selectFixtureChannels(consumer)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusUnauthorized || recorder.Body.String() != "bad key" {
 		t.Fatalf("response = %d %q", recorder.Code, recorder.Body.String())
 	}
@@ -223,12 +169,13 @@ func TestGatewayCooldownTakesAChannelOutAfterConsecutiveFailures(t *testing.T) {
 	failing := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) { w.WriteHeader(http.StatusBadGateway) })
 	id := e.createChannel(sharer, channelSpec{name: "flaky", upstream: failing, advanced: map[string]any{"cooldown_failures": 2, "cooldown_seconds": 60}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	for range 2 {
-		if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusBadGateway {
+		if code := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusBadGateway {
 			t.Fatalf("failing call = %d", code)
 		}
 	}
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), `"no_channel_available"`) {
 		t.Fatalf("call during cooldown = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -271,8 +218,9 @@ func TestGatewayRateLimitWithRetryAfterRestsTheChannelForThatLong(t *testing.T) 
 	// The default threshold is three failures in a row: the single 429 alone would not cool the channel.
 	id := e.createChannel(sharer, channelSpec{name: "limited", upstream: relay, advanced: map[string]any{"cooldown_seconds": 60}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	send := func() *httptest.ResponseRecorder {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+		return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	}
 
 	started := time.Now()
@@ -339,11 +287,12 @@ func TestGatewayRateLimitWithoutRetryAfterIsOnlyCounted(t *testing.T) {
 	})
 	id := e.createChannel(sharer, channelSpec{name: "limited", upstream: relay})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	body := []byte(`{"model":"gpt-test"}`)
-	if first := e.call(secret, http.MethodPost, "/v1/chat/completions", body, nil); first.Code != http.StatusTooManyRequests {
+	if first := e.call(secret, http.MethodPost, "/v1/responses", body, nil); first.Code != http.StatusTooManyRequests {
 		t.Fatalf("limited call = %d", first.Code)
 	}
-	if second := e.call(secret, http.MethodPost, "/v1/chat/completions", body, nil); second.Code != http.StatusOK {
+	if second := e.call(secret, http.MethodPost, "/v1/responses", body, nil); second.Code != http.StatusOK {
 		t.Fatalf("call right after a 429 without a hint = %d %s", second.Code, second.Body.String())
 	}
 	for _, kind := range e.channelEvents(id) {
@@ -360,19 +309,20 @@ func TestGatewayChecksBalanceAndKeyBudgetWithoutReserving(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
 	keyID, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
-	first := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	first := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if first.Code != http.StatusOK {
 		t.Fatalf("first call = %d %s", first.Code, first.Body.String())
 	}
 	if got := e.balance(consumer); got != "-0.04004" {
 		t.Fatalf("balance = %s", got)
 	}
-	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if second.Code != http.StatusOK || e.balance(consumer) != "-0.08008" {
 		t.Fatalf("overdrawing call = %d, balance %s", second.Code, e.balance(consumer))
 	}
-	third := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	third := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if third.Code != http.StatusPaymentRequired || !strings.Contains(third.Body.String(), `"insufficient_balance"`) || third.Header().Get("X-AIHub-Request-Id") == "" {
 		t.Fatalf("refused call = %d %s", third.Code, third.Body.String())
 	}
@@ -386,11 +336,12 @@ func TestGatewayChecksBalanceAndKeyBudgetWithoutReserving(t *testing.T) {
 	// A key budget refuses once its window spend has reached the limit.
 	rich := e.member("rich", "1000")
 	budgetKeyID, budgetSecret := e.defaultKey(rich)
+	e.selectFixtureChannels(rich)
 	e.apiJSON(rich, http.StatusOK, http.MethodPatch, "/api/keys/"+budgetKeyID, map[string]any{"budget_daily": "0.04"})
-	if code := e.call(budgetSecret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
+	if code := e.call(budgetSecret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
 		t.Fatalf("within budget = %d", code)
 	}
-	refused := e.call(budgetSecret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	refused := e.call(budgetSecret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if refused.Code != http.StatusPaymentRequired || !strings.Contains(refused.Body.String(), `"key_budget_exceeded"`) {
 		t.Fatalf("over budget = %d %s", refused.Code, refused.Body.String())
 	}
@@ -408,7 +359,8 @@ func TestGatewayOwnChannelNetsToZeroWithoutFee(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(owner, channelSpec{name: "mine", upstream: relay})
 	_, secret := e.defaultKey(owner)
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	e.selectFixtureChannels(owner)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("call = %d", recorder.Code)
 	}

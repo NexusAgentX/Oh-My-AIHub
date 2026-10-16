@@ -16,6 +16,7 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	keyID, _ := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	exec := func(sql string, args ...any) {
 		t.Helper()
 		if _, err := e.pool.Exec(ctx, sql, args...); err != nil {
@@ -32,7 +33,7 @@ func TestAdminDeleteModelPreservesHistoryAndRejectsChannelReferences(t *testing.
 	exec(`INSERT INTO route_prefs(account_id, model_id) VALUES ($1, 'gpt-test')`, consumer.id)
 	exec(`INSERT INTO route_prefs(account_id, api_key_id, model_id) VALUES ($1, $2, 'gpt-test')`, consumer.id, keyID)
 	exec(`UPDATE api_keys SET allowed_models = ARRAY['gpt-test'], model_aliases = '{"alias":"gpt-test"}' WHERE id = $1`, keyID)
-	exec(`INSERT INTO model_price_tiers(model_id, seq, name, min_prompt_tokens, timezone, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million) VALUES ('gpt-test', 1, 'long', 100, 'UTC', 1, 1, 1, 1)`)
+	exec(`INSERT INTO model_price_tiers(model_id, seq, name, min_input_tokens, timezone, input_price_nano_per_million, output_price_nano_per_million, cache_write_price_nano_per_million, cache_read_price_nano_per_million) VALUES ('gpt-test', 1, 'long', 100, 'UTC', 1, 1, 1, 1)`)
 	callID, err := e.store.Gateway.InsertCall(ctx, gateway.CallInsert{AccountID: consumer.id, RequestedModel: "gpt-test", Format: channel.FormatOpenAIChat, Outcome: gateway.OutcomeInProgress})
 	if err != nil {
 		t.Fatal(err)

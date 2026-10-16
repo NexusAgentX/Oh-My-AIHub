@@ -93,7 +93,7 @@ func TestSupplierDirectoryAndHall(t *testing.T) {
 			t.Fatal("inexact match")
 		}
 	}
-	ch := owner.expect(t, 201, http.MethodPost, "/api/channels", map[string]any{"name": "共享测试", "summary": "简短介绍", "description": "详细 **说明**", "base_url": "https://relay.example/v1", "api_key": "sk-secret-never-expose", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": []map[string]any{{"model_id": "deepseek-chat", "multiplier": "1.2"}}})["channel"].(map[string]any)
+	ch := owner.expect(t, 201, http.MethodPost, "/api/channels", map[string]any{"name": "共享测试", "summary": "简短介绍", "description": "详细 **说明**", "base_url": "https://relay.example/v1", "api_key": "sk-secret-never-expose", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": []map[string]any{{"model_id": "deepseek-chat", "multiplier": "1.2"}}})["channel"].(map[string]any)
 	channelID := ch["id"].(string)
 	impact := admin.expect(t, 200, http.MethodPost, "/api/admin/suppliers/preview", map[string]any{"endpoints": body["endpoints"]})
 	if impact["linked_channels"] != float64(1) {
@@ -123,7 +123,7 @@ func TestSupplierDirectoryAndHall(t *testing.T) {
 		t.Fatal("stale metadata")
 	}
 	seedModel(t, admin, "other-model")
-	owner.expect(t, 200, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": []map[string]any{
+	owner.expect(t, 200, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": []map[string]any{
 		{"model_id": "deepseek-chat", "enabled": true, "multiplier": "1.2"},
 		{"model_id": "other-model", "enabled": true, "multiplier": "1"},
 	}})
@@ -157,7 +157,7 @@ func TestSupplierAggregatesCustomPricesWithoutMixingChannels(t *testing.T) {
 	id := created["id"].(string)
 	var channelIDs []string
 	for _, price := range []map[string]string{{"input": "1", "output": "9", "cache_read": "4", "cache_write": "5"}, {"input": "2", "output": "1", "cache_read": "8", "cache_write": "7"}} {
-		c := owner.expect(t, 201, http.MethodPost, "/api/channels", map[string]any{"name": "Custom offer", "base_url": "https://relay.example", "api_key": "sk-only-fixture-key", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": []map[string]any{{"model_id": "custom-one", "custom_prices": price}}})["channel"].(map[string]any)
+		c := owner.expect(t, 201, http.MethodPost, "/api/channels", map[string]any{"name": "Custom offer", "base_url": "https://relay.example", "api_key": "sk-only-fixture-key", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": []map[string]any{{"model_id": "custom-one", "custom_prices": price}}})["channel"].(map[string]any)
 		channelIDs = append(channelIDs, c["id"].(string))
 	}
 	page := owner.expect(t, 200, http.MethodGet, "/api/suppliers/"+id, nil)
@@ -176,7 +176,7 @@ func TestSupplierAggregatesCustomPricesWithoutMixingChannels(t *testing.T) {
 	if second["next_cursor"] != nil || second["items"].([]any)[0].(map[string]any)["id"] == first["items"].([]any)[0].(map[string]any)["id"] {
 		t.Fatal("invalid pagination")
 	}
-	owner.expect(t, 200, http.MethodPatch, "/api/channels/"+channelIDs[1], map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": []map[string]any{{"model_id": "custom-one", "enabled": false, "custom_prices": map[string]string{"input": "2", "output": "1", "cache_read": "8", "cache_write": "7"}}}})
+	owner.expect(t, 200, http.MethodPatch, "/api/channels/"+channelIDs[1], map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": []map[string]any{{"model_id": "custom-one", "enabled": false, "custom_prices": map[string]string{"input": "2", "output": "1", "cache_read": "8", "cache_write": "7"}}}})
 	page = owner.expect(t, 200, http.MethodGet, "/api/suppliers/"+id, nil)
 	model = page["models"].([]any)[0].(map[string]any)
 	if model["online_channels"] != float64(1) || model["lowest_prices"].(map[string]any)["input"] != "1" {

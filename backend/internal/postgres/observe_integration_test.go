@@ -43,7 +43,7 @@ func (e *env) get(p person, path string) map[string]any {
 
 func (e *env) chat(secret string, headers map[string]string) string {
 	e.t.Helper()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), headers)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), headers)
 	if recorder.Code != http.StatusOK {
 		e.t.Fatalf("chat = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -711,6 +711,7 @@ func TestObserveOwnChannelCallsAreNotMissingBookings(t *testing.T) {
 	relay := okUpstream(t)
 	channelID := e.createChannel(owner, channelSpec{name: "mine", upstream: relay})
 	_, secret := e.defaultKey(owner)
+	e.selectFixtureChannels(owner)
 	id := e.chat(secret, nil)
 	if row := e.callRow(id); row.HasLedgerTx || row.CostNano != 40_000_000 {
 		t.Fatalf("own call = %+v", row)
@@ -878,8 +879,9 @@ func TestObserveOverviewFlagsAFailingChannel(t *testing.T) {
 	broken := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) { w.WriteHeader(http.StatusBadGateway) })
 	channelID := e.createChannel(sharer, channelSpec{name: "shaky", upstream: broken, advanced: map[string]any{"cooldown_failures": 100}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	for index := 0; index < 20; index++ {
-		e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+		e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	}
 	var found map[string]any
 	for _, item := range asList(t, e.get(e.admin, "/api/admin/overview")["attention"]) {
@@ -1023,6 +1025,7 @@ func TestObserveModelDetailShowsDailyCapRemaining(t *testing.T) {
 	e.createChannel(sharer, channelSpec{name: "capped", upstream: relay, multiplier: "1", advanced: map[string]any{"daily_revenue_cap": "0.1"}})
 	e.createChannel(sharer, channelSpec{name: "open", upstream: relay, multiplier: "3"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	e.chat(secret, nil) // 0.02 of the 0.1 cap
 	detail := e.get(consumer, "/api/models/gpt-test")
 	remaining := map[string]any{}
@@ -1172,7 +1175,7 @@ func TestObserveMetricsExposeCoreSeriesWithoutUserLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An unknown, user-chosen model name must not become a label value.
-	o.call(o.secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"definitely-not-in-the-catalog-alice-secret"}`), nil)
+	o.call(o.secret, http.MethodPost, "/v1/responses", []byte(`{"model":"definitely-not-in-the-catalog-alice-secret"}`), nil)
 	time.Sleep(300 * time.Millisecond)
 	recorder := httptest.NewRecorder()
 	o.metrics.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))

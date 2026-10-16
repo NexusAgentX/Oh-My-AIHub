@@ -7,7 +7,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
 func candidate(id, owner string, multiplier float64) Candidate {
@@ -29,7 +28,7 @@ func TestRankDefaultNeverChoosesAChannel(t *testing.T) {
 }
 
 func TestRankManualDoesNotReorderByPriceHealthOrOwnership(t *testing.T) {
-	got := Rank(RankInput{Mode: routing.ModeManual, Order: []string{"c", "b", "a"}, Candidates: []Candidate{candidate("a", "me", 0), candidate("b", "owner", 1), candidate("c", "owner", 10)}, ConsumerID: "me", Stats: map[string]ChannelStats{"c": {Attempts: 100, Successes: 1}}, Demoted: map[string]Anomaly{"c": {}}})
+	got := Rank(RankInput{Order: []string{"c", "b", "a"}, Candidates: []Candidate{candidate("a", "me", 0), candidate("b", "owner", 1), candidate("c", "owner", 10)}})
 	if ids(got) != "cba" {
 		t.Fatalf("manual order changed: %s", ids(got))
 	}
@@ -37,7 +36,7 @@ func TestRankManualDoesNotReorderByPriceHealthOrOwnership(t *testing.T) {
 
 func TestRankManualFollowsOrderAndDropsUnlistedAndUnticked(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1), candidate("new", "x", 1)}
-	got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"c", "a", "b"}, Excluded: []string{"a"}, Candidates: candidates}))
+	got := ids(Rank(RankInput{Order: []string{"c", "a", "b"}, Excluded: []string{"a"}, Candidates: candidates}))
 	if got != "cb" {
 		t.Fatalf("order = %s, want cb", got)
 	}
@@ -45,11 +44,11 @@ func TestRankManualFollowsOrderAndDropsUnlistedAndUnticked(t *testing.T) {
 
 func TestRankStickyMovesPreviousChannelToFront(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "c"}))
+	got := ids(Rank(RankInput{Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "c"}))
 	if got != "cab" {
 		t.Fatalf("order = %s, want cab", got)
 	}
-	if got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "gone"})); got != "abc" {
+	if got := ids(Rank(RankInput{Order: []string{"a", "b", "c"}, Candidates: candidates, Sticky: "gone"})); got != "abc" {
 		t.Fatalf("order = %s, want abc", got)
 	}
 }
@@ -57,7 +56,7 @@ func TestRankStickyMovesPreviousChannelToFront(t *testing.T) {
 func TestRankDropsUnavailableAndExcluded(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
 	got := ids(Rank(RankInput{
-		Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Excluded: []string{"c"},
+		Order: []string{"a", "b", "c"}, Candidates: candidates, Excluded: []string{"c"},
 		Available: func(c Candidate) bool { return c.ChannelID != "a" },
 	}))
 	if got != "b" {

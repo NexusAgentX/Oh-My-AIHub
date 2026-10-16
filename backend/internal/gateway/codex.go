@@ -47,8 +47,10 @@ func (e *Engine) ServeCodexConfig(w http.ResponseWriter, r *http.Request) {
 
 // Immutable one-cell requirements keep ordinary requests allocation-free. Any
 // extension append exceeds capacity and gets a request-owned backing array.
-var responsesInferenceRequirements = []string{"responses/inference"}
-var codexInferenceRequirements = []string{"codex/inference"}
+var responsesInferenceRequirements = []string{"responses/inference", "responses/nonstream"}
+var codexInferenceRequirements = []string{"codex/inference", "codex/nonstream"}
+var responsesStreamRequirements = []string{"responses/inference", "responses/stream"}
+var codexStreamRequirements = []string{"codex/inference", "codex/stream"}
 
 // identifyCapabilities scans only structural request fields. Prompt strings never
 // establish capabilities. All slices borrow the bounded incoming request body.
@@ -67,6 +69,12 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 	}
 	if format != channel.FormatOpenAIResponses && format != channel.FormatOpenAIImages {
 		return op, nil
+	}
+	rawField := func(name string) []byte {
+		if member, ok := scan.last(name); ok {
+			return body[member.start:member.end]
+		}
+		return nil
 	}
 	switch operationOf(path) {
 	case operationCompact:
@@ -95,13 +103,14 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 			if protocol == "codex" {
 				needed = codexInferenceRequirements
 			}
+			if bytes.Equal(rawField("stream"), []byte("true")) {
+				needed = responsesStreamRequirements
+				if protocol == "codex" {
+					needed = codexStreamRequirements
+				}
+			}
+
 		}
-	}
-	rawField := func(name string) []byte {
-		if member, ok := scan.last(name); ok {
-			return body[member.start:member.end]
-		}
-		return nil
 	}
 	if bytes.Equal(rawField("stream"), []byte("true")) {
 		add("stream")
@@ -220,6 +229,12 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 			case "additional_tools":
 				add("responses_lite")
 				visit(tools, depth+1, true)
+			case "function_call", "function_call_output":
+				add("function_tools")
+			case "custom_tool_call", "custom_tool_call_output":
+				add("custom_tools")
+			case "tool_search_call", "tool_search_output":
+				add("tool_search")
 			case "reasoning":
 				if encrypted {
 					add("encrypted_reasoning")

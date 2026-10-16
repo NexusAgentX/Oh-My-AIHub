@@ -11,7 +11,7 @@ import (
 type Compatibility map[string][]string
 
 var Protocols = []string{"responses", "codex"}
-var ChannelFeatures = []string{"inference", "stream", "background", "response_read", "response_delete", "response_cancel", "input_items", "conversations", "input_tokens", "compact", "zstd"}
+var ChannelFeatures = []string{"inference", "nonstream", "stream", "background", "response_read", "response_delete", "response_cancel", "input_items", "conversations", "input_tokens", "compact", "zstd"}
 var CodexChannelFeatures = []string{"search", "images_generate", "images_edit"}
 var ModelFeatures = []string{"function_tools", "custom_tools", "tool_namespaces", "tool_search", "parallel_tools", "structured_output", "reasoning", "encrypted_reasoning", "reasoning_all_turns", "vision", "web_search", "image_generation", "responses_lite", "compact_v1", "compact_v2", "compaction_input", "file_search", "code_interpreter", "mcp", "computer", "shell", "apply_patch", "fast", "ultrafast"}
 

@@ -278,6 +278,7 @@ func (s *perfStack) populate(channels, consumers int) {
 	for i := range consumers {
 		consumer := e.member(fmt.Sprintf("consumer%d", i), "1000000")
 		_, secret := e.defaultKey(consumer)
+		e.selectFixtureChannels(consumer)
 		budget := e.apiJSON(consumer, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{
 			"name": "budget", "budget_daily": "100000", "budget_monthly": "100000", "budget_total": "100000",
 		})

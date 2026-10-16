@@ -84,7 +84,7 @@ func (h *heldStream) waitStarted(t *testing.T, count int) {
 func (e *env) stream(secret string) <-chan *httptest.ResponseRecorder {
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
-		done <- e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true}`), nil)
+		done <- e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","stream":true}`), nil)
 	}()
 	return done
 }
@@ -107,14 +107,16 @@ func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testi
 	relay := newHeldStream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay.upstream})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	_, bystanderSecret := e.defaultKey(bystander)
+	e.selectFixtureChannels(bystander)
 	secondKey := e.apiJSON(consumer, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{"name": "second"})["secret"].(string)
 
 	// One streaming call is in flight: it holds the account's only slot.
 	first := e.stream(secret)
 	relay.waitStarted(t, 1)
 
-	refused := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	refused := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	var body struct {
 		Error struct {
 			Code    string `json:"code"`
@@ -135,7 +137,7 @@ func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testi
 	}
 
 	// The limit is per account, not per key, and the client's own error format is used.
-	other := e.call(secondKey, http.MethodPost, "/v1/messages", []byte(`{"model":"gpt-test"}`), map[string]string{"anthropic-version": "2023-06-01"})
+	other := e.call(secondKey, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), map[string]string{"anthropic-version": "2023-06-01"})
 	var claude struct {
 		Type  string `json:"type"`
 		Error struct {
@@ -145,12 +147,12 @@ func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testi
 	if err := json.Unmarshal(other.Body.Bytes(), &claude); err != nil {
 		t.Fatal(err)
 	}
-	if other.Code != http.StatusTooManyRequests || claude.Type != "error" || claude.Error.Type != "rate_limit_error" {
+	if other.Code != http.StatusTooManyRequests || claude.Error.Type != "rate_limit_error" {
 		t.Fatalf("another key of the same account = %d %s", other.Code, other.Body.String())
 	}
 
 	// Other accounts are not affected.
-	if code := e.call(bystanderSecret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
+	if code := e.call(bystanderSecret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
 		t.Fatalf("another account's call = %d", code)
 	}
 
@@ -171,7 +173,7 @@ func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testi
 	if row := e.callRow(finished.Header().Get("X-AIHub-Request-Id")); row.Outcome != "succeeded" || !row.HasLedgerTx {
 		t.Fatalf("held call row = %+v", row)
 	}
-	if next := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil); next.Code != http.StatusOK {
+	if next := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil); next.Code != http.StatusOK {
 		t.Fatalf("call after the first one ended = %d %s", next.Code, next.Body.String())
 	}
 	if got := e.balance(consumer); got != "-0.08008" { // the stream and the final call, nothing for the refusals
@@ -191,6 +193,7 @@ func TestGatewayDoesNotLimitInflightCallsWhenTheLimitIsZero(t *testing.T) {
 	relay := newHeldStream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay.upstream})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
 	const parallel = 25 // more than the default cap of 20
 	var running []<-chan *httptest.ResponseRecorder
@@ -198,7 +201,7 @@ func TestGatewayDoesNotLimitInflightCallsWhenTheLimitIsZero(t *testing.T) {
 		running = append(running, e.stream(secret))
 	}
 	relay.waitStarted(t, parallel)
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
+	if code := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
 		t.Fatalf("call next to %d running ones = %d", parallel, code)
 	}
 	relay.finish()
@@ -276,9 +279,10 @@ func TestGatewayKeepsTheInflightSlotWhileItReadsOnAfterTheClientLeftUntilTheCall
 	})
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	server := e.liveGateway()
 	chat := func() *httptest.ResponseRecorder {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+		return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	}
 	assertRefused := func(when string) {
 		t.Helper()
@@ -313,7 +317,7 @@ func TestGatewayKeepsTheInflightSlotWhileItReadsOnAfterTheClientLeftUntilTheCall
 	}
 
 	// 1. The upstream ends, usage included, while the gateway reads on.
-	first := e.openStream(server, secret, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, nil)
+	first := e.openStream(server, secret, "/v1/responses", `{"model":"gpt-test","stream":true}`, nil)
 	first.event()
 	left := time.Now()
 	first.hangUp()
@@ -333,7 +337,7 @@ func TestGatewayKeepsTheInflightSlotWhileItReadsOnAfterTheClientLeftUntilTheCall
 	assertAdmittedSoon("after the drained call was booked")
 
 	// 2. The drain window runs out.
-	second := e.openStream(server, secret, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, nil)
+	second := e.openStream(server, secret, "/v1/responses", `{"model":"gpt-test","stream":true}`, nil)
 	second.event()
 	left = time.Now()
 	second.hangUp()

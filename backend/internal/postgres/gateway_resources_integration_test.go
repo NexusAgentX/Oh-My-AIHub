@@ -22,7 +22,9 @@ func TestStoredResourceRegistrySurvivesRestartAndCredentialRotation(t *testing.T
 	})
 	channelID := e.createChannel(sharer, channelSpec{name: "stored-resource", upstream: upstream, key: "original-secret"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	_, foreign := e.defaultKey(other)
+	e.selectFixtureChannels(other)
 	created := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","store":true,"input":"private input"}`), nil)
 	if created.Code != 200 {
 		t.Fatalf("%d %s", created.Code, created.Body.String())

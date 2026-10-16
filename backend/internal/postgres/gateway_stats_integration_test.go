@@ -319,12 +319,13 @@ func TestCountingWhileRequestsRunEqualsTheOldQuery(t *testing.T) {
 	strictID := e.createChannel(sharer, channelSpec{name: "strict", upstream: strict.upstream, model: "claude-test", advanced: noCooldown})
 	tailID := e.createChannel(sharer, channelSpec{name: "tail", upstream: hangingUp, model: "gemini-test"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	server := e.liveGateway()
 
 	send := func(model string, stream bool) *http.Response {
 		t.Helper()
 		body := fmt.Sprintf(`{"model":%q,"stream":%v}`, model, stream)
-		request, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/chat/completions", strings.NewReader(body))
+		request, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/responses", strings.NewReader(body))
 		request.Header.Set("Authorization", "Bearer "+secret)
 		response, err := http.DefaultClient.Do(request)
 		if err != nil {
@@ -352,7 +353,7 @@ func TestCountingWhileRequestsRunEqualsTheOldQuery(t *testing.T) {
 	}
 	// A client that hangs up while the answer is still coming says nothing about the channel.
 	flaky.status.Store(0)
-	stream := e.openStream(server, secret, "/v1/chat/completions", `{"model":"gemini-test","stream":true}`, nil)
+	stream := e.openStream(server, secret, "/v1/responses", `{"model":"gemini-test","stream":true}`, nil)
 	stream.event()
 	stream.hangUp()
 	e.waitFinished(stream.requestID(), time.Now())
@@ -379,141 +380,9 @@ func TestCountingWhileRequestsRunEqualsTheOldQuery(t *testing.T) {
 
 // ---- ranking ----
 
-// streamTo sends a streaming chat request and returns the recorder.
-func streamTo(e *env, secret, model string) int {
-	e.t.Helper()
-	return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(fmt.Sprintf(`{"model":%q,"stream":true}`, model)), nil).Code
-}
-
 func setRouting(e *env, consumer person, body map[string]any) {
 	e.t.Helper()
 	e.apiJSON(consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", body)
-}
-
-// Fastest-first ranks by the first-token median of each channel's streaming
-// calls, counted in memory as the calls ended: it does not matter which channel
-// was created first, and the calls table is not consulted.
-func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
-	for _, fastCreatedFirst := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fast channel created first=%v", fastCreatedFirst), func(t *testing.T) {
-			e := newEnv(t)
-			consumer := e.member("consumer", "1000")
-			sharer := e.member("sharer", "0")
-			fast := newScriptedUpstream(t, 0, "")
-			slow := newScriptedUpstream(t, 250*time.Millisecond, "")
-			create := func(name string, u *scriptedUpstream) string {
-				return e.createChannel(sharer, channelSpec{name: name, upstream: u.upstream, multiplier: "1"})
-			}
-			var fastID, slowID string
-			if fastCreatedFirst {
-				fastID = create("fast", fast)
-				slowID = create("slow", slow)
-			} else {
-				slowID = create("slow", slow)
-				fastID = create("fast", fast)
-			}
-			_, secret := e.defaultKey(consumer)
-
-			// One streaming call through each channel, chosen by hand.
-			for _, id := range []string{slowID, fastID} {
-				setRouting(e, consumer, map[string]any{"mode": "manual", "order": []string{id}})
-				if code := streamTo(e, secret, "gpt-test"); code != http.StatusOK {
-					t.Fatalf("seeding call = %d", code)
-				}
-			}
-			setRouting(e, consumer, map[string]any{"mode": "fastest"})
-			e.engine.RefreshStats()
-			stats := e.engine.Stats()
-			if stats[fastID].TTFTP50MS == nil || stats[slowID].TTFTP50MS == nil || *stats[fastID].TTFTP50MS >= *stats[slowID].TTFTP50MS {
-				t.Fatalf("first-token medians: fast %+v slow %+v", stats[fastID], stats[slowID])
-			}
-
-			// With the calls table emptied, the memory alone has to decide.
-			if _, err := e.pool.Exec(context.Background(), `DELETE FROM calls`); err != nil {
-				t.Fatal(err)
-			}
-			fastBefore, slowBefore := len(fast.inference()), len(slow.inference())
-			for range 6 {
-				if code := streamTo(e, secret, "gpt-test"); code != http.StatusOK {
-					t.Fatalf("call = %d", code)
-				}
-			}
-			if fastHits, slowHits := len(fast.inference())-fastBefore, len(slow.inference())-slowBefore; fastHits != 6 || slowHits != 0 {
-				t.Fatalf("fastest mode sent %d calls to the fast channel and %d to the slow one", fastHits, slowHits)
-			}
-		})
-	}
-}
-
-// Stable-first ranks by the success rate of the last 24 hours once a channel
-// has 20 attempts. The figures follow the traffic: when the leading channel
-// starts to fail, its failures are counted as they happen and the other takes
-// the lead as soon as the stats are republished.
-func TestReliableModeFollowsTheSuccessRatesCountedInMemory(t *testing.T) {
-	book := gateway.NewStatsBook()
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.StatsBook = book })
-	consumer := e.member("consumer", "1000")
-	sharer := e.member("sharer", "0")
-	steady := newScriptedUpstream(t, 0, overloadedBody)
-	wobbly := newScriptedUpstream(t, 0, overloadedBody)
-	noCooldown := map[string]any{"cooldown_failures": 100}
-	steadyID := e.createChannel(sharer, channelSpec{name: "steady", upstream: steady.upstream, multiplier: "1", advanced: noCooldown})
-	wobblyID := e.createChannel(sharer, channelSpec{name: "wobbly", upstream: wobbly.upstream, multiplier: "1", advanced: noCooldown})
-	_, secret := e.defaultKey(consumer)
-	setRouting(e, consumer, map[string]any{"mode": "reliable"})
-
-	// Yesterday's record, as the gateway would have counted it.
-	now := time.Now()
-	for _, entry := range []struct {
-		id         string
-		ok, failed int
-	}{{steadyID, 28, 2}, {wobblyID, 20, 10}} {
-		for range entry.ok {
-			book.Record(entry.id, "gpt-test", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
-		}
-		for range entry.failed {
-			book.Record(entry.id, "gpt-test", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
-		}
-	}
-	e.engine.RefreshStats()
-
-	hits := func() [2]int { return [2]int{len(steady.inference()), len(wobbly.inference())} }
-	send := func() {
-		t.Helper()
-		if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusOK {
-			t.Fatalf("call = %d", code)
-		}
-		e.engine.RefreshStats()
-	}
-	for range 4 {
-		send()
-	}
-	if got := hits(); got != [2]int{4, 0} {
-		t.Fatalf("hits (steady, wobbly) = %v, want the steadier channel to take every call", got)
-	}
-
-	// The steady channel breaks. Each call tries it first, fails there (counted
-	// against it), and is answered by the other channel.
-	steady.status.Store(http.StatusServiceUnavailable)
-	for range 40 {
-		send()
-	}
-	stats := e.engine.Stats()
-	if stats[steadyID].Attempts <= 30 || stats[steadyID].Successes != 28+4 {
-		t.Fatalf("steady stats = %+v: its failures were not counted as they happened", stats[steadyID])
-	}
-	// Once its success rate has fallen below the other's, the calls skip it.
-	before := hits()
-	for range 5 {
-		send()
-	}
-	after := hits()
-	if after[0] != before[0] || after[1] != before[1]+5 {
-		t.Fatalf("hits before %v after %v: the broken channel is still tried first", before, after)
-	}
-	if e.callsTableHoldsAttemptsOf(steadyID) == 0 {
-		t.Fatal("the calls table should hold the live attempts too")
-	}
 }
 
 func (e *env) callsTableHoldsAttemptsOf(channelID string) int {
@@ -543,14 +412,7 @@ func eventReasons(e *env, channelID, kind string) []string {
 	return reasons
 }
 
-// A channel that answers every request for a model with a 4xx (the cheapest
-// one, say, with a wrong upstream model name the upstream does not recognise
-// as such) takes every call, because a 4xx is the request's own fault and is
-// never retried elsewhere. Once it has 20 attempts and nothing speaks against
-// the idea that the channel is at fault, it goes to the back of the line, its
-// owner and the administrators get a channel event, and the next call is
-// answered by another channel. It is not excluded.
-func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
+func TestChannelAnomalyIsReportedWithoutChangingManualOrder(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
@@ -560,8 +422,9 @@ func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
 	brokenID := e.createChannel(sharer, channelSpec{name: "broken", upstream: broken.upstream, multiplier: "1"})
 	healthyID := e.createChannel(sharer, channelSpec{name: "healthy", upstream: healthy.upstream, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	call := func() int {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code
+		return e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code
 	}
 
 	for index := range 19 {
@@ -585,14 +448,14 @@ func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
 		t.Fatalf("the healthy channel was reached %d times before the anomaly", len(healthy.inference()))
 	}
 
-	// From now on the other channel goes first.
+	// Anomaly observations do not override the user's explicit order.
 	for range 3 {
-		if code := call(); code != http.StatusOK {
-			t.Fatalf("call after the anomaly = %d", code)
+		if code := call(); code != 400 {
+			t.Fatal(code)
 		}
 	}
-	if got := len(healthy.inference()); got != 3 || len(broken.inference()) != 20 {
-		t.Fatalf("healthy channel hit %d times (want 3), broken one %d times (want still 20)", got, len(broken.inference()))
+	if len(healthy.inference()) != 0 || len(broken.inference()) != 23 {
+		t.Fatal("manual order changed")
 	}
 	for range 5 {
 		e.engine.RefreshStats()
@@ -622,16 +485,16 @@ func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
 		t.Fatalf("administrator's channel page has no events: %v", adminDetail)
 	}
 
-	// Demoted, not excluded: when the healthy channel fails, the broken one is
-	// still tried, and its 400 is what the client gets.
+	e.apiJSON(consumer, 200, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "manual", "order": []string{healthyID, brokenID}})
 	healthy.status.Store(http.StatusServiceUnavailable)
-	brokenBefore, healthyBefore := len(broken.inference()), len(healthy.inference())
-	if code := call(); code != http.StatusBadRequest {
-		t.Fatalf("call with the healthy channel down = %d, want the broken channel's 400", code)
+	healthyBefore, brokenBefore := len(healthy.inference()), len(broken.inference())
+	if code := call(); code != 400 {
+		t.Fatal(code)
 	}
 	if len(healthy.inference()) != healthyBefore+1 || len(broken.inference()) != brokenBefore+1 {
-		t.Fatalf("the healthy channel was tried %d times and the broken one %d times", len(healthy.inference())-healthyBefore, len(broken.inference())-brokenBefore)
+		t.Fatal("explicit fallback order lost")
 	}
+
 }
 
 // When every channel of the model answers with a 4xx the clients are at fault,
@@ -648,9 +511,10 @@ func TestFourXXFromEveryChannelIsNotHeldAgainstOne(t *testing.T) {
 	firstID := e.createChannel(sharer, channelSpec{name: "first", upstream: first.upstream, multiplier: "1"})
 	secondID := e.createChannel(sharer, channelSpec{name: "second", upstream: second.upstream, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	call := func() {
 		t.Helper()
-		if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusBadRequest {
+		if code := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusBadRequest {
 			t.Fatalf("call = %d", code)
 		}
 	}
@@ -658,7 +522,8 @@ func TestFourXXFromEveryChannelIsNotHeldAgainstOne(t *testing.T) {
 		call()
 	}
 	e.engine.RefreshStats()
-	// The first channel is the only one with data, so it is moved back: the next calls reach the second.
+	// Both channels receive samples only after an explicit order change.
+	setRouting(e, consumer, map[string]any{"mode": "manual", "order": []string{secondID, firstID}})
 	for range 20 {
 		call()
 	}
@@ -666,7 +531,8 @@ func TestFourXXFromEveryChannelIsNotHeldAgainstOne(t *testing.T) {
 		t.Fatalf("first channel hit %d times, second %d times: the demotion did not send the calls to the second", len(first.inference()), len(second.inference()))
 	}
 	e.engine.RefreshStats()
-	// Both answer 4xx every time: neither stands out, the order is by price again.
+	// Restore the explicit first-channel order.
+	setRouting(e, consumer, map[string]any{"mode": "manual", "order": []string{firstID, secondID}})
 	firstBefore := len(first.inference())
 	call()
 	if len(first.inference()) != firstBefore+1 {
@@ -700,6 +566,7 @@ func TestStatisticsAreReadFromTheDatabaseOnlyAtStartup(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
 	if err := e.engine.LoadStats(context.Background()); err != nil {
 		t.Fatal(err)

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
 // ---- counting an attempt where it ends ----
@@ -382,37 +381,5 @@ func TestReadersSeeTheSnapshotWhileItIsRebuilt(t *testing.T) {
 	wg.Wait()
 	if got := rig.engine.Stats()["a"].Attempts; got != 205 {
 		t.Fatalf("attempts = %d, want 205", got)
-	}
-}
-
-// ---- ranking ----
-
-func TestManualOrderRemainsAuthoritativeDespiteAnomalyFlags(t *testing.T) {
-	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2)}
-	got := Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a", "b"}, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}})
-	if ids(got) != "ab" {
-		t.Fatal(ids(got))
-	}
-}
-
-func TestRankKeepsADemotedChannelThatIsTheOnlyOneAndLetsTheStickyOneLead(t *testing.T) {
-	only := []Candidate{candidate("a", "x", 1)}
-	if got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a"}, Candidates: only, Demoted: map[string]Anomaly{"a": {}}})); got != "a" {
-		t.Fatalf("order = %s: a demoted channel is not excluded", got)
-	}
-	// A Responses turn continues where the previous one ran, healthy or not.
-	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	in := RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Demoted: map[string]Anomaly{"c": {}}, Sticky: "c"}
-	if got := ids(Rank(in)); got != "cab" {
-		t.Fatalf("sticky order = %s, want acb", got)
-	}
-	in.Sticky = "b"
-	if got := ids(Rank(in)); got != "bac" {
-		t.Fatalf("order = %s, want bac", got)
-	}
-	// An excluded or unavailable channel stays out whether it is demoted or not.
-	in = RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}, Excluded: []string{"b"}}
-	if got := ids(Rank(in)); got != "ac" {
-		t.Fatalf("order = %s, want ac", got)
 	}
 }

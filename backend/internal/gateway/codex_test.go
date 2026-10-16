@@ -22,12 +22,12 @@ func TestCodexRequirements(t *testing.T) {
 		path, body, op string
 		caps           []string
 	}{
-		{"/v1/responses", `{"model":"m","input":"hello"}`, "inference", []string{"responses/inference"}},
-		{"/backend-api/codex/responses", `{"model":"m","tools":[{"type":"web_search"}],"service_tier":"priority"}`, "inference", []string{"codex/inference", "codex/fast", "codex/web_search"}},
-		{"/backend-api/codex/responses", `{"model":"m","input":[{"type":"additional_tools","tools":[{"type":"web_search"}]},{"type":"compaction_trigger"}]}`, "compact_v2", []string{"codex/inference", "codex/responses_lite", "codex/web_search", "codex/compact_v2"}},
+		{"/v1/responses", `{"model":"m","input":"hello"}`, "inference", []string{"responses/inference", "responses/nonstream"}},
+		{"/backend-api/codex/responses", `{"model":"m","tools":[{"type":"web_search"}],"service_tier":"priority"}`, "inference", []string{"codex/inference", "codex/nonstream", "codex/fast", "codex/web_search"}},
+		{"/backend-api/codex/responses", `{"model":"m","input":[{"type":"additional_tools","tools":[{"type":"web_search"}]},{"type":"compaction_trigger"}]}`, "compact_v2", []string{"codex/inference", "codex/nonstream", "codex/responses_lite", "codex/web_search", "codex/compact_v2"}},
 		{"/backend-api/codex/responses/compact", `{"model":"m"}`, "compact_v1", []string{"codex/compact", "codex/compact_v1"}},
 		{"/backend-api/codex/alpha/search", `{"model":"m"}`, "codex_search", []string{"codex/search"}},
-		{"/v1/responses", `{"model":"m","input":[{"type":"reasoning","encrypted_content":"portable"},{"type":"compaction","id":"cmp_any","encrypted_content":"portable"}]}`, "inference", []string{"responses/inference", "responses/encrypted_reasoning", "responses/compaction_input"}},
+		{"/v1/responses", `{"model":"m","input":[{"type":"reasoning","encrypted_content":"portable"},{"type":"compaction","id":"cmp_any","encrypted_content":"portable"}]}`, "inference", []string{"responses/inference", "responses/nonstream", "responses/encrypted_reasoning", "responses/compaction_input"}},
 	} {
 		facts, scan, err := ScanRequest([]byte(tc.body))
 		if err != nil {
@@ -55,7 +55,7 @@ func TestCodexZstdTransparentForwarding(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `{"id":"resp_native","status":"completed","output":[],"usage":{"input_tokens":3,"output_tokens":1}}`)
 	})
-	s.candidate.Advanced.Capabilities = []string{"codex/inference"}
+	s.candidate.Advanced.Capabilities = []string{"codex/inference", "codex/nonstream"}
 	encoder, err := zstd.NewWriter(nil, zstd.WithEncoderConcurrency(1))
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestOrdinaryCapabilityScanDoesNotAllocate(t *testing.T) {
 	}
 	allocations := testing.AllocsPerRun(100, func() {
 		op, caps := identifyCapabilities("/v1/responses", channel.FormatOpenAIResponses, body, scan, "")
-		if op != "inference" || !slices.Equal(caps, []string{"responses/inference"}) {
+		if op != "inference" || !slices.Equal(caps, []string{"responses/inference", "responses/nonstream"}) {
 			t.Fatal(op, caps)
 		}
 	})
@@ -207,10 +207,10 @@ func TestCompatibilityFindsStructuralFeaturesWithoutReadingPromptText(t *testing
 		body string
 		want []string
 	}{
-		{`{"model":"m","input":"additional_tools encrypted_content input_image web_search"}`, []string{"responses/inference"}},
-		{`{"model":"m","tools":[{"type":"namespace","name":"x","tools":[{"type":"function","name":"f"}]}]}`, []string{"responses/inference", "responses/tool_namespaces", "responses/function_tools"}},
+		{`{"model":"m","input":"additional_tools encrypted_content input_image web_search"}`, []string{"responses/inference", "responses/nonstream"}},
+		{`{"model":"m","tools":[{"type":"namespace","name":"x","tools":[{"type":"function","name":"f"}]}]}`, []string{"responses/inference", "responses/nonstream", "responses/tool_namespaces", "responses/function_tools"}},
 		{`{"model":"m","stream":true,"background":true,"reasoning":{"context":"all_turns"},"include":["reasoning.encrypted_content"]}`, []string{"responses/inference", "responses/stream", "responses/background", "responses/response_read", "responses/reasoning", "responses/reasoning_all_turns", "responses/encrypted_reasoning"}},
-		{`{"model":"m","text":{"format":{"type":"json_schema","schema":{}}},"input":[{"role":"user","content":[{"type":"input_image","image_url":"opaque"}]}]}`, []string{"responses/inference", "responses/structured_output", "responses/vision"}},
+		{`{"model":"m","text":{"format":{"type":"json_schema","schema":{}}},"input":[{"role":"user","content":[{"type":"input_image","image_url":"opaque"}]}]}`, []string{"responses/inference", "responses/nonstream", "responses/structured_output", "responses/vision"}},
 	} {
 		body := []byte(tc.body)
 		facts, scan, err := ScanRequest(body)
@@ -241,8 +241,8 @@ func (emptyManualRoutes) Resolve(_ context.Context, _, _, model string) (routing
 }
 
 func TestCompatibilityCannotUseModelDeclarationForChannelOperation(t *testing.T) {
-	candidate := Candidate{Capabilities: []string{"codex/inference", "codex/function_tools"}, Advanced: channel.Advanced{Capabilities: []string{"responses/inference"}}}
-	if supportsCapabilities(candidate, []string{"codex/inference"}) {
+	candidate := Candidate{Capabilities: []string{"codex/inference", "codex/function_tools"}, Advanced: channel.Advanced{Capabilities: []string{"responses/inference", "responses/nonstream"}}}
+	if supportsCapabilities(candidate, []string{"codex/inference", "codex/nonstream"}) {
 		t.Fatal("model claimed channel protocol")
 	}
 	if supportsCapabilities(candidate, []string{"responses/function_tools"}) {

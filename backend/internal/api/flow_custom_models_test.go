@@ -21,7 +21,7 @@ func TestCustomModelsListPriceAndRoute(t *testing.T) {
 		}
 	}
 	channelBody := func(name string, models ...map[string]any) map[string]any {
-		return map[string]any{"name": name, "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": models}
+		return map[string]any{"name": name, "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": models}
 	}
 	created := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", channelBody("贵", customModel("4", "4"),
 		map[string]any{"model_id": "deepseek-chat"}))["channel"].(map[string]any)

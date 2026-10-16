@@ -20,7 +20,7 @@ func (a *app) registerGatewayRoutes(r *router) {
 	r.implement("B", "GET /v1/responses/{responseID}", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) { a.gateway.ServeOpenAIResponse(w, r) })
 	r.implement("B", "POST /v1/responses/{responseID}/cancel", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) { a.gateway.ServeResponse(w, r, true) })
 	r.implement("B", "GET /v1/models/{model}", accessGatewayKey, a.gateway.GetModel)
-	r.implement("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
+	r.implement("B", "GET /v1/models", accessGatewayKey, a.gateway.ListModels)
 
 	for path, format := range map[string]channel.Format{
 		"/v1/responses/compact":      channel.FormatOpenAIResponses,

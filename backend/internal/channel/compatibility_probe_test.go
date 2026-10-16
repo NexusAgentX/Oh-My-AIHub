@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -82,5 +83,31 @@ func TestCompatibilityCellsStayProtocolAndScopeSpecific(t *testing.T) {
 	}
 	if got := DeclaredFormats([]string{"codex/search"}); len(got) != 0 {
 		t.Fatal("search incorrectly advertises inference")
+	}
+}
+
+func TestFunctionCompatibilityIncludesResultContinuation(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var request map[string]json.RawMessage
+		if json.NewDecoder(r.Body).Decode(&request) != nil {
+			t.Error("bad request")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if calls == 1 {
+			io.WriteString(w, `{"id":"resp_tool","status":"completed","output":[{"type":"function_call","name":"compat_echo","call_id":"call_probe","arguments":"{\"value\":\"OK\"}"}]}`)
+			return
+		}
+		raw := string(request["input"])
+		if !strings.Contains(raw, "function_call_output") || !strings.Contains(raw, "call_probe") || !strings.Contains(raw, "compatibility-result-17") {
+			t.Error("tool result not linked to the call")
+		}
+		io.WriteString(w, `{"id":"resp_continuation","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"compatibility-result-17"}]}]}`)
+	}))
+	result := (&Service{}).probeCompatibilityCell(context.Background(), compatibilityTestOutbound{client: server.Client()}, Channel{BaseURL: server.URL}, compatibilityProbe{Model: Model{ModelID: "m", UpstreamModel: "up"}, Protocol: "responses", Feature: "function_tools", Scope: "model"}, "synthetic-secret")
+	server.Close()
+	if !result.OK || calls != 2 {
+		t.Fatalf("%+v calls=%d", result, calls)
 	}
 }

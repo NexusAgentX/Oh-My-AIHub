@@ -5091,11 +5091,11 @@ components:
         responses:
           type: array
           uniqueItems: true
-          items: {type: string, enum: [inference, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd]}
+          items: {type: string, enum: [inference, nonstream, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd]}
         codex:
           type: array
           uniqueItems: true
-          items: {type: string, enum: [inference, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd, search, images_generate, images_edit]}
+          items: {type: string, enum: [inference, nonstream, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd, search, images_generate, images_edit]}
       additionalProperties: false
     ModelCompatibility:
       type: object

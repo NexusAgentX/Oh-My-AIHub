@@ -143,7 +143,8 @@ export function applyTestResults(rows: ModelRow[], results: ChannelTestResult[])
     const errors = { ...row.errors }
     let capabilities = [...(row.capabilities ?? [])]
     for (const result of mine) {
-      if (result.scope !== 'model' || result.skipped) continue
+      if (result.scope !== 'model') continue
+      if (result.skipped) { errors[`${result.protocol}/${result.capability}`] = result.error || '未验证，请手动确认'; continue }
       const cell = `${result.protocol}/${result.capability}`
       passed[cell] = result.ok
       capabilities = capabilities.filter(v => v !== cell)

@@ -38,7 +38,7 @@ func newAnomalyPair(t *testing.T) *anomalyPair {
 }
 
 func (p *anomalyPair) call() int {
-	return p.e.call(p.secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code
+	return p.e.call(p.secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil).Code
 }
 
 // breakAndFlag sends the 20 calls the cheaper channel needs to be judged and
@@ -121,7 +121,7 @@ func TestEveryKindOfChannelEditEndsTheDemotion(t *testing.T) {
 		}},
 		{"models", func(p *anomalyPair) {
 			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{
-				"models": []any{map[string]any{"model_id": "gpt-test", "upstream_model": "right-name", "multiplier": "1", "formats": []string{"openai_chat"}}},
+				"models": []any{map[string]any{"model_id": "gpt-test", "upstream_model": "right-name", "multiplier": "1"}},
 			})
 		}},
 		{"unlist and list again", func(p *anomalyPair) {

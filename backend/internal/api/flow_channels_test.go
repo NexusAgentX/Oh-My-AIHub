@@ -24,7 +24,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 		"name": "阿里中转", "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001",
 		"models": []map[string]any{{"model_id": "deepseek-chat", "upstream_model": "deepseek-chat-v2", "multiplier": "1.2"}},
 		"advanced": map[string]any{
-			"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}},
+			"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}},
 			"user_agent":    "relay-test/1.0", "header_rules": map[string]any{"set": []map[string]string{{"name": "X-Relay", "value": "1"}}, "remove": []string{"X-Old"}},
 			"concurrency_limit": 4, "rpm_limit": 60, "daily_revenue_cap": dailyCap, "ttft_timeout_ms": 20000, "request_timeout_ms": 300000, "idle_timeout_ms": 10000,
 			"cooldown_failures": 3, "cooldown_seconds": 60,
@@ -152,7 +152,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	}
 	second := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 		"name": "第二个", "base_url": "https://relay.example", "api_key": "sk-upstream-test-key-0003", "status": "unlisted",
-		"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "stream"}, "codex": []string{"inference"}}}, "models": []map[string]any{{"model_id": "deepseek-chat", "enabled": false}},
+		"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": []map[string]any{{"model_id": "deepseek-chat", "enabled": false}},
 	})["channel"].(map[string]any)
 	page := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/channels?limit=1", nil)
 	if len(page["items"].([]any)) != 1 || page["next_cursor"] == nil {
