@@ -33,7 +33,7 @@ func (o *optional[T]) UnmarshalJSON(data []byte) error {
 }
 
 type pricesRequest struct {
-	GeoMultipliers map[string]string `json:"geo_multipliers"`
+	GeoMultipliers map[string]string `json:"geo_multipliers,omitempty"`
 	TokenPrices    map[string]string `json:"token_prices"`
 	Input          string            `json:"input"`
 	Output         string            `json:"output"`
@@ -43,7 +43,7 @@ type pricesRequest struct {
 
 type priceTierRequest struct {
 	ServiceTier     string        `json:"service_tier"`
-	ThinkingMode    string        `json:"thinking_mode"`
+	ThinkingMode    string        `json:"-"`
 	Name            string        `json:"name"`
 	MinPromptTokens *int64        `json:"min_prompt_tokens"`
 	MaxPromptTokens *int64        `json:"max_prompt_tokens"`
@@ -172,7 +172,7 @@ type modelPricesJSON struct {
 	Input  string `json:"input"`
 	Output string `json:"output"`
 
-	GeoMultipliers map[string]string `json:"geo_multipliers"`
+	GeoMultipliers map[string]string `json:"geo_multipliers,omitempty"`
 	TokenPrices    map[string]string `json:"token_prices"`
 	CacheWrite     string            `json:"cache_write"`
 	CacheRead      string            `json:"cache_read"`
@@ -182,7 +182,7 @@ type modelPricesJSON struct {
 type priceTierJSON struct {
 	Seq             int             `json:"seq"`
 	ServiceTier     string          `json:"service_tier"`
-	ThinkingMode    string          `json:"thinking_mode"`
+	ThinkingMode    string          `json:"thinking_mode,omitempty"`
 	Name            string          `json:"name"`
 	MinPromptTokens *int64          `json:"min_prompt_tokens"`
 	MaxPromptTokens *int64          `json:"max_prompt_tokens"`

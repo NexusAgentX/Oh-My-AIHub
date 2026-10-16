@@ -11,21 +11,21 @@ func TestValidateNormalizesAndRejectsBadPreferences(t *testing.T) {
 	}
 	tooMany, tooFast := int32(11), int32(10)
 	for _, bad := range []Pref{
-		{Mode: "random"}, {Mode: ModeManual, Order: []string{"not-a-uuid"}}, {Mode: ModeCheapest, MaxAttempts: &tooMany}, {Mode: ModeCheapest, TTFTTimeoutMS: &tooFast},
+		{Mode: "random"}, {Mode: ModeManual, Order: []string{"not-a-uuid"}}, {Mode: ModeManual, MaxAttempts: &tooMany}, {Mode: ModeManual, TTFTTimeoutMS: &tooFast},
 	} {
 		if _, err := Validate(bad); err == nil {
 			t.Fatalf("accepted %+v", bad)
 		}
 	}
-	if Default("m").Mode != ModeCheapest || Default("m").Source != SourceDefault {
-		t.Fatal("default preference must be cheapest-first")
+	if Default("m").Mode != ModeManual || Default("m").Source != SourceDefault {
+		t.Fatal("default preference must be manual with no channels")
 	}
 }
 
 func TestTimeoutOverridesAcceptIndependentBounds(t *testing.T) {
 	for _, value := range []int32{999, 1000, 3600000, 3600001} {
 		for _, field := range []string{"idle", "request"} {
-			pref := Pref{Mode: ModeCheapest}
+			pref := Pref{Mode: ModeManual}
 			if field == "idle" {
 				pref.IdleTimeoutMS = &value
 			} else {

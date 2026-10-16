@@ -50,7 +50,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"model without tiers or prices", newAdminModelJSON(catalog.Model{}), map[string]any{
 			"price_tiers": emptyList, "context_window": nil, "max_output_tokens": nil,
 			"base_prices": map[string]any{
-				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject, "geo_multipliers": emptyObject,
+				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject,
 			},
 		}},
 		{"price tier without weekday predicate", newPriceTierJSON(1, ledger.PriceTier{Weekdays: []int{}}), map[string]any{
@@ -100,7 +100,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"channel without models or overrides", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(channel.Channel{}, catalogView{}, time.Unix(0, 0)), map[string]any{
 			"suspended_reason": nil, "cooldown_until": nil, "models": emptyList,
 			"advanced": map[string]any{
-				"capabilities": emptyList, "user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
+				"compatibility": map[string]any{"responses": emptyList, "codex": emptyList}, "user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
 				"daily_revenue_cap": nil, "ttft_timeout_ms": nil, "request_timeout_ms": nil, "idle_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
 			},
 			"today": map[string]any{"revenue": "0", "calls": float64(0), "success_rate": nil},
@@ -110,7 +110,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		), map[string]any{
 			"models": []any{map[string]any{
 				"model_id": "m", "display_name": "", "upstream_model": "", "price_currency": "CNY", "multiplier": "0", "fx_discount": false,
-				"capabilities": emptyList, "effective_multiplier": "0", "formats": []any{"gemini"}, "format_tests": emptyObject,
+				"compatibility": map[string]any{"responses": emptyList, "codex": emptyList}, "effective_multiplier": "0", "formats": emptyList, "format_tests": emptyObject,
 				"enabled": false, "current_prices": map[string]any{"input": "0", "output": "0", "cache_write": "0", "cache_read": "0"},
 				"custom_prices": nil, "pending_multiplier": false,
 			}},

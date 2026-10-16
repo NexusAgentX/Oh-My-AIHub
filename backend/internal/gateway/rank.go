@@ -1,63 +1,20 @@
 package gateway
 
 import (
-	"math"
 	"slices"
 	"sort"
-
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
-
-// minSamples is how many 24h attempts a channel needs before its own success
-// rate counts; fewer are rated with the platform median.
-const minSamples = 20
 
 // RankInput describes one routing decision.
 type RankInput struct {
-	Mode       routing.Mode
 	Order      []string // manual order
 	Excluded   []string
 	Candidates []Candidate
-	Stats      map[string]ChannelStats
-	// Demoted are the channels that answer this model with 4xx almost every
-	// time while the others do not (detectAnomalies): they are tried after all
-	// the others, in any mode, but not excluded.
-	Demoted    map[string]Anomaly
-	ConsumerID string
 	// Sticky is the channel that served the previous Responses turn, if any.
 	Sticky string
 	// Available reports whether a candidate can take a request now
 	// (cooldown, concurrency, RPM, daily revenue cap).
 	Available func(Candidate) bool
-}
-
-// price orders candidates by what they charge: the channel multiplier and
-// currency conversion applied to the model's current tier price (identical for
-// every candidate of one model, so multiplier × rate alone orders them). The
-// channels of a custom model each set their own prices and are ordered by the
-// 3:1 blend of them; a model's candidates are never mixed. Channels of the
-// caller cost 0.
-func price(candidate Candidate, consumerID string) float64 {
-	if candidate.OwnerID == consumerID {
-		return 0
-	}
-	if candidate.Custom != nil {
-		return candidate.Custom.Blended()
-	}
-	rate := candidate.RateNano
-	if rate == 0 {
-		rate = ledger.UnitRate
-	}
-	return float64(candidate.MultiplierNano) * float64(rate)
-}
-
-func medianOf(values []float64) (float64, bool) {
-	if len(values) == 0 {
-		return 0, false
-	}
-	sort.Float64s(values)
-	return values[len(values)/2], true
 }
 
 // Rank filters and orders the candidates of a request.
@@ -71,7 +28,7 @@ func Rank(in RankInput) []Candidate {
 		if excluded[candidate.ChannelID] {
 			continue
 		}
-		if in.Mode == routing.ModeManual && !slices.Contains(in.Order, candidate.ChannelID) {
+		if !slices.Contains(in.Order, candidate.ChannelID) {
 			// A channel missing from the manual list counts as unticked.
 			continue
 		}
@@ -81,69 +38,8 @@ func Rank(in RankInput) []Candidate {
 		pool = append(pool, candidate)
 	}
 
-	var rates, latencies []float64
-	for _, stats := range in.Stats {
-		if stats.Attempts >= minSamples {
-			rates = append(rates, stats.SuccessRate())
-		}
-		if stats.TTFTP50MS != nil {
-			latencies = append(latencies, *stats.TTFTP50MS)
-		}
-	}
-	medianRate, ok := medianOf(rates)
-	if !ok {
-		medianRate = 1
-	}
-	medianLatency, haveLatency := medianOf(latencies)
-	rate := func(candidate Candidate) float64 {
-		stats := in.Stats[candidate.ChannelID]
-		if stats.Attempts < minSamples {
-			return medianRate
-		}
-		return stats.SuccessRate()
-	}
-	latency := func(candidate Candidate) float64 {
-		if stats, found := in.Stats[candidate.ChannelID]; found && stats.TTFTP50MS != nil {
-			return *stats.TTFTP50MS
-		}
-		if haveLatency {
-			return medianLatency
-		}
-		return math.Inf(1)
-	}
-
 	position := func(candidate Candidate) int { return slices.Index(in.Order, candidate.ChannelID) }
-	sort.SliceStable(pool, func(i, j int) bool {
-		a, b := pool[i], pool[j]
-		switch in.Mode {
-		case routing.ModeManual:
-			return position(a) < position(b)
-		case routing.ModeReliable:
-			if rate(a) != rate(b) {
-				return rate(a) > rate(b)
-			}
-		case routing.ModeFastest:
-			if latency(a) != latency(b) {
-				return latency(a) < latency(b)
-			}
-		default:
-			if price(a, in.ConsumerID) != price(b, in.ConsumerID) {
-				return price(a, in.ConsumerID) < price(b, in.ConsumerID)
-			}
-			if rate(a) != rate(b) {
-				return rate(a) > rate(b)
-			}
-			return a.ChannelID < b.ChannelID
-		}
-		if price(a, in.ConsumerID) != price(b, in.ConsumerID) {
-			return price(a, in.ConsumerID) < price(b, in.ConsumerID)
-		}
-		return a.ChannelID < b.ChannelID
-	})
-
-	if len(in.Demoted) > 0 {
-		pool = demote(pool, in.Demoted)
-	}
+	sort.SliceStable(pool, func(i, j int) bool { return position(pool[i]) < position(pool[j]) })
 
 	if in.Sticky != "" {
 		if index := slices.IndexFunc(pool, func(c Candidate) bool { return c.ChannelID == in.Sticky }); index > 0 {
@@ -153,19 +49,4 @@ func Rank(in RankInput) []Candidate {
 		}
 	}
 	return pool
-}
-
-// demote moves the demoted candidates behind the others, each group keeping its
-// order.
-func demote(pool []Candidate, demoted map[string]Anomaly) []Candidate {
-	rest := make([]Candidate, 0, len(pool))
-	var last []Candidate
-	for _, candidate := range pool {
-		if _, bad := demoted[candidate.ChannelID]; bad {
-			last = append(last, candidate)
-		} else {
-			rest = append(rest, candidate)
-		}
-	}
-	return append(rest, last...)
 }

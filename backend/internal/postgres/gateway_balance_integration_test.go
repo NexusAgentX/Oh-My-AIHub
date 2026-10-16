@@ -104,6 +104,7 @@ func TestBookingsAndCreditLimitChangesReachTheNextRequestAtOnce(t *testing.T) {
 	member := func(name, credit string) (person, probe) {
 		p := e.member(name, credit)
 		_, secret := e.defaultKey(p)
+		e.selectFixtureChannels(p)
 		return p, probe{e: e, secret: secret, upstrms: []*upstream{relay}}
 	}
 
@@ -199,6 +200,7 @@ func TestSettlementsAreAddedLocallyWithoutReadingTheDatabase(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	for range 3 {
 		if recorder := chatRequest(e, secret); recorder.Code != http.StatusOK {
 			t.Fatalf("warm-up = %d", recorder.Code)
@@ -320,6 +322,7 @@ func TestBalancesFollowTheDatabaseUnderConcurrentWork(t *testing.T) {
 	for index := range 3 {
 		p := e.member(fmt.Sprintf("consumer%d", index), "100000")
 		_, secret := e.defaultKey(p)
+		e.selectFixtureChannels(p)
 		consumers = append(consumers, p)
 		secrets = append(secrets, secret)
 	}

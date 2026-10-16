@@ -56,6 +56,13 @@ func buildFleet(records []gateway.CandidateRecord) fleetSet {
 			key := candidateKey{model: record.ModelID, format: format}
 			fleet.candidates[key] = append(fleet.candidates[key], record.Candidate)
 		}
+		if record.Candidate.Custom != nil {
+			fleet.customOnline[record.ModelID] = struct{}{}
+		}
+		protocols := channel.DeclaredFormats(record.Candidate.Advanced.Capabilities)
+		if len(protocols) == 0 {
+			continue
+		}
 		index, seen := position[record.ModelID]
 		if !seen {
 			index = len(fleet.online)
@@ -67,7 +74,7 @@ func buildFleet(records []gateway.CandidateRecord) fleetSet {
 			online.Custom = true
 			fleet.customOnline[record.ModelID] = struct{}{}
 		}
-		for _, format := range record.Formats {
+		for _, format := range protocols {
 			if !slices.Contains(online.Formats, format) {
 				online.Formats = append(online.Formats, format)
 			}

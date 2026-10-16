@@ -30,11 +30,8 @@ type inferenceRequest struct {
 }
 
 var allFormats = []inferenceRequest{
-	{name: "openai chat", path: "/v1/chat/completions", body: `{"model":"gpt-test","messages":[{"role":"user","content":"hi"}]}`},
-	{name: "openai responses", path: "/v1/responses", body: `{"model":"gpt-test","input":"hi"}`},
-	{name: "anthropic", path: "/v1/messages", body: `{"model":"gpt-test","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}`,
-		headers: map[string]string{"anthropic-version": "2023-06-01"}},
-	{name: "gemini", path: "/v1beta/models/gpt-test:generateContent", body: `{"contents":[{"parts":[{"text":"hi"}]}]}`},
+	{name: "responses text", path: "/v1/responses", body: `{"model":"gpt-test","input":"hi"}`},
+	{name: "responses items", path: "/v1/responses", body: `{"model":"gpt-test","input":[{"role":"user","content":"hi"}]}`},
 }
 
 // replyWith answers every request with a fixed status and body.
@@ -63,10 +60,6 @@ func TestGatewayFallsBackWhenTheUpstreamSaysTheModelDoesNotExist(t *testing.T) {
 			`{"error":{"message":"The requested model 'gpt-up' does not exist.","type":"invalid_request_error","param":"model","code":"model_not_found"}}`},
 		// Anthropic itself answers 404 not_found_error, which falls back by status;
 		// the 4xx outside that list comes from Anthropic-compatible relays.
-		{"anthropic relay message", allFormats[2], http.StatusBadRequest,
-			`{"type":"error","error":{"type":"invalid_request_error","message":"The model ` + "`gpt-up`" + ` does not exist or you do not have access to it."}}`},
-		{"gemini not found status", allFormats[3], http.StatusBadRequest,
-			`{"error":{"code":400,"message":"models/gpt-up is not found for API version v1beta, or is not supported for generateContent.","status":"NOT_FOUND"}}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,6 +73,7 @@ func TestGatewayFallsBackWhenTheUpstreamSaysTheModelDoesNotExist(t *testing.T) {
 				advanced: map[string]any{"cooldown_failures": 1, "cooldown_seconds": 60}})
 			goodID := e.createChannel(sharer, channelSpec{name: "good", upstream: good, multiplier: "2"})
 			_, secret := e.defaultKey(consumer)
+			e.selectFixtureChannels(consumer)
 			send := func() *httptest.ResponseRecorder {
 				return e.call(secret, http.MethodPost, tc.request.path, []byte(tc.request.body), tc.request.headers)
 			}
@@ -121,8 +115,9 @@ func TestGatewayAnswersWithTheLastUpstreamErrorWhenEveryChannelLacksTheModel(t *
 	e.createChannel(sharer, channelSpec{name: "a", upstream: replyWith(t, http.StatusBadRequest, `{"error":{"code":"invalid_model","message":"nope"}}`), multiplier: "1"})
 	e.createChannel(sharer, channelSpec{name: "b", upstream: replyWith(t, http.StatusUnprocessableEntity, lastBody), multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusUnprocessableEntity || recorder.Body.String() != lastBody {
 		t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -163,13 +158,6 @@ func TestGatewayHandsBackRequestErrorsByteForByteAndDoesNotCountThem(t *testing.
 			`{"error":{"message":"Invalid value: 'bot'. Supported values are: 'system', 'assistant', 'user', 'function', and 'tool'.","type":"invalid_request_error","param":"messages[0].role","code":"invalid_value"}}`},
 		{"openai responses missing input", allFormats[1], http.StatusBadRequest,
 			`{"error":{"message":"Missing required parameter: 'input'.","type":"invalid_request_error","param":"input","code":"missing_required_parameter"}}`},
-		{"anthropic max_tokens", allFormats[2], http.StatusBadRequest,
-			`{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: 100000 > 8192, which is the maximum allowed number of output tokens for claude-3-5-sonnet-20241022"},"request_id":"req_011"}`},
-		{"anthropic bad messages", allFormats[2], http.StatusBadRequest,
-			`{"type":"error","error":{"type":"invalid_request_error","message":"messages: text content blocks must be non-empty"}}`},
-		{"gemini bad payload", allFormats[3], http.StatusBadRequest,
-			"{\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"Invalid JSON payload received. Unknown name \\\"foo\\\" at 'generation_config': Cannot find field.\",\n" +
-				"    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n"},
 	}
 	e := newEnv(t)
 	consumer := e.member("consumer", "100")
@@ -189,6 +177,7 @@ func TestGatewayHandsBackRequestErrorsByteForByteAndDoesNotCountThem(t *testing.
 		advanced: map[string]any{"cooldown_failures": 1, "cooldown_seconds": 60}})
 	e.createChannel(sharer, channelSpec{name: "other", upstream: other, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
 	for index, tc := range cases {
 		current.Store(&tc)

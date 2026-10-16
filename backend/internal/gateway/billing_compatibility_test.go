@@ -355,7 +355,7 @@ func TestBackgroundFollowupsPreserveOpaqueProtocolContent(t *testing.T) {
 	engine.settingsSnap.Store(&settingsSnapshot{outbound: backgroundOutbound{client: upstream.Client()}})
 	metadata := backgroundMetadata{Candidate: Candidate{ChannelID: "channel", Credential: credential, BaseURL: upstream.URL}, ModelID: "main", Location: authBearer, Headers: http.Header{"Openai-Project": {"original-project"}, "Openai-Organization": {"original-org"}}}
 	raw, _ := json.Marshal(metadata)
-	fixture.jobs["call"] = BackgroundJob{CallID: "call", ResponseID: "resp_opaque", AccountID: "consumer", KeyID: "key", Metadata: raw}
+	fixture.jobs["call"] = BackgroundJob{ChannelID: "channel", CallID: "call", ResponseID: "resp_opaque", AccountID: "consumer", KeyID: "key", Metadata: raw}
 	invoke := func(method string, length int64) *httptest.ResponseRecorder {
 		request := httptest.NewRequest(method, "/v1/responses/resp_opaque?future_flag=keep&key=sk-aih-test", strings.NewReader(string(opaque)))
 		request.ContentLength = length

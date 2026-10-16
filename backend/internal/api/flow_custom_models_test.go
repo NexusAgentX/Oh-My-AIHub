@@ -16,15 +16,15 @@ func TestCustomModelsListPriceAndRoute(t *testing.T) {
 
 	customModel := func(input, output string) map[string]any {
 		return map[string]any{
-			"model_id": "foo-1", "formats": []string{"openai_chat"}, "multiplier": "3",
+			"model_id": "foo-1", "multiplier": "3",
 			"custom_prices": map[string]string{"input": input, "output": output, "cache_write": "0", "cache_read": "0.1"},
 		}
 	}
 	channelBody := func(name string, models ...map[string]any) map[string]any {
-		return map[string]any{"name": name, "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001", "models": models}
+		return map[string]any{"name": name, "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}}, "models": models}
 	}
 	created := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", channelBody("贵", customModel("4", "4"),
-		map[string]any{"model_id": "deepseek-chat", "formats": []string{"openai_chat"}}))["channel"].(map[string]any)
+		map[string]any{"model_id": "deepseek-chat"}))["channel"].(map[string]any)
 	var custom map[string]any
 	for _, item := range created["models"].([]any) {
 		if model := item.(map[string]any); model["model_id"] == "foo-1" {
@@ -62,6 +62,6 @@ func TestCustomModelsListPriceAndRoute(t *testing.T) {
 	}
 	alice.expect(t, http.StatusNotFound, http.MethodGet, "/api/models/missing", nil)
 
-	alice.expect(t, http.StatusOK, http.MethodPut, "/api/routing/foo-1", map[string]any{"mode": "reliable"})
-	alice.expect(t, http.StatusNotFound, http.MethodPut, "/api/routing/missing", map[string]any{"mode": "reliable"})
+	alice.expect(t, http.StatusOK, http.MethodPut, "/api/routing/foo-1", map[string]any{"mode": "manual"})
+	alice.expect(t, http.StatusNotFound, http.MethodPut, "/api/routing/missing", map[string]any{"mode": "manual"})
 }

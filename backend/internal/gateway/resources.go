@@ -39,6 +39,14 @@ type resourceRoute struct {
 	Headers   http.Header
 }
 
+// Compatibility always comes from the current routing snapshot, not a resource's
+// creation metadata. Avoid duplicating the matrix on every stored response/item.
+func marshalResourceRoute(candidate Candidate, headers http.Header) ([]byte, error) {
+	candidate.Capabilities = nil
+	candidate.Advanced.Capabilities = nil
+	return json.Marshal(resourceRoute{Candidate: candidate, Headers: headers})
+}
+
 func protocolHeaders(h http.Header) http.Header {
 	out := http.Header{}
 	for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
@@ -73,7 +81,7 @@ func (e *Engine) keepResource(ctx context.Context, call *callState, candidate Ca
 	if !responseIDPattern.MatchString(id) {
 		return errors.New("invalid upstream resource id")
 	}
-	raw, err := json.Marshal(resourceRoute{Candidate: candidate, Headers: call.upstreamHeaders})
+	raw, err := marshalResourceRoute(candidate, call.upstreamHeaders)
 	if err != nil || len(raw) > 65536 {
 		return errors.New("resource route exceeds budget")
 	}
@@ -200,6 +208,9 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 	row, err := e.ownedResource(r.Context(), key, kind, id)
 	if err != nil {
 		resourceError(w, err)
+		return
+	}
+	if !e.compatibleResource(w, r, row) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -600,7 +611,7 @@ func (e *Engine) keepItems(ctx context.Context, call *callState, candidate Candi
 	if e.Resources == nil || len(ids) == 0 || call.resourceKind == "" {
 		return nil
 	}
-	raw, err := json.Marshal(resourceRoute{Candidate: candidate, Headers: call.upstreamHeaders})
+	raw, err := marshalResourceRoute(candidate, call.upstreamHeaders)
 	if err != nil {
 		return err
 	}

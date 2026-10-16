@@ -300,7 +300,7 @@ func (b *fakeBrowse) OnlineChannels(context.Context) ([]gateway.OnlineChannel, e
 			if model.Enabled && !model.PendingMultiplier {
 				online = append(online, gateway.OnlineChannel{
 					ModelID: model.ModelID, ChannelID: item.ID, ChannelName: item.Name, OwnerID: item.Owner.ID, OwnerName: item.Owner.DisplayName,
-					Formats: model.Formats, MultiplierNano: model.MultiplierNano, FXDiscount: model.FXDiscount, Advanced: item.Advanced,
+					Formats: channel.DeclaredFormats(item.Advanced.Capabilities), MultiplierNano: model.MultiplierNano, FXDiscount: model.FXDiscount, Advanced: item.Advanced,
 					Custom: model.Custom,
 				})
 			}
@@ -431,6 +431,12 @@ func newFakeUpstream(t *testing.T) *httptest.Server {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/chat/completions":
 			w.Header().Set("Content-Type", "text/event-stream")
 			_, _ = fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\ndata: [DONE]\n\n")
+		case r.Method == http.MethodGet && r.URL.Path == "/backend-api/codex/models":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"models":[{"slug":"codex-only-model"}]}`)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/responses":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"resp_probe","status":"completed","output":[]}`)
 		default:
 			http.NotFound(w, r)
 		}

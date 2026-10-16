@@ -30,7 +30,7 @@ func (e *env) cooling(channelID string) bool {
 	return !e.runtime.CooldownUntil(channelID, time.Now()).IsZero()
 }
 
-const chatFrame = "data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n"
+const chatFrame = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"x\"}\n\n"
 
 // pacedChatStream sends frames chunks of a Chat stream, one every interval, and
 // then the usage frame.
@@ -47,7 +47,7 @@ func pacedChatStream(frames int, interval time.Duration) func(http.ResponseWrite
 				return
 			}
 		}
-		_, _ = io.WriteString(w, "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":500}}\n\ndata: [DONE]\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.completed\",\"response\":"+responsesBody+"}\n\n")
 	}
 }
 
@@ -77,11 +77,12 @@ func TestGatewayStreamOutlivesTheRequestTimeoutWhileOutputKeepsFlowing(t *testin
 		"ttft_timeout_ms": 1000, "request_timeout_ms": 1000, "idle_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","stream":true}`), nil)
 	elapsed := time.Since(started)
 	body := recorder.Body.String()
-	if recorder.Code != http.StatusOK || elapsed < 3*time.Second || strings.Count(body, "\"delta\"") != 8 || !strings.HasSuffix(body, "data: [DONE]\n\n") {
+	if recorder.Code != http.StatusOK || elapsed < 3*time.Second || strings.Count(body, "\"delta\"") != 8 || !strings.Contains(body, "response.completed") {
 		t.Fatalf("call = %d after %s: %q", recorder.Code, elapsed, body)
 	}
 	callID := recorder.Header().Get("X-AIHub-Request-Id")
@@ -107,8 +108,9 @@ func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) 
 		"ttft_timeout_ms": 1000, "request_timeout_ms": 60000, "idle_timeout_ms": 1500, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","stream":true}`), nil)
 	elapsed := time.Since(started)
 	if recorder.Code != http.StatusOK || elapsed < 1500*time.Millisecond || elapsed > 10*time.Second || recorder.Body.String() != chatFrame {
 		t.Fatalf("call = %d after %s: %q", recorder.Code, elapsed, recorder.Body.String())
@@ -137,8 +139,9 @@ func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheRequestTimeout(t *tes
 	}})
 	e.createChannel(sharer, channelSpec{name: "fast", upstream: fast, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusOK || recorder.Body.String() != chatBody || time.Since(started) < 1500*time.Millisecond {
 		t.Fatalf("call = %d after %s: %s", recorder.Code, time.Since(started), recorder.Body.String())
 	}
@@ -170,7 +173,8 @@ func TestGatewayInterruptsANonStreamingAnswerThatStallsMidBody(t *testing.T) {
 		"request_timeout_ms": 1500, "idle_timeout_ms": 60000, "cooldown_failures": 1, "cooldown_seconds": 60,
 	}})
 	_, secret := e.defaultKey(consumer)
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	e.selectFixtureChannels(consumer)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	callID := recorder.Header().Get("X-AIHub-Request-Id")
 	if row := e.callRow(callID); row.Outcome != "interrupted" || row.Attempts != 1 || row.HasLedgerTx {
 		t.Fatalf("call = %+v", row)
@@ -192,12 +196,12 @@ func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
 	endless := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher := w.(http.Flusher)
-		_, _ = io.WriteString(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"usage\":{\"input_tokens\":1000,\"output_tokens\":1}}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_timeout\",\"usage\":{\"input_tokens\":1000,\"output_tokens\":1}}}\n\n")
 		flusher.Flush()
 		for {
 			select {
 			case <-time.After(100 * time.Millisecond):
-				_, _ = io.WriteString(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"text\":\"x\"}}\n\n")
+				_, _ = io.WriteString(w, chatFrame)
 				flusher.Flush()
 			case <-r.Context().Done():
 				return
@@ -206,8 +210,9 @@ func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
 	})
 	id := e.createChannel(sharer, channelSpec{name: "endless", upstream: endless, advanced: map[string]any{"cooldown_failures": 1, "cooldown_seconds": 60}})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/messages", []byte(`{"model":"gpt-test","max_tokens":10,"stream":true}`), map[string]string{"anthropic-version": "2023-06-01"})
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","max_tokens":10,"stream":true}`), map[string]string{"anthropic-version": "2023-06-01"})
 	elapsed := time.Since(started)
 	if recorder.Code != http.StatusOK || elapsed < 1500*time.Millisecond || elapsed > 10*time.Second {
 		t.Fatalf("call = %d after %s", recorder.Code, elapsed)
@@ -240,8 +245,9 @@ func TestGatewayAnswersWhenTheCallTimeLimitPassesBeforeAnyOutput(t *testing.T) {
 	id := e.createChannel(sharer, channelSpec{name: "stuck", upstream: stuck, multiplier: "1", advanced: map[string]any{"cooldown_failures": 1, "cooldown_seconds": 60}})
 	e.createChannel(sharer, channelSpec{name: "spare", upstream: spare, multiplier: "2"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	started := time.Now()
-	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	recorder := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if recorder.Code != http.StatusGatewayTimeout || !strings.Contains(recorder.Body.String(), `"call_deadline"`) || time.Since(started) < time.Second {
 		var outcome, attempts string
 		_ = e.pool.QueryRow(context.Background(), `SELECT outcome, attempts::text FROM calls WHERE id = $1`, recorder.Header().Get("X-AIHub-Request-Id")).Scan(&outcome, &attempts)

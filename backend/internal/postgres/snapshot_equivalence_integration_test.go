@@ -63,34 +63,34 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 		created := e.apiJSON(owner, http.StatusCreated, http.MethodPost, "/api/channels", body)
 		w.channels[name] = created["channel"].(map[string]any)["id"].(string)
 	}
-	all := []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
 	custom := func(id string, input string, formats ...string) map[string]any {
-		return map[string]any{"model_id": id, "formats": formats, "custom_prices": map[string]string{"input": input, "output": "2", "cache_write": "0", "cache_read": "0"}}
+		return map[string]any{"model_id": id, "custom_prices": map[string]string{"input": input, "output": "2", "cache_write": "0", "cache_read": "0"}}
 	}
 	create(w.sharerA, "a", map[string]any{
 		"models": []any{
-			map[string]any{"model_id": "gpt-test", "multiplier": "1", "formats": []string{"openai_chat", "openai_responses"}},
-			map[string]any{"model_id": "claude-test", "multiplier": "3", "formats": []string{"anthropic"}},
-			map[string]any{"model_id": "gemini-test", "multiplier": "2", "upstream_model": "gem-up", "formats": []string{"gemini", "openai_chat"}},
-			map[string]any{"model_id": "usd-model", "multiplier": "1.2", "fx_discount": true, "formats": []string{"openai_chat"}},
+			map[string]any{"model_id": "gpt-test", "multiplier": "1"},
+			map[string]any{"model_id": "claude-test", "multiplier": "3"},
+			map[string]any{"model_id": "gemini-test", "multiplier": "2", "upstream_model": "gem-up"},
+			map[string]any{"model_id": "usd-model", "multiplier": "1.2", "fx_discount": true},
 		},
 		"advanced": map[string]any{
-			"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "daily_revenue_cap": "50", "ttft_timeout_ms": 5000,
+			"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}},
+			"user_agent":    "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "daily_revenue_cap": "50", "ttft_timeout_ms": 5000,
 			"request_timeout_ms": 20000, "idle_timeout_ms": 3000, "cooldown_failures": 4, "cooldown_seconds": 60,
 			"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-A", "value": "1"}}, "remove": []any{"X-B"}},
 		},
 	})
-	create(w.sharerB, "b", map[string]any{"models": []any{
-		map[string]any{"model_id": "gpt-test", "multiplier": "2", "formats": []string{"openai_chat"}},
-		map[string]any{"model_id": "usd-model", "multiplier": "1", "formats": []string{"openai_chat"}},
+	create(w.sharerB, "b", map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{
+		map[string]any{"model_id": "gpt-test", "multiplier": "2"},
+		map[string]any{"model_id": "usd-model", "multiplier": "1"},
 		custom("my-custom", "1", "openai_chat", "anthropic"),
 		custom("convert-me", "1", "openai_chat"),
 	}})
-	create(w.sharerB, "c", map[string]any{"models": []any{custom("my-custom", "3", "openai_chat")}})
-	create(w.sharerA, "unlisted", map[string]any{"status": "unlisted", "models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerA, "suspended", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerA, "deleted", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerC, "ownerless", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
+	create(w.sharerB, "c", map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{custom("my-custom", "3", "openai_chat")}})
+	create(w.sharerA, "unlisted", map[string]any{"status": "unlisted", "advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{map[string]any{"model_id": "gpt-test"}}})
+	create(w.sharerA, "suspended", map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{map[string]any{"model_id": "gpt-test"}}})
+	create(w.sharerA, "deleted", map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{map[string]any{"model_id": "gpt-test"}}})
+	create(w.sharerC, "ownerless", map[string]any{"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream", "stream"}}}, "models": []any{map[string]any{"model_id": "gpt-test"}}})
 	e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+w.channels["suspended"]+"/suspend", map[string]any{"reason": "test"})
 	if recorder := e.api(w.sharerA, http.MethodDelete, "/api/channels/"+w.channels["deleted"], nil); recorder.Code != http.StatusNoContent {
 		t.Fatalf("delete channel = %d", recorder.Code)
@@ -127,10 +127,10 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{
 		"mode": "manual", "order": []string{w.channels["b"], w.channels["a"]}, "excluded": []string{w.channels["c"]}, "max_attempts": 4,
 	})
-	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/my-custom", map[string]any{"mode": "reliable", "ttft_timeout_ms": 7000, "idle_timeout_ms": 2000, "request_timeout_ms": 12000})
-	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+w.keyIDs["rich"]+"/routing/gpt-test", map[string]any{"mode": "fastest", "max_attempts": 2, "ttft_timeout_ms": 5000, "idle_timeout_ms": 3000, "request_timeout_ms": 15000})
+	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/routing/my-custom", map[string]any{"mode": "manual", "ttft_timeout_ms": 7000, "idle_timeout_ms": 2000, "request_timeout_ms": 12000})
+	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+w.keyIDs["rich"]+"/routing/gpt-test", map[string]any{"mode": "manual", "max_attempts": 2, "ttft_timeout_ms": 5000, "idle_timeout_ms": 3000, "request_timeout_ms": 15000})
 	e.apiJSON(w.consumer, http.StatusOK, http.MethodPut, "/api/keys/"+defaultID+"/routing/usd-model", map[string]any{"mode": "manual", "order": []string{w.channels["b"]}})
-	e.apiJSON(w.sharerA, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "cheapest", "excluded": []string{w.channels["b"]}})
+	e.apiJSON(w.sharerA, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "manual", "excluded": []string{w.channels["b"]}})
 	return w
 }
 
@@ -143,7 +143,7 @@ func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cach
 	rawCatalog := catalog.NewService(raw.Catalog)
 
 	modelNames := []string{"gpt-test", "claude-test", "gemini-test", "usd-model", "convert-me", "my-custom", "nope"}
-	formats := []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini, "bogus"}
+	formats := []channel.Format{channel.FormatOpenAIResponses, channel.FormatOpenAIImages, "bogus"}
 
 	nonEmpty := 0
 	for _, model := range modelNames {
@@ -173,7 +173,7 @@ func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cach
 			t.Errorf("%s: model %s differs:\n snapshot %+v (%v)\n database %+v (%v)", label, model, gotModel, gotErr, wantModel, wantErr)
 		}
 	}
-	if nonEmpty < 8 {
+	if nonEmpty < 5 {
 		t.Fatalf("%s: only %d (model, format) pairs have candidates: the data set is too thin", label, nonEmpty)
 	}
 	if got, _ := cached.Models.Get(ctx, "  gpt-test "); got.ID != "gpt-test" {
@@ -251,7 +251,7 @@ func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
 	w.compare(t, "kept current by invalidations", w.e.cached)
 
 	// The conditions that exclude a channel really do.
-	candidates, err := fresh.Gateway.Candidates(context.Background(), "gpt-test", channel.FormatOpenAIChat)
+	candidates, err := fresh.Gateway.Candidates(context.Background(), "gpt-test", channel.FormatOpenAIResponses)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
 	}
 	slices.Sort(names)
 	if !slices.Equal(names, []string{"a", "b"}) {
-		t.Fatalf("channels offering gpt-test in openai_chat = %v, want a and b (not unlisted, suspended, deleted, of a disabled owner)", names)
+		t.Fatalf("channels offering gpt-test in openai_responses = %v, want a and b (not unlisted, suspended, deleted, of a disabled owner)", names)
 	}
 	if online, _ := fresh.Gateway.CustomModelOnline(context.Background(), "convert-me"); online {
 		t.Fatal("a custom model turned official is online while it waits for its multiplier")
@@ -291,6 +291,7 @@ func TestGatewayRequestsDoNotReadSnapshotDataFromTheDatabase(t *testing.T) {
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	for range 3 { // settings, spend and touch caches
 		if recorder := chatRequest(e, secret); recorder.Code != http.StatusOK {
 			t.Fatalf("warm-up = %d", recorder.Code)

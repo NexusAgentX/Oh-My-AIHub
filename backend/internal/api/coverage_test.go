@@ -35,11 +35,6 @@ var coverageExceptions = map[string]string{
 	"POST /backend-api/codex/images/edits":       gatewayPassthrough,
 
 	"GET /v1/models/{model}":                               gatewayPassthrough,
-	"GET /v1/chat/completions":                             gatewayPassthrough,
-	"GET /v1/chat/completions/{resourceID}":                gatewayPassthrough,
-	"POST /v1/chat/completions/{resourceID}":               gatewayPassthrough,
-	"DELETE /v1/chat/completions/{resourceID}":             gatewayPassthrough,
-	"GET /v1/chat/completions/{resourceID}/messages":       gatewayPassthrough,
 	"DELETE /v1/responses/{responseID}":                    gatewayPassthrough,
 	"GET /v1/responses/{responseID}/input_items":           gatewayPassthrough,
 	"POST /v1/responses/compact":                           gatewayPassthrough,
@@ -52,17 +47,10 @@ var coverageExceptions = map[string]string{
 	"POST /v1/conversations/{resourceID}/items":            gatewayPassthrough,
 	"GET /v1/conversations/{resourceID}/items/{itemID}":    gatewayPassthrough,
 	"DELETE /v1/conversations/{resourceID}/items/{itemID}": gatewayPassthrough,
-	"POST /v1/images/generations":                          gatewayPassthrough,
-	"POST /v1/images/edits":                                gatewayPassthrough,
-	"POST /v1/images/variations":                           gatewayPassthrough,
-	"POST /v1/chat/completions":                            gatewayPassthrough,
 	"POST /v1/responses":                                   gatewayPassthrough,
 	"GET /v1/responses/{responseID}":                       gatewayPassthrough,
 	"POST /v1/responses/{responseID}/cancel":               gatewayPassthrough,
-	"POST /v1/messages":                                    gatewayPassthrough,
-	"POST /v1beta/models/{model}":                          gatewayPassthrough,
 	"GET /v1/models":                                       gatewayPassthrough,
-	"GET /v1beta/models":                                   gatewayPassthrough,
 }
 
 // gatewayPassthrough 说明外部模型 API 入口为何不在本包验证：规范只登记 default 的原生透传响应，

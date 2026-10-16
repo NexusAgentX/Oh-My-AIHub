@@ -17,20 +17,12 @@ import {
 } from './modelForm'
 import type { PriceTier, PriceTierInput } from './types'
 
-/** 实际服务档位的常见取值（含协议前缀）；仍可填其他值 */
 const serviceTierPresets = [
-  { value: 'openai:default', label: 'OpenAI 标准' },
-  { value: 'openai:priority', label: 'OpenAI 优先' },
-  { value: 'openai:fast', label: 'OpenAI 快速' },
-  { value: 'openai:flex', label: 'OpenAI Flex' },
-  { value: 'anthropic:standard', label: 'Anthropic 标准' },
-  { value: 'anthropic:priority', label: 'Anthropic 优先' },
-  { value: 'gemini:standard', label: 'Gemini 标准（trafficType）' },
-  { value: 'gemini:priority', label: 'Gemini 优先（trafficType）' },
-  { value: 'gemini:flex', label: 'Gemini Flex（trafficType）' },
-  { value: 'gemini:STANDARD', label: 'Gemini 标准' },
-  { value: 'gemini:PRIORITY', label: 'Gemini 优先' },
-  { value: 'gemini:FLEX', label: 'Gemini Flex' },
+  { value: '', label: '不限' },
+  { value: 'openai:default', label: '标准' },
+  { value: 'openai:fast', label: 'Fast' },
+  { value: 'openai:ultrafast', label: 'Ultrafast' },
+  { value: 'openai:flex', label: 'Flex' },
 ]
 
 export function PriceFields({
@@ -44,7 +36,6 @@ export function PriceFields({
   error?: string
   legend: string
 }) {
-  const [geoKey, setGeoKey] = useState('')
   const field = (key: 'input' | 'output' | 'cache_read' | 'cache_write', label: string) => (
     <TextField
       inputMode="decimal"
@@ -78,32 +69,6 @@ export function PriceFields({
               }
             />
           ))}
-        </div>
-      </details>
-      <details>
-        <summary>地域倍率</summary>
-        <div className="field-row">
-          {Object.entries({ us: '', eu: '', ...prices.geo_multipliers }).map(([key, value]) => (
-            <TextField
-              key={key}
-              label={`地域 ${key} · token 倍率`}
-              inputMode="decimal"
-              value={value}
-              placeholder="1"
-              onChange={(event) => onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [key]: event.target.value } })}
-            />
-          ))}
-        </div>
-        <div className="geo-add-row">
-          <TextField label="其他地域" placeholder="例如 us-central1" value={geoKey} onChange={(event) => setGeoKey(event.target.value)} />
-          <Button
-            type="button" variant="secondary"
-            disabled={!/^[a-z][a-z0-9_-]{0,31}$/.test(geoKey) || geoKey === 'us' || geoKey === 'eu' || geoKey in (prices.geo_multipliers ?? {}) || Object.keys(prices.geo_multipliers ?? {}).length >= 32}
-            onClick={() => {
-              onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [geoKey]: '' } })
-              setGeoKey('')
-            }}
-          >添加地域</Button>
         </div>
       </details>
       <InlineError>{error}</InlineError>
@@ -140,25 +105,13 @@ function TierEditForm({
         onChange={(event) => set({ name: event.target.value })}
         value={form.name}
       />
-      <TextField
+      <SelectField
         label="实际服务档位（可选）"
-        placeholder="例如 openai:default、anthropic:priority"
-        suggestions={serviceTierPresets}
         value={form.serviceTier ?? ''}
         onChange={(event) => set({ serviceTier: event.target.value })}
-      />
-      <SelectField
-        label="百炼实际思考模式（可选）"
-        onChange={(event) => set({ thinkingMode: event.target.value })}
-        value={form.thinkingMode ?? ''}
       >
-        <option value="">不限</option>
-        <option value="qwen_thinking">已输出思考</option>
-        <option value="qwen_non_thinking">未输出思考</option>
+        {serviceTierPresets.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
       </SelectField>
-      <p className="muted-copy">
-        服务档位以响应为准；配置百炼条件即采用百炼实际思考输出计价语义。未知事实不命中特定条件。
-      </p>
       <Checkbox
         checked={form.useTokens}
         label="按输入总量分档（含缓存读写，不含输出）"

@@ -46,7 +46,7 @@ function ModalityPicker({
   values: string[]
   onChange: (values: string[]) => void
 }) {
-  const options = [...new Set([...modalityOptions, ...values])]
+  const options = [...new Set([...modalityOptions, ...values.filter(value => value !== 'file')])]
   return (
     <fieldset className="weekday-picker">
       <legend>{legend}</legend>

@@ -251,10 +251,10 @@ func (q *Queries) InsertChannelEvent(ctx context.Context, arg InsertChannelEvent
 
 const insertChannelModel = `-- name: InsertChannelModel :exec
 INSERT INTO channel_models (
-    channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount,
+    channel_id, model_id, upstream_model, multiplier_nano, format_tests, enabled, fx_discount,
     is_custom, custom_input_price_nano_per_million, custom_output_price_nano_per_million,
     custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier, capabilities
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::text[])
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::text[])
 `
 
 type InsertChannelModelParams struct {
@@ -262,7 +262,6 @@ type InsertChannelModelParams struct {
 	ModelID                             string
 	UpstreamModel                       string
 	MultiplierNano                      int64
-	Formats                             []string
 	FormatTests                         []byte
 	Enabled                             bool
 	FxDiscount                          bool
@@ -281,7 +280,6 @@ func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModel
 		arg.ModelID,
 		arg.UpstreamModel,
 		arg.MultiplierNano,
-		arg.Formats,
 		arg.FormatTests,
 		arg.Enabled,
 		arg.FxDiscount,
@@ -516,7 +514,7 @@ func (q *Queries) ListCustomModelNames(ctx context.Context) ([]string, error) {
 }
 
 const listModelsOfChannels = `-- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount,
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.format_tests, cm.enabled, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million, cm.pending_multiplier,
        cm.catalog_model_id, cm.capabilities
@@ -539,7 +537,6 @@ func (q *Queries) ListModelsOfChannels(ctx context.Context, channelIds []string)
 			&i.ModelID,
 			&i.UpstreamModel,
 			&i.MultiplierNano,
-			&i.Formats,
 			&i.FormatTests,
 			&i.Enabled,
 			&i.FxDiscount,
@@ -655,23 +652,17 @@ func (q *Queries) LockModelName(ctx context.Context, modelID string) error {
 }
 
 const setChannelModelTests = `-- name: SetChannelModelTests :exec
-UPDATE channel_models SET format_tests = $3, formats = $4 WHERE channel_id = $1 AND model_id = $2
+UPDATE channel_models SET format_tests = $3 WHERE channel_id = $1 AND model_id = $2
 `
 
 type SetChannelModelTestsParams struct {
 	ChannelID   string
 	ModelID     string
 	FormatTests []byte
-	Formats     []string
 }
 
 func (q *Queries) SetChannelModelTests(ctx context.Context, arg SetChannelModelTestsParams) error {
-	_, err := q.db.Exec(ctx, setChannelModelTests,
-		arg.ChannelID,
-		arg.ModelID,
-		arg.FormatTests,
-		arg.Formats,
-	)
+	_, err := q.db.Exec(ctx, setChannelModelTests, arg.ChannelID, arg.ModelID, arg.FormatTests)
 	return err
 }
 

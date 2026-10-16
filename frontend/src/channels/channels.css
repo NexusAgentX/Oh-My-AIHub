@@ -137,3 +137,14 @@
 @media (max-width: 960px) {
   .channel-chart-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.compatibility-matrix { max-height: 28rem; overflow: auto; }
+.compatibility-matrix table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.compatibility-matrix th, .compatibility-matrix td { padding: var(--space-2); border-bottom: 1px solid var(--hairline); text-align: left; }
+.compatibility-matrix thead { position: sticky; top: 0; background: var(--canvas); }
+.compatibility-matrix td > span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.compatibility-matrix .checkbox-label { font-size: 0; }
+.compatibility-matrix td label { min-height: 44px; min-width: 44px; }
+.compatibility-matrix td label span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.compatibility-pass { color: var(--positive); }
+.compatibility-fail { color: var(--danger); }

@@ -79,24 +79,24 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 场景 | 内容 | 参考负载 |
 | --- | --- | --- |
-| `nonstream-small` | OpenAI Chat 非流式，上游 50 ms 后一次返回 64 个输出 token | 50 次/秒（开环） |
-| `stream-1k` | OpenAI Chat 流式，首字 200 ms，每 5 ms 一块，共 1000 个 token（约 5 秒一条） | 20 次/秒 |
-| `concurrent-500` | OpenAI Chat 流式，首字 100 ms，每 20 ms 一块，共 100 个 token | 500 个 worker 背靠背（闭环） |
+| `nonstream-small` | OpenAI Responses 非流式，上游 50 ms 后一次返回 64 个输出 token | 50 次/秒（开环） |
+| `stream-1k` | OpenAI Responses 流式，首字 200 ms，每 5 ms 一块，共 1000 个 token（约 5 秒一条） | 20 次/秒 |
+| `concurrent-500` | OpenAI Responses 流式，首字 100 ms，每 20 ms 一块，共 100 个 token | 500 个 worker 背靠背（闭环） |
 | `nonstream-saturated` | 同 `nonstream-small`，但 worker 数多于数据库连接 | 64 个 worker 背靠背（闭环）：看吞吐上限本身，即结算在饱和时每秒能处理多少个调用；扫描找的是满足延迟判据的最高速率，对存储的偶发停顿很敏感（同一代码两轮可以差一倍），这个数字稳定得多 |
 | `key-budget` | 同 `nonstream-small`，Key 带日、月、总预算 | 50 次/秒 |
 | `responses-sticky` | OpenAI Responses 非流式，请求带上一轮的 `previous_response_id` | 50 次/秒 |
-| `formats` | 四种格式的流式与非流式各一个场景 | 非流式 40 次/秒，流式 10 次/秒 |
+| `formats` | Responses 的流式与非流式各一个场景（旧版本为四种协议） | 非流式 40 次/秒，流式 10 次/秒 |
 | `sweep-*` | 对 `nonstream-small`、`stream-1k` 逐级提高速率，再在最后一个成功级与第一个失败级之间二分两次 | 见报告 |
 
 每个场景先跑直连模拟上游（压测程序到上游，TLS，连接复用），再跑经过网关（压测程序到网关，明文 HTTP，连接复用）；两次的负载与参数相同。随后做一次数据库语句审计：用同形状的短回答跑几百个请求，缓存已预热，按查询名统计每请求语句数。
 
 测试自己照顾的几件事，免得它们变成测量噪音：
 
-- 建好数据后先经网关写入 2000 个调用再 `ANALYZE`，之后每次运行前再 `ANALYZE`，相当于有 autovacuum 的生产库；否则刚建的空表会让账本触发器走全表扫描。
+- 建好数据后先经网关写入 2000 个 `store:false` 调用再 `ANALYZE`（预热账本，不额外填充资源表，保持与旧版 Chat 预热的数据边界一致），之后每次运行前再 `ANALYZE`，相当于有 autovacuum 的生产库；否则刚建的空表会让账本触发器走全表扫描。
 - 每次运行前等所有渠道离开冷却。网关过载时本地超时会被记成渠道失败而冷却渠道，下一次运行会遇到“没有可用渠道”的 503，测到的是冷却而不是负载。
 - 闭环负载（并发场景）的 worker 在一条回答的时间内错开启动；一起启动、回答又一样长的 worker 会成批到达，成批结算，量到的是人为的排队。
 
-模拟上游贴着真实 API 的形状：OpenAI Chat 流式只在请求带 `stream_options.include_usage` 时才发纯用量帧（网关替客户端打开它，所以会经过纯用量帧过滤）、每块带 `"usage":null`；Anthropic 的 `message_start` 带输入、`message_delta` 带输出；Gemini 每块重复累计用量；Responses 的最后一个事件重复整段文本。
+模拟上游贴着真实 API 的形状：OpenAI Responses 流式只在请求带 `stream_options.include_usage` 时才发纯用量帧（网关替客户端打开它，所以会经过纯用量帧过滤）、每块带 `"usage":null`；Anthropic 的 `message_start` 带输入、`message_delta` 带输出；Gemini 每块重复累计用量；Responses 的最后一个事件重复整段文本。
 
 ## 在 GitHub Actions 上运行
 

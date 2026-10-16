@@ -32,7 +32,7 @@ const (
 )
 
 // Formats lists native protocol formats in display order.
-var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini, FormatOpenAIImages}
+var Formats = []Format{FormatOpenAIResponses, FormatCodex}
 
 func (f Format) Valid() bool { return slices.Contains(Formats, f) }
 
@@ -215,6 +215,10 @@ type AdminFilter struct {
 
 // TestOutcome is the result of one model × format probe.
 type TestOutcome struct {
+	Protocol   string
+	Capability string
+	Scope      string
+	Skipped    bool
 	ModelID    string
 	Format     Format
 	OK         bool
@@ -341,16 +345,7 @@ func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
 			return nil, ErrInvalidInput
 		}
 		seen[model.ModelID] = true
-		formats := make([]Format, 0, len(model.Formats))
-		for _, format := range Formats {
-			if slices.Contains(model.Formats, format) {
-				formats = append(formats, format)
-			}
-		}
-		if len(formats) == 0 || len(formats) != len(uniqueFormats(model.Formats)) {
-			return nil, ErrInvalidInput
-		}
-		model.Formats = formats
+		model.Formats = nil // derived from the channel matrix when read
 		result = append(result, model)
 	}
 	return result, nil

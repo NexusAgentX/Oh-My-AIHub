@@ -18,12 +18,13 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 	sharer := e.member("sharer", "0")
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":500}}`))
+		_, _ = w.Write([]byte(`{"choices":[],"usage":{"input_tokens":1000,"output_tokens":500}}`))
 	})
 	channel := func(name, multiplier string, fxDiscount bool) string {
 		created := e.apiJSON(sharer, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 			"name": name, "base_url": relay.server.URL, "api_key": "upstream-key-" + name,
-			"models": []any{map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "fx_discount": fxDiscount, "formats": []string{"openai_chat"}}},
+			"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}}},
+			"models":   []any{map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "fx_discount": fxDiscount}},
 		})
 		return created["channel"].(map[string]any)["id"].(string)
 	}
@@ -43,10 +44,11 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 	discounted := channel("discounted", "0.13", true)
 	channel("plain", "1", false)
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 
 	// gpt-test costs $10/M input and $20/M output: 1000 + 500 tokens are $0.02.
 	// Cheapest first picks the discounted relay: $0.02 × 0.13 = 0.0026 points.
-	first := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	first := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if first.Code != http.StatusOK {
 		t.Fatalf("call %d %s", first.Code, first.Body.String())
 	}
@@ -72,7 +74,7 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 
 	// Without the discount the dollar price is converted: $0.02 × 1 × 6.8 = 0.136.
 	e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+discounted, map[string]any{"status": "unlisted"})
-	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
 	if second.Code != http.StatusOK {
 		t.Fatalf("call %d %s", second.Code, second.Body.String())
 	}

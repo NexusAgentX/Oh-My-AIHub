@@ -19,12 +19,11 @@ export function draftFromPreference(preference: RoutingPreference, channels: Mod
   const ids = channels.map((channel) => channel.id)
   const known = preference.order.filter((id) => ids.includes(id))
   const added = ids.filter((id) => !known.includes(id))
-  const manualWithOrder = preference.mode === 'manual' && preference.order.length > 0
   const excluded = preference.excluded.filter((id) => ids.includes(id))
   return {
-    mode: preference.mode,
+    mode: 'manual',
     order: [...known, ...added],
-    excluded: manualWithOrder ? [...new Set([...excluded, ...added])] : excluded,
+    excluded: [...new Set([...excluded, ...added])],
     max_attempts: preference.max_attempts,
     ttft_timeout_ms: preference.ttft_timeout_ms,
     idle_timeout_ms: preference.idle_timeout_ms,

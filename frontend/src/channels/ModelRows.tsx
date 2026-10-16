@@ -1,7 +1,5 @@
 import { CapabilityToggles, modelCapabilities } from './Capabilities'
 import { useEffect, useRef } from 'react'
-import type { Format } from '../api/types'
-import { formatLabels, formats } from '../calls'
 import { formatPoints } from '../money/format'
 import { shortMultiplier } from '../money/MultiplierText'
 import { useModelDetails, useModels } from '../models/queries'
@@ -35,31 +33,6 @@ function CustomPrices({ row, onChange }: { row: ModelRow; onChange: (prices: Cus
           />
         </label>
       ))}
-    </span>
-  )
-}
-
-/** 可切换的接口能力标签；测试通过的显示绿色 ✓。 */
-function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: Format[]) => void }) {
-  return (
-    <span aria-label="支持的格式" className="format-toggles" role="group">
-      {formats.map((format) => {
-        const on = row.formats.includes(format)
-        const passed = row.passed[format]
-        return (
-          <button
-            aria-pressed={on}
-            className={`format-toggle ${on ? 'format-toggle-on' : ''} ${passed ? 'format-toggle-ok' : ''} ${passed === false ? 'format-toggle-failed' : ''}`}
-            key={format}
-            onClick={() => onChange(on ? row.formats.filter((item) => item !== format) : [...row.formats, format])}
-            title={passed === undefined ? undefined : passed ? '测试通过' : row.errors?.[format] || '测试未通过'}
-            type="button"
-          >
-            {passed && <Icon name="check" size={12} />}
-            {formatLabels[format]}{passed === false && ' · 失败'}
-          </button>
-        )
-      })}
     </span>
   )
 }
@@ -147,7 +120,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
       <li aria-hidden="true" className="model-rows-head">
         <span>卖</span>
         <span>平台模型 / 上游名称</span>
-        <span>支持的格式</span>
+        <span>模型兼容性</span>
         <span>倍率 / 自定义价格</span>
         <span>实际价 入/出</span>
         <span />
@@ -197,12 +170,9 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
             />
           </div>
           <div className="model-row-formats">
-            <FormatToggles onChange={(next) => update(row.key, { formats: next })} row={row} />
-            {row.formats.includes('openai_responses') && <details><summary>扩展能力</summary><CapabilityToggles values={row.capabilities} options={modelCapabilities} onChange={capabilities => update(row.key, {capabilities})} /></details>}
-            {formats.some((format) => row.passed[format] === false) && <details className="format-test-errors">
-              <summary>查看测试失败原因</summary>
-              <ul>{formats.filter((format) => row.passed[format] === false).map((format) => <li key={format}><strong>{formatLabels[format]}</strong>：{row.errors?.[format] || '测试未通过'}</li>)}</ul>
-            </details>}
+            <details><summary>模型兼容性 · {row.capabilities?.length ?? 0} 项</summary><CapabilityToggles values={row.capabilities} options={modelCapabilities} passed={row.passed} errors={row.errors} onChange={capabilities => update(row.key, { capabilities })} /></details>
+            {Object.keys(row.errors ?? {}).length > 0 && <details className="format-test-errors"><summary>查看探测详情</summary><ul>{Object.entries(row.errors ?? {}).map(([cell, error]) => <li key={cell}><strong>{cell}</strong>：{error}</li>)}</ul></details>}
+
           </div>
           <div className="model-row-multiplier">
             {row.custom ? (
@@ -243,7 +213,7 @@ export function ModelRows({ addedRowKey, rows, onChange, onTest, testing, testin
             {usdRate(row) && row.fxDiscount && <small title={effectiveOf(row) ?? undefined}>实际倍率 {shortMultiplier(effectiveOf(row) ?? '—')}</small>}
           </span>
           <div className="model-row-actions">
-            <Button aria-label={`测试 ${row.modelId || row.upstream} 的格式`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">测试</Button>
+            <Button aria-label={`探测 ${row.modelId || row.upstream} 的兼容性`} disabled={testing || !row.sell || !row.modelId} loading={testing && testingModel === row.modelId} onClick={() => onTest(row.modelId)} size="sm" type="button" variant="secondary">探测</Button>
             <IconButton icon={<Icon name="x" />} label="移除" onClick={() => onChange(rows.filter((item) => item.key !== row.key))} />
           </div>
         </li>

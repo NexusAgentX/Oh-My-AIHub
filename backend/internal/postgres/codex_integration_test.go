@@ -1,9 +1,11 @@
 package postgres_test
 
 import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -14,12 +16,14 @@ func TestCodexFixedSettingsAndCapabilityIsolation(t *testing.T) {
 	up := okUpstream(t)
 	e.createChannel(provider, channelSpec{name: "ordinary", upstream: up})
 	_, secret := e.defaultKey(consumer)
+	e.selectFixtureChannels(consumer)
 	request := []byte(`{"model":"gpt-test","store":false,"input":"hello"}`)
 	rejected := e.call(secret, http.MethodPost, "/backend-api/codex/responses", request, nil)
 	if rejected.Code != 503 || !strings.Contains(rejected.Body.String(), "capability_unavailable") {
 		t.Fatalf("%d %s", rejected.Code, rejected.Body.String())
 	}
-	e.createChannel(provider, channelSpec{name: "codex", upstream: up, advanced: map[string]any{"capabilities": []string{"codex_backend", "codex_search"}}, capabilities: []string{"responses_lite", "compact_v2"}})
+	codexID := e.createChannel(provider, channelSpec{name: "codex", upstream: up, advanced: map[string]any{"compatibility": channel.Matrix(channel.ChannelCapabilities)}, capabilities: []string{"codex/responses_lite", "codex/compact_v2"}})
+	e.apiJSON(consumer, 200, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "manual", "order": []string{codexID}})
 	accepted := e.call(secret, http.MethodPost, "/backend-api/codex/responses", request, nil)
 	if accepted.Code != 200 {
 		t.Fatalf("%d %s", accepted.Code, accepted.Body.String())
@@ -47,5 +51,31 @@ func TestCodexFixedSettingsAndCapabilityIsolation(t *testing.T) {
 	result = e.call("invalid", http.MethodGet, "/v1/user-auth-credential/whoami", nil, nil)
 	if result.Code != 401 {
 		t.Fatalf("invalid key: %d", result.Code)
+	}
+}
+
+func TestCodexSearchOnlyChannelDoesNotNeedInference(t *testing.T) {
+	e := newEnv(t)
+	consumer := e.member("search-consumer", "100")
+	owner := e.member("search-provider", "0")
+	var calls atomic.Int64
+	up := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		calls.Add(1)
+		if r.URL.Path != "/backend-api/codex/alpha/search" {
+			t.Errorf("unexpected inference: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"output":"controlled search result","results":[]}`))
+	})
+	id := e.createChannel(owner, channelSpec{name: "search only", upstream: up, advanced: map[string]any{"compatibility": map[string]any{"codex": []string{"search"}}}})
+	_, secret := e.defaultKey(consumer)
+	e.apiJSON(consumer, 200, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "manual", "order": []string{id}})
+	result := e.call(secret, http.MethodPost, "/backend-api/codex/alpha/search", []byte(`{"model":"gpt-test","commands":{"search_query":[{"q":"test"}]}}`), nil)
+	if result.Code != 200 || calls.Load() != 1 {
+		t.Fatalf("search: %d %s calls=%d", result.Code, result.Body.String(), calls.Load())
+	}
+	result = e.call(secret, http.MethodPost, "/backend-api/codex/responses", []byte(`{"model":"gpt-test","input":"hello"}`), nil)
+	if result.Code != 503 || calls.Load() != 1 {
+		t.Fatalf("inference was not blocked: %d %s calls=%d", result.Code, result.Body.String(), calls.Load())
 	}
 }

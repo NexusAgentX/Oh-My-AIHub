@@ -36,22 +36,22 @@ type headerRulesJSON struct {
 
 // channelAdvancedJSON is the OpenAPI ChannelAdvanced schema.
 type channelAdvancedJSON struct {
-	Capabilities     []string        `json:"capabilities"`
-	UserAgent        *string         `json:"user_agent"`
-	HeaderRules      headerRulesJSON `json:"header_rules"`
-	ConcurrencyLimit *int32          `json:"concurrency_limit"`
-	RPMLimit         *int32          `json:"rpm_limit"`
-	DailyRevenueCap  *string         `json:"daily_revenue_cap"`
-	TTFTTimeoutMS    *int32          `json:"ttft_timeout_ms"`
-	RequestTimeoutMS *int32          `json:"request_timeout_ms"`
-	IdleTimeoutMS    *int32          `json:"idle_timeout_ms"`
-	CooldownFailures *int32          `json:"cooldown_failures"`
-	CooldownSeconds  *int32          `json:"cooldown_seconds"`
+	Compatibility    channel.Compatibility `json:"compatibility"`
+	UserAgent        *string               `json:"user_agent"`
+	HeaderRules      headerRulesJSON       `json:"header_rules"`
+	ConcurrencyLimit *int32                `json:"concurrency_limit"`
+	RPMLimit         *int32                `json:"rpm_limit"`
+	DailyRevenueCap  *string               `json:"daily_revenue_cap"`
+	TTFTTimeoutMS    *int32                `json:"ttft_timeout_ms"`
+	RequestTimeoutMS *int32                `json:"request_timeout_ms"`
+	IdleTimeoutMS    *int32                `json:"idle_timeout_ms"`
+	CooldownFailures *int32                `json:"cooldown_failures"`
+	CooldownSeconds  *int32                `json:"cooldown_seconds"`
 }
 
 // channelModelJSON is the OpenAPI ChannelModel schema.
 type channelModelJSON struct {
-	Capabilities        []string                  `json:"capabilities"`
+	Compatibility       channel.Compatibility     `json:"compatibility"`
 	ModelID             string                    `json:"model_id"`
 	DisplayName         string                    `json:"display_name"`
 	UpstreamModel       string                    `json:"upstream_model"`
@@ -160,6 +160,10 @@ type channelDiscoverResponseJSON struct {
 
 // channelTestResultJSON is the OpenAPI ChannelTestResult schema.
 type channelTestResultJSON struct {
+	Protocol   string         `json:"protocol"`
+	Capability string         `json:"capability"`
+	Scope      string         `json:"scope"`
+	Skipped    bool           `json:"skipped"`
 	ModelID    string         `json:"model_id"`
 	Format     channel.Format `json:"format"`
 	OK         bool           `json:"ok"`
@@ -211,7 +215,7 @@ func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
 		remove = []string{}
 	}
 	return channelAdvancedJSON{
-		Capabilities: channel.CapabilityList(advanced.Capabilities), UserAgent: advanced.UserAgent,
+		Compatibility: channel.Matrix(advanced.Capabilities), UserAgent: advanced.UserAgent,
 		HeaderRules:      headerRulesJSON{Set: set, Remove: remove},
 		ConcurrencyLimit: advanced.ConcurrencyLimit,
 		RPMLimit:         advanced.RPMLimit,
@@ -236,14 +240,14 @@ func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Ti
 		prices, _ := currentPrices(known, now)
 		pricing := newChannelPricing(known, model.MultiplierNano, model.FXDiscount, view.usdRateNano)
 		items = append(items, channelModelJSON{
-			Capabilities: channel.CapabilityList(model.Capabilities), ModelID: model.ModelID,
+			Compatibility: channel.Matrix(model.Capabilities), ModelID: model.ModelID,
 			DisplayName:         known.DisplayName,
 			UpstreamModel:       model.UpstreamModel,
 			PriceCurrency:       known.PriceCurrency,
 			Multiplier:          money.FromNano(model.MultiplierNano).String(),
 			FXDiscount:          model.FXDiscount,
 			EffectiveMultiplier: money.FromNano(pricing.EffectiveNano).String(),
-			Formats:             model.Formats,
+			Formats:             channel.DeclaredFormats(item.Advanced.Capabilities),
 			FormatTests:         newFormatTestsJSON(model.FormatTests),
 			Enabled:             model.Enabled,
 			CurrentPrices:       newEffectivePricesJSON(prices, model.MultiplierNano, pricing.RateNano),
@@ -328,22 +332,22 @@ type headerRulesRequest struct {
 }
 
 type advancedRequest struct {
-	Capabilities     []string            `json:"capabilities"`
-	UserAgent        *string             `json:"user_agent"`
-	HeaderRules      *headerRulesRequest `json:"header_rules"`
-	ConcurrencyLimit *int32              `json:"concurrency_limit"`
-	RPMLimit         *int32              `json:"rpm_limit"`
-	DailyRevenueCap  *string             `json:"daily_revenue_cap"`
-	TTFTTimeoutMS    *int32              `json:"ttft_timeout_ms"`
-	RequestTimeoutMS *int32              `json:"request_timeout_ms"`
-	IdleTimeoutMS    *int32              `json:"idle_timeout_ms"`
-	CooldownFailures *int32              `json:"cooldown_failures"`
-	CooldownSeconds  *int32              `json:"cooldown_seconds"`
+	Compatibility    channel.Compatibility `json:"compatibility"`
+	UserAgent        *string               `json:"user_agent"`
+	HeaderRules      *headerRulesRequest   `json:"header_rules"`
+	ConcurrencyLimit *int32                `json:"concurrency_limit"`
+	RPMLimit         *int32                `json:"rpm_limit"`
+	DailyRevenueCap  *string               `json:"daily_revenue_cap"`
+	TTFTTimeoutMS    *int32                `json:"ttft_timeout_ms"`
+	RequestTimeoutMS *int32                `json:"request_timeout_ms"`
+	IdleTimeoutMS    *int32                `json:"idle_timeout_ms"`
+	CooldownFailures *int32                `json:"cooldown_failures"`
+	CooldownSeconds  *int32                `json:"cooldown_seconds"`
 }
 
 func (r advancedRequest) advanced() (channel.Advanced, error) {
 	advanced := channel.Advanced{
-		Capabilities: r.Capabilities, UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
+		Capabilities: r.Compatibility.Cells(), UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
 		RequestTimeoutMS: r.RequestTimeoutMS, IdleTimeoutMS: r.IdleTimeoutMS, CooldownFailures: r.CooldownFailures, CooldownSeconds: r.CooldownSeconds,
 	}
 	if r.DailyRevenueCap != nil {
@@ -363,14 +367,13 @@ func (r advancedRequest) advanced() (channel.Advanced, error) {
 }
 
 type channelModelRequest struct {
-	Capabilities  []string          `json:"capabilities"`
-	ModelID       string            `json:"model_id"`
-	UpstreamModel string            `json:"upstream_model"`
-	Multiplier    *string           `json:"multiplier"`
-	FXDiscount    *bool             `json:"fx_discount"`
-	Formats       []channel.Format  `json:"formats"`
-	Enabled       *bool             `json:"enabled"`
-	CustomPrices  *customPricesJSON `json:"custom_prices"`
+	Compatibility channel.Compatibility `json:"compatibility"`
+	ModelID       string                `json:"model_id"`
+	UpstreamModel string                `json:"upstream_model"`
+	Multiplier    *string               `json:"multiplier"`
+	FXDiscount    *bool                 `json:"fx_discount"`
+	Enabled       *bool                 `json:"enabled"`
+	CustomPrices  *customPricesJSON     `json:"custom_prices"`
 }
 
 func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) {
@@ -386,8 +389,8 @@ func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) 
 		}
 		enabled := request.Enabled == nil || *request.Enabled
 		model := channel.Model{
-			Capabilities: request.Capabilities, ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
-			FXDiscount: request.FXDiscount != nil && *request.FXDiscount, Formats: request.Formats, Enabled: enabled,
+			Capabilities: request.Compatibility.Cells(), ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
+			FXDiscount: request.FXDiscount != nil && *request.FXDiscount, Enabled: enabled,
 		}
 		if request.CustomPrices != nil {
 			prices, err := request.CustomPrices.prices()
@@ -604,7 +607,7 @@ func (a *app) testChannel(w http.ResponseWriter, r *http.Request) {
 	results := make([]channelTestResultJSON, 0, len(outcomes))
 	for _, outcome := range outcomes {
 		results = append(results, channelTestResultJSON{
-			ModelID: outcome.ModelID, Format: outcome.Format, OK: outcome.OK, StatusCode: outcome.StatusCode,
+			Protocol: outcome.Protocol, Capability: outcome.Capability, Scope: outcome.Scope, Skipped: outcome.Skipped, ModelID: outcome.ModelID, Format: outcome.Format, OK: outcome.OK, StatusCode: outcome.StatusCode,
 			Error: outcome.Error, DurationMS: outcome.DurationMS,
 		})
 	}

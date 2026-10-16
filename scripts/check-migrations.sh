@@ -47,7 +47,7 @@ while IFS= read -r path; do
     max_released=$((10#$version))
   fi
   if [ ! -f "$path" ]; then
-    fail "已发布迁移 $path（$baseline_tag）被删除或重命名。"
+    fail "已发布迁移 $path（${baseline_tag}）被删除或重命名。"
   elif [ "$(git hash-object -- "$path")" != "$(git rev-parse "$baseline_tag:$path")" ]; then
     fail "已发布迁移 $path 与 $baseline_tag 中的内容不一致（被修改）。"
   fi
@@ -71,9 +71,9 @@ for path in "$migrations_dir"/*; do
 done
 
 if [ "$failures" -ne 0 ]; then
-  echo "迁移守卫失败（基线 $baseline_tag）：请还原已发布的迁移，并把变更写入版本号更大的新迁移。" >&2
-  echo "若分支落后于 $baseline_tag，请先把 main 合并进来再检查。" >&2
+  echo "迁移守卫失败（基线 ${baseline_tag}）：请还原已发布的迁移，并把变更写入版本号更大的新迁移。" >&2
+  echo "若分支落后于 ${baseline_tag}，请先把 main 合并进来再检查。" >&2
   exit 1
 fi
 
-echo "迁移守卫通过：基线 $baseline_tag，已发布迁移 $released_count 个均未改动，新增:${added:- 无}"
+echo "迁移守卫通过：基线 ${baseline_tag}，已发布迁移 $released_count 个均未改动，新增:${added:- 无}"
