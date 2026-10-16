@@ -36,6 +36,7 @@ function modelName(row: CallRowBase & { requested_model?: string }) {
   return (
     <>
       <strong className="call-model">{model}</strong>
+      {row.operation && <small>{operationLabels[row.operation] ?? row.operation}</small>}
       {aliased && <small>别名 {row.requested_model}</small>}
     </>
   )
@@ -56,7 +57,6 @@ export const callColumns = {
     cell: (row) => (
       <span className="call-format">
         {formatLabels[row.format]}
-        {row.operation && <small>{operationLabels[row.operation] ?? row.operation}</small>}
         {row.stream && <small>流式</small>}
       </span>
     ),
