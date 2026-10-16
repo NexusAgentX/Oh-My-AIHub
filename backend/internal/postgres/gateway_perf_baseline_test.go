@@ -77,10 +77,11 @@ type perfScenario struct {
 	qps     float64
 	workers int
 	// cap bounds the requests in flight of an open load.
-	cap      int
-	budget   bool // use the keys that carry budgets
-	sticky   bool // continue Responses conversations with previous_response_id
-	profiled bool // repeated under the profilers when -perf.out is set
+	cap        int
+	storeFalse bool // keep dataset priming stateless on both sides of an A/B
+	budget     bool // use the keys that carry budgets
+	sticky     bool // continue Responses conversations with previous_response_id
+	profiled   bool // repeated under the profilers when -perf.out is set
 }
 
 // warmup is the warm-up before a measured window: the flag's, or for a stream
@@ -185,7 +186,7 @@ func (s *perfStack) perfPlan(sc perfScenario, throughGateway bool, chats *conver
 		Warmup: sc.warmup(), Duration: *perfDuration, Ramp: sc.ramp(),
 		Next: func(seq int64) gatewaybench.Request {
 			consumer := int(seq) % len(keys)
-			spec := gatewaybench.RequestSpec{Format: sc.format, Stream: sc.stream}
+			spec := gatewaybench.RequestSpec{Format: sc.format, Stream: sc.stream, StoreFalse: sc.storeFalse}
 			if throughGateway {
 				spec.APIKey = keys[consumer]
 			}
@@ -734,7 +735,7 @@ func (s *perfStack) smoke() {
 // of any measurement.
 func (s *perfStack) prime() {
 	s.upstream.SetProfile(gatewaybench.Profile{TTFT: 2 * time.Millisecond, Tokens: 8, InputTokens: 20})
-	sc := perfScenario{name: "prime", format: channel.FormatOpenAIResponses, workers: 4}
+	sc := perfScenario{name: "prime", format: channel.FormatOpenAIResponses, workers: 4, storeFalse: true}
 	plan := s.perfPlan(sc, true, nil)
 	plan.Warmup, plan.Duration, plan.MaxRequests = 0, 0, 2000
 	result := gatewaybench.Run(context.Background(), s.gateway, plan)
