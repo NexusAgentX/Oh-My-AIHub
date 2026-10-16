@@ -210,6 +210,12 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 	defer func() { <-e.followupSlots }()
 	body, err := readRequestBody(w, r)
 	if err != nil {
+		if errors.Is(err, errDecodeBusy) {
+			w.Header().Set("Retry-After", "1")
+			WriteError(w, DialectOpenAI, 429, "request_decoders_busy", "请求解压繁忙，请稍后重试", "")
+			return
+		}
+
 		WriteError(w, DialectOpenAI, 413, "request_too_large", "请求体过大", "")
 		return
 	}

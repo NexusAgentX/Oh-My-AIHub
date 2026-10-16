@@ -1,13 +1,20 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
-	"github.com/klauspost/compress/zstd"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/klauspost/compress/zstd"
 )
+
+// Decoding happens before model admission. Bound its memory/CPU independently
+// and never queue compressed requests behind slow clients.
+var decodeSlots = make(chan struct{}, 2)
+var errDecodeBusy = errors.New("request decoders busy")
 
 // chunkPool lends the read buffers of upstream answers. Every answer needs one
 // from its first read to its last, and most answers are small, so a fresh
@@ -48,6 +55,12 @@ func readRequestBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 		if encoding != "zstd" {
 			return nil, fmt.Errorf("unsupported content encoding")
 		}
+		select {
+		case decodeSlots <- struct{}{}:
+		default:
+			return nil, errDecodeBusy
+		}
+		defer func() { <-decodeSlots }()
 		decoder, err := zstd.NewReader(reader, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxMemory(64<<20), zstd.WithDecoderMaxWindow(32<<20))
 		if err != nil {
 			return nil, err

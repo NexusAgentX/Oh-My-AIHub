@@ -429,6 +429,12 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	call.phase, call.phaseAt = "request", prepareAt
 	body, err := readRequestBody(w, r)
 	if err != nil {
+		if errors.Is(err, errDecodeBusy) {
+			w.Header().Set("Retry-After", "1")
+			e.reject(w, call, OutcomeRejectedInflight, 429, "request_decoders_busy", "请求解压繁忙，请稍后重试")
+			return
+		}
+
 		call.requested = pathModel
 		e.reject(w, call, OutcomeRejectedModel, http.StatusRequestEntityTooLarge, "request_too_large", "请求体过大或读取失败")
 		return

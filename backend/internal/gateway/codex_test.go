@@ -173,3 +173,30 @@ func TestOrdinaryCapabilityScanDoesNotAllocate(t *testing.T) {
 		t.Fatalf("ordinary request capability scan allocated %g times", allocations)
 	}
 }
+
+func TestDecoderSaturationRejectsBeforeReadingAndDoesNotBlockPlainJSON(t *testing.T) {
+	e, _ := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"resp_plain","status":"completed","usage":{"input_tokens":1,"output_tokens":1}}`)
+	})
+	for range cap(decodeSlots) {
+		decodeSlots <- struct{}{}
+	}
+	defer func() {
+		for range cap(decodeSlots) {
+			<-decodeSlots
+		}
+	}()
+	req := resourceRequest("POST", "/v1/responses", "not a zstd frame")
+	req.Header.Set("Content-Encoding", "zstd")
+	out := httptest.NewRecorder()
+	e.Serve(out, req, channel.FormatOpenAIResponses, "", false)
+	if out.Code != 429 || out.Header().Get("Retry-After") != "1" || !strings.Contains(out.Body.String(), "request_decoders_busy") {
+		t.Fatalf("%d %s", out.Code, out.Body.String())
+	}
+	out = httptest.NewRecorder()
+	e.Serve(out, resourceRequest("POST", "/v1/responses", `{"model":"gpt-test","store":false,"input":"hello"}`), channel.FormatOpenAIResponses, "", false)
+	if out.Code != 200 {
+		t.Fatalf("plain JSON affected by decoder saturation: %d %s", out.Code, out.Body.String())
+	}
+}
