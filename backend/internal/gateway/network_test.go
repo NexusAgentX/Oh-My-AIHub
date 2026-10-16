@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"net"
 	"net/http/httptrace"
 	"testing"
@@ -63,5 +64,26 @@ func TestRepeatedStageIsAggregateInsteadOfFalseContinuousSpan(t *testing.T) {
 	call.stage("routing", at.Add(time.Second), at.Add(time.Second+time.Millisecond))
 	if s := call.diagnostics.Stages[0]; s.OffsetMS != nil || s.DurationMS != 2 {
 		t.Fatal("disjoint work turned into a continuous span")
+	}
+}
+
+func TestGatewayNodeManualOverrideAndUnknownSnapshot(t *testing.T) {
+	automatic := &geolocation.Location{Label: "Automatic", Latitude: 1, Longitude: 2}
+	manual := &geolocation.Location{Label: "Configured", Latitude: 3, Longitude: 4}
+	snapshot := geolocation.Entry{IP: "8.8.8.8", Location: automatic}
+	if node := gatewaySnapshot(snapshot, nil); node.IP != "8.8.8.8" || node.Location != automatic {
+		t.Fatal("automatic node not used")
+	}
+	if node := gatewaySnapshot(snapshot, manual); node.IP != "8.8.8.8" || node.Location != manual {
+		t.Fatal("manual region did not override automatic region")
+	}
+	if node := gatewaySnapshot(geolocation.Entry{}, manual); node.IP != "" || node.Location != manual {
+		t.Fatal("manual region requires discovery")
+	}
+	if node := (&Engine{}).gatewayNode(); node.IP != "" || node.Location != nil {
+		t.Fatal("disabled discovery fabricated a node")
+	}
+	if n := testing.AllocsPerRun(100, func() { gatewaySnapshot(snapshot, manual) }); n != 0 {
+		t.Fatalf("gateway node construction allocated %v", n)
 	}
 }
