@@ -7960,6 +7960,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": Record<string, never>;
+                "multipart/form-data": Record<string, never>;
             };
         };
         responses: {
@@ -7982,6 +7983,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": Record<string, never>;
+                "multipart/form-data": Record<string, never>;
             };
         };
         responses: {

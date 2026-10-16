@@ -9,7 +9,7 @@ ALTER TABLE calls ADD CONSTRAINT calls_format_check CHECK (format IN ('openai_ch
 CREATE TABLE gateway_resources (
  account_id uuid NOT NULL REFERENCES accounts(id),
  key_id uuid NOT NULL,
- kind text NOT NULL CHECK (kind IN ('chat','response','conversation','item')),
+ kind text NOT NULL CHECK (kind IN ('chat','response','conversation','item','compaction')),
  resource_id text NOT NULL CHECK (length(resource_id) BETWEEN 1 AND 256),
  call_id uuid NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
  channel_id uuid NOT NULL REFERENCES channels(id),

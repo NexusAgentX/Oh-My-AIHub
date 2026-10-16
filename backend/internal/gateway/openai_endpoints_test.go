@@ -226,7 +226,7 @@ func TestCompactAndCountReuseProtocolWithoutInventingCharges(t *testing.T) {
 			if f == channel.FormatOpenAICount {
 				io.WriteString(w, `{"object":"response.input_tokens","input_tokens":123}`)
 			} else {
-				io.WriteString(w, `{"object":"response.compaction","output":[{"type":"compaction","encrypted_content":"opaque"}],"usage":{"input_tokens":100,"output_tokens":10}}`)
+				io.WriteString(w, `{"id":"resp_compact","object":"response.compaction","output":[{"id":"cmp_owned","type":"compaction","encrypted_content":"opaque"}],"usage":{"input_tokens":100,"output_tokens":10}}`)
 			}
 		})
 		w := httptest.NewRecorder()
@@ -350,5 +350,38 @@ func TestStoredResponseItemReferencesAreRegisteredWithoutContent(t *testing.T) {
 	item, err := e.ownedResource(context.Background(), s.key, "item", "msg_items")
 	if err != nil || bytes.Contains(item.Metadata, []byte("sensitive answer")) || bytes.Contains(item.Metadata, []byte("private request")) {
 		t.Fatal(item, err)
+	}
+}
+
+func TestCompactionStateRetainsItsUpstreamScope(t *testing.T) {
+	e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/v1/responses/compact" {
+			io.WriteString(w, `{"id":"resp_compact","object":"response.compaction","output":[{"id":"cmp_owned","type":"compaction","encrypted_content":"opaque-state"}],"usage":{"input_tokens":20,"output_tokens":5}}`)
+		} else {
+			io.WriteString(w, `{"id":"resp_next","status":"completed","usage":{"input_tokens":10,"output_tokens":1}}`)
+		}
+	})
+	out := httptest.NewRecorder()
+	e.Serve(out, resourceRequest("POST", "/v1/responses/compact", `{"model":"gpt-test","input":[]}`), channel.FormatOpenAICompact, "", false)
+	if out.Code != 200 {
+		t.Fatalf("%d %s", out.Code, out.Body.String())
+	}
+	for _, row := range s.rows {
+		if bytes.Contains(row.Metadata, []byte("opaque-state")) {
+			t.Fatal("compaction content persisted")
+		}
+	}
+	input := `{"model":"gpt-test","store":false,"input":[{"id":"cmp_owned","type":"compaction","encrypted_content":"opaque-state"}]}`
+	out = httptest.NewRecorder()
+	e.Serve(out, resourceRequest("POST", "/v1/responses", input), channel.FormatOpenAIResponses, "", false)
+	if out.Code != 200 {
+		t.Fatalf("%d %s", out.Code, out.Body.String())
+	}
+	s.key.KeyID = "foreign-key"
+	out = httptest.NewRecorder()
+	e.Serve(out, resourceRequest("POST", "/v1/responses", input), channel.FormatOpenAIResponses, "", false)
+	if out.Code != 404 {
+		t.Fatalf("%d %s", out.Code, out.Body.String())
 	}
 }

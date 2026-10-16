@@ -56,6 +56,8 @@ func resourceKind(f channel.Format) string {
 		return "response"
 	case channel.FormatOpenAIConversations:
 		return "conversation"
+	case channel.FormatOpenAICompact:
+		return "compaction"
 	}
 	return ""
 }
@@ -123,14 +125,29 @@ func (e *Engine) resourceExchange(ctx context.Context, r *http.Request, row Reso
 	if err != nil {
 		return nil, "", nil, err
 	}
-	timeout := resolveTimeouts(defaults, routing.Pref{}).withChannel(route.Candidate.Advanced).request
+	timeouts := resolveTimeouts(defaults, routing.Pref{}).withChannel(route.Candidate.Advanced)
+	timeout := timeouts.request
+	streaming := r.URL.Query().Get("stream") == "true"
+	if streaming {
+		timeout = e.CallTimeLimit
+	}
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 	if timeout > e.CallTimeLimit {
 		timeout = e.CallTimeLimit
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancelContext := context.WithTimeout(ctx, timeout)
+	var clock *time.Timer
+	if streaming && timeouts.ttft > 0 {
+		clock = time.AfterFunc(timeouts.ttft, cancelContext)
+	}
+	cancel := func() {
+		if clock != nil {
+			clock.Stop()
+		}
+		cancelContext()
+	}
 	target, err := UpstreamURL(route.Candidate.BaseURL, path, r.URL.RawQuery, channel.FormatOpenAIResponses, "", location, secret)
 	if err != nil {
 		cancel()
@@ -159,6 +176,9 @@ func (e *Engine) resourceExchange(ctx context.Context, r *http.Request, row Reso
 	if err != nil {
 		cancel()
 		return nil, "", nil, errors.New("resource upstream exchange failed")
+	}
+	if streaming {
+		response.Body = &resourceStreamBody{ReadCloser: response.Body, clock: clock, idle: timeouts.idle, cancel: cancelContext}
 	}
 	return response, secret, cancel, nil
 }
@@ -443,7 +463,7 @@ func inputReferences(body []byte, scan objectScan) ([]string, error) {
 		return nil, nil
 	}
 	raw := body[member.start:member.end]
-	if !bytes.Contains(raw, []byte("item_reference")) && !bytes.Contains(raw, []byte(`\u`)) {
+	if !bytes.Contains(raw, []byte("item_reference")) && !bytes.Contains(raw, []byte("compaction")) && !bytes.Contains(raw, []byte(`\u`)) {
 		return nil, nil
 	}
 	var ids []string
@@ -456,7 +476,7 @@ func inputReferences(body []byte, scan objectScan) ([]string, error) {
 		if json.Unmarshal(item, &ref) != nil {
 			return
 		}
-		if ref.Type != "item_reference" {
+		if ref.Type != "item_reference" && ref.Type != "compaction" {
 			return
 		}
 		if len(ids) >= maxBillingItems || !responseIDPattern.MatchString(ref.ID) {
@@ -507,4 +527,29 @@ func sameResourceScope(a, b Resource) bool {
 		return false
 	}
 	return x.Candidate.ChannelID == y.Candidate.ChannelID && x.Candidate.BaseURL == y.Candidate.BaseURL && reflect.DeepEqual(x.Candidate.Credential, y.Candidate.Credential) && reflect.DeepEqual(x.Headers, y.Headers)
+}
+
+type resourceStreamBody struct {
+	io.ReadCloser
+	clock  *time.Timer
+	idle   time.Duration
+	cancel context.CancelFunc
+}
+
+func (b *resourceStreamBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if n > 0 && b.idle > 0 {
+		if b.clock == nil {
+			b.clock = time.AfterFunc(b.idle, b.cancel)
+		} else {
+			b.clock.Reset(b.idle)
+		}
+	}
+	return n, err
+}
+func (b *resourceStreamBody) Close() error {
+	if b.clock != nil {
+		b.clock.Stop()
+	}
+	return b.ReadCloser.Close()
 }

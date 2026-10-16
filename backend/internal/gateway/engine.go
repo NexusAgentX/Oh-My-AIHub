@@ -519,7 +519,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			call.boundResource = &row
 		}
 	}
-	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount || format == channel.FormatOpenAIConversations) {
+	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount || format == channel.FormatOpenAIConversations || format == channel.FormatOpenAICompact) {
 		refs, err := inputReferences(body, scan)
 		if err != nil {
 			e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "条目引用无效或过多")

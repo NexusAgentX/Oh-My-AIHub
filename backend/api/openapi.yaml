@@ -3531,6 +3531,8 @@ paths:
         content:
           application/json:
             schema: {type: object, description: 原生请求正文。}
+          multipart/form-data:
+            schema: {type: object, description: 原生图片表单；只替换 model 字段，其余字节保留。}
       operationId: editImages
       tags: [gateway]
       summary: 图片编辑
@@ -3547,6 +3549,8 @@ paths:
         content:
           application/json:
             schema: {type: object, description: 原生请求正文。}
+          multipart/form-data:
+            schema: {type: object, description: 原生图片表单；只替换 model 字段，其余字节保留。}
       operationId: varyImages
       tags: [gateway]
       summary: 图片变体
