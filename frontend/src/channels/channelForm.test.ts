@@ -17,8 +17,8 @@ describe('channel wizard', () => {
     ])
     expect(validateRows(rows)).toBe('')
     expect(modelsInput(rows)).toEqual([
-      { model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', fx_discount: false, formats: ['openai_chat', 'openai_responses'], enabled: true },
-      { model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', fx_discount: false, formats: ['anthropic'], enabled: true },
+      { capabilities: [], model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', fx_discount: false, formats: ['openai_chat', 'openai_responses'], enabled: true },
+      { capabilities: [], model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', fx_discount: false, formats: ['anthropic'], enabled: true },
     ])
     expect(modelsInput([{ ...rows[0], multiplier: '0.13', fxDiscount: true }])[0]).toMatchObject({ multiplier: '0.13', fx_discount: true })
   })
@@ -51,7 +51,7 @@ describe('channel wizard', () => {
     expect(custom.modelId).toBe('unknown-x')
     expect(validateRows([custom])).toBe('')
     expect(modelsInput([custom])).toEqual([{
-      model_id: 'unknown-x', upstream_model: 'unknown-x', formats: ['openai_chat'], enabled: true,
+      capabilities: [], model_id: 'unknown-x', upstream_model: 'unknown-x', formats: ['openai_chat'], enabled: true,
       custom_prices: { input: '1', output: '9', cache_write: '0', cache_read: '0.1' },
     }])
     expect(validateRows([{ ...custom, customPrices: { ...custom.customPrices, cacheRead: '' } }])).toContain('四个价格')

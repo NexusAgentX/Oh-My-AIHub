@@ -453,14 +453,15 @@ type channelSpec struct {
 	upstream *upstream
 	// baseURL, when set, is used in place of the fake upstream's address; the
 	// performance baseline points channels at host names of its own.
-	baseURL    string
-	key        string
-	model      string
-	upstreamAs string
-	multiplier string
-	formats    []string
-	advanced   map[string]any
-	status     string
+	baseURL      string
+	key          string
+	model        string
+	upstreamAs   string
+	multiplier   string
+	formats      []string
+	capabilities []string
+	advanced     map[string]any
+	status       string
 }
 
 func (e *env) createChannel(owner person, spec channelSpec) string {
@@ -478,6 +479,9 @@ func (e *env) createChannel(owner person, spec channelSpec) string {
 		spec.key = "upstream-key-" + spec.name
 	}
 	model := map[string]any{"model_id": spec.model, "multiplier": spec.multiplier, "formats": spec.formats}
+	if spec.capabilities != nil {
+		model["capabilities"] = spec.capabilities
+	}
 	if spec.upstreamAs != "" {
 		model["upstream_model"] = spec.upstreamAs
 	}

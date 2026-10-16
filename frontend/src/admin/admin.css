@@ -199,3 +199,11 @@
 .geo-add-row { display: flex; align-items: flex-end; gap: var(--space-3); margin-top: var(--space-3); }
 .geo-add-row > .field { flex: 1; min-width: 0; }
 .geo-add-row > .button { flex-shrink: 0; }
+
+.codex-editor { min-width: 0; }
+.codex-editor details { min-width: 0; padding-block: var(--space-3); border-bottom: 1px solid var(--hairline); }
+.codex-editor summary { cursor: pointer; font-weight: 700; margin-bottom: var(--space-3); }
+.codex-json { font-family: var(--font-mono); resize: vertical; min-height: 12rem; max-width: 100%; }
+.codex-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.codex-diff pre { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); background: var(--sunken); padding: var(--space-3); }
+@media (max-width: 767px) { .codex-diff { grid-template-columns: minmax(0, 1fr); } }

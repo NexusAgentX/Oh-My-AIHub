@@ -51,7 +51,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': { ...backendProxy },
-			'^/v1(?:beta)?(?:/|$)': { ...backendProxy },
+			'^/(?:v1(?:beta)?|backend-api)(?:/|$)': { ...backendProxy },
     },
   },
 })

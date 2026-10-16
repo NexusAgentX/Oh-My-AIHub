@@ -19,6 +19,21 @@ import (
 // coverageExceptions 是门禁的显式例外清单：operation（“METHOD /path”，与规范一致）到不在本包验证的原因。
 // 新增例外必须写明原因；例外被覆盖或不再存在于规范时门禁同样失败，保证清单只会变短。
 var coverageExceptions = map[string]string{
+	"GET /backend-api/codex/responses/{responseID}":             gatewayPassthrough,
+	"DELETE /backend-api/codex/responses/{responseID}":          gatewayPassthrough,
+	"POST /backend-api/codex/responses/{responseID}/cancel":     gatewayPassthrough,
+	"GET /backend-api/codex/responses/{responseID}/input_items": gatewayPassthrough,
+	"POST /backend-api/codex/responses/input_tokens":            gatewayPassthrough,
+
+	"GET /v1/user-auth-credential/whoami":        gatewayPassthrough,
+	"GET /backend-api/wham/accounts/check":       gatewayPassthrough,
+	"GET /backend-api/codex/models":              gatewayPassthrough,
+	"POST /backend-api/codex/responses":          gatewayPassthrough,
+	"POST /backend-api/codex/responses/compact":  gatewayPassthrough,
+	"POST /backend-api/codex/alpha/search":       gatewayPassthrough,
+	"POST /backend-api/codex/images/generations": gatewayPassthrough,
+	"POST /backend-api/codex/images/edits":       gatewayPassthrough,
+
 	"GET /v1/models/{model}":                               gatewayPassthrough,
 	"GET /v1/chat/completions":                             gatewayPassthrough,
 	"GET /v1/chat/completions/{resourceID}":                gatewayPassthrough,

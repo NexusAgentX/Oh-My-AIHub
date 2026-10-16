@@ -3,6 +3,7 @@ import { feeRateToPercent, isAmount, percentToFeeRate } from './format'
 import type { Settings, SettingsUpdateRequest } from './types'
 
 export type SettingsForm = {
+ codex?: Settings['codex']
   feePercent: string
   paymentTimeoutMinutes: string
   defaultCreditLimit: string
@@ -49,7 +50,7 @@ function timeToMinute(value: string) {
 
 export function settingsToForm(settings: Settings): SettingsForm {
   return {
-    feePercent: feeRateToPercent(settings.fee_rate_nano),
+    codex: settings.codex, feePercent: feeRateToPercent(settings.fee_rate_nano),
     paymentTimeoutMinutes: String(settings.c2c_payment_timeout_minutes),
     defaultCreditLimit: formatPointAmount(settings.default_credit_limit),
     defaultMaxAttempts: String(settings.default_max_attempts),
@@ -85,6 +86,13 @@ export function formToSettings(
   form: SettingsForm,
 ): { body: SettingsUpdateRequest; errors?: undefined } | { body?: undefined; errors: SettingsErrors } {
   const errors: SettingsErrors = {}
+  if (form.codex) {
+    for (const [field, raw] of Object.entries(form.codex)) {
+      if (!raw) continue
+      try { const value: unknown = JSON.parse(raw); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('请输入 JSON 对象') }
+      catch { errors.codex = `${field} JSON 无效` }
+    }
+  }
   const fee = percentToFeeRate(form.feePercent)
   if (fee === null) errors.feePercent = '0～100，最多 7 位小数'
   const timeout = integerIn(form.paymentTimeoutMinutes, 5, 1440)
@@ -123,7 +131,7 @@ export function formToSettings(
   if (Object.keys(errors).length > 0) return { errors }
   return {
     body: {
-      fee_rate_nano: fee!,
+      ...(form.codex ? {codex: form.codex} : {}), fee_rate_nano: fee!,
       c2c_payment_timeout_minutes: timeout!,
       default_credit_limit: credit,
       default_max_attempts: attempts!,

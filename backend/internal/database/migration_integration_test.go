@@ -90,7 +90,7 @@ COMMIT;`)
  'ledger_transactions', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
  'ledger_entries', (SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
  'settings', (SELECT jsonb_agg(to_jsonb(a) - ARRAY['usd_cny_rate_nano', 'usd_cny_rate_source', 'usd_cny_rate_updated_at',
-   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls', 'default_total_timeout_ms', 'default_request_timeout_ms', 'default_idle_timeout_ms']) FROM settings a))::text`).Scan(&value)
+   'fx_auto_sync', 'fx_sync_minute', 'fx_sync_attempted_at', 'fx_sync_error', 'account_max_inflight_calls', 'default_total_timeout_ms', 'default_request_timeout_ms', 'default_idle_timeout_ms', 'codex']) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,6 +104,11 @@ COMMIT;`)
 		if after := snapshot(); after != before {
 			t.Fatal("upgrade changed existing account, ledger or settings data")
 		}
+	}
+	// 0016 adds disabled Codex documents without changing existing settings.
+	var codexEmpty bool
+	if err := db.QueryRowContext(ctx, `SELECT codex = '{}'::jsonb FROM settings`).Scan(&codexEmpty); err != nil || !codexEmpty {
+		t.Fatalf("Codex compatibility must start unconfigured: empty=%v err=%v", codexEmpty, err)
 	}
 	// 0003 adds the exchange rate with a manual 6.8 default and keeps every
 	// existing model a CNY (points) model.

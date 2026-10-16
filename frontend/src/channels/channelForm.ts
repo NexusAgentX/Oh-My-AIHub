@@ -11,6 +11,7 @@ import { isPositiveAmount } from '../money/format'
 
 /** 选模型表格的一行。key 为本地稳定标识。 */
 export type ModelRow = {
+ capabilities?: string[]
   key: string
   sell: boolean
   /** 平台模型；上游模型不在目录里时为空，需手动选择 */
@@ -53,6 +54,7 @@ export function customNameFrom(upstream: string) {
 export type HeaderSetRow = { name: string; value: string }
 
 export type AdvancedForm = {
+ capabilities?: string[]
   userAgent: string
   headerSet: HeaderSetRow[]
   headerRemove: string[]
@@ -109,7 +111,7 @@ export function rowsFromChannel(channel: Channel): ModelRow[] {
     sell: model.enabled,
     modelId: model.model_id,
     upstream: model.upstream_model,
-    formats: model.formats,
+    capabilities: model.capabilities ?? [], formats: model.formats,
     // 待设倍率的模型须重新填写倍率。
     multiplier: model.pending_multiplier ? '' : model.multiplier,
     fxDiscount: model.fx_discount,
@@ -156,7 +158,7 @@ export function modelsInput(rows: ModelRow[]): ChannelModelInput[] {
   return rows
     .filter((row) => row.modelId)
     .map((row): ChannelModelInput => {
-      const base = { model_id: row.modelId, upstream_model: row.upstream.trim() || row.modelId, formats: row.formats, enabled: row.sell }
+      const base = { capabilities: (row.capabilities ?? []) as NonNullable<ChannelModelInput['capabilities']>, model_id: row.modelId, upstream_model: row.upstream.trim() || row.modelId, formats: row.formats, enabled: row.sell }
       if (row.custom) {
         const prices = row.customPrices
         return {
@@ -196,7 +198,7 @@ function numberOrEmpty(value: number | null) {
 
 export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
   return {
-    userAgent: advanced.user_agent ?? '',
+    capabilities: advanced.capabilities ?? [], userAgent: advanced.user_agent ?? '',
     headerSet: advanced.header_rules.set.map((rule) => ({ ...rule })),
     headerRemove: advanced.header_rules.remove.slice(),
     concurrency: numberOrEmpty(advanced.concurrency_limit),
@@ -213,7 +215,7 @@ export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
 /** 已改项数：UA、请求头规则、并发、RPM、每日收入上限、超时、失败冷却（各算一项）。 */
 export function advancedChangedCount(form: AdvancedForm) {
   return [
-    form.userAgent.trim(),
+    form.capabilities?.length, form.userAgent.trim(),
     form.headerSet.some((row) => row.name.trim()) || form.headerRemove.some((name) => name.trim()),
     form.concurrency,
     form.rpm,
@@ -249,7 +251,7 @@ export function validateAdvanced(form: AdvancedForm) {
 
 export function advancedInput(form: AdvancedForm): ChannelAdvancedInput {
   return {
-    user_agent: form.userAgent.trim() || null,
+    capabilities: (form.capabilities ?? []) as NonNullable<ChannelAdvancedInput['capabilities']>, user_agent: form.userAgent.trim() || null,
     header_rules: {
       set: form.headerSet.filter((row) => row.name.trim()).map((row) => ({ name: row.name.trim(), value: row.value })),
       remove: form.headerRemove.map((name) => name.trim()).filter(Boolean),

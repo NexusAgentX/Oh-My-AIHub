@@ -36,6 +36,7 @@ type headerRulesJSON struct {
 
 // channelAdvancedJSON is the OpenAPI ChannelAdvanced schema.
 type channelAdvancedJSON struct {
+	Capabilities     []string        `json:"capabilities"`
 	UserAgent        *string         `json:"user_agent"`
 	HeaderRules      headerRulesJSON `json:"header_rules"`
 	ConcurrencyLimit *int32          `json:"concurrency_limit"`
@@ -50,6 +51,7 @@ type channelAdvancedJSON struct {
 
 // channelModelJSON is the OpenAPI ChannelModel schema.
 type channelModelJSON struct {
+	Capabilities        []string                  `json:"capabilities"`
 	ModelID             string                    `json:"model_id"`
 	DisplayName         string                    `json:"display_name"`
 	UpstreamModel       string                    `json:"upstream_model"`
@@ -209,7 +211,7 @@ func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
 		remove = []string{}
 	}
 	return channelAdvancedJSON{
-		UserAgent:        advanced.UserAgent,
+		Capabilities: channel.CapabilityList(advanced.Capabilities), UserAgent: advanced.UserAgent,
 		HeaderRules:      headerRulesJSON{Set: set, Remove: remove},
 		ConcurrencyLimit: advanced.ConcurrencyLimit,
 		RPMLimit:         advanced.RPMLimit,
@@ -234,7 +236,7 @@ func (a *app) newChannelJSON(item channel.Channel, view catalogView, now time.Ti
 		prices, _ := currentPrices(known, now)
 		pricing := newChannelPricing(known, model.MultiplierNano, model.FXDiscount, view.usdRateNano)
 		items = append(items, channelModelJSON{
-			ModelID:             model.ModelID,
+			Capabilities: channel.CapabilityList(model.Capabilities), ModelID: model.ModelID,
 			DisplayName:         known.DisplayName,
 			UpstreamModel:       model.UpstreamModel,
 			PriceCurrency:       known.PriceCurrency,
@@ -326,6 +328,7 @@ type headerRulesRequest struct {
 }
 
 type advancedRequest struct {
+	Capabilities     []string            `json:"capabilities"`
 	UserAgent        *string             `json:"user_agent"`
 	HeaderRules      *headerRulesRequest `json:"header_rules"`
 	ConcurrencyLimit *int32              `json:"concurrency_limit"`
@@ -340,7 +343,7 @@ type advancedRequest struct {
 
 func (r advancedRequest) advanced() (channel.Advanced, error) {
 	advanced := channel.Advanced{
-		UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
+		Capabilities: r.Capabilities, UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
 		RequestTimeoutMS: r.RequestTimeoutMS, IdleTimeoutMS: r.IdleTimeoutMS, CooldownFailures: r.CooldownFailures, CooldownSeconds: r.CooldownSeconds,
 	}
 	if r.DailyRevenueCap != nil {
@@ -360,6 +363,7 @@ func (r advancedRequest) advanced() (channel.Advanced, error) {
 }
 
 type channelModelRequest struct {
+	Capabilities  []string          `json:"capabilities"`
 	ModelID       string            `json:"model_id"`
 	UpstreamModel string            `json:"upstream_model"`
 	Multiplier    *string           `json:"multiplier"`
@@ -382,7 +386,7 @@ func modelsFromRequest(requests []channelModelRequest) ([]channel.Model, error) 
 		}
 		enabled := request.Enabled == nil || *request.Enabled
 		model := channel.Model{
-			ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
+			Capabilities: request.Capabilities, ModelID: request.ModelID, UpstreamModel: request.UpstreamModel, MultiplierNano: multiplier,
 			FXDiscount: request.FXDiscount != nil && *request.FXDiscount, Formats: request.Formats, Enabled: enabled,
 		}
 		if request.CustomPrices != nil {

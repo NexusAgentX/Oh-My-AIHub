@@ -69,12 +69,14 @@ type supplierIconJSON struct {
 	IconSource string `json:"icon_source"`
 }
 type hallOfferJSON struct {
+	Capabilities        []string         `json:"capabilities"`
 	Model               catalogModelJSON `json:"model"`
 	Multiplier          string           `json:"multiplier"`
 	EffectiveMultiplier string           `json:"effective_multiplier"`
 	FXDiscount          bool             `json:"fx_discount"`
 }
 type hallChannelJSON struct {
+	Capabilities             []string         `json:"capabilities"`
 	ID                       string           `json:"id"`
 	Name                     string           `json:"name"`
 	Summary                  string           `json:"summary"`
@@ -314,7 +316,7 @@ func (a *app) loadHall(ctx context.Context) (hallView, error) {
 		}
 	}
 	for _, listing := range listings {
-		item := hallChannelJSON{ID: listing.ID, Name: listing.Name, Summary: listing.Summary, Description: listing.Description, Owner: partyJSON{ID: listing.OwnerID, DisplayName: listing.OwnerName}, IsMine: listing.OwnerID == accountFromContext(ctx).ID, Models: []hallOfferJSON{}, Formats: []channel.Format{}}
+		item := hallChannelJSON{Capabilities: channel.CapabilityList(listing.Advanced.Capabilities), ID: listing.ID, Name: listing.Name, Summary: listing.Summary, Description: listing.Description, Owner: partyJSON{ID: listing.OwnerID, DisplayName: listing.OwnerName}, IsMine: listing.OwnerID == accountFromContext(ctx).ID, Models: []hallOfferJSON{}, Formats: []channel.Format{}}
 		if value := supplier.Match(values, listing.BaseURL); value != nil {
 			public := newSupplierJSON(*value)
 			item.Supplier = &public
@@ -341,7 +343,7 @@ func (a *app) loadHall(ctx context.Context) (hallView, error) {
 				summary = newCustomModelJSON(entry.ModelID, []gateway.OnlineChannel{entry})
 			}
 			pricing := newChannelPricing(model, entry.MultiplierNano, entry.FXDiscount, view.rate)
-			item.Models = append(item.Models, hallOfferJSON{Model: summary, Multiplier: money.FromNano(entry.MultiplierNano).String(), EffectiveMultiplier: money.FromNano(pricing.EffectiveNano).String(), FXDiscount: pricing.FXDiscount})
+			item.Models = append(item.Models, hallOfferJSON{Capabilities: channel.CapabilityList(entry.Capabilities), Model: summary, Multiplier: money.FromNano(entry.MultiplierNano).String(), EffectiveMultiplier: money.FromNano(pricing.EffectiveNano).String(), FXDiscount: pricing.FXDiscount})
 			for _, format := range entry.Formats {
 				if !slices.Contains(item.Formats, format) {
 					item.Formats = append(item.Formats, format)
@@ -370,9 +372,10 @@ func (a *app) listHall(w http.ResponseWriter, r *http.Request) {
 		if id := query.Get("supplier"); id != "" && (item.Supplier == nil || item.Supplier.ID != id) {
 			continue
 		}
+		capability := query.Get("capability")
 		model, format := query.Get("model"), channel.Format(query.Get("format"))
-		if (model != "" || format != "") && !slices.ContainsFunc(item.Models, func(offer hallOfferJSON) bool {
-			return (model == "" || offer.Model.ID == model) && (format == "" || slices.Contains(offer.Model.Formats, format))
+		if (model != "" || format != "" || capability != "") && !slices.ContainsFunc(item.Models, func(offer hallOfferJSON) bool {
+			return (model == "" || offer.Model.ID == model) && (format == "" || slices.Contains(offer.Model.Formats, format)) && (capability == "" || slices.Contains(item.Capabilities, capability) || slices.Contains(offer.Capabilities, capability))
 		}) {
 			continue
 		}

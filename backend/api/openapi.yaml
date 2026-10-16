@@ -25,6 +25,197 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /backend-api/codex/responses/input_tokens:
+    post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      operationId: codexCountResponseInputTokens
+      tags: [gateway]
+      summary: 统计输入 token
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      responses:
+        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
+  /backend-api/codex/responses/{responseID}/input_items:
+    get:
+      operationId: codexListResponseInputItems
+      tags: [gateway]
+      summary: 查询响应输入项
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      responses:
+        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
+  /backend-api/codex/responses/{responseID}/cancel:
+    post:
+      operationId: codexCancelOpenAIResponse
+      tags: [gateway]
+      summary: 取消后台响应
+      description: 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        default: {description: 原生响应（含流式）与原生错误。}
+  /backend-api/codex/responses/{responseID}:
+    delete:
+      operationId: codexDeleteStoredResponse
+      tags: [gateway]
+      summary: 删除上游响应
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      responses:
+        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
+    get:
+      operationId: codexRetrieveOpenAIResponse
+      tags: [gateway]
+      summary: 查询已存储响应或恢复后台流
+      description: 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+      x-access: gateway_key
+      x-feature: B
+      security:
+      - {bearerKey: []}
+      parameters:
+      - name: responseID
+        in: path
+        required: true
+        schema: {type: string, maxLength: 256}
+      responses:
+        default: {description: 原生响应（含流式）与原生错误。}
+  /v1/user-auth-credential/whoami:
+    get:
+      operationId: codexWhoami
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/wham/accounts/check:
+    get:
+      operationId: codexAccounts
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/models:
+    get:
+      operationId: codexModels
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/responses:
+    post:
+      operationId: codexResponses
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/responses/compact:
+    post:
+      operationId: codexCompact
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/alpha/search:
+    post:
+      operationId: codexSearch
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/images/generations:
+    post:
+      operationId: codexImageGeneration
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      responses:
+        default: {description: 原生响应或网关错误。}
+  /backend-api/codex/images/edits:
+    post:
+      operationId: codexImageEdit
+      tags: [gateway]
+      summary: Codex HTTP 兼容入口
+      x-access: gateway_key
+      x-feature: B
+      security: [{bearerKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
+      responses:
+        default: {description: 原生响应或网关错误。}
   /api/channel-hall/{channelID}/analysis:
     get:
       operationId: analyzeHallChannel
@@ -340,6 +531,9 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
       parameters:
+        - in: query
+          name: capability
+          schema: {type: string}
         - name: cursor
           in: query
           schema:
@@ -1806,6 +2000,7 @@ paths:
       - {$ref: '#/components/parameters/usageStatusQuery'}
       - {$ref: '#/components/parameters/billedQuery'}
       - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/operation'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -1871,6 +2066,7 @@ paths:
       - {$ref: '#/components/parameters/usageStatusQuery'}
       - {$ref: '#/components/parameters/billedQuery'}
       - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/operation'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -2011,6 +2207,7 @@ paths:
       - {$ref: '#/components/parameters/errorCodeQuery'}
       - {$ref: '#/components/parameters/endReasonQuery'}
       - {$ref: '#/components/parameters/format'}
+      - {$ref: '#/components/parameters/operation'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -2919,6 +3116,7 @@ paths:
       - {$ref: '#/components/parameters/usageStatusQuery'}
       - {$ref: '#/components/parameters/billedQuery'}
       - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/operation'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -2985,6 +3183,7 @@ paths:
       - {$ref: '#/components/parameters/usageStatusQuery'}
       - {$ref: '#/components/parameters/billedQuery'}
       - {$ref: '#/components/parameters/attemptChannelQuery'}
+      - {$ref: '#/components/parameters/operation'}
       - {$ref: '#/components/parameters/requestID'}
       - {$ref: '#/components/parameters/minDurationMs'}
       - {$ref: '#/components/parameters/maxDurationMs'}
@@ -3750,6 +3949,11 @@ components:
       in: query
       required: false
       description: 调用标签（X-AIHub-Tag）。
+      schema: {type: string}
+    operation:
+      name: operation
+      in: query
+      required: false
       schema: {type: string}
     format:
       name: format
@@ -4857,6 +5061,7 @@ components:
     ModelChannel:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string}}
         id: {type: string, format: uuid}
         name: {type: string}
         owner: {$ref: '#/components/schemas/Party'}
@@ -5071,6 +5276,7 @@ components:
       type: object
       description: 高级设置；null 表示使用平台默认。
       properties:
+        capabilities: {type: array, items: {type: string, enum: [codex_backend, codex_search]}, uniqueItems: true}
         user_agent: {type: [string, 'null']}
         header_rules: {$ref: '#/components/schemas/HeaderRules'}
         concurrency_limit: {type: [integer, 'null'], minimum: 1}
@@ -5086,6 +5292,7 @@ components:
     ChannelAdvancedInput:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string, enum: [codex_backend, codex_search]}, uniqueItems: true}
         user_agent: {type: [string, 'null']}
         header_rules: {$ref: '#/components/schemas/HeaderRules'}
         concurrency_limit: {type: [integer, 'null'], minimum: 1}
@@ -5111,6 +5318,7 @@ components:
     ChannelModel:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string, enum: [web_search, image_generation, responses_lite, compact_v1, compact_v2, priority, ultrafast]}, uniqueItems: true}
         model_id: {type: string}
         display_name: {type: string}
         upstream_model: {type: string}
@@ -5149,6 +5357,7 @@ components:
     ChannelModelInput:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string, enum: [web_search, image_generation, responses_lite, compact_v1, compact_v2, priority, ultrafast]}, uniqueItems: true}
         model_id: {type: string}
         upstream_model: {type: string, description: 默认与 model_id 相同（模型重定向）。}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
@@ -5400,6 +5609,9 @@ components:
     CallDiagnostics:
       type: object
       properties:
+        operation: {type: string}
+        required_capabilities: {type: array, items: {type: string}}
+        bound_resource: {type: boolean}
         network: {anyOf: [{$ref: '#/components/schemas/CallNetwork'}, {type: 'null'}]}
         stages: {type: array, items: {$ref: '#/components/schemas/StageTiming'}}
         routing: {type: array, items: {$ref: '#/components/schemas/RouteDecision'}}
@@ -5527,6 +5739,7 @@ components:
       type: object
       description: 调用列表项。charged = cost + fee，为调用方实际扣除。
       properties:
+        operation: {type: string}
         id: {type: string, format: uuid, description: 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         completed_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -5640,6 +5853,7 @@ components:
     CallDetail:
       type: object
       properties:
+        operation: {type: string}
         diagnostics: {anyOf: [{$ref: '#/components/schemas/CallDiagnostics'}, {type: 'null'}]}
         upstream_response_id: {type: [string, 'null']}
         id: {type: string, format: uuid, description: 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。}
@@ -5859,6 +6073,7 @@ components:
       type: object
       description: 渠道所有者视角的调用，不含调用者身份。error 为该渠道上最近一次失败尝试（没有失败为 null）。
       properties:
+        operation: {type: string}
         id: {type: string, format: uuid}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         model_id: {type: [string, 'null']}
@@ -5892,6 +6107,7 @@ components:
     AdminCall:
       type: object
       properties:
+        operation: {type: string}
         id: {type: string, format: uuid, description: 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         completed_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -6166,9 +6382,18 @@ components:
         replayed: {type: boolean, description: 幂等键重复时为 true，未重复记账。}
       required: [account, transaction_id, replayed]
       additionalProperties: false
+    CodexSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        whoami: {type: string, maxLength: 524288}
+        accounts: {type: string, maxLength: 524288}
+        models: {type: string, maxLength: 524288}
+      required: [whoami, accounts, models]
     Settings:
       type: object
       properties:
+        codex: {$ref: '#/components/schemas/CodexSettings'}
         fee_rate_nano: {type: integer, minimum: 0, maximum: 1000000000, description: 手续费率，1e9 = 100%，默认 1000000 = 0.1%。}
         c2c_payment_timeout_minutes: {type: integer, minimum: 5, maximum: 1440}
         default_credit_limit: {$ref: '#/components/schemas/Amount'}
@@ -6198,6 +6423,7 @@ components:
       type: object
       description: 整体替换全部设置。
       properties:
+        codex: {$ref: '#/components/schemas/CodexSettings'}
         fee_rate_nano: {type: integer, minimum: 0, maximum: 1000000000, description: 手续费率，1e9 = 100%，默认 1000000 = 0.1%。}
         c2c_payment_timeout_minutes: {type: integer, minimum: 5, maximum: 1440}
         default_credit_limit: {$ref: '#/components/schemas/Amount'}
@@ -6851,6 +7077,7 @@ components:
     HallOffer:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string}}
         model:
           $ref: '#/components/schemas/CatalogModel'
         multiplier:
@@ -6921,6 +7148,7 @@ components:
     HallChannel:
       type: object
       properties:
+        capabilities: {type: array, items: {type: string}}
         id:
           type: string
           format: uuid

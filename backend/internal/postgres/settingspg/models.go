@@ -31,4 +31,5 @@ type Setting struct {
 	FxSyncError              *string
 	AccountMaxInflightCalls  int32
 	DefaultIdleTimeoutMs     int32
+	Codex                    []byte
 }

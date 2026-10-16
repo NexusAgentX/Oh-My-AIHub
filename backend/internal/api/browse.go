@@ -68,6 +68,7 @@ type catalogModelListJSON struct {
 
 // modelChannelJSON is the OpenAPI ModelChannel schema.
 type modelChannelJSON struct {
+	Capabilities             []string            `json:"capabilities"`
 	ID                       string              `json:"id"`
 	Name                     string              `json:"name"`
 	Owner                    partyJSON           `json:"owner"`
@@ -372,11 +373,11 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		prices, _ := currentPrices(priced, now)
 		pricing := newChannelPricing(priced, entry.MultiplierNano, entry.FXDiscount, defaults.USDCNYRateNano)
 		channels = append(channels, modelChannelJSON{
-			ID:                       entry.ChannelID,
-			Name:                     entry.ChannelName,
-			Owner:                    partyJSON{ID: entry.OwnerID, DisplayName: entry.OwnerName},
-			IsMine:                   entry.OwnerID == accountID,
-			Formats:                  entry.Formats,
+			ID:           entry.ChannelID,
+			Name:         entry.ChannelName,
+			Owner:        partyJSON{ID: entry.OwnerID, DisplayName: entry.OwnerName},
+			IsMine:       entry.OwnerID == accountID,
+			Capabilities: append(append([]string{}, entry.Advanced.Capabilities...), entry.Capabilities...), Formats: entry.Formats,
 			Multiplier:               money.FromNano(entry.MultiplierNano).String(),
 			FXDiscount:               pricing.FXDiscount,
 			EffectiveMultiplier:      money.FromNano(pricing.EffectiveNano).String(),

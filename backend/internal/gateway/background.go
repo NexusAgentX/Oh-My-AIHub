@@ -45,6 +45,7 @@ type BackgroundStore interface {
 }
 
 type backgroundMetadata struct {
+	CodexPath            bool
 	RequestedServiceTier string
 	ThinkingRequested    *bool
 	Mode                 routing.Mode
@@ -133,7 +134,8 @@ func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate 
 	if e.Jobs == nil || !responseIDPattern.MatchString(id) {
 		return errors.New("invalid background response metadata")
 	}
-	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, ThinkingRequested: call.thinkingRequested, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	defaults.Codex = settings.Codex{} // fixed compatibility documents are not job state
+	metadata := backgroundMetadata{CodexPath: call.requestPath == "/backend-api/codex/responses", RequestedServiceTier: call.requestedServiceTier, ThinkingRequested: call.thinkingRequested, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
 	defer func() {
 		if saveErr == nil {
 			return
@@ -298,6 +300,9 @@ func (e *Engine) backgroundExchange(ctx context.Context, m backgroundMetadata, i
 		return nil, "", err
 	}
 	path := "/v1/responses/" + id
+	if m.CodexPath {
+		path = "/backend-api/codex/responses/" + id
+	}
 	if operation != "" {
 		path += "/" + operation
 	}
