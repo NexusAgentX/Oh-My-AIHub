@@ -49,7 +49,7 @@ func (s *Store) RetryBackground(ctx context.Context, id string, at time.Time) er
 func (s *Store) VerifyBackgroundCredentials(ctx context.Context, keyring *channel.Keyring) error {
 	after := "00000000-0000-0000-0000-000000000000"
 	for {
-		rows, err := s.pool.Query(ctx, `SELECT call_id::text, metadata FROM gateway_background_jobs WHERE call_id>$1::uuid ORDER BY call_id LIMIT 128`, after)
+		rows, err := s.pool.Query(ctx, `SELECT j.call_id::text, j.metadata FROM gateway_background_jobs j WHERE j.call_id>$1::uuid ORDER BY j.call_id LIMIT 128`, after)
 		if err != nil {
 			return err
 		}

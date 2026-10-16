@@ -14,6 +14,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/gatewaypg"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
@@ -150,6 +154,11 @@ func TestBackgroundStreamAndPollSettleConcurrentlyInOneLedgerTransaction(t *test
 		t.Fatal("initial stream event not delivered")
 	}
 	id := response.Header.Get("X-AIHub-Request-Id")
+	// The database and application clocks can differ slightly; make the saved
+	// job explicitly due instead of racing the poller's five-second tick.
+	if _, err := e.pool.Exec(context.Background(), `UPDATE gateway_background_jobs SET next_poll_at=now()-interval '1 minute' WHERE call_id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
 	ctx, stop := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { defer close(done); e.engine.RunBackground(ctx) }()
@@ -198,6 +207,24 @@ func TestBackgroundStreamAndPollSettleConcurrentlyInOneLedgerTransaction(t *test
 	}
 }
 
+type backgroundCredentialQueries struct {
+	mu   sync.Mutex
+	sql  string
+	args []any
+}
+
+func (q *backgroundCredentialQueries) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.sql == "" && strings.Contains(data.SQL, "gateway_background_jobs") {
+		q.sql, q.args = data.SQL, append([]any(nil), data.Args...)
+	}
+	return ctx
+}
+
+func (*backgroundCredentialQueries) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {
+}
+
 func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	e := newEnv(t)
 	consumer, sharer := e.member("history-consumer", "100"), e.member("history-sharer", "0")
@@ -221,15 +248,30 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Bulk inserts into a fresh isolated schema have no planner statistics yet.
+	// Check the steady-state access path after the same analysis autovacuum
+	// performs on an established production table; never force an index plan.
+	if _, err := e.pool.Exec(ctx, `ANALYZE gateway_background_jobs`); err != nil {
+		t.Fatal(err)
+	}
+	queries := &backgroundCredentialQueries{}
+	config := e.pool.Config()
+	config.ConnConfig.Tracer = queries
+	tracedPool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tracedPool.Close()
+	verifier := gatewaypg.NewStore(tracedPool, nil)
 	started := time.Now()
-	if err := e.store.Gateway.VerifyBackgroundCredentials(ctx, rotated); err != nil {
+	if err := verifier.VerifyBackgroundCredentials(ctx, rotated); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("verified 1025 historical ciphertexts across nine indexed pages in %s", time.Since(started))
 	if jobs, err := e.store.Gateway.PendingBackground(ctx); err != nil || len(jobs) != 0 {
 		t.Fatal("completed history unexpectedly restored as running tasks")
 	}
-	if err := e.store.Gateway.VerifyBackgroundCredentials(ctx, withoutOld); err == nil || strings.Contains(err.Error(), "private-historical-key") {
+	if err := verifier.VerifyBackgroundCredentials(ctx, withoutOld); err == nil || strings.Contains(err.Error(), "private-historical-key") {
 		t.Fatalf("missing historical key must prevent startup without leaking plaintext: %v", err)
 	}
 	var last string
@@ -244,11 +286,17 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 	if _, err := e.pool.Exec(ctx, `UPDATE gateway_background_jobs SET metadata=$2 WHERE call_id=$1`, last, metadata); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.store.Gateway.VerifyBackgroundCredentials(ctx, old); err == nil || !strings.Contains(err.Error(), last) || strings.Contains(err.Error(), "private-last-page-key") {
+	if err := verifier.VerifyBackgroundCredentials(ctx, old); err == nil || !strings.Contains(err.Error(), last) || strings.Contains(err.Error(), "private-last-page-key") {
 		t.Fatalf("credential failure on last page was missed or leaked plaintext: %v", err)
 	}
 	var plan string
-	if err := e.pool.QueryRow(ctx, `EXPLAIN (FORMAT JSON) SELECT call_id::text,metadata FROM gateway_background_jobs WHERE call_id>$1::uuid ORDER BY call_id LIMIT 128`, "00000000-0000-0000-0000-000000000000").Scan(&plan); err != nil {
+	queries.mu.Lock()
+	sql, args := queries.sql, queries.args
+	queries.mu.Unlock()
+	if sql == "" {
+		t.Fatal("no credential verification query was captured")
+	}
+	if err := e.pool.QueryRow(ctx, "EXPLAIN (FORMAT JSON) "+sql, args...).Scan(&plan); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(plan, "Index Scan") || strings.Contains(plan, `"Node Type": "Sort"`) {
