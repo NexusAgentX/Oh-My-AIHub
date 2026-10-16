@@ -13,14 +13,12 @@ export type PricesForm = {
   cache_write: string
   cache_read: string
 
-  geo_multipliers?: Record<string, string>
   token_prices?: Record<string, string>
 }
 
 export type TierForm = {
   name: string
   serviceTier?: string
-  thinkingMode?: string
   useTokens: boolean
   minPromptTokens: string
   maxPromptTokens: string
@@ -79,7 +77,6 @@ export function tierToForm(tier: PriceTier): TierForm {
   return {
     name: tier.name,
     serviceTier: tier.service_tier,
-    thinkingMode: tier.thinking_mode,
     useTokens: tier.min_prompt_tokens !== null || tier.max_prompt_tokens !== null,
     minPromptTokens: tier.min_prompt_tokens === null ? '' : String(tier.min_prompt_tokens),
     maxPromptTokens: tier.max_prompt_tokens === null ? '' : String(tier.max_prompt_tokens),
@@ -104,8 +101,7 @@ export function formToTierInput(form: TierForm): PriceTierInput {
   const weekdays = form.useTime && form.weekdays.length > 0 ? [...form.weekdays].sort((a, b) => a - b) : null
   return {
     name: form.name.trim(),
-    service_tier: form.serviceTier?.trim() || undefined,
-    thinking_mode: (form.thinkingMode || undefined) as PriceTierInput['thinking_mode'],
+    service_tier: (form.serviceTier?.trim() || undefined) as PriceTierInput['service_tier'],
     timezone: form.timezone.trim() || 'UTC',
     min_prompt_tokens: form.useTokens ? tokenValue(form.minPromptTokens) : null,
     max_prompt_tokens: form.useTokens ? tokenValue(form.maxPromptTokens) : null,
@@ -117,11 +113,7 @@ export function formToTierInput(form: TierForm): PriceTierInput {
 }
 
 function trimPrices(prices: PricesForm): ModelPrices {
-  const clean = (values: Record<string, string>) => Object.fromEntries(
-    Object.entries(values).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, value.trim()]),
-  )
   return {
-    ...(prices.geo_multipliers ? { geo_multipliers: clean(prices.geo_multipliers) } : {}),
     ...(prices.token_prices
       ? {
           token_prices: Object.fromEntries(
@@ -159,11 +151,7 @@ export function isValidTimezone(timezone: string) {
 export type TierErrors = Partial<Record<'name' | 'tokens' | 'time' | 'timezone' | 'prices' | 'condition', string>>
 
 export function validatePrices(prices: PricesForm) {
-  for (const [key, value] of Object.entries(prices.geo_multipliers ?? {})) {
-    if (value.trim() !== '' && (!/^[a-z][a-z0-9_-]{0,31}$/.test(key) || !isValidPrice(value) || Number(value) > 100)) {
-      return '地域倍率为 0～100，最多 9 位小数'
-    }
-  }
+
   return [
     prices.input,
     prices.output,
@@ -178,6 +166,7 @@ export function validatePrices(prices: PricesForm) {
 export function validateTier(form: TierForm): TierErrors {
   const errors: TierErrors = {}
   const input = formToTierInput(form)
+  if (input.service_tier && !['openai:default', 'openai:fast', 'openai:ultrafast', 'openai:flex'].includes(input.service_tier)) errors.condition = '请选择有效的服务档位'
   if (input.name && input.name.length > 64) errors.name = '名称最多 64 个字符'
   if (!form.name.trim()) errors.name = '请填写档位名称'
   if (form.useTokens) {
@@ -205,7 +194,7 @@ export function validateTier(form: TierForm): TierErrors {
     if (!isValidTimezone(form.timezone.trim() || 'UTC')) errors.timezone = '无效的时区'
   }
   const hasPredicate =
-    Boolean(input.service_tier || input.thinking_mode) ||
+    Boolean(input.service_tier) ||
     input.min_prompt_tokens != null ||
     input.max_prompt_tokens != null ||
     input.start_minute_of_day != null ||
@@ -248,7 +237,6 @@ function weekdaysSummary(weekdays: number[]) {
 export function tierConditionSummary(tier: PriceTierInput) {
   const parts: string[] = []
   if (tier.service_tier) parts.push(`服务档位 ${tier.service_tier}`)
-  if (tier.thinking_mode) parts.push(tier.thinking_mode === 'qwen_thinking' ? '百炼实际思考' : '百炼未输出思考')
   const min = tier.min_prompt_tokens ?? null
   const max = tier.max_prompt_tokens ?? null
   if (min !== null && max !== null) parts.push(`输入侧 ${formatTokenBound(min)}–${formatTokenBound(max)}`)
@@ -311,7 +299,7 @@ export type ModelForm = {
   tiers: PriceTierInput[]
 }
 
-export const modalityOptions = ['text', 'image', 'audio', 'video', 'file']
+export const modalityOptions = ['text', 'image', 'audio', 'video']
 
 export function emptyModelForm(): ModelForm {
   return {
@@ -339,7 +327,6 @@ export function tierToInput(tier: PriceTier): PriceTierInput {
   return {
     name: tier.name,
     service_tier: tier.service_tier,
-    thinking_mode: tier.thinking_mode,
     timezone: tier.timezone,
     min_prompt_tokens: tier.min_prompt_tokens,
     max_prompt_tokens: tier.max_prompt_tokens,

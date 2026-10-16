@@ -31,7 +31,7 @@ export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChang
   )
   return (
     <>
-      <fieldset className="form-section"><legend>渠道能力</legend><CapabilityToggles values={form.capabilities} options={channelCapabilities} onChange={capabilities => set({capabilities})} /></fieldset>
+      <fieldset className="form-section"><legend>渠道兼容性</legend><CapabilityToggles values={form.capabilities} options={channelCapabilities} onChange={capabilities => set({capabilities})} /></fieldset>
       <TextField label="User-Agent" onChange={(event) => set({ userAgent: event.target.value })} placeholder="不修改" value={form.userAgent} />
       <fieldset className="form-section">
         <legend>请求头规则</legend>

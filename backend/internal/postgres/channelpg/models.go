@@ -13,7 +13,6 @@ type ChannelModel struct {
 	ModelID                             string
 	UpstreamModel                       string
 	MultiplierNano                      int64
-	Formats                             []string
 	FormatTests                         []byte
 	Enabled                             bool
 	FxDiscount                          bool

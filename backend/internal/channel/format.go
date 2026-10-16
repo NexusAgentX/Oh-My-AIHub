@@ -13,6 +13,7 @@ import (
 type Format string
 
 const (
+	FormatCodex           Format = "codex"
 	FormatOpenAIChat      Format = "openai_chat"
 	FormatOpenAIResponses Format = "openai_responses"
 	FormatAnthropic       Format = "anthropic"

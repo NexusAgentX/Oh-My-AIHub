@@ -16,6 +16,7 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -465,6 +466,19 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
 	call.diagnostics.Operation, call.diagnostics.RequiredCapabilities = identifyCapabilities(r.URL.Path, format, body, scan, facts.ServiceTier)
+	if strings.EqualFold(r.Header.Get("X-OpenAI-Internal-Codex-Responses-Lite"), "true") {
+		protocol := "responses"
+		if strings.HasPrefix(r.URL.Path, "/backend-api/codex/") {
+			protocol = "codex"
+		}
+		for _, feature := range []string{"responses_lite", "reasoning_all_turns"} {
+			value := protocol + "/" + feature
+			if !slices.Contains(call.diagnostics.RequiredCapabilities, value) {
+				call.diagnostics.RequiredCapabilities = append(call.diagnostics.RequiredCapabilities, value)
+			}
+		}
+	}
+
 	if call.multipartModel == nil {
 		call.hints = scan.billingHints(body, format)
 	}
@@ -671,6 +685,17 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	call.mode, call.source = pref.Mode, pref.Source
+	selected := false
+	for _, id := range pref.Order {
+		if !containsString(pref.Excluded, id) {
+			selected = true
+			break
+		}
+	}
+	if !selected {
+		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusBadRequest, "routing_not_configured", "尚未选择渠道，请前往模型详情或 API Key 设置配置调用渠道")
+		return
+	}
 	maxAttempts := int(defaults.DefaultMaxAttempts)
 	if pref.MaxAttempts != nil {
 		maxAttempts = int(*pref.MaxAttempts)
@@ -694,7 +719,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 		candidates = eligible
 		if len(candidates) == 0 {
-			e.finishRejected(w, call, OutcomeRejectedNoChannel, 503, "capability_unavailable", "没有满足所需能力的渠道")
+			e.finishRejected(w, call, OutcomeRejectedNoChannel, 503, "capability_unavailable", "所选渠道不兼容此请求，请检查渠道兼容性或配置其他渠道")
 			return
 		}
 	}

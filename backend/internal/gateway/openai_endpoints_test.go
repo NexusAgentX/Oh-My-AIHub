@@ -105,7 +105,7 @@ func newResourceFixture(t *testing.T, h http.HandlerFunc) (*Engine, *resourceFix
 	run := newCredentialRun(t, 200)
 	server := httptest.NewServer(h)
 	t.Cleanup(server.Close)
-	s := &resourceFixture{key: KeyAuth{KeyID: "key", OwnerID: "consumer", Enabled: true, AccountActive: true}, candidate: Candidate{Capabilities: append([]string(nil), channel.ModelCapabilities...), ChannelID: "upstream", OwnerID: "provider", BaseURL: server.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "original-secret")}}
+	s := &resourceFixture{key: KeyAuth{KeyID: "key", OwnerID: "consumer", Enabled: true, AccountActive: true}, candidate: Candidate{Advanced: channel.Advanced{Capabilities: append([]string(nil), channel.ChannelCapabilities...)}, Capabilities: append([]string(nil), channel.ModelCapabilities...), ChannelID: "upstream", OwnerID: "provider", BaseURL: server.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "original-secret")}}
 	e := newServeFixture(t, 10, defaultRouting{}).engine
 	e.Store, e.Resources, e.Keyring, e.Catalog = s, s, run.keyring, resourceModels{}
 	e.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: 1}, outbound: fakeOutbound{transport: http.DefaultTransport}})
@@ -203,8 +203,8 @@ func TestMultipartImageSplicesOnlyModelAndRejectsAmbiguity(t *testing.T) {
 		t.Fatal("duplicate model accepted")
 	}
 }
-func TestOpenAIImageOperationsShareOneProtocolAndKeepTheirPaths(t *testing.T) {
-	for _, path := range []string{"/v1/images/generations", "/v1/images/edits", "/v1/images/variations"} {
+func TestCodexImageOperationsKeepTheirPaths(t *testing.T) {
+	for _, path := range []string{"/backend-api/codex/images/generations", "/backend-api/codex/images/edits"} {
 		t.Run(path, func(t *testing.T) {
 			e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != path {

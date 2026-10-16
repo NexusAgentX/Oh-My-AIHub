@@ -3336,33 +3336,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-  /v1/chat/completions:
-    get:
-      operationId: listStoredChats
-      tags: [gateway]
-      summary: 列出当前 Key 的已存储补全
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-    post:
-      operationId: proxyOpenAIChat
-      tags: [gateway]
-      summary: OpenAI Chat Completions
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
   /v1/responses:
     post:
       operationId: proxyOpenAIResponses
@@ -3445,73 +3418,6 @@ paths:
       - {bearerKey: []}
       parameters:
       - name: model
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/chat/completions/{resourceID}:
-    get:
-      operationId: getStoredChat
-      tags: [gateway]
-      summary: 已存储补全管理
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: resourceID
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-    post:
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-      operationId: updateStoredChat
-      tags: [gateway]
-      summary: 已存储补全管理
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: resourceID
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-    delete:
-      operationId: deleteStoredChat
-      tags: [gateway]
-      summary: 已存储补全管理
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: resourceID
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/chat/completions/{resourceID}/messages:
-    get:
-      operationId: listStoredChatMessages
-      tags: [gateway]
-      summary: 已存储补全消息
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: resourceID
         in: path
         required: true
         schema: {type: string, maxLength: 256}
@@ -3707,95 +3613,6 @@ paths:
         schema: {type: string, maxLength: 256}
       responses:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/images/generations:
-    post:
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-      operationId: generateImages
-      tags: [gateway]
-      summary: 图片生成
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/images/edits:
-    post:
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-          multipart/form-data:
-            schema: {type: object, description: 原生图片表单；只替换 model 字段，其余字节保留。}
-      operationId: editImages
-      tags: [gateway]
-      summary: 图片编辑
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/images/variations:
-    post:
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-          multipart/form-data:
-            schema: {type: object, description: 原生图片表单；只替换 model 字段，其余字节保留。}
-      operationId: varyImages
-      tags: [gateway]
-      summary: 图片变体
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      responses:
-        default: {description: 原生响应与错误；单模型详情由网关直接回答。}
-  /v1/messages:
-    post:
-      operationId: proxyAnthropicMessages
-      tags: [gateway]
-      summary: Anthropic Messages
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {anthropicKey: []}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
-  /v1beta/models/{model}:
-    post:
-      operationId: proxyGemini
-      tags: [gateway]
-      summary: Gemini generateContent / streamGenerateContent
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {geminiKey: []}
-      - {geminiQueryKey: []}
-      parameters:
-      - {$ref: '#/components/parameters/model'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {type: object, description: 原生请求正文。}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
   /v1/models:
     get:
       operationId: listGatewayModels
@@ -3809,19 +3626,7 @@ paths:
       - {anthropicKey: []}
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
-  /v1beta/models:
-    get:
-      operationId: listGeminiModels
-      tags: [gateway]
-      summary: Gemini 风格模型列表
-      description: "外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。"
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {geminiKey: []}
-      - {geminiQueryKey: []}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
+
 components:
   securitySchemes:
     sessionCookie: {type: apiKey, in: cookie, name: oma_session, description: 登录后由服务端设置的 HttpOnly 会话 Cookie。}
@@ -4552,9 +4357,9 @@ components:
     Date: {type: string, format: date, description: 日期（YYYY-MM-DD，Asia/Shanghai）。}
     Format:
       type: string
-      enum: [openai_chat, openai_responses, anthropic, gemini, openai_images]
+      enum: [openai_chat, openai_responses, anthropic, gemini, openai_images, codex]
       description: 原生协议格式。compact、输入 token 计数和 Conversations 复用 OpenAI Responses；三种 OpenAI 图片操作统一使用 OpenAI Images。具体操作以上游实际支持为准，网关不做格式转换。
-    RoutingMode: {type: string, enum: [cheapest, reliable, fastest, manual], description: 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。}
+    RoutingMode: {type: string, enum: [manual], description: 手动选择渠道并排序；默认不选择渠道。}
     CallOutcome:
       type: string
       enum: [rejected_balance, rejected_budget, rejected_key, rejected_model, rejected_format, rejected_no_channel, rejected_inflight, upstream_failed, interrupted, client_disconnected, succeeded, succeeded_unbilled, in_progress]
@@ -4671,11 +4476,21 @@ components:
       properties:
         input: {$ref: '#/components/schemas/Price'}
         output: {$ref: '#/components/schemas/Price'}
-        geo_multipliers:
-          description: 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。
+        token_prices:
+          description: 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。
           type: object
-          maxProperties: 32
-          additionalProperties: {type: string, pattern: '^(0|[1-9][0-9]{0,2})(\.[0-9]{1,9})?$'}
+          additionalProperties: {$ref: '#/components/schemas/Price'}
+        cache_write: {$ref: '#/components/schemas/Price'}
+        cache_read: {$ref: '#/components/schemas/Price'}
+      required: [input, output, cache_write, cache_read]
+      additionalProperties: false
+    HistoricalModelPrices:
+      type: object
+      description: 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。
+      properties:
+        geo_multipliers: {type: object, additionalProperties: {type: string}, description: 历史地域倍率快照。}
+        input: {$ref: '#/components/schemas/Price'}
+        output: {$ref: '#/components/schemas/Price'}
         token_prices:
           description: 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。
           type: object
@@ -4867,8 +4682,7 @@ components:
       description: 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。
       properties:
         seq: {type: integer, minimum: 1, maximum: 16}
-        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。'}
-        thinking_mode: {type: string, enum: ['', qwen_thinking, qwen_non_thinking]}
+        service_tier: {type: string, enum: ['', 'openai:default', 'openai:fast', 'openai:ultrafast', 'openai:flex']}
         name: {type: string, maxLength: 64}
         min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
         max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
@@ -4885,8 +4699,7 @@ components:
     PriceTierInput:
       type: object
       properties:
-        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。'}
-        thinking_mode: {type: string, enum: ['', qwen_thinking, qwen_non_thinking]}
+        service_tier: {type: string, enum: ['', 'openai:default', 'openai:fast', 'openai:ultrafast', 'openai:flex']}
         name: {type: string, maxLength: 64}
         min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
         max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
@@ -5272,11 +5085,35 @@ components:
           maxItems: 32
       required: [set, remove]
       additionalProperties: false
+    ChannelCompatibility:
+      type: object
+      properties:
+        responses:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [inference, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd]}
+        codex:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [inference, stream, background, response_read, response_delete, response_cancel, input_items, conversations, input_tokens, compact, zstd, search, images_generate, images_edit]}
+      additionalProperties: false
+    ModelCompatibility:
+      type: object
+      properties:
+        responses:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [function_tools, custom_tools, tool_namespaces, tool_search, parallel_tools, structured_output, reasoning, encrypted_reasoning, reasoning_all_turns, vision, web_search, image_generation, responses_lite, compact_v1, compact_v2, compaction_input, file_search, code_interpreter, mcp, computer, shell, apply_patch, fast, ultrafast]}
+        codex:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [function_tools, custom_tools, tool_namespaces, tool_search, parallel_tools, structured_output, reasoning, encrypted_reasoning, reasoning_all_turns, vision, web_search, image_generation, responses_lite, compact_v1, compact_v2, compaction_input, file_search, code_interpreter, mcp, computer, shell, apply_patch, fast, ultrafast]}
+      additionalProperties: false
     ChannelAdvanced:
       type: object
       description: 高级设置；null 表示使用平台默认。
       properties:
-        capabilities: {type: array, items: {type: string, enum: [codex_backend, codex_search]}, uniqueItems: true}
+        compatibility: {$ref: '#/components/schemas/ChannelCompatibility'}
         user_agent: {type: [string, 'null']}
         header_rules: {$ref: '#/components/schemas/HeaderRules'}
         concurrency_limit: {type: [integer, 'null'], minimum: 1}
@@ -5292,7 +5129,7 @@ components:
     ChannelAdvancedInput:
       type: object
       properties:
-        capabilities: {type: array, items: {type: string, enum: [codex_backend, codex_search]}, uniqueItems: true}
+        compatibility: {$ref: '#/components/schemas/ChannelCompatibility'}
         user_agent: {type: [string, 'null']}
         header_rules: {$ref: '#/components/schemas/HeaderRules'}
         concurrency_limit: {type: [integer, 'null'], minimum: 1}
@@ -5318,7 +5155,7 @@ components:
     ChannelModel:
       type: object
       properties:
-        capabilities: {type: array, items: {type: string, enum: [web_search, image_generation, responses_lite, compact_v1, compact_v2, priority, ultrafast]}, uniqueItems: true}
+        compatibility: {$ref: '#/components/schemas/ModelCompatibility'}
         model_id: {type: string}
         display_name: {type: string}
         upstream_model: {type: string}
@@ -5329,7 +5166,6 @@ components:
         formats:
           type: array
           items: {$ref: '#/components/schemas/Format'}
-          minItems: 1
         format_tests:
           type: object
           additionalProperties: {$ref: '#/components/schemas/FormatTest'}
@@ -5357,21 +5193,17 @@ components:
     ChannelModelInput:
       type: object
       properties:
-        capabilities: {type: array, items: {type: string, enum: [web_search, image_generation, responses_lite, compact_v1, compact_v2, priority, ultrafast]}, uniqueItems: true}
+        compatibility: {$ref: '#/components/schemas/ModelCompatibility'}
         model_id: {type: string}
         upstream_model: {type: string, description: 默认与 model_id 相同（模型重定向）。}
         multiplier: {$ref: '#/components/schemas/Multiplier'}
         fx_discount: {type: boolean, description: '汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。'}
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-          minItems: 1
         enabled: {type: boolean}
         custom_prices:
           allOf:
           - {$ref: '#/components/schemas/CustomPrices'}
           description: 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。
-      required: [model_id, formats]
+      required: [model_id]
       additionalProperties: false
     ChannelToday:
       type: object
@@ -5519,13 +5351,17 @@ components:
     ChannelTestResult:
       type: object
       properties:
+        protocol: {type: string, enum: [responses, codex]}
+        capability: {type: string}
+        scope: {type: string, enum: [channel, model]}
+        skipped: {type: boolean}
         model_id: {type: string}
         format: {$ref: '#/components/schemas/Format'}
         ok: {type: boolean}
         status_code: {type: [integer, 'null']}
         error: {type: [string, 'null']}
         duration_ms: {type: integer}
-      required: [model_id, format, ok, status_code, error, duration_ms]
+      required: [protocol, capability, scope, skipped, model_id, format, ok, status_code, error, duration_ms]
       additionalProperties: false
     ChannelTestResponse:
       type: object
@@ -5792,7 +5628,7 @@ components:
             required: [model, kind, usage, price_snapshot]
             additionalProperties: false
         geo_multipliers: {type: object, additionalProperties: {type: string}}
-        selected_prices: {$ref: '#/components/schemas/ModelPrices'}
+        selected_prices: {$ref: '#/components/schemas/HistoricalModelPrices'}
         token_prices: {type: object, additionalProperties: {type: string}}
         base_token_prices: {type: object, additionalProperties: {type: string}}
         detail:
@@ -5831,7 +5667,7 @@ components:
             tool_prompt_tokens: {type: integer}
             notes: {type: array, items: {type: string}}
           additionalProperties: false
-        base_prices: {$ref: '#/components/schemas/ModelPrices'}
+        base_prices: {$ref: '#/components/schemas/HistoricalModelPrices'}
         tier:
           anyOf:
           - {$ref: '#/components/schemas/TierRef'}
@@ -5880,10 +5716,7 @@ components:
         charged: {$ref: '#/components/schemas/Amount'}
         ttft_ms: {type: [integer, 'null']}
         duration_ms: {type: [integer, 'null']}
-        routing_mode:
-          anyOf:
-          - {$ref: '#/components/schemas/RoutingMode'}
-          - {type: 'null'}
+        routing_mode: {type: [string, 'null'], enum: [manual, cheapest, reliable, fastest, null]}
         routing_source: {type: [string, 'null'], enum: [default, account, key, null]}
         client_user_agent: {type: [string, 'null']}
         attempts:

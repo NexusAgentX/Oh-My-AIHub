@@ -2,8 +2,8 @@ package channel
 
 import "slices"
 
-var ChannelCapabilities = []string{"codex_backend", "codex_search"}
-var ModelCapabilities = []string{"web_search", "image_generation", "responses_lite", "compact_v1", "compact_v2", "priority", "ultrafast"}
+var ChannelCapabilities = cells(ChannelFeatures, CodexChannelFeatures)
+var ModelCapabilities = cells(ModelFeatures, nil)
 
 func ValidCapabilities(values, allowed []string) bool {
 	if len(values) > len(allowed) {

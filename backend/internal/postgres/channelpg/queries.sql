@@ -7,10 +7,10 @@ INSERT INTO channels (
 
 -- name: InsertChannelModel :exec
 INSERT INTO channel_models (
-    channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount,
+    channel_id, model_id, upstream_model, multiplier_nano, format_tests, enabled, fx_discount,
     is_custom, custom_input_price_nano_per_million, custom_output_price_nano_per_million,
     custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier, capabilities
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, sqlc.arg(capabilities)::text[]);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, sqlc.arg(capabilities)::text[]);
 
 -- Serializes custom model names against catalog creation (catalogpg.CreateModel
 -- takes the same lock) so a name is never both custom and official.
@@ -63,7 +63,7 @@ ORDER BY c.created_at DESC, c.id DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount,
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.format_tests, cm.enabled, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million, cm.pending_multiplier,
        cm.catalog_model_id, cm.capabilities
@@ -113,7 +113,7 @@ INSERT INTO channel_events (channel_id, kind, reason) VALUES ($1, $2, $3);
 SELECT id, kind, reason, created_at FROM channel_events WHERE channel_id = $1 ORDER BY id DESC LIMIT sqlc.arg(row_limit);
 
 -- name: SetChannelModelTests :exec
-UPDATE channel_models SET format_tests = $3, formats = $4 WHERE channel_id = $1 AND model_id = $2;
+UPDATE channel_models SET format_tests = $3 WHERE channel_id = $1 AND model_id = $2;
 
 -- Marks the channel as edited without changing a field of it: applying the probe
 -- results rewrites the formats of its models. The gateway counts the 4xx

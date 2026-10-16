@@ -353,6 +353,13 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		WriteError(w, DialectOf(r), 403, "model_not_allowed", "该 API Key 不允许使用此模型", "")
 		return
 	}
+	feature := "response_read"
+	if cancel {
+		feature = "response_cancel"
+	}
+	if !e.compatibleResource(w, r, Resource{ModelID: metadata.ModelID, ChannelID: job.ChannelID, CallID: job.CallID}, feature) {
+		return
+	}
 	select {
 	case e.followupSlots <- struct{}{}:
 		defer func() { <-e.followupSlots }()

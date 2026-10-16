@@ -92,11 +92,11 @@ func TestKeysAndRoutingPreferences(t *testing.T) {
 	if recorder := alice.call(t, http.MethodPut, "/api/routing/deepseek-chat", map[string]any{"mode": "random"}); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid routing mode = %d", recorder.Code)
 	}
-	override := alice.expect(t, http.StatusOK, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "fastest", "idle_timeout_ms": 3000, "request_timeout_ms": 20000})
+	override := alice.expect(t, http.StatusOK, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "manual", "idle_timeout_ms": 3000, "request_timeout_ms": 20000})
 	if override["source"] != "key" || override["order"].([]any) == nil || override["ttft_timeout_ms"] != nil || override["idle_timeout_ms"] != float64(3000) || override["request_timeout_ms"] != float64(20000) {
 		t.Fatalf("key routing = %v", override)
 	}
-	if recorder := bob.call(t, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "fastest"}); recorder.Code != http.StatusNotFound {
+	if recorder := bob.call(t, http.MethodPut, keyPath+"/routing/deepseek-chat", map[string]any{"mode": "manual"}); recorder.Code != http.StatusNotFound {
 		t.Fatalf("routing on someone else's key = %d", recorder.Code)
 	}
 	if detail := alice.expect(t, http.StatusOK, http.MethodGet, keyPath, nil); len(detail["routing"].([]any)) != 1 {

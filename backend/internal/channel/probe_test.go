@@ -2,7 +2,6 @@ package channel
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -25,16 +24,10 @@ func TestMatchModelIsExactThenCaseInsensitiveThenDateStripped(t *testing.T) {
 	}
 }
 
-func TestSuggestFormatsFollowTheModelFamily(t *testing.T) {
-	cases := map[string][]Format{
-		"claude-sonnet-4-5": {FormatOpenAIChat, FormatAnthropic}, "anthropic/claude-3-opus": {FormatOpenAIChat, FormatAnthropic},
-		"gpt-image-1": {FormatOpenAIImages}, "openai/gpt-image-1": {FormatOpenAIImages}, "dall-e-3": {FormatOpenAIImages},
-		"gpt-5": {FormatOpenAIChat, FormatOpenAIResponses}, "o3-mini": {FormatOpenAIChat, FormatOpenAIResponses},
-		"gemini-2.5-pro": {FormatOpenAIChat, FormatGemini}, "deepseek-chat": {FormatOpenAIChat}, "ollama-x": {FormatOpenAIChat},
-	}
-	for model, want := range cases {
-		if got := SuggestFormats(model); fmt.Sprint(got) != fmt.Sprint(want) {
-			t.Fatalf("%s = %v, want %v", model, got, want)
+func TestDiscoveryDoesNotInferCompatibilityFromModelName(t *testing.T) {
+	for _, name := range []string{"gpt-5", "claude", "gemini", "custom"} {
+		if got := SuggestFormats(name); len(got) != 0 {
+			t.Fatal(got)
 		}
 	}
 }
@@ -62,18 +55,15 @@ func TestValidateAdvancedRejectsForbiddenHeadersAndBadRanges(t *testing.T) {
 	}
 }
 
-func TestNormalizeModelsDefaultsUpstreamAndOrdersFormats(t *testing.T) {
+func TestNormalizeModelsDefaultsUpstreamAndDiscardsPerModelFormats(t *testing.T) {
 	known := func(id string) bool { return id == "gpt-5" || id == "claude" }
 	got, err := NormalizeModels([]Model{{ModelID: " gpt-5 ", MultiplierNano: 1_500_000_000, Formats: []Format{FormatOpenAIResponses, FormatOpenAIChat}}}, known)
-	if err != nil || got[0].UpstreamModel != "gpt-5" || fmt.Sprint(got[0].Formats) != "[openai_chat openai_responses]" {
+	if err != nil || got[0].UpstreamModel != "gpt-5" || len(got[0].Formats) != 0 {
 		t.Fatalf("got %+v, %v", got, err)
 	}
 	for _, bad := range [][]Model{
 		nil,
 		{{ModelID: "missing", Formats: []Format{FormatOpenAIChat}}},
-		{{ModelID: "gpt-5", Formats: nil}},
-		{{ModelID: "gpt-5", Formats: []Format{"smoke"}}},
-		{{ModelID: "gpt-5", Formats: []Format{FormatOpenAIChat, "smoke"}}},
 		{{ModelID: "gpt-5", Formats: []Format{FormatOpenAIChat}, MultiplierNano: MaxMultiplierNano + 1}},
 		{{ModelID: "gpt-5", Formats: []Format{FormatOpenAIChat}}, {ModelID: "gpt-5", Formats: []Format{FormatOpenAIChat}}},
 	} {

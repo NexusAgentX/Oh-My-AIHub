@@ -34,7 +34,9 @@ func (s *protocolErrorStore) Candidates(context.Context, string, channel.Format)
 type defaultRouting struct{ routing.Store }
 
 func (defaultRouting) Resolve(_ context.Context, _, _, model string) (routing.Pref, error) {
-	return routing.Default(model), nil
+	pref := routing.Default(model)
+	pref.Order = []string{"upstream", "second", "zz-fallback"}
+	return pref, nil
 }
 
 // Exercise the public Engine handler over HTTP, an actual controlled HTTP
@@ -57,7 +59,7 @@ func TestHTTP200ProtocolErrorEndToEnd(t *testing.T) {
 				}))
 				defer upstream.Close()
 				run := newCredentialRun(t, http.StatusOK)
-				store := &protocolErrorStore{fallbackCredential: run.seal("zz-fallback", "sk-test"), candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-test")}}
+				store := &protocolErrorStore{fallbackCredential: run.seal("zz-fallback", "sk-test"), candidate: Candidate{Advanced: channel.Advanced{Capabilities: channel.CapabilityList(channel.ChannelCapabilities)}, Capabilities: channel.CapabilityList(channel.ModelCapabilities), ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-test")}}
 				fixture := newServeFixture(t, 10, defaultRouting{})
 				engine := fixture.engine
 				engine.Store, engine.Keyring = store, run.keyring

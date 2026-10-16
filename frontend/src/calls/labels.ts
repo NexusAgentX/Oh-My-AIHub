@@ -1,9 +1,10 @@
 import type { BadgeTone } from '../ui'
-import type { CallOutcome, Format, RoutingMode } from '../api/types'
+import type { CallOutcome, Format } from '../api/types'
 
-export const formats: Format[] = ['openai_chat', 'openai_responses', 'anthropic', 'gemini', 'openai_images']
+export const formats: Format[] = ['openai_responses', 'codex']
 
 export const formatLabels: Record<Format, string> = {
+  codex: 'Codex',
   openai_chat: 'OpenAI Chat',
   openai_responses: 'Responses',
   anthropic: 'Anthropic',
@@ -12,7 +13,7 @@ export const formatLabels: Record<Format, string> = {
 
 }
 
-export const routingModeLabels: Record<RoutingMode, string> = {
+export const routingModeLabels: Record<string, string> = {
   cheapest: '便宜优先',
   reliable: '稳定优先',
   fastest: '快速优先',

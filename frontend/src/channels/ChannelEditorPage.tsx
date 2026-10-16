@@ -1,3 +1,4 @@
+import { matrixCells } from './Capabilities'
 import { SupplierRecognition } from '../sharing/SupplierRecognition'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -74,12 +75,12 @@ function Stepper({ current }: { current: number }) {
 
 function emptyRow(custom = false): ModelRow {
   return {
-    key: rowKey(), sell: true, modelId: '', upstream: '', formats: ['openai_chat'], multiplier: '1', fxDiscount: false, passed: {},
+    key: rowKey(), sell: true, modelId: '', upstream: '', formats: [], multiplier: '1', fxDiscount: false, passed: {},
     custom, customPrices: emptyCustomPrices, pending: false,
   }
 }
 
-/** 选模型区：读取结果提示、测试格式、手动添加与表格。 */
+/** 选模型区：读取结果提示、探测兼容性、手动添加与表格。 */
 function ModelsSection({
   rows,
   onRows,
@@ -107,12 +108,13 @@ function ModelsSection({
     <div className="channel-models">
       {summary && (
         <p className="muted-copy">
-          从上游读取到 {summary.total} 个模型，其中 {summary.matched} 个在平台目录里；不在目录的可设为自定义模型并自定价格。格式已按模型预选，绿色是测试通过的
+          从上游读取到 {summary.total} 个模型，其中 {summary.matched} 个在平台目录里；不在目录的可设为自定义模型并自定价格。兼容性可自动探测或手动填写
         </p>
       )}
+      <p className="muted-copy">探测会真实调用上游，可能产生费用。未验证的能力可手动填写。</p>
       <div className="channel-models-actions">
         <Button disabled={testing || !rows.some((row) => row.sell && row.modelId)} loading={testing && testingModel === null} onClick={() => onTest()} size="sm" type="button" variant="secondary">
-          测试格式
+          探测兼容性
         </Button>
         <Button icon={<Icon name="plus" />} onClick={() => addRow()} size="sm" type="button" variant="quiet">
           手动添加
@@ -127,7 +129,7 @@ function ModelsSection({
   )
 }
 
-/** 新建：三步向导（连接 → 选模型 → 上架）。「测试格式」会先以未上架状态保存渠道。 */
+/** 新建：三步向导（连接 → 选模型 → 上架）。「探测兼容性」会先以未上架状态保存渠道。 */
 function ChannelWizard() {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
@@ -195,6 +197,7 @@ function ChannelWizard() {
       setTestError(problem)
       return
     }
+    if (!modelId && rows.filter(row => row.sell && row.modelId).length > 3) { setTestError('批量探测最多 3 个模型，请使用模型行的探测按钮'); return }
     setTesting(true)
     setTestingModel(modelId ?? null)
     try {
@@ -204,6 +207,7 @@ function ChannelWizard() {
         body: { model_ids: modelId ? [modelId] : rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
       })
       setRows((current) => applyTestResults(current, result.results))
+      setAdvanced((current) => ({ ...current, capabilities: matrixCells(result.channel.advanced.compatibility) }))
     } catch (caught) {
       setTestError(errorMessage(caught, '测试失败，请重试'))
     } finally {
@@ -449,6 +453,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
       setTestError(problem)
       return
     }
+    if (!modelId && rows.filter(row => row.sell && row.modelId).length > 3) { setTestError('批量探测最多 3 个模型，请使用模型行的探测按钮'); return }
     setTesting(true)
     setTestingModel(modelId ?? null)
     try {
@@ -458,6 +463,7 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
         body: { model_ids: modelId ? [modelId] : rows.filter((row) => row.sell && row.modelId).map((row) => row.modelId), apply: false },
       })
       setRows((current) => applyTestResults(current, result.results))
+      setAdvanced((current) => ({ ...current, capabilities: matrixCells(result.channel.advanced.compatibility) }))
     } catch (caught) {
       setTestError(errorMessage(caught, '测试失败，请重试'))
     } finally {

@@ -35,7 +35,6 @@ var (
 
 // Model IDs are the names clients send. They cannot contain "/" or ":" so
 // they fit one path segment, including Gemini's "{model}:generateContent".
-var serviceTierPattern = regexp.MustCompile(`^(openai|anthropic|gemini):[A-Za-z0-9_-]{1,48}$`)
 
 var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
@@ -351,8 +350,15 @@ func Validate(model Model) error {
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
-	if !validGeoPrices(model.GeoMultipliers) || !validTokenPrices(model.TokenPrices) {
+	if len(model.GeoMultipliers) != 0 || !validTokenPrices(model.TokenPrices) {
 		return ErrInvalidInput
+	}
+	for _, modalities := range [][]string{model.InputModalities, model.OutputModalities} {
+		for _, value := range modalities {
+			if value != "text" && value != "image" && value != "audio" && value != "video" {
+				return ErrInvalidInput
+			}
+		}
 	}
 	return validatePriceTiers(model.PriceTiers)
 }
@@ -362,7 +368,7 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
-		if !validGeoPrices(tier.GeoMultipliers) || !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
+		if len(tier.GeoMultipliers) != 0 || !validTokenPrices(tier.TokenPrices) || !ValidServiceTier(tier.ServiceTier) || tier.ThinkingMode != "" {
 			return ErrInvalidInput
 		}
 		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
@@ -404,16 +410,11 @@ func validTokenPrices(prices map[string]money.Amount) bool {
 	return true
 }
 
-var geoPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
-
-func validGeoPrices(geo map[string]int64) bool {
-	if len(geo) > 32 {
-		return false
+// ValidServiceTier describes the only actual response tiers accepted for new prices.
+func ValidServiceTier(value string) bool {
+	switch value {
+	case "", "openai:default", "openai:fast", "openai:ultrafast", "openai:flex":
+		return true
 	}
-	for key, value := range geo {
-		if !geoPattern.MatchString(key) || value < 0 || value > 100*ledger.FixedPointScale {
-			return false
-		}
-	}
-	return true
+	return false
 }

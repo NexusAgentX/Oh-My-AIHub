@@ -417,7 +417,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 }
 
 const listAllCandidates = `-- name: ListAllCandidates :many
-SELECT cm.model_id, cm.formats,
+SELECT cm.model_id, array_remove(ARRAY[CASE WHEN c.capabilities && ARRAY['responses/inference','codex/inference']::text[] THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[] AS formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
@@ -590,7 +590,7 @@ SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_non
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(cm.formats)
+WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(array_remove(ARRAY[CASE WHEN c.capabilities && ARRAY['responses/inference','codex/inference']::text[] THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[])
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id
 `
@@ -680,7 +680,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       c.capabilities AS channel_capabilities, cm.capabilities, cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       c.capabilities AS channel_capabilities, cm.capabilities, array_remove(ARRAY[CASE WHEN 'responses/inference'=ANY(c.capabilities) THEN 'openai_responses' END, CASE WHEN 'codex/inference'=ANY(c.capabilities) THEN 'codex' END], NULL)::text[] AS formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -758,8 +758,8 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 const listOnlineModels = `-- name: ListOnlineModels :many
 SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
 FROM channel_models cm
-CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
+CROSS JOIN LATERAL unnest(array_remove(ARRAY[CASE WHEN 'responses/inference'=ANY(c.capabilities) THEN 'openai_responses' END, CASE WHEN 'codex/inference'=ANY(c.capabilities) THEN 'codex' END], NULL)::text[]) AS f
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 GROUP BY cm.model_id

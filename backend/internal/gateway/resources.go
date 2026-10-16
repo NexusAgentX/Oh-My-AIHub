@@ -202,6 +202,9 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 		resourceError(w, err)
 		return
 	}
+	if !e.compatibleResource(w, r, row) {
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-AIHub-Request-Id", row.CallID)
 	if !e.acquireFollowup(w) {

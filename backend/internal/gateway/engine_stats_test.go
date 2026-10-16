@@ -387,56 +387,32 @@ func TestReadersSeeTheSnapshotWhileItIsRebuilt(t *testing.T) {
 
 // ---- ranking ----
 
-func TestRankPutsDemotedChannelsLastInEveryModeButKeepsThem(t *testing.T) {
-	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3), candidate("d", "x", 4)}
-	demoted := map[string]Anomaly{"a": {}, "c": {}}
-	fast, slow := 100.0, 900.0
-	stats := map[string]ChannelStats{
-		"a": {Attempts: 40, Successes: 40, TTFTP50MS: &fast}, "b": {Attempts: 40, Successes: 30, TTFTP50MS: &slow},
-		"c": {Attempts: 40, Successes: 40, TTFTP50MS: &fast}, "d": {Attempts: 40, Successes: 20, TTFTP50MS: &slow},
-	}
-	for _, tc := range []struct {
-		mode routing.Mode
-		want string
-	}{
-		{routing.ModeCheapest, "bdac"}, // the demoted keep their price order behind the rest
-		{routing.ModeReliable, "bdac"}, // b is more reliable than d, a before c
-		{routing.ModeFastest, "bdac"},  // b and d tie on first token, then by price
-		{routing.ModeManual, "dbac"},   // the manual order a, c, d, b with the demoted moved back
-	} {
-		in := RankInput{Mode: tc.mode, Candidates: candidates, Stats: stats, Demoted: demoted, ConsumerID: "me"}
-		if tc.mode == routing.ModeManual {
-			in.Order = []string{"a", "c", "d", "b"}
-		}
-		if got := ids(Rank(in)); got != tc.want {
-			t.Errorf("%s: order = %s, want %s", tc.mode, got, tc.want)
-		}
-	}
-
-	// Without the flag the same input ranks differently, so the demotion is what moved them.
-	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Stats: stats, ConsumerID: "me"})); got != "abcd" {
-		t.Fatalf("undemoted order = %s", got)
+func TestManualOrderRemainsAuthoritativeDespiteAnomalyFlags(t *testing.T) {
+	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2)}
+	got := Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a", "b"}, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}})
+	if ids(got) != "ab" {
+		t.Fatal(ids(got))
 	}
 }
 
 func TestRankKeepsADemotedChannelThatIsTheOnlyOneAndLetsTheStickyOneLead(t *testing.T) {
 	only := []Candidate{candidate("a", "x", 1)}
-	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: only, Demoted: map[string]Anomaly{"a": {}}})); got != "a" {
+	if got := ids(Rank(RankInput{Mode: routing.ModeManual, Order: []string{"a"}, Candidates: only, Demoted: map[string]Anomaly{"a": {}}})); got != "a" {
 		t.Fatalf("order = %s: a demoted channel is not excluded", got)
 	}
 	// A Responses turn continues where the previous one ran, healthy or not.
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	in := RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Demoted: map[string]Anomaly{"c": {}}, Sticky: "c"}
+	in := RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Demoted: map[string]Anomaly{"c": {}}, Sticky: "c"}
 	if got := ids(Rank(in)); got != "cab" {
-		t.Fatalf("sticky order = %s, want cab", got)
+		t.Fatalf("sticky order = %s, want acb", got)
 	}
 	in.Sticky = "b"
 	if got := ids(Rank(in)); got != "bac" {
 		t.Fatalf("order = %s, want bac", got)
 	}
 	// An excluded or unavailable channel stays out whether it is demoted or not.
-	in = RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}, Excluded: []string{"b"}}
-	if got := ids(Rank(in)); got != "ca" {
-		t.Fatalf("order = %s, want ca", got)
+	in = RankInput{Mode: routing.ModeManual, Order: []string{"a", "b", "c"}, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}, Excluded: []string{"b"}}
+	if got := ids(Rank(in)); got != "ac" {
+		t.Fatalf("order = %s, want ac", got)
 	}
 }

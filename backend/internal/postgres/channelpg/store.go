@@ -88,9 +88,6 @@ func toModel(row ChannelModel) channel.Model {
 			CacheWrite: deref(row.CustomCacheWritePriceNanoPerMillion), CacheRead: deref(row.CustomCacheReadPriceNanoPerMillion),
 		}
 	}
-	for _, format := range row.Formats {
-		model.Formats = append(model.Formats, channel.Format(format))
-	}
 	var tests map[string]channel.FormatTest
 	if json.Unmarshal(row.FormatTests, &tests) == nil {
 		for format, test := range tests {
@@ -105,14 +102,6 @@ func deref(amount *money.Amount) money.Amount {
 		return 0
 	}
 	return *amount
-}
-
-func formatStrings(formats []channel.Format) []string {
-	result := make([]string, 0, len(formats))
-	for _, format := range formats {
-		result = append(result, string(format))
-	}
-	return result
 }
 
 // hydrate attaches models and today statistics to channels.
@@ -150,6 +139,9 @@ func hydrate(ctx context.Context, q *Queries, channels []channel.Channel) ([]cha
 	}
 	for index := range channels {
 		channels[index].Models = byChannel[channels[index].ID]
+		for j := range channels[index].Models {
+			channels[index].Models[j].Formats = channel.DeclaredFormats(channels[index].Advanced.Capabilities)
+		}
 		channels[index].Today = today[channels[index].ID]
 	}
 	return channels, nil
@@ -188,7 +180,7 @@ func insertModels(ctx context.Context, q *Queries, channelID string, models []ch
 		}
 		params := InsertChannelModelParams{
 			ChannelID: channelID, ModelID: model.ModelID, UpstreamModel: model.UpstreamModel, MultiplierNano: model.MultiplierNano,
-			Capabilities: channel.CapabilityList(model.Capabilities), Formats: formatStrings(model.Formats), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
+			Capabilities: channel.CapabilityList(model.Capabilities), FormatTests: encoded, Enabled: model.Enabled, FxDiscount: model.FXDiscount,
 			PendingMultiplier: model.PendingMultiplier,
 		}
 		if prices := model.Custom; prices != nil {
@@ -453,6 +445,9 @@ func (s *Store) SaveTests(ctx context.Context, id string, results []channel.Test
 		}
 		byModel := map[string][]channel.TestOutcome{}
 		for _, result := range results {
+			if result.Skipped {
+				continue
+			}
 			byModel[result.ModelID] = append(byModel[result.ModelID], result)
 		}
 		for _, row := range rows {
@@ -461,38 +456,23 @@ func (s *Store) SaveTests(ctx context.Context, id string, results []channel.Test
 				continue
 			}
 			model := toModel(row)
-			tested := map[channel.Format]bool{}
-			var passed []channel.Format
 			for _, outcome := range outcomes {
-				tested[outcome.Format] = true
-				model.FormatTests[outcome.Format] = channel.FormatTest{
-					OK: outcome.OK, StatusCode: outcome.StatusCode, Error: outcome.Error, DurationMS: &outcome.DurationMS, TestedAt: testedAt,
+				cell := outcome.Format
+				if outcome.Capability != "" {
+					cell = channel.Format(outcome.Protocol + "/" + outcome.Capability)
 				}
-				if outcome.OK {
-					passed = append(passed, outcome.Format)
-				}
-			}
-			formats := model.Formats
-			if apply {
-				var next []channel.Format
-				for _, format := range channel.Formats {
-					if slices.Contains(passed, format) || (slices.Contains(model.Formats, format) && !tested[format]) {
-						next = append(next, format)
-					}
-				}
-				if len(next) > 0 {
-					formats = next
-				}
+				model.FormatTests[cell] = channel.FormatTest{OK: outcome.OK, StatusCode: outcome.StatusCode, Error: outcome.Error, DurationMS: &outcome.DurationMS, TestedAt: testedAt}
 			}
 			tests := map[string]channel.FormatTest{}
-			for format, test := range model.FormatTests {
-				tests[string(format)] = test
+			for cell, test := range model.FormatTests {
+				tests[string(cell)] = test
 			}
+
 			encoded, err := json.Marshal(tests)
 			if err != nil {
 				return err
 			}
-			if err := q.SetChannelModelTests(ctx, SetChannelModelTestsParams{ChannelID: id, ModelID: row.ModelID, FormatTests: encoded, Formats: formatStrings(formats)}); err != nil {
+			if err := q.SetChannelModelTests(ctx, SetChannelModelTestsParams{ChannelID: id, ModelID: row.ModelID, FormatTests: encoded}); err != nil {
 				return err
 			}
 		}
