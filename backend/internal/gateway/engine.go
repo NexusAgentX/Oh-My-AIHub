@@ -262,6 +262,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	itemsRegistered      bool
 	resourceKind         string
 	resourceRegistered   bool
 	boundResource        *Resource
@@ -486,12 +487,12 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		}
 		call.stream = facts.Stream
-		if format == channel.FormatOpenAIResponses {
+		if format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount {
 			stickyResponseID = facts.PreviousResponseID
 		}
 	}
 
-	if e.Resources != nil && format == channel.FormatOpenAIResponses {
+	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount) {
 		kind, id := "response", stickyResponseID
 		if member, ok := scan.last("conversation"); ok && string(body[member.start:member.end]) != "null" {
 			var raw struct {
@@ -516,6 +517,25 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 				return
 			}
 			call.boundResource = &row
+		}
+	}
+	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount || format == channel.FormatOpenAIConversations) {
+		refs, err := inputReferences(body, scan)
+		if err != nil {
+			e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "条目引用无效或过多")
+			return
+		}
+		for _, id := range refs {
+			item, err := e.ownedResource(ctx, key, "item", id)
+			if err != nil {
+				e.reject(w, call, OutcomeRejectedModel, 404, "resource_not_found", "引用条目不存在或不可访问")
+				return
+			}
+			if call.boundResource != nil && !sameResourceScope(*call.boundResource, item) {
+				e.reject(w, call, OutcomeRejectedModel, 400, "resource_scope_mismatch", "引用条目属于不同上游资源范围")
+				return
+			}
+			call.boundResource = &item
 		}
 	}
 	call.stage("request", prepareAt, e.Now())
@@ -665,6 +685,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			if candidate.ChannelID == route.Candidate.ChannelID {
 				candidate.BaseURL = route.Candidate.BaseURL
 				candidate.Credential = route.Candidate.Credential
+				candidate.Advanced.HeaderRules = route.Candidate.Advanced.HeaderRules
+				candidate.Advanced.UserAgent = route.Candidate.Advanced.UserAgent
 				bound = append(bound, candidate)
 			}
 		}
@@ -694,7 +716,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	sticky := ""
-	if stickyResponseID != "" {
+	if call.boundResource != nil {
+		sticky = call.boundResource.ChannelID
+	} else if stickyResponseID != "" {
 		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
 			sticky = channelID
 		}
@@ -1400,15 +1424,25 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		var envelope struct {
 			ID string `json:"id"`
 		}
-		if json.Unmarshal(payload, &envelope) != nil || envelope.ID == "" {
+		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
+		initial.Write(payload, e.Now())
+		initialObservation := initial.Finish()
+		if initialObservation.ProtocolError {
+			call.resourceKind = ""
+		} else if json.Unmarshal(payload, &envelope) != nil || envelope.ID == "" {
 			e.internalError(w, call, errors.New("missing resource id"))
 			return
 		}
-		if err := e.keepResource(result.upstream, call, candidate, envelope.ID); err != nil {
+		if err := e.keepResource(result.upstream, call, candidate, envelope.ID); call.resourceKind != "" && err != nil {
 			e.internalError(w, call, err)
 			return
 		}
 		call.resourceRegistered = true
+		if err := e.keepItems(result.upstream, call, candidate, envelope.ID, itemIDs(payload)); err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		call.itemsRegistered = true
 	}
 	if call.hints.Background && !call.polling && !call.stream {
 		payload, err := stageBackground(&result)
@@ -1442,7 +1476,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	}
 	w.Header().Set("X-AIHub-Request-Id", call.id)
 	_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
-	w.WriteHeader(response.StatusCode)
+	headersStarted := call.resourceKind == ""
+	if headersStarted {
+		w.WriteHeader(response.StatusCode)
+	}
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
 	observer.trackResource = call.resourceKind != ""
@@ -1464,6 +1501,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		}
 		_ = controller.SetWriteDeadline(e.Now().Add(clientWriteLimit))
 		writeAt := e.Now()
+		if !headersStarted {
+			w.WriteHeader(response.StatusCode)
+			headersStarted = true
+		}
 		n, err := w.Write(chunk)
 		written += int64(n)
 		if err == nil {
@@ -1487,6 +1528,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		strip = &usageFrameFilter{}
 	}
 	var resourcePrefix []byte
+	var resourceErr error
 	deliver := func(chunk []byte) {
 		if len(chunk) == 0 {
 			return
@@ -1497,16 +1539,18 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		observer.Write(chunk, e.Now())
 		if call.resourceKind != "" && !call.resourceRegistered && call.stream {
 			if len(resourcePrefix)+len(chunk) > maxJSONBuffer {
-				result.cancel(errors.New("resource prefix exceeds budget"))
+				resourceErr = errors.New("resource prefix exceeds budget")
+				result.cancel(resourceErr)
 				undelivered = true
 				watch.left()
 				return
 			}
 			resourcePrefix = append(resourcePrefix, chunk...)
-			if observer.responseID == "" {
+			if observer.responseID == "" && !observer.protocolError {
 				return
 			}
-			if err := e.keepResource(result.upstream, call, candidate, observer.responseID); err != nil {
+			if err := e.keepResource(result.upstream, call, candidate, observer.responseID); !observer.protocolError && err != nil {
+				resourceErr = err
 				result.cancel(err)
 				undelivered = true
 				watch.left()
@@ -1523,6 +1567,16 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 				watch.left()
 				return
 			}
+		}
+		if call.resourceKind != "" && call.resourceRegistered && !call.itemsRegistered && terminalResponse(observer.responseStatus) {
+			if err := e.keepItems(result.upstream, call, candidate, observer.responseID, observer.resourceItems); err != nil {
+				resourceErr = err
+				result.cancel(err)
+				undelivered = true
+				watch.left()
+				return
+			}
+			call.itemsRegistered = true
 		}
 		if strip != nil {
 			chunk = strip.Filter(chunk)
@@ -1555,6 +1609,16 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
+	if call.resourceKind != "" && !call.resourceRegistered && resourceErr == nil && !call.polling {
+		resourceErr = errors.New("upstream did not return a resource id")
+	}
+	if resourceErr != nil {
+		observation.ProtocolError = true
+		if !headersStarted {
+			w.Header().Del("Content-Length")
+			WriteError(w, call.dialect, 502, "resource_registration_failed", "无法登记上游资源", call.id)
+		}
+	}
 	if call.hints.Background && call.pending && !terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
 		return
 	}

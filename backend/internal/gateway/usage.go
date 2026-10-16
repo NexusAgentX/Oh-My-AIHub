@@ -42,6 +42,9 @@ type Observation struct {
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
 	trackResource bool
+	resourceItems []string
+	media         *mediaProjection
+	image         bool
 	format        channel.Format
 	stream        bool
 	sse           bool
@@ -95,11 +98,18 @@ type anthropicUsage struct{ input, output, cacheWrite, cacheRead int64 }
 // NewObserver starts a reader for one response of the given format.
 // stream reports whether the client asked for a streamed response.
 func NewObserver(format channel.Format, stream bool, contentType string) *Observer {
-	return &Observer{format: observationFormat(format), stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream")}
+	o := &Observer{format: observationFormat(format), stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream"), image: imageFormat(format)}
+	if o.image || format == channel.FormatOpenAICompact {
+		o.media = &mediaProjection{}
+	}
+	return o
 }
 
 // Write feeds one chunk that arrived at the given time.
 func (o *Observer) Write(chunk []byte, at time.Time) {
+	if o.media != nil {
+		chunk = o.media.write(chunk)
+	}
 	if o.sse {
 		o.writeSSE(chunk, at)
 		return

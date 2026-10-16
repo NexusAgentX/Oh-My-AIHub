@@ -283,3 +283,8 @@ LIMIT sqlc.arg(page_limit);
 
 -- name: DeleteResource :exec
 DELETE FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4;
+
+-- name: SaveResourceItems :exec
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+SELECT $1,$2,'item',unnest(sqlc.arg(item_ids)::text[]),$3,$4,$5,$6
+ON CONFLICT DO NOTHING;

@@ -142,7 +142,7 @@ func TestListFormatsFollowTheEndpoint(t *testing.T) {
 		headers map[string]string
 		want    []channel.Format
 	}{
-		{"openai", "/v1/models", nil, []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}},
+		{"openai", "/v1/models", nil, []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImageGeneration, channel.FormatOpenAIImageEdit, channel.FormatOpenAIImageVariation}},
 		{"anthropic", "/v1/models", map[string]string{"anthropic-version": "2023-06-01"}, []channel.Format{channel.FormatAnthropic}},
 		{"gemini", "/v1beta/models", nil, []channel.Format{channel.FormatGemini}},
 		{"gemini ignores anthropic-version", "/v1beta/models", map[string]string{"anthropic-version": "2023-06-01"}, []channel.Format{channel.FormatGemini}},

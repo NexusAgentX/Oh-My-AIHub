@@ -223,6 +223,7 @@ func newPerfStack(t *testing.T, channels, consumers int, dnsDelay time.Duration)
 	withLabel("gateway", func() {
 		quiet := slog.New(slog.NewJSONHandler(io.Discard, nil))
 		s.e = newEnvOn(t, s.pool, store, func(d *gateway.Dependencies) {
+			d.Resources = store.Gateway
 			d.Outbound = policy
 			d.Logger = quiet
 		})

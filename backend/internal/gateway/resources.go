@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ type Resource struct {
 }
 type ResourceStore interface {
 	SaveResource(context.Context, Resource) error
+	SaveResourceItems(context.Context, Resource, []string) error
 	LookupResource(context.Context, string, string, string, string) (Resource, error)
 	ListResources(context.Context, string, string, string, string, bool, int) ([]Resource, error)
 	DeleteResource(context.Context, string, string, string, string) error
@@ -175,6 +177,8 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 		resourceError(w, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-AIHub-Request-Id", row.CallID)
 	if !e.acquireFollowup(w) {
 		return
 	}
@@ -183,6 +187,25 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 	if err != nil {
 		WriteError(w, DialectOpenAI, 413, "request_too_large", "请求体过大", "")
 		return
+	}
+	if r.Method == http.MethodPost && kind == "conversation" {
+		_, scan, err := ScanRequest(body)
+		if err != nil {
+			WriteError(w, DialectOpenAI, 400, "invalid_request", "请求必须为 JSON 对象", "")
+			return
+		}
+		refs, err := inputReferences(body, scan)
+		if err != nil {
+			WriteError(w, DialectOpenAI, 400, "invalid_request", "条目引用无效", "")
+			return
+		}
+		for _, id := range refs {
+			item, err := e.ownedResource(r.Context(), key, "item", id)
+			if err != nil || !sameResourceScope(row, item) {
+				resourceError(w, ErrResourceNotFound)
+				return
+			}
+		}
 	}
 	// Child item IDs and pagination cursors stay within the authorized parent.
 	if item := r.PathValue("itemID"); item != "" && !responseIDPattern.MatchString(item) {
@@ -207,6 +230,20 @@ func (e *Engine) ServeResource(w http.ResponseWriter, r *http.Request, kind stri
 		if r.PathValue("itemID") == "" {
 			_ = e.Resources.DeleteResource(r.Context(), key.OwnerID, key.KeyID, kind, id)
 		}
+	}
+	if kind == "conversation" || strings.HasSuffix(r.URL.Path, "/input_items") {
+		payload, err := io.ReadAll(io.LimitReader(response.Body, maxRequestBytes+1))
+		if err != nil || len(payload) > maxRequestBytes || !json.Valid(payload) {
+			resourceError(w, errors.New("resource response exceeds budget"))
+			return
+		}
+		if ids := itemIDs(payload); len(ids) > 0 {
+			if err := e.Resources.SaveResourceItems(r.Context(), row, ids); err != nil {
+				resourceError(w, err)
+				return
+			}
+		}
+		response.Body = io.NopCloser(bytes.NewReader(payload))
 	}
 	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 		w.Header()[name] = values
@@ -392,4 +429,82 @@ func (e *Engine) ServeOpenAIResponse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	e.ServeResource(w, r, "response")
+}
+
+// Only IDs of items observed under an owned parent can be used as opaque
+// item_reference inputs. Otherwise shared upstream credentials would let a
+// caller borrow another consumer's history without its parent response ID.
+func inputReferences(body []byte, scan objectScan) ([]string, error) {
+	member, ok := scan.last("input")
+	if !ok {
+		member, ok = scan.last("items")
+	}
+	if !ok {
+		return nil, nil
+	}
+	raw := body[member.start:member.end]
+	if !bytes.Contains(raw, []byte("item_reference")) && !bytes.Contains(raw, []byte(`\u`)) {
+		return nil, nil
+	}
+	var ids []string
+	var failure error
+	eachElement(raw, func(item []byte) {
+		var ref struct {
+			Type string `json:"type"`
+			ID   string `json:"id"`
+		}
+		if json.Unmarshal(item, &ref) != nil {
+			return
+		}
+		if ref.Type != "item_reference" {
+			return
+		}
+		if len(ids) >= maxBillingItems || !responseIDPattern.MatchString(ref.ID) {
+			failure = errors.New("invalid item reference")
+			return
+		}
+		ids = append(ids, ref.ID)
+	})
+	return ids, failure
+}
+func itemIDs(raw []byte) []string {
+	var envelope struct {
+		Output borrowedJSON `json:"output"`
+		Items  borrowedJSON `json:"items"`
+		Data   borrowedJSON `json:"data"`
+	}
+	if json.Unmarshal(raw, &envelope) != nil {
+		return nil
+	}
+	ids := make([]string, 0)
+	for _, items := range []borrowedJSON{envelope.Output, envelope.Items, envelope.Data} {
+		eachElement(items, func(item []byte) {
+			var value struct {
+				ID string `json:"id"`
+			}
+			if len(ids) < maxBillingItems && json.Unmarshal(item, &value) == nil && responseIDPattern.MatchString(value.ID) {
+				ids = append(ids, value.ID)
+			}
+		})
+	}
+	return ids
+}
+func (e *Engine) keepItems(ctx context.Context, call *callState, candidate Candidate, id string, ids []string) error {
+	if e.Resources == nil || len(ids) == 0 || call.resourceKind == "" {
+		return nil
+	}
+	raw, err := json.Marshal(resourceRoute{Candidate: candidate, Headers: call.upstreamHeaders})
+	if err != nil {
+		return err
+	}
+	parent := Resource{AccountID: call.key.OwnerID, KeyID: call.key.KeyID, CallID: call.id, ChannelID: candidate.ChannelID, ModelID: call.modelID, Kind: call.resourceKind, ID: id, Metadata: raw}
+	return e.Resources.SaveResourceItems(ctx, parent, ids)
+}
+
+func sameResourceScope(a, b Resource) bool {
+	var x, y resourceRoute
+	if json.Unmarshal(a.Metadata, &x) != nil || json.Unmarshal(b.Metadata, &y) != nil {
+		return false
+	}
+	return x.Candidate.ChannelID == y.Candidate.ChannelID && x.Candidate.BaseURL == y.Candidate.BaseURL && reflect.DeepEqual(x.Candidate.Credential, y.Candidate.Credential) && reflect.DeepEqual(x.Headers, y.Headers)
 }

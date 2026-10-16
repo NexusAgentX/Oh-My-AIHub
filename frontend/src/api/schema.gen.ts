@@ -7637,7 +7637,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7715,7 +7719,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7733,7 +7741,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7751,7 +7763,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7791,7 +7807,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7851,7 +7871,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7911,7 +7935,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7929,7 +7957,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {
@@ -7947,7 +7979,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
             /** @description 原生响应与错误；单模型详情由网关直接回答。 */
             default: {

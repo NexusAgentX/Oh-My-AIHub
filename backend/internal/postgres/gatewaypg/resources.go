@@ -2,7 +2,9 @@ package gatewaypg
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/jackc/pgx/v5"
@@ -48,4 +50,32 @@ func (s *Store) ListResources(ctx context.Context, account, key, kind, after str
 }
 func (s *Store) DeleteResource(ctx context.Context, account, key, kind, id string) error {
 	return s.q.DeleteResource(ctx, DeleteResourceParams{AccountID: account, KeyID: key, Kind: kind, ResourceID: id})
+}
+
+// VerifyResourceCredentials covers retained resource snapshots as well as live
+// channels, so keyring rotation cannot silently orphan stored upstream objects.
+func (s *Store) VerifyResourceCredentials(ctx context.Context, keyring *channel.Keyring) error {
+	rows, err := s.pool.Query(ctx, `SELECT metadata FROM gateway_resources`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw []byte
+		if err := rows.Scan(&raw); err != nil {
+			return err
+		}
+		var route struct{ Candidate gateway.Candidate }
+		if err := json.Unmarshal(raw, &route); err != nil {
+			return errors.New("invalid resource credential snapshot")
+		}
+		if _, err := keyring.Decrypt(route.Candidate.ChannelID, route.Candidate.Credential); err != nil {
+			return errors.New("resource credential unavailable")
+		}
+	}
+	return rows.Err()
+}
+
+func (s *Store) SaveResourceItems(ctx context.Context, row gateway.Resource, ids []string) error {
+	return s.q.SaveResourceItems(ctx, SaveResourceItemsParams{AccountID: row.AccountID, KeyID: row.KeyID, CallID: row.CallID, ChannelID: row.ChannelID, ModelID: row.ModelID, Metadata: row.Metadata, ItemIds: ids})
 }

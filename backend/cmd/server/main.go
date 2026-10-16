@@ -198,6 +198,9 @@ func main() {
 	if err := store.Gateway.VerifyBackgroundCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
 		fatal(logger, "checking background credentials failed", err)
 	}
+	if err := store.Gateway.VerifyResourceCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
+		fatal(logger, "checking stored resource credentials failed", err)
+	}
 	if err := engine.RestoreBackground(backgroundCheckCtx); err != nil {
 		fatal(logger, "restoring background tasks failed", err)
 	}

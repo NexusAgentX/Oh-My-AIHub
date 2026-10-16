@@ -3268,6 +3268,11 @@ paths:
       responses:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: updateStoredChat
       tags: [gateway]
       summary: 已存储补全管理
@@ -3331,6 +3336,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/responses/compact:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: compactResponse
       tags: [gateway]
       summary: 压缩上下文
@@ -3342,6 +3352,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/responses/input_tokens:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: countResponseInputTokens
       tags: [gateway]
       summary: 统计输入 token
@@ -3353,6 +3368,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/conversations:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: createConversation
       tags: [gateway]
       summary: 创建上游会话
@@ -3379,6 +3399,11 @@ paths:
       responses:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: updateConversation
       tags: [gateway]
       summary: 上游会话管理
@@ -3425,6 +3450,11 @@ paths:
       responses:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: createConversationItems
       tags: [gateway]
       summary: 添加会话条目
@@ -3480,6 +3510,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/images/generations:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: generateImages
       tags: [gateway]
       summary: 图片生成
@@ -3491,6 +3526,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/images/edits:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: editImages
       tags: [gateway]
       summary: 图片编辑
@@ -3502,6 +3542,11 @@ paths:
         default: {description: 原生响应与错误；单模型详情由网关直接回答。}
   /v1/images/variations:
     post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, description: 原生请求正文。}
       operationId: varyImages
       tags: [gateway]
       summary: 图片变体

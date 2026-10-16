@@ -38,7 +38,7 @@ function CustomPrices({ row, onChange }: { row: ModelRow; onChange: (prices: Cus
   )
 }
 
-/** 四个可切换的格式标签；测试通过的显示绿色 ✓。 */
+/** 可切换的接口能力标签；测试通过的显示绿色 ✓。 */
 function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: Format[]) => void }) {
   return (
     <span aria-label="支持的格式" className="format-toggles" role="group">

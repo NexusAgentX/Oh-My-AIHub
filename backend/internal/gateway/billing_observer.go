@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
@@ -85,7 +86,7 @@ func anthropicIterations(items []anthropicFields, parent *anthropicFields) []led
 func (o *Observer) observeResponseItems(raw []byte) {
 	// Plain message output cannot contain a billable tool. Escaped member values
 	// take the full path so JSON spelling never changes accounting semantics.
-	if !bytes.Contains(raw, []byte("_call")) && !bytes.Contains(raw, []byte{92}) {
+	if !o.trackResource && !bytes.Contains(raw, []byte("_call")) && !bytes.Contains(raw, []byte{92}) {
 		return
 	}
 	eachElement(raw, o.observeResponseItem)
@@ -97,6 +98,12 @@ func (o *Observer) observeResponseItem(raw []byte) {
 	}
 	o.members = o.members[:0]
 	item := o.objectOf(raw)
+	if o.trackResource {
+		id := textValue(item.get("id"))
+		if responseIDPattern.MatchString(id) && len(o.resourceItems) < maxBillingItems && !slices.Contains(o.resourceItems, id) {
+			o.resourceItems = append(o.resourceItems, id)
+		}
+	}
 	kind := textValue(item.get("type"))
 	if kind != "web_search_call" && kind != "file_search_call" && kind != "code_interpreter_call" && kind != "image_generation_call" {
 		return

@@ -1226,6 +1226,35 @@ func (q *Queries) SaveResource(ctx context.Context, arg SaveResourceParams) (int
 	return result.RowsAffected(), nil
 }
 
+const saveResourceItems = `-- name: SaveResourceItems :exec
+INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
+SELECT $1,$2,'item',unnest($7::text[]),$3,$4,$5,$6
+ON CONFLICT DO NOTHING
+`
+
+type SaveResourceItemsParams struct {
+	AccountID string
+	KeyID     string
+	CallID    string
+	ChannelID string
+	ModelID   string
+	Metadata  []byte
+	ItemIds   []string
+}
+
+func (q *Queries) SaveResourceItems(ctx context.Context, arg SaveResourceItemsParams) error {
+	_, err := q.db.Exec(ctx, saveResourceItems,
+		arg.AccountID,
+		arg.KeyID,
+		arg.CallID,
+		arg.ChannelID,
+		arg.ModelID,
+		arg.Metadata,
+		arg.ItemIds,
+	)
+	return err
+}
+
 const setCallLedgerTx = `-- name: SetCallLedgerTx :exec
 UPDATE calls SET ledger_tx_id = $2 WHERE id = $1
 `

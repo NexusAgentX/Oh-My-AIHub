@@ -285,7 +285,7 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 	}
 	formats := request.Formats
 	if len(formats) == 0 {
-		formats = Formats
+		formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini}
 	}
 	for _, format := range formats {
 		if !format.Valid() {
@@ -301,7 +301,15 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 		if len(request.ModelIDs) > 0 && !slices.Contains(request.ModelIDs, model.ModelID) {
 			continue
 		}
-		for _, format := range uniqueFormats(formats) {
+		selected := formats
+		if len(request.Formats) == 0 {
+			for _, declared := range model.Formats {
+				if declared != FormatOpenAIConversations && declared != FormatOpenAIImageEdit && declared != FormatOpenAIImageVariation {
+					selected = append(slices.Clone(selected), declared)
+				}
+			}
+		}
+		for _, format := range uniqueFormats(selected) {
 			jobs = append(jobs, job{model: model, format: format})
 		}
 	}
@@ -378,6 +386,9 @@ func (s *Service) probeOnce(ctx context.Context, policy Outbound, channel Channe
 		return outcome
 	}
 	started := time.Now()
+	if format == FormatOpenAIConversations || format == FormatOpenAIImageEdit || format == FormatOpenAIImageVariation {
+		return fail(nil, "此接口需使用实际资源或图片进行验收，请手动声明能力", started)
+	}
 	// The client has no deadline of its own; the whole test, including reading
 	// the streamed answer, is bounded by the context. It is not the pooled client
 	// of forwarded requests: a test resolves anew and leaves no connection behind.

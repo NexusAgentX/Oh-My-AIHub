@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formats, formatLabels } from '../calls'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { MarkdownContent } from '../markdown/MarkdownContent'
 import { ModelCatalog } from '../models/ModelCatalog'
@@ -19,7 +20,7 @@ export function ChannelHallPage() {
     <div className="hall-filters"><TextField label="渠道" type="search" placeholder="搜索渠道或渠道主" value={filters.q} onChange={(e) => set('q', e.target.value)} />
       <SelectField label="供应商" value={filters.supplier} onChange={(e) => set('supplier', e.target.value)}><option value="">全部</option>{suppliers.data?.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</SelectField>
       <TextField label="模型" type="search" placeholder="模型名称（精确匹配）" value={filters.model} onChange={(e) => set('model', e.target.value)} />
-      <SelectField label="格式" value={filters.format} onChange={(e) => set('format', e.target.value)}><option value="">全部</option><option value="openai_chat">OpenAI Chat</option><option value="openai_responses">OpenAI Responses</option><option value="anthropic">Anthropic</option><option value="gemini">Gemini</option></SelectField>
+      <SelectField label="格式" value={filters.format} onChange={(e) => set('format', e.target.value)}><option value="">全部</option>{formats.map((format) => <option key={format} value={format}>{formatLabels[format]}</option>)}</SelectField>
     </div>
       {Object.values(filters).some(Boolean) && <Button variant="quiet" onClick={() => setParams({})}>清空</Button>}
     <QueryBoundary query={query} errorFallback="渠道大厅加载失败">{(data) => <>{data.pages.some((page) => page.items.length) ? <div className="sharing-grid">{data.pages.flatMap((page) => page.items).map((channel) => <ChannelCard channel={channel} key={channel.id} />)}</div> : <EmptyState title="暂无符合条件的渠道" />}{query.hasNextPage && <Button variant="secondary" loading={query.isFetchingNextPage} onClick={() => query.fetchNextPage()}>加载更多</Button>}</>}</QueryBoundary>
