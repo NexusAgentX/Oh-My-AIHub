@@ -186,17 +186,20 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 		o.detail.ToolPromptTokens = n
 	}
 	queries, maps := int64(0), int64(0)
-	eachElement(root.get("candidates"), func(raw []byte) {
-		candidate := o.objectOf(raw)
-		grounding := o.objectOf(candidate.get("groundingMetadata"))
-		eachElement(grounding.get("webSearchQueries"), func([]byte) { queries++ })
-		eachElement(grounding.get("groundingChunks"), func(raw []byte) {
-			chunk := o.objectOf(raw)
-			if len(chunk.get("maps")) > 0 {
-				maps++
-			}
+	candidates := root.get("candidates")
+	if hasGroundingMetadata(candidates) {
+		eachElement(candidates, func(raw []byte) {
+			candidate := o.objectOf(raw)
+			grounding := o.objectOf(candidate.get("groundingMetadata"))
+			eachElement(grounding.get("webSearchQueries"), func([]byte) { queries++ })
+			eachElement(grounding.get("groundingChunks"), func(raw []byte) {
+				chunk := o.objectOf(raw)
+				if len(chunk.get("maps")) > 0 {
+					maps++
+				}
+			})
 		})
-	})
+	}
 	if queries > 0 {
 		o.unit("google_search_query", queries)
 		o.unit("google_search_prompt", 1)
@@ -206,10 +209,16 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 		o.note("Maps 检索片段不能确认查询次数")
 		o.unit("google_maps_prompt", 1)
 	}
-	if n > 0 && o.detail.Units["google_search_prompt"] == 0 && o.detail.Units["google_maps_prompt"] == 0 {
+	grounded := o.detail.Units["google_search_prompt"] > 0 || o.detail.Units["google_maps_prompt"] > 0
+	if grounded && o.geminiToolAdded > 0 {
+		o.usage.InputTokens -= o.geminiToolAdded
+		o.geminiToolAdded = 0
+	}
+	if n > 0 && !grounded {
 		// usage summaries are cumulative; absorbGemini replaced the input first.
 		if total, valid := sumTokens(o.usage.InputTokens, n); valid {
 			o.usage.InputTokens = total
+			o.geminiToolAdded = n
 			// Tool modality may be unknown: keep it in the generic input remainder.
 		} else {
 			o.note("工具输入总量无效，未计价")
@@ -242,4 +251,8 @@ func (o *Observer) updateIterationTotals(old, next ledger.Usage) {
 		}
 		return
 	}
+}
+
+func hasGroundingMetadata(raw []byte) bool {
+	return bytes.Contains(raw, []byte(`"groundingMetadata"`)) || bytes.Contains(raw, []byte(`\u`))
 }

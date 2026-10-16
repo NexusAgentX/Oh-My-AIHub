@@ -283,7 +283,7 @@ func TestBackgroundDeadlineSettlesCancellationUsage(t *testing.T) {
 	fixture.jobs[job.CallID] = job
 	engine.pollBackgroundJob(context.Background(), job)
 	got, exists := fixture.finished[job.CallID]
-	if !exists || got.Cost.String() != "0.0002" || got.Bill == nil {
+	if !exists || got.Outcome != OutcomeInterrupted || got.Cost.String() != "0.0002" || got.Bill == nil {
 		t.Fatalf("cancel usage lost: %+v", got)
 	}
 }
@@ -311,5 +311,13 @@ func TestBackgroundRegistrationFailureCancelsProviderWork(t *testing.T) {
 	err = engine.keepBackground(call, catalog.Model{}, Candidate{ChannelID: "channel", BaseURL: upstream.URL, Credential: credential}, settings.Settings{}, "resp_unregistered")
 	if err == nil || !cancelled.Load() || call.pending || len(engine.jobs) != 0 {
 		t.Fatalf("registration failure leaked work: %v cancelled=%v pending=%v", err, cancelled.Load(), call.pending)
+	}
+}
+
+func TestBillingGeminiGroundingArrivesAfterUsage(t *testing.T) {
+	raw := "data: " + `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"toolUsePromptTokenCount":30}}` + "\n\ndata: " + `{"candidates":[{"groundingMetadata":{"webSearchQueries":["synthetic query"]}}]}` + "\n\n"
+	got := observe(channel.FormatGemini, true, "text/event-stream", raw, 1)
+	if got.Usage.InputTokens != 100 || got.Usage.Detail.Units["google_search_prompt"] != ledger.FixedPointScale {
+		t.Fatalf("late grounding was double charged: %+v", got.Usage)
 	}
 }

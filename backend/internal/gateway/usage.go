@@ -79,6 +79,7 @@ type Observer struct {
 	// anthropic reports its fields in two events; track which were seen.
 	anthropic       anthropicUsage
 	openai          openAIUsageState
+	geminiToolAdded int64
 	iterationsSeen  bool
 	iterationOffset anthropicUsage
 	iterationMask   uint8
@@ -187,8 +188,17 @@ func (o *Observer) handleLine(line []byte, at time.Time) {
 		o.eventData = o.eventData[:0]
 		return
 	}
-	o.eventData = append(o.eventData, payload...)
+	if len(o.eventData) == 0 {
+		// Transfer the completed line buffer to the event instead of retaining
+		// two copies of a potentially large single-line response.completed frame.
+		spare := o.eventData[:0]
+		copy(o.line, payload)
+		o.eventData = o.line[:len(payload)]
+		o.line = spare
+		return
+	}
 	o.eventData = append(o.eventData, '\n')
+	o.eventData = append(o.eventData, payload...)
 }
 
 func (o *Observer) finishEvent(at time.Time) {
@@ -197,7 +207,9 @@ func (o *Observer) finishEvent(at time.Time) {
 		o.frame(at)
 		o.absorb(payload)
 	}
-	o.eventData = o.eventData[:0]
+	if len(o.eventData) > 0 {
+		o.line, o.eventData = o.eventData[:0], o.line[:0]
+	}
 	o.eventSkip = false
 }
 
@@ -297,6 +309,9 @@ func (o *Observer) absorb(raw []byte) {
 	case channel.FormatGemini:
 		if keys&keyUsageMetadata != 0 {
 			o.absorbGemini(raw)
+		} else if hasGroundingMetadata(raw) && json.Valid(raw) {
+			o.members = o.members[:0]
+			o.observeGeminiTools(o.objectOf(raw), nil)
 		}
 	}
 	o.absorbDetails(raw, keys)
@@ -665,6 +680,7 @@ func (o *Observer) absorbGemini(raw []byte) {
 		cached = 0
 		o.note("缓存用量超过输入总量或为负，使用通用输入价")
 	}
+	o.geminiToolAdded = 0
 	o.usage = ledger.Usage{InputTokens: prompt - cached, OutputTokens: output, CacheReadTokens: cached}
 	o.found = true
 }

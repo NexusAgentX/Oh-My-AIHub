@@ -1474,6 +1474,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if observation.ProtocolClientError {
 			endReason = EndClientError
 		}
+	case observation.ResponseStatus == "cancelled":
+		outcome, endReason = OutcomeInterrupted, EndInterrupted
 	case clientGone:
 		// Whatever stopped the reading after the client left is no fault of the
 		// channel, and neither is the client's leaving.
