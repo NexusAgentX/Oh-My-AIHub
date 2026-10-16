@@ -192,7 +192,7 @@ func envelopeMarkerValue(raw []byte) bool {
 
 func isEnvelopeMarker(value string) bool {
 	switch value {
-	case "error", "response.failed", "failed", "response.completed", "completed", "response.incomplete", "incomplete":
+	case "response.image_generation_call.in_progress", "response.image_generation_call.generating", "response.image_generation_call.completed", "error", "response.failed", "failed", "response.completed", "completed", "response.incomplete", "incomplete":
 		return true
 	default:
 		return false

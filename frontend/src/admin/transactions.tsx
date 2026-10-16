@@ -133,6 +133,34 @@ const inferenceLabels: Record<string, string> = { message: '主模型推理', co
 
 const thinkingModeLabels: Record<string, string> = { qwen_thinking: '已输出思考', qwen_non_thinking: '未输出思考' }
 
+const imageStatusLabels: Record<string, string> = { in_progress: '处理中', generating: '生成中', completed: '已完成', failed: '失败' }
+const imageQualityLabels: Record<string, string> = { low: '低', medium: '中', high: '高', xhigh: '超高', max: '最高', auto: '自动' }
+const imageBackgroundLabels: Record<string, string> = { transparent: '透明', opaque: '不透明', auto: '自动' }
+const imageActionLabels: Record<string, string> = { generate: '生成新图', edit: '编辑图片', auto: '自动' }
+
+function ImageGenerationObservations({ images }: { images: NonNullable<NonNullable<PriceSnapshot['detail']>['image_generations']> }) {
+  return images.map((image, index) => {
+    const items: Array<[string, ReactNode]> = [
+      ['调用 ID', <span className="mono" key="id">{image.id}</span>],
+      ['状态', imageStatusLabels[image.status ?? ''] ?? '未提供'],
+      ['画图模型', image.model ? `${image.model}（${image.model_source === 'request' ? '请求配置' : '上游返回 · 兼容字段'}）` : '未提供'],
+    ]
+    if (image.size) items.push(['图片尺寸', image.size])
+    if (image.quality) items.push(['图片质量', imageQualityLabels[image.quality] ?? image.quality])
+    if (image.output_format) items.push(['图片格式', image.output_format.toUpperCase()])
+    if (image.background) items.push(['背景', imageBackgroundLabels[image.background] ?? image.background])
+    if (image.action) items.push(['操作', imageActionLabels[image.action] ?? image.action])
+    items.push(['独立用量', image.usage
+      ? `输入 ${image.usage.input_tokens} · 输出 ${image.usage.output_tokens} · 缓存读 ${image.usage.cache_read_tokens} · 缓存写 ${image.usage.cache_write_tokens} tokens（上游兼容字段）`
+      : '上游未提供'])
+    items.push(['图像子模型费用', '暂不收取'])
+    return <details key={image.id}>
+      <summary>图像生成 {index + 1} · {imageStatusLabels[image.status ?? ''] ?? '状态未知'}</summary>
+      <DetailList items={items} />
+    </details>
+  })
+}
+
 /** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。没有信息的项不显示。 */
 export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   const detail = snapshot.detail
@@ -206,6 +234,7 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   return (
     <>
       <DetailList items={items} />
+      <ImageGenerationObservations images={detail?.image_generations ?? []} />
       {components.map((component, index) => (
         <details key={index}>
           <summary>{component.model} · {inferenceLabels[component.kind] ?? component.kind}</summary>

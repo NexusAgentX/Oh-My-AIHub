@@ -300,7 +300,7 @@ func (o *Observer) absorb(raw []byte) {
 			o.absorbChat(raw)
 		}
 	case channel.FormatOpenAIResponses:
-		if keys&(keyUsage|keyID) != 0 {
+		if keys&(keyUsage|keyID|keyEnvelope) != 0 {
 			o.absorbResponses(raw)
 		}
 	case channel.FormatAnthropic:
@@ -426,11 +426,12 @@ type borrowedJSON []byte
 func (b *borrowedJSON) UnmarshalJSON(raw []byte) error { *b = raw; return nil }
 
 func (o *Observer) absorbResponses(raw []byte) {
-	if !bytes.Contains(raw, []byte(`"usage"`)) && !bytes.Contains(raw, []byte(`"id"`)) {
+	if !bytes.Contains(raw, []byte(`"usage"`)) && !bytes.Contains(raw, []byte(`"id"`)) && !bytes.Contains(raw, []byte(`"item_id"`)) {
 		return
 	}
 	var value struct {
 		Type       string          `json:"type"`
+		ItemID     string          `json:"item_id"`
 		ID         string          `json:"id"`
 		Usage      *responsesUsage `json:"usage"`
 		Status     string          `json:"status"`
@@ -464,9 +465,25 @@ func (o *Observer) absorbResponses(raw []byte) {
 		o.responseStatus, o.background = value.Status, value.Background
 		o.observeResponseItems(value.Output)
 	}
-	if value.Type == "response.output_item.done" {
+	switch value.Type {
+	case "response.output_item.added":
+		if !bytes.Contains(value.Item, []byte("_call")) && !bytes.Contains(value.Item, []byte{92}) {
+			return
+		}
+		o.members = o.members[:0]
+		if !json.Valid(value.Item) || textValue(o.objectOf(value.Item).get("type")) != "image_generation_call" {
+			return
+		}
 		o.observeResponseItem(value.Item)
+	case "response.output_item.done":
+		o.observeResponseItem(value.Item)
+	case "response.image_generation_call.in_progress", "response.image_generation_call.generating", "response.image_generation_call.completed":
+		if validObservationID(value.ItemID) {
+			o.members = o.members[:0]
+			o.observeImageGeneration(o.objectOf(raw), value.ItemID, strings.TrimPrefix(value.Type, "response.image_generation_call."))
+		}
 	}
+
 }
 
 type anthropicFields struct {

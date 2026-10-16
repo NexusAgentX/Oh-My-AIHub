@@ -1533,6 +1533,11 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
+	if !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.ImageGenerations) > 0 {
+		observation.Usage.Detail.Notes = appendNote(observation.Usage.Detail.Notes, "主模型用量缺失，未计费")
+		finish.PriceSnapshot = priceSnapshot(model, ledger.PriceResult{}, candidate, defaults.USDCNYRateNano, 0, observation.Usage, call.started)
+	}
+
 	call.stage("pricing", pricingAt, e.Now())
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
