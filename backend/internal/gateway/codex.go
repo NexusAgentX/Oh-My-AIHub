@@ -45,7 +45,7 @@ func (e *Engine) ServeCodexConfig(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(raw))
 }
 
-// Immutable one-cell requirements keep ordinary requests allocation-free. Any
+// Immutable basic requirements keep ordinary requests allocation-free. Any
 // extension append exceeds capacity and gets a request-owned backing array.
 var responsesInferenceRequirements = []string{"responses/inference", "responses/nonstream"}
 var codexInferenceRequirements = []string{"codex/inference", "codex/nonstream"}
@@ -112,7 +112,7 @@ func identifyCapabilities(path string, format channel.Format, body []byte, scan 
 
 		}
 	}
-	if bytes.Equal(rawField("stream"), []byte("true")) {
+	if op != "inference" && bytes.Equal(rawField("stream"), []byte("true")) {
 		add("stream")
 	}
 	if bytes.Equal(rawField("background"), []byte("true")) {

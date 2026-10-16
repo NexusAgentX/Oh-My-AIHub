@@ -159,19 +159,26 @@ func TestCapabilityFailoverStaysWithinSupportingChannels(t *testing.T) {
 }
 
 func TestOrdinaryCapabilityScanDoesNotAllocate(t *testing.T) {
-	body := []byte(`{"model":"m","input":"hello"}`)
-	_, scan, err := ScanRequest(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allocations := testing.AllocsPerRun(100, func() {
-		op, caps := identifyCapabilities("/v1/responses", channel.FormatOpenAIResponses, body, scan, "")
-		if op != "inference" || !slices.Equal(caps, []string{"responses/inference", "responses/nonstream"}) {
-			t.Fatal(op, caps)
+	for _, stream := range []bool{false, true} {
+		body := []byte(`{"model":"m","input":"hello"}`)
+		want := []string{"responses/inference", "responses/nonstream"}
+		if stream {
+			body = []byte(`{"model":"m","input":"hello","stream":true}`)
+			want[1] = "responses/stream"
 		}
-	})
-	if allocations != 0 {
-		t.Fatalf("ordinary request capability scan allocated %g times", allocations)
+		_, scan, err := ScanRequest(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocations := testing.AllocsPerRun(100, func() {
+			op, caps := identifyCapabilities("/v1/responses", channel.FormatOpenAIResponses, body, scan, "")
+			if op != "inference" || !slices.Equal(caps, want) {
+				t.Fatal(op, caps)
+			}
+		})
+		if allocations != 0 {
+			t.Fatalf("stream=%v capability scan allocated %g times", stream, allocations)
+		}
 	}
 }
 
