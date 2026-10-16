@@ -167,6 +167,21 @@ func modalityCounts(raw json.RawMessage) (map[string]int64, bool) {
 	return result, true
 }
 
+// A configured Bailian predicate is the administrator's explicit opt-in to its
+// actual-output semantics. No model name, provider label or alias implies it.
+func (o *Observer) configureThinkingPricing(tiers []ledger.PriceTier, requested *bool) {
+	if o.format != channel.FormatOpenAIChat {
+		return
+	}
+	for _, tier := range tiers {
+		if tier.ThinkingMode == "qwen_thinking" || tier.ThinkingMode == "qwen_non_thinking" {
+			o.bailianPricing = true
+			o.qwenObserved = requested != nil && !*requested
+			return
+		}
+	}
+}
+
 // absorbDetails runs for every event, including reasoning/service events without usage.
 // keys are the member names scanFrameKeys found in raw: an event with none of
 // the members below changes nothing here, and is not decoded.
@@ -198,15 +213,25 @@ func (o *Observer) absorbDetails(raw []byte, keys frameKeys) {
 		o.setServiceTier(prefix + tier)
 	}
 	if o.format == channel.FormatOpenAIChat && keys&keyReasoning != 0 {
-		// A reasoning_content member in the delta (or message) of any choice
-		// marks a model that thinks; there is no need to keep what it says.
+		// Observe only presence/nonempty state; never decode or retain the text.
+		// The generic reasoning alias cannot establish a Bailian pricing mode.
 		eachElement(value.get("choices"), func(choice []byte) {
 			choiceMembers := o.objectOf(choice)
 			for _, field := range [...]string{"delta", "message"} {
-				if raw := o.objectOf(choiceMembers.get(field)).get("reasoning_content"); raw != nil {
-					o.qwenObserved = true
-					if textValue(raw) != "" {
-						o.detail.ThinkingMode = "qwen_thinking"
+				part := o.objectOf(choiceMembers.get(field))
+				for _, key := range [...]string{"reasoning_content", "reasoning"} {
+					raw := part.get(key)
+					isString := len(raw) >= 2 && raw[0] == '"'
+					nonempty := isString && len(raw) > 2
+					if isString {
+						o.thinkingSeen = true
+						o.thinkingNonempty = o.thinkingNonempty || nonempty
+					}
+					if o.bailianPricing && key == "reasoning_content" && (isString || string(raw) == "null") {
+						o.qwenObserved = true
+						if nonempty {
+							o.detail.ThinkingMode = "qwen_thinking"
+						}
 					}
 				}
 			}

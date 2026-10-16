@@ -407,3 +407,31 @@ describe('admin calls live stream', () => {
     expect(matchRoutes(appRoutes, '/admin/calls')?.at(-1)?.route.path).toBe('calls')
   })
 })
+
+describe('thinking facts in price snapshots', () => {
+  const base = {
+    base_prices: { input: '1', output: '2', cache_read: '0.1', cache_write: '1.25' },
+    tier: null, multiplier: '1', fee_rate_nano: 0,
+    prices: { input: '1', output: '2', cache_read: '0.1', cache_write: '1.25' },
+  }
+  it('keeps generic observation independent of provider and price', () => {
+    const markup = renderToStaticMarkup(<PriceSnapshotView snapshot={{ ...base, detail: { thinking_observed: true } }} />)
+    expect(markup).toContain('思考内容观察')
+    expect(markup).toContain('已观察到')
+    expect(markup).not.toContain('百炼')
+    expect(markup).not.toContain('历史思考标签')
+    expect(renderToStaticMarkup(<PriceSnapshotView snapshot={{ ...base, detail: { thinking_observed: false } }} />)).toContain('未观察到')
+    expect(renderToStaticMarkup(<PriceSnapshotView snapshot={base} />)).not.toContain('思考内容观察')
+  })
+  it('requires the recorded explicit basis before labelling a Bailian price mode', () => {
+    const legacy = { ...base, detail: { thinking_mode: 'qwen_thinking' } }
+    const markup = renderToStaticMarkup(<PriceSnapshotView snapshot={legacy} />)
+    expect(markup).toContain('历史思考标签')
+    expect(markup).toContain('来源未记录')
+    expect(markup).not.toContain('百炼')
+    const current = renderToStaticMarkup(<PriceSnapshotView snapshot={{ ...legacy, detail: { ...legacy.detail, thinking_mode_basis: 'bailian_condition' } }} />)
+    expect(current).toContain('百炼计价模式')
+    expect(current).not.toContain('来源未记录')
+    expect(legacy.detail).toEqual({ thinking_mode: 'qwen_thinking' })
+  })
+})

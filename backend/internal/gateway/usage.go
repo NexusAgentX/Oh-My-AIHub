@@ -54,6 +54,9 @@ type Observer struct {
 
 	detail              ledger.UsageDetail
 	qwenObserved        bool
+	bailianPricing      bool
+	thinkingSeen        bool
+	thinkingNonempty    bool
 	anthropicSpeed      string
 	anthropicTier       string
 	usage               ledger.Usage
@@ -176,10 +179,16 @@ func (o *Observer) Finish() Observation {
 			}
 		}
 	}
-	if o.qwenObserved && o.detail.ThinkingMode == "" {
-		o.detail.ThinkingMode = "qwen_non_thinking"
+	if o.bailianPricing && o.qwenObserved {
+		o.detail.ThinkingModeBasis = "bailian_condition"
+		if o.detail.ThinkingMode == "" {
+			o.detail.ThinkingMode = "qwen_non_thinking"
+		}
 	}
-	if len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || len(o.detail.Notes) > 0 {
+	if o.thinkingSeen {
+		o.detail.ThinkingObserved = &o.thinkingNonempty
+	}
+	if len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || o.detail.ThinkingObserved != nil || len(o.detail.Notes) > 0 {
 		o.usage.Detail = &o.detail
 	}
 	status := "missing"

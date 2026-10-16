@@ -127,7 +127,7 @@ function TierEditForm({
         <option value="qwen_non_thinking">未输出思考</option>
       </SelectField>
       <p className="muted-copy">
-        服务档位以响应为准；百炼条件仅适用于按实际思考输出定价的模型。未知事实不命中特定条件。
+        服务档位以响应为准；配置百炼条件即采用百炼实际思考输出计价语义。未知事实不命中特定条件。
       </p>
       <Checkbox
         checked={form.useTokens}

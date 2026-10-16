@@ -50,6 +50,9 @@ func metadataState(s readerState) readerState {
 	d.Tokens = nil
 	d.Notes = nil
 	d.ToolPromptTokens = 0
+	// #467 deliberately separates generic observations from Bailian modes.
+	d.ThinkingMode, d.ThinkingModeBasis, d.ThinkingObserved = "", "", nil
+	s.Qwen = false
 	s.Usage = nil
 	s.Found = false
 	s.Anthropic = [4]int64{}
@@ -58,8 +61,8 @@ func metadataState(s readerState) readerState {
 }
 
 // sameReading preserves the pre-optimization metadata contract. Usage and token
-// detail semantics intentionally changed in #457 and are covered independently
-// by usage_compatibility_test.go; comparing those to a frozen bug is invalid.
+// detail semantics changed in #457/#467 and are covered independently by
+// usage_compatibility_test.go and thinking_test.go, not the frozen bugs.
 func sameReading(t testing.TB, format channel.Format, qwen bool, events []string) {
 	t.Helper()
 	current := NewObserver(format, true, "text/event-stream")

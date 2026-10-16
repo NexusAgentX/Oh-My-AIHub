@@ -5173,6 +5173,8 @@ components:
             requested_service_tier: {type: string}
             service_tier: {type: string}
             thinking_mode: {type: string}
+            thinking_mode_basis: {type: string, enum: [bailian_condition], description: 当前模型显式配置百炼条件档；历史快照缺少此依据。}
+            thinking_observed: {type: boolean, description: 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。}
             tool_prompt_tokens: {type: integer}
             notes: {type: array, items: {type: string}}
           additionalProperties: false

@@ -41,10 +41,10 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 		thinkingMode     string
 		tier             string
 	}{
-		{"chat, thinking off", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "qwen_non_thinking", "priority"},
+		{"chat, thinking off", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "", "priority"},
 		{"chat, thinking on", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":true,"service_tier":"flex"}`, nil, "", "flex"},
 		{"chat, neither", "/v1/chat/completions", `{"model":"gpt-test"}`, nil, "", ""},
-		{"chat, later member wins, other case", "/v1/chat/completions", `{"enable_thinking":true,"model":"gpt-test","Enable_Thinking":false,"service_tier":"a","SERVICE_TIER":"scale"}`, nil, "qwen_non_thinking", "scale"},
+		{"chat, later member wins, other case", "/v1/chat/completions", `{"enable_thinking":true,"model":"gpt-test","Enable_Thinking":false,"service_tier":"a","SERVICE_TIER":"scale"}`, nil, "", "scale"},
 		{"chat, a service tier that is no string", "/v1/chat/completions", `{"model":"gpt-test","enable_thinking":null,"service_tier":5}`, nil, "", ""},
 		{"responses", "/v1/responses", `{"model":"gpt-test","enable_thinking":false,"service_tier":"priority"}`, nil, "", "priority"},
 		{"anthropic", "/v1/messages", `{"model":"gpt-test","max_tokens":10,"service_tier":"auto"}`, anthropic, "", "auto"},

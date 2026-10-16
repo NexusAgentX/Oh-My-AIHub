@@ -139,7 +139,15 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   const items: Array<[string, ReactNode]> = [['价格档', snapshot.tier?.name ?? '基准价']]
   if (detail?.service_tier) items.push(['实际服务档位', detail.service_tier])
   if (detail?.requested_service_tier) items.push(['请求服务档位', detail.requested_service_tier])
-  if (thinking) items.push(['百炼思考模式', thinking])
+  if (detail?.thinking_observed !== undefined) {
+    items.push(['思考内容观察', detail.thinking_observed ? '已观察到' : '未观察到'])
+  }
+  if (thinking) {
+    items.push([
+      detail?.thinking_mode_basis === 'bailian_condition' ? '百炼计价模式' : '历史思考标签',
+      detail?.thinking_mode_basis === 'bailian_condition' ? thinking : `${thinking}（来源未记录）`,
+    ])
+  }
   for (const [key, count] of Object.entries(detail?.tokens ?? {})) {
     items.push([
       tokenPriceLabels[key] || key,

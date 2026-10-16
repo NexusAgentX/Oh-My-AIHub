@@ -21,8 +21,8 @@ const (
 	// keyUsageMetadata and keyServiceTier: likewise non-null.
 	keyUsageMetadata
 	keyServiceTier
-	// keyReasoning: reasoning_content, which marks a model that thinks. A null
-	// one counts: that the member is there is what is read.
+	// keyReasoning: generic reasoning observations, never provider identity.
+	// Null still counts so explicitly configured Bailian semantics can read it.
 	keyReasoning
 	// keyID: an "id" member, where an OpenAI Responses event names its response.
 	keyID
@@ -54,6 +54,7 @@ var frameKeyNames = [...]struct {
 	{"service_tier", keyServiceTier},
 	{"usagemetadata", keyUsageMetadata},
 	{"reasoning_content", keyReasoning},
+	{"reasoning", keyReasoning},
 }
 
 // scanFrameKeys reports which of the keys occur as a member name anywhere in the

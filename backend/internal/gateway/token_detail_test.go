@@ -44,7 +44,7 @@ func TestStreamFactsAndReplacement(t *testing.T) {
 		o.absorb([]byte(raw))
 	}
 	got := o.Finish()
-	if got.Usage.Detail.ServiceTier != "openai:default" || got.Usage.Detail.ThinkingMode != "qwen_thinking" || len(got.Usage.Detail.Tokens) != 0 || got.Usage.OutputTokens != 20 {
+	if got.Usage.Detail.ServiceTier != "openai:default" || got.Usage.Detail.ThinkingMode != "" || got.Usage.Detail.ThinkingObserved == nil || !*got.Usage.Detail.ThinkingObserved || len(got.Usage.Detail.Tokens) != 0 || got.Usage.OutputTokens != 20 {
 		t.Fatalf("%+v", got.Usage.Detail)
 	}
 	snap := priceSnapshot(catalog.Model{}, ledger.PriceResult{}, Candidate{MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, 0, 0, got.Usage, time.Now())
@@ -52,7 +52,7 @@ func TestStreamFactsAndReplacement(t *testing.T) {
 		Detail ledger.UsageDetail `json:"detail"`
 	}
 	_ = json.Unmarshal(snap, &decoded)
-	if decoded.Detail.ServiceTier != "openai:default" || decoded.Detail.ThinkingMode != "qwen_thinking" {
+	if decoded.Detail.ServiceTier != "openai:default" || decoded.Detail.ThinkingMode != "" || decoded.Detail.ThinkingObserved == nil || !*decoded.Detail.ThinkingObserved {
 		t.Fatal(string(snap))
 	}
 }
