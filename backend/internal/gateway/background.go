@@ -46,7 +46,6 @@ type BackgroundStore interface {
 
 type backgroundMetadata struct {
 	RequestedServiceTier string
-	ThinkingRequested    *bool
 	Mode                 routing.Mode
 	Source               routing.Source
 	Started              time.Time
@@ -133,7 +132,7 @@ func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate 
 	if e.Jobs == nil || !responseIDPattern.MatchString(id) {
 		return errors.New("invalid background response metadata")
 	}
-	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, ThinkingRequested: call.thinkingRequested, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
 	defer func() {
 		if saveErr == nil {
 			return
@@ -223,7 +222,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		e.Logger.Error("gateway: invalid task metadata", "request_id", job.CallID)
 		return
 	}
-	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, thinkingRequested: metadata.ThinkingRequested, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
 	if !e.Now().Before(job.Deadline) {
 		// Cancellation may return final usage. Feed it through normal settlement
 		// before falling back to an interrupted call without reliable usage.

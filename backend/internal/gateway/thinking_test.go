@@ -13,13 +13,11 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-func TestThinkingObservationsAndExplicitPricing(t *testing.T) {
+func TestThinkingObservationsDoNotChangePricing(t *testing.T) {
 	off, on := false, true
 	for _, tc := range []struct {
-		name, events, mode string
-		enabled            bool
-		requested          *bool
-		observed           *bool
+		name, events string
+		observed     *bool
 	}{
 		{name: "generic content", events: `{"choices":[{"delta":{"reasoning_content":"private"}}]}`, observed: &on},
 		{name: "generic alias", events: `{"choices":[{"delta":{"reasoning":"private"}}]}`, observed: &on},
@@ -27,27 +25,13 @@ func TestThinkingObservationsAndExplicitPricing(t *testing.T) {
 		{name: "empty", events: `{"choices":[{"delta":{"reasoning_content":""}}]}`, observed: &off},
 		{name: "null unknown", events: `{"choices":[{"delta":{"reasoning_content":null}}]}`},
 		{name: "invalid unknown", events: `{"choices":[{"delta":{"reasoning_content":42}}]}`},
-		{name: "request is not observation", requested: &off},
 		{name: "multiple choices", events: `{"choices":[{"delta":{"reasoning_content":""}},{"delta":{"reasoning":"private"}}]}`, observed: &on},
 		{name: "both keys", events: `{"choices":[{"delta":{"reasoning_content":"","reasoning":"private"}}]}`, observed: &on},
 		{name: "sticky nonempty", events: "{\"choices\":[{\"delta\":{\"reasoning\":\"private\"}}]}\n{\"choices\":[{\"delta\":{\"reasoning\":\"\"}}]}", observed: &on},
-		{name: "configured actual", enabled: true, events: `{"choices":[{"delta":{"reasoning_content":"private"}}]}`, observed: &on, mode: "qwen_thinking"},
-		{name: "configured empty", enabled: true, events: `{"choices":[{"delta":{"reasoning_content":""}}]}`, observed: &off, mode: "qwen_non_thinking"},
-		{name: "configured null", enabled: true, events: `{"choices":[{"delta":{"reasoning_content":null}}]}`, mode: "qwen_non_thinking"},
-		{name: "configured invalid", enabled: true, events: `{"choices":[{"delta":{"reasoning_content":42}}]}`},
-		{name: "configured alias remains generic", enabled: true, events: `{"choices":[{"delta":{"reasoning":"private"}}]}`, observed: &on},
-		{name: "configured numeric tokens remain generic", enabled: true, events: `{"usage":{"prompt_tokens":1,"completion_tokens":20,"completion_tokens_details":{"reasoning_tokens":10}}}`},
-		{name: "configured request off", enabled: true, requested: &off, mode: "qwen_non_thinking"},
-		{name: "configured request on unknown", enabled: true, requested: &on},
-		{name: "response overrides request", enabled: true, requested: &off, events: `{"choices":[{"delta":{"reasoning_content":"private"}}]}`, observed: &on, mode: "qwen_thinking"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			o := NewObserver(channel.FormatOpenAIChat, true, "text/event-stream")
 			model := catalog.Model{OutputPrice: money.FromNano(2)}
-			if tc.enabled {
-				model.PriceTiers = []ledger.PriceTier{{ThinkingMode: "qwen_thinking", OutputPrice: money.FromNano(4)}, {ThinkingMode: "qwen_non_thinking", OutputPrice: money.FromNano(3)}}
-			}
-			o.configureThinkingPricing(model.PriceTiers, tc.requested)
 			for _, event := range bytes.Split([]byte(tc.events), []byte("\n")) {
 				o.absorb(event)
 			}
@@ -63,16 +47,13 @@ func TestThinkingObservationsAndExplicitPricing(t *testing.T) {
 			if d == nil {
 				d = &ledger.UsageDetail{}
 			}
-			if d.ThinkingMode != tc.mode {
-				t.Fatalf("mode=%q want=%q", d.ThinkingMode, tc.mode)
+			if d.ThinkingMode != "" {
+				t.Fatalf("retired mode generated: %q", d.ThinkingMode)
 			}
 			if (d.ThinkingObserved == nil) != (tc.observed == nil) || (tc.observed != nil && *d.ThinkingObserved != *tc.observed) {
 				t.Fatalf("observation=%v want=%v", d.ThinkingObserved, tc.observed)
 			}
 			wantBasis := ""
-			if tc.mode != "" {
-				wantBasis = "bailian_condition"
-			}
 			if d.ThinkingModeBasis != wantBasis {
 				t.Fatalf("basis=%q want=%q", d.ThinkingModeBasis, wantBasis)
 			}
@@ -81,12 +62,6 @@ func TestThinkingObservationsAndExplicitPricing(t *testing.T) {
 				t.Fatal(err)
 			}
 			wantTier := 0
-			if tc.mode == "qwen_thinking" {
-				wantTier = 1
-			}
-			if tc.mode == "qwen_non_thinking" {
-				wantTier = 2
-			}
 			if priced.TierSeq != wantTier {
 				t.Fatalf("price=%+v want tier=%d", priced, wantTier)
 			}
@@ -100,21 +75,10 @@ func TestThinkingObservationsAndExplicitPricing(t *testing.T) {
 			if err := json.Unmarshal(snapshot, &saved); err != nil {
 				t.Fatal(err)
 			}
-			if saved.Detail.ThinkingModeBasis != wantBasis || saved.Detail.ThinkingMode != tc.mode {
+			if saved.Detail.ThinkingModeBasis != wantBasis || saved.Detail.ThinkingMode != "" {
 				t.Fatalf("snapshot: %s", snapshot)
 			}
 		})
-	}
-}
-
-func TestBailianConditionsDoNotApplyToOtherProtocols(t *testing.T) {
-	off := false
-	for _, format := range []channel.Format{channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini} {
-		o := NewObserver(format, false, "application/json")
-		o.configureThinkingPricing([]ledger.PriceTier{{ThinkingMode: "qwen_thinking"}}, &off)
-		if o.bailianPricing || o.qwenObserved {
-			t.Fatalf("enabled Bailian pricing for %s", format)
-		}
 	}
 }
 

@@ -15,17 +15,15 @@ import (
 // matching tier in stored order wins and a model without conditional tiers
 // always prices with its unconditional catalog prices.
 //
-// Predicates include optional response service/thinking facts, prompt-side token
+// Predicates include optional response service facts, prompt-side token
 // volume (MinPromptTokens inclusive, MaxPromptTokens exclusive) and a weekly
 // time window expressed in the tier's IANA timezone (StartMinute inclusive,
 // EndMinute exclusive; Start > End crosses midnight and the window belongs to
 // its start day; Weekdays constrains that start day, empty means every day).
 type PriceTier struct {
-	Name         string
-	ServiceTier  string
-	ThinkingMode string
+	Name        string
+	ServiceTier string
 
-	GeoMultipliers  map[string]int64
 	TokenPrices     map[string]money.Amount
 	MinPromptTokens *int64
 	MaxPromptTokens *int64
@@ -43,7 +41,7 @@ type PriceTier struct {
 // without predicates are meaningless next to the default prices and are
 // rejected by catalog validation.
 func (t PriceTier) HasPredicate() bool {
-	return t.ServiceTier != "" || t.ThinkingMode != "" || t.MinPromptTokens != nil || t.MaxPromptTokens != nil || t.StartMinute != nil || len(t.Weekdays) > 0
+	return t.ServiceTier != "" || t.MinPromptTokens != nil || t.MaxPromptTokens != nil || t.StartMinute != nil || len(t.Weekdays) > 0
 }
 
 // Matches evaluates every predicate of the tier against the prompt-side token
@@ -53,10 +51,14 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time, facts ...*UsageDeta
 	if len(facts) > 0 {
 		detail = facts[0]
 	}
-	if t.ServiceTier != "" && (detail == nil || t.ServiceTier != detail.ServiceTier) {
-		return false
+	actualTier := ""
+	if detail != nil {
+		actualTier = detail.ServiceTier
 	}
-	if t.ThinkingMode != "" && (detail == nil || t.ThinkingMode != detail.ThinkingMode) {
+	if actualTier == "openai:priority" {
+		actualTier = "openai:fast"
+	}
+	if t.ServiceTier != "" && t.ServiceTier != actualTier {
 		return false
 	}
 	if t.MinPromptTokens != nil && promptTokens < *t.MinPromptTokens {
@@ -98,7 +100,6 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time, facts ...*UsageDeta
 // the settlement formula.
 func (t PriceTier) Prices() Prices {
 	return Prices{
-		GeoMultipliers:       t.GeoMultipliers,
 		TokenPrices:          t.TokenPrices,
 		InputPerMillion:      t.InputPrice,
 		OutputPerMillion:     t.OutputPrice,
@@ -115,11 +116,7 @@ func (t PriceTier) Prices() Prices {
 func SelectPriceTier(defaultPrices Prices, tiers []PriceTier, promptTokens int64, at time.Time, facts ...*UsageDetail) (Prices, int) {
 	for index, tier := range tiers {
 		if tier.Matches(promptTokens, at, facts...) {
-			prices := tier.Prices()
-			if len(prices.GeoMultipliers) == 0 {
-				prices.GeoMultipliers = defaultPrices.GeoMultipliers
-			}
-			return prices, index + 1
+			return tier.Prices(), index + 1
 		}
 	}
 	return defaultPrices, 0

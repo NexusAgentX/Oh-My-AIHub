@@ -181,7 +181,8 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 	if strings.Contains(string(before), "private") {
 		t.Fatal("snapshot retained content")
 	}
-	tiers := []ledger.PriceTier{{ThinkingMode: "qwen_thinking", InputPrice: input, OutputPrice: mustAmount(t, "40")}}
+	threshold := int64(0)
+	tiers := []ledger.PriceTier{{MinPromptTokens: &threshold, InputPrice: input, OutputPrice: mustAmount(t, "40")}}
 	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); err != nil {
 		t.Fatal(err)
 	}
@@ -190,10 +191,10 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("historical snapshot changed after opting in")
+		t.Fatal("historical snapshot changed after catalog update")
 	}
-	// A later call sees explicit configuration, while the previous one stays generic.
-	next := e.member("bailian-consumer", "100")
+	// A later call sees the new token tier; thinking remains a generic observation.
+	next := e.member("next-consumer", "100")
 	_, nextSecret := e.defaultKey(next)
 	configured := e.call(nextSecret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if configured.Code != http.StatusOK {
@@ -209,7 +210,7 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 	if err := json.Unmarshal(after, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Detail.ThinkingMode != "qwen_thinking" || snapshot.Detail.ThinkingModeBasis != "bailian_condition" {
+	if snapshot.Detail.ThinkingMode != "" || snapshot.Detail.ThinkingModeBasis != "" || snapshot.Detail.ThinkingObserved == nil || !*snapshot.Detail.ThinkingObserved {
 		t.Fatalf("configured snapshot %s", after)
 	}
 }

@@ -179,10 +179,12 @@ it('keeps explicit zero, omits inherited detail prices and accepts response cond
   expect(formToTierInput(form).service_tier).toBe('openai:default')
 })
 
-it('preserves explicit region multipliers and rejects invalid rates', () => {
-  const form = tier({ minPromptTokens: '1', prices: { input: '1', output: '2', cache_read: '0', cache_write: '0', geo_multipliers: { us: '1.1', eu: '0', global: '' } } })
-  expect(validateTier(form)).toEqual({})
-  expect(formToTierInput(form).prices.geo_multipliers).toEqual({ us: '1.1', eu: '0' })
-  form.prices.geo_multipliers!.us = '101'
-  expect(validateTier(form).prices).toBeTruthy()
+it('rejects the retired priority condition and accepts fast and ultrafast', () => {
+  expect(validateTier(tier({ serviceTier: 'openai:priority', useTokens: false })).condition).toBe('请使用 openai:fast')
+  for (const serviceTier of ['openai:fast', 'openai:ultrafast', 'anthropic:priority', 'gemini:priority']) {
+    expect(validateTier(tier({ serviceTier, useTokens: false }))).toEqual({})
+    const input = formToTierInput(tier({ serviceTier, useTokens: false }))
+    expect(input).not.toHaveProperty('thinking_mode')
+    expect(input.prices).not.toHaveProperty('geo_multipliers')
+  }
 })

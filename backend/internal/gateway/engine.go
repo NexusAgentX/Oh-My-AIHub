@@ -280,7 +280,6 @@ type callState struct {
 	source               routing.Source
 	attempts             []Attempt
 	lastChannelID        string
-	thinkingRequested    *bool
 	requestedServiceTier string
 	// usageInjected is set when the gateway turned include_usage on for an
 	// OpenAI Chat stream whose client had not: the usage-only frame that the
@@ -431,7 +430,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// validated here (its model and stream flag are in the path), so a body the
 	// scan rejects only means there are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
-	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
+	call.requestedServiceTier = facts.ServiceTier
 	call.hints = scan.billingHints(body, format)
 	if call.hints.Background {
 		call.upstreamHeaders = http.Header{}
@@ -1341,7 +1340,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
 	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
-	observer.configureThinkingPricing(model.PriceTiers, call.thinkingRequested)
 	var written, upstreamBytes int64
 	var clientWriteTime time.Duration
 	// undelivered is set when a part of the answer did not reach the client.
@@ -1533,6 +1531,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
+	if !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.Iterations) > 0 {
+		observation.Usage.Detail.Notes = appendNote(observation.Usage.Detail.Notes, "主模型用量缺失，未计费")
+		finish.PriceSnapshot = priceSnapshot(model, ledger.PriceResult{}, candidate, defaults.USDCNYRateNano, 0, observation.Usage, call.started)
+	}
 	call.stage("pricing", pricingAt, e.Now())
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
@@ -1601,10 +1603,9 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 			"cache_write": price(model.CacheWritePrice), "cache_read": price(model.CacheReadPrice),
 		},
 		"detail":               usage.Detail,
-		"geo_multipliers":      geoPriceStrings(model.GeoMultipliers),
 		"token_prices":         map[string]string{},
 		"base_token_prices":    map[string]string{},
-		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}, "geo_multipliers": geoPriceStrings(effective.GeoMultipliers)},
+		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}},
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,
@@ -1626,7 +1627,7 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 	}
 	if usage.Detail == nil {
 		snapshot["detail"] = &ledger.UsageDetail{Notes: []string{"未提供可靠细分，按通用价格结算"}}
-	} else if len(usage.Detail.Tokens) == 0 {
+	} else if len(usage.Detail.Tokens) == 0 && len(usage.Detail.Iterations) == 0 {
 		detail := *usage.Detail
 		detail.Notes = append(append([]string(nil), detail.Notes...), "未提供可靠细分，按通用价格结算")
 		snapshot["detail"] = &detail

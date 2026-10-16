@@ -10,7 +10,6 @@ function minuteText(minute: number) {
 export function tierCondition(tier: PriceTier) {
   const parts: string[] = []
   if (tier.service_tier) parts.push(`服务档位 ${tier.service_tier}`)
-  if (tier.thinking_mode) parts.push(tier.thinking_mode === 'qwen_thinking' ? '百炼实际思考' : '百炼未输出思考')
   if (tier.weekdays && tier.weekdays.length > 0 && tier.weekdays.length < 7) {
     parts.push(`周${tier.weekdays.map((day) => weekdayNames[day - 1] ?? day).join('、')}`)
   }

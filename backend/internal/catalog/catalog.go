@@ -51,7 +51,6 @@ type Model struct {
 	CacheWritePrice money.Amount
 	CacheReadPrice  money.Amount
 
-	GeoMultipliers           map[string]int64
 	TokenPrices              map[string]money.Amount
 	PriceTiers               []ledger.PriceTier
 	Enabled                  bool
@@ -108,7 +107,6 @@ func (m Model) InPoints(usdRateNano int64) Model {
 // BasePrices projects the four base prices into the pricing formula input.
 func (m Model) BasePrices() ledger.Prices {
 	return ledger.Prices{
-		GeoMultipliers:  m.GeoMultipliers,
 		TokenPrices:     m.TokenPrices,
 		InputPerMillion: m.InputPrice, OutputPerMillion: m.OutputPrice,
 		CacheWritePerMillion: m.CacheWritePrice, CacheReadPerMillion: m.CacheReadPrice,
@@ -124,7 +122,6 @@ type ModelPatch struct {
 	CacheWritePrice *money.Amount
 	CacheReadPrice  *money.Amount
 
-	GeoMultipliers           *map[string]int64
 	TokenPrices              *map[string]money.Amount
 	PriceTiers               *[]ledger.PriceTier
 	Enabled                  *bool
@@ -167,9 +164,6 @@ func (p ModelPatch) Apply(model Model) Model {
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
 	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
-	if p.GeoMultipliers != nil {
-		model.GeoMultipliers = *p.GeoMultipliers
-	}
 	if p.TokenPrices != nil {
 		model.TokenPrices = *p.TokenPrices
 	}
@@ -351,7 +345,7 @@ func Validate(model Model) error {
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
-	if !validGeoPrices(model.GeoMultipliers) || !validTokenPrices(model.TokenPrices) {
+	if !validTokenPrices(model.TokenPrices) || !validModalities(model.InputModalities) || !validModalities(model.OutputModalities) {
 		return ErrInvalidInput
 	}
 	return validatePriceTiers(model.PriceTiers)
@@ -362,7 +356,7 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
-		if !validGeoPrices(tier.GeoMultipliers) || !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
+		if !validTokenPrices(tier.TokenPrices) || tier.ServiceTier == "openai:priority" || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) {
 			return ErrInvalidInput
 		}
 		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
@@ -404,14 +398,11 @@ func validTokenPrices(prices map[string]money.Amount) bool {
 	return true
 }
 
-var geoPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
-
-func validGeoPrices(geo map[string]int64) bool {
-	if len(geo) > 32 {
-		return false
-	}
-	for key, value := range geo {
-		if !geoPattern.MatchString(key) || value < 0 || value > 100*ledger.FixedPointScale {
+func validModalities(values []string) bool {
+	for _, value := range values {
+		switch value {
+		case "text", "image", "audio", "video":
+		default:
 			return false
 		}
 	}

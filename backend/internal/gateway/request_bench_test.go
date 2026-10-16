@@ -45,8 +45,7 @@ func BenchmarkRequestFacts(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
 				var pricing struct {
-					EnableThinking *bool  `json:"enable_thinking"`
-					ServiceTier    string `json:"service_tier"`
+					ServiceTier string `json:"service_tier"`
 				}
 				_ = json.Unmarshal(body, &pricing)
 				if _, _, err := ScanRequest(body); err != nil {
@@ -58,7 +57,7 @@ func BenchmarkRequestFacts(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
 				facts, _, err := ScanRequest(body)
-				if err != nil || facts.EnableThinking == nil {
+				if err != nil || facts.ServiceTier != "auto" {
 					b.Fatal(err)
 				}
 			}

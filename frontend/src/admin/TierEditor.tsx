@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { tokenPriceLabels } from '../models/tokenPricing'
-import { Button, Checkbox, IconButton, Icon, InlineError, SelectField, TextField } from '../ui'
+import { Button, Checkbox, IconButton, Icon, InlineError, TextField } from '../ui'
 import {
   emptyTier,
   formToTierInput,
@@ -20,8 +20,8 @@ import type { PriceTier, PriceTierInput } from './types'
 /** 实际服务档位的常见取值（含协议前缀）；仍可填其他值 */
 const serviceTierPresets = [
   { value: 'openai:default', label: 'OpenAI 标准' },
-  { value: 'openai:priority', label: 'OpenAI 优先' },
-  { value: 'openai:fast', label: 'OpenAI 快速' },
+  { value: 'openai:fast', label: 'OpenAI Fast' },
+  { value: 'openai:ultrafast', label: 'OpenAI Ultrafast' },
   { value: 'openai:flex', label: 'OpenAI Flex' },
   { value: 'anthropic:standard', label: 'Anthropic 标准' },
   { value: 'anthropic:priority', label: 'Anthropic 优先' },
@@ -44,7 +44,6 @@ export function PriceFields({
   error?: string
   legend: string
 }) {
-  const [geoKey, setGeoKey] = useState('')
   const field = (key: 'input' | 'output' | 'cache_read' | 'cache_write', label: string) => (
     <TextField
       inputMode="decimal"
@@ -78,32 +77,6 @@ export function PriceFields({
               }
             />
           ))}
-        </div>
-      </details>
-      <details>
-        <summary>地域倍率</summary>
-        <div className="field-row">
-          {Object.entries({ us: '', eu: '', ...prices.geo_multipliers }).map(([key, value]) => (
-            <TextField
-              key={key}
-              label={`地域 ${key} · token 倍率`}
-              inputMode="decimal"
-              value={value}
-              placeholder="1"
-              onChange={(event) => onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [key]: event.target.value } })}
-            />
-          ))}
-        </div>
-        <div className="field-row">
-          <TextField label="其他地域" placeholder="例如 us-central1" value={geoKey} onChange={(event) => setGeoKey(event.target.value)} />
-          <Button
-            type="button" size="sm" variant="secondary"
-            disabled={!/^[a-z][a-z0-9_-]{0,31}$/.test(geoKey) || geoKey === 'us' || geoKey === 'eu' || geoKey in (prices.geo_multipliers ?? {}) || Object.keys(prices.geo_multipliers ?? {}).length >= 32}
-            onClick={() => {
-              onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [geoKey]: '' } })
-              setGeoKey('')
-            }}
-          >添加地域</Button>
         </div>
       </details>
       <InlineError>{error}</InlineError>
@@ -147,18 +120,6 @@ function TierEditForm({
         value={form.serviceTier ?? ''}
         onChange={(event) => set({ serviceTier: event.target.value })}
       />
-      <SelectField
-        label="百炼实际思考模式（可选）"
-        onChange={(event) => set({ thinkingMode: event.target.value })}
-        value={form.thinkingMode ?? ''}
-      >
-        <option value="">不限</option>
-        <option value="qwen_thinking">已输出思考</option>
-        <option value="qwen_non_thinking">未输出思考</option>
-      </SelectField>
-      <p className="muted-copy">
-        服务档位以响应为准；配置百炼条件即采用百炼实际思考输出计价语义。未知事实不命中特定条件。
-      </p>
       <Checkbox
         checked={form.useTokens}
         label="按输入总量分档（含缓存读写，不含输出）"
