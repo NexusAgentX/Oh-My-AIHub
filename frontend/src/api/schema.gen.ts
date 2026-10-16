@@ -2708,6 +2708,13 @@ export interface components {
                 requested_service_tier?: string;
                 service_tier?: string;
                 thinking_mode?: string;
+                /**
+                 * @description 当前模型显式配置百炼条件档；历史快照缺少此依据。
+                 * @enum {string}
+                 */
+                thinking_mode_basis?: "bailian_condition";
+                /** @description 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。 */
+                thinking_observed?: boolean;
                 tool_prompt_tokens?: number;
                 notes?: string[];
             } | null;

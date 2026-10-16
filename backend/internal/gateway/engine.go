@@ -1269,9 +1269,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
-	if call.format == channel.FormatOpenAIChat && call.thinkingRequested != nil && !*call.thinkingRequested {
-		observer.qwenObserved = true
-	}
+	observer.configureThinkingPricing(model.PriceTiers, call.thinkingRequested)
 	var written, upstreamBytes int64
 	var clientWriteTime time.Duration
 	// undelivered is set when a part of the answer did not reach the client.

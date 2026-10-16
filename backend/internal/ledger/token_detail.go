@@ -2,7 +2,7 @@ package ledger
 
 import "strings"
 
-// UsageDetail contains only billing facts, never prompt or reasoning content.
+// UsageDetail contains billing and observation facts, never prompt or reasoning content.
 // Tokens are disjoint subsets of the four summary buckets, not extra usage.
 type UsageDetail struct {
 	RequestedServiceTier string           `json:"requested_service_tier,omitempty"`
@@ -10,6 +10,8 @@ type UsageDetail struct {
 	Tokens               map[string]int64 `json:"tokens,omitempty"`
 	ServiceTier          string           `json:"service_tier,omitempty"`
 	ThinkingMode         string           `json:"thinking_mode,omitempty"`
+	ThinkingModeBasis    string           `json:"thinking_mode_basis,omitempty"`
+	ThinkingObserved     *bool            `json:"thinking_observed,omitempty"`
 	Notes                []string         `json:"notes,omitempty"`
 }
 
