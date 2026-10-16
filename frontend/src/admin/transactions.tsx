@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { tokenPriceLabels } from '../models/tokenPricing'
+import { tokenPriceLabels, unitPriceLabels } from '../models/tokenPricing'
 import { Link } from 'react-router-dom'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { MultiplierText } from '../money/MultiplierText'
@@ -129,14 +129,24 @@ export function pricingNotes(notes: readonly string[], hasBreakdown: boolean) {
   return hasBreakdown && remainders.length > 0 ? [...rest, `其余按通用价：${remainders.join(' · ')} tokens`] : rest
 }
 
+const inferenceLabels: Record<string, string> = { message: '主模型推理', compaction: '上下文压缩', advisor_message: 'Advisor 子推理', image_generation_call: '图像子推理', main: '主模型推理' }
+
 const thinkingModeLabels: Record<string, string> = { qwen_thinking: '已输出思考', qwen_non_thinking: '未输出思考' }
 
 /** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。没有信息的项不显示。 */
 export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
   const detail = snapshot.detail
+  const components = snapshot.components ?? []
   const thinking = thinkingModeLabels[detail?.thinking_mode ?? '']
   const notes = pricingNotes(detail?.notes ?? [], Object.keys(detail?.tokens ?? {}).length > 0)
-  const items: Array<[string, ReactNode]> = [['价格档', snapshot.tier?.name ?? '基准价']]
+  const items: Array<[string, ReactNode]> = [['价格档', components.length ? '按各次推理分别选档' : snapshot.tier?.name ?? '基准价']]
+  if (detail?.inference_geo) {
+    const geo = detail.inference_geo
+    items.push(['实际推理地域', components.length ? geo : `${geo} · token 倍率 ${snapshot.selected_prices?.geo_multipliers?.[geo] ?? '1'}`])
+  }
+  for (const [key, quantity] of Object.entries(detail?.units_nano ?? {})) {
+    items.push([unitPriceLabels[key] ?? key, `${quantity / 1e9}（暂不收取工具附加费）`])
+  }
   if (detail?.service_tier) items.push(['实际服务档位', detail.service_tier])
   if (detail?.requested_service_tier) items.push(['请求服务档位', detail.requested_service_tier])
   if (detail?.thinking_observed !== undefined) {
@@ -178,7 +188,7 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
     ],
     ['手续费率', `${feeRateToPercent(snapshot.fee_rate_nano)}%`],
   )
-  for (const [key, label] of priceLabels) {
+  for (const [key, label] of (components.length ? [] : priceLabels)) {
     const selected = snapshot.selected_prices?.[key]
     let formula = `${selected} × ${snapshot.multiplier}`
     if (usd) {
@@ -193,7 +203,23 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
         : `${formatPoints(snapshot.prices[key])}（基准 ${formatPoints(snapshot.base_prices[key])}）`,
     ])
   }
-  return <DetailList items={items} />
+  return (
+    <>
+      <DetailList items={items} />
+      {components.map((component, index) => (
+        <details key={index}>
+          <summary>{component.model} · {inferenceLabels[component.kind] ?? component.kind}</summary>
+          <DetailList items={[
+            ['输入 token', String(component.usage.input_tokens)],
+            ['输出 token', String(component.usage.output_tokens)],
+            ['缓存读 token', String(component.usage.cache_read_tokens)],
+            ['缓存写 token', String(component.usage.cache_write_tokens)],
+          ]} />
+          <PriceSnapshotView snapshot={component.price_snapshot} />
+        </details>
+      ))}
+    </>
+  )
 }
 
 export function TransactionDetail({ transaction }: { transaction: LedgerTransaction }) {

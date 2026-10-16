@@ -69,6 +69,7 @@ type Dependencies struct {
 	Geo               *geolocation.Service
 	GatewayLocation   *geolocation.Location
 	LocationSource    string
+	Jobs              BackgroundStore
 	Store             Store
 	Catalog           Models
 	Settings          *settings.Service
@@ -94,8 +95,11 @@ type Dependencies struct {
 // Engine serves the gateway endpoints.
 type Engine struct {
 	Dependencies
-	spend    *SpendCache
-	inflight *Inflight
+	spend         *SpendCache
+	inflight      *Inflight
+	jobsMu        sync.Mutex
+	followupSlots chan struct{}
+	jobs          map[string]backgroundLease
 
 	// Settings are published as an immutable snapshot by RunRefresh, so the
 	// request path reads them without locking or waiting on the database. The
@@ -143,7 +147,7 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.StatsBook == nil {
 		dependencies.StatsBook = NewStatsBook()
 	}
-	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
+	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -281,7 +285,16 @@ type callState struct {
 	// usageInjected is set when the gateway turned include_usage on for an
 	// OpenAI Chat stream whose client had not: the usage-only frame that the
 	// upstream then adds is not for the client (see usageFrameFilter).
-	usageInjected bool
+	usageInjected   bool
+	hints           billingHints
+	submodels       []catalog.Model
+	pending         bool
+	polling         bool
+	completed       bool
+	releaseAccount  func()
+	releaseChannel  func()
+	authLocation    authLocation
+	upstreamHeaders http.Header
 }
 
 // ---- authentication ----
@@ -367,6 +380,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		}
 		e.Telemetry.Active(string(format), -1)
+		if call.pending && !call.completed {
+			return
+		}
 		if call.phase != "" {
 			call.stage(call.phase, call.phaseAt, e.Now())
 		}
@@ -386,6 +402,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	call.key = key
+	call.authLocation = location
 	call.diagnostics.Network = &Network{Client: NetworkNode{IP: clientip.Address(r, e.TrustedProxyCIDRs)}, Gateway: e.gatewayNode(), Attempts: []*NetworkAttempt{}, LocationSource: e.LocationSource}
 
 	if !key.AccountActive || !keyUsable(key, started) {
@@ -415,6 +432,16 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// scan rejects only means there are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
+	call.hints = scan.billingHints(body, format)
+	if call.hints.Background {
+		call.upstreamHeaders = http.Header{}
+		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
+			if v := r.Header.Get(name); v != "" {
+				call.upstreamHeaders.Set(name, v)
+			}
+		}
+	}
+
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
 		call.requested, call.stream = pathModel, pathStream
@@ -487,6 +514,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 
+	call.submodels, err = e.captureSubmodels(ctx, call.hints)
+	if err != nil {
+		e.Logger.Warn("gateway: submodel prices unavailable; forwarding without submodel charges", "request_id", call.id)
+	}
 	// Balance and budgets are checked, never reserved (Epic #170 decision 6).
 	points, err := e.Store.Points(ctx, key.OwnerID)
 	if err != nil {
@@ -518,7 +549,27 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.finishRejected(w, call, OutcomeRejectedInflight, http.StatusTooManyRequests, "too_many_inflight_calls", "同时进行的调用过多，请稍后重试")
 		return
 	}
-	defer releaseInflight()
+	call.releaseAccount = releaseInflight
+	defer func() {
+		if !call.pending {
+			releaseInflight()
+		}
+	}()
+	if call.hints.Background {
+		if format != channel.FormatOpenAIResponses || e.Jobs == nil {
+			e.finishRejected(w, call, OutcomeRejectedFormat, 400, "background_unavailable", "后台响应暂不可用")
+			return
+		}
+		if !e.reserveBackground(call.id) {
+			e.finishRejected(w, call, OutcomeRejectedInflight, 429, "background_capacity_exceeded", "后台任务已满，请稍后重试")
+			return
+		}
+		defer func() {
+			if !call.pending {
+				e.releaseBackground(call.id)
+			}
+		}()
+	}
 
 	call.stage("admission", admissionAt, e.Now())
 	routingAt := e.Now()
@@ -641,8 +692,11 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			release()
 			return
 		case result.response != nil:
+			call.releaseChannel = release
 			e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
-			release()
+			if !call.pending {
+				release()
+			}
 			return
 		}
 		release()
@@ -1249,8 +1303,24 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	defer response.Body.Close()
 	defer result.cancel(nil)
 
+	if call.hints.Background && !call.polling && !call.stream {
+		payload, err := stageBackground(&result)
+		if err != nil {
+			e.internalError(w, call, err)
+			return
+		}
+		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
+		initial.Write(payload, e.Now())
+		ack := initial.Finish()
+		if ack.ResponseID != "" {
+			if err := e.keepBackground(call, model, candidate, defaults, ack.ResponseID); err != nil {
+				e.internalError(w, call, err)
+				return
+			}
+		}
+	}
 	watch := result.watch
-	if !watch.commit() {
+	if !watch.commit() && !call.pending {
 		// The client left between the first byte and the first write: nothing
 		// was delivered and the attempt has been cancelled, so nothing is billed.
 		record := &call.attempts[len(call.attempts)-1]
@@ -1269,6 +1339,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
+	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
+	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
 	observer.configureThinkingPricing(model.PriceTiers, call.thinkingRequested)
 	var written, upstreamBytes int64
 	var clientWriteTime time.Duration
@@ -1314,6 +1386,15 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		// or not: that is what makes the usage at the end billable.
 		upstreamBytes += int64(len(chunk))
 		observer.Write(chunk, e.Now())
+		if call.hints.Background && !call.pending && !call.polling && observer.responseID != "" {
+			if err := e.keepBackground(call, model, candidate, defaults, observer.responseID); err != nil {
+				e.Logger.Error("gateway: saving background response failed", "request_id", call.id, "error", err)
+				result.cancel(err)
+				undelivered = true
+				watch.left()
+				return
+			}
+		}
 		if strip != nil {
 			chunk = strip.Filter(chunk)
 		}
@@ -1345,6 +1426,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
+	if call.hints.Background && call.pending && !terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
+		return
+	}
 	call.diagnostics.StopReason = observation.StopReason
 	call.diagnostics.UsageStatus = observation.UsageStatus
 	call.diagnostics.Frames = observation.Frames
@@ -1360,6 +1444,22 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	duration := int(e.Now().Sub(call.started).Milliseconds())
 	ttftFromStart := int(result.started.Sub(call.started).Milliseconds()) + int(result.ttft.Milliseconds())
+	if call.polling && len(call.attempts) > 0 {
+		previous := call.attempts[len(call.attempts)-1]
+		if previous.TTFTMS != nil {
+			ttftFromStart = *previous.TTFTMS
+			if previous.OffsetMS != nil {
+				ttftFromStart += *previous.OffsetMS
+			}
+		}
+		// Polling sees the final object, not the original client's delivery or
+		// generation cadence. Do not publish invented streaming measurements.
+		call.diagnostics.Frames = 0
+		call.diagnostics.MaxFrameGapMS = nil
+		call.diagnostics.Delivery = "not_observed"
+		written = 0
+		observation.IntervalP50MS, observation.IntervalP95MS = nil, nil
+	}
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
@@ -1368,6 +1468,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if observation.ProtocolClientError {
 			endReason = EndClientError
 		}
+	case observation.ResponseStatus == "cancelled":
+		outcome, endReason = OutcomeInterrupted, EndInterrupted
 	case clientGone:
 		// Whatever stopped the reading after the client left is no fault of the
 		// channel, and neither is the client's leaving.
@@ -1405,7 +1507,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.stream {
 		speedMillis -= ttftFromStart
 	}
-	if observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
+	if !call.polling && observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
 		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
 		finish.TokensPerSecond = &speed
 	}
@@ -1416,11 +1518,11 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if self {
 			feeRate = 0
 		}
-		priced, err := ledger.CalculatePriceAt(observation.Usage, model.BasePrices(), model.PriceTiers, call.started, candidate.MultiplierNano, candidate.RateNano, feeRate)
+		priced, snapshot, err := e.priceUsage(call, model, candidate, observation.Usage, defaults, feeRate)
 		if err != nil {
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
-			finish.PriceSnapshot = priceSnapshot(model, priced, candidate, defaults.USDCNYRateNano, feeRate, observation.Usage, call.started)
+			finish.PriceSnapshot = snapshot
 			// Explicit upstream failure is not charged (PRODUCT.md), but reliable
 			// usage and its contemporaneous price snapshot remain diagnostic facts.
 			if !observation.ProtocolError {
@@ -1442,22 +1544,40 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish, status int, usage ledger.Usage) {
 	ctx := context.WithoutCancel(context.Background())
 	outcome, err := e.finishCall(ctx, call, finish)
+	closed := err == nil
+	finished := outcome.Finished
+
 	if err != nil {
 		e.Logger.Error("gateway: booking call failed", "request_id", call.id, "error", err)
 		e.Events.Publish(Event{Kind: EventSettlementFailed, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format)})
 		fallback := finish
 		fallback.Bill = nil
-		if _, retryErr := e.finishCall(ctx, call, fallback); retryErr != nil {
+		if retryResult, retryErr := e.finishCall(ctx, call, fallback); retryErr != nil {
 			e.Logger.Error("gateway: closing call failed", "request_id", call.id, "error", retryErr)
+		} else {
+			closed, finished = true, retryResult.Finished
 		}
 	} else if outcome.Finished && finish.Bill != nil {
 		now := e.Now()
-		e.spend.Add(call.key.KeyID, finish.Cost+finish.Fee, now)
+		e.spend.Add(call.key.KeyID, finish.Cost+finish.Fee, call.started)
 		var revenueCap money.Amount
 		if candidate.Advanced.DailyRevenueCap != nil {
 			revenueCap = *candidate.Advanced.DailyRevenueCap
 		}
-		e.Runtime.AddRevenue(candidate.ChannelID, finish.Cost, now, revenueCap)
+		e.Runtime.AddRevenueAt(candidate.ChannelID, finish.Cost, call.started, now, revenueCap)
+	}
+	if closed {
+		call.completed = true
+		if call.pending {
+			e.releaseBackground(call.id)
+		}
+	}
+	if !finished {
+		return
+	}
+	call.finish = finish
+	if call.polling && e.Telemetry != nil {
+		e.Telemetry.Complete(Completion{Format: string(call.format), Stream: call.stream, Status: status, Duration: e.Now().Sub(call.started), Finish: finish, Booked: call.booked})
 	}
 	e.log(call, finish.Outcome, status, finish.DurationMS, usage, finish.Cost, finish.Fee)
 	event := Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format), Outcome: finish.Outcome, StatusCode: status, DurationMS: finish.DurationMS}
@@ -1481,9 +1601,10 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 			"cache_write": price(model.CacheWritePrice), "cache_read": price(model.CacheReadPrice),
 		},
 		"detail":               usage.Detail,
+		"geo_multipliers":      geoPriceStrings(model.GeoMultipliers),
 		"token_prices":         map[string]string{},
 		"base_token_prices":    map[string]string{},
-		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}},
+		"selected_prices":      map[string]any{"input": effective.InputPerMillion.String(), "output": effective.OutputPerMillion.String(), "cache_read": effective.CacheReadPerMillion.String(), "cache_write": effective.CacheWritePerMillion.String(), "token_prices": map[string]string{}, "geo_multipliers": geoPriceStrings(effective.GeoMultipliers)},
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,

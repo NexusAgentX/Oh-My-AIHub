@@ -134,9 +134,10 @@ func (s *Store) Candidates(ctx context.Context, modelID string, format channel.F
 // candidateColumns are the columns ListCandidates and ListAllCandidates have
 // in common.
 type candidateColumns struct {
-	ID, OwnerID, Name, BaseUrl                     string
-	ApiKeyCiphertext, ApiKeyNonce                  []byte
-	ApiKeyKeyID                                    string
+	ID, OwnerID, Name, BaseUrl    string
+	ApiKeyCiphertext, ApiKeyNonce []byte
+	ApiKeyKeyID                   string
+
 	UserAgent                                      *string
 	HeaderRules                                    []byte
 	ConcurrencyLimit, RpmLimit                     *int32
@@ -289,6 +290,11 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 			return nil // already closed: never book twice
 		}
 		result.Finished = true
+		if finish.Background {
+			if err := q.SettleBackground(ctx, finish.ID); err != nil {
+				return err
+			}
+		}
 		if finish.Bill == nil {
 			return nil
 		}

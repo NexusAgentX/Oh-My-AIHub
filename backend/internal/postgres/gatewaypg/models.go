@@ -3,3 +3,19 @@
 //   sqlc v1.31.1
 
 package gatewaypg
+
+import (
+	"time"
+)
+
+type GatewayBackgroundJob struct {
+	CallID     string
+	AccountID  string
+	KeyID      string
+	ChannelID  string
+	ResponseID string
+	Metadata   []byte
+	NextPollAt time.Time
+	DeadlineAt time.Time
+	SettledAt  *time.Time
+}

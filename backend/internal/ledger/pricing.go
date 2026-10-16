@@ -13,11 +13,11 @@ const FixedPointScale int64 = 1_000_000_000
 
 // Usage is the four normalized token buckets of one call.
 type Usage struct {
-	InputTokens      int64
-	OutputTokens     int64
-	CacheWriteTokens int64
-	CacheReadTokens  int64
-	Detail           *UsageDetail
+	InputTokens      int64        `json:"input_tokens"`
+	OutputTokens     int64        `json:"output_tokens"`
+	CacheWriteTokens int64        `json:"cache_write_tokens"`
+	CacheReadTokens  int64        `json:"cache_read_tokens"`
+	Detail           *UsageDetail `json:"detail,omitempty"`
 }
 
 // Prices are four per-million-token prices in nano-points.
@@ -26,6 +26,7 @@ type Prices struct {
 	OutputPerMillion     money.Amount
 	CacheWritePerMillion money.Amount
 	CacheReadPerMillion  money.Amount
+	GeoMultipliers       map[string]int64
 	TokenPrices          map[string]money.Amount
 }
 
@@ -36,6 +37,7 @@ type PriceResult struct {
 	Cost    money.Amount
 	Fee     money.Amount
 	TierSeq int
+	exact   *big.Rat
 }
 
 // CalculatePriceV2 prices one call under formula v2 (ADR-0012): it selects the
@@ -52,6 +54,16 @@ func CalculatePriceV2(usage Usage, basePrices Prices, tiers []PriceTier, at time
 // (1e9 = 1, see ChannelRate) converts into points. The cost is rounded up once
 // on the converted total.
 func CalculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time.Time, multiplierNano, rateNano, feeRateNano int64) (PriceResult, error) {
+	return calculatePriceAt(usage, basePrices, tiers, at, multiplierNano, rateNano, feeRateNano, false)
+}
+
+// CalculatePriceComponentAt retains the exact unrounded cost for combining
+// separately priced inferences. Ordinary calls avoid this extra allocation.
+func CalculatePriceComponentAt(usage Usage, basePrices Prices, tiers []PriceTier, at time.Time, multiplierNano, rateNano int64) (PriceResult, error) {
+	return calculatePriceAt(usage, basePrices, tiers, at, multiplierNano, rateNano, 0, true)
+}
+
+func calculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time.Time, multiplierNano, rateNano, feeRateNano int64, exact bool) (PriceResult, error) {
 	promptTokens, err := PromptSideTokens(usage)
 	if err != nil {
 		return PriceResult{}, err
@@ -87,12 +99,26 @@ func CalculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time
 			}
 		}
 	}
+	geo := int64(FixedPointScale)
+	if usage.Detail != nil && usage.Detail.InferenceGeo != "" {
+		if v, ok := prices.GeoMultipliers[usage.Detail.InferenceGeo]; ok {
+			geo = v
+		}
+	}
+	if geo < 0 {
+		return PriceResult{}, ErrInvalidInput
+	}
+	extended := geo != FixedPointScale
+	if extended {
+		weightedUsage.Mul(weightedUsage, big.NewInt(geo))
+	}
 	numerator := new(big.Int).Mul(weightedUsage, big.NewInt(multiplierNano))
 	numerator.Mul(numerator, big.NewInt(rateNano))
-	cost, err := ceilNonNegative(
-		numerator,
-		new(big.Int).Mul(big.NewInt(1_000_000), new(big.Int).Mul(big.NewInt(FixedPointScale), big.NewInt(FixedPointScale))),
-	)
+	denominator := new(big.Int).Mul(big.NewInt(1_000_000), new(big.Int).Mul(big.NewInt(FixedPointScale), big.NewInt(FixedPointScale)))
+	if extended {
+		denominator.Mul(denominator, big.NewInt(FixedPointScale))
+	}
+	cost, err := ceilNonNegative(numerator, denominator)
 	if err != nil {
 		return PriceResult{}, err
 	}
@@ -106,7 +132,11 @@ func CalculatePriceAt(usage Usage, basePrices Prices, tiers []PriceTier, at time
 	if cost > math.MaxInt64-fee {
 		return PriceResult{}, ErrAmountOverflow
 	}
-	return PriceResult{Cost: money.FromNano(cost), Fee: money.FromNano(fee), TierSeq: tierSeq}, nil
+	result := PriceResult{Cost: money.FromNano(cost), Fee: money.FromNano(fee), TierSeq: tierSeq}
+	if exact {
+		result.exact = new(big.Rat).SetFrac(numerator, denominator)
+	}
+	return result, nil
 }
 
 func ceilNonNegative(numerator, denominator *big.Int) (int64, error) {
@@ -140,4 +170,31 @@ func ScalePriceAt(price money.Amount, multiplierNano, rateNano int64) money.Amou
 		return money.FromNano(math.MaxInt64)
 	}
 	return money.FromNano(scaled.Int64())
+}
+
+// CombinePrices sums exact costs before the one final rounding and platform fee.
+func CombinePrices(parts []PriceResult, feeRateNano int64) (PriceResult, error) {
+	if feeRateNano < 0 || feeRateNano > FixedPointScale {
+		return PriceResult{}, ErrInvalidInput
+	}
+	total := new(big.Rat)
+	for _, part := range parts {
+		if part.exact == nil {
+			total.Add(total, new(big.Rat).SetInt64(part.Cost.Nano()))
+		} else {
+			total.Add(total, part.exact)
+		}
+	}
+	cost, err := ceilNonNegative(total.Num(), total.Denom())
+	if err != nil {
+		return PriceResult{}, err
+	}
+	fee, err := ceilNonNegative(new(big.Int).Mul(big.NewInt(cost), big.NewInt(feeRateNano)), big.NewInt(FixedPointScale))
+	if err != nil {
+		return PriceResult{}, err
+	}
+	if cost > math.MaxInt64-fee {
+		return PriceResult{}, ErrAmountOverflow
+	}
+	return PriceResult{Cost: money.FromNano(cost), Fee: money.FromNano(fee), exact: total}, nil
 }

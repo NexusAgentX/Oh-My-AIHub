@@ -1606,6 +1606,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/responses/{responseID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询后台响应或恢复流
+         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         */
+        get: operations["retrieveOpenAIResponse"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/{responseID}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 取消后台响应
+         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         */
+        post: operations["cancelOpenAIResponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/messages": {
         parameters: {
             query?: never;
@@ -1932,6 +1972,10 @@ export interface components {
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
+            /** @description 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。 */
+            geo_multipliers?: {
+                [key: string]: string;
+            };
             /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
             token_prices?: {
                 [key: string]: components["schemas"]["Price"];
@@ -2692,8 +2736,24 @@ export interface components {
             ttft_ms: number | null;
             duration_ms: number | null;
         };
+        InferenceUsage: {
+            input_tokens: number;
+            output_tokens: number;
+            cache_read_tokens: number;
+            cache_write_tokens: number;
+            detail?: Record<string, never>;
+        };
         /** @description 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。 */
         PriceSnapshot: {
+            components?: {
+                model: string;
+                kind: string;
+                usage: components["schemas"]["InferenceUsage"];
+                price_snapshot: components["schemas"]["PriceSnapshot"];
+            }[];
+            geo_multipliers?: {
+                [key: string]: string;
+            };
             selected_prices?: components["schemas"]["ModelPrices"];
             token_prices?: {
                 [key: string]: string;
@@ -2715,6 +2775,11 @@ export interface components {
                 thinking_mode_basis?: "bailian_condition";
                 /** @description 是否观察到非空思考内容；仅供观察，不表示百炼模式或收费量。缺失表示未知。 */
                 thinking_observed?: boolean;
+                inference_geo?: string;
+                units_nano?: {
+                    [key: string]: number;
+                };
+                iterations?: Record<string, never>[];
                 tool_prompt_tokens?: number;
                 notes?: string[];
             } | null;
@@ -7198,6 +7263,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    retrieveOpenAIResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancelOpenAIResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
             content: {
                 "application/json": Record<string, never>;
             };

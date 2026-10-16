@@ -69,3 +69,18 @@ func mustPriceAmount(t *testing.T, value string) money.Amount {
 	}
 	return amount
 }
+
+func TestCombinePricesRoundsOnceAcrossSubInferences(t *testing.T) {
+	var parts []PriceResult
+	for range 3 {
+		p, err := CalculatePriceComponentAt(Usage{InputTokens: 1}, Prices{InputPerMillion: money.FromNano(1)}, nil, pricingTime, FixedPointScale, UnitRate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts = append(parts, p)
+	}
+	got, err := CombinePrices(parts, 1)
+	if err != nil || got.Cost.Nano() != 1 || got.Fee.Nano() != 1 {
+		t.Fatalf("%+v %v", got, err)
+	}
+}

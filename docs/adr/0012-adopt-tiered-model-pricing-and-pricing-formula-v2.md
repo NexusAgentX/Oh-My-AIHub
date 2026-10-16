@@ -79,3 +79,5 @@
 
 - v0.7.0 重写（[ADR-0025](0025-remove-ledger-holds-and-adopt-c2c-escrow-account.md)、ADR-0027，现为 [ADR-0035](0035-adopt-transparent-gateway-v2.md)）删除了以下内容：调用级快照表 `api_call_candidates` 与 `api_call_price_tiers`、`BeginCall`/`FinalizeCall`、`formula_version`、预授权上界。价格快照改为随调用保存在 `calls` 中；计价公式 v1 与存量 v1 调用已不存在。
 - 选档口径（谓词、首个命中生效、整单按档）以及加权和与分别向上取整的内核继续有效。[ADR-0030](0030-price-reliable-token-breakdowns.md) 扩展了计价维度，[ADR-0038](0038-price-usd-models-with-platform-exchange-rate.md) 扩展了计价币种。
+
+[ADR-0043](0043-track-background-responses-and-component-billing.md) 将首命中选档应用到每次可靠推理，并在合并各分量精确费用后统一取整；不以多轮汇总量替代每轮上下文。

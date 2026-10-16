@@ -33,11 +33,12 @@ func (o *optional[T]) UnmarshalJSON(data []byte) error {
 }
 
 type pricesRequest struct {
-	TokenPrices map[string]string `json:"token_prices"`
-	Input       string            `json:"input"`
-	Output      string            `json:"output"`
-	CacheWrite  string            `json:"cache_write"`
-	CacheRead   string            `json:"cache_read"`
+	GeoMultipliers map[string]string `json:"geo_multipliers"`
+	TokenPrices    map[string]string `json:"token_prices"`
+	Input          string            `json:"input"`
+	Output         string            `json:"output"`
+	CacheWrite     string            `json:"cache_write"`
+	CacheRead      string            `json:"cache_read"`
 }
 
 type priceTierRequest struct {
@@ -111,8 +112,12 @@ func parsePriceTiers(requests []priceTierRequest) ([]ledger.PriceTier, error) {
 		if err != nil {
 			return nil, err
 		}
+		geo, err := request.Prices.parseGeo()
+		if err != nil {
+			return nil, err
+		}
 		tiers = append(tiers, ledger.PriceTier{
-			TokenPrices: specific, ServiceTier: request.ServiceTier, ThinkingMode: request.ThinkingMode,
+			GeoMultipliers: geo, TokenPrices: specific, ServiceTier: request.ServiceTier, ThinkingMode: request.ThinkingMode,
 			Name: request.Name, MinPromptTokens: request.MinPromptTokens, MaxPromptTokens: request.MaxPromptTokens,
 			Timezone: request.Timezone, Weekdays: request.Weekdays, StartMinute: request.StartMinute, EndMinute: request.EndMinute,
 			InputPrice: prices[0], OutputPrice: prices[1], CacheWritePrice: prices[2], CacheReadPrice: prices[3],
@@ -144,6 +149,11 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 		if err != nil {
 			return patch, err
 		}
+		geo, err := request.BasePrices.parseGeo()
+		if err != nil {
+			return patch, err
+		}
+		patch.GeoMultipliers = &geo
 		patch.TokenPrices = &specific
 		patch.InputPrice, patch.OutputPrice, patch.CacheWritePrice, patch.CacheReadPrice = &prices[0], &prices[1], &prices[2], &prices[3]
 	}
@@ -159,11 +169,13 @@ func (request modelRequest) patch() (catalog.ModelPatch, error) {
 
 // modelPricesJSON is the OpenAPI ModelPrices schema.
 type modelPricesJSON struct {
-	Input       string            `json:"input"`
-	Output      string            `json:"output"`
-	TokenPrices map[string]string `json:"token_prices"`
-	CacheWrite  string            `json:"cache_write"`
-	CacheRead   string            `json:"cache_read"`
+	Input  string `json:"input"`
+	Output string `json:"output"`
+
+	GeoMultipliers map[string]string `json:"geo_multipliers"`
+	TokenPrices    map[string]string `json:"token_prices"`
+	CacheWrite     string            `json:"cache_write"`
+	CacheRead      string            `json:"cache_read"`
 }
 
 // priceTierJSON is the OpenAPI PriceTier schema.
@@ -220,7 +232,13 @@ func newModelPricesJSON(input, output, cacheWrite, cacheRead money.Amount, extra
 			specific[key] = value.String()
 		}
 	}
-	return modelPricesJSON{
+	geo := map[string]string{}
+	if len(extras) > 1 {
+		for key, value := range extras[1] {
+			geo[key] = value.String()
+		}
+	}
+	return modelPricesJSON{GeoMultipliers: geo,
 		Input:       input.String(),
 		Output:      output.String(),
 		TokenPrices: specific,
@@ -245,7 +263,7 @@ func newPriceTierJSON(seq int, tier ledger.PriceTier) priceTierJSON {
 		Weekdays:        weekdays,
 		StartMinute:     tier.StartMinute,
 		EndMinute:       tier.EndMinute,
-		Prices:          newModelPricesJSON(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices),
+		Prices:          newModelPricesJSON(tier.InputPrice, tier.OutputPrice, tier.CacheWritePrice, tier.CacheReadPrice, tier.TokenPrices, geoAmounts(tier.GeoMultipliers)),
 	}
 }
 
@@ -258,7 +276,7 @@ func newAdminModelJSON(model catalog.Model) adminModelJSON {
 		ID:                       model.ID,
 		DisplayName:              model.DisplayName,
 		PriceCurrency:            model.PriceCurrency,
-		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices),
+		BasePrices:               newModelPricesJSON(model.InputPrice, model.OutputPrice, model.CacheWritePrice, model.CacheReadPrice, model.TokenPrices, geoAmounts(model.GeoMultipliers)),
 		PriceTiers:               tiers,
 		Enabled:                  model.Enabled,
 		SortOrder:                model.SortOrder,
@@ -365,4 +383,23 @@ func (p pricesRequest) parseTokens() (map[string]money.Amount, error) {
 		result[key] = amount
 	}
 	return result, nil
+}
+
+func geoAmounts(values map[string]int64) map[string]money.Amount {
+	result := map[string]money.Amount{}
+	for key, value := range values {
+		result[key] = money.FromNano(value)
+	}
+	return result
+}
+func (p pricesRequest) parseGeo() (map[string]int64, error) {
+	geo := map[string]int64{}
+	for key, value := range p.GeoMultipliers {
+		amount, err := parseModelPrice(value)
+		if err != nil || amount.Nano() > 100*ledger.FixedPointScale {
+			return nil, catalog.ErrInvalidInput
+		}
+		geo[key] = amount.Nano()
+	}
+	return geo, nil
 }

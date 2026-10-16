@@ -21,9 +21,11 @@ import (
 // EndMinute exclusive; Start > End crosses midnight and the window belongs to
 // its start day; Weekdays constrains that start day, empty means every day).
 type PriceTier struct {
-	Name            string
-	ServiceTier     string
-	ThinkingMode    string
+	Name         string
+	ServiceTier  string
+	ThinkingMode string
+
+	GeoMultipliers  map[string]int64
 	TokenPrices     map[string]money.Amount
 	MinPromptTokens *int64
 	MaxPromptTokens *int64
@@ -96,6 +98,7 @@ func (t PriceTier) Matches(promptTokens int64, at time.Time, facts ...*UsageDeta
 // the settlement formula.
 func (t PriceTier) Prices() Prices {
 	return Prices{
+		GeoMultipliers:       t.GeoMultipliers,
 		TokenPrices:          t.TokenPrices,
 		InputPerMillion:      t.InputPrice,
 		OutputPerMillion:     t.OutputPrice,
@@ -112,7 +115,11 @@ func (t PriceTier) Prices() Prices {
 func SelectPriceTier(defaultPrices Prices, tiers []PriceTier, promptTokens int64, at time.Time, facts ...*UsageDetail) (Prices, int) {
 	for index, tier := range tiers {
 		if tier.Matches(promptTokens, at, facts...) {
-			return tier.Prices(), index + 1
+			prices := tier.Prices()
+			if len(prices.GeoMultipliers) == 0 {
+				prices.GeoMultipliers = defaultPrices.GeoMultipliers
+			}
+			return prices, index + 1
 		}
 	}
 	return defaultPrices, 0

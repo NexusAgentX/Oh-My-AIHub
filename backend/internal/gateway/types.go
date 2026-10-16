@@ -156,6 +156,7 @@ type Billing struct {
 // CallFinish closes a call record and, when Bill is set, books the ledger
 // transaction "call:<id>" in the same database transaction.
 type CallFinish struct {
+	Background         bool
 	Diagnostics        *Diagnostics
 	ID                 string
 	AccountID          string

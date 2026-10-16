@@ -331,10 +331,30 @@ func (c *SpendCache) Add(keyID string, amount money.Amount, now time.Time) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	entry, ok := c.keys[keyID]
-	if !ok || !entry.loaded || !entry.day.Equal(localtime.DayStart(now)) || !entry.month.Equal(localtime.MonthStart(now)) {
+	if !ok || !entry.loaded {
 		return
 	}
-	entry.today += amount
-	entry.thisMonth += amount
+	if entry.day.Equal(localtime.DayStart(now)) {
+		entry.today += amount
+	}
+	if entry.month.Equal(localtime.MonthStart(now)) {
+		entry.thisMonth += amount
+	}
 	entry.total += amount
+}
+
+// RestoreInflight retains a durable task without consuming another RPM slot.
+func (r *Runtime) RestoreInflight(id string) func() {
+	r.mutex.Lock()
+	r.state(id).inflight++
+	r.mutex.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { r.mutex.Lock(); r.state(id).inflight--; r.mutex.Unlock() }) }
+}
+
+// AddRevenueAt uses the same call-start day as the persisted revenue query.
+func (r *Runtime) AddRevenueAt(id string, amount money.Amount, started, now time.Time, cap money.Amount) {
+	if localtime.DayStart(started).Equal(localtime.DayStart(now)) {
+		r.AddRevenue(id, amount, now, cap)
+	}
 }

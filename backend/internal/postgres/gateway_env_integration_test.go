@@ -296,7 +296,7 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
 	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
 	dependencies := gateway.Dependencies{
-		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: gateway.Publishers{bus, e.metrics}, Telemetry: e.metrics,
 	}
 	if configure != nil {

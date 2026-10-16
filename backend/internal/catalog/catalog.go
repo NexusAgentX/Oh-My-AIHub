@@ -45,11 +45,13 @@ type Model struct {
 	// PriceCurrency is the currency of every price of the model (base prices,
 	// fine-grained prices and tiers): ledger.CurrencyCNY prices are points,
 	// ledger.CurrencyUSD prices are converted at the platform exchange rate.
-	PriceCurrency            string
-	InputPrice               money.Amount
-	OutputPrice              money.Amount
-	CacheWritePrice          money.Amount
-	CacheReadPrice           money.Amount
+	PriceCurrency   string
+	InputPrice      money.Amount
+	OutputPrice     money.Amount
+	CacheWritePrice money.Amount
+	CacheReadPrice  money.Amount
+
+	GeoMultipliers           map[string]int64
 	TokenPrices              map[string]money.Amount
 	PriceTiers               []ledger.PriceTier
 	Enabled                  bool
@@ -106,6 +108,7 @@ func (m Model) InPoints(usdRateNano int64) Model {
 // BasePrices projects the four base prices into the pricing formula input.
 func (m Model) BasePrices() ledger.Prices {
 	return ledger.Prices{
+		GeoMultipliers:  m.GeoMultipliers,
 		TokenPrices:     m.TokenPrices,
 		InputPerMillion: m.InputPrice, OutputPerMillion: m.OutputPrice,
 		CacheWritePerMillion: m.CacheWritePrice, CacheReadPerMillion: m.CacheReadPrice,
@@ -114,12 +117,14 @@ func (m Model) BasePrices() ledger.Prices {
 
 // ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
 type ModelPatch struct {
-	DisplayName              *string
-	PriceCurrency            *string
-	InputPrice               *money.Amount
-	OutputPrice              *money.Amount
-	CacheWritePrice          *money.Amount
-	CacheReadPrice           *money.Amount
+	DisplayName     *string
+	PriceCurrency   *string
+	InputPrice      *money.Amount
+	OutputPrice     *money.Amount
+	CacheWritePrice *money.Amount
+	CacheReadPrice  *money.Amount
+
+	GeoMultipliers           *map[string]int64
 	TokenPrices              *map[string]money.Amount
 	PriceTiers               *[]ledger.PriceTier
 	Enabled                  *bool
@@ -162,6 +167,9 @@ func (p ModelPatch) Apply(model Model) Model {
 	setAmount(&model.OutputPrice, p.OutputPrice)
 	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
 	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
+	if p.GeoMultipliers != nil {
+		model.GeoMultipliers = *p.GeoMultipliers
+	}
 	if p.TokenPrices != nil {
 		model.TokenPrices = *p.TokenPrices
 	}
@@ -343,7 +351,7 @@ func Validate(model Model) error {
 	if !validPrice(model.InputPrice) || !validPrice(model.OutputPrice) || !validPrice(model.CacheWritePrice) || !validPrice(model.CacheReadPrice) {
 		return ErrInvalidInput
 	}
-	if !validTokenPrices(model.TokenPrices) {
+	if !validGeoPrices(model.GeoMultipliers) || !validTokenPrices(model.TokenPrices) {
 		return ErrInvalidInput
 	}
 	return validatePriceTiers(model.PriceTiers)
@@ -354,7 +362,7 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 		return ErrInvalidInput
 	}
 	for _, tier := range tiers {
-		if !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
+		if !validGeoPrices(tier.GeoMultipliers) || !validTokenPrices(tier.TokenPrices) || (tier.ServiceTier != "" && !serviceTierPattern.MatchString(tier.ServiceTier)) || (tier.ThinkingMode != "" && tier.ThinkingMode != "qwen_thinking" && tier.ThinkingMode != "qwen_non_thinking") {
 			return ErrInvalidInput
 		}
 		if !tier.HasPredicate() || utf8.RuneCountInString(tier.Name) > 64 {
@@ -390,6 +398,20 @@ func validatePriceTiers(tiers []ledger.PriceTier) error {
 func validTokenPrices(prices map[string]money.Amount) bool {
 	for key, value := range prices {
 		if ledger.TokenBucket(key) < 0 || !validPrice(value) {
+			return false
+		}
+	}
+	return true
+}
+
+var geoPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+
+func validGeoPrices(geo map[string]int64) bool {
+	if len(geo) > 32 {
+		return false
+	}
+	for key, value := range geo {
+		if !geoPattern.MatchString(key) || value < 0 || value > 100*ledger.FixedPointScale {
 			return false
 		}
 	}

@@ -12,6 +12,8 @@ export type PricesForm = {
   output: string
   cache_write: string
   cache_read: string
+
+  geo_multipliers?: Record<string, string>
   token_prices?: Record<string, string>
 }
 
@@ -115,7 +117,11 @@ export function formToTierInput(form: TierForm): PriceTierInput {
 }
 
 function trimPrices(prices: PricesForm): ModelPrices {
+  const clean = (values: Record<string, string>) => Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, value.trim()]),
+  )
   return {
+    ...(prices.geo_multipliers ? { geo_multipliers: clean(prices.geo_multipliers) } : {}),
     ...(prices.token_prices
       ? {
           token_prices: Object.fromEntries(
@@ -153,6 +159,11 @@ export function isValidTimezone(timezone: string) {
 export type TierErrors = Partial<Record<'name' | 'tokens' | 'time' | 'timezone' | 'prices' | 'condition', string>>
 
 export function validatePrices(prices: PricesForm) {
+  for (const [key, value] of Object.entries(prices.geo_multipliers ?? {})) {
+    if (value.trim() !== '' && (!/^[a-z][a-z0-9_-]{0,31}$/.test(key) || !isValidPrice(value) || Number(value) > 100)) {
+      return '地域倍率为 0～100，最多 9 位小数'
+    }
+  }
   return [
     prices.input,
     prices.output,

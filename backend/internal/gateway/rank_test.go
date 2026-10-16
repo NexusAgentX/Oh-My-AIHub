@@ -215,3 +215,22 @@ func TestPricingModelUsesCustomPrices(t *testing.T) {
 func catalogModel(id string) catalog.Model {
 	return catalog.Model{ID: id, DisplayName: id, PriceCurrency: "USD", InputPrice: money.FromNano(5e9), OutputPrice: money.FromNano(9e9)}
 }
+
+func TestLateSettlementUsesCallStartBudgetWindow(t *testing.T) {
+	cache := NewSpendCache()
+	previous := time.Date(2026, 3, 31, 15, 59, 0, 0, time.UTC) // Asia/Shanghai March 31
+	now := previous.Add(2 * time.Minute)
+	load := func() (Spend, error) { return Spend{Today: 5, Month: 50, Total: 500}, nil }
+	_, _ = cache.Get("key", now, load)
+	cache.Add("key", 7, previous)
+	got, _ := cache.Get("key", now, load)
+	if got != (Spend{Today: 5, Month: 50, Total: 507}) {
+		t.Fatalf("late charge leaked into current window: %+v", got)
+	}
+	runtime := NewRuntime(nil)
+	runtime.SetRevenue("channel", 10, now)
+	runtime.AddRevenueAt("channel", 7, previous, now, 11)
+	if state, _ := runtime.Check("channel", Limits{DailyRevenueCap: 11}, now); state != StateAvailable {
+		t.Fatalf("previous-day revenue exhausted current day: %s", state)
+	}
+}

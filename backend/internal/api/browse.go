@@ -205,7 +205,7 @@ func newCatalogModelJSON(model catalog.Model, online []gateway.OnlineChannel, no
 		ParameterInfo:            model.ParameterInfo,
 		PriceCurrency:            model.PriceCurrency,
 		USDCNYRate:               usdRate,
-		BasePrices:               newModelPricesJSON(points.InputPrice, points.OutputPrice, points.CacheWritePrice, points.CacheReadPrice, points.TokenPrices),
+		BasePrices:               newModelPricesJSON(points.InputPrice, points.OutputPrice, points.CacheWritePrice, points.CacheReadPrice, points.TokenPrices, geoAmounts(points.GeoMultipliers)),
 		CurrentTier:              tier,
 		LowestPrices:             lowest,
 		Formats:                  ordered,

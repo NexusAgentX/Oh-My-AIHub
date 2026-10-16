@@ -116,7 +116,11 @@ func TestStoppingTheWatchEndsItsClocks(t *testing.T) {
 	recorder.expectNone(t, 200*time.Millisecond)
 
 	again := newCancelRecorder()
-	stopped := watchClient(client, again.cancel, time.Millisecond)
+	// A watcher on an already cancelled context may fire before stop is called.
+	// Use a live context to test that stop prevents future callbacks.
+	other, cancelOther := context.WithCancel(context.Background())
+	defer cancelOther()
+	stopped := watchClient(other, again.cancel, time.Millisecond)
 	stopped.stop()
 	stopped.left()
 	again.expectNone(t, 50*time.Millisecond)

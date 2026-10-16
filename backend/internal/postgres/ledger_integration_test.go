@@ -27,8 +27,8 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 		WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name <> 'goose_db_version'`).Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 26 {
-		t.Fatalf("schema tables = %d, want 26", tables)
+	if tables != 27 {
+		t.Fatalf("schema tables = %d, want 27", tables)
 	}
 	var suppliers, supplierEndpoints int
 	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM suppliers), (SELECT count(*) FROM supplier_endpoints)`).Scan(&suppliers, &supplierEndpoints); err != nil {

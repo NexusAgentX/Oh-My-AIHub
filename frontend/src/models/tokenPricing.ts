@@ -10,3 +10,19 @@ export const tokenPriceLabels: Record<string, string> = {
     ),
   ),
 }
+
+export const unitPriceLabels: Record<string, string> = {
+  web_search: '网页搜索 / 次',
+  image_generation: '图像生成 / 次',
+  file_search: '文件搜索 / 次',
+  google_search_query: 'Google 搜索 / 查询',
+  google_search_prompt: 'Google 搜索 / 请求',
+  google_maps_query: 'Google 地图 / 查询',
+  google_maps_prompt: 'Google 地图 / 请求',
+  container_1gb: '容器 1 GB / 会话',
+  container_4gb: '容器 4 GB / 会话',
+  container_16gb: '容器 16 GB / 会话',
+  container_64gb: '容器 64 GB / 会话',
+  code_execution_second: '代码执行 / 秒',
+  storage_gb_hour: '存储 / GB·小时',
+}

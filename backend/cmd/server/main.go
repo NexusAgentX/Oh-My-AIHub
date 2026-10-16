@@ -191,9 +191,17 @@ func main() {
 
 	engine := gateway.NewEngine(gateway.Dependencies{
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
-		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
+	backgroundCheckCtx, cancelBackgroundCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	if err := store.Gateway.VerifyBackgroundCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
+		fatal(logger, "checking background credentials failed", err)
+	}
+	if err := engine.RestoreBackground(backgroundCheckCtx); err != nil {
+		fatal(logger, "restoring background tasks failed", err)
+	}
+	cancelBackgroundCheck()
 	// An edit of a channel (settings, models, formats, suspension) clears what the
 	// 4xx anomaly rule counted against it before, and a channel ranked last for
 	// those answers is ranked on its merits again before the edit returns.
@@ -214,6 +222,7 @@ func main() {
 	cancelStats()
 	go engine.RunReaper(engineContext, time.Minute)
 	go engine.RunRefresh(engineContext)
+	go engine.RunBackground(engineContext)
 	go cached.Cache.Run(engineContext)
 
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)
