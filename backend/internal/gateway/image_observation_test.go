@@ -38,7 +38,7 @@ func TestImageStreamMetadataMergesAndTerminalStatusDoesNotRegress(t *testing.T) 
 		`{"type":"response.image_generation_call.generating","item_id":"ig_one"}`,
 		`{"type":"response.image_generation_call.completed","item_id":"ig_one"}`,
 		`{"type":"response.output_item.done","item":{"id":"ig_one","type":"image_generation_call","status":"completed","size":"1024x1024","quality":"max","model":"returned-image","usage":{"input_tokens":12,"output_tokens":34,"input_tokens_details":{"image_tokens":10}}}}`,
-		`{"type":"response.completed","response":{"id":"resp_one","status":"completed","usage":{"input_tokens":100,"output_tokens":20},"output":[{"id":"ig_one","type":"image_generation_call","status":"generating","usage":{"input_tokens":12,"output_tokens":34}}]}}`,
+		`{"type":"response.completed","response":{"id":"resp_one","status":"completed","usage":{"input_tokens":100,"output_tokens":20},"output":[{"id":"ig_one","type":"image_generation_call","status":"generating","usage":{"input_tokens":12,"output_tokens":34,"output_tokens_details":{"image_tokens":34}}}]}}`,
 	}
 	var stream strings.Builder
 	for _, event := range events {
@@ -46,7 +46,7 @@ func TestImageStreamMetadataMergesAndTerminalStatusDoesNotRegress(t *testing.T) 
 	}
 	got := observe(channel.FormatOpenAIResponses, true, "text/event-stream", stream.String(), 1)
 	image := got.Usage.Detail.ImageGenerations[0]
-	if len(got.Usage.Detail.ImageGenerations) != 1 || got.Usage.Detail.Units["image_generation"] != ledger.FixedPointScale || image.Status != "completed" || image.ModelSource != "response" || image.Model != "returned-image" || image.Size != "1024x1024" || image.Quality != "max" || image.Usage.InputTokens != 12 || image.Usage.OutputTokens != 34 || image.Usage.Detail.Tokens["input_image"] != 10 {
+	if len(got.Usage.Detail.ImageGenerations) != 1 || got.Usage.Detail.Units["image_generation"] != ledger.FixedPointScale || image.Status != "completed" || image.ModelSource != "response" || image.Model != "returned-image" || image.Size != "1024x1024" || image.Quality != "max" || image.Usage.InputTokens != 12 || image.Usage.OutputTokens != 34 || image.Usage.Detail.Tokens["input_image"] != 10 || image.Usage.Detail.Tokens["output_image"] != 34 {
 		t.Fatalf("%+v", got)
 	}
 	if !got.Found || got.Usage.InputTokens != 100 || got.Usage.OutputTokens != 20 || len(got.Usage.Detail.Iterations) != 0 {

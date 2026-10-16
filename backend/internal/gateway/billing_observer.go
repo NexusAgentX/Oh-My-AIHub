@@ -356,7 +356,18 @@ func (o *Observer) observeImageGeneration(item jsonObject, id string, eventStatu
 					image.Usage.CacheWriteTokens = usage.CacheWriteTokens
 				}
 				if usage.Detail != nil && len(usage.Detail.Tokens) > 0 {
-					image.Usage.Detail = usage.Detail
+					if image.Usage.Detail == nil {
+						image.Usage.Detail = usage.Detail
+					} else {
+						if image.Usage.Detail.Tokens == nil {
+							image.Usage.Detail.Tokens = map[string]int64{}
+						}
+						for key, value := range usage.Detail.Tokens {
+							if value > image.Usage.Detail.Tokens[key] {
+								image.Usage.Detail.Tokens[key] = value
+							}
+						}
+					}
 				}
 			}
 		}
