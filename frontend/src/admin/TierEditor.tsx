@@ -94,10 +94,10 @@ export function PriceFields({
             />
           ))}
         </div>
-        <div className="field-row">
+        <div className="geo-add-row">
           <TextField label="其他地域" placeholder="例如 us-central1" value={geoKey} onChange={(event) => setGeoKey(event.target.value)} />
           <Button
-            type="button" size="sm" variant="secondary"
+            type="button" variant="secondary"
             disabled={!/^[a-z][a-z0-9_-]{0,31}$/.test(geoKey) || geoKey === 'us' || geoKey === 'eu' || geoKey in (prices.geo_multipliers ?? {}) || Object.keys(prices.geo_multipliers ?? {}).length >= 32}
             onClick={() => {
               onChange({ ...prices, geo_multipliers: { ...prices.geo_multipliers, [geoKey]: '' } })
