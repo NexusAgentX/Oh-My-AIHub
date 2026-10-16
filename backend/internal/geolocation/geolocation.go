@@ -95,8 +95,8 @@ func (s *Service) Lookup(ip string) *Location {
 	if s == nil {
 		return nil
 	}
-	e, _ := s.cached(ip)
-	if !s.now().Before(e.Expires) {
+	e, ok := s.cached(ip)
+	if !ok {
 		return nil
 	}
 	return e.Location

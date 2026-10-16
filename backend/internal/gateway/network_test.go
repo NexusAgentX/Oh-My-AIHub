@@ -39,7 +39,7 @@ func TestNetworkTraceFreezesActualPeerAndOverlappingPhases(t *testing.T) {
 		t.Fatalf("phases: %+v", node.Phases)
 	}
 	hooks.GotConn(httptrace.GotConnInfo{})
-	if trace.ip != node.Node.IP || trace.reused == nil || !*trace.reused {
+	if trace.ip != node.Node.IP || !trace.hasConnection || !trace.reused {
 		t.Fatal("late callback mutated frozen record")
 	}
 }

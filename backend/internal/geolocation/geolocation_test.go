@@ -176,3 +176,26 @@ func TestGatewayCoordinatesValidate(t *testing.T) {
 		t.Fatal("valid config refused")
 	}
 }
+
+func TestHotCacheLookupAllocatesNothing(t *testing.T) {
+	s := New(nil)
+	s.remember(Entry{IP: "8.8.8.8", Location: &Location{Label: "Example", Latitude: 10, Longitude: 20}, Expires: time.Now().Add(time.Hour)})
+	if n := testing.AllocsPerRun(100, func() {
+		if s.Lookup("8.8.8.8") == nil {
+			panic("cache miss")
+		}
+	}); n != 0 {
+		t.Fatalf("cache hit allocated %v times", n)
+	}
+}
+
+func BenchmarkHotCacheLookup(b *testing.B) {
+	s := New(nil)
+	s.remember(Entry{IP: "8.8.8.8", Location: &Location{Label: "Example", Latitude: 10, Longitude: 20}, Expires: time.Now().Add(time.Hour)})
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			s.Lookup("8.8.8.8")
+		}
+	})
+}

@@ -93,7 +93,7 @@ func (c *callState) stage(name string, since time.Time, now time.Time) {
 			return
 		}
 	}
-	offset := max(0, float64(since.Sub(c.started))/float64(time.Millisecond))
+	offset := elapsedMS(since.Sub(c.started))
 	c.diagnostics.Stages = append(c.diagnostics.Stages, StageTiming{Stage: name, OffsetMS: &offset, DurationMS: float64(now.Sub(since)) / float64(time.Millisecond)})
 }
 func (e *Engine) finishCall(ctx context.Context, call *callState, finish CallFinish) (FinishResult, error) {

@@ -35,8 +35,12 @@ type NetworkPhase struct {
 }
 
 func phase(stage string, origin, start, end time.Time) NetworkPhase {
-	return NetworkPhase{stage, max(0, float64(start.Sub(origin))/float64(time.Millisecond)), max(0, float64(end.Sub(start))/float64(time.Millisecond))}
+	return NetworkPhase{stage, elapsedMS(start.Sub(origin)), elapsedMS(end.Sub(start))}
 }
+
+// Microsecond precision is sufficient for a request replay. It avoids storing
+// floating-point rounding tails in the JSON/WAL of every completed call.
+func elapsedMS(duration time.Duration) float64 { return max(0, float64(duration.Microseconds())/1000) }
 
 // Trace callbacks may outlive Do or run concurrently. Freeze copies only the
 // bounded facts known when Do returns; late callbacks cannot mutate stored data.
@@ -47,7 +51,8 @@ type networkTrace struct {
 	now                                                         func() time.Time
 	origin, start, connected, tlsStart, tlsDone, wrote, headers time.Time
 	ip                                                          string
-	reused                                                      *bool
+	reused                                                      bool
+	hasConnection                                               bool
 }
 
 func (t *networkTrace) update(f func()) {
@@ -62,8 +67,7 @@ func (t *networkTrace) trace() *httptrace.ClientTrace {
 		GotConn: func(info httptrace.GotConnInfo) {
 			t.update(func() {
 				t.connected = t.now()
-				reused := info.Reused
-				t.reused = &reused
+				t.reused, t.hasConnection = info.Reused, true
 				if info.Conn != nil && info.Conn.RemoteAddr() != nil {
 					if address, ok := info.Conn.RemoteAddr().(*net.TCPAddr); ok {
 						t.ip = address.AddrPort().Addr().Unmap().String()
@@ -94,7 +98,9 @@ func (t *networkTrace) freeze(end time.Time, record *Attempt, node *NetworkAttem
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.frozen = true
-	record.ReusedConnection = t.reused
+	if t.hasConnection {
+		record.ReusedConnection = &t.reused
+	}
 	if !t.connected.IsZero() {
 		record.ConnectMS = millis(t.connected.Sub(t.origin))
 	}
