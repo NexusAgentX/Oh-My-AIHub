@@ -46,7 +46,7 @@ export default function NetworkReplay({ call }: { call: CallDetail }) {
   const originalPoints = nodes.map((n, i) => mapPoint(n?.location, i))
   const points = originalPoints.map((point, i) => {
     const peers = originalPoints.filter(p => Math.hypot(p.x - point.x, p.y - point.y) < 22)
-    return peers.length > 1 ? { x: Math.max(12, Math.min(708, point.x + (i - 1) * 24)), y: Math.max(12, Math.min(350, point.y + (i - 1) * 12)) } : point
+    return peers.length > 1 ? { x: Math.max(12, Math.min(708, point.x + (i - 1) * 36)), y: Math.max(12, Math.min(350, point.y + (i - 1) * 20)) } : point
   })
   const active = spans.filter(s => position >= s.start && position < s.end)
   const inbound = active.some(s => s.label === '读取与解析请求')
@@ -80,7 +80,7 @@ export default function NetworkReplay({ call }: { call: CallDetail }) {
         {points.map((p, i) => <g key={i} transform={`translate(${Math.max(12, Math.min(708, p.x))} ${Math.max(12, p.y)})`}>
           <path d={`M${originalPoints[i].x - p.x} ${originalPoints[i].y - p.y}L0 0`} className="network-link" />
           <circle r={i === 1 ? 12 : 9} className={`network-node node-${i}`} />
-          <text y="4" textAnchor="middle" className="network-node-number">{i + 1}</text>
+          <text dominantBaseline="central" textAnchor="middle" className="network-node-number">{i + 1}</text>
         </g>)}
       </svg>
     </div>
