@@ -492,10 +492,12 @@ function ChannelEditForm({ detail }: { detail: ChannelDetail }) {
             <div className="channel-save-bar">
               <div className="form-actions channel-edit-actions">
                 <Switch checked={listed} disabled={channel.status === 'suspended'} label={listed ? '上架' : '下架'} onChange={setListed} />
-                <Button loading={update.isPending && !test.isPending}>保存</Button>
+                <div className="channel-save-actions">
+                  <SuccessMessage>{message}</SuccessMessage>
+                  <Button loading={update.isPending && !test.isPending}>保存</Button>
+                </div>
               </div>
               <InlineError>{error}</InlineError>
-              <SuccessMessage>{message}</SuccessMessage>
             </div>
             <Card title="连接">
               <div className="stack-form">
