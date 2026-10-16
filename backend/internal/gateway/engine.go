@@ -386,7 +386,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	call.key = key
-	call.diagnostics.Network = &Network{Client: NetworkNode{IP: clientip.Address(r, e.TrustedProxyCIDRs)}, Gateway: NetworkNode{Location: e.GatewayLocation}, Attempts: []*NetworkAttempt{}, LocationSource: e.LocationSource}
+	call.diagnostics.Network = &Network{Client: NetworkNode{IP: clientip.Address(r, e.TrustedProxyCIDRs)}, Gateway: e.gatewayNode(), Attempts: []*NetworkAttempt{}, LocationSource: e.LocationSource}
 
 	if !key.AccountActive || !keyUsable(key, started) {
 		status, code, message := http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期"

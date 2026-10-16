@@ -5,25 +5,35 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 )
 
 type memoryStore struct {
+	mu       sync.Mutex
 	entries  []Entry
 	used     int
 	saved    int
 	enriched chan map[string]*Location
 }
 
-func (m *memoryStore) LoadGeoCache(context.Context) ([]Entry, error) { return m.entries, nil }
+func (m *memoryStore) LoadGeoCache(context.Context) ([]Entry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]Entry(nil), m.entries...), nil
+}
 func (m *memoryStore) SaveGeoCache(_ context.Context, e Entry) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.entries = append(m.entries, e)
 	m.saved++
 	return nil
 }
 func (m *memoryStore) ReserveGeoLookup(_ context.Context, _ time.Time, limit int) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.used >= limit {
 		return false, nil
 	}
@@ -36,6 +46,8 @@ func (m *memoryStore) EnrichCallLocations(_ context.Context, _ string, p map[str
 	}
 	return nil
 }
+
+func (m *memoryStore) queries() int { m.mu.Lock(); defer m.mu.Unlock(); return m.used }
 
 type transport func(*http.Request) (*http.Response, error)
 
@@ -65,7 +77,7 @@ func TestPersistentWarmCacheAndNegativeExpiry(t *testing.T) {
 		for range 10 {
 			s.resolve(ctx, "8.8.8.8")
 		}
-		if calls != 1 || store.used != 1 {
+		if calls != 1 || store.queries() != 1 {
 			t.Fatal("cache did not deduplicate")
 		}
 		restarted := New(store)

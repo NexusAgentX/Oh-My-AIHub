@@ -153,3 +153,16 @@ func (e *Engine) scheduleNetwork(id string, n *Network) {
 	}
 	e.Geo.Offer(geolocation.Job{CallID: id, Addresses: addresses})
 }
+
+// gatewayNode is read once when opening the request. Later refreshes cannot
+// move an already captured call to a different egress address or region.
+func (e *Engine) gatewayNode() NetworkNode {
+	return gatewaySnapshot(e.Geo.Gateway(), e.GatewayLocation)
+}
+func gatewaySnapshot(snapshot geolocation.Entry, override *geolocation.Location) NetworkNode {
+	node := NetworkNode{IP: snapshot.IP, Location: snapshot.Location}
+	if override != nil {
+		node.Location = override
+	}
+	return node
+}
