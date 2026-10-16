@@ -6,8 +6,7 @@ SELECT * FROM settings FOR UPDATE;
 
 -- name: UpdateSettings :one
 UPDATE settings
-SET codex = sqlc.arg(codex)::jsonb,
-    fee_rate_nano = $1,
+SET fee_rate_nano = $1,
     c2c_payment_timeout_minutes = $2,
     default_credit_limit_nano = $3,
     default_max_attempts = $4,

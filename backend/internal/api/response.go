@@ -24,7 +24,7 @@ import (
 )
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
@@ -64,8 +64,6 @@ func writeInvalidJSON(w http.ResponseWriter) {
 
 func writeDomainError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, channel.ErrProbeBusy):
-		writeError(w, http.StatusTooManyRequests, "probe_busy", "兼容性探测繁忙，请稍后重试")
 	case errors.Is(err, supplier.ErrInvalid):
 		writeError(w, 422, "invalid_supplier", "供应商资料或图标无效，请检查 HTTPS 地址与字段长度")
 	case errors.Is(err, supplier.ErrConflict):

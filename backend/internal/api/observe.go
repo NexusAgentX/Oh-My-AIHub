@@ -82,7 +82,7 @@ func optionalAmount(query map[string][]string, name string) (*money.Amount, bool
 func parseCallFilter(r *http.Request) (observe.CallFilter, bool) {
 	query := r.URL.Query()
 	filter := observe.CallFilter{
-		APIKeyID: query.Get("api_key_id"), Model: query.Get("model"), Operation: query.Get("operation"), Format: query.Get("format"), Outcome: query.Get("outcome"),
+		APIKeyID: query.Get("api_key_id"), Model: query.Get("model"), Format: query.Get("format"), Outcome: query.Get("outcome"),
 		Tag: query.Get("tag"), RequestID: query.Get("request_id"), AccountID: query.Get("account_id"), FinalChannelID: query.Get("channel_id"),
 	}
 	ok := true
@@ -227,7 +227,6 @@ type accountRefJSON struct {
 
 // callSummaryJSON is the OpenAPI CallSummary schema.
 type callSummaryJSON struct {
-	Operation      string          `json:"operation"`
 	ID             string          `json:"id"`
 	CreatedAt      time.Time       `json:"created_at"`
 	CompletedAt    *time.Time      `json:"completed_at"`
@@ -332,7 +331,6 @@ type channelCallErrorJSON struct {
 
 // channelCallJSON is the OpenAPI ChannelCall schema: a call as the channel's owner sees it.
 type channelCallJSON struct {
-	Operation  string                `json:"operation"`
 	ID         string                `json:"id"`
 	CreatedAt  time.Time             `json:"created_at"`
 	ModelID    *string               `json:"model_id"`
@@ -488,19 +486,19 @@ func newCallSummaryJSON(row observe.CallRow) callSummaryJSON {
 		CompletedAt:    row.CompletedAt,
 		ModelID:        row.ModelID,
 		RequestedModel: row.RequestedModel,
-		Operation:      row.Operation, Format: row.Format,
-		Stream:       row.Stream,
-		Tag:          row.Tag,
-		APIKey:       newObservedKeyRefJSON(row.Key),
-		Outcome:      row.Outcome,
-		Channel:      newChannelRefJSON(row.Channel),
-		AttemptCount: row.AttemptCount,
-		Usage:        newUsageJSON(row.Usage),
-		Cost:         row.Cost.String(),
-		Fee:          row.Fee.String(),
-		Charged:      row.Charged().String(),
-		TTFTMS:       row.TTFTMS,
-		DurationMS:   row.DurationMS,
+		Format:         row.Format,
+		Stream:         row.Stream,
+		Tag:            row.Tag,
+		APIKey:         newObservedKeyRefJSON(row.Key),
+		Outcome:        row.Outcome,
+		Channel:        newChannelRefJSON(row.Channel),
+		AttemptCount:   row.AttemptCount,
+		Usage:          newUsageJSON(row.Usage),
+		Cost:           row.Cost.String(),
+		Fee:            row.Fee.String(),
+		Charged:        row.Charged().String(),
+		TTFTMS:         row.TTFTMS,
+		DurationMS:     row.DurationMS,
 	}
 }
 
@@ -526,10 +524,10 @@ func newChannelCallJSON(row observe.CallRow, channelID string) channelCallJSON {
 		revenue = row.Revenue()
 	}
 	return channelCallJSON{
-		ID:        row.ID,
-		CreatedAt: row.CreatedAt,
-		ModelID:   row.ModelID,
-		Operation: row.Operation, Format: row.Format,
+		ID:         row.ID,
+		CreatedAt:  row.CreatedAt,
+		ModelID:    row.ModelID,
+		Format:     row.Format,
 		Stream:     row.Stream,
 		Outcome:    row.Outcome,
 		Usage:      newUsageJSON(row.Usage),
@@ -780,7 +778,7 @@ func (a *app) listChannelCalls(w http.ResponseWriter, r *http.Request) {
 	// by consumer, key, tag or cost.
 	filter = observe.CallFilter{
 		Stream: filter.Stream, StatusCode: filter.StatusCode, ErrorCode: filter.ErrorCode, EndReason: filter.EndReason,
-		ScopeChannelID: channelID, Model: filter.Model, Operation: filter.Operation, Format: filter.Format, Outcome: filter.Outcome, RequestID: filter.RequestID,
+		ScopeChannelID: channelID, Model: filter.Model, Format: filter.Format, Outcome: filter.Outcome, RequestID: filter.RequestID,
 		From: filter.From, To: filter.To, MinDurationMS: filter.MinDurationMS, MaxDurationMS: filter.MaxDurationMS,
 		MinTokens: filter.MinTokens, MaxTokens: filter.MaxTokens,
 	}

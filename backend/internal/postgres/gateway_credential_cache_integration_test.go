@@ -15,11 +15,10 @@ func TestGatewayOpensAChannelKeyOnceUntilTheKeyChangesOrTheChannelIsDeleted(t *t
 	relay := okUpstream(t)
 	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, key: "sk-first-0001"})
 	_, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	request := []byte(`{"model":"gpt-test"}`)
 	callOK := func() {
 		t.Helper()
-		if recorder := e.call(secret, http.MethodPost, "/v1/responses", request, nil); recorder.Code != http.StatusOK {
+		if recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", request, nil); recorder.Code != http.StatusOK {
 			t.Fatalf("call = %d %s", recorder.Code, recorder.Body.String())
 		}
 	}
@@ -59,7 +58,7 @@ func TestGatewayOpensAChannelKeyOnceUntilTheKeyChangesOrTheChannelIsDeleted(t *t
 	if recorder := e.api(sharer, http.MethodDelete, "/api/channels/"+channelID, nil); recorder.Code != http.StatusNoContent {
 		t.Fatalf("delete channel = %d", recorder.Code)
 	}
-	if code := e.call(secret, http.MethodPost, "/v1/responses", request, nil).Code; code != http.StatusServiceUnavailable {
+	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", request, nil).Code; code != http.StatusServiceUnavailable {
 		t.Fatalf("call to a deleted channel = %d", code)
 	}
 	if len(relay.inference()) != 5 || e.keyring.CredentialDecryptions() != 2 {

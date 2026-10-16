@@ -35,7 +35,6 @@ const (
 )
 
 type Settings struct {
-	Codex                    Codex
 	FeeRateNano              int64
 	C2CPaymentTimeoutMinutes int32
 	DefaultCreditLimit       money.Amount
@@ -120,9 +119,6 @@ func validHost(host string) bool {
 
 // Validate enforces the same ranges as the database constraints.
 func Validate(value Settings) error {
-	if err := value.Codex.Validate(); err != nil {
-		return err
-	}
 	switch {
 	case value.FeeRateNano < 0 || value.FeeRateNano > money.Scale,
 		value.C2CPaymentTimeoutMinutes < 5 || value.C2CPaymentTimeoutMinutes > 1440,

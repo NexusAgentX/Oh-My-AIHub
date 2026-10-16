@@ -17,26 +17,32 @@ describe('channel wizard', () => {
     ])
     expect(validateRows(rows)).toBe('')
     expect(modelsInput(rows)).toEqual([
-      { compatibility: { responses: [], codex: [] }, model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', fx_discount: false, enabled: true },
-      { compatibility: { responses: [], codex: [] }, model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', fx_discount: false, enabled: true },
+      { model_id: 'gpt-5', upstream_model: 'gpt-5', multiplier: '1', fx_discount: false, formats: ['openai_chat', 'openai_responses'], enabled: true },
+      { model_id: 'claude-sonnet-4-5', upstream_model: 'vendor/claude', multiplier: '1', fx_discount: false, formats: ['anthropic'], enabled: true },
     ])
     expect(modelsInput([{ ...rows[0], multiplier: '0.13', fxDiscount: true }])[0]).toMatchObject({ multiplier: '0.13', fx_discount: true })
   })
 
-  it('applies verified model cells and keeps skipped declarations', () => {
-    const tested = applyTestResults([{ ...rows[0], capabilities: ['codex/vision'] }], [
-      { model_id: 'gpt-5', format: 'openai_responses', protocol: 'responses', capability: 'function_tools', scope: 'model', skipped: false, ok: true, status_code: 200, error: null, duration_ms: 10 },
-      { model_id: 'gpt-5', format: 'codex', protocol: 'codex', capability: 'vision', scope: 'model', skipped: true, ok: false, status_code: null, error: 'manual', duration_ms: 0 },
-      { model_id: 'gpt-5', format: 'codex', protocol: 'codex', capability: 'inference', scope: 'channel', skipped: false, ok: true, status_code: 200, error: null, duration_ms: 10 },
+  it('corrects formats from test results and marks passes', () => {
+    const tested = applyTestResults(rows, [
+      { model_id: 'gpt-5', format: 'openai_chat', ok: true, status_code: 200, error: null, duration_ms: 10 },
+      { model_id: 'gpt-5', format: 'openai_responses', ok: false, status_code: 404, error: 'no', duration_ms: 10 },
+      { model_id: 'gpt-5', format: 'anthropic', ok: true, status_code: 200, error: null, duration_ms: 10 },
     ])
-    expect(tested[0].capabilities).toEqual(['codex/vision', 'responses/function_tools'])
-    expect(tested[0].passed).toEqual({ 'responses/function_tools': true })
-    expect(tested[0].errors).toEqual({ 'codex/vision': 'manual' })
+    expect(tested[0].formats).toEqual(['openai_chat', 'anthropic'])
+    expect(tested[0].passed).toEqual({ openai_chat: true, openai_responses: false, anthropic: true })
+    expect(tested[1]).toBe(rows[1])
+    expect(tested[0].errors).toEqual({ openai_responses: 'no' })
+    const retried = applyTestResults(tested, [
+      { model_id: 'gpt-5', format: 'openai_responses', ok: true, status_code: 200, error: null, duration_ms: 10 },
+    ])
+    expect(retried[0].errors).toEqual({})
+    expect(retried[1]).toBe(rows[1])
   })
 
   it('rejects selling a model without a platform match or format', () => {
     expect(validateRows([{ ...rows[2], sell: true }])).toBe('勾选的模型需要选择平台模型或设为自定义模型')
-    expect(validateRows([{ ...rows[0], formats: [] }])).toBe('')
+    expect(validateRows([{ ...rows[0], formats: [] }])).toContain('格式')
   })
 
   it('sends custom models with their prices and no multiplier', () => {
@@ -45,7 +51,7 @@ describe('channel wizard', () => {
     expect(custom.modelId).toBe('unknown-x')
     expect(validateRows([custom])).toBe('')
     expect(modelsInput([custom])).toEqual([{
-      compatibility: { responses: [], codex: [] }, model_id: 'unknown-x', upstream_model: 'unknown-x', enabled: true,
+      model_id: 'unknown-x', upstream_model: 'unknown-x', formats: ['openai_chat'], enabled: true,
       custom_prices: { input: '1', output: '9', cache_write: '0', cache_read: '0.1' },
     }])
     expect(validateRows([{ ...custom, customPrices: { ...custom.customPrices, cacheRead: '' } }])).toContain('四个价格')

@@ -52,7 +52,6 @@ type KeyAuth struct {
 // Candidate is one channel offering the requested model in the requested
 // format.
 type Candidate struct {
-	Capabilities   []string
 	ChannelID      string
 	OwnerID        string
 	Name           string
@@ -255,7 +254,6 @@ type OnlineModel struct {
 
 // OnlineChannel is one listed channel offering one model, for browsing.
 type OnlineChannel struct {
-	Capabilities   []string
 	ModelID        string
 	ChannelID      string
 	ChannelName    string

@@ -1,4 +1,3 @@
-import { operationLabels } from './operations'
 import type { ReactNode } from 'react'
 import type { CallOutcome, CallSummary, ChannelCall, Format, Usage } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
@@ -9,7 +8,6 @@ import { OutcomeBadge } from './OutcomeBadge'
 
 /** 各类调用记录（用户、渠道所有者、管理员）共有的字段。 */
 export type CallRowBase = {
-  operation?: string
   id: string
   created_at: string
   model_id: string | null
@@ -36,7 +34,6 @@ function modelName(row: CallRowBase & { requested_model?: string }) {
   return (
     <>
       <strong className="call-model">{model}</strong>
-      {row.operation && <small>{operationLabels[row.operation] ?? row.operation}</small>}
       {aliased && <small>别名 {row.requested_model}</small>}
     </>
   )

@@ -191,15 +191,12 @@ func main() {
 
 	engine := gateway.NewEngine(gateway.Dependencies{
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
-		Resources: store.Gateway, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
 	backgroundCheckCtx, cancelBackgroundCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	if err := store.Gateway.VerifyBackgroundCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
 		fatal(logger, "checking background credentials failed", err)
-	}
-	if err := store.Gateway.VerifyResourceCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
-		fatal(logger, "checking stored resource credentials failed", err)
 	}
 	if err := engine.RestoreBackground(backgroundCheckCtx); err != nil {
 		fatal(logger, "restoring background tasks failed", err)

@@ -234,10 +234,10 @@ func TestBackgroundAckPersistsBeforeDeliveryAndBindsFollowups(t *testing.T) {
 func TestBillingImageToolRetainsModalityDetailsAndDeduplicatesItems(t *testing.T) {
 	raw := `{"id":"resp_image","usage":{"input_tokens":100,"output_tokens":20},"output":[{"id":"ig_one","type":"image_generation_call","model":"image-model","usage":{"input_tokens":10,"output_tokens":30,"input_tokens_details":{"text_tokens":2,"image_tokens":8},"output_tokens_details":{"image_tokens":30}}},{"id":"ig_one","type":"image_generation_call","model":"image-model","usage":{"input_tokens":10,"output_tokens":30}}]}`
 	got := observe(channel.FormatOpenAIResponses, false, "application/json", raw, 7)
-	if got.Usage.Detail == nil || len(got.Usage.Detail.ImageGenerations) != 1 {
+	if got.Usage.Detail == nil || len(got.Usage.Detail.Iterations) != 1 {
 		t.Fatalf("%+v", got.Usage)
 	}
-	child := got.Usage.Detail.ImageGenerations[0].Usage
+	child := got.Usage.Detail.Iterations[0].Usage
 	if child.Detail == nil || child.Detail.Tokens["input_image"] != 8 || child.Detail.Tokens["output_image"] != 30 {
 		t.Fatalf("child=%+v", child)
 	}
@@ -355,7 +355,7 @@ func TestBackgroundFollowupsPreserveOpaqueProtocolContent(t *testing.T) {
 	engine.settingsSnap.Store(&settingsSnapshot{outbound: backgroundOutbound{client: upstream.Client()}})
 	metadata := backgroundMetadata{Candidate: Candidate{ChannelID: "channel", Credential: credential, BaseURL: upstream.URL}, ModelID: "main", Location: authBearer, Headers: http.Header{"Openai-Project": {"original-project"}, "Openai-Organization": {"original-org"}}}
 	raw, _ := json.Marshal(metadata)
-	fixture.jobs["call"] = BackgroundJob{ChannelID: "channel", CallID: "call", ResponseID: "resp_opaque", AccountID: "consumer", KeyID: "key", Metadata: raw}
+	fixture.jobs["call"] = BackgroundJob{CallID: "call", ResponseID: "resp_opaque", AccountID: "consumer", KeyID: "key", Metadata: raw}
 	invoke := func(method string, length int64) *httptest.ResponseRecorder {
 		request := httptest.NewRequest(method, "/v1/responses/resp_opaque?future_flag=keep&key=sk-aih-test", strings.NewReader(string(opaque)))
 		request.ContentLength = length

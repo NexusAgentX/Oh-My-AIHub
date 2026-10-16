@@ -1,9 +1,6 @@
-import { capabilityLabel } from '../channels/Capabilities'
-import { operationLabels } from './operations'
 import type { components } from '../api/schema.gen'
 import { formatMs } from '../money/format'
 const labels: Record<string, string> = {
-  missing_capability: '缺少所需能力',
   authentication: '鉴权',
   request: '读取与解析请求',
   open_call: '创建调用',
@@ -34,7 +31,6 @@ const labels: Record<string, string> = {
   revenue: '收入上限',
   daily_revenue: '收入上限',
   demoted: '异常降级',
-  anomalous: '4xx 异常',
   sticky: '沿用上次渠道',
   cheapest: '价格优先',
   reliable: '稳定优先',
@@ -51,9 +47,6 @@ export function CallDiagnostics({ data }: { data: components['schemas']['CallDia
       <section className="call-detail-section">
         <h3>交付与用量</h3>
         <dl className="call-detail-grid">
-          {data.operation && <div><dt>操作</dt><dd>{operationLabels[data.operation] ?? data.operation}</dd></div>}
-          {!!data.required_capabilities?.length && <div><dt>所需能力</dt><dd>{data.required_capabilities.map(capabilityLabel).join('、')}</dd></div>}
-          {data.bound_resource && <div><dt>资源绑定</dt><dd>原渠道及凭据范围</dd></div>}
           <div>
             <dt>交付</dt>
             <dd>{diagnosticLabel(data.delivery)}</dd>

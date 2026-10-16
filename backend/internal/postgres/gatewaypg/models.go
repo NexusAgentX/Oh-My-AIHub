@@ -19,15 +19,3 @@ type GatewayBackgroundJob struct {
 	DeadlineAt time.Time
 	SettledAt  *time.Time
 }
-
-type GatewayResource struct {
-	AccountID  string
-	KeyID      string
-	Kind       string
-	ResourceID string
-	CallID     string
-	ChannelID  string
-	ModelID    string
-	Metadata   []byte
-	CreatedAt  time.Time
-}

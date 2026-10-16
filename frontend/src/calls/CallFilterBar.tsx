@@ -1,4 +1,3 @@
-import { operationLabels } from './operations'
 import { useState, type FormEvent } from 'react'
 import { rangeFrom, type RangePreset } from '../money/time'
 import { Button, Icon, Segmented } from '../ui'
@@ -6,7 +5,6 @@ import { formatLabels, formats, outcomeLabels, outcomeOptions } from './labels'
 import type { CallListParams } from './queries'
 
 export type CallFilterState = {
- operation?: string
   stream?: string
   min_duration_ms?: string
   max_duration_ms?: string
@@ -85,7 +83,6 @@ export function filtersToParams(filters: CallFilterState, now = new Date()): Cal
     request_id: filters.requestId || undefined,
     model: filters.model || undefined,
     api_key_id: filters.apiKeyId || undefined,
-    operation: filters.operation || undefined,
     format: filters.format || undefined,
     outcome: filters.outcome || undefined,
     tag: filters.tag || undefined,
@@ -189,7 +186,6 @@ export function CallFilterBar({
         options={formats.map((format) => ({ value: format, label: formatLabels[format] }))}
         value={value.format}
       />
-      <FilterSelect label="操作" value={value.operation ?? ''} onChange={operation => set({operation})} options={Object.entries(operationLabels).map(([value, label]) => ({value, label}))} />
       <FilterSelect
         label="结果"
         onChange={(outcome) => set({ outcome })}

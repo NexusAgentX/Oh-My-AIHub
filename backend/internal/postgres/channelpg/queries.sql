@@ -2,15 +2,15 @@
 INSERT INTO channels (
     id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id, status,
     user_agent, header_rules, concurrency_limit, rpm_limit, daily_revenue_cap_nano,
-    ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms, summary, description, capabilities
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, sqlc.narg(idle_timeout_ms), sqlc.arg(summary), sqlc.arg(description), sqlc.arg(capabilities)::text[]);
+    ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms, summary, description
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, sqlc.narg(idle_timeout_ms), sqlc.arg(summary), sqlc.arg(description));
 
 -- name: InsertChannelModel :exec
 INSERT INTO channel_models (
-    channel_id, model_id, upstream_model, multiplier_nano, format_tests, enabled, fx_discount,
+    channel_id, model_id, upstream_model, multiplier_nano, formats, format_tests, enabled, fx_discount,
     is_custom, custom_input_price_nano_per_million, custom_output_price_nano_per_million,
-    custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier, capabilities
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, sqlc.arg(capabilities)::text[]);
+    custom_cache_write_price_nano_per_million, custom_cache_read_price_nano_per_million, pending_multiplier
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
 
 -- Serializes custom model names against catalog creation (catalogpg.CreateModel
 -- takes the same lock) so a name is never both custom and official.
@@ -24,7 +24,7 @@ SELECT EXISTS (SELECT 1 FROM models WHERE id = $1);
 DELETE FROM channel_models WHERE channel_id = $1;
 
 -- name: GetChannel :one
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules, c.capabilities,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -36,7 +36,7 @@ WHERE c.id = $1 AND c.deleted_at IS NULL;
 SELECT status FROM channels WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
 -- name: ListOwnerChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules, c.capabilities,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -46,7 +46,7 @@ WHERE c.owner_id = $1 AND c.deleted_at IS NULL
 ORDER BY c.created_at DESC, c.id DESC;
 
 -- name: ListAdminChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules, c.capabilities,
+SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -63,10 +63,10 @@ ORDER BY c.created_at DESC, c.id DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListModelsOfChannels :many
-SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.format_tests, cm.enabled, cm.fx_discount,
+SELECT cm.channel_id, cm.model_id, cm.upstream_model, cm.multiplier_nano, cm.formats, cm.format_tests, cm.enabled, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million, cm.pending_multiplier,
-       cm.catalog_model_id, cm.capabilities
+       cm.catalog_model_id
 FROM channel_models cm
 WHERE cm.channel_id = ANY(sqlc.arg(channel_ids)::uuid[])
 ORDER BY cm.channel_id, cm.model_id;
@@ -87,7 +87,7 @@ WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: UpdateChannelAdvanced :exec
 UPDATE channels SET
-    capabilities = sqlc.arg(capabilities)::text[], user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5, daily_revenue_cap_nano = $6,
+    user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5, daily_revenue_cap_nano = $6,
     ttft_timeout_ms = $7, request_timeout_ms = $8, idle_timeout_ms = sqlc.narg(idle_timeout_ms), cooldown_failures = $9, cooldown_seconds = $10, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL;
 
@@ -113,7 +113,7 @@ INSERT INTO channel_events (channel_id, kind, reason) VALUES ($1, $2, $3);
 SELECT id, kind, reason, created_at FROM channel_events WHERE channel_id = $1 ORDER BY id DESC LIMIT sqlc.arg(row_limit);
 
 -- name: SetChannelModelTests :exec
-UPDATE channel_models SET format_tests = $3 WHERE channel_id = $1 AND model_id = $2;
+UPDATE channel_models SET format_tests = $3, formats = $4 WHERE channel_id = $1 AND model_id = $2;
 
 -- Marks the channel as edited without changing a field of it: applying the probe
 -- results rewrites the formats of its models. The gateway counts the 4xx

@@ -35,10 +35,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
-	"slices"
-	"sort"
 )
 
 // ---- a loopback stand-in for the pinned egress policy ----
@@ -456,15 +453,14 @@ type channelSpec struct {
 	upstream *upstream
 	// baseURL, when set, is used in place of the fake upstream's address; the
 	// performance baseline points channels at host names of its own.
-	baseURL      string
-	key          string
-	model        string
-	upstreamAs   string
-	multiplier   string
-	formats      []string
-	capabilities []string
-	advanced     map[string]any
-	status       string
+	baseURL    string
+	key        string
+	model      string
+	upstreamAs string
+	multiplier string
+	formats    []string
+	advanced   map[string]any
+	status     string
 }
 
 func (e *env) createChannel(owner person, spec channelSpec) string {
@@ -476,15 +472,12 @@ func (e *env) createChannel(owner person, spec channelSpec) string {
 		spec.multiplier = "2"
 	}
 	if spec.formats == nil {
-		spec.formats = []string{"openai_responses"}
+		spec.formats = []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
 	}
 	if spec.key == "" {
 		spec.key = "upstream-key-" + spec.name
 	}
-	model := map[string]any{"model_id": spec.model, "multiplier": spec.multiplier, "compatibility": channel.Matrix(channel.ModelCapabilities)}
-	if spec.capabilities != nil {
-		model["compatibility"] = channel.Matrix(spec.capabilities)
-	}
+	model := map[string]any{"model_id": spec.model, "multiplier": spec.multiplier, "formats": spec.formats}
 	if spec.upstreamAs != "" {
 		model["upstream_model"] = spec.upstreamAs
 	}
@@ -492,23 +485,10 @@ func (e *env) createChannel(owner person, spec channelSpec) string {
 	if baseURL == "" {
 		baseURL = spec.upstream.server.URL
 	}
-	advanced := map[string]any{}
-	for key, value := range spec.advanced {
-		advanced[key] = value
+	body := map[string]any{"name": spec.name, "base_url": baseURL, "api_key": spec.key, "models": []any{model}}
+	if spec.advanced != nil {
+		body["advanced"] = spec.advanced
 	}
-	if _, set := advanced["compatibility"]; !set {
-		matrix := channel.Compatibility{}
-		for _, protocol := range spec.formats {
-			if protocol == "openai_responses" {
-				matrix["responses"] = channel.ChannelFeatures
-			}
-			if protocol == "codex" {
-				matrix["codex"] = append(slices.Clone(channel.ChannelFeatures), channel.CodexChannelFeatures...)
-			}
-		}
-		advanced["compatibility"] = matrix
-	}
-	body := map[string]any{"name": spec.name, "base_url": baseURL, "api_key": spec.key, "models": []any{model}, "advanced": advanced}
 	if spec.status != "" {
 		body["status"] = spec.status
 	}
@@ -615,13 +595,16 @@ func (e *env) channelEvents(channelID string) []string {
 // ---- canned upstream answers ----
 
 const (
-	responsesBody                   = `{"id":"resp_1","object":"response","status":"completed","output":[],"usage":{"input_tokens":1000,"output_tokens":500}}`
-	chatBody                        = responsesBody
-	anthropicBody                   = `{"id":"m1","type":"message","content":[{"type":"text","text":"hi"}],"usage":{"input_tokens":1000,"output_tokens":500}}`
-	geminiBody                      = `{"candidates":[{"content":{"parts":[{"text":"hi"}]}}],"usageMetadata":{"promptTokenCount":1000,"candidatesTokenCount":500}}`
-	noUsageBody                     = `{"id":"resp_no_usage","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"hi"}]}]}`
-	chatStreamBody                  = responsesStreamBody
-	chatStreamBodyWithoutUsageFrame = responsesStreamBody
+	chatBody       = `{"id":"c1","object":"chat.completion","choices":[{"message":{"role":"assistant","content":"hi"}}],"usage":{"prompt_tokens":1000,"completion_tokens":500}}`
+	responsesBody  = `{"id":"resp_1","object":"response","usage":{"input_tokens":1000,"output_tokens":500}}`
+	anthropicBody  = `{"id":"m1","type":"message","content":[{"type":"text","text":"hi"}],"usage":{"input_tokens":1000,"output_tokens":500}}`
+	geminiBody     = `{"candidates":[{"content":{"parts":[{"text":"hi"}]}}],"usageMetadata":{"promptTokenCount":1000,"candidatesTokenCount":500}}`
+	noUsageBody    = `{"id":"c9","choices":[{"message":{"content":"hi"}}]}`
+	chatStreamBody = "data: {\"choices\":[{\"delta\":{\"content\":\"h\"}}],\"usage\":null}\n\n" +
+		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":500}}\n\ndata: [DONE]\n\n"
+	// What a client that did not ask for usage receives of chatStreamBody: the
+	// gateway turned include_usage on for it and keeps the usage-only frame back.
+	chatStreamBodyWithoutUsageFrame = "data: {\"choices\":[{\"delta\":{\"content\":\"h\"}}],\"usage\":null}\n\ndata: [DONE]\n\n"
 )
 
 // okUpstream answers every inference request with the body fitting its path.
@@ -637,11 +620,6 @@ func okUpstream(t *testing.T) *upstream {
 			}
 			_, _ = io.WriteString(w, chatBody)
 		case strings.HasSuffix(r.URL.Path, "/responses"):
-			if bytes.Contains(body, []byte(`"stream":true`)) {
-				w.Header().Set("Content-Type", "text/event-stream")
-				_, _ = io.WriteString(w, responsesStreamBody)
-				return
-			}
 			_, _ = io.WriteString(w, responsesBody)
 		case strings.HasSuffix(r.URL.Path, "/messages"):
 			_, _ = io.WriteString(w, anthropicBody)
@@ -650,51 +628,3 @@ func okUpstream(t *testing.T) *upstream {
 		}
 	})
 }
-
-// Most integration scenarios explicitly start with selected fixture channels.
-// This setup is outside the measured request path and never changes a stored
-// preference. Empty/default routing behavior is tested separately.
-func (e *env) selectFixtureChannels(person person) {
-	ctx := context.Background()
-	models, err := e.cached.Gateway.OnlineModels(ctx)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	for _, model := range models {
-		pref, err := e.cached.Routing.Resolve(ctx, person.id, "", model.ID)
-		if err != nil {
-			e.t.Fatal(err)
-		}
-		if pref.Source != routing.SourceDefault {
-			continue
-		}
-		candidates, err := e.cached.Gateway.Candidates(ctx, model.ID, channel.FormatOpenAIResponses)
-		if err != nil {
-			e.t.Fatal(err)
-		}
-		sort.SliceStable(candidates, func(i, j int) bool {
-			a, b := candidates[i], candidates[j]
-			if a.OwnerID == person.id && b.OwnerID != person.id {
-				return true
-			}
-			if b.OwnerID == person.id && a.OwnerID != person.id {
-				return false
-			}
-			if a.Custom != nil && b.Custom != nil {
-				return a.Custom.Blended() < b.Custom.Blended()
-			}
-			return a.MultiplierNano < b.MultiplierNano
-		})
-		for _, candidate := range candidates {
-			pref.Order = append(pref.Order, candidate.ChannelID)
-		}
-		if len(pref.Order) == 0 {
-			continue
-		}
-		if _, err = e.cached.Routing.Set(ctx, person.id, "", pref); err != nil {
-			e.t.Fatal(err)
-		}
-	}
-}
-
-const responsesStreamBody = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\ndata: {\"type\":\"response.completed\",\"response\":" + responsesBody + "}\n\n"

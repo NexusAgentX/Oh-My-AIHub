@@ -3,7 +3,6 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -29,13 +28,12 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 	}
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"service_tier":"default","choices":[],"usage":{"input_tokens":1000,"output_tokens":500,"input_tokens_details":{"audio_tokens":500},"output_tokens_details":{"audio_tokens":100}}}`))
+		_, _ = w.Write([]byte(`{"service_tier":"default","choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":500,"prompt_tokens_details":{"audio_tokens":500},"completion_tokens_details":{"audio_tokens":100}}}`))
 	})
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.017"})
-	rec := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","service_tier":"priority"}`), nil)
+	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","service_tier":"priority"}`), nil)
 	if rec.Code != 200 {
 		t.Fatalf("call %d %s", rec.Code, rec.Body.String())
 	}
@@ -48,7 +46,7 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 	if e.balance(consumer) != "-0.017017" {
 		t.Fatalf("balance %s", e.balance(consumer))
 	}
-	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if second.Code != http.StatusPaymentRequired {
 		t.Fatalf("new token charges did not exhaust budget: %d", second.Code)
 	}
@@ -88,13 +86,12 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 	}
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: " + `{"usage":{"input_tokens":1000,"input_tokens_details":{"cached_tokens":300,"cache_creation_tokens":100,"cache_creation_token_details":{"ephemeral_5m_input_tokens":40,"ephemeral_1h_input_tokens":60}}}}` + "\n\ndata: " + `{"usage":{"output_tokens":500}}` + "\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: " + `{"usage":{"prompt_tokens":1000,"prompt_tokens_details":{"cached_tokens":300,"cache_creation_tokens":100,"cache_creation_token_details":{"ephemeral_5m_input_tokens":40,"ephemeral_1h_input_tokens":60}}}}` + "\n\ndata: " + `{"usage":{"completion_tokens":500}}` + "\n\ndata: [DONE]\n\n"))
 	})
 	e.createChannel(sharer, channelSpec{name: "compat-relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.031"})
-	rec := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","stream":true,"stream_options":{"include_usage":true}}`), nil)
+	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true,"stream_options":{"include_usage":true}}`), nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("call %d %s", rec.Code, rec.Body.String())
 	}
@@ -107,7 +104,7 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 	if got := e.balance(consumer); got != "-0.031031" {
 		t.Fatalf("balance %s", got)
 	}
-	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if second.Code != http.StatusPaymentRequired {
 		t.Fatalf("budget was not exhausted: %d", second.Code)
 	}
@@ -134,7 +131,7 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 	}
 }
 
-func TestResponsesReasoningDoesNotCreateBailianPriceFacts(t *testing.T) {
+func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	consumer := e.member("thinking-consumer", "100")
@@ -143,16 +140,15 @@ func TestResponsesReasoningDoesNotCreateBailianPriceFacts(t *testing.T) {
 	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output}); err != nil {
 		t.Fatal(err)
 	}
-	response := `{"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"private"}]}],"usage":{"input_tokens":1000,"output_tokens":500,"output_tokens_details":{"reasoning_tokens":300}}}`
+	response := `{"choices":[{"message":{"reasoning_content":"private","reasoning":"private"}}],"usage":{"prompt_tokens":1000,"completion_tokens":500,"completion_tokens_details":{"reasoning_tokens":300}}}`
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(response))
 	})
 	e.createChannel(sharer, channelSpec{name: "thinking-relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
-	e.selectFixtureChannels(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.02"})
-	rec := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","enable_thinking":false}`), nil)
+	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","enable_thinking":false}`), nil)
 	if rec.Code != http.StatusOK || rec.Body.String() != response {
 		t.Fatalf("transparent response: %d %s", rec.Code, rec.Body.String())
 	}
@@ -164,7 +160,7 @@ func TestResponsesReasoningDoesNotCreateBailianPriceFacts(t *testing.T) {
 	if balance := e.balance(consumer); balance != "-0.02002" {
 		t.Fatal("balance", balance)
 	}
-	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test"}`), nil)
+	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	if second.Code != http.StatusPaymentRequired {
 		t.Fatal("budget", second.Code)
 	}
@@ -179,22 +175,41 @@ func TestResponsesReasoningDoesNotCreateBailianPriceFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := snapshot.Detail
-	if d.ThinkingMode != "" || d.ThinkingModeBasis != "" || d.ThinkingObserved != nil {
+	if d.ThinkingMode != "" || d.ThinkingModeBasis != "" || d.ThinkingObserved == nil || !*d.ThinkingObserved {
 		t.Fatalf("generic snapshot: %s", before)
 	}
 	if strings.Contains(string(before), "private") {
 		t.Fatal("snapshot retained content")
 	}
 	tiers := []ledger.PriceTier{{ThinkingMode: "qwen_thinking", InputPrice: input, OutputPrice: mustAmount(t, "40")}}
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); !errors.Is(err, catalog.ErrInvalidInput) {
-		t.Fatalf("removed pricing predicate accepted: %v", err)
+	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); err != nil {
+		t.Fatal(err)
 	}
 	var after []byte
 	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
 		t.Fatal(err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("historical snapshot changed after rejected configuration")
+		t.Fatal("historical snapshot changed after opting in")
 	}
-
+	// A later call sees explicit configuration, while the previous one stays generic.
+	next := e.member("bailian-consumer", "100")
+	_, nextSecret := e.defaultKey(next)
+	configured := e.call(nextSecret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	if configured.Code != http.StatusOK {
+		t.Fatalf("configured call %d %s", configured.Code, configured.Body.String())
+	}
+	id = configured.Header().Get("X-AIHub-Request-Id")
+	if row := e.callRow(id); row.CostNano != 30_000_000 {
+		t.Fatalf("configured cost %+v", row)
+	}
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(after, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Detail.ThinkingMode != "qwen_thinking" || snapshot.Detail.ThinkingModeBasis != "bailian_condition" {
+		t.Fatalf("configured snapshot %s", after)
+	}
 }

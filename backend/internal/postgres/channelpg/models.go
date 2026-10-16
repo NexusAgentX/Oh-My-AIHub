@@ -13,6 +13,7 @@ type ChannelModel struct {
 	ModelID                             string
 	UpstreamModel                       string
 	MultiplierNano                      int64
+	Formats                             []string
 	FormatTests                         []byte
 	Enabled                             bool
 	FxDiscount                          bool
@@ -23,5 +24,4 @@ type ChannelModel struct {
 	CustomCacheReadPriceNanoPerMillion  *money.Amount
 	PendingMultiplier                   bool
 	CatalogModelID                      *string
-	Capabilities                        []string
 }

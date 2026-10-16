@@ -4,217 +4,6 @@
  */
 
 export interface paths {
-    "/backend-api/codex/responses/input_tokens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 统计输入 token */
-        post: operations["codexCountResponseInputTokens"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/responses/{responseID}/input_items": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查询响应输入项 */
-        get: operations["codexListResponseInputItems"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/responses/{responseID}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 取消后台响应
-         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
-         */
-        post: operations["codexCancelOpenAIResponse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/responses/{responseID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 查询已存储响应或恢复后台流
-         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
-         */
-        get: operations["codexRetrieveOpenAIResponse"];
-        put?: never;
-        post?: never;
-        /** 删除上游响应 */
-        delete: operations["codexDeleteStoredResponse"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/user-auth-credential/whoami": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Codex HTTP 兼容入口 */
-        get: operations["codexWhoami"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/wham/accounts/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Codex HTTP 兼容入口 */
-        get: operations["codexAccounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Codex HTTP 兼容入口 */
-        get: operations["codexModels"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/responses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Codex HTTP 兼容入口 */
-        post: operations["codexResponses"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/responses/compact": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Codex HTTP 兼容入口 */
-        post: operations["codexCompact"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/alpha/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Codex HTTP 兼容入口 */
-        post: operations["codexSearch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/images/generations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Codex HTTP 兼容入口 */
-        post: operations["codexImageGeneration"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backend-api/codex/images/edits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Codex HTTP 兼容入口 */
-        post: operations["codexImageEdit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/channel-hall/{channelID}/analysis": {
         parameters: {
             query?: never;
@@ -1777,6 +1566,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/chat/completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * OpenAI Chat Completions
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         */
+        post: operations["proxyOpenAIChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/responses": {
         parameters: {
             query?: never;
@@ -1805,14 +1614,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 查询已存储响应或恢复后台流
-         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         * 查询后台响应或恢复流
+         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
          */
         get: operations["retrieveOpenAIResponse"];
         put?: never;
         post?: never;
-        /** 删除上游响应 */
-        delete: operations["deleteStoredResponse"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1829,7 +1637,7 @@ export interface paths {
         put?: never;
         /**
          * 取消后台响应
-         * @description 原生透传；仅创建资源的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
+         * @description 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
          */
         post: operations["cancelOpenAIResponse"];
         delete?: never;
@@ -1838,41 +1646,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/models/{model}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 本地模型详情 */
-        get: operations["getGatewayModel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/responses/{responseID}/input_items": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查询响应输入项 */
-        get: operations["listResponseInputItems"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/responses/compact": {
+    "/v1/messages": {
         parameters: {
             query?: never;
             header?: never;
@@ -1881,15 +1655,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 压缩上下文 */
-        post: operations["compactResponse"];
+        /**
+         * Anthropic Messages
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         */
+        post: operations["proxyAnthropicMessages"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/responses/input_tokens": {
+    "/v1beta/models/{model}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1898,81 +1675,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 统计输入 token */
-        post: operations["countResponseInputTokens"];
+        /**
+         * Gemini generateContent / streamGenerateContent
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         */
+        post: operations["proxyGemini"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/conversations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 创建上游会话 */
-        post: operations["createConversation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/conversations/{resourceID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 上游会话管理 */
-        get: operations["getConversation"];
-        put?: never;
-        /** 上游会话管理 */
-        post: operations["updateConversation"];
-        /** 上游会话管理 */
-        delete: operations["deleteConversation"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/conversations/{resourceID}/items": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查询会话条目 */
-        get: operations["listConversationItems"];
-        put?: never;
-        /** 添加会话条目 */
-        post: operations["createConversationItems"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/conversations/{resourceID}/items/{itemID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查询会话条目 */
-        get: operations["getConversationItem"];
-        put?: never;
-        post?: never;
-        /** 删除会话条目 */
-        delete: operations["deleteConversationItem"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1990,6 +1698,26 @@ export interface paths {
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
          */
         get: operations["listGatewayModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1beta/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gemini 风格模型列表
+         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         */
+        get: operations["listGeminiModels"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2142,15 +1870,15 @@ export interface components {
          */
         Date: string;
         /**
-         * @description 原生协议格式。compact、输入 token 计数和 Conversations 复用 OpenAI Responses；三种 OpenAI 图片操作统一使用 OpenAI Images。具体操作以上游实际支持为准，网关不做格式转换。
+         * @description 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini。网关不做格式转换。
          * @enum {string}
          */
-        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images" | "codex";
+        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini";
         /**
-         * @description 手动选择渠道并排序；默认不选择渠道。
+         * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
          * @enum {string}
          */
-        RoutingMode: "manual";
+        RoutingMode: "cheapest" | "reliable" | "fastest" | "manual";
         /**
          * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
          * @enum {string}
@@ -2244,21 +1972,10 @@ export interface components {
         ModelPrices: {
             input: components["schemas"]["Price"];
             output: components["schemas"]["Price"];
-            /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
-            token_prices?: {
-                [key: string]: components["schemas"]["Price"];
-            };
-            cache_write: components["schemas"]["Price"];
-            cache_read: components["schemas"]["Price"];
-        };
-        /** @description 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。 */
-        HistoricalModelPrices: {
-            /** @description 历史地域倍率快照。 */
+            /** @description 实际推理地域对应的 token 价格倍率，0～100；不作用于工具费用。缺失为 1。 */
             geo_multipliers?: {
                 [key: string]: string;
             };
-            input: components["schemas"]["Price"];
-            output: components["schemas"]["Price"];
             /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
             token_prices?: {
                 [key: string]: components["schemas"]["Price"];
@@ -2390,8 +2107,10 @@ export interface components {
         /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
         PriceTier: {
             seq: number;
+            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            service_tier?: string;
             /** @enum {string} */
-            service_tier?: "" | "openai:default" | "openai:fast" | "openai:ultrafast" | "openai:flex";
+            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens: number | null;
@@ -2407,8 +2126,10 @@ export interface components {
             prices: components["schemas"]["ModelPrices"];
         };
         PriceTierInput: {
+            /** @description 实际响应档位，含协议前缀，如 openai:default 或 anthropic:priority。 */
+            service_tier?: string;
             /** @enum {string} */
-            service_tier?: "" | "openai:default" | "openai:fast" | "openai:ultrafast" | "openai:flex";
+            thinking_mode?: "" | "qwen_thinking" | "qwen_non_thinking";
             name?: string;
             /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
             min_prompt_tokens?: number | null;
@@ -2517,7 +2238,6 @@ export interface components {
             items: components["schemas"]["CatalogModel"][];
         };
         ModelChannel: {
-            capabilities?: string[];
             /** Format: uuid */
             id: string;
             name: string;
@@ -2660,17 +2380,8 @@ export interface components {
             }[];
             remove: string[];
         };
-        ChannelCompatibility: {
-            responses?: ("inference" | "nonstream" | "stream" | "background" | "response_read" | "response_delete" | "response_cancel" | "input_items" | "conversations" | "input_tokens" | "compact" | "zstd")[];
-            codex?: ("inference" | "nonstream" | "stream" | "background" | "response_read" | "response_delete" | "response_cancel" | "input_items" | "conversations" | "input_tokens" | "compact" | "zstd" | "search" | "images_generate" | "images_edit")[];
-        };
-        ModelCompatibility: {
-            responses?: ("function_tools" | "custom_tools" | "tool_namespaces" | "tool_search" | "parallel_tools" | "structured_output" | "reasoning" | "encrypted_reasoning" | "reasoning_all_turns" | "vision" | "web_search" | "image_generation" | "responses_lite" | "compact_v1" | "compact_v2" | "compaction_input" | "file_search" | "code_interpreter" | "mcp" | "computer" | "shell" | "apply_patch" | "fast" | "ultrafast")[];
-            codex?: ("function_tools" | "custom_tools" | "tool_namespaces" | "tool_search" | "parallel_tools" | "structured_output" | "reasoning" | "encrypted_reasoning" | "reasoning_all_turns" | "vision" | "web_search" | "image_generation" | "responses_lite" | "compact_v1" | "compact_v2" | "compaction_input" | "file_search" | "code_interpreter" | "mcp" | "computer" | "shell" | "apply_patch" | "fast" | "ultrafast")[];
-        };
         /** @description 高级设置；null 表示使用平台默认。 */
         ChannelAdvanced: {
-            compatibility?: components["schemas"]["ChannelCompatibility"];
             user_agent: string | null;
             header_rules: components["schemas"]["HeaderRules"];
             concurrency_limit: number | null;
@@ -2683,7 +2394,6 @@ export interface components {
             cooldown_seconds: number | null;
         };
         ChannelAdvancedInput: {
-            compatibility?: components["schemas"]["ChannelCompatibility"];
             user_agent?: string | null;
             header_rules?: components["schemas"]["HeaderRules"];
             concurrency_limit?: number | null;
@@ -2703,7 +2413,6 @@ export interface components {
             tested_at: components["schemas"]["Timestamp"];
         };
         ChannelModel: {
-            compatibility?: components["schemas"]["ModelCompatibility"];
             model_id: string;
             display_name: string;
             upstream_model: string;
@@ -2732,13 +2441,13 @@ export interface components {
             cache_read: components["schemas"]["Price"];
         };
         ChannelModelInput: {
-            compatibility?: components["schemas"]["ModelCompatibility"];
             model_id: string;
             /** @description 默认与 model_id 相同（模型重定向）。 */
             upstream_model?: string;
             multiplier?: components["schemas"]["Multiplier"];
             /** @description 汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。 */
             fx_discount?: boolean;
+            formats: components["schemas"]["Format"][];
             enabled?: boolean;
             /** @description 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。 */
             custom_prices?: components["schemas"]["CustomPrices"];
@@ -2831,12 +2540,6 @@ export interface components {
             apply?: boolean;
         };
         ChannelTestResult: {
-            /** @enum {string} */
-            protocol: "responses" | "codex";
-            capability: string;
-            /** @enum {string} */
-            scope: "channel" | "model";
-            skipped: boolean;
             model_id: string;
             format: components["schemas"]["Format"];
             ok: boolean;
@@ -2895,9 +2598,6 @@ export interface components {
             rank: number;
         };
         CallDiagnostics: {
-            operation?: string;
-            required_capabilities?: string[];
-            bound_resource?: boolean;
             network?: components["schemas"]["CallNetwork"] | null;
             stages: components["schemas"]["StageTiming"][];
             routing: components["schemas"]["RouteDecision"][];
@@ -3012,7 +2712,6 @@ export interface components {
         };
         /** @description 调用列表项。charged = cost + fee，为调用方实际扣除。 */
         CallSummary: {
-            operation?: string;
             /**
              * Format: uuid
              * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
@@ -3055,7 +2754,7 @@ export interface components {
             geo_multipliers?: {
                 [key: string]: string;
             };
-            selected_prices?: components["schemas"]["HistoricalModelPrices"];
+            selected_prices?: components["schemas"]["ModelPrices"];
             token_prices?: {
                 [key: string]: string;
             };
@@ -3080,30 +2779,11 @@ export interface components {
                 units_nano?: {
                     [key: string]: number;
                 };
-                /** @description 图像工具观察信息，不参与计费；不保存提示词或图片。兼容上游的独立用量缺失时不推算。 */
-                image_generations?: {
-                    id: string;
-                    /** @enum {string} */
-                    status?: "in_progress" | "generating" | "completed" | "failed";
-                    model?: string;
-                    /** @enum {string} */
-                    model_source?: "request" | "response";
-                    size?: string;
-                    /** @enum {string} */
-                    quality?: "low" | "medium" | "high" | "xhigh" | "max" | "auto";
-                    /** @enum {string} */
-                    output_format?: "png" | "webp" | "jpeg";
-                    /** @enum {string} */
-                    background?: "transparent" | "opaque" | "auto";
-                    /** @enum {string} */
-                    action?: "generate" | "edit" | "auto";
-                    usage?: components["schemas"]["InferenceUsage"];
-                }[];
                 iterations?: Record<string, never>[];
                 tool_prompt_tokens?: number;
                 notes?: string[];
             } | null;
-            base_prices: components["schemas"]["HistoricalModelPrices"];
+            base_prices: components["schemas"]["ModelPrices"];
             tier: components["schemas"]["TierRef"] | null;
             multiplier: components["schemas"]["Multiplier"];
             currency?: components["schemas"]["PriceCurrency"];
@@ -3117,7 +2797,6 @@ export interface components {
             prices: components["schemas"]["EffectivePrices"];
         };
         CallDetail: {
-            operation?: string;
             diagnostics: components["schemas"]["CallDiagnostics"] | null;
             upstream_response_id: string | null;
             /**
@@ -3143,8 +2822,7 @@ export interface components {
             charged: components["schemas"]["Amount"];
             ttft_ms: number | null;
             duration_ms: number | null;
-            /** @enum {string|null} */
-            routing_mode: "manual" | "cheapest" | "reliable" | "fastest" | null;
+            routing_mode: components["schemas"]["RoutingMode"] | null;
             /** @enum {string|null} */
             routing_source: "default" | "account" | "key" | null;
             client_user_agent: string | null;
@@ -3269,7 +2947,6 @@ export interface components {
         };
         /** @description 渠道所有者视角的调用，不含调用者身份。error 为该渠道上最近一次失败尝试（没有失败为 null）。 */
         ChannelCall: {
-            operation?: string;
             /** Format: uuid */
             id: string;
             created_at: components["schemas"]["Timestamp"];
@@ -3295,7 +2972,6 @@ export interface components {
             next_cursor: string | null;
         };
         AdminCall: {
-            operation?: string;
             /**
              * Format: uuid
              * @description 请求 ID，同时在响应头 X-AIHub-Request-Id 返回。
@@ -3498,13 +3174,7 @@ export interface components {
             /** @description 幂等键重复时为 true，未重复记账。 */
             replayed: boolean;
         };
-        CodexSettings: {
-            whoami: string;
-            accounts: string;
-            models: string;
-        };
         Settings: {
-            codex?: components["schemas"]["CodexSettings"];
             /** @description 手续费率，1e9 = 100%，默认 1000000 = 0.1%。 */
             fee_rate_nano: number;
             c2c_payment_timeout_minutes: number;
@@ -3537,7 +3207,6 @@ export interface components {
         };
         /** @description 整体替换全部设置。 */
         SettingsUpdateRequest: {
-            codex?: components["schemas"]["CodexSettings"];
             /** @description 手续费率，1e9 = 100%，默认 1000000 = 0.1%。 */
             fee_rate_nano: number;
             c2c_payment_timeout_minutes: number;
@@ -3919,7 +3588,6 @@ export interface components {
             website_url: string;
         };
         HallOffer: {
-            capabilities?: string[];
             model: components["schemas"]["CatalogModel"];
             multiplier: string;
             effective_multiplier: string;
@@ -3974,7 +3642,6 @@ export interface components {
             trend: components["schemas"]["DirectoryRow"][];
         };
         HallChannel: {
-            capabilities?: string[];
             /** Format: uuid */
             id: string;
             name: string;
@@ -4140,7 +3807,6 @@ export interface components {
         channelIDQuery: string;
         /** @description 调用标签（X-AIHub-Tag）。 */
         tag: string;
-        operation: string;
         /** @description API 格式。 */
         format: components["schemas"]["Format"];
         /** @description 聚合维度；channel 仅在 view=revenue 时有效。 */
@@ -4218,276 +3884,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    codexCountResponseInputTokens: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexListResponseInputItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexCancelOpenAIResponse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应（含流式）与原生错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexRetrieveOpenAIResponse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应（含流式）与原生错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexDeleteStoredResponse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexWhoami: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexAccounts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexModels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexResponses: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexCompact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexSearch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexImageGeneration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    codexImageEdit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应或网关错误。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     analyzeHallChannel: {
         parameters: {
             query: {
@@ -4699,7 +4095,6 @@ export interface operations {
     listChannelHall: {
         parameters: {
             query?: {
-                capability?: string;
                 cursor?: string;
                 limit?: number;
                 q?: string;
@@ -6113,7 +5508,6 @@ export interface operations {
                 usage_status?: components["parameters"]["usageStatusQuery"];
                 billed?: components["parameters"]["billedQuery"];
                 attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
-                operation?: components["parameters"]["operation"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -6195,7 +5589,6 @@ export interface operations {
                 usage_status?: components["parameters"]["usageStatusQuery"];
                 billed?: components["parameters"]["billedQuery"];
                 attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
-                operation?: components["parameters"]["operation"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -6391,7 +5784,6 @@ export interface operations {
                 end_reason?: components["parameters"]["endReasonQuery"];
                 /** @description API 格式。 */
                 format?: components["parameters"]["format"];
-                operation?: components["parameters"]["operation"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -7541,7 +6933,6 @@ export interface operations {
                 usage_status?: components["parameters"]["usageStatusQuery"];
                 billed?: components["parameters"]["billedQuery"];
                 attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
-                operation?: components["parameters"]["operation"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -7625,7 +7016,6 @@ export interface operations {
                 usage_status?: components["parameters"]["usageStatusQuery"];
                 billed?: components["parameters"]["billedQuery"];
                 attempt_channel_id?: components["parameters"]["attemptChannelQuery"];
-                operation?: components["parameters"]["operation"];
                 /** @description 请求 ID，精确匹配。 */
                 request_id?: components["parameters"]["requestID"];
                 /** @description 总耗时下限（毫秒，含）。 */
@@ -7843,6 +7233,28 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    proxyOpenAIChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     proxyOpenAIResponses: {
         parameters: {
             query?: never;
@@ -7885,26 +7297,6 @@ export interface operations {
             };
         };
     };
-    deleteStoredResponse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     cancelOpenAIResponse: {
         parameters: {
             query?: never;
@@ -7929,60 +7321,20 @@ export interface operations {
             };
         };
     };
-    getGatewayModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                model: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listResponseInputItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                responseID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    compactResponse: {
+    proxyAnthropicMessages: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": Record<string, never>;
             };
         };
         responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -7991,192 +7343,23 @@ export interface operations {
             };
         };
     };
-    countResponseInputTokens: {
+    proxyGemini: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description 模型名与动作，例如 `gemini-2.5-flash:generateContent`。 */
+                model: components["parameters"]["model"];
+            };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": Record<string, never>;
             };
         };
         responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    createConversation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getConversation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    updateConversation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    deleteConversation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listConversationItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    createConversationItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": Record<string, never>;
-            };
-        };
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getConversationItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-                itemID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    deleteConversationItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resourceID: string;
-                itemID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 原生响应与错误；单模型详情由网关直接回答。 */
+            /** @description 原生响应（含流式）与原生错误。 */
             default: {
                 headers: {
                     [name: string]: unknown;
@@ -8186,6 +7369,24 @@ export interface operations {
         };
     };
     listGatewayModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listGeminiModels: {
         parameters: {
             query?: never;
             header?: never;

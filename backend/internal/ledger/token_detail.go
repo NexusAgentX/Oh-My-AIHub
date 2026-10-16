@@ -7,32 +7,16 @@ import "strings"
 type UsageDetail struct {
 	InferenceGeo string `json:"inference_geo,omitempty"`
 
-	Units                map[string]int64  `json:"units_nano,omitempty"`
-	Iterations           []UsageIteration  `json:"iterations,omitempty"`
-	ImageGenerations     []ImageGeneration `json:"image_generations,omitempty"`
-	RequestedServiceTier string            `json:"requested_service_tier,omitempty"`
-	ToolPromptTokens     int64             `json:"tool_prompt_tokens,omitempty"`
-	Tokens               map[string]int64  `json:"tokens,omitempty"`
-	ServiceTier          string            `json:"service_tier,omitempty"`
-	ThinkingMode         string            `json:"thinking_mode,omitempty"`
-	ThinkingModeBasis    string            `json:"thinking_mode_basis,omitempty"`
-	ThinkingObserved     *bool             `json:"thinking_observed,omitempty"`
-	Notes                []string          `json:"notes,omitempty"`
-}
-
-// ImageGeneration is bounded, non-billable metadata. Usage is an optional
-// compatible upstream extension, not the parent response's model usage.
-type ImageGeneration struct {
-	ID           string `json:"id"`
-	Status       string `json:"status,omitempty"`
-	Model        string `json:"model,omitempty"`
-	ModelSource  string `json:"model_source,omitempty"`
-	Size         string `json:"size,omitempty"`
-	Quality      string `json:"quality,omitempty"`
-	OutputFormat string `json:"output_format,omitempty"`
-	Background   string `json:"background,omitempty"`
-	Action       string `json:"action,omitempty"`
-	Usage        *Usage `json:"usage,omitempty"`
+	Units                map[string]int64 `json:"units_nano,omitempty"`
+	Iterations           []UsageIteration `json:"iterations,omitempty"`
+	RequestedServiceTier string           `json:"requested_service_tier,omitempty"`
+	ToolPromptTokens     int64            `json:"tool_prompt_tokens,omitempty"`
+	Tokens               map[string]int64 `json:"tokens,omitempty"`
+	ServiceTier          string           `json:"service_tier,omitempty"`
+	ThinkingMode         string           `json:"thinking_mode,omitempty"`
+	ThinkingModeBasis    string           `json:"thinking_mode_basis,omitempty"`
+	ThinkingObserved     *bool            `json:"thinking_observed,omitempty"`
+	Notes                []string         `json:"notes,omitempty"`
 }
 
 func TokenBucket(key string) int {

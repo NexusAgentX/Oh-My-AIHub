@@ -31,8 +31,8 @@ const (
 	StatusSuspended Status = "suspended"
 )
 
-// Formats lists native protocol formats in display order.
-var Formats = []Format{FormatOpenAIResponses, FormatCodex}
+// Formats lists the four native API formats in display order.
+var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini}
 
 func (f Format) Valid() bool { return slices.Contains(Formats, f) }
 
@@ -54,7 +54,6 @@ type HeaderRules struct {
 // Advanced holds the optional per-channel overrides; nil means the platform
 // default.
 type Advanced struct {
-	Capabilities     []string
 	UserAgent        *string
 	HeaderRules      HeaderRules
 	ConcurrencyLimit *int32
@@ -106,7 +105,6 @@ func (p CustomPrices) Model(id string) catalog.Model {
 // price multiplier and the formats the upstream actually serves. A model with
 // Custom prices is not in the catalog (ADR-0034).
 type Model struct {
-	Capabilities   []string
 	ModelID        string
 	UpstreamModel  string
 	MultiplierNano int64
@@ -215,10 +213,6 @@ type AdminFilter struct {
 
 // TestOutcome is the result of one model × format probe.
 type TestOutcome struct {
-	Protocol   string
-	Capability string
-	Scope      string
-	Skipped    bool
 	ModelID    string
 	Format     Format
 	OK         bool
@@ -273,9 +267,6 @@ func hasControl(value string) bool {
 // ValidateAdvanced checks the overrides against the database ranges and the
 // header rule restrictions.
 func ValidateAdvanced(advanced Advanced) error {
-	if !ValidCapabilities(advanced.Capabilities, ChannelCapabilities) {
-		return ErrInvalidInput
-	}
 	if advanced.UserAgent != nil && (*advanced.UserAgent == "" || utf8.RuneCountInString(*advanced.UserAgent) > 512 || hasControl(*advanced.UserAgent)) {
 		return ErrInvalidInput
 	}
@@ -341,11 +332,17 @@ func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
 		} else if !known(model.ModelID) {
 			return nil, ErrInvalidInput
 		}
-		if !ValidCapabilities(model.Capabilities, ModelCapabilities) {
+		seen[model.ModelID] = true
+		formats := make([]Format, 0, len(model.Formats))
+		for _, format := range Formats {
+			if slices.Contains(model.Formats, format) {
+				formats = append(formats, format)
+			}
+		}
+		if len(formats) == 0 || len(formats) != len(uniqueFormats(model.Formats)) {
 			return nil, ErrInvalidInput
 		}
-		seen[model.ModelID] = true
-		model.Formats = nil // derived from the channel matrix when read
+		model.Formats = formats
 		result = append(result, model)
 	}
 	return result, nil

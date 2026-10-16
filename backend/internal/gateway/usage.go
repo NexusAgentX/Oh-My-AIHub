@@ -41,13 +41,9 @@ type Observation struct {
 // Observer scans a response as it streams past, without ever altering it and
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
-	trackResource bool
-	resourceItems []string
-	media         *mediaProjection
-	image         bool
-	format        channel.Format
-	stream        bool
-	sse           bool
+	format channel.Format
+	stream bool
+	sse    bool
 
 	eventData    []byte
 	eventSkip    bool
@@ -98,18 +94,11 @@ type anthropicUsage struct{ input, output, cacheWrite, cacheRead int64 }
 // NewObserver starts a reader for one response of the given format.
 // stream reports whether the client asked for a streamed response.
 func NewObserver(format channel.Format, stream bool, contentType string) *Observer {
-	o := &Observer{format: observationFormat(format), stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream"), image: imageFormat(format)}
-	if o.image {
-		o.media = &mediaProjection{}
-	}
-	return o
+	return &Observer{format: format, stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream")}
 }
 
 // Write feeds one chunk that arrived at the given time.
 func (o *Observer) Write(chunk []byte, at time.Time) {
-	if o.media != nil {
-		chunk = o.media.write(chunk)
-	}
 	if o.sse {
 		o.writeSSE(chunk, at)
 		return
@@ -307,11 +296,11 @@ func (o *Observer) absorb(raw []byte) {
 	}
 	switch o.format {
 	case channel.FormatOpenAIChat:
-		if keys&keyUsage != 0 || o.trackResource && o.responseID == "" && keys&keyID != 0 {
+		if keys&keyUsage != 0 {
 			o.absorbChat(raw)
 		}
 	case channel.FormatOpenAIResponses:
-		if keys&(keyUsage|keyID|keyEnvelope) != 0 {
+		if keys&(keyUsage|keyID) != 0 {
 			o.absorbResponses(raw)
 		}
 	case channel.FormatAnthropic:
@@ -410,11 +399,10 @@ func (o *Observer) setResponsesUsage(u *responsesUsage) {
 	o.found = true
 }
 func (o *Observer) absorbChat(raw []byte) {
-	if !bytes.Contains(raw, []byte(`"usage"`)) && !(o.trackResource && o.responseID == "") {
+	if !bytes.Contains(raw, []byte(`"usage"`)) {
 		return
 	}
 	var value struct {
-		ID    string `json:"id"`
 		Usage *struct {
 			PromptTokens        *int64          `json:"prompt_tokens"`
 			CompletionTokens    *int64          `json:"completion_tokens"`
@@ -424,13 +412,7 @@ func (o *Observer) absorbChat(raw []byte) {
 			CacheHit            json.RawMessage `json:"prompt_cache_hit_tokens"`
 		} `json:"usage"`
 	}
-	if json.Unmarshal(raw, &value) != nil {
-		return
-	}
-	if o.trackResource && value.ID != "" {
-		o.responseID = value.ID
-	}
-	if value.Usage == nil {
+	if json.Unmarshal(raw, &value) != nil || value.Usage == nil {
 		return
 	}
 	u := value.Usage
@@ -444,12 +426,11 @@ type borrowedJSON []byte
 func (b *borrowedJSON) UnmarshalJSON(raw []byte) error { *b = raw; return nil }
 
 func (o *Observer) absorbResponses(raw []byte) {
-	if !bytes.Contains(raw, []byte(`"usage"`)) && !bytes.Contains(raw, []byte(`"id"`)) && !bytes.Contains(raw, []byte(`"item_id"`)) {
+	if !bytes.Contains(raw, []byte(`"usage"`)) && !bytes.Contains(raw, []byte(`"id"`)) {
 		return
 	}
 	var value struct {
 		Type       string          `json:"type"`
-		ItemID     string          `json:"item_id"`
 		ID         string          `json:"id"`
 		Usage      *responsesUsage `json:"usage"`
 		Status     string          `json:"status"`
@@ -483,25 +464,9 @@ func (o *Observer) absorbResponses(raw []byte) {
 		o.responseStatus, o.background = value.Status, value.Background
 		o.observeResponseItems(value.Output)
 	}
-	switch value.Type {
-	case "response.output_item.added":
-		if !bytes.Contains(value.Item, []byte("_call")) && !bytes.Contains(value.Item, []byte{92}) {
-			return
-		}
-		o.members = o.members[:0]
-		if !json.Valid(value.Item) || textValue(o.objectOf(value.Item).get("type")) != "image_generation_call" {
-			return
-		}
+	if value.Type == "response.output_item.done" {
 		o.observeResponseItem(value.Item)
-	case "response.output_item.done":
-		o.observeResponseItem(value.Item)
-	case "response.image_generation_call.in_progress", "response.image_generation_call.generating", "response.image_generation_call.completed":
-		if validObservationID(value.ItemID) {
-			o.members = o.members[:0]
-			o.observeImageGeneration(o.objectOf(raw), value.ItemID, strings.TrimPrefix(value.Type, "response.image_generation_call."))
-		}
 	}
-
 }
 
 type anthropicFields struct {

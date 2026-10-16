@@ -96,8 +96,8 @@ func TestCallObservationReports(t *testing.T) {
 	carol, _ := p.member(t, "carol")
 	channelID := bob.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 		"name": "阿里中转", "base_url": "https://relay.example", "api_key": "sk-upstream-test-key-0001",
-		"models":   []map[string]any{{"model_id": "deepseek-chat"}},
-		"advanced": map[string]any{"compatibility": map[string]any{"responses": []string{"inference", "nonstream", "stream"}, "codex": []string{"inference", "nonstream"}}, "daily_revenue_cap": "10"},
+		"models":   []map[string]any{{"model_id": "deepseek-chat", "formats": []string{"openai_chat"}}},
+		"advanced": map[string]any{"daily_revenue_cap": "10"},
 	})["channel"].(map[string]any)["id"].(string)
 	keyID := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{"name": "默认 Key"})["key"].(map[string]any)["id"].(string)
 	ids := p.observeFixtures(aliceID, channelID, keyID)

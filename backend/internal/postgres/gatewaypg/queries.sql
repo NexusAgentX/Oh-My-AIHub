@@ -33,13 +33,13 @@ WHERE k.deleted_at IS NULL;
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       c.capabilities AS channel_capabilities, cm.capabilities, cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(array_remove(ARRAY[CASE WHEN cardinality(c.capabilities) > 0 THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[])
+WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
   AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id;
 
@@ -49,11 +49,11 @@ ORDER BY c.id;
 -- model order and, within a model, in channel id order, the order of
 -- ListCandidates.
 -- name: ListAllCandidates :many
-SELECT cm.model_id, array_remove(ARRAY[CASE WHEN cardinality(c.capabilities) > 0 THEN 'openai_responses' END, CASE WHEN c.capabilities && ARRAY['codex/images_generate','codex/images_edit']::text[] THEN 'openai_images' END], NULL)::text[] AS formats,
+SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
        c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       c.capabilities AS channel_capabilities, cm.capabilities, cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
+       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
@@ -145,8 +145,8 @@ AND NOT EXISTS (SELECT 1 FROM gateway_background_jobs j WHERE j.call_id=calls.id
 -- name: ListOnlineModels :many
 SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
 FROM channel_models cm
+CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
-CROSS JOIN LATERAL unnest(array_remove(ARRAY[CASE WHEN 'responses/inference'=ANY(c.capabilities) THEN 'openai_responses' END, CASE WHEN 'codex/inference'=ANY(c.capabilities) THEN 'codex' END], NULL)::text[]) AS f
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 GROUP BY cm.model_id
@@ -164,7 +164,7 @@ SELECT EXISTS (
 
 -- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       c.capabilities AS channel_capabilities, cm.capabilities, array_remove(ARRAY[CASE WHEN 'responses/inference'=ANY(c.capabilities) THEN 'openai_responses' END, CASE WHEN 'codex/inference'=ANY(c.capabilities) THEN 'codex' END], NULL)::text[] AS formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
        c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -263,28 +263,3 @@ UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_
 
 -- name: SettleBackground :exec
 UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL;
-
--- name: SaveResource :execrows
-INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING;
-
--- name: LookupResource :one
-SELECT * FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4;
-
--- name: ListResources :many
-SELECT r.* FROM gateway_resources r
-WHERE r.account_id=sqlc.arg(account_id) AND r.key_id=sqlc.arg(key_id) AND r.kind=sqlc.arg(kind)
-AND (sqlc.arg(after_id)::text='' OR
- (sqlc.arg(descending)::boolean AND (r.created_at,r.resource_id)<(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=sqlc.arg(after_id))) OR
- (NOT sqlc.arg(descending)::boolean AND (r.created_at,r.resource_id)>(SELECT c.created_at,c.resource_id FROM gateway_resources c WHERE c.account_id=r.account_id AND c.key_id=r.key_id AND c.kind=r.kind AND c.resource_id=sqlc.arg(after_id))))
-ORDER BY CASE WHEN sqlc.arg(descending)::boolean THEN r.created_at END DESC, CASE WHEN sqlc.arg(descending)::boolean THEN r.resource_id END DESC,
- CASE WHEN NOT sqlc.arg(descending)::boolean THEN r.created_at END ASC, CASE WHEN NOT sqlc.arg(descending)::boolean THEN r.resource_id END ASC
-LIMIT sqlc.arg(page_limit);
-
--- name: DeleteResource :exec
-DELETE FROM gateway_resources WHERE account_id=$1 AND key_id=$2 AND kind=$3 AND resource_id=$4;
-
--- name: SaveResourceItems :exec
-INSERT INTO gateway_resources (account_id,key_id,kind,resource_id,call_id,channel_id,model_id,metadata)
-SELECT $1,$2,'item',unnest(sqlc.arg(item_ids)::text[]),$3,$4,$5,$6
-ON CONFLICT DO NOTHING;

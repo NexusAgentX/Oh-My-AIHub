@@ -32,7 +32,7 @@ const channel = (id: string): ModelChannel => ({
 const preference = (patch: Partial<RoutingPreference>): RoutingPreference => ({
   model_id: 'm',
   source: 'account',
-  mode: 'manual',
+  mode: 'cheapest',
   order: [],
   excluded: [],
   max_attempts: null,
@@ -53,10 +53,10 @@ describe('routing editor logic', () => {
     expect(orderedChannels(channels, draft).map((item) => item.id)).toEqual(['b', 'a', 'c'])
   })
 
-  it('leaves every channel unchecked by default', () => {
+  it('keeps every channel checked by default outside manual mode', () => {
     const draft = draftFromPreference(preference({ source: 'default' }), channels)
-    expect(draft.excluded).toEqual(['a', 'b', 'c'])
-    expect(orderedChannels(channels, draft).map(c => c.id)).toEqual(['a', 'b', 'c'])
+    expect(draft.excluded).toEqual([])
+    expect(orderedChannels(channels, draft)).toBe(channels)
   })
 
   it('moves channels with the keyboard and by dragging', () => {
@@ -68,10 +68,10 @@ describe('routing editor logic', () => {
   it('unchecks channels in any mode and only submits an order for manual', () => {
     let draft = draftFromPreference(preference({}), channels)
     draft = setUsed(draft, 'b', false)
-    expect(toRoutingInput(draft)).toEqual({ mode: 'manual', order: ['a', 'b', 'c'], excluded: ['a', 'b', 'c'], max_attempts: null, ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null })
+    expect(toRoutingInput(draft)).toEqual({ mode: 'cheapest', order: [], excluded: ['b'], max_attempts: null, ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null })
     draft = changeMode(draft, 'manual', channels)
     expect(toRoutingInput(draft).order).toEqual(['a', 'b', 'c'])
-    expect(setUsed(draft, 'b', true).excluded).toEqual(['a', 'c'])
+    expect(setUsed(draft, 'b', true).excluded).toEqual([])
   })
 
   it('counts changed advanced settings', () => {

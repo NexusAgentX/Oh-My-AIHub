@@ -58,7 +58,8 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
 	// Each entry answers in its own protocol's error shape.
 	for path, want := range map[string]string{
-		"/v1/responses": `"code":"invalid_api_key"`, "/backend-api/codex/responses": `"code":"invalid_api_key"`,
+		"/v1/chat/completions": `"code":"invalid_api_key"`, "/v1/responses": `"code":"invalid_api_key"`,
+		"/v1/messages": `"type":"authentication_error"`, "/v1beta/models/gemini-2.5-flash:generateContent": `"reason":"INVALID_API_KEY"`,
 	} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
@@ -71,13 +72,15 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
 	for _, target := range []struct{ method, path string }{
-		{http.MethodPost, "/v1/chat/completions"}, {http.MethodPost, "/v1/messages"}, {http.MethodPost, "/v1/images/generations"}, {http.MethodPost, "/v1/images/edits"}, {http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/images/unsupported"}, {http.MethodGet, "/v1/unsupported"},
+		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/images/generations"}, {http.MethodGet, "/v1/chat/completions"},
 		{http.MethodPost, "/v1beta/models/gemini-2.5-flash:countTokens"}, {http.MethodPost, "/v1beta/other"},
 	} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(target.method, target.path, strings.NewReader(`{}`)))
 		want := `"code":"unsupported_endpoint"`
-
+		if strings.HasPrefix(target.path, "/v1beta/") {
+			want = `"reason":"UNSUPPORTED_ENDPOINT"`
+		}
 		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), want) {
 			// A Gemini operation is rejected after authentication, so it may answer 401 first.
 			if !(strings.Contains(target.path, "countTokens") && recorder.Code == http.StatusUnauthorized) {

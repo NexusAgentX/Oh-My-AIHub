@@ -104,11 +104,13 @@ func (e *Engine) recordAttempt(call *callState, candidate Candidate, record Atte
 }
 
 // ChannelEdited tells the engine that a channel's configuration was changed (its
-// settings, its models, its compatibility matrix) or that it was taken down or restored.
+// settings, its models, its formats) or that it was taken down or restored.
 // Whatever 4xx answers the channel gave before are no longer evidence about it:
-// they came from the old configuration. Manual routing order is unaffected. The 4xx anomaly figures of the channel are cleared, the
+// they came from the old configuration, and a channel ranked last is rarely
+// called, so without this it would stay last until they age out of the
+// 24-hour window. The 4xx anomaly figures of the channel are cleared, the
 // rule is applied again and the result published before it returns, so the next
-// diagnostic describes the new configuration. The
+// ranking already takes the channel for what the new configuration earns. The
 // channel's success rate and first-token time stay, and so do its cooldown and
 // limits. If the new configuration turns out just as broken, it is flagged
 // and announced again once the rule has enough fresh attempts.

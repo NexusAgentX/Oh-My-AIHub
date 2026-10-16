@@ -1,14 +1,14 @@
-import { CapabilityTags } from '../channels/Capabilities'
 import { Link } from 'react-router-dom'
 import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
-import type { ModelChannel } from '../api/types'
-import { FormatTags } from '../calls'
+import type { ModelChannel, RoutingMode } from '../api/types'
+import { FormatTags, routingModeLabels } from '../calls'
 import { formatMs, formatPoints, formatRatio } from '../money/format'
 import { MultiplierText } from '../money/MultiplierText'
-import { Badge, Disclosure, Icon, TextField } from '../ui'
+import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
   advancedChanged,
+  changeMode,
   channelStateLabel,
   moveChannel,
   moveTo,
@@ -17,6 +17,10 @@ import {
   type RoutingDraft,
 } from './routing'
 
+const modeOptions = (Object.keys(routingModeLabels) as RoutingMode[]).map((key) => ({
+  key,
+  label: routingModeLabels[key],
+}))
 
 function parseOptionalInt(value: string) {
   if (value.trim() === '') return null
@@ -70,7 +74,12 @@ export function RoutingEditor({
   return (
     <div className="routing-editor">
       <div className="routing-mode">
-        <strong>手动选择渠道</strong>
+        <Segmented
+          label="调用方式"
+          onChange={(mode) => onChange(changeMode(draft, mode, channels))}
+          options={modeOptions}
+          value={draft.mode}
+        />
         {scopeHint && <span className="muted-copy" id={hintID}>{scopeHint}</span>}
       </div>
       {rows.length === 0 ? (
@@ -121,7 +130,7 @@ export function RoutingEditor({
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
                     <Badge tone={state.tone}>{state.label}</Badge>
                   </span>
-                  <FormatTags formats={channel.formats} /><CapabilityTags values={channel.capabilities} />
+                  <FormatTags formats={channel.formats} />
                 </div>
                 <dl className="routing-metrics">
                   <div>
