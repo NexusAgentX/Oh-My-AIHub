@@ -99,7 +99,7 @@ type anthropicUsage struct{ input, output, cacheWrite, cacheRead int64 }
 // stream reports whether the client asked for a streamed response.
 func NewObserver(format channel.Format, stream bool, contentType string) *Observer {
 	o := &Observer{format: observationFormat(format), stream: stream, sse: strings.Contains(strings.ToLower(contentType), "text/event-stream"), image: imageFormat(format)}
-	if o.image || format == channel.FormatOpenAICompact {
+	if o.image {
 		o.media = &mediaProjection{}
 	}
 	return o

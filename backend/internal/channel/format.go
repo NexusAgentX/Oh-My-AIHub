@@ -8,21 +8,16 @@ import (
 	"unicode"
 )
 
-// Format is one of the four native API formats the gateway forwards without
+// Format is one of the native API formats the gateway forwards without
 // conversion.
 type Format string
 
 const (
-	FormatOpenAIChat            Format = "openai_chat"
-	FormatOpenAIResponses       Format = "openai_responses"
-	FormatAnthropic             Format = "anthropic"
-	FormatGemini                Format = "gemini"
-	FormatOpenAICompact         Format = "openai_compact"
-	FormatOpenAICount           Format = "openai_count"
-	FormatOpenAIConversations   Format = "openai_conversations"
-	FormatOpenAIImageGeneration Format = "openai_image_generation"
-	FormatOpenAIImageEdit       Format = "openai_image_edit"
-	FormatOpenAIImageVariation  Format = "openai_image_variation"
+	FormatOpenAIChat      Format = "openai_chat"
+	FormatOpenAIResponses Format = "openai_responses"
+	FormatAnthropic       Format = "anthropic"
+	FormatGemini          Format = "gemini"
+	FormatOpenAIImages    Format = "openai_images"
 )
 
 var ErrInvalidInput = errors.New("invalid channel input")

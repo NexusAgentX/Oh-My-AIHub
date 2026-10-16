@@ -44,12 +44,12 @@ func (a *app) registerGatewayRoutes(r *router) {
 	r.implement("B", "GET /v1beta/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, true) })
 
 	for path, format := range map[string]channel.Format{
-		"/v1/responses/compact":      channel.FormatOpenAICompact,
-		"/v1/responses/input_tokens": channel.FormatOpenAICount,
-		"/v1/conversations":          channel.FormatOpenAIConversations,
-		"/v1/images/generations":     channel.FormatOpenAIImageGeneration,
-		"/v1/images/edits":           channel.FormatOpenAIImageEdit,
-		"/v1/images/variations":      channel.FormatOpenAIImageVariation,
+		"/v1/responses/compact":      channel.FormatOpenAIResponses,
+		"/v1/responses/input_tokens": channel.FormatOpenAIResponses,
+		"/v1/conversations":          channel.FormatOpenAIResponses,
+		"/v1/images/generations":     channel.FormatOpenAIImages,
+		"/v1/images/edits":           channel.FormatOpenAIImages,
+		"/v1/images/variations":      channel.FormatOpenAIImages,
 	} {
 		r.implement("B", "POST "+path, accessGatewayKey, serve(format))
 	}

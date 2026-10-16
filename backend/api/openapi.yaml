@@ -4348,8 +4348,8 @@ components:
     Date: {type: string, format: date, description: 日期（YYYY-MM-DD，Asia/Shanghai）。}
     Format:
       type: string
-      enum: [openai_chat, openai_responses, anthropic, gemini, openai_compact, openai_count, openai_conversations, openai_image_generation, openai_image_edit, openai_image_variation]
-      description: 原生接口及按端点声明的能力；新增能力不由普通 Responses 自动推断。网关不做格式转换。
+      enum: [openai_chat, openai_responses, anthropic, gemini, openai_images]
+      description: 原生协议格式。compact、输入 token 计数和 Conversations 复用 OpenAI Responses；三种 OpenAI 图片操作统一使用 OpenAI Images。具体操作以上游实际支持为准，网关不做格式转换。
     RoutingMode: {type: string, enum: [cheapest, reliable, fastest, manual], description: 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。}
     CallOutcome:
       type: string

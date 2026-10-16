@@ -31,8 +31,8 @@ const (
 	StatusSuspended Status = "suspended"
 )
 
-// Formats lists native interfaces and independently declared endpoint capabilities.
-var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini, FormatOpenAICompact, FormatOpenAICount, FormatOpenAIConversations, FormatOpenAIImageGeneration, FormatOpenAIImageEdit, FormatOpenAIImageVariation}
+// Formats lists native protocol formats in display order.
+var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini, FormatOpenAIImages}
 
 func (f Format) Valid() bool { return slices.Contains(Formats, f) }
 

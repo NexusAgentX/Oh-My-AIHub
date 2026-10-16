@@ -1,19 +1,14 @@
 import type { BadgeTone } from '../ui'
 import type { CallOutcome, Format, RoutingMode } from '../api/types'
 
-export const formats: Format[] = ['openai_chat', 'openai_responses', 'anthropic', 'gemini', 'openai_compact', 'openai_count', 'openai_conversations', 'openai_image_generation', 'openai_image_edit', 'openai_image_variation']
+export const formats: Format[] = ['openai_chat', 'openai_responses', 'anthropic', 'gemini', 'openai_images']
 
 export const formatLabels: Record<Format, string> = {
   openai_chat: 'OpenAI Chat',
   openai_responses: 'Responses',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
-  openai_compact: '上下文压缩',
-  openai_count: 'Token 计数',
-  openai_conversations: 'Conversations',
-  openai_image_generation: '图片生成',
-  openai_image_edit: '图片编辑',
-  openai_image_variation: '图片变体',
+  openai_images: 'OpenAI Images',
 
 }
 

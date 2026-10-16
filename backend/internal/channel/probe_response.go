@@ -19,7 +19,7 @@ const (
 func validateTestResponse(response *http.Response, format Format) error {
 	if !strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
 		limit := testBodyLimit
-		if format == FormatOpenAIImageGeneration {
+		if format == FormatOpenAIImages {
 			limit = 32 << 20
 		}
 		body, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))

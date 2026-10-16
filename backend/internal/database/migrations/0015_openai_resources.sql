@@ -1,10 +1,10 @@
 -- +goose Up
 ALTER TABLE channel_models DROP CONSTRAINT channel_models_formats_check;
 ALTER TABLE channel_models ADD CONSTRAINT channel_models_formats_check CHECK (
- cardinality(formats)>0 AND formats <@ ARRAY['openai_chat','openai_responses','anthropic','gemini','openai_compact','openai_count','openai_conversations','openai_image_generation','openai_image_edit','openai_image_variation']::text[]
+ cardinality(formats)>0 AND formats <@ ARRAY['openai_chat','openai_responses','anthropic','gemini','openai_images']::text[]
 );
 ALTER TABLE calls DROP CONSTRAINT calls_format_check;
-ALTER TABLE calls ADD CONSTRAINT calls_format_check CHECK (format IN ('openai_chat','openai_responses','anthropic','gemini','openai_compact','openai_count','openai_conversations','openai_image_generation','openai_image_edit','openai_image_variation'));
+ALTER TABLE calls ADD CONSTRAINT calls_format_check CHECK (format IN ('openai_chat','openai_responses','anthropic','gemini','openai_images'));
 -- Routing metadata only; no messages, prompts, images or response bodies.
 CREATE TABLE gateway_resources (
  account_id uuid NOT NULL REFERENCES accounts(id),

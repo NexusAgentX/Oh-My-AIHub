@@ -98,7 +98,7 @@ func listFormats(dialect Dialect, gemini bool) []channel.Format {
 	case dialect == DialectAnthropic:
 		return []channel.Format{channel.FormatAnthropic}
 	}
-	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImageGeneration, channel.FormatOpenAIImageEdit, channel.FormatOpenAIImageVariation}
+	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImages}
 }
 
 // openAIModelList is OpenAI's unpaged {"object":"list","data":[Model]}.

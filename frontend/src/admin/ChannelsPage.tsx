@@ -39,12 +39,7 @@ const formatLabels: Record<string, string> = {
   openai_responses: 'Responses',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
-  openai_compact: '上下文压缩',
-  openai_count: 'Token 计数',
-  openai_conversations: 'Conversations',
-  openai_image_generation: '图片生成',
-  openai_image_edit: '图片编辑',
-  openai_image_variation: '图片变体',
+  openai_images: 'OpenAI Images',
 
 }
 

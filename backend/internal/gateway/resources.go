@@ -48,16 +48,21 @@ func protocolHeaders(h http.Header) http.Header {
 	}
 	return out
 }
-func resourceKind(f channel.Format) string {
+func resourceKind(f channel.Format, op operation) string {
+	switch op {
+	case operationCount:
+		return ""
+	case operationConversation:
+		return "conversation"
+	case operationCompact:
+		return "compaction"
+	}
 	switch f {
 	case channel.FormatOpenAIChat:
 		return "chat"
 	case channel.FormatOpenAIResponses:
 		return "response"
-	case channel.FormatOpenAIConversations:
-		return "conversation"
-	case channel.FormatOpenAICompact:
-		return "compaction"
+
 	}
 	return ""
 }

@@ -27,10 +27,14 @@ type resourceFixture struct {
 	rows      []Resource
 	key       KeyAuth
 	saveErr   error
+	formats   []channel.Format
 }
 
 func (s *resourceFixture) LookupKey(context.Context, []byte) (KeyAuth, error) { return s.key, nil }
-func (s *resourceFixture) Candidates(context.Context, string, channel.Format) ([]Candidate, error) {
+func (s *resourceFixture) Candidates(_ context.Context, _ string, format channel.Format) ([]Candidate, error) {
+	if s.formats != nil && !slices.Contains(s.formats, format) {
+		return nil, nil
+	}
 	return []Candidate{s.candidate}, nil
 }
 func (s *resourceFixture) SaveResource(_ context.Context, row Resource) error {
@@ -89,7 +93,11 @@ func (resourceModels) List(context.Context, bool) ([]catalog.Model, error) {
 	return []catalog.Model{m}, nil
 }
 func (s *resourceFixture) OnlineModels(context.Context) ([]OnlineModel, error) {
-	return []OnlineModel{{ID: "gpt-test", Formats: channel.Formats}}, nil
+	formats := s.formats
+	if formats == nil {
+		formats = channel.Formats
+	}
+	return []OnlineModel{{ID: "gpt-test", Formats: formats}}, nil
 }
 func newResourceFixture(t *testing.T, h http.HandlerFunc) (*Engine, *resourceFixture) {
 	t.Helper()
@@ -194,6 +202,29 @@ func TestMultipartImageSplicesOnlyModelAndRejectsAmbiguity(t *testing.T) {
 		t.Fatal("duplicate model accepted")
 	}
 }
+func TestOpenAIImageOperationsShareOneProtocolAndKeepTheirPaths(t *testing.T) {
+	for _, path := range []string{"/v1/images/generations", "/v1/images/edits", "/v1/images/variations"} {
+		t.Run(path, func(t *testing.T) {
+			e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != path {
+					t.Errorf("path = %s", r.URL.Path)
+				}
+				raw, _ := io.ReadAll(r.Body)
+				if !strings.Contains(string(raw), `"model":"upstream-model"`) {
+					t.Error(string(raw))
+				}
+				w.Header().Set("Content-Type", "application/json")
+				io.WriteString(w, `{"data":[],"usage":{"input_tokens":10,"output_tokens":20}}`)
+			})
+			s.formats = []channel.Format{channel.FormatOpenAIImages}
+			out := httptest.NewRecorder()
+			e.Serve(out, resourceRequest("POST", path, `{"model":"gpt-test","prompt":"test"}`), channel.FormatOpenAIImages, "", false)
+			if out.Code != 200 || len(s.finished) != 1 || s.finished[0].Cost == 0 {
+				t.Fatalf("%d %s", out.Code, out.Body.String())
+			}
+		})
+	}
+}
 func TestLargeImagesKeepUsageWithoutBufferingImageStrings(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		raw := `{"data":[{"b64_json":"` + strings.Repeat("A", maxJSONBuffer+100) + `"}],"usage":{"input_tokens":30,"input_tokens_details":{"text_tokens":10,"image_tokens":20},"output_tokens":40}}`
@@ -202,7 +233,7 @@ func TestLargeImagesKeepUsageWithoutBufferingImageStrings(t *testing.T) {
 			contentType = "text/event-stream"
 			raw = "data: " + raw + "\n\n"
 		}
-		o := NewObserver(channel.FormatOpenAIImageEdit, stream, contentType)
+		o := NewObserver(channel.FormatOpenAIImages, stream, contentType)
 		for off := 0; off < len(raw); off += 19 {
 			o.Write([]byte(raw[off:min(off+19, len(raw))]), time.Now())
 		}
@@ -216,29 +247,30 @@ func TestLargeImagesKeepUsageWithoutBufferingImageStrings(t *testing.T) {
 	}
 }
 func TestCompactAndCountReuseProtocolWithoutInventingCharges(t *testing.T) {
-	for _, f := range []channel.Format{channel.FormatOpenAICompact, channel.FormatOpenAICount} {
+	for _, path := range []string{"/v1/responses/compact", "/v1/responses/input_tokens"} {
 		e, s := newResourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
 			raw, _ := io.ReadAll(r.Body)
 			if !strings.Contains(string(raw), `"model":"upstream-model"`) {
 				t.Error(string(raw))
 			}
 			w.Header().Set("Content-Type", "application/json")
-			if f == channel.FormatOpenAICount {
+			if path == "/v1/responses/input_tokens" {
 				io.WriteString(w, `{"object":"response.input_tokens","input_tokens":123}`)
 			} else {
 				io.WriteString(w, `{"id":"resp_compact","object":"response.compaction","output":[{"id":"cmp_owned","type":"compaction","encrypted_content":"opaque"}],"usage":{"input_tokens":100,"output_tokens":10}}`)
 			}
 		})
+		s.formats = []channel.Format{channel.FormatOpenAIResponses}
 		w := httptest.NewRecorder()
-		e.Serve(w, resourceRequest("POST", "/v1/responses/compact", `{"model":"gpt-test","input":[]}`), f, "", false)
+		e.Serve(w, resourceRequest("POST", path, `{"model":"gpt-test","input":[]}`), channel.FormatOpenAIResponses, "", false)
 		if w.Code != 200 || len(s.finished) != 1 {
 			t.Fatalf("%d %s", w.Code, w.Body.String())
 		}
 		finish := s.finished[0]
-		if f == channel.FormatOpenAICount && (finish.Cost != 0 || finish.Outcome != OutcomeSucceeded) {
+		if path == "/v1/responses/input_tokens" && (finish.Cost != 0 || finish.Outcome != OutcomeSucceeded) {
 			t.Fatal(finish)
 		}
-		if f == channel.FormatOpenAICompact && finish.Cost == 0 {
+		if path == "/v1/responses/compact" && finish.Cost == 0 {
 			t.Fatal("compact usage not charged")
 		}
 	}
@@ -317,8 +349,9 @@ func TestConversationItemsAndOpaqueReferencesStayWithOriginalScope(t *testing.T)
 			io.WriteString(w, `{"id":"resp_conversation","status":"completed","output":[],"usage":{"input_tokens":10,"output_tokens":1}}`)
 		}
 	})
+	s.formats = []channel.Format{channel.FormatOpenAIResponses}
 	create := httptest.NewRecorder()
-	e.Serve(create, resourceRequest("POST", "/v1/conversations", `{"items":[]}`), channel.FormatOpenAIConversations, "", false)
+	e.Serve(create, resourceRequest("POST", "/v1/conversations", `{"items":[]}`), channel.FormatOpenAIResponses, "", false)
 	if create.Code != 200 || len(s.rows) != 1 || s.finished[0].Cost != 0 {
 		t.Fatalf("%d %s", create.Code, create.Body.String())
 	}
@@ -369,7 +402,7 @@ func TestCompactionStateRetainsItsUpstreamScope(t *testing.T) {
 		}
 	})
 	out := httptest.NewRecorder()
-	e.Serve(out, resourceRequest("POST", "/v1/responses/compact", `{"model":"gpt-test","input":[]}`), channel.FormatOpenAICompact, "", false)
+	e.Serve(out, resourceRequest("POST", "/v1/responses/compact", `{"model":"gpt-test","input":[]}`), channel.FormatOpenAIResponses, "", false)
 	if out.Code != 200 {
 		t.Fatalf("%d %s", out.Code, out.Body.String())
 	}

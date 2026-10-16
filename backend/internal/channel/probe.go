@@ -236,6 +236,8 @@ func SuggestFormats(modelID string) []Format {
 	switch {
 	case strings.HasPrefix(name, "claude"):
 		return []Format{FormatOpenAIChat, FormatAnthropic}
+	case strings.HasPrefix(name, "gpt-image"), strings.HasPrefix(name, "dall-e"):
+		return []Format{FormatOpenAIImages}
 	case strings.HasPrefix(name, "gpt"), openAIReasoning.MatchString(name):
 		return []Format{FormatOpenAIChat, FormatOpenAIResponses}
 	case strings.HasPrefix(name, "gemini"):
@@ -250,16 +252,8 @@ func testBody(format Format, upstreamModel string) []byte {
 	switch format {
 	case FormatOpenAIResponses:
 		return []byte(fmt.Sprintf(`{"model":%s,"input":"hi","max_output_tokens":16,"stream":true}`, model))
-	case FormatOpenAICompact, FormatOpenAICount:
-		return []byte(fmt.Sprintf(`{"model":%s,"input":[{"role":"user","content":"hi"}]}`, model))
-	case FormatOpenAIConversations:
-		return []byte(`{"items":[]}`)
-	case FormatOpenAIImageGeneration:
+	case FormatOpenAIImages:
 		return []byte(fmt.Sprintf(`{"model":%s,"prompt":"A black dot","n":1,"size":"1024x1024","quality":"low"}`, model))
-	case FormatOpenAIImageEdit, FormatOpenAIImageVariation:
-		// These capabilities require a real input image; declare them explicitly
-		// rather than silently sending an invalid Chat request as a probe.
-		return nil
 	case FormatAnthropic:
 		return []byte(fmt.Sprintf(`{"model":%s,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":true}`, model))
 	case FormatGemini:
@@ -304,7 +298,7 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 		selected := formats
 		if len(request.Formats) == 0 {
 			for _, declared := range model.Formats {
-				if declared != FormatOpenAIConversations && declared != FormatOpenAIImageEdit && declared != FormatOpenAIImageVariation {
+				if declared == FormatOpenAIImages {
 					selected = append(slices.Clone(selected), declared)
 				}
 			}
@@ -386,9 +380,6 @@ func (s *Service) probeOnce(ctx context.Context, policy Outbound, channel Channe
 		return outcome
 	}
 	started := time.Now()
-	if format == FormatOpenAIConversations || format == FormatOpenAIImageEdit || format == FormatOpenAIImageVariation {
-		return fail(nil, "此接口需使用实际资源或图片进行验收，请手动声明能力", started)
-	}
 	// The client has no deadline of its own; the whole test, including reading
 	// the streamed answer, is bounded by the context. It is not the pooled client
 	// of forwarded requests: a test resolves anew and leaves no connection behind.

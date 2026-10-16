@@ -262,6 +262,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	operation            operation
 	itemsRegistered      bool
 	resourceKind         string
 	resourceRegistered   bool
@@ -375,7 +376,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// (clientWatch), because an answer already under way is read to its end.
 	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
-	call := &callState{started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call := &callState{operation: operationOf(r.URL.Path), started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
 	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
 	observed := &observedWriter{ResponseWriter: w}
 	w = observed
@@ -441,15 +442,15 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if imageFormat(format) && multipartType(r.Header.Get("Content-Type")) {
 		facts, call.multipartModel, scanErr = multipartFacts(body, r.Header.Get("Content-Type"))
 	}
-	call.unmetered = format == channel.FormatOpenAICount || format == channel.FormatOpenAIConversations
-	if format == channel.FormatOpenAIConversations && scanErr == nil {
-		names, err := e.availableModels(ctx, key, []channel.Format{channel.FormatOpenAIConversations})
+	call.unmetered = call.operation == operationCount || call.operation == operationConversation
+	if call.operation == operationConversation && scanErr == nil {
+		names, err := e.availableModels(ctx, key, []channel.Format{channel.FormatOpenAIResponses})
 		if err != nil {
 			e.internalError(w, call, err)
 			return
 		}
 		if len(names) == 0 {
-			e.reject(w, call, OutcomeRejectedNoChannel, 503, "no_channel_available", "没有支持会话管理的渠道")
+			e.reject(w, call, OutcomeRejectedNoChannel, 503, "no_channel_available", "没有可用的 OpenAI Responses 渠道")
 			return
 		}
 		facts.Model, facts.HasModel = names[0].id, true
@@ -472,7 +473,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			store = ok && string(body[member.start:member.end]) == "true"
 		}
 		if store {
-			call.resourceKind = resourceKind(format)
+			call.resourceKind = resourceKind(format, call.operation)
 		}
 	}
 	call.upstreamHeaders = protocolHeaders(r.Header)
@@ -487,12 +488,12 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		}
 		call.stream = facts.Stream
-		if format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount {
+		if format == channel.FormatOpenAIResponses {
 			stickyResponseID = facts.PreviousResponseID
 		}
 	}
 
-	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount) {
+	if e.Resources != nil && format == channel.FormatOpenAIResponses {
 		kind, id := "response", stickyResponseID
 		if member, ok := scan.last("conversation"); ok && string(body[member.start:member.end]) != "null" {
 			var raw struct {
@@ -519,7 +520,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			call.boundResource = &row
 		}
 	}
-	if e.Resources != nil && (format == channel.FormatOpenAIResponses || format == channel.FormatOpenAICount || format == channel.FormatOpenAIConversations || format == channel.FormatOpenAICompact) {
+	if e.Resources != nil && format == channel.FormatOpenAIResponses {
 		refs, err := inputReferences(body, scan)
 		if err != nil {
 			e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "条目引用无效或过多")
@@ -1424,7 +1425,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		var envelope struct {
 			ID string `json:"id"`
 		}
-		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
+		initial := call.observer(false, response.Header.Get("Content-Type"))
 		initial.Write(payload, e.Now())
 		initialObservation := initial.Finish()
 		if initialObservation.ProtocolError {
@@ -1450,7 +1451,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			e.internalError(w, call, err)
 			return
 		}
-		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
+		initial := call.observer(false, response.Header.Get("Content-Type"))
 		initial.Write(payload, e.Now())
 		ack := initial.Finish()
 		if ack.ResponseID != "" {
@@ -1481,7 +1482,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		w.WriteHeader(response.StatusCode)
 	}
 
-	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
+	observer := call.observer(call.stream, response.Header.Get("Content-Type"))
 	observer.trackResource = call.resourceKind != ""
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
