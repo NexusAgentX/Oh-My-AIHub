@@ -635,3 +635,25 @@ func TestRetrievedSingleConversationItemCanBeReferenced(t *testing.T) {
 		}
 	}
 }
+
+func TestResourceRouteSizeDoesNotGrowWithCompatibilityMatrix(t *testing.T) {
+	candidate := Candidate{ChannelID: "channel", BaseURL: "https://upstream.example", Capabilities: channel.ModelCapabilities, Advanced: channel.Advanced{Capabilities: channel.ChannelCapabilities}}
+	headers := http.Header{"Openai-Project": []string{"project"}}
+	full, err := marshalResourceRoute(candidate, headers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate.Capabilities = nil
+	candidate.Advanced.Capabilities = nil
+	empty, err := marshalResourceRoute(candidate, headers)
+	if err != nil || !bytes.Equal(full, empty) {
+		t.Fatal("mutable capability matrix expanded resource metadata", err)
+	}
+	var restored resourceRoute
+	if err := json.Unmarshal(full, &restored); err != nil || restored.Candidate.ChannelID != "channel" || restored.Headers.Get("OpenAI-Project") != "project" {
+		t.Fatal("resource identity was not retained", err)
+	}
+	if len(channel.ModelCapabilities) == 0 || len(channel.ChannelCapabilities) == 0 {
+		t.Fatal("shared capability declarations mutated")
+	}
+}

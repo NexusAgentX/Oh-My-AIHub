@@ -426,7 +426,7 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		return
 	}
 	if e.Resources != nil {
-		raw, err := json.Marshal(resourceRoute{Candidate: metadata.Candidate, Headers: resourceHeaders})
+		raw, err := marshalResourceRoute(metadata.Candidate, resourceHeaders)
 		if err != nil {
 			resourceError(w, err)
 			return
