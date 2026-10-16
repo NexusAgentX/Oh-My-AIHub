@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"math"
 	"strings"
@@ -81,7 +82,14 @@ func anthropicIterations(items []anthropicFields, parent *anthropicFields) []led
 	return result
 }
 
-func (o *Observer) observeResponseItems(raw []byte) { eachElement(raw, o.observeResponseItem) }
+func (o *Observer) observeResponseItems(raw []byte) {
+	// Plain message output cannot contain a billable tool. Escaped member values
+	// take the full path so JSON spelling never changes accounting semantics.
+	if !bytes.Contains(raw, []byte("_call")) && !bytes.Contains(raw, []byte{92}) {
+		return
+	}
+	eachElement(raw, o.observeResponseItem)
+}
 
 func (o *Observer) observeResponseItem(raw []byte) {
 	if !json.Valid(raw) {

@@ -403,12 +403,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	call.key = key
 	call.authLocation = location
-	call.upstreamHeaders = http.Header{}
-	for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
-		if v := r.Header.Get(name); v != "" {
-			call.upstreamHeaders.Set(name, v)
-		}
-	}
 	call.diagnostics.Network = &Network{Client: NetworkNode{IP: clientip.Address(r, e.TrustedProxyCIDRs)}, Gateway: e.gatewayNode(), Attempts: []*NetworkAttempt{}, LocationSource: e.LocationSource}
 
 	if !key.AccountActive || !keyUsable(key, started) {
@@ -439,6 +433,15 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	facts, scan, scanErr := ScanRequest(body)
 	call.thinkingRequested, call.requestedServiceTier = facts.EnableThinking, facts.ServiceTier
 	call.hints = scan.billingHints(body)
+	if call.hints.Background {
+		call.upstreamHeaders = http.Header{}
+		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
+			if v := r.Header.Get(name); v != "" {
+				call.upstreamHeaders.Set(name, v)
+			}
+		}
+	}
+
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
 		call.requested, call.stream = pathModel, pathStream

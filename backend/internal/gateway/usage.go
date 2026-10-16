@@ -139,7 +139,14 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 				}
 			}
 		}
-		newline := bytes.IndexAny(chunk, "\r\n")
+		newline := bytes.IndexByte(chunk, '\n')
+		search := chunk
+		if newline >= 0 {
+			search = chunk[:newline]
+		}
+		if cr := bytes.IndexByte(search, '\r'); cr >= 0 {
+			newline = cr
+		}
 		if newline < 0 {
 			if !o.skipLine {
 				if len(o.line)+len(chunk) > maxLineBuffer {
@@ -229,6 +236,15 @@ func (o *Observer) Finish() Observation {
 	}
 	if len(o.detail.Units) > 0 || len(o.detail.Iterations) > 0 || o.detail.InferenceGeo != "" || o.detail.ToolPromptTokens > 0 || len(o.detail.Tokens) > 0 || o.detail.RequestedServiceTier != "" || o.detail.ServiceTier != "" || o.detail.ThinkingMode != "" || o.detail.ThinkingObserved != nil || len(o.detail.Notes) > 0 {
 		o.usage.Detail = &o.detail
+	}
+	if len(o.detail.Iterations) > 0 {
+		o.found = true
+	}
+	for _, quantity := range o.detail.Units {
+		if quantity > 0 {
+			o.found = true
+			break
+		}
 	}
 	status := "missing"
 	if o.found {

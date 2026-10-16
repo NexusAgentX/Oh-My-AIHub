@@ -83,7 +83,7 @@ export function PriceFields({
       <details>
         <summary>工具单价与地域倍率</summary>
         <p className="muted-copy">工具单价按每个标签的单位与本组币种填写；留空不收费，0 为免费。条件档留空沿用基准配置。</p>
-        <div className="field-row price-grid">
+        <div className="field-row">
           {Object.entries(unitPriceLabels).map(([key, label]) => (
             <TextField
               key={key}
@@ -95,7 +95,7 @@ export function PriceFields({
             />
           ))}
         </div>
-        <div className="field-row price-grid">
+        <div className="field-row">
           {Object.entries({ us: '', eu: '', ...prices.geo_multipliers }).map(([key, value]) => (
             <TextField
               key={key}

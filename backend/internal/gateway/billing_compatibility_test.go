@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -234,5 +235,50 @@ func TestBillingImageToolRetainsModalityDetailsAndDeduplicatesItems(t *testing.T
 	child := got.Usage.Detail.Iterations[0].Usage
 	if child.Detail == nil || child.Detail.Tokens["input_image"] != 8 || child.Detail.Tokens["output_image"] != 30 {
 		t.Fatalf("child=%+v", child)
+	}
+}
+
+func TestBillingReliableToolsWithoutTokenSummary(t *testing.T) {
+	got := observe(channel.FormatOpenAIResponses, false, "application/json", `{"id":"resp_tools","output":[{"id":"ws_one","type":"web_search_call"}]}`, 7)
+	if !got.Found || got.Usage.Detail == nil || got.Usage.Detail.Units["web_search"] != ledger.FixedPointScale {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestBackgroundDeadlineSettlesCancellationUsage(t *testing.T) {
+	fixture := &backgroundFixture{jobs: map[string]BackgroundJob{}, finished: map[string]CallFinish{}}
+	keyring, err := channel.ParseKeyring("v1="+base64.StdEncoding.EncodeToString(make([]byte, 32)), "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential, err := keyring.Encrypt("channel", 1, "frozen-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/responses/resp_deadline/cancel" {
+			t.Errorf("unexpected exchange %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"resp_deadline","status":"cancelled","usage":{"input_tokens":100,"output_tokens":20}}`)
+	}))
+	defer upstream.Close()
+	engine := NewEngine(Dependencies{Store: fixture, Jobs: fixture, Keyring: keyring})
+	engine.settingsSnap.Store(&settingsSnapshot{outbound: backgroundOutbound{client: upstream.Client()}})
+	metadata := backgroundMetadata{
+		Started: time.Now().Add(-time.Hour), Key: KeyAuth{OwnerID: "consumer", KeyID: "key"},
+		Candidate: Candidate{ChannelID: "channel", OwnerID: "seller", BaseURL: upstream.URL, Credential: credential, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate},
+		Model:     catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000}, ModelID: "main", Attempts: []Attempt{{}},
+	}
+	raw, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := BackgroundJob{CallID: "deadline", ResponseID: "resp_deadline", AccountID: "consumer", ChannelID: "channel", Metadata: raw, Deadline: time.Now().Add(-time.Minute)}
+	fixture.jobs[job.CallID] = job
+	engine.pollBackgroundJob(context.Background(), job)
+	got, exists := fixture.finished[job.CallID]
+	if !exists || got.Cost.String() != "0.0002" || got.Bill == nil {
+		t.Fatalf("cancel usage lost: %+v", got)
 	}
 }
