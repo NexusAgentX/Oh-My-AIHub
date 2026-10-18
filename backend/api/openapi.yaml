@@ -3677,6 +3677,21 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    GatewayCapacitySearch:
+      type: object
+      description: F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。
+      additionalProperties: false
+      required: [version, method, low, high, hard_maximum, precision_mode, precision, rounds, rechecks]
+      properties:
+        version: {type: string, minLength: 1, readOnly: true}
+        method: {type: string, enum: [binary, ternary], default: binary}
+        low: {type: integer, format: int64, minimum: 0}
+        high: {type: integer, format: int64, minimum: 1}
+        hard_maximum: {type: integer, format: int64, minimum: 1}
+        precision_mode: {type: string, enum: [absolute, relative]}
+        precision: {type: number, exclusiveMinimum: 0}
+        rounds: {type: integer, minimum: 1}
+        rechecks: {type: integer, minimum: 0}
     ForumAuthor:
       type: object
       additionalProperties: false
@@ -6660,3 +6675,3127 @@ components:
         linked_channels: {type: integer, minimum: 0}
       required: [linked_channels]
       additionalProperties: false
+
+# Discovery metadata only: these entries do not register live HTTP routes.
+x-aihub-gateway-contract:
+  {
+    "version": "2026-10-18.2",
+    "stage": "discovery",
+    "sources": [
+      {
+        "id": "chat",
+        "url": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/list",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "responses",
+        "url": "https://developers.openai.com/api/reference/go/resources/responses",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "conversations",
+        "url": "https://developers.openai.com/api/reference/go/resources/conversations",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "images",
+        "url": "https://developers.openai.com/api/reference/go/resources/images",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "messages",
+        "url": "https://platform.claude.com/docs/en/api/messages/count_tokens",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "gemini",
+        "url": "https://ai.google.dev/api/generate-content",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "cache",
+        "url": "https://ai.google.dev/api/caching",
+        "version": "2026-10-18 documentation snapshot"
+      },
+      {
+        "id": "codex",
+        "url": "https://github.com/openai/codex/tree/83086188ae0614bd882818ff1aa23f3194962012/codex-rs",
+        "version": "0.163.0 / 83086188ae0614bd882818ff1aa23f3194962012"
+      }
+    ],
+    "endpoints": [
+      {
+        "id": "chat.create",
+        "protocol": "openai-chat-completions",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "source": "chat",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "chat.list",
+        "protocol": "openai-chat-completions",
+        "method": "GET",
+        "path": "/v1/chat/completions",
+        "source": "chat",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "chat.get",
+        "protocol": "openai-chat-completions",
+        "method": "GET",
+        "path": "/v1/chat/completions/{completion_id}",
+        "source": "chat",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "chat.update",
+        "protocol": "openai-chat-completions",
+        "method": "POST",
+        "path": "/v1/chat/completions/{completion_id}",
+        "source": "chat",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "chat.delete",
+        "protocol": "openai-chat-completions",
+        "method": "DELETE",
+        "path": "/v1/chat/completions/{completion_id}",
+        "source": "chat",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "chat.messages",
+        "protocol": "openai-chat-completions",
+        "method": "GET",
+        "path": "/v1/chat/completions/{completion_id}/messages",
+        "source": "chat",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.create",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/responses",
+        "source": "responses",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.get",
+        "protocol": "openai-responses",
+        "method": "GET",
+        "path": "/v1/responses/{response_id}",
+        "source": "responses",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.delete",
+        "protocol": "openai-responses",
+        "method": "DELETE",
+        "path": "/v1/responses/{response_id}",
+        "source": "responses",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.cancel",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/responses/{response_id}/cancel",
+        "source": "responses",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.items",
+        "protocol": "openai-responses",
+        "method": "GET",
+        "path": "/v1/responses/{response_id}/input_items",
+        "source": "responses",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.count",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/responses/input_tokens",
+        "source": "responses",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "responses.compact",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/responses/compact",
+        "source": "responses",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.create",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/conversations",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.get",
+        "protocol": "openai-responses",
+        "method": "GET",
+        "path": "/v1/conversations/{conversation_id}",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.update",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/conversations/{conversation_id}",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.delete",
+        "protocol": "openai-responses",
+        "method": "DELETE",
+        "path": "/v1/conversations/{conversation_id}",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.items.create",
+        "protocol": "openai-responses",
+        "method": "POST",
+        "path": "/v1/conversations/{conversation_id}/items",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.items.list",
+        "protocol": "openai-responses",
+        "method": "GET",
+        "path": "/v1/conversations/{conversation_id}/items",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.items.get",
+        "protocol": "openai-responses",
+        "method": "GET",
+        "path": "/v1/conversations/{conversation_id}/items/{item_id}",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "conversations.items.delete",
+        "protocol": "openai-responses",
+        "method": "DELETE",
+        "path": "/v1/conversations/{conversation_id}/items/{item_id}",
+        "source": "conversations",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "images.generations",
+        "protocol": "openai-images",
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "source": "images",
+        "scope": "stateless",
+        "model": "actual_image_model",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "images.edits",
+        "protocol": "openai-images",
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "source": "images",
+        "scope": "stateless",
+        "model": "actual_image_model",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "images.variations",
+        "protocol": "openai-images",
+        "method": "POST",
+        "path": "/v1/images/variations",
+        "source": "images",
+        "scope": "stateless",
+        "model": "actual_image_model",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "messages.create",
+        "protocol": "native-messages",
+        "method": "POST",
+        "path": "/v1/messages",
+        "source": "messages",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key",
+        "headers": [
+          "anthropic-version:2023-06-01"
+        ]
+      },
+      {
+        "id": "messages.count",
+        "protocol": "native-messages",
+        "method": "POST",
+        "path": "/v1/messages/count_tokens",
+        "source": "messages",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key",
+        "headers": [
+          "anthropic-version:2023-06-01"
+        ]
+      },
+      {
+        "id": "gemini.generateContent",
+        "protocol": "native-generate-content",
+        "method": "POST",
+        "path": "/v1beta/models/{model}:generateContent",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "path",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "gemini.streamGenerateContent",
+        "protocol": "native-generate-content",
+        "method": "POST",
+        "path": "/v1beta/models/{model}:streamGenerateContent",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "path",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "gemini.countTokens",
+        "protocol": "native-generate-content",
+        "method": "POST",
+        "path": "/v1beta/models/{model}:countTokens",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "path",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "cache.create",
+        "protocol": "native-generate-content",
+        "method": "POST",
+        "path": "/v1beta/cachedContents",
+        "source": "cache",
+        "scope": "remote_resource",
+        "model": "explicit_or_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "cache.list",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1beta/cachedContents",
+        "source": "cache",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "cache.get",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1beta/cachedContents/{cache_id}",
+        "source": "cache",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "cache.update",
+        "protocol": "native-generate-content",
+        "method": "PATCH",
+        "path": "/v1beta/cachedContents/{cache_id}",
+        "source": "cache",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "cache.delete",
+        "protocol": "native-generate-content",
+        "method": "DELETE",
+        "path": "/v1beta/cachedContents/{cache_id}",
+        "source": "cache",
+        "scope": "remote_resource",
+        "model": "owned_context",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F7",
+        "auth": "platform_key"
+      },
+      {
+        "id": "models.openai.list",
+        "protocol": "openai-chat-completions",
+        "method": "GET",
+        "path": "/v1/models",
+        "source": "chat",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
+      },
+      {
+        "id": "models.openai.get",
+        "protocol": "openai-chat-completions",
+        "method": "GET",
+        "path": "/v1/models/{model}",
+        "source": "chat",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
+      },
+      {
+        "id": "models.anthropic.list",
+        "protocol": "native-messages",
+        "method": "GET",
+        "path": "/v1/models",
+        "source": "messages",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key",
+        "headers": [
+          "anthropic-version:2023-06-01"
+        ]
+      },
+      {
+        "id": "models.anthropic.get",
+        "protocol": "native-messages",
+        "method": "GET",
+        "path": "/v1/models/{model}",
+        "source": "messages",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key",
+        "headers": [
+          "anthropic-version:2023-06-01"
+        ]
+      },
+      {
+        "id": "models.gemini.list",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1beta/models",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
+      },
+      {
+        "id": "models.gemini.get",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1beta/models/{model}",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.models",
+        "protocol": "codex-special",
+        "method": "GET",
+        "path": "/backend-api/codex/models",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.responses",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/responses",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.compact",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/responses/compact",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.search",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/search",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "explicit_or_context",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.images",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/images/generations",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "actual_image_model",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "codex.notes.thread_hint",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/thread_hint",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "text"
+        ]
+      },
+      {
+        "id": "codex.notes.write_file",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/write_file",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy",
+          "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.notes.read_file",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/read_file",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "start_line",
+          "stop_line"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.notes.list_files_by_prefix",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/list_files_by_prefix",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "prefix",
+          "max_results",
+          "file_order_by",
+          "file_order"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.notes.search_contents",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/search_contents",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy",
+          "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query",
+          "path_prefix",
+          "max_matches_per_file",
+          "max_files",
+          "recent_file_first"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.notes.append_to_file",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/notes/v2/append_to_file",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "write",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy",
+          "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.history.list_windows",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/history/v2/list_windows",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "recent_first"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.history.list_items",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/history/v2/list_items",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "recent_first",
+          "tool_namespace",
+          "role",
+          "tool_name",
+          "window_id",
+          "max_chars_per_item"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.history.read_item",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/history/v2/read_item",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "item_id",
+          "window_id",
+          "offset_chars",
+          "limit_chars"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "item_id",
+          "window_id"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "codex.history.search_contents",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/alpha/history/v2/search_contents",
+        "source": "codex",
+        "scope": "context_acl_only",
+        "model": "context_or_stable_fallback",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key",
+        "headers": [
+          "x-openai-tool-output-truncation-policy",
+          "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "query",
+          "recent_first",
+          "tool_namespace",
+          "role",
+          "tool_name",
+          "window_id"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
+        ]
+      },
+      {
+        "id": "identity.whoami",
+        "protocol": "codex-special",
+        "method": "GET",
+        "path": "/v1/user-auth-credential/whoami",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "none_local",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key"
+      },
+      {
+        "id": "identity.accounts",
+        "protocol": "codex-special",
+        "method": "GET",
+        "path": "/backend-api/wham/accounts/check",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "none_local",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F8",
+        "auth": "platform_key"
+      }
+    ],
+    "suites": [
+      {
+        "id": "openai-chat-completions.group_model",
+        "protocol": "openai-chat-completions",
+        "target": "group_model",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "openai-chat-completions.base",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "B01",
+              "B02",
+              "B03",
+              "B04"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "accepted_native_message_shapes",
+              "role_and_instruction_semantics",
+              "unicode",
+              "multi_turn"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.json",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "B05",
+              "B06",
+              "B07",
+              "B08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_structure",
+              "reliable_usage_independently",
+              "normal_and_controlled_length_termination"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.stream",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "S01",
+              "S03",
+              "S04",
+              "S05",
+              "S06",
+              "S08",
+              "S10"
+            ],
+            "conditional_source_ids": [
+              "S02"
+            ],
+            "assertions": [
+              "text_lifecycle",
+              "tool_lifecycle_when_applicable",
+              "reasoning_lifecycle_when_applicable",
+              "indexes_utf8_and_terminal_usage",
+              "no_induced_network_failure"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.tools",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "S07",
+              "T01",
+              "T02",
+              "T03",
+              "T04",
+              "T05",
+              "T06",
+              "T07",
+              "T08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_declarations",
+              "auto",
+              "none",
+              "required",
+              "named_tool",
+              "call_result_association",
+              "strict_schema_when_native",
+              "parallel_native_control",
+              "custom_allowed_namespace_when_native"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.multi",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "S09",
+              "J07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_multiple_candidates",
+              "independent_indexes_and_termination",
+              "no_cross_candidate_usage_duplication"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.output",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "J01",
+              "J02",
+              "J03",
+              "J04",
+              "J05",
+              "J06",
+              "J09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_output_controls",
+              "json_object_when_native",
+              "strict_schema_when_native",
+              "nested_enum_required",
+              "stop_or_length_control",
+              "representative_current_sampling_effort_verbosity"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.vision",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "M01",
+              "M02",
+              "M03"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "url_or_uri_content_recognition",
+              "inline_content_recognition",
+              "multiple_images_when_native"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.audio",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "M04",
+              "M05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_input_when_applicable",
+              "native_output_when_applicable",
+              "actual_content_and_usage"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.document",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "M06"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_content_recognition",
+              "native_url_when_supported",
+              "citations_when_native",
+              "no_external_file_id_authorization"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.cache_tier",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "R09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "cache_options_acceptance",
+              "immediate_real_write_read_usage",
+              "each_enabled_service_tier_actual_return",
+              "no_wait_for_expiration"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.stored",
+            "endpoints": [
+              "chat.create",
+              "chat.list",
+              "chat.get",
+              "chat.update",
+              "chat.delete",
+              "chat.messages"
+            ],
+            "source_ids": [
+              "R10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "create_store_true",
+              "owned_list_get_metadata_messages_delete",
+              "bounded_pagination",
+              "no_repeat_inference_fee"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.fingerprint",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "pinned_lmfpd_and_reference_set",
+              "ranking_confidence_not_identity",
+              "no_output_body_persistence"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.length_search",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper",
+              "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "openai-chat-completions.group",
+        "protocol": "openai-chat-completions",
+        "target": "group",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "openai-chat-completions.errors",
+            "endpoints": [
+              "chat.create"
+            ],
+            "source_ids": [
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05"
+            ],
+            "conditional_source_ids": [
+              "R06",
+              "R07"
+            ],
+            "assertions": [
+              "invalid_auth",
+              "unknown_model",
+              "invalid_request",
+              "native_error_structure",
+              "natural_service_errors_observed_only"
+            ]
+          },
+          {
+            "id": "openai-chat-completions.catalog",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_protocol_auth_and_version",
+              "bounded_directory_pagination",
+              "metadata_not_capacity_proof"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "openai-responses.group_model",
+        "protocol": "openai-responses",
+        "target": "group_model",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "openai-responses.base",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05",
+              "R06"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "accepted_native_message_shapes",
+              "role_and_instruction_semantics",
+              "unicode",
+              "multi_turn"
+            ]
+          },
+          {
+            "id": "openai-responses.output",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "R07",
+              "F01",
+              "F02",
+              "F03",
+              "F04",
+              "F08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_output_controls",
+              "json_object_when_native",
+              "strict_schema_when_native",
+              "nested_enum_required",
+              "stop_or_length_control",
+              "representative_current_sampling_effort_verbosity"
+            ]
+          },
+          {
+            "id": "openai-responses.json",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "O01",
+              "O02",
+              "O03",
+              "O04",
+              "O05",
+              "O06",
+              "O07"
+            ],
+            "conditional_source_ids": [
+              "O08"
+            ],
+            "assertions": [
+              "native_structure",
+              "reliable_usage_independently",
+              "normal_and_controlled_length_termination"
+            ]
+          },
+          {
+            "id": "openai-responses.stream",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "S01",
+              "S02",
+              "S04",
+              "S05",
+              "S06",
+              "S07",
+              "S08",
+              "S09",
+              "S10",
+              "S11",
+              "S12",
+              "S13"
+            ],
+            "conditional_source_ids": [
+              "S03"
+            ],
+            "assertions": [
+              "text_lifecycle",
+              "tool_lifecycle_when_applicable",
+              "reasoning_lifecycle_when_applicable",
+              "indexes_utf8_and_terminal_usage",
+              "no_induced_network_failure"
+            ]
+          },
+          {
+            "id": "openai-responses.tools",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "T01",
+              "T02",
+              "T03",
+              "T04",
+              "T05",
+              "T06",
+              "T07",
+              "T08",
+              "T09",
+              "T10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_declarations",
+              "auto",
+              "none",
+              "required",
+              "named_tool",
+              "call_result_association",
+              "strict_schema_when_native",
+              "parallel_native_control",
+              "custom_allowed_namespace_when_native"
+            ]
+          },
+          {
+            "id": "openai-responses.state",
+            "endpoints": [
+              "responses.create",
+              "responses.get",
+              "responses.delete",
+              "responses.cancel",
+              "responses.items",
+              "responses.count",
+              "responses.compact",
+              "conversations.create",
+              "conversations.get",
+              "conversations.update",
+              "conversations.delete",
+              "conversations.items.create",
+              "conversations.items.list",
+              "conversations.items.get",
+              "conversations.items.delete"
+            ],
+            "source_ids": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "C07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "previous_response_id_three_turns",
+              "conversation_item_reference",
+              "store_false_self_contained_replay",
+              "unknown_reference_rejected",
+              "conflicting_references_rejected"
+            ]
+          },
+          {
+            "id": "openai-responses.context",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "C08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper"
+            ]
+          },
+          {
+            "id": "openai-responses.reasoning",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "F05",
+              "F06",
+              "F07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_configuration",
+              "actual_reasoning_when_observable",
+              "complete_opaque_signature_or_encrypted_replay",
+              "no_source_stickiness"
+            ]
+          },
+          {
+            "id": "openai-responses.vision",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M01",
+              "M02"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "url_or_uri_content_recognition",
+              "inline_content_recognition",
+              "multiple_images_when_native"
+            ]
+          },
+          {
+            "id": "openai-responses.document",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M03"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_content_recognition",
+              "native_url_when_supported",
+              "citations_when_native",
+              "no_external_file_id_authorization"
+            ]
+          },
+          {
+            "id": "openai-responses.audio",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M04"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_input_when_applicable",
+              "native_output_when_applicable",
+              "actual_content_and_usage"
+            ]
+          },
+          {
+            "id": "openai-responses.search",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_server_search_request_execution_result",
+              "reliable_usage_only"
+            ]
+          },
+          {
+            "id": "openai-responses.code",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_in_call_execution_and_result",
+              "reliable_receipt_only",
+              "no_container_crud"
+            ]
+          },
+          {
+            "id": "openai-responses.image_tool",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_image_output",
+              "actual_outputs_and_reliable_usage"
+            ]
+          },
+          {
+            "id": "openai-responses.mcp",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "M09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_remote_mcp_declaration",
+              "authorization_and_tool_round_trip",
+              "no_resource_management"
+            ]
+          },
+          {
+            "id": "openai-responses.background",
+            "endpoints": [
+              "responses.create",
+              "responses.get",
+              "responses.delete",
+              "responses.cancel",
+              "responses.items",
+              "responses.count",
+              "responses.compact",
+              "conversations.create",
+              "conversations.get",
+              "conversations.update",
+              "conversations.delete",
+              "conversations.items.create",
+              "conversations.items.list",
+              "conversations.items.get",
+              "conversations.items.delete"
+            ],
+            "source_ids": [
+              "A01",
+              "A02",
+              "A03",
+              "A04",
+              "A05",
+              "A06",
+              "A07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "background_create",
+              "owned_retrieve_resume_cancel_delete_input_items",
+              "terminal_usage_once",
+              "cleanup_only_owned_resources"
+            ]
+          },
+          {
+            "id": "openai-responses.count_compact",
+            "endpoints": [
+              "responses.count",
+              "responses.compact"
+            ],
+            "source_ids": [
+              "A08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_token_count",
+              "native_compact_when_applicable",
+              "complete_compacted_window_replay"
+            ]
+          },
+          {
+            "id": "openai-responses.fingerprint",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "pinned_lmfpd_and_reference_set",
+              "ranking_confidence_not_identity",
+              "no_output_body_persistence"
+            ]
+          },
+          {
+            "id": "openai-responses.length_search",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper",
+              "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "openai-responses.group",
+        "protocol": "openai-responses",
+        "target": "group",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "openai-responses.errors",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [
+              "R08",
+              "E01",
+              "E02",
+              "E03"
+            ],
+            "conditional_source_ids": [
+              "E04",
+              "E05",
+              "E06",
+              "E07"
+            ],
+            "assertions": [
+              "invalid_auth",
+              "unknown_model",
+              "invalid_request",
+              "native_error_structure",
+              "natural_service_errors_observed_only"
+            ]
+          },
+          {
+            "id": "openai-responses.catalog",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_protocol_auth_and_version",
+              "bounded_directory_pagination",
+              "metadata_not_capacity_proof"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "native-messages.group_model",
+        "protocol": "native-messages",
+        "target": "group_model",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "native-messages.base",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-B01",
+              "A-B02",
+              "A-B03",
+              "A-B04",
+              "A-B05",
+              "A-B06",
+              "A-B07",
+              "A-B08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "accepted_native_message_shapes",
+              "role_and_instruction_semantics",
+              "unicode",
+              "multi_turn"
+            ]
+          },
+          {
+            "id": "native-messages.json",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-O01",
+              "A-O02",
+              "A-O03",
+              "A-O04",
+              "A-O05",
+              "A-O06",
+              "A-O10"
+            ],
+            "conditional_source_ids": [
+              "A-O07",
+              "A-O08"
+            ],
+            "assertions": [
+              "native_structure",
+              "reliable_usage_independently",
+              "normal_and_controlled_length_termination"
+            ]
+          },
+          {
+            "id": "native-messages.context",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-O09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper"
+            ]
+          },
+          {
+            "id": "native-messages.stream",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-S01",
+              "A-S02",
+              "A-S03",
+              "A-S04",
+              "A-S05",
+              "A-S06",
+              "A-S07",
+              "A-S09",
+              "A-S10",
+              "A-S11",
+              "A-S13",
+              "A-E08"
+            ],
+            "conditional_source_ids": [
+              "A-S08",
+              "A-S12"
+            ],
+            "assertions": [
+              "text_lifecycle",
+              "tool_lifecycle_when_applicable",
+              "reasoning_lifecycle_when_applicable",
+              "indexes_utf8_and_terminal_usage",
+              "no_induced_network_failure"
+            ]
+          },
+          {
+            "id": "native-messages.tools",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-T01",
+              "A-T02",
+              "A-T03",
+              "A-T04",
+              "A-T05",
+              "A-T06",
+              "A-T07",
+              "A-T08",
+              "A-T09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_declarations",
+              "auto",
+              "none",
+              "required",
+              "named_tool",
+              "call_result_association",
+              "strict_schema_when_native",
+              "parallel_native_control",
+              "custom_allowed_namespace_when_native"
+            ]
+          },
+          {
+            "id": "native-messages.server_tools",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-T10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "web_search_20250305",
+              "code_execution_20250825",
+              "actual_tool_use_result_and_reliable_usage"
+            ]
+          },
+          {
+            "id": "native-messages.reasoning",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-F01",
+              "A-F03",
+              "A-F04",
+              "A-F05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_configuration",
+              "actual_reasoning_when_observable",
+              "complete_opaque_signature_or_encrypted_replay",
+              "no_source_stickiness"
+            ]
+          },
+          {
+            "id": "native-messages.output",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-F06",
+              "A-F07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_output_controls",
+              "json_object_when_native",
+              "strict_schema_when_native",
+              "nested_enum_required",
+              "stop_or_length_control",
+              "representative_current_sampling_effort_verbosity"
+            ]
+          },
+          {
+            "id": "native-messages.vision",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-M01",
+              "A-M02",
+              "A-M04"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "url_or_uri_content_recognition",
+              "inline_content_recognition",
+              "multiple_images_when_native"
+            ]
+          },
+          {
+            "id": "native-messages.document",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-M03"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_content_recognition",
+              "native_url_when_supported",
+              "citations_when_native",
+              "no_external_file_id_authorization"
+            ]
+          },
+          {
+            "id": "native-messages.cache_tier",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-M05",
+              "A-M06",
+              "A-M07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "cache_options_acceptance",
+              "immediate_real_write_read_usage",
+              "each_enabled_service_tier_actual_return",
+              "no_wait_for_expiration"
+            ]
+          },
+          {
+            "id": "native-messages.count_compact",
+            "endpoints": [
+              "messages.count"
+            ],
+            "source_ids": [
+              "A-M08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_token_count",
+              "native_compact_when_applicable",
+              "complete_compacted_window_replay"
+            ]
+          },
+          {
+            "id": "native-messages.mcp",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-M09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "anthropic-beta:mcp-client-2025-11-20",
+              "mcp_servers:url",
+              "mcp_toolset",
+              "mcp_tool_use_and_mcp_tool_result",
+              "no_files_or_container_crud"
+            ]
+          },
+          {
+            "id": "native-messages.sdk",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-E09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_sdk_real_basic_request_not_mock"
+            ]
+          },
+          {
+            "id": "native-messages.fingerprint",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "pinned_lmfpd_and_reference_set",
+              "ranking_confidence_not_identity",
+              "no_output_body_persistence"
+            ]
+          },
+          {
+            "id": "native-messages.length_search",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper",
+              "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "native-messages.group",
+        "protocol": "native-messages",
+        "target": "group",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "native-messages.errors",
+            "endpoints": [
+              "messages.create"
+            ],
+            "source_ids": [
+              "A-E01",
+              "A-E02",
+              "A-E03",
+              "A-E04",
+              "A-E07"
+            ],
+            "conditional_source_ids": [
+              "A-E05",
+              "A-E06"
+            ],
+            "assertions": [
+              "invalid_auth",
+              "unknown_model",
+              "invalid_request",
+              "native_error_structure",
+              "natural_service_errors_observed_only"
+            ]
+          },
+          {
+            "id": "native-messages.catalog",
+            "endpoints": [
+              "models.anthropic.list",
+              "models.anthropic.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_protocol_auth_and_version",
+              "bounded_directory_pagination",
+              "metadata_not_capacity_proof"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "native-generate-content.group_model",
+        "protocol": "native-generate-content",
+        "target": "group_model",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "native-generate-content.base",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-B01",
+              "G-B02",
+              "G-B03",
+              "G-B04",
+              "G-B05",
+              "G-B06",
+              "G-B07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "accepted_native_message_shapes",
+              "role_and_instruction_semantics",
+              "unicode",
+              "multi_turn"
+            ]
+          },
+          {
+            "id": "native-generate-content.json",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-O01",
+              "G-O02",
+              "G-O03",
+              "G-O04",
+              "G-O05",
+              "G-O08",
+              "G-O09"
+            ],
+            "conditional_source_ids": [
+              "G-O06",
+              "G-O07"
+            ],
+            "assertions": [
+              "native_structure",
+              "reliable_usage_independently",
+              "normal_and_controlled_length_termination"
+            ]
+          },
+          {
+            "id": "native-generate-content.multi",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-O10",
+              "G-S07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_multiple_candidates",
+              "independent_indexes_and_termination",
+              "no_cross_candidate_usage_duplication"
+            ]
+          },
+          {
+            "id": "native-generate-content.stream",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-S01",
+              "G-S02",
+              "G-S03",
+              "G-S04",
+              "G-S05",
+              "G-S06",
+              "G-S08",
+              "G-S09",
+              "G-S10",
+              "G-E08"
+            ],
+            "conditional_source_ids": [
+              "G-S11"
+            ],
+            "assertions": [
+              "text_lifecycle",
+              "tool_lifecycle_when_applicable",
+              "reasoning_lifecycle_when_applicable",
+              "indexes_utf8_and_terminal_usage",
+              "no_induced_network_failure"
+            ]
+          },
+          {
+            "id": "native-generate-content.tools",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-T01",
+              "G-T02",
+              "G-T03",
+              "G-T04",
+              "G-T05",
+              "G-T06",
+              "G-T07",
+              "G-T08",
+              "G-T09",
+              "G-T10",
+              "G-T11"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_declarations",
+              "auto",
+              "none",
+              "required",
+              "named_tool",
+              "call_result_association",
+              "strict_schema_when_native",
+              "parallel_native_control",
+              "custom_allowed_namespace_when_native"
+            ]
+          },
+          {
+            "id": "native-generate-content.server_echo",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-T12"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "ToolCall_ToolResponse_GOOGLE_SEARCH_WEB",
+              "ToolCall_ToolResponse_URL_CONTEXT",
+              "matching_id_and_echo_native_parts"
+            ]
+          },
+          {
+            "id": "native-generate-content.reasoning",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-F01",
+              "G-F02",
+              "G-F03",
+              "G-F04",
+              "G-F05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_configuration",
+              "actual_reasoning_when_observable",
+              "complete_opaque_signature_or_encrypted_replay",
+              "no_source_stickiness"
+            ]
+          },
+          {
+            "id": "native-generate-content.output",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-F06",
+              "G-F07",
+              "G-F09",
+              "G-F10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_current_output_controls",
+              "json_object_when_native",
+              "strict_schema_when_native",
+              "nested_enum_required",
+              "stop_or_length_control",
+              "representative_current_sampling_effort_verbosity"
+            ]
+          },
+          {
+            "id": "native-generate-content.vision",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M01",
+              "G-M02"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "url_or_uri_content_recognition",
+              "inline_content_recognition",
+              "multiple_images_when_native"
+            ]
+          },
+          {
+            "id": "native-generate-content.audio",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M03",
+              "G-M07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_input_when_applicable",
+              "native_output_when_applicable",
+              "actual_content_and_usage"
+            ]
+          },
+          {
+            "id": "native-generate-content.video",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M04"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_or_url_content_recognition",
+              "no_files_upload"
+            ]
+          },
+          {
+            "id": "native-generate-content.document",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_inline_content_recognition",
+              "native_url_when_supported",
+              "citations_when_native",
+              "no_external_file_id_authorization"
+            ]
+          },
+          {
+            "id": "native-generate-content.image_tool",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M06"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_image_output",
+              "actual_outputs_and_reliable_usage"
+            ]
+          },
+          {
+            "id": "native-generate-content.search",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_server_search_request_execution_result",
+              "reliable_usage_only"
+            ]
+          },
+          {
+            "id": "native-generate-content.code",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_in_call_execution_and_result",
+              "reliable_receipt_only",
+              "no_container_crud"
+            ]
+          },
+          {
+            "id": "native-generate-content.url_context",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-M10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_url_context_and_result"
+            ]
+          },
+          {
+            "id": "native-generate-content.safety",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-C01",
+              "G-C03"
+            ],
+            "conditional_source_ids": [
+              "G-C02"
+            ],
+            "assertions": [
+              "native_safety_configuration",
+              "feedback_only_if_observed"
+            ]
+          },
+          {
+            "id": "native-generate-content.cache_tier",
+            "endpoints": [
+              "gemini.generateContent",
+              "gemini.streamGenerateContent",
+              "gemini.countTokens",
+              "cache.create",
+              "cache.list",
+              "cache.get",
+              "cache.update",
+              "cache.delete"
+            ],
+            "source_ids": [
+              "G-C04",
+              "G-C05",
+              "G-C06",
+              "G-C08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "cache_options_acceptance",
+              "immediate_real_write_read_usage",
+              "each_enabled_service_tier_actual_return",
+              "no_wait_for_expiration"
+            ]
+          },
+          {
+            "id": "native-generate-content.sdk",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-E09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_sdk_real_basic_request_not_mock"
+            ]
+          },
+          {
+            "id": "native-generate-content.fingerprint",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "pinned_lmfpd_and_reference_set",
+              "ranking_confidence_not_identity",
+              "no_output_body_persistence"
+            ]
+          },
+          {
+            "id": "native-generate-content.length_search",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parameter_acceptance_separate",
+              "configured_bisection_or_trisection",
+              "measured_lower_and_proven_failure_upper",
+              "external_error_not_length_upper",
+              "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "native-generate-content.group",
+        "protocol": "native-generate-content",
+        "target": "group",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "native-generate-content.errors",
+            "endpoints": [
+              "gemini.generateContent"
+            ],
+            "source_ids": [
+              "G-B08",
+              "G-B09",
+              "G-C09",
+              "G-E01",
+              "G-E02",
+              "G-E03",
+              "G-E04",
+              "G-E07"
+            ],
+            "conditional_source_ids": [
+              "G-E05",
+              "G-E06"
+            ],
+            "assertions": [
+              "invalid_auth",
+              "unknown_model",
+              "invalid_request",
+              "native_error_structure",
+              "natural_service_errors_observed_only"
+            ]
+          },
+          {
+            "id": "native-generate-content.catalog",
+            "endpoints": [
+              "models.gemini.list",
+              "models.gemini.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "fixed_protocol_auth_and_version",
+              "bounded_directory_pagination",
+              "metadata_not_capacity_proof"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "openai-images.group_model",
+        "protocol": "openai-images",
+        "target": "group_model",
+        "feature": "F4",
+        "requirements": [
+          {
+            "id": "images.generations",
+            "endpoints": [
+              "images.generations"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "actual_image_model",
+              "native_json_or_multipart",
+              "each_enabled_pricing_unit",
+              "actual_product_count",
+              "reliable_usage_or_unpriced"
+            ]
+          },
+          {
+            "id": "images.edits",
+            "endpoints": [
+              "images.edits"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "actual_image_model",
+              "native_json_or_multipart",
+              "each_enabled_pricing_unit",
+              "actual_product_count",
+              "reliable_usage_or_unpriced"
+            ]
+          },
+          {
+            "id": "images.variations",
+            "endpoints": [
+              "images.variations"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "actual_image_model",
+              "native_json_or_multipart",
+              "each_enabled_pricing_unit",
+              "actual_product_count",
+              "reliable_usage_or_unpriced"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "codex-special.group_model",
+        "protocol": "codex-special",
+        "target": "group_model",
+        "feature": "F8",
+        "requirements": [
+          {
+            "id": "codex-special.RL01",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL01"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Lite 协议标记 / 固定 CLI 的 Lite 路径",
+              "核对实际 Header 名称、取值或其他协议识别方式，发真实请求并验证上游原生识别及平台保留。若该版本无独立 Lite Header，保留 ID 并按实际标记修正断言、记录源码/fixture 来源，不发明字段。",
+              "与 CLI/provider/目录版本绑定；字段被接受不等于完整 Lite 支持"
+            ]
+          },
+          {
+            "id": "codex-special.RL02",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL02"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "additional_tools 输入结构",
+              "发固定版本的原生 input 声明并触发工具；核验工具名/参数/call 关联与结果回填。",
+              "Lite 工具声明能力；不能由普通文本成功推导"
+            ]
+          },
+          {
+            "id": "codex-special.RL03",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL03"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "顶层 tools 与 Lite 声明的原生支持",
+              "分别用标准 tools 和 Lite 原生声明完成适用工具往返，各自保留原格式；上游只支持其一时分别报告。",
+              "不进行声明互转；同次响应可支持多个子断言"
+            ]
+          },
+          {
+            "id": "codex-special.RL04",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL04"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "parallel_tool_calls:false",
+              "发送明确禁止并行的工具场景，按固定版本约束验证实际行为及 call/result；不由开关接受推导限制已执行。",
+              "独立参数/行为证据；不增加并发压测"
+            ]
+          },
+          {
+            "id": "codex-special.RL05",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL05"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "reasoning.context:all_turns",
+              "使用有效的多轮合成上下文，分别记录参数接受和续聊行为，保留原生字段与 opaque 项。",
+              "不从一次参数接受推导所有历史行为"
+            ]
+          },
+          {
+            "id": "codex-special.RL06",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL06"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "developer / 基础指令语义",
+              "固定版本适用的指令与合成内容，核验层级/内容保留及可验证结果。",
+              "与实际模型/协议绑定，不改写为另一种指令协议"
+            ]
+          },
+          {
+            "id": "codex-special.RL07",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL07"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Namespace / custom 工具",
+              "声明命名空间/工具，接收实际调用，按 namespace/name/call 标识回填并续聊，核验分片和关联。",
+              "namespace/custom/普通 function 能力分别记录"
+            ]
+          },
+          {
+            "id": "codex-special.RL08",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Lite SSE 生命周期",
+              "实际 Lite 文本/工具流核验事件、索引、UTF-8、增量和终态/usage；可选事件及自然错误按实际出现记录。",
+              "HTTP 200 或可显示文本不能替代完整 SSE；不主动诱发上游错误"
+            ]
+          },
+          {
+            "id": "codex-special.RL09",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL09"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "多轮加密推理原样续用",
+              "生成后原样回传完整 encrypted reasoning 及相关项，验证后续推理；不因内部 ID 未登记拒绝。",
+              "目标原生回放证据；跨渠道平台回归另见 RL23"
+            ]
+          },
+          {
+            "id": "codex-special.RL10",
+            "endpoints": [
+              "codex.compact",
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL10"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Compaction 原 ID / 汇总",
+              "汇总 RL20 V1、RL21 V2、RL22 后台执行的必要子断言，不额外重复发送一套请求。",
+              "三项分别显示支持/失败/未知；单一成功不推导其他项"
+            ],
+            "aggregate_of": [
+              "codex-special.RL20",
+              "codex-special.RL21",
+              "codex-special.RL22"
+            ]
+          },
+          {
+            "id": "codex-special.RL12",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL12"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "标准与 Lite 原生兼容（保留旧“双向兼容”追溯）",
+              "对标准/Lite 各自适用的请求→工具→回填→续聊留证；跨形态回放仅按固定契约实际验证，不凭成功猜测。",
+              "上游兼容性分别报告；平台不做双向转换"
+            ]
+          },
+          {
+            "id": "codex-special.RL14",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL14"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "zstd 请求编码",
+              "发真实压缩请求，核验正常转发、模型替换后的有效编码/长度及无压缩回归；非法编码/解压上限负例在受控网关测试验证。",
+              "传输编码能力与 CLI 是否实际发压缩请求分别记录；不扩大上游故障诱发范围"
+            ]
+          },
+          {
+            "id": "codex-special.RL16",
+            "endpoints": [
+              "codex.search"
+            ],
+            "source_ids": [
+              "RL16"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "独立 alpha/search",
+              "按固定契约发搜索并核验实际结果结构/URL/opaque 输出及后续使用，记录可证实计量；CLI 证据须实际触发该 HTTP 路径。",
+              "与 Responses 内置 web_search 分开；不代理任意返回 URL"
+            ]
+          },
+          {
+            "id": "codex-special.RL20",
+            "endpoints": [
+              "codex.compact",
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL20"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "V1 standalone compact",
+              "用固定原生 compact 路径提交完整输入，保留返回的整个有效窗口及顺序并续聊；可复用 F4/F7 同目标/同路径/同配置真实证据。",
+              "原生 V1 能力；不能代替 V2 或后台执行"
+            ]
+          },
+          {
+            "id": "codex-special.RL21",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL21"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "V2 compaction_trigger",
+              "普通 Responses 输入实际 trigger，收集 compaction 输出后完整回传续聊，核验固定版本实际状态/元数据。",
+              "原生 V2 能力；store:false 与内部 ID 不引入来源绑定；不宣称所有摘要语义精确保留"
+            ]
+          },
+          {
+            "id": "codex-special.RL22",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL22"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "客户端后台 V2 正确性",
+              "用确实生效的独立配置触发后台 V2，与前台请求存在实际重叠，核验结果使用/取消/关闭及无重复收费。",
+              "同一 V2 的执行方式；不是 background=true、新接口或性能压测"
+            ]
+          },
+          {
+            "id": "codex-special.RL24",
+            "endpoints": [
+              "codex.responses"
+            ],
+            "source_ids": [
+              "RL24"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "实际服务档位",
+              "每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。",
+              "降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6"
+            ]
+          },
+          {
+            "id": "codex-special.RL25",
+            "endpoints": [
+              "codex.images"
+            ],
+            "source_ids": [
+              "RL25"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Codex 专用原生生图",
+              "固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。",
+              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "codex-special.group",
+        "protocol": "codex-special",
+        "target": "group",
+        "feature": "F8",
+        "requirements": [
+          {
+            "id": "codex-special.RL13",
+            "endpoints": [
+              "identity.whoami",
+              "identity.accounts",
+              "codex.responses",
+              "codex.notes.thread_hint"
+            ],
+            "source_ids": [
+              "RL13"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "客户端接入前置",
+              "固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。",
+              "三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported"
+            ]
+          },
+          {
+            "id": "codex-special.RL15",
+            "endpoints": [
+              "codex.models"
+            ],
+            "source_ids": [
+              "RL15"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Codex 能力目录",
+              "固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。",
+              "不暴露共享账号目录或存完整提示词；目录声明不自动证明能力"
+            ]
+          },
+          {
+            "id": "codex-special.RL17",
+            "endpoints": [
+              "codex.notes.thread_hint"
+            ],
+            "source_ids": [
+              "RL17"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "notes thread_hint",
+              "新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。",
+              "会话上下文辅助；不登记来源渠道粘性，不存提示正文"
+            ]
+          },
+          {
+            "id": "codex-special.RL18",
+            "endpoints": [
+              "codex.notes.write_file",
+              "codex.notes.read_file",
+              "codex.notes.list_files_by_prefix",
+              "codex.notes.search_contents",
+              "codex.notes.append_to_file"
+            ],
+            "source_ids": [
+              "RL18"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "notes 写读/列表及固定范围内操作",
+              "固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。",
+              "F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文"
+            ]
+          },
+          {
+            "id": "codex-special.RL19",
+            "endpoints": [
+              "codex.history.list_windows",
+              "codex.history.list_items",
+              "codex.history.read_item",
+              "codex.history.search_contents"
+            ],
+            "source_ids": [
+              "RL19"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "history 窗口/条目及固定范围内操作",
+              "list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。",
+              "F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "codex-special.gateway",
+        "protocol": "codex-special",
+        "target": "gateway",
+        "feature": "F8",
+        "requirements": [
+          {
+            "id": "codex-special.RL23",
+            "endpoints": [
+              "codex.responses",
+              "codex.notes.write_file",
+              "codex.notes.read_file"
+            ],
+            "source_ids": [
+              "RL23"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "自包含状态/history-notes 跨渠道",
+              "明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。",
+              "平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性"
+            ]
+          },
+          {
+            "id": "codex-special.RL26",
+            "endpoints": [
+              "codex.notes.thread_hint",
+              "codex.history.list_windows"
+            ],
+            "source_ids": [
+              "RL26"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "专项权限与隔离",
+              "两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。",
+              "归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容"
+            ]
+          }
+        ]
+      }
+    ],
+    "exclusions": [
+      {
+        "protocol": "openai-chat-completions",
+        "source_ids": [
+          "J08"
+        ],
+        "reason": "移出：logprobs/top_logprobs 概率输出检测，不计完整性，不标不支持。"
+      },
+      {
+        "protocol": "openai-chat-completions",
+        "source_ids": [
+          "R08"
+        ],
+        "reason": "移出：独立并发/稳定性/吞吐压测；普通请求耗时/结果另作被动观察，不计独立全测任务。"
+      },
+      {
+        "protocol": "openai-responses",
+        "source_ids": [
+          "M06"
+        ],
+        "reason": "移出：独立 file_search/文件向量库资源，不执行、不计完整性。"
+      },
+      {
+        "protocol": "openai-responses",
+        "source_ids": [
+          "E08"
+        ],
+        "reason": "移出：独立并发/性能专项；业务路由统计保留，不计独立全测任务。"
+      },
+      {
+        "protocol": "native-messages",
+        "source_ids": [
+          "A-B09"
+        ],
+        "reason": "移出：旧 assistant prefill 兼容专项；真实多轮 assistant 历史仍保留。"
+      },
+      {
+        "protocol": "native-messages",
+        "source_ids": [
+          "A-F02"
+        ],
+        "reason": "移出：旧 thinking enabled/budget_tokens 兼容专项；当前 adaptive/effort/签名回放保留。"
+      },
+      {
+        "protocol": "native-messages",
+        "source_ids": [
+          "A-F08"
+        ],
+        "reason": "移出：旧采样字段兼容专项；其他协议当前采样代表配置保留。"
+      },
+      {
+        "protocol": "native-generate-content",
+        "source_ids": [
+          "G-F08"
+        ],
+        "reason": "移出：旧 responseSchema 兼容专项；当前 responseFormat/strict 能力保留。"
+      },
+      {
+        "protocol": "native-generate-content",
+        "source_ids": [
+          "G-C07"
+        ],
+        "reason": "移出：独立 Files 上传及生命周期，不执行、不计完整性。"
+      },
+      {
+        "protocol": "codex-special",
+        "source_ids": [
+          "RL11"
+        ],
+        "reason": "WebSocket excluded; HTTP fallback is not WS evidence"
+      }
+    ],
+    "adjustments": {
+      "openai-chat-completions/B08": "并入终态子断言：保留现代 stop/length/tool_calls 及实际过滤等结果；旧 function_call 专项移出，可选终态未出现不判失败。",
+      "openai-chat-completions/S10": "并入每次真实流的正常终态/完整性必需断言；异常断流分支只在实际出现时记录，不主动制造中断。",
+      "openai-chat-completions/J03": "并入对应有效 strict/结构化样本的嵌套/enum/required 等子断言，不单独重复生成；JSON Object、strict输出及strict工具参数仍分别验证。",
+      "openai-chat-completions/M06": "保留请求内 file_data/合法 URL 内容理解；排除 file_id/独立 Files 生命周期，内容形态分别取证。",
+      "openai-chat-completions/R09": "部分保留：缓存选项/即时写读/真实 usage 与每启用档位实际返档；移出等待 TTL 到期及档位×其他功能全排列，不外推未测组合。",
+      "openai-responses/S11": "并入实际终态：计划的输出上限/截断场景须核验incomplete及原因；failed仅在真实出现时记录，不主动制造服务故障。",
+      "openai-responses/C08": "保留：truncation=auto/disabled 与有界上下文二分/三分配合，分别记录参数接受及实际行为，不混淆精确窗口。",
+      "openai-responses/F04": "并入对应有效 strict/结构化样本的嵌套/enum/required 等子断言，不单独重复生成；JSON Object、strict输出及strict工具参数仍分别验证。",
+      "openai-responses/F08": "部分保留：text.verbosity 代表配置独立取证；top_logprobs 概率输出检测移出。",
+      "openai-responses/M03": "保留请求内 file_data/合法 URL 等文档理解；不依赖独立 Files，内容形态分别取证。",
+      "openai-responses/M07": "保留模型调用内的具体代码/MCP工具执行及可靠结果，适用工具/授权分别取证；不依赖容器/Files/工具资源 CRUD。",
+      "openai-responses/M09": "保留模型调用内的具体代码/MCP工具执行及可靠结果，适用工具/授权分别取证；不依赖容器/Files/工具资源 CRUD。",
+      "openai-responses/A08": "拆为独立 token count 与 compact/压缩续用能力，可复用输入/产物，计数通过不能代替压缩通过。",
+      "native-messages/A-O09": "并入有界上下文二分/三分的实际长度/耗尽观察；不把超时、短回答或外部故障当窗口上界。",
+      "native-messages/A-M03": "保留请求内 inline/合法 URL 文档/PDF 与实际引用；不依赖独立 Files。",
+      "native-messages/A-M05": "并入缓存配置及真实写/读场景，保留断点与实际用量证据；不等待到期。",
+      "native-messages/A-M06": "部分保留：5m/1h 选项接受与即时真实写读；到期/保持时长实测移出，不能由字段推导已保持1小时。",
+      "native-messages/A-M09": "保留具体命名/固定版本的 MCP/调用内高级工具，按授权/执行子场景取证；不承诺所有 beta，Files/独立容器资源移出。",
+      "native-messages/A-E08": "部分保留并入普通操作/流：取消及实际中断来源记录；独立并发性能、主动制造超时和长时间耐久测试移出。",
+      "native-generate-content/G-S10": "并入每次真实流的完成/截断/完整性必需断言；传输中断分支只在实际出现时记录，不主动制造中断。",
+      "native-generate-content/G-T12": "保留固定版本的具体 ToolCall 类型/结果子场景；F0/F4 明确命名和断言，不承诺任意未来扩展或独立工具资源。",
+      "native-generate-content/G-F09": "并入对应有效 strict/结构化样本的嵌套/enum/required 等子断言，不单独重复生成；JSON Object、strict输出及strict工具参数仍分别验证。",
+      "native-generate-content/G-M02": "保留无需独立 Files 的合法原生图片 URI 输入，使用内容识别取证。",
+      "native-generate-content/G-M04": "保留无需独立 Files 的原生视频输入，独立记录适用形态及内容理解。",
+      "native-generate-content/G-M05": "保留无需独立 Files 的原生 PDF/文档输入，核验内容，不能为检测补建上传服务。",
+      "native-generate-content/G-M09": "保留模型调用内的具体代码/MCP工具执行及可靠结果，适用工具/授权分别取证；不依赖容器/Files/工具资源 CRUD。",
+      "native-generate-content/G-E08": "部分保留并入真实流完整性/中断记录；独立并发性能、主动断流/超时诱发和长时间耐久测试移出。",
+      "gateway/capacity-search": "后台参数契约见 components/schemas/GatewayCapacitySearch；上下文与最大输出分别配置，任务固定版本。无平台累计费用/HTTP/token/图片/工具/总时长硬预算。范围与轮数属于有限算法，前置失败/短回答/外部错误不当长度上界。",
+      "gateway/creation-ownership": "可信创建返回在暴露 ID 前原子登记账号/平台 Key、操作 ID、原 Binding 和受保护的真实凭据等值标签；同组同实际上游 Key 的不同渠道共享原生 ID 碰撞域。碰撞须保留隔离标记，旧归属也不可继续读取可能已被替换的数据。非创建列表/客户端自报 ID 不证明首次归属；子项先核验父级。正式持久化归 F1/F7，检测 fixture 不代替事务索引。",
+      "gateway/pagination": "在服务端过滤未登记/他人资源，重算返回列表的首末 ID/has_more，不透出共享 totals；默认原型每页至多100项、单次最多4页/合计1MiB，空页仍可给继续游标。原生游标以32字节保护密钥的AES-GCM封装，绑定账号/Key/资源/父级/规范化请求摘要；标准资源另绑原 Binding，context 游标不含渠道来源。原生游标至多2048字节，拒绝重复/超长/篡改，正式适配器先限制网络读取并映射原生分页字段。",
+      "codex-special/first-context-ownership": "客户端 session/agent/path/window/item 不是首次归属证明，thread_hint 的 text 也不是所有权声明。未知外部上下文失败关闭，不向共享上游试读再认领；正式 F8 须提供可信的首次会话归属/隔离证明。CLI 合成启用实验只证明扩展已调用，不证明任意共享上游首次归属安全；该前置未就绪不记为供应商 unsupported，不以来源粘性或保存正文补齐。",
+      "codex-special/profiles": "固定0.163.0：内置openai provider及平台身份兼容。history/notes配置 features.token_budget.enabled=true、use_history_notes_extension=true；后台V2另用 features.async_compaction.enabled=true 且 token_budget.enabled=false、use_history_notes_extension=false，要求provider远程压缩能力V2。两配置互斥，不把两开关均true当生效证明。remote_compaction_v2在该版本已是移除的无效开关。",
+      "codex-special/compaction": "V1原生POST codex/responses/compact；V2通过普通codex/responses输入type=compaction_trigger，返回完整type=compaction窗口并续用；后台V2是客户端执行方式，非background=true，不是context_management。固定源码sources/codex，三层证据独立，当前CLI原型未证明压缩实际触发。",
+      "gateway/evidence-layers": "upstream_protocol、gateway_proxy、official_cli分别记录目标、方法/路径、模型/凭据范围摘要、代码/客户端/配置/范围版本及结果；官方CLI+合成后端证据仅official_cli_with_synthetic_backend，不能投影真实供应商能力。client_not_enabled、configuration_error、platform_endpoint_pending、detector_error与真实unsupported分别归类。"
+    }
+  }

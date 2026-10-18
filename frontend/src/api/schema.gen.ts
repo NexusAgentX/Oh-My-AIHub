@@ -1730,6 +1730,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。 */
+        GatewayCapacitySearch: {
+            readonly version: string;
+            /**
+             * @default binary
+             * @enum {string}
+             */
+            method: "binary" | "ternary";
+            /** Format: int64 */
+            low: number;
+            /** Format: int64 */
+            high: number;
+            /** Format: int64 */
+            hard_maximum: number;
+            /** @enum {string} */
+            precision_mode: "absolute" | "relative";
+            precision: number;
+            rounds: number;
+            rechecks: number;
+        };
         ForumAuthor: {
             /** Format: uuid */
             id: string;
