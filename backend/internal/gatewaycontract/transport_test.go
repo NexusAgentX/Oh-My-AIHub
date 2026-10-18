@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -72,9 +73,9 @@ func TestImageEditMultipartDoesNotRequireFilesService(t *testing.T) {
 	if err = writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	requests := 0
+	var requests atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if r.URL.Path != "/v1/images/edits" {
 			t.Error("unexpected Files dependency")
 		}
@@ -111,7 +112,7 @@ func TestImageEditMultipartDoesNotRequireFilesService(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != 200 || requests != 1 {
+	if res.StatusCode != 200 || requests.Load() != 1 {
 		t.Fatal("single-request multipart experiment failed")
 	}
 }
@@ -124,8 +125,11 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 		{Kind: "codex_note", ID: "session/path", AccountID: "a", KeyID: "k"},
 	}
 	lookup := func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return rows, nil }
-	calls := 0
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; _, _ = io.WriteString(w, `{"id":"resp-a"}`) }))
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.WriteString(w, `{"id":"resp-a"}`)
+	}))
 	defer upstream.Close()
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestActor := actor
@@ -152,10 +156,10 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 			t.Fatal(err)
 		}
 		_ = res.Body.Close()
-		if key == "other-key" && (res.StatusCode != 404 || calls != 0) {
+		if key == "other-key" && (res.StatusCode != 404 || calls.Load() != 0) {
 			t.Fatal("unauthorized request reached shared credentials")
 		}
-		if key == "k" && (res.StatusCode != 200 || calls != 1) {
+		if key == "k" && (res.StatusCode != 200 || calls.Load() != 1) {
 			t.Fatal("owned resource inaccessible")
 		}
 	}
