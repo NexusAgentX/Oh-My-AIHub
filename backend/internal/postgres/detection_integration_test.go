@@ -27,7 +27,7 @@ func TestDetectionMetadataRestartAndAppendOnlyEvidence(t *testing.T) {
 	if err := store.Create(ctx, job); err != nil {
 		t.Fatal(err)
 	}
-	attempt := detection.Attempt{ID: marketID(t), EndpointID: "responses.create", Method: "POST", Path: "/v1/responses", Status: 200, Reason: "ok", Category: "generate", DurationMS: 3, Sent: true, ResponseReceived: true, At: now}
+	attempt := detection.Attempt{ID: marketID(t), EndpointID: "responses.create", Method: "POST", Path: "/v1/responses", EntryURL: "https://synthetic-upstream.invalid/native", Status: 200, Reason: "ok", Category: "generate", DurationMS: 3, Sent: true, ResponseReceived: true, At: now}
 	if err := store.RecordAttempt(ctx, job.ID, attempt); err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestDetectionMetadataRestartAndAppendOnlyEvidence(t *testing.T) {
 	if err != nil || len(pending) != 0 {
 		t.Fatal("cleaned artifact stays pending")
 	}
-	for _, sql := range []string{`UPDATE detection_attempts SET status=404 WHERE id=$1`, `DELETE FROM detection_attempts WHERE id=$1`} {
+	for _, sql := range []string{`UPDATE detection_attempts SET status=404 WHERE id=$1`, `UPDATE detection_attempts SET entry_url='https://other.invalid' WHERE id=$1`, `DELETE FROM detection_attempts WHERE id=$1`} {
 		if _, err := pool.Exec(ctx, sql, attempt.ID); err == nil {
 			t.Fatal("attempt history mutable")
 		}
@@ -87,7 +87,7 @@ func TestDetectionMetadataRestartAndAppendOnlyEvidence(t *testing.T) {
 		t.Fatal("result history mutable")
 	}
 	page, err := store.AttemptPage(ctx, job.ID, nil, 10)
-	if err != nil || len(page) != 1 || page[0].Path != "/v1/responses" {
+	if err != nil || len(page) != 1 || page[0].Path != "/v1/responses" || page[0].EntryURL != attempt.EntryURL {
 		t.Fatalf("attempt metadata page: %+v %v", page, err)
 	}
 	loaded.State = "finished"

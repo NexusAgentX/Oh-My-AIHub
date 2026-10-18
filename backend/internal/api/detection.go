@@ -12,6 +12,13 @@ import (
 )
 
 func (a *app) registerDetectionRoutes(r *router) {
+	r.implement("493", "POST /api/detection/mcp", accessPublic, func(w http.ResponseWriter, request *http.Request) {
+		if a.detectionMCP == nil {
+			http.NotFound(w, request)
+			return
+		}
+		a.detectionMCP.ServeHTTP(w, request)
+	})
 	r.implement("490", "GET /api/detection/reports/{reportID}", accessReady, a.getDetectionReport)
 	r.implement("490", "GET /api/detection/jobs/{taskID}/reports", accessReady, a.detectionReports)
 	r.implement("490", "GET /api/detection/jobs", accessReady, a.listDetectionJobs)

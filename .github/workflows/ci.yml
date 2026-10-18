@@ -134,6 +134,10 @@ jobs:
         run: mise exec -- go -C backend vet ./...
       - name: Backend staticcheck
         run: mise run lint-backend
+      - name: Build fixed official-SDK probe
+        run: |
+          mise run build-detection-sdk
+          echo "AIHUB_TEST_SDK_BINARY=$GITHUB_WORKSPACE/backend/bin/aihub-detection-sdk" >> "$GITHUB_ENV"
       - name: Backend tests with race detector
         run: mise exec -- go -C backend test -race ./...
 

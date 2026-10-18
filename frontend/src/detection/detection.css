@@ -10,6 +10,10 @@
 .detection-scenario[open] > .stack-form { margin-top: var(--space-4); }
 .detection-assertion { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; border-top: 1px solid var(--hairline); padding: var(--space-3) 0; }
 .detection-assertion code { overflow-wrap: anywhere; min-width: 0; }
+.detection-observation { border-top: 1px solid var(--hairline); padding-top: var(--space-4); }
+.detection-observation h3 { margin: 0 0 var(--space-3); font-size: var(--text-base); }
+.detection-observation > details { margin-top: var(--space-4); }
+.detection-observation > details > summary { cursor: pointer; min-height: var(--control-height); }
 .detection-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); align-items: start; }
 .detection-versions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); }
 .detection-versions dd { margin: 0; }

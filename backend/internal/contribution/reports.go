@@ -99,7 +99,7 @@ func Evaluate(ctx context.Context, actor Actor, draft Draft, live market.Directo
 			// affect future tasks, not otherwise valid completed evidence.
 			current.ParameterVersion = report.Target.Binding.ParameterVersion
 			current.CredentialScope = report.Target.Binding.CredentialScope
-			if !market.CompatibleBinding(report.Target.Binding, current) {
+			if !market.CompatibleBinding(report.Target.Binding, current) || !detection.CompatibleProfile(report.Target.Profile, target.Profile) {
 				continue
 			}
 			entry.State = "ready"

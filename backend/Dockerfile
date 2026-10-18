@@ -6,11 +6,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server \
-    && CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+    && CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate \
+    && CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/aihub-detection-sdk ./cmd/detection-sdk
 
 FROM alpine:3.24
 RUN addgroup -S app && adduser -S -G app app
-COPY --from=build /out/server /out/migrate /usr/local/bin/
+COPY --from=build /out/server /out/migrate /out/aihub-detection-sdk /usr/local/bin/
 USER app
 EXPOSE 8080
 CMD ["server"]

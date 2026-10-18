@@ -163,7 +163,7 @@ func (s *Service) create(ctx context.Context, actor Actor, target Target, parame
 		if continued.ReportID != nil {
 			for _, result := range continued.Results {
 				item, exists := byID[result.ScenarioID]
-				if exists && result.Source == s.source && !item.CredentialDependent && terminal(result.State) && result.State != "inconclusive" {
+				if exists && result.Source == s.source && !item.CredentialDependent && terminal(result.State) && result.State != "inconclusive" && (CompatibleProfile(continued.Target.Profile, target.Profile) || !slices.Contains(profileScenarios(plan), item.ID)) {
 					if result.SourceTaskID == "" {
 						result.SourceTaskID = continued.ID
 					}
@@ -176,7 +176,7 @@ func (s *Service) create(ctx context.Context, actor Actor, target Target, parame
 		}
 		job.Results = resumeResults(job)
 	}
-	if HasPending(plan) {
+	if HasPending(plan) && !hasExecutable(plan) {
 		job.State = "suite_pending"
 		job.ExecutionActive = false
 	}
@@ -291,6 +291,9 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	if !market.CompatibleBinding(job.Target.Binding, current) || plan.RegistryVersion != job.Plan.RegistryVersion {
 		return Job{}, ErrConflict
 	}
+	if !CompatibleProfile(job.Target.Profile, resolved.Target.Profile) {
+		selected = append(slices.Clone(selected), profileScenarios(plan)...)
+	}
 	job, err = withoutSelected(job, selected)
 	if err != nil {
 		return Job{}, err
@@ -298,9 +301,8 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	if actualScope != job.Target.Binding.CredentialScope {
 		return s.create(ctx, actor, resolved.Target, job.Parameters, secret, &job)
 	}
-	if HasPending(plan) {
-		return job, nil
-	}
+	job.Target = resolved.Target
+	job.Target.Binding = current
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -318,6 +320,14 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	job.ExecutionActive = true
 	job.Complete = false
 	job.UpdatedAt = time.Now().UTC()
+	if HasPending(plan) && !hasExecutable(plan) {
+		job.State = "suite_pending"
+		job.ExecutionActive = false
+		if err = s.store.Save(ctx, job); err != nil {
+			return Job{}, err
+		}
+		return job, nil
+	}
 	if err = s.store.Save(ctx, job); err != nil {
 		return Job{}, err
 	}
@@ -401,7 +411,7 @@ func (s *Service) execute(id string) {
 		return
 	}
 	resolved, err := s.resolver.Resolve(ctx, live.actor, job.Target)
-	if err != nil || resolved.Target.Binding.CapabilityDigest != job.Target.Binding.CapabilityDigest {
+	if err != nil || resolved.Target.Binding.CapabilityDigest != job.Target.Binding.CapabilityDigest || !CompatibleProfile(resolved.Target.Profile, job.Target.Profile) {
 		s.finish(ctx, &job, "outdated")
 		return
 	}
@@ -448,6 +458,9 @@ func (s *Service) execute(id string) {
 	for len(completed) < len(job.Plan.Items) {
 		progressed := false
 		for _, item := range job.Plan.Items {
+			if !item.Implemented {
+				continue
+			}
 			if _, ok := completed[item.ID]; ok {
 				continue
 			}
@@ -488,6 +501,10 @@ func (s *Service) execute(id string) {
 			}
 		}
 		if !progressed {
+			if HasPending(job.Plan) {
+				finish("suite_pending")
+				return
+			}
 			finish("failed")
 			return
 		}
@@ -556,6 +573,11 @@ func (s *Service) run(ctx context.Context, session *Session, item Planned, compl
 	result.SourceTaskID = session.jobID
 	result.SourceReportID = nil
 	refs := []string{}
+	for _, attempt := range result.Attempts {
+		if !slices.Contains(refs, attempt.ID) {
+			refs = append(refs, attempt.ID)
+		}
+	}
 	for _, a := range result.Assertions {
 		for _, id := range a.AttemptIDs {
 			if !slices.Contains(refs, id) {
@@ -563,7 +585,30 @@ func (s *Service) run(ctx context.Context, session *Session, item Planned, compl
 			}
 		}
 	}
-	if len(refs) > 1024 {
+	for _, capacity := range result.Capacity {
+		for _, step := range capacity.Steps {
+			for _, id := range step.AttemptIDs {
+				if !slices.Contains(refs, id) {
+					refs = append(refs, id)
+				}
+			}
+		}
+	}
+	for _, image := range result.Images {
+		for _, id := range image.AttemptIDs {
+			if !slices.Contains(refs, id) {
+				refs = append(refs, id)
+			}
+		}
+	}
+	for _, setting := range result.Settings {
+		for _, id := range setting.AttemptIDs {
+			if !slices.Contains(refs, id) {
+				refs = append(refs, id)
+			}
+		}
+	}
+	if len(refs) > 4096 {
 		return Result{State: "invalid"}
 	}
 	attempts, err := s.store.Attempts(ctx, session.jobID, refs)

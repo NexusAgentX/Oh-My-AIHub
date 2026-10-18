@@ -29,6 +29,7 @@ const (
 )
 
 type Dependencies struct {
+	DetectionMCP  *detection.MCPFixture
 	Contributions *contribution.Service
 	Detection     *detection.Service
 	Suppliers     *supplier.Service
@@ -54,6 +55,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	detectionMCP      *detection.MCPFixture
 	contributions     *contribution.Service
 	detection         *detection.Service
 	suppliers         *supplier.Service
@@ -88,6 +90,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		detectionMCP:      dependencies.DetectionMCP,
 		contributions:     dependencies.Contributions,
 		detection:         dependencies.Detection,
 		suppliers:         dependencies.Suppliers,

@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/Ikaleio/lm-detector",
+  "commit": "50a364bc686279094265f34f18f5501eac1d73f4",
+  "npm_package": "lmfpd",
+  "npm_version": "0.0.1792242250521",
+  "detector_sha256": "9117330f225a525d39d75db2616e90657e6b5d9ea1af46770389530de0a418fe",
+  "unified_bank_sha256": "3b0bc4477609f0fc0e98fb25b26a1e7393e550e4c65a40fe65813aa0a81301f5",
+  "profile": "strict; one round; three independent challenges; non-streaming; no optional output cap except native Messages max_tokens=8192",
+  "license": "MIT; see LMFPD-LICENSE.txt",
+  "files_ported": [
+    "shared/fingerprint-core.js",
+    "shared/positional.ts",
+    "shared/shared-detector.ts",
+    "shared/challenge-browser.js"
+  ]
+}

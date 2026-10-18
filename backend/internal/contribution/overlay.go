@@ -270,5 +270,12 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 	sort.Slice(out.Models, func(i, j int) bool { return out.Models[i].ID < out.Models[j].ID })
 	sort.Slice(out.Quotes, func(i, j int) bool { return out.Quotes[i].GroupModelID < out.Quotes[j].GroupModelID })
 	sort.Slice(targets, func(i, j int) bool { return targets[i].Binding.TargetID < targets[j].Binding.TargetID })
+	for i, target := range targets {
+		resolved, err := detection.ResolveDirectory(out, target)
+		if err != nil {
+			return market.Directory{}, nil, err
+		}
+		targets[i] = resolved.Target
+	}
 	return out, targets, nil
 }

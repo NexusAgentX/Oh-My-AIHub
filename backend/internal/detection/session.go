@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -63,12 +65,30 @@ type Request struct {
 	Headers    http.Header
 	Body       []byte
 	Category   string
+	// Internal-only negative authentication probes. Callers cannot supply an
+	// arbitrary replacement credential; configured protected headers are still
+	// stripped before either invalid or absent authentication is selected.
+	Authentication Authentication
+	// A generator may prove its synthetic request would exceed RequestBytes
+	// before allocating it. This records a local protection attempt, not an
+	// upstream response or a length-capability failure.
+	Oversized bool
 }
+type Authentication string
+
+const (
+	AuthenticationValid   Authentication = ""
+	AuthenticationInvalid Authentication = "invalid"
+	AuthenticationAbsent  Authentication = "absent"
+)
+
 type Response struct {
-	AttemptID string
-	Status    int
-	Headers   http.Header
-	Body      []byte
+	PriorAttempts []string
+	Sent          bool
+	AttemptID     string
+	Status        int
+	Headers       http.Header
+	Body          []byte
 }
 
 func (s *Session) Remember(id string, body []byte) error {
@@ -134,8 +154,29 @@ func matchPath(template, path string) bool {
 	return true
 }
 func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
+	if s.entry < 0 || s.entry >= len(s.resolved.Addresses) {
+		return Response{}, ErrInvalid
+	}
+	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
+	defer cancel()
+	var prior []string
+	for {
+		response, err := s.doEntry(callCtx, input)
+		endpoint := s.endpoints[input.EndpointID]
+		beforeWrite := input.Authentication == AuthenticationValid && err != nil && response.AttemptID != "" && !response.Sent && response.Status == 0
+		readSafe := endpoint.Method == http.MethodGet && input.Authentication == AuthenticationValid && response.AttemptID != "" && (err != nil || response.Status == 502 || response.Status == 503 || response.Status == 504)
+		if callCtx.Err() != nil || errors.Is(err, ErrBusy) || !(beforeWrite || readSafe) || s.entry+1 >= len(s.resolved.Addresses) {
+			response.PriorAttempts = prior
+			return response, err
+		}
+		prior = append(prior, response.AttemptID)
+		s.entry++
+	}
+}
+
+func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) {
 	e, ok := s.endpoints[input.EndpointID]
-	if !ok || !s.allowed[e.ID] || !matchPath(e.Path, input.Path) || int64(len(input.Body)) > s.limits.RequestBytes || !containsCategory(input.Category) || len(s.resolved.Addresses) == 0 {
+	if !ok || !s.allowed[e.ID] || !matchPath(e.Path, input.Path) || !containsCategory(input.Category) || len(s.resolved.Addresses) == 0 || (input.Authentication != AuthenticationValid && input.Authentication != AuthenticationInvalid && input.Authentication != AuthenticationAbsent) {
 		return Response{}, ErrInvalid
 	}
 	id, err := ids.NewUUID()
@@ -158,10 +199,15 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	// One selected entrance per call; scene code may explicitly retry only with
 	// known replay safety. A blind automatic retry can duplicate a tool/write.
 	base := s.resolved.Addresses[s.entry]
+	attempt.EntryURL = base
 	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
 	defer cancel()
 	policy := s.outbound
-	if s.prepareEgress != nil {
+	if input.Oversized || int64(len(input.Body)) > s.limits.RequestBytes {
+		err = ErrBusy
+		attempt.Reason = "body_limit"
+	}
+	if err == nil && s.prepareEgress != nil {
 		policy, err = s.prepareEgress(callCtx)
 	}
 	var client *http.Client
@@ -221,16 +267,26 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 						}
 					}
 				}
+				credential := string(s.secret)
+				if input.Authentication == AuthenticationInvalid {
+					credential = "aihub-invalid-" + id
+				}
 				switch e.Protocol {
 				case "native-messages":
-					req.Header.Set("x-api-key", string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("x-api-key", credential)
+					}
 					if req.Header.Get("anthropic-version") == "" {
 						req.Header.Set("anthropic-version", "2023-06-01")
 					}
 				case "native-generate-content":
-					req.Header.Set("x-goog-api-key", string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("x-goog-api-key", credential)
+					}
 				default:
-					req.Header.Set("Authorization", "Bearer "+string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("Authorization", "Bearer "+credential)
+					}
 				}
 				var resp *http.Response
 				resp, err = client.Do(req)
@@ -247,7 +303,7 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 						output.Body = nil
 						err = ErrBusy
 						attempt.Reason = "body_limit"
-					} else if err == nil && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") && oversizedEvent(output.Body, s.limits.EventBytes) {
+					} else if err == nil && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") && oversizedEvent(output.Body, s.eventLimit(e.ID)) {
 						clear(output.Body)
 						output.Body = nil
 						err = ErrBusy
@@ -268,6 +324,7 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	}
 	attempt.DurationMS = time.Since(start).Milliseconds()
 	output.AttemptID = id
+	output.Sent = attempt.Sent
 	// Metadata writes have their own bounded deadline so cancellation still
 	// records the actual failed/partial attempt. No body/header/secret is saved.
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -277,12 +334,26 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	}
 	return output, err
 }
+
+func (s *Session) eventLimit(endpoint string) int {
+	// Native image events carry a whole base64 product. Keep the same bounded
+	// total response limit, rather than applying the smaller text-event limit.
+	if slices.Contains([]string{"images.generations", "images.edits", "codex.images", "codex.images.edit"}, endpoint) {
+		return int(s.limits.ResponseBytes)
+	}
+	return s.limits.EventBytes
+}
 func containsCategory(category string) bool {
 	return category == "generate" || category == "count" || category == "query" || category == "cleanup"
 }
 func (s *Session) Meter(input, output, images, tools int64) error {
 	if input < 0 || output < 0 || images < 0 || tools < 0 {
 		return ErrInvalid
+	}
+	for _, pair := range [][2]int64{{s.usage.InputTokens, input}, {s.usage.OutputTokens, output}, {s.usage.Images, images}, {s.usage.Tools, tools}} {
+		if pair[0] > math.MaxInt64-pair[1] {
+			return ErrInvalid
+		}
 	}
 	s.usage.InputTokens += input
 	s.usage.OutputTokens += output

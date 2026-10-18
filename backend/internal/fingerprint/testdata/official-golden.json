@@ -1,0 +1,1575 @@
+{
+  "source_commit": "50a364bc686279094265f34f18f5501eac1d73f4",
+  "generator": "LCG uint32 seed=123456789; a=1664525; c=1013904223; deterministic synthetic samples only",
+  "cases": [
+    {
+      "pattern": "lcg",
+      "outputs": [
+        {
+          "text": "228, 73, 246, 137, 48, 119, 205, 122, 1, 52, 230, 195, 142, 122, 287, 115, 44, 353, 346, 105, 119, 45, 283, 119, 238, 113, 349, 295, 130, 34, 318, 299, 208, 101, 149, 38, 153, 298, 233, 169, 245, 162, 294, 157, 140, 164, 254, 274, 221, 324, 193, 175, 136, 77, 172, 182, 100, 214, 220, 1, 325, 248, 311, 220, 21, 166, 191, 178, 232, 27, 48, 71, 353, 283, 355, 269, 88, 343, 161, 103, 53, 277, 72, 224, 90, 344, 69, 126, 72, 254, 221, 285, 33, 344, 132, 155, 33, 49, 259, 171, 297, 35, 14, 339, 320, 110, 324, 253, 11, 166, 164, 93, 234, 177, 323, 83, 167, 91, 78, 15, 275, 114, 310, 272, 263, 16, 291, 354, 250, 205, 334, 8, 100, 111, 130, 35, 344, 16, 104, 257, 25, 122, 262, 98, 335, 112, 13, 156, 89, 55, 44, 239, 13, 353, 339, 321, 38, 295, 174, 120, 114, 298, 340, 4, 349, 214, 287, 216, 2, 138, 51, 92, 292, 111, 244, 241, 126, 134, 25, 310, 232, 25, 263, 192, 54, 335, 303, 1, 202, 203, 22, 347, 278, 319, 46, 239, 125, 118, 321, 339, 237, 128, 105, 146, 106, 154, 44, 8, 127, 116, 22, 230, 206, 217, 311, 47, 198, 200, 38, 266, 21, 99, 327, 23, 272, 170, 274, 150, 122, 175, 315, 330, 261, 112, 304, 168, 23, 189, 353, 219, 45, 250, 116, 23, 222, 307, 268, 99, 32, 109, 37, 215, 121, 312, 253, 29, 127, 133, 120, 261, 321, 348, 191, 192, 244, 131, 172, 280, 184, 222, 179, 143, 186, 141, 158, 271, 231, 345, 310, 2, 154, 191, 173, 30, 162, 325, 23, 201, 20, 99, 141, 151",
+          "expected_count": 292
+        },
+        {
+          "text": "239, 15, 224, 42, 196, 300, 139, 116, 270, 282, 352, 134, 292, 325, 297, 7, 75, 249, 248, 189, 292, 188, 266, 319, 250, 354, 209, 191, 274, 82, 180, 229, 198, 91, 120, 172, 20, 294, 121, 242, 310, 58, 223, 309, 304, 343, 323, 53, 152, 311, 193, 301, 67, 14, 332, 288, 235, 71, 312, 230, 293, 317, 23, 314, 260, 90, 293, 29, 18, 315, 132, 177, 175, 123, 51, 95, 256, 10, 67, 188, 290, 283, 352, 101, 209, 261, 326, 75, 262, 85, 333, 108, 337, 248, 260, 43, 76, 104, 82, 96, 181, 27, 276, 70, 235, 53, 240, 208, 124, 19, 270, 107, 314, 291, 61, 78, 276, 16, 203, 40, 167, 159, 116, 43, 49, 348, 4, 336, 200, 244, 191, 313, 242, 225, 98, 239, 196, 255, 274, 213, 287, 272, 294, 237, 144, 329, 225, 133, 225, 64, 159, 206, 338, 177, 156, 167, 336, 50, 237, 58, 171, 81, 355, 289, 129, 207, 351, 159, 112, 343, 341, 254, 99, 235, 56, 158, 150, 206, 17, 289, 208, 138, 337, 312, 38, 144, 81, 330, 68, 171, 11, 218, 227, 323, 148, 306, 169, 47, 58, 290, 83, 105, 321, 291, 27, 101, 224, 333, 238, 309, 224, 79, 119, 249, 11, 168, 200, 133, 223, 198, 293, 27, 194, 276, 44, 224, 305, 111, 76, 346, 9, 347, 149, 205, 186, 100, 276, 186, 42, 129, 107, 334, 7, 19, 251, 270, 222, 55, 179, 36, 145, 61, 324, 220, 26, 265, 254, 326, 86, 230, 61, 253, 231, 116, 245, 318, 257, 134, 132, 264, 268, 98, 4, 298, 345, 339, 231, 148, 281, 76, 335, 115, 318, 335, 28, 55, 314, 89, 217, 276, 161, 193, 334, 3, 335, 315, 246, 81, 192, 209, 92, 28, 183, 353, 22, 139, 32, 122, 85, 251, 103, 246, 213, 149, 293, 232, 279",
+          "expected_count": 317
+        },
+        {
+          "text": "70, 335, 225, 196, 352, 284, 309, 333, 101, 181, 313, 126, 68, 247, 55, 293, 306, 280, 115, 243, 116, 337, 197, 291, 107, 101, 349, 212, 287, 174, 306, 171, 12, 223, 107, 96, 186, 48, 299, 152, 8, 180, 207, 305, 158, 15, 132, 255, 221, 232, 296, 240, 1, 344, 291, 253, 73, 227, 36, 67, 89, 6, 13, 107, 53, 55, 150, 68, 94, 56, 308, 284, 14, 229, 263, 33, 253, 352, 59, 203, 31, 214, 55, 134, 91, 147, 155, 333, 323, 274, 192, 163, 354, 32, 196, 236, 80, 2, 179, 154, 154, 244, 248, 148, 22, 323, 161, 328, 270, 227, 132, 153, 162, 42, 38, 194, 347, 336, 266, 280, 236, 284, 149, 123, 121, 285, 147, 339, 352, 231, 41, 38, 108, 138, 198, 227, 311, 41, 105, 71, 300, 280, 55, 214, 151, 230, 301, 225, 296, 283, 158, 189, 126, 238, 224, 167, 23, 233, 190, 245, 35, 293, 307, 103, 329, 168, 110, 28, 214, 276, 166, 115, 351, 231, 315, 339, 58, 329, 212, 331, 88, 7, 144, 252, 71, 215, 42, 55, 255, 101, 261, 284, 34, 339, 203, 19, 38, 301, 50, 69, 301, 191, 335, 241, 348, 96, 150, 68, 13, 29, 271, 303, 96, 84, 100, 350, 117, 339, 107, 250, 15, 55, 218, 169, 312, 161, 238, 261, 1, 298, 108, 255, 196, 210, 9, 125, 133, 293, 336, 152, 65, 338, 237, 284, 55, 15, 122, 204, 127, 167, 133, 196, 95, 255, 135, 167, 192, 204, 29, 281, 338, 114, 239, 278, 254, 243, 333, 244, 228, 116, 98, 219, 129, 175, 193, 104, 21, 160, 126, 191, 287, 64, 207, 138, 290, 296, 212, 132, 283, 146, 227, 238, 282, 306, 263, 282, 239, 245, 287, 260, 7, 273, 252, 43, 137, 26, 191, 96, 122, 310, 195, 120, 245, 32, 132, 65, 161, 326, 208, 215, 350, 114, 130, 129, 195, 311, 175, 100, 238, 12, 138, 183",
+          "expected_count": 332
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-4o",
+          "display_name": "gpt-4o",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 2.9004636944540856,
+          "probability": 0.9901683401143593
+        },
+        {
+          "model": "kimi-k3",
+          "display_name": "kimi-k3",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 1.8409773529347273,
+          "probability": 0.005766836327330171
+        },
+        {
+          "model": "deepseek-v3.2",
+          "display_name": "deepseek-v3.2",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 1.6431791902266502,
+          "probability": 0.002206594570701307
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "display_name": "deepseek-v4-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 1.3955418436229792,
+          "probability": 0.000662798965051099
+        },
+        {
+          "model": "deepseek-v4-flash-0731",
+          "display_name": "deepseek-v4-flash-0731",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 1.3329591403646808,
+          "probability": 0.0004890759537193402
+        },
+        {
+          "model": "mimo-v2.5",
+          "display_name": "mimo-v2.5",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 1.2042718601318123,
+          "probability": 0.0002617800886515885
+        },
+        {
+          "model": "step-5-preview",
+          "display_name": "step-5-preview",
+          "family": "step",
+          "family_name": "Step",
+          "score": 1.132692437290212,
+          "probability": 0.0001849074226958259
+        },
+        {
+          "model": "qwen3.8-flash",
+          "display_name": "qwen3.8-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.9839936863696673,
+          "probability": 0.00008980582549123438
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "display_name": "deepseek-v4-pro",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.7369367500822497,
+          "probability": 0.000027051293931507696
+        },
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra/6.1-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.735161741886596,
+          "probability": 0.000026819089141539102
+        },
+        {
+          "model": "gemini-3.6-flash",
+          "display_name": "gemini-3.6-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.6720273692193902,
+          "probability": 0.000019736715368966764
+        },
+        {
+          "model": "qwen3.8-27b",
+          "display_name": "qwen3.8-27b",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.6461694452076336,
+          "probability": 0.000017407356964984916
+        },
+        {
+          "model": "mimo-v2.6-pro",
+          "display_name": "mimo-v2.6-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 0.6184534205398142,
+          "probability": 0.00001521498422228798
+        },
+        {
+          "model": "muse-spark-1.3",
+          "display_name": "muse-spark-1.3",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": 0.5129264113111703,
+          "probability": 0.000009113468514491848
+        },
+        {
+          "model": "mimo-v2.5-pro",
+          "display_name": "mimo-v2.5-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 0.44598120714326506,
+          "probability": 0.00000658379615737828
+        },
+        {
+          "model": "grok-4.6",
+          "display_name": "grok-4.6",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 0.36439169523454845,
+          "probability": 0.000004429756556928161
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.3610804208078385,
+          "probability": 0.000004359085608880597
+        },
+        {
+          "model": "claude-sonnet-5.5",
+          "display_name": "claude-sonnet-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.3369815596048949,
+          "probability": 0.0000038776065609290215
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "display_name": "gemini-3.8-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.3343914208400445,
+          "probability": 0.0000038291322790376246
+        },
+        {
+          "model": "grok-4.5",
+          "display_name": "grok-4.5",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 0.3230929177732757,
+          "probability": 0.000003624669975144363
+        },
+        {
+          "model": "gemini-2.5-pro",
+          "display_name": "gemini-2.5-pro",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.3206515697446931,
+          "probability": 0.0000035819452400551026
+        },
+        {
+          "model": "qwen3.8-omni-flash",
+          "display_name": "qwen3.8-omni-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.3188718458774646,
+          "probability": 0.000003551116954803249
+        },
+        {
+          "model": "deepseek-v4.1-flash-1017",
+          "display_name": "deepseek-v4.1-flash-1017",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.2805867282240083,
+          "probability": 0.0000029485621771850898
+        },
+        {
+          "model": "kimi-k2.8-preview",
+          "display_name": "kimi-k2.8-preview",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 0.27960406198831944,
+          "probability": 0.0000029345232538593424
+        },
+        {
+          "model": "muse-spark-1.2",
+          "display_name": "muse-spark-1.2",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": 0.22669143128968292,
+          "probability": 0.0000022694943176140143
+        },
+        {
+          "model": "deepseek-v4-pro-0813",
+          "display_name": "deepseek-v4-pro-0813",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.212374738754747,
+          "probability": 0.0000021170491576978587
+        },
+        {
+          "model": "mimo-v2.6-flash",
+          "display_name": "mimo-v2.6-flash",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 0.18877315292421407,
+          "probability": 0.000001887766118538054
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "display_name": "gemini-3.5-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.12794139447149827,
+          "probability": 0.0000014048693536409778
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.11672833844237612,
+          "probability": 0.0000013304062387559519
+        },
+        {
+          "model": "claude-fable-5.1",
+          "display_name": "claude-fable-5.1",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.10108375968513757,
+          "probability": 0.000001233062837494174
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.058190030562897316,
+          "probability": 0.000001001174069681627
+        },
+        {
+          "model": "glm-5.3",
+          "display_name": "glm-5.3",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.0854886512312777,
+          "probability": 4.982514529463931e-7
+        },
+        {
+          "model": "claude-opus-5.5",
+          "display_name": "claude-opus-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.10711286626373628,
+          "probability": 4.48576668234998e-7
+        },
+        {
+          "model": "glm-5.3-flash",
+          "display_name": "glm-5.3-flash",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.1478187740649347,
+          "probability": 3.68108486425061e-7
+        },
+        {
+          "model": "gemini-3.7-flash",
+          "display_name": "gemini-3.7-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.14836392091182102,
+          "probability": 3.671351388393278e-7
+        },
+        {
+          "model": "qwen3.8-max-0902",
+          "display_name": "qwen3.8-max-0902",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": -0.156841924663207,
+          "probability": 3.523248899492332e-7
+        },
+        {
+          "model": "deepseek-v4.1-flash",
+          "display_name": "deepseek-v4.1-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": -0.16421907520496226,
+          "probability": 3.3992470012941503e-7
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.23408219866055457,
+          "probability": 2.4211441274309365e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.25094286927038895,
+          "probability": 2.230778655670437e-7
+        },
+        {
+          "model": "glm-5.3-flashx",
+          "display_name": "glm-5.3-flashx",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.2955618741827533,
+          "probability": 1.7961464538954632e-7
+        },
+        {
+          "model": "seed-2.1-turbo",
+          "display_name": "seed-2.1-turbo",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": -0.3639976184193191,
+          "probability": 1.288221170556638e-7
+        },
+        {
+          "model": "seed-2.0-mini",
+          "display_name": "seed-2.0-mini",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": -0.3904821998877935,
+          "probability": 1.1327304689001995e-7
+        },
+        {
+          "model": "gemini-4-argon",
+          "display_name": "gemini-4-argon",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.5190107514354445,
+          "probability": 6.067666305149725e-8
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.5255471895031949,
+          "probability": 5.878065199874331e-8
+        },
+        {
+          "model": "seed-2.0-lite",
+          "display_name": "seed-2.0-lite",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": -0.5792678308885765,
+          "probability": 4.528158381808868e-8
+        },
+        {
+          "model": "glm-5.2",
+          "display_name": "glm-5.2",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.6343786621829061,
+          "probability": 3.46478663234726e-8
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "display_name": "gemini-3.1-pro-preview",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.663499471942577,
+          "probability": 3.007821484715754e-8
+        },
+        {
+          "model": "hy4-preview",
+          "display_name": "hy4-preview",
+          "family": "hunyuan",
+          "family_name": "Hunyuan",
+          "score": -0.7769125521363861,
+          "probability": 1.7339244959592934e-8
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.8815017929806235,
+          "probability": 1.0433269011301242e-8
+        },
+        {
+          "model": "claude-sonnet-4.6",
+          "display_name": "claude-sonnet-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.8955694489730964,
+          "probability": 9.744230308968319e-9
+        },
+        {
+          "model": "claude-haiku-4.5",
+          "display_name": "claude-haiku-4.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.9261709026794671,
+          "probability": 8.398466306751418e-9
+        },
+        {
+          "model": "claude-haiku-5.5",
+          "display_name": "claude-haiku-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.0774254886692072,
+          "probability": 4.028646236736699e-9
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.0857776428780324,
+          "probability": 3.868494276240195e-9
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -1.098344714739058,
+          "probability": 3.6394375454046747e-9
+        },
+        {
+          "model": "grok-4.7",
+          "display_name": "grok-4.7",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": -1.190131800956217,
+          "probability": 2.3303869588093554e-9
+        },
+        {
+          "model": "muse-wonder",
+          "display_name": "muse-wonder",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -1.3485566287419006,
+          "probability": 1.079600358236318e-9
+        },
+        {
+          "model": "claude-opus-4.7",
+          "display_name": "claude-opus-4.7",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.3570568821631628,
+          "probability": 1.0359372761151342e-9
+        },
+        {
+          "model": "claude-opus-4.8",
+          "display_name": "claude-opus-4.8",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.4462515333534638,
+          "probability": 6.717310852051594e-10
+        },
+        {
+          "model": "claude-fable-5",
+          "display_name": "claude-fable-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.5204988097432715,
+          "probability": 4.683665657975553e-10
+        },
+        {
+          "model": "claude-opus-4.6",
+          "display_name": "claude-opus-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.8823565402832414,
+          "probability": 8.078308670255545e-11
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 292,
+          "minimum_numbers": 161,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 317,
+          "minimum_numbers": 175,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 2,
+          "parsed_numbers": 332,
+          "minimum_numbers": 183,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        }
+      ],
+      "probability_scope": "reference-closed-set"
+    },
+    {
+      "pattern": "mixed",
+      "outputs": [
+        {
+          "text": "7, 6, 161, 326, 236, 236, 311, 7, 1, 256, 81, 261, 351, 251, 7, 216, 216, 341, 306, 166, 236, 7, 346, 236, 121, 206, 321, 51, 7, 166, 166, 71, 326, 146, 31, 7, 51, 66, 96, 131, 156, 96, 7, 71, 341, 106, 201, 301, 36, 7, 251, 161, 321, 26, 146, 196, 7, 1, 31, 1, 201, 171, 131, 7, 101, 116, 241, 176, 91, 131, 7, 351, 341, 346, 351, 276, 81, 7, 91, 156, 261, 316, 1, 51, 7, 296, 341, 271, 1, 201, 36, 7, 161, 296, 301, 61, 161, 241, 7, 141, 61, 171, 66, 271, 176, 7, 196, 196, 51, 116, 106, 106, 7, 171, 191, 56, 121, 96, 31, 7, 306, 211, 126, 291, 246, 76, 7, 346, 181, 311, 246, 36, 141, 7, 291, 171, 296, 76, 161, 216, 7, 251, 241, 131, 251, 201, 61, 7, 86, 271, 216, 126, 61, 341, 7, 181, 186, 51, 156, 241, 211, 7, 276, 16, 321, 1, 11, 11, 7, 331, 251, 101, 36, 196, 151, 7, 271, 311, 121, 126, 91, 121, 7, 246, 266, 251, 91, 1, 296, 7, 106, 311, 321, 171, 226, 126, 7, 231, 181, 271, 116, 281, 166, 7, 171, 56, 216, 36, 276, 221, 7, 81, 316, 16, 131, 231, 276, 7, 186, 261, 101, 136, 211, 111, 7, 136, 301, 36, 251, 161, 151, 7, 236, 201, 96, 126, 111, 231, 7, 26, 221, 181, 221, 111, 41, 7, 271, 136, 156, 186, 181, 6, 7, 136, 196, 141, 276, 306, 241, 7, 181, 316, 241, 246, 151, 296, 7, 331, 206, 41, 181, 1, 216, 7, 76, 286, 86, 301, 126, 6, 7, 241, 151, 146, 96, 201, 111, 7, 96, 136, 346, 41",
+          "expected_count": 292
+        },
+        {
+          "text": "7, 71, 51, 206, 266, 76, 336, 7, 281, 341, 336, 311, 36, 201, 7, 31, 16, 176, 171, 231, 36, 7, 261, 171, 181, 346, 331, 241, 7, 51, 186, 76, 276, 96, 241, 7, 96, 46, 246, 141, 126, 286, 7, 121, 96, 291, 191, 261, 46, 7, 251, 81, 331, 66, 236, 16, 7, 351, 136, 81, 41, 161, 111, 7, 231, 91, 41, 141, 86, 151, 7, 171, 161, 256, 251, 116, 211, 7, 331, 226, 26, 346, 336, 146, 7, 236, 206, 16, 241, 66, 241, 7, 261, 171, 231, 211, 21, 161, 7, 121, 191, 131, 311, 346, 106, 7, 131, 326, 261, 91, 281, 176, 7, 31, 301, 31, 311, 76, 301, 7, 121, 81, 221, 211, 241, 316, 7, 256, 286, 151, 241, 141, 141, 7, 131, 126, 266, 206, 301, 351, 7, 291, 46, 116, 6, 221, 56, 7, 56, 316, 81, 316, 266, 171, 7, 121, 256, 246, 116, 286, 141, 7, 351, 21, 286, 321, 331, 81, 7, 291, 281, 201, 136, 106, 276, 7, 36, 316, 81, 21, 326, 331, 7, 136, 186, 6, 46, 226, 336, 7, 51, 21, 66, 191, 26, 106, 7, 231, 286, 26, 56, 166, 181, 7, 131, 146, 51, 241, 121, 121, 7, 36, 236, 176, 51, 126, 286, 7, 46, 276, 41, 131, 256, 311, 7, 51, 101, 196, 21, 306, 41, 7, 31, 311, 216, 141, 311, 216, 7, 286, 176, 246, 31, 91, 186, 7, 41, 271, 181, 176, 11, 301, 7, 31, 126, 256, 201, 206, 71, 7, 301, 196, 86, 221, 156, 166, 7, 311, 301, 251, 271, 131, 16, 7, 301, 271, 86, 26, 336, 21, 7, 216, 166, 251, 136, 271, 146, 7, 16, 311, 91, 251, 246, 11, 7, 151, 161, 46, 246, 331, 101, 7, 201, 341, 106, 336, 156, 251, 7, 186, 156, 161, 351, 31, 41, 7, 326",
+          "expected_count": 317
+        },
+        {
+          "text": "7, 251, 56, 266, 336, 351, 121, 7, 146, 191, 141, 271, 336, 166, 7, 41, 106, 331, 216, 146, 221, 7, 271, 31, 176, 146, 321, 346, 7, 156, 106, 141, 56, 46, 176, 7, 216, 236, 71, 46, 36, 186, 7, 101, 76, 71, 301, 206, 36, 7, 56, 131, 1, 296, 31, 196, 7, 66, 176, 331, 86, 26, 61, 7, 261, 271, 36, 336, 111, 276, 7, 351, 66, 76, 246, 161, 196, 7, 291, 301, 151, 1, 271, 311, 7, 21, 61, 241, 191, 301, 246, 7, 346, 156, 266, 111, 41, 6, 7, 56, 56, 151, 171, 26, 106, 7, 91, 216, 281, 66, 301, 51, 7, 206, 186, 256, 311, 256, 261, 7, 111, 351, 31, 256, 246, 1, 7, 271, 336, 86, 201, 186, 181, 7, 276, 66, 131, 201, 166, 351, 7, 331, 271, 1, 41, 81, 81, 7, 56, 346, 76, 231, 271, 121, 7, 121, 111, 96, 236, 156, 171, 7, 111, 156, 221, 126, 191, 136, 7, 311, 116, 216, 331, 86, 151, 7, 286, 221, 346, 231, 81, 31, 7, 191, 351, 6, 206, 271, 206, 7, 236, 351, 166, 271, 301, 91, 7, 81, 246, 341, 81, 241, 251, 7, 316, 121, 36, 336, 61, 141, 7, 91, 121, 61, 141, 326, 226, 7, 176, 181, 71, 271, 21, 131, 7, 91, 121, 236, 1, 66, 181, 7, 266, 336, 41, 266, 306, 41, 7, 46, 321, 266, 116, 351, 271, 7, 251, 306, 276, 121, 306, 266, 7, 206, 316, 121, 246, 306, 141, 7, 266, 211, 126, 321, 201, 146, 7, 151, 71, 221, 131, 26, 286, 7, 251, 161, 101, 86, 271, 241, 7, 316, 321, 331, 26, 56, 346, 7, 346, 16, 66, 121, 341, 106, 7, 341, 126, 156, 11, 231, 31, 7, 191, 211, 326, 126, 241, 121, 7, 126, 261, 241, 156, 156, 301, 7, 91, 206, 326, 6, 326, 211, 7, 286, 261, 131, 161, 141, 121, 7, 331, 201",
+          "expected_count": 332
+        }
+      ],
+      "results": [
+        {
+          "model": "mimo-v2.6-flash",
+          "display_name": "mimo-v2.6-flash",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 2.6399408563308846,
+          "probability": 0.9849868501299747
+        },
+        {
+          "model": "step-5-preview",
+          "display_name": "step-5-preview",
+          "family": "step",
+          "family_name": "Step",
+          "score": 1.6532866402990558,
+          "probability": 0.00817115802020818
+        },
+        {
+          "model": "deepseek-v4.1-flash-1017",
+          "display_name": "deepseek-v4.1-flash-1017",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 1.4672081442241063,
+          "probability": 0.0033097011984632163
+        },
+        {
+          "model": "qwen3.8-flash",
+          "display_name": "qwen3.8-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 1.2243894224925649,
+          "probability": 0.0010176817226746472
+        },
+        {
+          "model": "qwen3.8-omni-flash",
+          "display_name": "qwen3.8-omni-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 1.1733498027252884,
+          "probability": 0.0007942445721634512
+        },
+        {
+          "model": "hy4-preview",
+          "display_name": "hy4-preview",
+          "family": "hunyuan",
+          "family_name": "Hunyuan",
+          "score": 0.9647924936299023,
+          "probability": 0.0002884329950007848
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "display_name": "deepseek-v4-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.9184210337478911,
+          "probability": 0.0002302680887143925
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.851245450252476,
+          "probability": 0.0001661653613743669
+        },
+        {
+          "model": "seed-2.1-turbo",
+          "display_name": "seed-2.1-turbo",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": 0.8029656922117971,
+          "probability": 0.00013143291661078357
+        },
+        {
+          "model": "gpt-4o",
+          "display_name": "gpt-4o",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.7861375452574337,
+          "probability": 0.00012111797041860753
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.7788255069581198,
+          "probability": 0.00011689214387332436
+        },
+        {
+          "model": "kimi-k3",
+          "display_name": "kimi-k3",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 0.7711739880472327,
+          "probability": 0.0001126279028869177
+        },
+        {
+          "model": "qwen3.8-27b",
+          "display_name": "qwen3.8-27b",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.7235301581346009,
+          "probability": 0.00008936161478976136
+        },
+        {
+          "model": "mimo-v2.5",
+          "display_name": "mimo-v2.5",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 0.6700614514359454,
+          "probability": 0.0000689238649676
+        },
+        {
+          "model": "glm-5.3",
+          "display_name": "glm-5.3",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": 0.6656530769170341,
+          "probability": 0.00006746383910395649
+        },
+        {
+          "model": "glm-5.3-flashx",
+          "display_name": "glm-5.3-flashx",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": 0.5881025986405428,
+          "probability": 0.000046290732899592766
+        },
+        {
+          "model": "claude-fable-5.1",
+          "display_name": "claude-fable-5.1",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.5538629543683693,
+          "probability": 0.000039198773302697043
+        },
+        {
+          "model": "glm-5.3-flash",
+          "display_name": "glm-5.3-flash",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": 0.5507468262402296,
+          "probability": 0.00003860998531515468
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.49970219943332844,
+          "probability": 0.000030132235700151212
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.49601672376776385,
+          "probability": 0.000029597674721479214
+        },
+        {
+          "model": "grok-4.7",
+          "display_name": "grok-4.7",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 0.45593599236358273,
+          "probability": 0.000024362139440811076
+        },
+        {
+          "model": "claude-opus-5.5",
+          "display_name": "claude-opus-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.3990977461455935,
+          "probability": 0.00001848530751669827
+        },
+        {
+          "model": "grok-4.6",
+          "display_name": "grok-4.6",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 0.3215597259874754,
+          "probability": 0.000012684576234193119
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.30593349455393987,
+          "probability": 0.000011757516560001341
+        },
+        {
+          "model": "deepseek-v4.1-flash",
+          "display_name": "deepseek-v4.1-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.2768326196012825,
+          "probability": 0.000010207824847471066
+        },
+        {
+          "model": "deepseek-v4-flash-0731",
+          "display_name": "deepseek-v4-flash-0731",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.2552483811562928,
+          "probability": 0.000009191907369428333
+        },
+        {
+          "model": "deepseek-v4-pro-0813",
+          "display_name": "deepseek-v4-pro-0813",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.24221311104782842,
+          "probability": 0.00000862800488675877
+        },
+        {
+          "model": "kimi-k2.8-preview",
+          "display_name": "kimi-k2.8-preview",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 0.15889041459994863,
+          "probability": 0.000005756494113928444
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "display_name": "deepseek-v4-pro",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.14892917995051913,
+          "probability": 0.000005484624029822901
+        },
+        {
+          "model": "grok-4.5",
+          "display_name": "grok-4.5",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 0.1473199216395263,
+          "probability": 0.00000544192382487744
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.13534180674700727,
+          "probability": 0.000005134368744000832
+        },
+        {
+          "model": "deepseek-v3.2",
+          "display_name": "deepseek-v3.2",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.12833532282973587,
+          "probability": 0.000004962588903536839
+        },
+        {
+          "model": "muse-spark-1.3",
+          "display_name": "muse-spark-1.3",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": 0.10428320258360331,
+          "probability": 0.000004415452670854527
+        },
+        {
+          "model": "qwen3.8-max-0902",
+          "display_name": "qwen3.8-max-0902",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.09378938078231984,
+          "probability": 0.0000041960499228513754
+        },
+        {
+          "model": "claude-fable-5",
+          "display_name": "claude-fable-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.06610388333876194,
+          "probability": 0.0000036681214676043594
+        },
+        {
+          "model": "seed-2.0-lite",
+          "display_name": "seed-2.0-lite",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": 0.03734175355223028,
+          "probability": 0.000003189890926285757
+        },
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra/6.1-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.015722515141951457,
+          "probability": 0.0000028719338834334214
+        },
+        {
+          "model": "gemini-4-argon",
+          "display_name": "gemini-4-argon",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.27814900573783796,
+          "probability": 6.89147375629492e-7
+        },
+        {
+          "model": "claude-haiku-5.5",
+          "display_name": "claude-haiku-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.3215855675069387,
+          "probability": 5.580736215413892e-7
+        },
+        {
+          "model": "claude-opus-4.6",
+          "display_name": "claude-opus-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.3663621364956264,
+          "probability": 4.489980041469979e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.3801465633172927,
+          "probability": 4.199223205490206e-7
+        },
+        {
+          "model": "muse-spark-1.2",
+          "display_name": "muse-spark-1.2",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -0.39389172292561636,
+          "probability": 3.928043921190244e-7
+        },
+        {
+          "model": "gemini-2.5-pro",
+          "display_name": "gemini-2.5-pro",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.4946988300943842,
+          "probability": 2.4073775257179665e-7
+        },
+        {
+          "model": "claude-opus-4.8",
+          "display_name": "claude-opus-4.8",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.5272813061201987,
+          "probability": 2.0550295985153492e-7
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.678051958375653,
+          "probability": 9.880933807565867e-8
+        },
+        {
+          "model": "claude-haiku-4.5",
+          "display_name": "claude-haiku-4.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.6809572507755599,
+          "probability": 9.742487680322247e-8
+        },
+        {
+          "model": "claude-sonnet-5.5",
+          "display_name": "claude-sonnet-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.7623419488393481,
+          "probability": 6.56153367535465e-8
+        },
+        {
+          "model": "mimo-v2.6-pro",
+          "display_name": "mimo-v2.6-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": -0.8545420843904454,
+          "probability": 4.193029216438911e-8
+        },
+        {
+          "model": "muse-wonder",
+          "display_name": "muse-wonder",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -0.8828310264653233,
+          "probability": 3.654753633691877e-8
+        },
+        {
+          "model": "seed-2.0-mini",
+          "display_name": "seed-2.0-mini",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": -0.9504271664060735,
+          "probability": 2.6319508101422797e-8
+        },
+        {
+          "model": "mimo-v2.5-pro",
+          "display_name": "mimo-v2.5-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": -0.9770935886975557,
+          "probability": 2.3122264374696133e-8
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.0159900612357133,
+          "probability": 1.9141948694884012e-8
+        },
+        {
+          "model": "gemini-3.6-flash",
+          "display_name": "gemini-3.6-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -1.0937064946209292,
+          "probability": 1.312378492627372e-8
+        },
+        {
+          "model": "claude-opus-4.7",
+          "display_name": "claude-opus-4.7",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.1662058635311745,
+          "probability": 9.228612267335599e-9
+        },
+        {
+          "model": "gemini-3.7-flash",
+          "display_name": "gemini-3.7-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -1.183034327475755,
+          "probability": 8.504331301239405e-9
+        },
+        {
+          "model": "glm-5.2",
+          "display_name": "glm-5.2",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -1.1939866373801942,
+          "probability": 8.063776750625368e-9
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "display_name": "gemini-3.1-pro-preview",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -1.3042011382756982,
+          "probability": 4.721319321335608e-9
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "display_name": "gemini-3.8-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -1.5072161363223655,
+          "probability": 1.7613450321026134e-9
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "display_name": "gemini-3.5-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -2.385784559591432,
+          "probability": 2.4699187038722646e-11
+        },
+        {
+          "model": "claude-sonnet-4.6",
+          "display_name": "claude-sonnet-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -2.6738056425550525,
+          "probability": 6.097623980932721e-12
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 292,
+          "minimum_numbers": 161,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 317,
+          "minimum_numbers": 175,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 2,
+          "parsed_numbers": 332,
+          "minimum_numbers": 183,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        }
+      ],
+      "probability_scope": "reference-closed-set"
+    },
+    {
+      "pattern": "sequential",
+      "outputs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292",
+          "expected_count": 292
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317",
+          "expected_count": 317
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332",
+          "expected_count": 332
+        }
+      ],
+      "results": [
+        {
+          "model": "deepseek-v3.2",
+          "display_name": "deepseek-v3.2",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 3.1139916205011424,
+          "probability": 0.9548069166420734
+        },
+        {
+          "model": "kimi-k3",
+          "display_name": "kimi-k3",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 2.476369799306876,
+          "probability": 0.0431500926443369
+        },
+        {
+          "model": "qwen3.8-27b",
+          "display_name": "qwen3.8-27b",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 1.610616402394832,
+          "probability": 0.0006439477793087338
+        },
+        {
+          "model": "grok-4.5",
+          "display_name": "grok-4.5",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 1.5609943229769012,
+          "probability": 0.0005060377829253231
+        },
+        {
+          "model": "qwen3.8-flash",
+          "display_name": "qwen3.8-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 1.4777097574359082,
+          "probability": 0.0003376844452856203
+        },
+        {
+          "model": "mimo-v2.5",
+          "display_name": "mimo-v2.5",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 1.305435503378042,
+          "probability": 0.00014626266458901135
+        },
+        {
+          "model": "mimo-v2.5-pro",
+          "display_name": "mimo-v2.5-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": 1.288030424656471,
+          "probability": 0.0001344067252717112
+        },
+        {
+          "model": "grok-4.6",
+          "display_name": "grok-4.6",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": 1.195641011178937,
+          "probability": 0.00008581126080479525
+        },
+        {
+          "model": "gpt-4o",
+          "display_name": "gpt-4o",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 1.1824823000573184,
+          "probability": 0.00008049866026882682
+        },
+        {
+          "model": "step-5-preview",
+          "display_name": "step-5-preview",
+          "family": "step",
+          "family_name": "Step",
+          "score": 1.079633425703953,
+          "probability": 0.00004884834178393222
+        },
+        {
+          "model": "claude-haiku-4.5",
+          "display_name": "claude-haiku-4.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.9799991667998003,
+          "probability": 0.000030108670413418424
+        },
+        {
+          "model": "hy4-preview",
+          "display_name": "hy4-preview",
+          "family": "hunyuan",
+          "family_name": "Hunyuan",
+          "score": 0.6490369928663825,
+          "probability": 0.000006033843502626531
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "display_name": "deepseek-v4-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.5639884421528631,
+          "probability": 0.000003992099756225911
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "display_name": "gemini-3.1-pro-preview",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.49905281039840726,
+          "probability": 0.000002912278129917388
+        },
+        {
+          "model": "glm-5.2",
+          "display_name": "glm-5.2",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": 0.4951932708642045,
+          "probability": 0.000002858195515642324
+        },
+        {
+          "model": "seed-2.0-lite",
+          "display_name": "seed-2.0-lite",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": 0.41516112894347823,
+          "probability": 0.0000019376724879165396
+        },
+        {
+          "model": "kimi-k2.8-preview",
+          "display_name": "kimi-k2.8-preview",
+          "family": "kimi",
+          "family_name": "Kimi",
+          "score": 0.37505325504217524,
+          "probability": 0.0000015947071925952175
+        },
+        {
+          "model": "glm-5.3",
+          "display_name": "glm-5.3",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": 0.35999495361292305,
+          "probability": 0.0000014822399770161674
+        },
+        {
+          "model": "qwen3.8-omni-flash",
+          "display_name": "qwen3.8-omni-flash",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": 0.3419653531194361,
+          "probability": 0.0000013579655084245977
+        },
+        {
+          "model": "deepseek-v4.1-flash",
+          "display_name": "deepseek-v4.1-flash",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.3351855441827366,
+          "probability": 0.0000013139780436026378
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "display_name": "deepseek-v4-pro",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.28754176740140686,
+          "probability": 0.000001042541209282271
+        },
+        {
+          "model": "deepseek-v4-pro-0813",
+          "display_name": "deepseek-v4-pro-0813",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.27125847678782977,
+          "probability": 9.632675579776102e-7
+        },
+        {
+          "model": "seed-2.1-turbo",
+          "display_name": "seed-2.1-turbo",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": 0.20917301463727633,
+          "probability": 7.12508831813032e-7
+        },
+        {
+          "model": "claude-opus-5.5",
+          "display_name": "claude-opus-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.08923351469608372,
+          "probability": 3.979259108382555e-7
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "display_name": "gemini-3.8-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.05650033823285406,
+          "probability": 3.3943625453238704e-7
+        },
+        {
+          "model": "gemini-3.6-flash",
+          "display_name": "gemini-3.6-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": 0.05206745164812845,
+          "probability": 3.32206367185393e-7
+        },
+        {
+          "model": "claude-fable-5.1",
+          "display_name": "claude-fable-5.1",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": 0.03155662835923835,
+          "probability": 3.007076890343876e-7
+        },
+        {
+          "model": "deepseek-v4-flash-0731",
+          "display_name": "deepseek-v4-flash-0731",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": 0.030579009853207106,
+          "probability": 2.992832733591867e-7
+        },
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra/6.1-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": 0.008604396535250053,
+          "probability": 2.689871034297976e-7
+        },
+        {
+          "model": "mimo-v2.6-flash",
+          "display_name": "mimo-v2.6-flash",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": -0.03220980677407022,
+          "probability": 2.2061862818697535e-7
+        },
+        {
+          "model": "deepseek-v4.1-flash-1017",
+          "display_name": "deepseek-v4.1-flash-1017",
+          "family": "deepseek",
+          "family_name": "DeepSeek",
+          "score": -0.03393399067785345,
+          "probability": 2.1877886442490416e-7
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.04781367376564391,
+          "probability": 2.0451680018570943e-7
+        },
+        {
+          "model": "glm-5.3-flash",
+          "display_name": "glm-5.3-flash",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.12930227024507107,
+          "probability": 1.3767190865325685e-7
+        },
+        {
+          "model": "grok-4.7",
+          "display_name": "grok-4.7",
+          "family": "grok",
+          "family_name": "Grok",
+          "score": -0.14365644128020394,
+          "probability": 1.284009162656201e-7
+        },
+        {
+          "model": "glm-5.3-flashx",
+          "display_name": "glm-5.3-flashx",
+          "family": "glm",
+          "family_name": "GLM",
+          "score": -0.1857922024862731,
+          "probability": 1.0463844719399836e-7
+        },
+        {
+          "model": "gemini-3.7-flash",
+          "display_name": "gemini-3.7-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.3068974816841952,
+          "probability": 5.810911732212215e-8
+        },
+        {
+          "model": "muse-wonder",
+          "display_name": "muse-wonder",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -0.36684845351279405,
+          "probability": 4.343000414099916e-8
+        },
+        {
+          "model": "seed-2.0-mini",
+          "display_name": "seed-2.0-mini",
+          "family": "seed",
+          "family_name": "Seed",
+          "score": -0.45736263301486596,
+          "probability": 2.7981344556596875e-8
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.559581740089265,
+          "probability": 1.7031704705792346e-8
+        },
+        {
+          "model": "mimo-v2.6-pro",
+          "display_name": "mimo-v2.6-pro",
+          "family": "mimo",
+          "family_name": "MiMo",
+          "score": -0.6260363696735388,
+          "probability": 1.2333478039424755e-8
+        },
+        {
+          "model": "claude-opus-4.8",
+          "display_name": "claude-opus-4.8",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.6560156122991165,
+          "probability": 1.0662288683450087e-8
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.6834366087512862,
+          "probability": 9.332788203352524e-9
+        },
+        {
+          "model": "gemini-2.5-pro",
+          "display_name": "gemini-2.5-pro",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.7324043042644655,
+          "probability": 7.357393675196088e-9
+        },
+        {
+          "model": "gemini-4-argon",
+          "display_name": "gemini-4-argon",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -0.7458101638064549,
+          "probability": 6.893615472732576e-9
+        },
+        {
+          "model": "muse-spark-1.2",
+          "display_name": "muse-spark-1.2",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -0.7632164853629457,
+          "probability": 6.334786055758554e-9
+        },
+        {
+          "model": "claude-haiku-5.5",
+          "display_name": "claude-haiku-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.7819449550872212,
+          "probability": 5.7839968292367605e-9
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.8815987121520992,
+          "probability": 3.5647466603131372e-9
+        },
+        {
+          "model": "muse-spark-1.3",
+          "display_name": "muse-spark-1.3",
+          "family": "muse",
+          "family_name": "Muse",
+          "score": -0.9300652737657398,
+          "probability": 2.817074260880222e-9
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.9373248938562778,
+          "probability": 2.719478316499584e-9
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -0.9503436093844589,
+          "probability": 2.5528497931682585e-9
+        },
+        {
+          "model": "qwen3.8-max-0902",
+          "display_name": "qwen3.8-max-0902",
+          "family": "qwen",
+          "family_name": "Qwen",
+          "score": -0.9925647976269691,
+          "probability": 2.0795445779746575e-9
+        },
+        {
+          "model": "claude-sonnet-5.5",
+          "display_name": "claude-sonnet-5.5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -0.9995434204236601,
+          "probability": 2.010241553796775e-9
+        },
+        {
+          "model": "claude-sonnet-4.6",
+          "display_name": "claude-sonnet-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.0167161028674288,
+          "probability": 1.8493791527900473e-9
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -1.0610112138834384,
+          "probability": 1.4914009345653015e-9
+        },
+        {
+          "model": "claude-opus-4.6",
+          "display_name": "claude-opus-4.6",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.065721256393557,
+          "probability": 1.4576710619516894e-9
+        },
+        {
+          "model": "claude-fable-5",
+          "display_name": "claude-fable-5",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.0800215042828571,
+          "probability": 1.359865831022876e-9
+        },
+        {
+          "model": "claude-opus-4.7",
+          "display_name": "claude-opus-4.7",
+          "family": "claude",
+          "family_name": "Claude",
+          "score": -1.1014627189228532,
+          "probability": 1.225378259347179e-9
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "display_name": "gemini-3.5-flash",
+          "family": "gemini",
+          "family_name": "Gemini",
+          "score": -1.1247021917186881,
+          "probability": 1.0945893530597823e-9
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -1.3834578774849926,
+          "probability": 3.1150040516789104e-10
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "family": "gpt",
+          "family_name": "GPT",
+          "score": -1.5652533181857784,
+          "probability": 1.2882437076135865e-10
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 292,
+          "minimum_numbers": 161,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 317,
+          "minimum_numbers": 175,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        },
+        {
+          "index": 2,
+          "parsed_numbers": 332,
+          "minimum_numbers": 183,
+          "accepted": true,
+          "raw_out_of_range_count": 0
+        }
+      ],
+      "probability_scope": "reference-closed-set"
+    }
+  ]
+}

@@ -147,9 +147,10 @@ func (f fixtureOutbound) FreshClient(context.Context, string) (*http.Client, err
 func (f fixtureOutbound) WithExtraBlockedHosts([]string) (channel.Outbound, error) { return f, nil }
 
 type fixtureResolver struct {
-	base   string
-	mu     sync.Mutex
-	digest string
+	profile TestProfile
+	base    string
+	mu      sync.Mutex
+	digest  string
 }
 
 func (f *fixtureResolver) Resolve(_ context.Context, actor Actor, input Target) (Resolved, error) {
@@ -158,7 +159,7 @@ func (f *fixtureResolver) Resolve(_ context.Context, actor Actor, input Target) 
 	if actor.ID != "owner" && !actor.Admin {
 		return Resolved{}, ErrNotFound
 	}
-	return Resolved{Target: Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: input.Binding.TargetID, TargetRevision: 1, CapabilityDigest: f.digest}, ModelType: "text", Model: "native/model:v1"}, Addresses: []string{f.base}}, nil
+	return Resolved{Target: Target{Profile: f.profile, Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: input.Binding.TargetID, TargetRevision: 1, CapabilityDigest: f.digest}, ModelType: "text", Model: "native/model:v1"}, Addresses: []string{f.base}}, nil
 }
 func fixtureManifest(requirements ...string) gatewaycontract.Manifest {
 	reqs := []gatewaycontract.Requirement{}
@@ -623,6 +624,33 @@ func TestThreeEvidenceLayersCannotReplaceEachOther(t *testing.T) {
 	plan, err = r.Plan(target)
 	if err != nil || len(plan.Items) != 3 || HasPending(plan) {
 		t.Fatalf("independent layers not expressible: %+v %v", plan, err)
+	}
+}
+
+func TestImplementedScenariosRunWhileOtherSuitesRemainPending(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer up.Close()
+	m := newMemoryStore()
+	r, err := NewRegistry(fixtureManifest("native", "future"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	register(t, r, "native", []string{"native"}, nil, fixtureRunner("native"))
+	s := makeService(t, r, m, &fixtureResolver{base: up.URL, digest: "fixed"}, DefaultLimits())
+	job, err := s.Create(context.Background(), Actor{ID: "owner"}, Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "target"}}, testParameters(), "synthetic-secret")
+	if err != nil || job.State != "queued" {
+		t.Fatalf("implemented suite blocked by future work: %+v %v", job, err)
+	}
+	job = m.wait(t, job.ID, "suite_pending", "failed")
+	if job.State != "suite_pending" || len(job.Results) != 1 || job.Results[0].ScenarioID != "native" || job.Usage.HTTP != 1 || job.Complete || job.ReportID == nil {
+		t.Fatalf("partial execution lost evidence or faked completion: %+v", job)
+	}
+	if _, err = s.Resume(context.Background(), Actor{ID: "owner"}, job.ID, "synthetic-secret"); err != nil {
+		t.Fatal(err)
+	}
+	job = m.wait(t, job.ID, "suite_pending", "failed")
+	if job.Usage.HTTP != 1 || len(job.Results) != 1 || job.Complete {
+		t.Fatal("resume repeated completed work or authorized incomplete report")
 	}
 }
 func TestConditionalObservationIsOwnedByManifest(t *testing.T) {

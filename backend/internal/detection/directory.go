@@ -45,6 +45,19 @@ func ResolveDirectory(d market.Directory, input Target) (Resolved, error) {
 		target.Binding.CapabilityDigest = model.CapabilityDigest
 		target.ModelType = model.ModelType
 		target.Model = model.UpstreamModel
+		target.ContextWindow = model.ContextWindow
+		target.MaxOutputTokens = model.MaxOutputTokens
+		if model.QuoteID != nil {
+			for _, quote := range d.Quotes {
+				if quote.ID == *model.QuoteID && quote.GroupModelID == model.ID {
+					target.Profile = profileFor(quote)
+					break
+				}
+			}
+		}
+		if model.ModelType != "image" {
+			target.Profile.Images = nil
+		}
 	}
 	result := Resolved{Target: target, Addresses: []string{}}
 	if group.Defaults.UserAgent != nil {
