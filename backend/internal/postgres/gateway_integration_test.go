@@ -28,7 +28,8 @@ func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) 
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
+	relayID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
+	e.declareGroupedCapabilities(relayID, "upstream_protocol/openai-chat-completions.output/temperature")
 	_, secret := e.defaultKey(consumer)
 
 	// Whitespace, key order, escapes and numbers must reach the upstream untouched.
