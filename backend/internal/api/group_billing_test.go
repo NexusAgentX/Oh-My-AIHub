@@ -23,7 +23,7 @@ func groupBillingFixture(t *testing.T) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statement, err := quotepricing.Calculate(book, "demo-text", quotepricing.Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000}, Units: []quotepricing.Unit{{Unit: "tool_call", Tool: "web_search", QuantityNano: ledger.UnitRate}, {Unit: "successful_image", ModelID: "demo-image", QuantityNano: 2 * ledger.UnitRate}, {Unit: "tool_session", Tool: "code", QuantityNano: ledger.UnitRate, ReceiptKey: strings.Repeat("a", 64)}, {Unit: "tool_second", Tool: "unknown_tool", QuantityNano: ledger.UnitRate}}}, time.Date(2026, 10, 18, 1, 0, 0, 0, time.UTC), ledger.UnitRate/2, 7*ledger.UnitRate, ledger.UnitRate/100)
+	statement, err := quotepricing.Calculate(book, "demo-text", quotepricing.Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000}, Units: []quotepricing.Unit{{Unit: "tool_call", Tool: "web_search", QuantityNano: ledger.UnitRate}, {Unit: "successful_image", ModelID: "demo-image", QuantityNano: 2 * ledger.UnitRate}, {Unit: "tool_session", Tool: "code", QuantityNano: ledger.UnitRate, ReceiptKey: strings.Repeat("a", 64)}, {Unit: "tool_query", Tool: "unknown_tool", QuantityNano: ledger.UnitRate}}}, time.Date(2026, 10, 18, 1, 0, 0, 0, time.UTC), ledger.UnitRate/2, 7*ledger.UnitRate, ledger.UnitRate/100)
 	if err != nil {
 		t.Fatal(err)
 	}

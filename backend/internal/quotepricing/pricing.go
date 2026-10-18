@@ -268,7 +268,7 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		if unit.Tool == "" && ((offer.Quote.BillingUnit == "per_million_tokens") || (offer.Quote.BillingUnit == "per_request" && unit.Unit != "request") || (offer.Quote.BillingUnit == "per_successful_image" && unit.Unit != "successful_image")) {
 			continue
 		}
-		if unit.Unit == "tool_session" && unit.ReceiptKey == "" {
+		if (unit.Unit == "tool_session" || unit.Unit == "tool_second") && unit.ReceiptKey == "" {
 			missing(model, unit.Unit, "missing_creation_receipt")
 			statement.Lines[len(statement.Lines)-1].Unit = &unit
 			statement.Lines[len(statement.Lines)-1].Reference = reference(offer)

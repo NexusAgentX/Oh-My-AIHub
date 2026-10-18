@@ -56,7 +56,7 @@ func TestCandidateQuotesFXDiscountChildrenAndWholeTable(t *testing.T) {
 }
 func TestMissingFactsPreserveReliableParentAndOtherParts(t *testing.T) {
 	b := book(t, offer(t, "main", "CNY", "2"))
-	facts := Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{Iterations: []ledger.UsageIteration{{Type: "advisor_message", Model: "missing", Usage: ledger.Usage{InputTokens: 99}}}}}, Units: []Unit{{Unit: "tool_second", Tool: "code", QuantityNano: ledger.UnitRate}}}
+	facts := Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{Iterations: []ledger.UsageIteration{{Type: "advisor_message", Model: "missing", Usage: ledger.Usage{InputTokens: 99}}}}}, Units: []Unit{{Unit: "tool_query", Tool: "search", QuantityNano: ledger.UnitRate}}}
 	s, err := Calculate(b, "main", facts, time.Now(), ledger.UnitRate, ledger.UnitRate, 0)
 	if err != nil || s.Cost != amount(t, "2") || len(s.Lines) != 3 || s.Lines[1].Reason != "missing_group_quote" || s.Lines[2].Reason != "missing_unit_price" {
 		t.Fatalf("reliable parent discarded: %+v %v", s, err)
@@ -142,5 +142,20 @@ func TestReceiptIdentityUsesEngineCredentialExecutionAndPeriod(t *testing.T) {
 		if err != nil || next == one {
 			t.Fatal("distinct billing scope collided", err)
 		}
+	}
+}
+
+func TestRuntimeQuantityNeedsReliableBillingPeriodAndPreservesFraction(t *testing.T) {
+	o := offer(t, "main", "CNY", "0")
+	o.Quote.UnitPrices = []market.UnitPrice{{Unit: "tool_second", Tool: "code", Price: amount(t, "2")}}
+	facts := Facts{MainReliable: true, Units: []Unit{{Unit: "tool_second", Tool: "code", QuantityNano: 1_250_000_000}}}
+	statement, err := Calculate(book(t, o), "main", facts, time.Now(), ledger.UnitRate/2, ledger.UnitRate, 0)
+	if err != nil || statement.Cost != 0 || statement.Lines[1].Reason != "missing_creation_receipt" {
+		t.Fatal("runtime without an execution period was billed", err)
+	}
+	facts.Units[0].ReceiptKey = strings.Repeat("c", 64)
+	statement, err = Calculate(book(t, o), "main", facts, time.Now(), ledger.UnitRate/2, ledger.UnitRate, 0)
+	if err != nil || statement.Cost != amount(t, "1.25") {
+		t.Fatal("fractional reliable runtime priced incorrectly", err)
 	}
 }
