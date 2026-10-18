@@ -14907,6 +14907,7 @@ components:
     FormatTest:
       type: object
       properties:
+        endpoint_id: {type: string, description: 最小可调用性实际使用的固定入口标识；省略时为原公共格式入口。}
         ok: {type: boolean}
         status_code: {type: [integer, 'null']}
         error: {type: [string, 'null']}

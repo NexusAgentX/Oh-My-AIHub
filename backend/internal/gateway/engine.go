@@ -680,6 +680,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			reason = "missing_group_quote"
 		case !resourceMatch(candidate, call.resourceBinding):
 			reason = "resource_scope_unavailable"
+		case !keyProbeMatchesEndpoint(candidate, format, r.URL.Path):
+			reason = "channel_probe_endpoint_mismatch"
 		case !supportsAll(candidate, call.resourceRequired):
 			reason = "required_capability_evidence_missing"
 		case containsString(pref.Excluded, candidate.ChannelID):
@@ -700,7 +702,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
 		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !supportsAll(c, call.resourceRequired) || call.resourceObserver != nil && c.GroupID == "" {
+			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || call.resourceObserver != nil && c.GroupID == "" {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)

@@ -81,6 +81,31 @@ func TestServeCompressedResponsesIsolatesContextAndKeepsOpaqueBytes(t *testing.T
 	}
 }
 
+func TestNativeOnlyKeyProbeDoesNotGrantPublicPrimaryEntrances(t *testing.T) {
+	for _, tc := range []struct {
+		format               channel.Format
+		native, public, path string
+	}{
+		{channel.FormatOpenAIResponses, "codex.responses", "upstream_protocol/openai-responses.base/accepted_native_message_shapes", "/v1/responses"},
+		{channel.FormatOpenAIImages, "codex.images", "upstream_protocol/images.generations/native_json_or_multipart", "/v1/images/generations"},
+	} {
+		candidate := Candidate{KeyProbeEndpoints: map[channel.Format]string{tc.format: tc.native}, Evidence: map[string]bool{}}
+		if keyProbeMatchesEndpoint(candidate, tc.format, tc.path) {
+			t.Fatal("native-only Key probe fabricated public endpoint support")
+		}
+		if !keyProbeMatchesEndpoint(candidate, tc.format, "/backend-api/codex/responses") {
+			t.Fatal("native-only minimal probe lost its actual entrance")
+		}
+		candidate.Evidence[tc.public] = true
+		if !keyProbeMatchesEndpoint(candidate, tc.format, tc.path) {
+			t.Fatal("current independent public report support ignored")
+		}
+	}
+	if !keyProbeMatchesEndpoint(Candidate{}, channel.FormatOpenAIResponses, "/v1/responses") {
+		t.Fatal("existing public minimal probe was changed")
+	}
+}
+
 func TestOrdinaryInferenceDoesNotAllocateForContextDetection(t *testing.T) {
 	body := []byte(`{"model":"fixture","input":"plain","client_metadata":null}`)
 	_, scan, err := ScanRequest(body)

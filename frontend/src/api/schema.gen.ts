@@ -4542,6 +4542,8 @@ export interface components {
             cooldown_seconds?: number | null;
         };
         FormatTest: {
+            /** @description 最小可调用性实际使用的固定入口标识；省略时为原公共格式入口。 */
+            endpoint_id?: string;
             ok: boolean;
             status_code: number | null;
             error: string | null;
