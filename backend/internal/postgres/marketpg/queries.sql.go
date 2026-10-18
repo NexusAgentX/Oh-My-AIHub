@@ -1133,6 +1133,29 @@ func (q *Queries) RetireGroupAddresses(ctx context.Context, groupID string) erro
 	return err
 }
 
+const rewrapProtectedRoot = `-- name: RewrapProtectedRoot :exec
+UPDATE market_protected_keys SET encryption_key_id=$2,credential_version=$3,nonce=$4,ciphertext=$5 WHERE purpose=$1
+`
+
+type RewrapProtectedRootParams struct {
+	Purpose           string `json:"purpose"`
+	EncryptionKeyID   string `json:"encryption_key_id"`
+	CredentialVersion int64  `json:"credential_version"`
+	Nonce             []byte `json:"nonce"`
+	Ciphertext        []byte `json:"ciphertext"`
+}
+
+func (q *Queries) RewrapProtectedRoot(ctx context.Context, arg RewrapProtectedRootParams) error {
+	_, err := q.db.Exec(ctx, rewrapProtectedRoot,
+		arg.Purpose,
+		arg.EncryptionKeyID,
+		arg.CredentialVersion,
+		arg.Nonce,
+		arg.Ciphertext,
+	)
+	return err
+}
+
 const setCurrentQuote = `-- name: SetCurrentQuote :execrows
 UPDATE market_group_models SET current_quote_id=$2,revision=revision+1,updated_at=now() WHERE id=$1 AND deleted_at IS NULL
 `

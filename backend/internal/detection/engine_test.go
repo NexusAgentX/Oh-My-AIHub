@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,7 @@ import (
 )
 
 type memoryStore struct {
+	reports   map[string]Job
 	artifacts map[string][]Artifact
 	mu        sync.Mutex
 	jobs      map[string]Job
@@ -27,7 +29,7 @@ type memoryStore struct {
 }
 
 func newMemoryStore() *memoryStore {
-	return &memoryStore{artifacts: map[string][]Artifact{}, jobs: map[string]Job{}, attempts: map[string]map[string]Attempt{}, events: make(chan string, 100)}
+	return &memoryStore{reports: map[string]Job{}, artifacts: map[string][]Artifact{}, jobs: map[string]Job{}, attempts: map[string]map[string]Attempt{}, events: make(chan string, 100)}
 }
 func cloneJob(job Job) Job {
 	b, _ := json.Marshal(job)
@@ -51,7 +53,7 @@ func (m *memoryStore) Get(_ context.Context, id string) (Job, error) {
 	}
 	return cloneJob(v), nil
 }
-func (m *memoryStore) List(_ context.Context, owner string, admin bool, limit int) ([]Job, error) {
+func (m *memoryStore) List(_ context.Context, owner string, admin bool, _ *Cursor, limit int) ([]Job, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := []Job{}
@@ -163,7 +165,7 @@ func fixtureManifest(requirements ...string) gatewaycontract.Manifest {
 	for _, id := range requirements {
 		reqs = append(reqs, gatewaycontract.Requirement{ID: id, Endpoints: []string{"fixture.infer"}, SourceIDs: []string{id}, Assertions: []string{"first", "second"}})
 	}
-	return gatewaycontract.Manifest{Version: "fixture.v1", Stage: "discovery", Sources: []gatewaycontract.Source{{ID: "fixture", URL: "https://fixture.example/docs", Version: "pinned"}}, Endpoints: []gatewaycontract.Endpoint{{ID: "fixture.infer", Protocol: "openai-responses", Method: "POST", Path: "/v1/responses", Source: "fixture", Feature: "F7", Auth: "platform_key", Scope: "stateless", Model: "explicit", Billing: "inference", Replay: "inference"}}, Suites: []gatewaycontract.Suite{{ID: "fixture.suite", Target: "group_model", Protocol: "openai-responses", Feature: "F4", Requirements: reqs}}}
+	return gatewaycontract.Manifest{Version: "fixture.v1", Stage: "discovery", Sources: []gatewaycontract.Source{{ID: "fixture", URL: "https://fixture.example/docs", Version: "pinned"}}, Endpoints: []gatewaycontract.Endpoint{{ID: "fixture.infer", Protocol: "openai-responses", Method: "POST", Path: "/v1/responses", Source: "fixture", Feature: "F7", Auth: "platform_key", Scope: "stateless", Model: "explicit", Billing: "inference", Replay: "inference"}}, Suites: []gatewaycontract.Suite{{ID: "fixture.suite", EvidenceLayers: []string{"upstream_protocol"}, ModelTypes: []string{"text"}, Target: "group_model", Protocol: "openai-responses", Feature: "F4", Requirements: reqs}}}
 }
 func testParameters() Parameters {
 	v := gatewaycontract.SearchSettings{Version: "test.v1", Method: "binary", Low: 0, High: 100, HardMaximum: 100, PrecisionMode: "absolute", Precision: 1, Rounds: 8}
@@ -180,7 +182,7 @@ func makeService(t *testing.T, r *Registry, m *memoryStore, resolver *fixtureRes
 }
 func fixtureRunner(requirements ...string) Runner {
 	return func(ctx context.Context, s *Session) Result {
-		response, err := s.Do(ctx, Request{EndpointID: "fixture.infer", Path: "/v1/responses", Headers: http.Header{"Content-Type": []string{"application/json"}}, Body: []byte(`{"synthetic":"never persist this body"}`), Category: "generate"})
+		response, err := s.Do(ctx, Request{EndpointID: "fixture.infer", Path: "/v1/responses", Headers: http.Header{"Content-Type": []string{"application/json"}, "authorization": []string{"must-not-cross"}}, Body: []byte(`{"synthetic":"never persist this body"}`), Category: "generate"})
 		state, reason := "pass", "ok"
 		if err != nil {
 			state, reason = "inconclusive", "external_error"
@@ -335,9 +337,13 @@ func TestCancellationSaturationRestartAndChangedCredentials(t *testing.T) {
 		t.Fatalf("cancel overwritten or usage lost: %+v", j)
 	}
 	s = makeService(t, r, m, resolver, limits)
-	if _, err = s.Resume(context.Background(), Actor{ID: "owner"}, j.ID, "different-key"); !errors.Is(err, ErrConflict) {
-		t.Fatalf("credential scope changed silently: %v", err)
+	continued, err := s.Resume(context.Background(), Actor{ID: "owner"}, j.ID, "different-key")
+	if err != nil || continued.ID == j.ID || continued.ContinuedFromID == nil || *continued.ContinuedFromID != j.ID {
+		t.Fatalf("new credential lost provenance: %+v %v", continued, err)
 	}
+	_, _ = s.Cancel(context.Background(), Actor{ID: "owner"}, continued.ID)
+	s.Close()
+	s = makeService(t, r, m, resolver, limits)
 	resolver.mu.Lock()
 	resolver.digest = strings.Repeat("b", 64)
 	resolver.mu.Unlock()
@@ -366,6 +372,60 @@ func TestWitnessAndPathBoundaries(t *testing.T) {
 	result.Assertions[0].AttemptIDs = []string{"network-failure"}
 	if ValidateResult(item, result, map[string]Attempt{"network-failure": {ID: "network-failure", Sent: true}}) == nil {
 		t.Fatal("network failure proves support")
+	}
+}
+
+func TestQueuedCancellationImmediatelyReleasesAdmission(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	up := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		_, _ = io.Copy(io.Discard, req.Body)
+		entered <- struct{}{}
+		<-req.Context().Done()
+	}))
+	defer up.Close()
+	registry, _ := NewRegistry(fixtureManifest("a"))
+	register(t, registry, "a", []string{"a"}, nil, fixtureRunner("a"))
+	store := newMemoryStore()
+	limits := DefaultLimits()
+	limits.Workers, limits.Queue, limits.PerOwner = 1, 1, 2
+	service := makeService(t, registry, store, &fixtureResolver{base: up.URL, digest: strings.Repeat("a", 64)}, limits)
+	defer service.Close()
+	actor := Actor{ID: "owner"}
+	target := Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "target"}}
+	running, err := service.Create(context.Background(), actor, target, testParameters(), "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-entered
+	queued, err := service.Create(context.Background(), actor, target, testParameters(), "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Create(context.Background(), actor, target, testParameters(), "key"); !errors.Is(err, ErrBusy) {
+		t.Fatalf("queue saturation: %v", err)
+	}
+	if _, err = service.Cancel(context.Background(), actor, queued.ID); err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := service.Create(context.Background(), actor, target, testParameters(), "key")
+	if err != nil {
+		t.Fatalf("cancelled task retained admission: %v", err)
+	}
+	_, _ = service.Cancel(context.Background(), actor, replacement.ID)
+	_, _ = service.Cancel(context.Background(), actor, running.ID)
+}
+
+func TestSharedScenarioCannotBorrowOtherModelTypeAssertions(t *testing.T) {
+	manifest := fixtureManifest("text_only", "both_types")
+	manifest.Suites[0].ModelTypes = []string{"text", "image"}
+	manifest.Suites[0].Requirements[0].ModelTypes = []string{"text"}
+	registry, err := NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = registry.Register(Definition{ID: "shared", SuiteID: "fixture.suite", Requirements: []string{"text_only", "both_types"}, CodeVersion: "test.v1", Layer: "upstream_protocol", Run: fixtureRunner("text_only", "both_types")})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("mixed applicability accepted: %v", err)
 	}
 }
 
@@ -501,5 +561,170 @@ func TestPartialRetestKeepsIndependentEvidence(t *testing.T) {
 	}
 	if !kept {
 		t.Fatal("independent original evidence lost")
+	}
+}
+
+func (m *memoryStore) AttemptPage(ctx context.Context, id string, _ *Cursor, limit int) ([]Attempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := []Attempt{}
+	for _, a := range m.attempts[id] {
+		out = append(out, a)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+func (m *memoryStore) Finish(ctx context.Context, job Job) (Job, error) {
+	id := fmt.Sprintf("report-%d", len(job.Results)) + job.UpdatedAt.String()
+	job.ReportID = &id
+	m.mu.Lock()
+	m.reports[id] = cloneJob(job)
+	m.mu.Unlock()
+	return job, m.Save(ctx, job)
+}
+func (m *memoryStore) GetReport(_ context.Context, id string) (Job, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok := m.reports[id]
+	if !ok {
+		return job, ErrNotFound
+	}
+	return cloneJob(job), nil
+}
+func (m *memoryStore) ReportPage(context.Context, string, *Cursor, int) ([]ReportSummary, error) {
+	return []ReportSummary{}, nil
+}
+
+func TestThreeEvidenceLayersCannotReplaceEachOther(t *testing.T) {
+	manifest := fixtureManifest("a")
+	manifest.Suites[0].EvidenceLayers = []string{"upstream_protocol", "gateway_proxy", "official_cli"}
+	r, err := NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	register(t, r, "native", []string{"a"}, nil, fixtureRunner("a"))
+	target := Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "target"}, ModelType: "text"}
+	plan, err := r.Plan(target)
+	if err != nil || len(plan.Items) != 3 || !HasPending(plan) {
+		t.Fatalf("one evidence layer satisfied all: %+v %v", plan, err)
+	}
+	r, err = NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, layer := range manifest.Suites[0].EvidenceLayers {
+		if err := r.Register(Definition{ID: layer, SuiteID: "fixture.suite", Requirements: []string{"a"}, CodeVersion: "fixture.v1", Layer: layer, Run: fixtureRunner("a")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan, err = r.Plan(target)
+	if err != nil || len(plan.Items) != 3 || HasPending(plan) {
+		t.Fatalf("independent layers not expressible: %+v %v", plan, err)
+	}
+}
+func TestConditionalObservationIsOwnedByManifest(t *testing.T) {
+	manifest := fixtureManifest("a")
+	manifest.Suites[0].Requirements[0].ConditionalAssertions = []string{"a/a2"}
+	r, err := NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	register(t, r, "a", []string{"a"}, nil, fixtureRunner("a"))
+	// Caller mutation must not alter a task's canonical requirement declaration.
+	manifest.Suites[0].Requirements[0].ConditionalAssertions = append(manifest.Suites[0].Requirements[0].ConditionalAssertions, "a/a1")
+	plan, err := r.Plan(Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "t"}, ModelType: "text"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := plan.Items[0]
+	if !slices.Equal(item.Conditional, []string{"a/a2"}) {
+		t.Fatalf("mutable or missing applicability: %+v", item.Conditional)
+	}
+	result := Result{ScenarioID: item.ID, Layer: item.Layer, Source: "synthetic", State: "partial", Reason: "not_observed", Assertions: []Assertion{{ID: "a/a1", State: "pass", Reason: "ok", AttemptIDs: []string{"attempt"}}, {ID: "a/a2", State: "unobserved", Reason: "not_observed", AttemptIDs: []string{"attempt"}}}}
+	witnesses := map[string]Attempt{"attempt": {ID: "attempt", Sent: true, ResponseReceived: true, Status: 200}}
+	if ValidateResult(item, result, witnesses) != nil {
+		t.Fatal("declared conditional observation requires another request")
+	}
+	result.Assertions[0].State = "unobserved"
+	result.Assertions[0].Reason = "not_observed"
+	if ValidateResult(item, result, witnesses) == nil {
+		t.Fatal("mandatory assertion silently made conditional")
+	}
+}
+
+func TestNewCredentialForksProvenanceAndReusesEngineEvidence(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer upstream.Close()
+	manifest := fixtureManifest("auth", "capability")
+	manifest.Suites[0].Requirements[0].CredentialDependent = true
+	registry, err := NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	register(t, registry, "auth", []string{"auth"}, nil, fixtureRunner("auth"))
+	register(t, registry, "capability", []string{"capability"}, nil, fixtureRunner("capability"))
+	store := newMemoryStore()
+	resolver := &fixtureResolver{base: upstream.URL, digest: strings.Repeat("a", 64)}
+	service := makeService(t, registry, store, resolver, DefaultLimits())
+	old, err := service.Create(context.Background(), Actor{ID: "owner"}, Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "target"}}, testParameters(), "key-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old = store.wait(t, old.ID, "finished")
+	service.Close()
+	service = makeService(t, registry, store, resolver, DefaultLimits())
+	continued, err := service.Retest(context.Background(), Actor{ID: "owner"}, old.ID, "key-b", []string{"auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	continued = store.wait(t, continued.ID, "finished")
+	service.Close()
+	if continued.ID == old.ID || continued.ContinuedFromID == nil || len(continued.Results) != 2 || continued.Usage.HTTP != 1 || calls != 3 {
+		t.Fatalf("credential change forced full rerun or hid source: %+v calls=%d", continued, calls)
+	}
+	for _, result := range continued.Results {
+		if result.ScenarioID == "capability" && (result.SourceTaskID != old.ID || result.SourceReportID == nil || *result.SourceReportID != *old.ReportID) {
+			t.Fatal("reused result lost original report/credential provenance")
+		}
+	}
+	snapshot, err := service.GetReport(context.Background(), Actor{ID: "owner"}, *old.ReportID)
+	if err != nil || snapshot.Usage.HTTP != 2 {
+		t.Fatal("continuation rewrote original immutable report")
+	}
+}
+
+func TestCodexImageEvidenceUsesTheImageModelTarget(t *testing.T) {
+	manifest, err := gatewaycontract.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := NewRegistry(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"text", "image"} {
+		plan, err := r.Plan(Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "offering"}, ModelType: kind})
+		if err != nil {
+			t.Fatal(err)
+		}
+		count := 0
+		for _, item := range plan.Items {
+			if slices.Contains(item.Requirements, "codex-special.RL25") {
+				count++
+			}
+		}
+		if (kind == "text" && count != 0) || (kind == "image" && count != 3) {
+			t.Fatalf("RL25 %s target has %d layers", kind, count)
+		}
 	}
 }

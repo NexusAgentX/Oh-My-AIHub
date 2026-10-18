@@ -23,7 +23,10 @@ func NewRegistry(m gatewaycontract.Manifest) (*Registry, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
-	return &Registry{manifest: m, definitions: map[string]Definition{}}, nil
+	encoded, _ := json.Marshal(m)
+	var frozen gatewaycontract.Manifest
+	_ = json.Unmarshal(encoded, &frozen)
+	return &Registry{manifest: frozen, definitions: map[string]Definition{}}, nil
 }
 func AssertionID(requirement string, index int) string {
 	return requirement + "/a" + strconv.Itoa(index+1)
@@ -44,8 +47,8 @@ func (r *Registry) Register(d Definition) error {
 	if suite == nil {
 		return ErrInvalid
 	}
-	assertions := map[string]bool{}
 	seen := map[string]bool{}
+	var modelTypes []string
 	for _, id := range d.Requirements {
 		if seen[id] {
 			return ErrInvalid
@@ -53,48 +56,43 @@ func (r *Registry) Register(d Definition) error {
 		seen[id] = true
 		found := false
 		for _, req := range suite.Requirements {
-			if req.ID == id && len(req.AggregateOf) == 0 {
+			if req.ID == id && len(req.AggregateOf) == 0 && slices.Contains(requiredLayers(*suite, req), d.Layer) {
 				found = true
-				for i := range req.Assertions {
-					assertions[AssertionID(id, i)] = true
+				types := req.ModelTypes
+				if len(types) == 0 {
+					types = suite.ModelTypes
 				}
+				types = slices.Clone(types)
+				slices.Sort(types)
+				if len(seen) > 1 && !slices.Equal(modelTypes, types) {
+					return ErrInvalid
+				}
+				modelTypes = types
 			}
 		}
 		if !found {
 			return ErrInvalid
 		}
 		for _, prior := range r.definitions {
-			if slices.Contains(prior.Requirements, id) {
+			if prior.Layer == d.Layer && slices.Contains(prior.Requirements, id) {
 				return ErrInvalid
 			}
 		}
 	}
-	for _, id := range d.Conditional {
-		if !assertions[id] {
-			return ErrInvalid
-		}
-	}
+
 	d.Requirements = slices.Clone(d.Requirements)
-	d.Dependencies = slices.Clone(d.Dependencies)
-	d.Conditional = slices.Clone(d.Conditional)
+	d.Dependencies = append([]string{}, d.Dependencies...)
+	if d.EstimatedHTTP != nil {
+		v := *d.EstimatedHTTP
+		d.EstimatedHTTP = &v
+	}
 	r.definitions[d.ID] = d
 	return nil
 }
 func applies(s gatewaycontract.Suite, t Target) bool {
-	if s.Target != t.Binding.TargetKind {
-		return false
-	}
-	// OpenAI image endpoints apply to image offerings. Responses/Gemini keep
-	// their own image-tool scenarios for text offerings; their suite registration
-	// cannot disappear merely because an upstream says a protocol is unsupported.
-	if s.Protocol == "openai-images" {
-		return t.ModelType == "image"
-	}
-	if s.Target == "group_model" && t.ModelType == "image" {
-		return s.Protocol == "native-generate-content" || s.Protocol == "openai-responses"
-	}
-	return true
+	return s.Target == t.Binding.TargetKind && (s.Target != "group_model" || slices.Contains(s.ModelTypes, t.ModelType))
 }
+
 func (r *Registry) Plan(t Target) (Plan, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -106,7 +104,7 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 	claimed := map[string]string{}
 	for id, d := range r.definitions {
 		for _, req := range d.Requirements {
-			claimed[req] = id
+			claimed[claimKey(req, d.Layer)] = id
 		}
 	}
 	included := map[string]bool{}
@@ -116,46 +114,59 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 			continue
 		}
 		for _, req := range suite.Requirements {
-			id := claimed[req.ID]
-			if id == "" {
-				id = req.ID
-			}
-			reqOwner[req.ID] = id
-			if included[id] {
+			if len(req.ModelTypes) > 0 && !slices.Contains(req.ModelTypes, t.ModelType) {
 				continue
 			}
-			included[id] = true
-			d, exists := r.definitions[id]
-			item := Planned{ID: id, SuiteID: suite.ID, Requirements: []string{req.ID}, Assertions: []string{}, Conditional: []string{}, Dependencies: []string{}, Aggregate: len(req.AggregateOf) > 0, Implemented: exists || len(req.AggregateOf) > 0, Layer: "upstream_protocol"}
-			if exists {
-				item.Requirements = slices.Clone(d.Requirements)
-				item.Conditional = slices.Clone(d.Conditional)
-				item.Dependencies = slices.Clone(d.Dependencies)
-				item.CodeVersion = d.CodeVersion
-				item.Layer = d.Layer
-				item.EstimatedHTTP = d.EstimatedHTTP
-			}
-			for _, required := range item.Requirements {
-				for _, member := range suite.Requirements {
-					if member.ID == required {
-						for i := range member.Assertions {
-							item.Assertions = append(item.Assertions, AssertionID(member.ID, i))
+			layers := requiredLayers(suite, req)
+			for _, layer := range layers {
+				key := claimKey(req.ID, layer)
+				id := claimed[key]
+				if id == "" {
+					id = req.ID
+					if len(layers) > 1 {
+						id = key
+					}
+				}
+				reqOwner[key] = id
+				if included[id] {
+					continue
+				}
+				included[id] = true
+				d, exists := r.definitions[id]
+				item := Planned{AssertionLabels: map[string]string{}, ID: id, SuiteID: suite.ID, Requirements: []string{req.ID}, Assertions: []string{}, Conditional: []string{}, Dependencies: []string{}, Aggregate: len(req.AggregateOf) > 0, Implemented: exists || len(req.AggregateOf) > 0, Layer: layer}
+				if exists {
+					item.Requirements = slices.Clone(d.Requirements)
+					item.Dependencies = append([]string{}, d.Dependencies...)
+					item.CodeVersion = d.CodeVersion
+					item.EstimatedHTTP = d.EstimatedHTTP
+				}
+				for _, required := range item.Requirements {
+					for _, member := range suite.Requirements {
+						if member.ID == required {
+							item.CredentialDependent = item.CredentialDependent || member.CredentialDependent
+							item.Conditional = append(item.Conditional, member.ConditionalAssertions...)
+							for i, label := range member.Assertions {
+								assertion := AssertionID(member.ID, i)
+								item.Assertions = append(item.Assertions, assertion)
+								item.AssertionLabels[assertion] = label
+							}
 						}
 					}
 				}
+				if item.Aggregate {
+					item.Dependencies = slices.Clone(req.AggregateOf)
+					item.CodeVersion = "aggregate.v1"
+				}
+				p.Items = append(p.Items, item)
 			}
-			if item.Aggregate {
-				item.Dependencies = slices.Clone(req.AggregateOf)
-				item.CodeVersion = "aggregate.v1"
-			}
-			p.Items = append(p.Items, item)
 		}
 	}
+
 	for i := range p.Items {
 		item := &p.Items[i]
 		if item.Aggregate {
 			for j, req := range item.Dependencies {
-				if owner := reqOwner[req]; owner != "" {
+				if owner := reqOwner[claimKey(req, item.Layer)]; owner != "" {
 					item.Dependencies[j] = owner
 				}
 			}
@@ -199,4 +210,12 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 	sum := sha256.Sum256(encoded)
 	p.RegistryVersion = hex.EncodeToString(sum[:])
 	return p, nil
+}
+
+func claimKey(requirement, layer string) string { return requirement + "@" + layer }
+func requiredLayers(suite gatewaycontract.Suite, req gatewaycontract.Requirement) []string {
+	if len(req.EvidenceLayers) > 0 {
+		return req.EvidenceLayers
+	}
+	return suite.EvidenceLayers
 }

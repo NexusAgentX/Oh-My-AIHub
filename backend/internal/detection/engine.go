@@ -17,47 +17,54 @@ import (
 )
 
 type Service struct {
-	rootMu   sync.RWMutex
-	mu       sync.Mutex
-	registry *Registry
-	store    Store
-	resolver Resolver
-	outbound channel.Outbound
-	limits   Limits
-	root     []byte
-	ctx      context.Context
-	cancel   context.CancelFunc
-	queue    chan string
-	live     map[string]*liveJob
-	owners   map[string]int
-	wg       sync.WaitGroup
-	closed   bool
-	source   string
+	rootMu        sync.RWMutex
+	mu            sync.Mutex
+	registry      *Registry
+	store         Store
+	resolver      Resolver
+	outbound      channel.Outbound
+	prepareEgress func(context.Context) (channel.Outbound, error)
+	limits        Limits
+	root          []byte
+	ctx           context.Context
+	cancel        context.CancelFunc
+	queue         chan string
+	live          map[string]*liveJob
+	owners        map[string]int
+	wg            sync.WaitGroup
+	closed        bool
+	settings      SearchStore
+	source        string
 }
 type liveJob struct {
-	actor  Actor
-	secret []byte
-	cancel context.CancelFunc
+	ownerID string
+	actor   Actor
+	secret  []byte
+	cancel  context.CancelFunc
 }
 type Config struct {
 	Registry       *Registry
 	Store          Store
 	Resolver       Resolver
 	Outbound       channel.Outbound
+	PrepareEgress  func(context.Context) (channel.Outbound, error)
 	Limits         Limits
 	CredentialRoot []byte
 	Synthetic      bool
+	Settings       SearchStore
 }
 
 func New(ctx context.Context, c Config) (*Service, error) {
 	if c.Registry == nil || c.Store == nil || c.Resolver == nil || c.Outbound == nil || c.Limits.Validate() != nil || len(c.CredentialRoot) != 32 {
 		return nil, ErrInvalid
 	}
-	if err := c.Store.Interrupt(ctx); err != nil {
+	startupCtx, cancelStartup := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelStartup()
+	if err := c.Store.Interrupt(startupCtx); err != nil {
 		return nil, err
 	}
 	workCtx, cancel := context.WithCancel(ctx)
-	s := &Service{registry: c.Registry, store: c.Store, resolver: c.Resolver, outbound: c.Outbound, limits: c.Limits, root: slices.Clone(c.CredentialRoot), ctx: workCtx, cancel: cancel, queue: make(chan string, c.Limits.Queue), live: map[string]*liveJob{}, owners: map[string]int{}, source: "real_upstream"}
+	s := &Service{registry: c.Registry, store: c.Store, resolver: c.Resolver, outbound: c.Outbound, prepareEgress: c.PrepareEgress, limits: c.Limits, root: slices.Clone(c.CredentialRoot), ctx: workCtx, cancel: cancel, queue: make(chan string, c.Limits.Queue), live: map[string]*liveJob{}, owners: map[string]int{}, settings: c.Settings, source: "real_upstream"}
 	if c.Synthetic {
 		s.source = "synthetic"
 	}
@@ -111,6 +118,9 @@ func parametersVersion(p Parameters) string {
 	return hex.EncodeToString(sum[:])
 }
 func (s *Service) Create(ctx context.Context, actor Actor, target Target, parameters Parameters, secret string) (Job, error) {
+	return s.create(ctx, actor, target, parameters, secret, nil)
+}
+func (s *Service) create(ctx context.Context, actor Actor, target Target, parameters Parameters, secret string, continued *Job) (Job, error) {
 	if actor.ID == "" || len(secret) == 0 || len(secret) > 8192 || strings.ContainsAny(secret, "\r\n\x00") || parameters.Context.Validate() != nil || parameters.MaxOutput.Validate() != nil {
 		return Job{}, ErrInvalid
 	}
@@ -135,24 +145,55 @@ func (s *Service) Create(ctx context.Context, actor Actor, target Target, parame
 		return Job{}, err
 	}
 	now := time.Now().UTC()
-	job := Job{ID: id, OwnerID: actor.ID, Target: target, Parameters: parameters, Plan: plan, State: "queued", Results: []Result{}, CreatedAt: now, UpdatedAt: now}
+	job := Job{ID: id, OwnerID: actor.ID, RequestedByID: actor.ID, Target: target, Parameters: parameters, Plan: plan, State: "queued", ExecutionActive: true, PendingCleanup: []Artifact{}, Results: []Result{}, CreatedAt: now, UpdatedAt: now}
+
+	if continued != nil {
+		prior := target.Binding
+		prior.CredentialScope = continued.Target.Binding.CredentialScope
+		if !market.CompatibleBinding(continued.Target.Binding, prior) {
+			return Job{}, ErrConflict
+		}
+		job.OwnerID = continued.OwnerID
+		from := continued.ID
+		job.ContinuedFromID = &from
+		byID := map[string]Planned{}
+		for _, item := range plan.Items {
+			byID[item.ID] = item
+		}
+		if continued.ReportID != nil {
+			for _, result := range continued.Results {
+				item, exists := byID[result.ScenarioID]
+				if exists && result.Source == s.source && !item.CredentialDependent && terminal(result.State) && result.State != "inconclusive" {
+					if result.SourceTaskID == "" {
+						result.SourceTaskID = continued.ID
+					}
+					if result.SourceReportID == nil {
+						result.SourceReportID = continued.ReportID
+					}
+					job.Results = append(job.Results, result)
+				}
+			}
+		}
+		job.Results = resumeResults(job)
+	}
 	if HasPending(plan) {
 		job.State = "suite_pending"
+		job.ExecutionActive = false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return Job{}, ErrClosed
 	}
-	if job.State == "queued" && (s.owners[actor.ID] >= s.limits.PerOwner || len(s.queue) >= cap(s.queue)) {
+	if job.State == "queued" && (s.owners[job.OwnerID] >= s.limits.PerOwner || len(s.queue) >= cap(s.queue)) {
 		return Job{}, ErrBusy
 	}
 	if err = s.store.Create(ctx, job); err != nil {
 		return Job{}, err
 	}
 	if job.State == "queued" {
-		s.live[id] = &liveJob{actor: actor, secret: []byte(secret)}
-		s.owners[actor.ID]++
+		s.live[id] = &liveJob{ownerID: job.OwnerID, actor: actor, secret: []byte(secret)}
+		s.owners[job.OwnerID]++
 		s.queue <- id
 	}
 	return job, nil
@@ -167,11 +208,11 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (Job, error) 
 	}
 	return job, nil
 }
-func (s *Service) List(ctx context.Context, actor Actor, limit int) ([]Job, error) {
-	if actor.ID == "" || limit < 1 || limit > 100 {
+func (s *Service) List(ctx context.Context, actor Actor, cursor *Cursor, limit int) ([]Job, error) {
+	if actor.ID == "" || limit < 1 || limit > 101 {
 		return nil, ErrInvalid
 	}
-	return s.store.List(ctx, actor.ID, actor.Admin, limit)
+	return s.store.List(ctx, actor.ID, actor.Admin, cursor, limit)
 }
 func (s *Service) Cancel(ctx context.Context, actor Actor, id string) (Job, error) {
 	s.mu.Lock()
@@ -187,6 +228,27 @@ func (s *Service) Cancel(ctx context.Context, actor Actor, id string) (Job, erro
 		active.cancel()
 	} else if active != nil {
 		clear(active.secret)
+		job.ExecutionActive = false
+		delete(s.live, id)
+		s.owners[active.ownerID]--
+		// A cancelled queued task releases admission immediately. Producers
+		// hold mu; concurrent workers can only remove entries while we compact.
+		pending := make([]string, 0, len(s.queue))
+		for count := len(s.queue); count > 0; count-- {
+			select {
+			case queued := <-s.queue:
+				if queued != id {
+					pending = append(pending, queued)
+				}
+			default:
+			}
+		}
+		for _, queued := range pending {
+			s.queue <- queued
+		}
+	}
+	if s.live[id] == nil {
+		job.ExecutionActive = false
 	}
 	job.State = "cancelled"
 	job.Complete = false
@@ -207,24 +269,34 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	if err != nil {
 		return Job{}, err
 	}
-	if (!slices.Contains([]string{"interrupted", "cancelled", "suite_pending", "failed"}, job.State) && !(len(selected) > 0 && job.State == "finished")) || secret == "" || len(secret) > 8192 || strings.ContainsAny(secret, "\r\n\x00") {
+	if job.ExecutionActive || (!slices.Contains([]string{"interrupted", "cancelled", "suite_pending", "failed"}, job.State) && !(len(selected) > 0 && job.State == "finished")) || secret == "" || len(secret) > 8192 || strings.ContainsAny(secret, "\r\n\x00") {
 		return Job{}, ErrInvalid
 	}
 	resolved, err := s.resolver.Resolve(ctx, actor, job.Target)
 	if err != nil {
 		return Job{}, err
 	}
-	current := resolved.Target.Binding
-	current.ManifestVersion = job.Plan.ManifestVersion
-	current.CodeVersion = job.Plan.RegistryVersion
-	current.ParameterVersion = parametersVersion(job.Parameters)
-	current.CredentialScope = s.scope(resolved.Target, secret)
 	plan, err := s.registry.Plan(resolved.Target)
 	if err != nil {
 		return Job{}, err
 	}
+	current := resolved.Target.Binding
+	current.ManifestVersion = plan.ManifestVersion
+	current.CodeVersion = plan.RegistryVersion
+	current.ParameterVersion = parametersVersion(job.Parameters)
+	actualScope := s.scope(resolved.Target, secret)
+	// Compare engine inputs separately from credential provenance. A new key
+	// forks execution, preserves its own binding and reuses independent evidence.
+	current.CredentialScope = job.Target.Binding.CredentialScope
 	if !market.CompatibleBinding(job.Target.Binding, current) || plan.RegistryVersion != job.Plan.RegistryVersion {
 		return Job{}, ErrConflict
+	}
+	job, err = withoutSelected(job, selected)
+	if err != nil {
+		return Job{}, err
+	}
+	if actualScope != job.Target.Binding.CredentialScope {
+		return s.create(ctx, actor, resolved.Target, job.Parameters, secret, &job)
 	}
 	if HasPending(plan) {
 		return job, nil
@@ -240,55 +312,56 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	if s.owners[job.OwnerID] >= s.limits.PerOwner || len(s.queue) >= cap(s.queue) {
 		return Job{}, ErrBusy
 	}
-	// A resumed dependent cannot consume vanished in-memory bodies/ciphertext.
-	// Re-run only its completed prerequisite closure; independent evidence stays.
-	if len(selected) > 0 {
-		removed := map[string]bool{}
-		known := map[string]bool{}
-		for _, item := range job.Plan.Items {
-			known[item.ID] = true
-		}
-		for _, id := range selected {
-			if !known[id] {
-				return Job{}, ErrInvalid
-			}
-			removed[id] = true
-		}
-		for changed := true; changed; {
-			changed = false
-			for _, item := range job.Plan.Items {
-				if removed[item.ID] {
-					continue
-				}
-				for _, dep := range item.Dependencies {
-					if removed[dep] {
-						removed[item.ID] = true
-						changed = true
-						break
-					}
-				}
-			}
-		}
-		kept := []Result{}
-		for _, result := range job.Results {
-			if !removed[result.ScenarioID] {
-				kept = append(kept, result)
-			}
-		}
-		job.Results = kept
-	}
 	job.Results = resumeResults(job)
+	job.RequestedByID = actor.ID
 	job.State = "queued"
+	job.ExecutionActive = true
 	job.Complete = false
 	job.UpdatedAt = time.Now().UTC()
 	if err = s.store.Save(ctx, job); err != nil {
 		return Job{}, err
 	}
-	s.live[id] = &liveJob{actor: Actor{ID: job.OwnerID, Admin: actor.Admin && actor.ID == job.OwnerID}, secret: []byte(secret)}
+	s.live[id] = &liveJob{ownerID: job.OwnerID, actor: actor, secret: []byte(secret)}
 	s.owners[job.OwnerID]++
 	s.queue <- id
 	return job, nil
 }
+func withoutSelected(job Job, selected []string) (Job, error) {
+	removed, known := map[string]bool{}, map[string]bool{}
+	for _, item := range job.Plan.Items {
+		known[item.ID] = true
+	}
+	for _, id := range selected {
+		if !known[id] {
+			return job, ErrInvalid
+		}
+		removed[id] = true
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, item := range job.Plan.Items {
+			if removed[item.ID] {
+				continue
+			}
+			for _, dep := range item.Dependencies {
+				if removed[dep] {
+					removed[item.ID] = true
+					changed = true
+					break
+				}
+			}
+		}
+	}
+	kept := []Result{}
+	for _, result := range job.Results {
+		if !removed[result.ScenarioID] {
+			kept = append(kept, result)
+		}
+	}
+	job.Results = kept
+	return job, nil
+}
+
 func (s *Service) worker() {
 	defer s.wg.Done()
 	for {
@@ -315,7 +388,7 @@ func (s *Service) execute(id string) {
 		s.mu.Lock()
 		clear(live.secret)
 		delete(s.live, id)
-		s.owners[live.actor.ID]--
+		s.owners[live.ownerID]--
 		s.mu.Unlock()
 	}()
 	job, err := s.store.Get(ctx, id)
@@ -336,7 +409,7 @@ func (s *Service) execute(id string) {
 	for _, e := range s.registry.manifest.Endpoints {
 		endpoints[e.ID] = e
 	}
-	session := &Session{Target: job.Target, Parameters: job.Parameters, resolved: resolved, secret: live.secret, outbound: s.outbound, endpoints: endpoints, store: s.store, jobID: job.ID, limits: s.limits, source: s.source}
+	session := &Session{Target: job.Target, Parameters: job.Parameters, resolved: resolved, secret: live.secret, outbound: s.outbound, prepareEgress: s.prepareEgress, endpoints: endpoints, store: s.store, jobID: job.ID, limits: s.limits, source: s.source}
 	defer session.clear()
 	initialUsage := job.Usage
 	// Cleanup runs before final usage/state persistence, including cancellation.
@@ -480,6 +553,8 @@ func (s *Service) run(ctx context.Context, session *Session, item Planned, compl
 	}
 	result.FinishedAt = time.Now().UTC()
 	result.ID, _ = ids.NewUUID()
+	result.SourceTaskID = session.jobID
+	result.SourceReportID = nil
 	refs := []string{}
 	for _, a := range result.Assertions {
 		for _, id := range a.AttemptIDs {
@@ -530,9 +605,22 @@ func (s *Service) finish(ctx context.Context, job *Job, state string) {
 	} else {
 		job.State = state
 	}
+	job.ExecutionActive = false
+	pending, cleanupErr := s.store.Artifacts(saveCtx, job.ID)
+	job.PendingCleanup = append([]Artifact{}, pending...)
+	if cleanupErr != nil {
+		job.State = "failed"
+	}
 	job.UpdatedAt = time.Now().UTC()
 	job.Complete = Complete(*job)
-	_ = s.store.Save(saveCtx, *job)
+	saved, err := s.store.Finish(saveCtx, *job)
+	if err == nil {
+		*job = saved
+	} else {
+		job.State = "failed"
+		job.Complete = false
+		_ = s.store.Save(saveCtx, *job)
+	}
 }
 
 // Serialize progress with cancel/terminal writes so an in-flight save cannot
@@ -584,4 +672,62 @@ func resumeResults(job Job) []Result {
 		}
 	}
 	return out
+}
+
+func (s *Service) Parameters(ctx context.Context) (Parameters, error) {
+	if s.settings == nil {
+		return Parameters{}, ErrClosed
+	}
+	return s.settings.Parameters(ctx)
+}
+func (s *Service) SetSearch(ctx context.Context, actor Actor, target string, value gatewaycontract.SearchSettings) (gatewaycontract.SearchSettings, error) {
+	if actor.ID == "" || !actor.Admin {
+		return value, ErrNotFound
+	}
+	if s.settings == nil {
+		return value, ErrClosed
+	}
+	return s.settings.SetSearch(ctx, actor.ID, target, value)
+}
+func (s *Service) Start(ctx context.Context, actor Actor, target Target, secret string) (Job, error) {
+	parameters, err := s.Parameters(ctx)
+	if err != nil {
+		return Job{}, err
+	}
+	return s.Create(ctx, actor, target, parameters, secret)
+}
+func (s *Service) AttemptPage(ctx context.Context, actor Actor, id string, cursor *Cursor, limit int) ([]Attempt, error) {
+	if _, err := s.Get(ctx, actor, id); err != nil {
+		return nil, err
+	}
+	if limit < 1 || limit > 101 {
+		return nil, ErrInvalid
+	}
+	return s.store.AttemptPage(ctx, id, cursor, limit)
+}
+func (s *Service) Artifacts(ctx context.Context, actor Actor, id string) ([]Artifact, error) {
+	if _, err := s.Get(ctx, actor, id); err != nil {
+		return nil, err
+	}
+	return s.store.Artifacts(ctx, id)
+}
+
+func (s *Service) GetReport(ctx context.Context, actor Actor, id string) (Job, error) {
+	job, err := s.store.GetReport(ctx, id)
+	if err != nil {
+		return Job{}, err
+	}
+	if actor.ID == "" || (actor.ID != job.OwnerID && !actor.Admin) {
+		return Job{}, ErrNotFound
+	}
+	return job, nil
+}
+func (s *Service) ReportPage(ctx context.Context, actor Actor, id string, cursor *Cursor, limit int) ([]ReportSummary, error) {
+	if _, err := s.Get(ctx, actor, id); err != nil {
+		return nil, err
+	}
+	if limit < 1 || limit > 101 {
+		return nil, ErrInvalid
+	}
+	return s.store.ReportPage(ctx, id, cursor, limit)
 }

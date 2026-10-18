@@ -117,3 +117,5 @@ SELECT * FROM market_protected_keys WHERE purpose=$1;
 SELECT * FROM market_protected_keys ORDER BY purpose;
 -- name: InsertProtectedRoot :exec
 INSERT INTO market_protected_keys(purpose,encryption_key_id,credential_version,nonce,ciphertext) VALUES($1,$2,$3,$4,$5);
+-- name: RewrapProtectedRoot :exec
+UPDATE market_protected_keys SET encryption_key_id=$2,credential_version=$3,nonce=$4,ciphertext=$5 WHERE purpose=$1;

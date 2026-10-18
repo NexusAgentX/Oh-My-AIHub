@@ -91,30 +91,34 @@ type Assertion struct {
 	AttemptIDs []string `json:"attempt_ids"`
 }
 type Result struct {
-	ID         string      `json:"id"`
-	ScenarioID string      `json:"scenario_id"`
-	State      string      `json:"state"`
-	Reason     string      `json:"reason"`
-	Layer      string      `json:"layer"`
-	Source     string      `json:"source"` // real_upstream or synthetic; fixtures never authorize creation
-	Assertions []Assertion `json:"assertions"`
-	Attempts   []Attempt   `json:"attempts"`
-	Usage      Usage       `json:"usage"`
-	StartedAt  time.Time   `json:"started_at"`
-	FinishedAt time.Time   `json:"finished_at"`
+	SourceTaskID   string      `json:"source_task_id"`
+	SourceReportID *string     `json:"source_report_id"`
+	ID             string      `json:"id"`
+	ScenarioID     string      `json:"scenario_id"`
+	State          string      `json:"state"`
+	Reason         string      `json:"reason"`
+	Layer          string      `json:"layer"`
+	Source         string      `json:"source"` // real_upstream or synthetic; fixtures never authorize creation
+	Assertions     []Assertion `json:"assertions"`
+	Attempts       []Attempt   `json:"attempts"`
+	Usage          Usage       `json:"usage"`
+	StartedAt      time.Time   `json:"started_at"`
+	FinishedAt     time.Time   `json:"finished_at"`
 }
 type Planned struct {
-	ID            string   `json:"id"`
-	SuiteID       string   `json:"suite_id"`
-	Requirements  []string `json:"requirements"`
-	Assertions    []string `json:"assertions"`
-	Conditional   []string `json:"conditional"`
-	Dependencies  []string `json:"dependencies"`
-	Aggregate     bool     `json:"aggregate"`
-	Implemented   bool     `json:"implemented"`
-	CodeVersion   string   `json:"code_version"`
-	Layer         string   `json:"layer"`
-	EstimatedHTTP *int64   `json:"estimated_http"`
+	CredentialDependent bool              `json:"credential_dependent"`
+	AssertionLabels     map[string]string `json:"assertion_labels"`
+	ID                  string            `json:"id"`
+	SuiteID             string            `json:"suite_id"`
+	Requirements        []string          `json:"requirements"`
+	Assertions          []string          `json:"assertions"`
+	Conditional         []string          `json:"conditional"`
+	Dependencies        []string          `json:"dependencies"`
+	Aggregate           bool              `json:"aggregate"`
+	Implemented         bool              `json:"implemented"`
+	CodeVersion         string            `json:"code_version"`
+	Layer               string            `json:"layer"`
+	EstimatedHTTP       *int64            `json:"estimated_http"`
 }
 type Plan struct {
 	EngineVersion   string    `json:"engine_version"`
@@ -123,17 +127,22 @@ type Plan struct {
 	Items           []Planned `json:"items"`
 }
 type Job struct {
-	ID         string     `json:"id"`
-	OwnerID    string     `json:"owner_id"`
-	Target     Target     `json:"target"`
-	Parameters Parameters `json:"parameters"`
-	Plan       Plan       `json:"plan"`
-	State      string     `json:"state"`
-	Complete   bool       `json:"complete"`
-	Results    []Result   `json:"results"`
-	Usage      Usage      `json:"usage"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	RequestedByID   string     `json:"requested_by_id"`
+	ContinuedFromID *string    `json:"continued_from_id"`
+	PendingCleanup  []Artifact `json:"pending_cleanup"`
+	ReportID        *string    `json:"report_id"`
+	ExecutionActive bool       `json:"execution_active"`
+	ID              string     `json:"id"`
+	OwnerID         string     `json:"owner_id"`
+	Target          Target     `json:"target"`
+	Parameters      Parameters `json:"parameters"`
+	Plan            Plan       `json:"plan"`
+	State           string     `json:"state"`
+	Complete        bool       `json:"complete"`
+	Results         []Result   `json:"results"`
+	Usage           Usage      `json:"usage"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 type Artifact struct {
 	ID                string `json:"id"`
@@ -145,11 +154,29 @@ type Artifact struct {
 	Removed           bool   `json:"removed"`
 	Reason            string `json:"reason"`
 }
+type Cursor struct {
+	At time.Time
+	ID string
+}
+type SearchStore interface {
+	Parameters(context.Context) (Parameters, error)
+	SetSearch(context.Context, string, string, gatewaycontract.SearchSettings) (gatewaycontract.SearchSettings, error)
+}
+type ReportSummary struct {
+	ID        string    `json:"id"`
+	TaskID    string    `json:"task_id"`
+	State     string    `json:"state"`
+	Complete  bool      `json:"complete"`
+	CreatedAt time.Time `json:"created_at"`
+}
 type Store interface {
 	Create(context.Context, Job) error
 	Get(context.Context, string) (Job, error)
-	List(context.Context, string, bool, int) ([]Job, error)
+	List(context.Context, string, bool, *Cursor, int) ([]Job, error)
 	Save(context.Context, Job) error
+	Finish(context.Context, Job) (Job, error)
+	GetReport(context.Context, string) (Job, error)
+	ReportPage(context.Context, string, *Cursor, int) ([]ReportSummary, error)
 	Interrupt(context.Context) error
 	RecordAttempt(context.Context, string, Attempt) error
 	Attempts(context.Context, string, []string) ([]Attempt, error)
@@ -157,6 +184,7 @@ type Store interface {
 	Artifacts(context.Context, string) ([]Artifact, error)
 	SaveArtifact(context.Context, string, Artifact) error
 	RecordResult(context.Context, string, Result) error
+	AttemptPage(context.Context, string, *Cursor, int) ([]Attempt, error)
 }
 
 type Runner func(context.Context, *Session) Result
@@ -165,7 +193,6 @@ type Definition struct {
 	SuiteID       string
 	Requirements  []string
 	Dependencies  []string
-	Conditional   []string
 	CodeVersion   string
 	Layer         string
 	EstimatedHTTP *int64

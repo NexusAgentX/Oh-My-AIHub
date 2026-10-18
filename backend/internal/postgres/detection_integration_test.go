@@ -86,9 +86,35 @@ func TestDetectionMetadataRestartAndAppendOnlyEvidence(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE detection_results SET state='unsupported' WHERE id=$1`, result.ID); err == nil {
 		t.Fatal("result history mutable")
 	}
-	page, err := store.AttemptPage(ctx, job.ID, "", 10)
+	page, err := store.AttemptPage(ctx, job.ID, nil, 10)
 	if err != nil || len(page) != 1 || page[0].Path != "/v1/responses" {
 		t.Fatalf("attempt metadata page: %+v %v", page, err)
+	}
+	loaded.State = "finished"
+	loaded.ExecutionActive = false
+	firstReport, err := store.Finish(ctx, loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.Usage.HTTP = 2
+	loaded.UpdatedAt = loaded.UpdatedAt.Add(time.Second)
+	secondReport, err := store.Finish(ctx, loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *firstReport.ReportID == *secondReport.ReportID {
+		t.Fatal("retest reused report identity")
+	}
+	original, err := store.GetReport(ctx, *firstReport.ReportID)
+	if err != nil || original.Usage.HTTP != 1 {
+		t.Fatal("later task update rewrote approved evidence")
+	}
+	history, err := store.ReportPage(ctx, job.ID, nil, 10)
+	if err != nil || len(history) != 2 {
+		t.Fatalf("immutable report history: %d %v", len(history), err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE detection_reports SET complete=true WHERE id=$1`, *firstReport.ReportID); err == nil {
+		t.Fatal("report snapshot mutable")
 	}
 	encoded, _ := json.Marshal(loaded)
 	if strings.Contains(string(encoded), "protected-equality-label") {
@@ -145,13 +171,21 @@ func TestDetectionSearchSettingsVersionAuditAndRootStability(t *testing.T) {
 	if err != nil || len(root) != 32 {
 		t.Fatalf("root: %v", err)
 	}
+	if err := s.Market.VerifyProtectedRoots(ctx, upstreamKeyringOf(t, "v2", "v2")); err == nil {
+		t.Fatal("missing historical wrapping key did not fail startup")
+	}
 	rotated := upstreamKeyringOf(t, "v2", "v1", "v2")
 	same, err := s.Market.ProtectedRoot(ctx, rotated, "credential-scope-root-v1")
 	if err != nil || !bytes.Equal(root, same) {
 		t.Fatal("wrapping key rotation changed identity root")
 	}
-	if err := s.Market.VerifyProtectedRoots(ctx, upstreamKeyringOf(t, "v2", "v2")); err == nil {
-		t.Fatal("missing historical wrapping key did not fail startup")
+	if err := s.Market.VerifyProtectedRoots(ctx, upstreamKeyringOf(t, "v2", "v2")); err != nil {
+		t.Fatal("successful rewrap still requires retired root wrapper")
+	}
+	var wrapping string
+	var version int64
+	if err := pool.QueryRow(ctx, `SELECT encryption_key_id,credential_version FROM market_protected_keys WHERE purpose='credential-scope-root-v1'`).Scan(&wrapping, &version); err != nil || wrapping != "v2" || version != 2 {
+		t.Fatalf("root rewrap: %s %d %v", wrapping, version, err)
 	}
 	var cipher, nonce []byte
 	if err := pool.QueryRow(ctx, `SELECT ciphertext,nonce FROM market_protected_keys WHERE purpose='credential-scope-root-v1'`).Scan(&cipher, &nonce); err != nil {

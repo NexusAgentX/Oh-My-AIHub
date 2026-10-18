@@ -66,7 +66,7 @@ func (s *Session) Cleanup(ctx context.Context) error {
 		s.allowed = map[string]bool{a.DeleteEndpoint: true}
 		response, callErr := s.Do(ctx, Request{EndpointID: a.DeleteEndpoint, Path: a.DeletePath, Category: "cleanup"})
 		a.Reason = "external_error"
-		if callErr == nil && ((response.Status >= 200 && response.Status < 300) || response.Status == 404) {
+		if callErr == nil && (response.Status >= 200 && response.Status < 300) {
 			a.Removed = true
 			a.Reason = "ok"
 		}
@@ -75,4 +75,36 @@ func (s *Session) Cleanup(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// DeleteTracked lets a protocol scene test deletion without scheduling the same
+// successful delete again at final cleanup. A generic 404 alone does not prove
+// that an upstream with a missing endpoint has removed the resource.
+func (s *Session) DeleteTracked(ctx context.Context, kind, nativeID string) (Response, error) {
+	pending, err := s.store.Artifacts(ctx, s.jobID)
+	if err != nil {
+		return Response{}, err
+	}
+	var found *Artifact
+	for i := range pending {
+		if pending[i].Kind == kind && pending[i].NativeID == nativeID && !pending[i].Removed {
+			if found != nil {
+				return Response{}, ErrInvalid
+			}
+			found = &pending[i]
+		}
+	}
+	if found == nil {
+		return Response{}, ErrInvalid
+	}
+	response, err := s.Do(ctx, Request{EndpointID: found.DeleteEndpoint, Path: found.DeletePath, Category: "cleanup"})
+	found.Reason = "external_error"
+	if err == nil && response.Status >= 200 && response.Status < 300 {
+		found.Removed = true
+		found.Reason = "ok"
+	}
+	if saveErr := s.store.SaveArtifact(ctx, s.jobID, *found); saveErr != nil {
+		return response, saveErr
+	}
+	return response, err
 }

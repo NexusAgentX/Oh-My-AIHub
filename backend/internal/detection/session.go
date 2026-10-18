@@ -39,11 +39,13 @@ func (l Limits) Validate() error {
 }
 
 type Session struct {
+	entry         int
 	Target        Target
 	Parameters    Parameters
 	resolved      Resolved
 	secret        []byte
 	outbound      channel.Outbound
+	prepareEgress func(context.Context) (channel.Outbound, error)
 	endpoints     map[string]gatewaycontract.Endpoint
 	allowed       map[string]bool
 	store         Store
@@ -155,10 +157,17 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	}
 	// One selected entrance per call; scene code may explicitly retry only with
 	// known replay safety. A blind automatic retry can duplicate a tool/write.
-	base := s.resolved.Addresses[0]
+	base := s.resolved.Addresses[s.entry]
 	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
 	defer cancel()
-	client, err := s.outbound.FreshClient(callCtx, base)
+	policy := s.outbound
+	if s.prepareEgress != nil {
+		policy, err = s.prepareEgress(callCtx)
+	}
+	var client *http.Client
+	if err == nil {
+		client, err = policy.FreshClient(callCtx, base)
+	}
 	var output Response
 	if err == nil {
 		defer client.CloseIdleConnections()
@@ -204,8 +213,13 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 				}
 				// Credentials/transport fields cannot be supplied through a scene/header
 				// override. Never use a query-string key or log the resulting request.
-				for _, name := range []string{"Authorization", "x-api-key", "x-goog-api-key", "Cookie", "Proxy-Authorization", "Content-Length", "Host", "Connection", "Transfer-Encoding"} {
-					req.Header.Del(name)
+				for name := range req.Header {
+					for _, protected := range []string{"Authorization", "x-api-key", "x-goog-api-key", "Cookie", "Proxy-Authorization", "Content-Length", "Host", "Connection", "Transfer-Encoding"} {
+						if strings.EqualFold(name, protected) {
+							delete(req.Header, name)
+							break
+						}
+					}
 				}
 				switch e.Protocol {
 				case "native-messages":
@@ -299,4 +313,13 @@ func oversizedEvent(body []byte, limit int) bool {
 		}
 	}
 	return false
+}
+
+func (s *Session) EntryCount() int { return len(s.resolved.Addresses) }
+func (s *Session) SelectEntry(index int) error {
+	if index < 0 || index >= len(s.resolved.Addresses) {
+		return ErrInvalid
+	}
+	s.entry = index
+	return nil
 }

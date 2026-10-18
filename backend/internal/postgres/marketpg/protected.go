@@ -58,7 +58,17 @@ func (s *Store) ProtectedRoot(ctx context.Context, keys *channel.Keyring, purpos
 		row, err := q.GetProtectedRoot(ctx, purpose)
 		if err == nil {
 			root, err = rootPlaintext(keys, row)
-			return err
+			if err != nil {
+				return err
+			}
+			if row.EncryptionKeyID != keys.ActiveKeyID() {
+				sealed, err := keys.Encrypt("market-protected:"+purpose, row.CredentialVersion+1, base64.StdEncoding.EncodeToString(root))
+				if err != nil {
+					return err
+				}
+				return q.RewrapProtectedRoot(ctx, RewrapProtectedRootParams{Purpose: purpose, EncryptionKeyID: sealed.KeyID, CredentialVersion: sealed.Version, Nonce: sealed.Nonce, Ciphertext: sealed.Ciphertext})
+			}
+			return nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err

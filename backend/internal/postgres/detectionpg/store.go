@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -66,11 +67,17 @@ func (s *Store) Get(ctx context.Context, id string) (detection.Job, error) {
 	}
 	return decodeTask(r.Metadata, r.ID, r.OwnerID, r.State, r.CredentialScope, r.Complete)
 }
-func (s *Store) List(ctx context.Context, owner string, admin bool, limit int) ([]detection.Job, error) {
-	if limit < 1 || limit > 100 {
+func (s *Store) List(ctx context.Context, owner string, admin bool, cursor *detection.Cursor, limit int) ([]detection.Job, error) {
+	if limit < 1 || limit > 101 {
 		return nil, detection.ErrInvalid
 	}
-	rows, err := New(s.pool).ListTasks(ctx, ListTasksParams{OwnerID: owner, IsAdmin: admin, PageLimit: int32(limit)})
+	var at *time.Time
+	var afterID *string
+	if cursor != nil {
+		at = &cursor.At
+		afterID = &cursor.ID
+	}
+	rows, err := New(s.pool).ListTasks(ctx, ListTasksParams{OwnerID: owner, IsAdmin: admin, PageLimit: int32(limit), AfterAt: at, AfterID: afterID})
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +123,17 @@ func (s *Store) Attempts(ctx context.Context, jobID string, ids []string) ([]det
 	}
 	return out, nil
 }
-func (s *Store) AttemptPage(ctx context.Context, jobID, after string, limit int) ([]detection.Attempt, error) {
-	if limit < 1 || limit > 100 {
+func (s *Store) AttemptPage(ctx context.Context, jobID string, cursor *detection.Cursor, limit int) ([]detection.Attempt, error) {
+	if limit < 1 || limit > 101 {
 		return nil, detection.ErrInvalid
 	}
-	if after == "" {
-		after = "00000000-0000-0000-0000-000000000000"
+	var at *time.Time
+	var afterID *string
+	if cursor != nil {
+		at = &cursor.At
+		afterID = &cursor.ID
 	}
-	rows, err := New(s.pool).PageAttempts(ctx, PageAttemptsParams{TaskID: jobID, AfterID: after, PageLimit: int32(limit)})
+	rows, err := New(s.pool).PageAttempts(ctx, PageAttemptsParams{TaskID: jobID, AfterAt: at, AfterID: afterID, PageLimit: int32(limit)})
 	if err != nil {
 		return nil, err
 	}
@@ -213,4 +223,66 @@ func (s *Store) RecordResult(ctx context.Context, jobID string, result detection
 		return detection.ErrInvalid
 	}
 	return New(s.pool).InsertResult(ctx, InsertResultParams{ID: result.ID, TaskID: jobID, ScenarioID: result.ScenarioID, State: result.State, Result: data})
+}
+
+// Finish atomically appends an immutable report and advances the task's latest
+// view. F2 references ReportID, so a later retest cannot rewrite its evidence.
+func (s *Store) Finish(ctx context.Context, job detection.Job) (detection.Job, error) {
+	reportID, err := ids.NewUUID()
+	if err != nil {
+		return job, err
+	}
+	job.ReportID = &reportID
+	job.PendingCleanup = append([]detection.Artifact{}, job.PendingCleanup...)
+	job.ExecutionActive = false
+	data, err := taskData(job)
+	if err != nil {
+		return job, err
+	}
+	b := job.Target.Binding
+	err = pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertBinding(ctx, InsertBindingParams{ID: reportID, OwnerID: job.OwnerID, TargetKind: b.TargetKind, TargetID: b.TargetID, TargetRevision: b.TargetRevision, CapabilityDigest: b.CapabilityDigest, ManifestVersion: b.ManifestVersion, CodeVersion: b.CodeVersion, ParameterVersion: b.ParameterVersion, CredentialScope: b.CredentialScope}); err != nil {
+			return err
+		}
+		if err := q.InsertReport(ctx, InsertReportParams{ID: reportID, TaskID: job.ID, OwnerID: job.OwnerID, State: job.State, Complete: job.Complete, Metadata: data, CreatedAt: job.UpdatedAt}); err != nil {
+			return err
+		}
+		count, err := q.UpdateTask(ctx, UpdateTaskParams{ID: job.ID, State: job.State, Complete: job.Complete, Metadata: data, UpdatedAt: job.UpdatedAt})
+		if err == nil && count != 1 {
+			return detection.ErrNotFound
+		}
+		return err
+	})
+	return job, err
+}
+func (s *Store) GetReport(ctx context.Context, id string) (detection.Job, error) {
+	row, err := New(s.pool).GetReport(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return detection.Job{}, detection.ErrNotFound
+	}
+	if err != nil {
+		return detection.Job{}, err
+	}
+	return decodeTask(row.Metadata, row.TaskID, row.OwnerID, row.State, row.CredentialScope, row.Complete)
+}
+func (s *Store) ReportPage(ctx context.Context, taskID string, cursor *detection.Cursor, limit int) ([]detection.ReportSummary, error) {
+	if limit < 1 || limit > 101 {
+		return nil, detection.ErrInvalid
+	}
+	var at *time.Time
+	var id *string
+	if cursor != nil {
+		at = &cursor.At
+		id = &cursor.ID
+	}
+	rows, err := New(s.pool).PageReports(ctx, PageReportsParams{TaskID: taskID, AfterAt: at, AfterID: id, PageLimit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	out := []detection.ReportSummary{}
+	for _, row := range rows {
+		out = append(out, detection.ReportSummary{ID: row.ID, TaskID: row.TaskID, State: row.State, Complete: row.Complete, CreatedAt: row.CreatedAt})
+	}
+	return out, nil
 }

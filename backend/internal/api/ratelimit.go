@@ -7,6 +7,7 @@ import (
 
 // rateLimits 集中登录与改密相关的限流器和口令哈希并发槽位。
 type rateLimits struct {
+	detectionStarts      *loginLimiter
 	forumUploads         *loginLimiter
 	forumUploadSlots     chan struct{}
 	loginLimiter         *loginLimiter
@@ -22,6 +23,7 @@ type rateLimits struct {
 
 func newRateLimits() rateLimits {
 	return rateLimits{
+		detectionStarts:      newLoginLimiter(10, time.Minute, 10_000),
 		forumUploads:         newLoginLimiter(30, time.Minute, 10_000),
 		forumUploadSlots:     make(chan struct{}, 2),
 		loginLimiter:         newLoginLimiter(8, 15*time.Minute, 10_000),

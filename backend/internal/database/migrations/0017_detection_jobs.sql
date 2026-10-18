@@ -60,6 +60,19 @@ CREATE TABLE detection_results (
 CREATE INDEX detection_result_task ON detection_results(task_id,created_at,id);
 CREATE TRIGGER detection_result_immutable BEFORE UPDATE OR DELETE ON detection_results FOR EACH ROW EXECUTE FUNCTION market_append_only();
 
+CREATE TABLE detection_reports (
+ id uuid PRIMARY KEY REFERENCES market_report_bindings(id),
+ task_id uuid NOT NULL REFERENCES detection_tasks(id),
+ owner_id uuid NOT NULL REFERENCES accounts(id),
+ state text NOT NULL CHECK(state IN ('finished','cancelled','interrupted','failed','outdated')),
+ complete boolean NOT NULL,
+ metadata jsonb NOT NULL CHECK(jsonb_typeof(metadata)='object' AND octet_length(metadata::text)<=4194304),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(NOT complete OR state='finished')
+);
+CREATE INDEX detection_report_task ON detection_reports(task_id,created_at DESC,id DESC);
+CREATE TRIGGER detection_report_immutable BEFORE UPDATE OR DELETE ON detection_reports FOR EACH ROW EXECUTE FUNCTION market_append_only();
+
 -- +goose Down
 -- +goose StatementBegin
 DO $$ BEGIN
@@ -68,4 +81,4 @@ DO $$ BEGIN
  END IF;
 END $$;
 -- +goose StatementEnd
-DROP TABLE detection_results,detection_artifacts,detection_attempts,detection_tasks;
+DROP TABLE detection_reports,detection_results,detection_artifacts,detection_attempts,detection_tasks;

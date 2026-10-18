@@ -52,6 +52,37 @@ func (q *Queries) FindAttempts(ctx context.Context, arg FindAttemptsParams) ([]D
 	return items, nil
 }
 
+const getReport = `-- name: GetReport :one
+SELECT r.id, r.task_id, r.owner_id, r.state, r.complete, r.metadata, r.created_at,b.credential_scope FROM detection_reports r JOIN market_report_bindings b ON b.id=r.id WHERE r.id=$1
+`
+
+type GetReportRow struct {
+	ID              string
+	TaskID          string
+	OwnerID         string
+	State           string
+	Complete        bool
+	Metadata        []byte
+	CreatedAt       time.Time
+	CredentialScope string
+}
+
+func (q *Queries) GetReport(ctx context.Context, id string) (GetReportRow, error) {
+	row := q.db.QueryRow(ctx, getReport, id)
+	var i GetReportRow
+	err := row.Scan(
+		&i.ID,
+		&i.TaskID,
+		&i.OwnerID,
+		&i.State,
+		&i.Complete,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.CredentialScope,
+	)
+	return i, err
+}
+
 const getTask = `-- name: GetTask :one
 SELECT t.id, t.owner_id, t.state, t.complete, t.metadata_schema, t.metadata, t.created_at, t.updated_at,b.credential_scope FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id WHERE t.id=$1
 `
@@ -187,6 +218,33 @@ func (q *Queries) InsertBinding(ctx context.Context, arg InsertBindingParams) er
 	return err
 }
 
+const insertReport = `-- name: InsertReport :exec
+INSERT INTO detection_reports(id,task_id,owner_id,state,complete,metadata,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+`
+
+type InsertReportParams struct {
+	ID        string
+	TaskID    string
+	OwnerID   string
+	State     string
+	Complete  bool
+	Metadata  []byte
+	CreatedAt time.Time
+}
+
+func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) error {
+	_, err := q.db.Exec(ctx, insertReport,
+		arg.ID,
+		arg.TaskID,
+		arg.OwnerID,
+		arg.State,
+		arg.Complete,
+		arg.Metadata,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const insertResult = `-- name: InsertResult :exec
 INSERT INTO detection_results(id,task_id,scenario_id,state,result) VALUES($1,$2,$3,$4,$5)
 `
@@ -290,7 +348,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) error {
 }
 
 const interruptTasks = `-- name: InterruptTasks :exec
-UPDATE detection_tasks SET state='interrupted',complete=false,metadata=jsonb_set(jsonb_set(jsonb_set(metadata,'{state}','"interrupted"'),'{complete}','false'),'{updated_at}',to_jsonb(now())),updated_at=now() WHERE state IN ('queued','running')
+UPDATE detection_tasks SET state='interrupted',complete=false,metadata=jsonb_set(jsonb_set(jsonb_set(jsonb_set(metadata,'{state}','"interrupted"'),'{complete}','false'),'{updated_at}',to_jsonb(now())),'{execution_active}','false'),updated_at=now() WHERE state IN ('queued','running')
 `
 
 func (q *Queries) InterruptTasks(ctx context.Context) error {
@@ -372,12 +430,14 @@ func (q *Queries) ListArtifacts(ctx context.Context, taskID string) ([]Detection
 
 const listTasks = `-- name: ListTasks :many
 SELECT t.id, t.owner_id, t.state, t.complete, t.metadata_schema, t.metadata, t.created_at, t.updated_at,b.credential_scope FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
-WHERE t.owner_id=$1 OR $2::boolean ORDER BY t.created_at DESC,t.id LIMIT $3
+WHERE (t.owner_id=$1 OR $2::boolean) AND ($3::timestamptz IS NULL OR (t.created_at,t.id)<($3::timestamptz,$4::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT $5
 `
 
 type ListTasksParams struct {
 	OwnerID   string
 	IsAdmin   bool
+	AfterAt   *time.Time
+	AfterID   *string
 	PageLimit int32
 }
 
@@ -394,7 +454,13 @@ type ListTasksRow struct {
 }
 
 func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error) {
-	rows, err := q.db.Query(ctx, listTasks, arg.OwnerID, arg.IsAdmin, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listTasks,
+		arg.OwnerID,
+		arg.IsAdmin,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -433,17 +499,23 @@ func (q *Queries) LockSearchSetting(ctx context.Context, dollar_1 *string) error
 }
 
 const pageAttempts = `-- name: PageAttempts :many
-SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at FROM detection_attempts WHERE task_id=$1 AND id>$2 ORDER BY id LIMIT $3
+SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at FROM detection_attempts WHERE task_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4
 `
 
 type PageAttemptsParams struct {
 	TaskID    string
-	AfterID   string
+	AfterAt   *time.Time
+	AfterID   *string
 	PageLimit int32
 }
 
 func (q *Queries) PageAttempts(ctx context.Context, arg PageAttemptsParams) ([]DetectionAttempt, error) {
-	rows, err := q.db.Query(ctx, pageAttempts, arg.TaskID, arg.AfterID, arg.PageLimit)
+	rows, err := q.db.Query(ctx, pageAttempts,
+		arg.TaskID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +535,56 @@ func (q *Queries) PageAttempts(ctx context.Context, arg PageAttemptsParams) ([]D
 			&i.DurationMs,
 			&i.Sent,
 			&i.ResponseReceived,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pageReports = `-- name: PageReports :many
+SELECT id,task_id,state,complete,created_at FROM detection_reports WHERE task_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4
+`
+
+type PageReportsParams struct {
+	TaskID    string
+	AfterAt   *time.Time
+	AfterID   *string
+	PageLimit int32
+}
+
+type PageReportsRow struct {
+	ID        string
+	TaskID    string
+	State     string
+	Complete  bool
+	CreatedAt time.Time
+}
+
+func (q *Queries) PageReports(ctx context.Context, arg PageReportsParams) ([]PageReportsRow, error) {
+	rows, err := q.db.Query(ctx, pageReports,
+		arg.TaskID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PageReportsRow
+	for rows.Next() {
+		var i PageReportsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.State,
+			&i.Complete,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
