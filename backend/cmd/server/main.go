@@ -39,6 +39,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/resourcepg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
@@ -213,7 +214,24 @@ func main() {
 		cancel()
 	}
 
+	resourceStartup, stopResourceStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	resourcePool, err := database.OpenLimited(resourceStartup, databaseURL, 2)
+	if err != nil {
+		fatal(logger, "opening resource metadata pool failed", err)
+	}
+	defer resourcePool.Close()
+	cursorRoot, err := store.Market.ProtectedRoot(resourceStartup, credentialKeyring, "cursor-root-v1")
+	if err != nil {
+		fatal(logger, "opening resource cursor root failed", err)
+	}
+	resourceCursors, err := gatewaycontract.NewCursorCodec(cursorRoot)
+	clear(cursorRoot)
+	stopResourceStartup()
+	if err != nil {
+		fatal(logger, "initializing resource cursor codec failed", err)
+	}
 	engine := gateway.NewEngine(gateway.Dependencies{
+		Resources: resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
 		Ready: groupRuntime.Check, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,

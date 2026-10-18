@@ -94,11 +94,12 @@ func UpstreamURL(baseURL string, requestPath, rawQuery string, format channel.Fo
 	}
 	if format == channel.FormatGemini {
 		if index := strings.LastIndex(requestPath, ":"); index >= 0 && strings.HasPrefix(requestPath, "/v1beta/models/") {
+			basePath := strings.TrimSuffix(target.EscapedPath(), "/")
+			target.RawPath = basePath + "/v1beta/models/" + url.PathEscape(upstreamModel) + requestPath[index:]
 			requestPath = "/v1beta/models/" + upstreamModel + requestPath[index:]
 		}
 	}
 	target.Path = strings.TrimSuffix(target.Path, "/") + requestPath
-	target.RawPath = ""
 	var kept []string
 	for _, pair := range strings.Split(rawQuery, "&") {
 		if pair == "" {

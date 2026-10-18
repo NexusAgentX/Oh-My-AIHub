@@ -14,6 +14,8 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
@@ -223,6 +225,19 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		return
 	}
 	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	if e.Resources != nil && metadata.Candidate.GroupID != "" {
+		// The durable background registration is a trusted producer chain and
+		// can finish a failed initial ownership write without replaying creation.
+		row := resourcestate.Record{Resource: gatewaycontract.Resource{Kind: "response", ID: job.ResponseID, AccountID: metadata.Key.OwnerID, KeyID: metadata.Key.KeyID, Binding: candidateBinding(metadata.Candidate), CredentialScope: metadata.Candidate.CredentialScope, CreationID: job.CallID}, ModelID: metadata.ModelID}
+		if err := e.Resources.Observe(ctx, []resourcestate.Record{row}); err != nil {
+			if errors.Is(err, resourcestate.ErrQuarantined) {
+				finish := CallFinish{ID: call.id, AccountID: call.key.OwnerID, Outcome: OutcomeUpstreamFailed, ModelID: call.modelID, ChannelID: job.ChannelID, Attempts: call.attempts, DurationMS: int(e.Now().Sub(call.started).Milliseconds()), Diagnostics: &call.diagnostics}
+				e.settle(call, metadata.Candidate, finish, http.StatusBadGateway, finish.Usage)
+			}
+			return
+		}
+		call.resourceObserver = &resourceObserver{format: channel.FormatOpenAIResponses, store: true, responseID: job.ResponseID, expectedResponseID: job.ResponseID}
+	}
 	if !e.Now().Before(job.Deadline) {
 		// Cancellation may return final usage. Feed it through normal settlement
 		// before falling back to an interrupted call without reliable usage.

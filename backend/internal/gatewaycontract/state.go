@@ -60,7 +60,7 @@ func contextOnly(kind string) bool {
 
 func remoteResource(kind string) bool {
 	switch kind {
-	case "response", "conversation", "item", "stored_chat", "cache":
+	case "response", "conversation", "item", "stored_chat", "cache", "audio", "container":
 		return true
 	default:
 		return false

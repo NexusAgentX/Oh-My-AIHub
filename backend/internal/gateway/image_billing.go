@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -13,11 +12,11 @@ import (
 // It keeps only counts and reliable usage. Requested n is never a product
 // count and no image, URL or revised prompt is retained or fetched.
 func ObserveNativeImage(body []byte) (Observation, quotepricing.Facts) {
-	if len(body) > maxJSONBuffer || !json.Valid(body) {
+	if len(body) > maxRequestBytes || !json.Valid(body) {
 		return Observation{UsageStatus: "parse_limit"}, quotepricing.Facts{IndependentImage: true}
 	}
 	o := NewObserver(channel.FormatOpenAIResponses, false, "application/json")
-	o.Write(body, time.Now())
+	o.absorb(body)
 	observed := o.Finish()
 	facts := quotepricing.Facts{Usage: observed.Usage, MainReliable: observed.Found, IndependentImage: true}
 	if observed.ProtocolError {
@@ -31,6 +30,10 @@ func ObserveNativeImage(body []byte) (Observation, quotepricing.Facts) {
 		return observed, facts
 	}
 	products := int64(0)
+	kind := textValue(root.get("type"))
+	if (kind == "image_generation.completed" || kind == "image_edit.completed") && len(root.get("b64_json")) > 2 {
+		products = 1
+	}
 	eachElement(root.get("data"), func(raw []byte) {
 		item := o.objectOf(raw)
 		if len(item.get("error")) > 0 && string(item.get("error")) != "null" {

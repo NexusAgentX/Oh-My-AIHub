@@ -4,6 +4,342 @@
  */
 
 export interface paths {
+    "/v1/chat/completions/{completionID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * chat.get
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyChatGet"];
+        put?: never;
+        /**
+         * chat.update
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyChatUpdate"];
+        /**
+         * chat.delete
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        delete: operations["proxyChatDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/completions/{completionID}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * chat.messages
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyChatMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/{responseID}/input_items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * responses.items
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyResponsesItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/input_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * responses.count
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyResponsesCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses/compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * responses.compact
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyResponsesCompact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * conversations.create
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyConversationsCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversationID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * conversations.get
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyConversationsGet"];
+        put?: never;
+        /**
+         * conversations.update
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyConversationsUpdate"];
+        /**
+         * conversations.delete
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        delete: operations["proxyConversationsDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversationID}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * conversations.items.list
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyConversationsItemsList"];
+        put?: never;
+        /**
+         * conversations.items.create
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyConversationsItemsCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversationID}/items/{itemID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * conversations.items.get
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyConversationsItemsGet"];
+        put?: never;
+        post?: never;
+        /**
+         * conversations.items.delete
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        delete: operations["proxyConversationsItemsDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * images.generations
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyImagesGenerations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * images.edits
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyImagesEdits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/variations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * images.variations
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyImagesVariations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/messages/count_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * messages.count
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyMessagesCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1beta/cachedContents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * cache.list
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyCacheList"];
+        put?: never;
+        /**
+         * cache.create
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        post: operations["proxyCacheCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1beta/cachedContents/{cacheID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * cache.get
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyCacheGet"];
+        put?: never;
+        post?: never;
+        /**
+         * cache.delete
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        delete: operations["proxyCacheDelete"];
+        options?: never;
+        head?: never;
+        /**
+         * cache.update
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        patch: operations["proxyCacheUpdate"];
+        trace?: never;
+    };
     "/api/group-channels/{channelID}/events": {
         parameters: {
             query?: never;
@@ -2089,7 +2425,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * chat.list
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        get: operations["proxyChatList"];
         put?: never;
         /**
          * OpenAI Chat Completions
@@ -2136,7 +2476,11 @@ export interface paths {
         get: operations["retrieveOpenAIResponse"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * responses.delete
+         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         */
+        delete: operations["proxyResponsesDelete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3285,10 +3629,10 @@ export interface components {
          */
         Date: string;
         /**
-         * @description 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini。网关不做格式转换。
+         * @description 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini、Images。网关不做格式转换。
          * @enum {string}
          */
-        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini";
+        Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
         /**
          * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
          * @enum {string}
@@ -5502,6 +5846,527 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    proxyChatGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                completionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyChatUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                completionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyChatDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                completionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyChatMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                completionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyResponsesItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyResponsesCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyResponsesCompact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsItemsList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsItemsCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsItemsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+                itemID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyConversationsItemsDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationID: string;
+                itemID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyImagesGenerations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyImagesEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyImagesVariations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyMessagesCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCacheList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCacheCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCacheGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cacheID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCacheDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cacheID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCacheUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cacheID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     groupChannelEvents: {
         parameters: {
             query?: never;
@@ -10063,6 +10928,24 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    proxyChatList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     proxyOpenAIChat: {
         parameters: {
             query?: never;
@@ -10108,6 +10991,26 @@ export interface operations {
         };
     };
     retrieveOpenAIResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyResponsesDelete: {
         parameters: {
             query?: never;
             header?: never;

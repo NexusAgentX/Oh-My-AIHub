@@ -1,6 +1,6 @@
-// Package gatewaycontract defines discovery-stage gateway contracts. It is not
-// registered in the server: loading a manifest never opens a proxy endpoint or
-// supplies upstream capability evidence.
+// Package gatewaycontract defines versioned gateway discovery contracts.
+// Loading a manifest alone neither registers a route nor supplies upstream
+// capability evidence; live features explicitly register their endpoint subset.
 package gatewaycontract
 
 import (

@@ -27,10 +27,12 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -66,6 +68,8 @@ var (
 
 // Dependencies wires the gateway.
 type Dependencies struct {
+	Resources         resourcestate.Repository
+	ResourceCursors   *gatewaycontract.CursorCodec
 	Ready             func() error
 	TrustedProxyCIDRs []netip.Prefix
 	Geo               *geolocation.Service
@@ -260,6 +264,12 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	resourceReferences   []gatewaycontract.Reference
+	auxiliaryEndpoint    *gatewaycontract.Endpoint
+	imageMultipart       *imageMultipart
+	resourceObserver     *resourceObserver
+	resourceBinding      *resourcestate.Record
+	resourceRequired     []CapabilityRequirement
 	phase                string
 	phaseAt              time.Time
 	diagnostics          Diagnostics
@@ -437,8 +447,13 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// validated here (its model and stream flag are in the path), so a body the
 	// scan rejects only means there are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
+	if format == channel.FormatOpenAIImages && strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
+		facts, scan, call.imageMultipart, scanErr = scanImageMultipart(body, r.Header.Get("Content-Type"))
+	}
 	call.requestedServiceTier = facts.ServiceTier
-	call.hints = scan.billingHints(body, format)
+	if call.imageMultipart == nil {
+		call.hints = scan.billingHints(body, format)
+	}
 	if call.hints.Background {
 		call.upstreamHeaders = http.Header{}
 		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
@@ -453,14 +468,24 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		call.requested, call.stream = pathModel, pathStream
 	} else {
 		call.requested, call.stream = facts.Model, facts.Stream
-		if scanErr != nil || !facts.HasModel || facts.Model == "" {
-			e.reject(w, call, OutcomeRejectedModel, http.StatusBadRequest, "invalid_request", "请求体缺少 model 字段或不是合法的 JSON 对象")
-			return
-		}
-		call.stream = facts.Stream
-		if format == channel.FormatOpenAIResponses {
-			stickyResponseID = facts.PreviousResponseID
-		}
+	}
+	if scanErr != nil {
+		e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "请求体不是合法的原生请求")
+		return
+	}
+	if err = e.prepareResources(ctx, call, body, r.URL.Path); err != nil {
+		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
+		return
+	}
+	if call.requested == "" && call.resourceBinding != nil {
+		call.requested = call.resourceBinding.ContextModelID
+	}
+	if call.requested == "" {
+		e.reject(w, call, OutcomeRejectedModel, 400, "model_context_required", "请求需要明确的模型上下文")
+		return
+	}
+	if format == channel.FormatOpenAIResponses {
+		stickyResponseID = facts.PreviousResponseID
 	}
 
 	call.stage("request", prepareAt, e.Now())
@@ -607,7 +632,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	sticky := ""
-	if stickyResponseID != "" {
+	if e.Resources == nil && stickyResponseID != "" {
 		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
 			sticky = channelID
 		}
@@ -618,6 +643,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		switch {
 		case !candidate.ValidOffering(call.modelID):
 			reason = "missing_group_quote"
+		case !resourceMatch(candidate, call.resourceBinding):
+			reason = "resource_scope_unavailable"
+		case !supportsAll(candidate, call.resourceRequired):
+			reason = "required_capability_evidence_missing"
 		case containsString(pref.Excluded, candidate.ChannelID):
 			reason = "excluded"
 		case pref.Mode == routing.ModeManual && !containsString(pref.Order, candidate.ChannelID):
@@ -636,7 +665,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
 		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) {
+			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !supportsAll(c, call.resourceRequired) || call.resourceObserver != nil && c.GroupID == "" {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
@@ -1078,10 +1107,15 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 
 	upstreamBody := body
-	if call.format != channel.FormatGemini {
+	if call.imageMultipart != nil {
+		upstreamBody = call.imageMultipart.replace(body, candidate.UpstreamModel)
+	} else if call.format != channel.FormatGemini {
 		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream)
 	}
 	target, err := UpstreamURL(candidate.BaseURL, r.URL.Path, r.URL.RawQuery, call.format, candidate.UpstreamModel, location, secret)
+	if call.auxiliaryEndpoint != nil {
+		target, err = auxiliaryURL(candidate, nativePath(*call.auxiliaryEndpoint, r, candidate.UpstreamModel), r.URL.RawQuery, location, secret)
+	}
 	if err != nil {
 		return fail(EndConnectError, "bad_upstream_url", "无法构造上游地址", nil)
 	}
@@ -1127,7 +1161,11 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		network.Phases = append(network.Phases, phase("prepare", result.started, result.started, trace.start))
 	}
 
-	request, err := http.NewRequestWithContext(withNetworkTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
+	method := http.MethodPost
+	if call.auxiliaryEndpoint != nil {
+		method = r.Method
+	}
+	request, err := http.NewRequestWithContext(withNetworkTrace(attemptCtx, trace), method, target, bytes.NewReader(upstreamBody))
 	if err != nil {
 		cancel(nil)
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
@@ -1346,7 +1384,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	defer putChunk(buffer)
 	defer response.Body.Close()
 	defer result.cancel(nil)
-
 	if call.hints.Background && !call.polling && !call.stream {
 		payload, err := stageBackground(&result)
 		if err != nil {
@@ -1363,6 +1400,30 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
+	var stagedImage []byte
+	// Native JSON resources are registered before any response byte is visible.
+	// Holding the already bounded response is necessary for an ID that may
+	// appear at the end; no body is retained after this call.
+	if (call.resourceObserver != nil || call.format == channel.FormatOpenAIImages) && !isResourceSSE(response.Header.Get("Content-Type")) {
+		payload, err := stageResourceJSON(&result)
+		if err == nil && call.resourceObserver != nil {
+			err = e.registerResources(call, candidate, payload)
+		}
+		if err != nil {
+			if call.pending {
+				if !call.polling {
+					WriteError(w, call.dialect, 502, "resource_registration_failed", "资源归属登记暂未完成，后台调用将继续收尾", call.id)
+				}
+				return
+			}
+			e.internalError(w, call, err)
+			return
+		}
+		if call.format == channel.FormatOpenAIImages {
+			stagedImage = payload
+		}
+	}
+
 	watch := result.watch
 	if !watch.commit() && !call.pending {
 		// The client left between the first byte and the first write: nothing
@@ -1382,10 +1443,14 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	w.WriteHeader(response.StatusCode)
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
+	if stagedImage != nil {
+		observer.absorb(stagedImage)
+	}
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
 	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
 	var written, upstreamBytes int64
+	resourceFailure := false
 	var clientWriteTime time.Duration
 	// undelivered is set when a part of the answer did not reach the client.
 	undelivered := false
@@ -1421,6 +1486,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.usageInjected && call.format == channel.FormatOpenAIChat && call.stream && observer.sse {
 		strip = &usageFrameFilter{}
 	}
+	var resourceGate *resourceEventGate
+	if call.resourceObserver != nil && observer.sse {
+		resourceGate = &resourceEventGate{observe: func(raw []byte) error { return e.registerResources(call, candidate, raw) }, send: send}
+	}
 	deliver := func(chunk []byte) {
 		if len(chunk) == 0 {
 			return
@@ -1428,7 +1497,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		// The observer sees every byte the upstream sends, wanted by the client
 		// or not: that is what makes the usage at the end billable.
 		upstreamBytes += int64(len(chunk))
-		observer.Write(chunk, e.Now())
+		if stagedImage == nil {
+			observer.Write(chunk, e.Now())
+		}
 		if call.hints.Background && !call.pending && !call.polling && observer.responseID != "" {
 			if err := e.keepBackground(call, model, candidate, defaults, observer.responseID); err != nil {
 				e.Logger.Error("gateway: saving background response failed", "request_id", call.id, "error", err)
@@ -1441,7 +1512,16 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if strip != nil {
 			chunk = strip.Filter(chunk)
 		}
-		send(chunk)
+		if resourceGate != nil {
+			if err := resourceGate.write(chunk); err != nil {
+				resourceFailure = true
+				result.cancel(err)
+				undelivered = true
+				watch.left()
+			}
+		} else {
+			send(chunk)
+		}
 	}
 	deliver(result.first)
 	readErr := result.firstErr
@@ -1454,7 +1534,20 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		deliver((*buffer)[:n])
 	}
 	if strip != nil {
-		send(strip.Flush()) // what was held back for an event that never ended
+		tail := strip.Flush()
+		if resourceGate != nil {
+			_ = resourceGate.write(tail)
+		} else {
+			send(tail)
+		}
+	}
+	if resourceGate != nil && answerEnded(result.upstream, readErr) {
+		if err := resourceGate.finish(); err != nil {
+			resourceFailure = true
+			result.cancel(err)
+			undelivered = true
+			watch.left()
+		}
 	}
 	// Whether the answer ran to its end, and whether the client was gone while
 	// it did. A client that closes its side after receiving everything, before
@@ -1469,6 +1562,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
+	if resourceFailure && call.pending {
+		return
+	}
 	if call.hints.Background && call.pending && !terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
 		return
 	}
@@ -1506,6 +1602,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
+	case resourceFailure:
+		outcome, endReason = OutcomeUpstreamFailed, EndInterrupted
 	case observation.ProtocolError:
 		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
 		if observation.ProtocolClientError {
@@ -1519,7 +1617,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		outcome, endReason = OutcomeClientDisconnect, EndClientDisconnected
 	case stopped != nil:
 		outcome, endReason = OutcomeInterrupted, EndInterrupted
-	case !observation.Found:
+	case !observation.Found && !(call.format == channel.FormatOpenAIImages && len(observation.Units) > 0):
 		outcome = OutcomeUnbilled
 	}
 	// A 2xx status is provisional: clearing failures before the body ends
@@ -1550,7 +1648,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.stream {
 		speedMillis -= ttftFromStart
 	}
-	if !call.polling && observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
+	if !call.polling && call.format != channel.FormatOpenAIImages && observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
 		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
 		finish.TokensPerSecond = &speed
 	}
@@ -1561,21 +1659,21 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if self {
 			feeRate = 0
 		}
-		call.billingFacts = quotepricing.Facts{Usage: observation.Usage, MainReliable: observation.Found, IterationsReplace: call.format == channel.FormatAnthropic, Units: observation.Units}
+		call.billingFacts = quotepricing.Facts{Usage: observation.Usage, MainReliable: observation.Found, IndependentImage: call.format == channel.FormatOpenAIImages, IterationsReplace: call.format == channel.FormatAnthropic, Units: observation.Units}
 		priced, snapshot, err := e.priceUsage(call, model, candidate, observation.Usage, defaults, feeRate)
 		if err != nil {
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
 			finish.PriceSnapshot = snapshot
-			if !observation.ProtocolError {
+			if !observation.ProtocolError && !resourceFailure {
 				finish.QuoteStatement = call.pricedStatement
 			}
 			// Explicit upstream failure is not charged (PRODUCT.md), but reliable
 			// usage and its contemporaneous price snapshot remain diagnostic facts.
-			if !observation.ProtocolError {
+			if !observation.ProtocolError && !resourceFailure {
 				finish.Cost, finish.Fee = priced.Cost, priced.Fee
 			}
-			if !observation.ProtocolError && !self && priced.Cost+priced.Fee > 0 {
+			if !observation.ProtocolError && !resourceFailure && !self && priced.Cost+priced.Fee > 0 {
 				finish.Bill = &Billing{ConsumerID: call.key.OwnerID, ProviderID: candidate.OwnerID, Cost: priced.Cost, Fee: priced.Fee}
 			}
 		}
