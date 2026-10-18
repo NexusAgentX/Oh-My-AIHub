@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
@@ -74,6 +75,12 @@ func (o *Observer) observeServerTools(usage jsonObject) {
 func anthropicIterations(items []anthropicFields, parent *anthropicFields) []ledger.UsageIteration {
 	result := make([]ledger.UsageIteration, 0, len(items))
 	for _, item := range items {
+		if !gatewaycontract.ValidModelID(item.Model) {
+			item.Model = ""
+		}
+		if item.Type != "" && item.Type != "message" && item.Type != "advisor_message" && item.Type != "compaction" {
+			item.Type = "unknown"
+		}
 		value := func(p *int64) int64 {
 			if p == nil {
 				return 0
@@ -195,6 +202,9 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		model := textValue(item.get("model"))
 		if model == "" {
 			model = o.imageModel
+		}
+		if !gatewaycontract.ValidModelID(model) {
+			model = ""
 		}
 		if model == "" {
 			o.note("图像工具模型缺失，子模型费用未计价")

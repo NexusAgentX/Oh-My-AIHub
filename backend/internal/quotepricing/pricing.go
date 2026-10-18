@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -24,9 +25,10 @@ type Book struct {
 	Offers            map[string]Offer `json:"offers"`
 }
 type Offer struct {
-	ModelID  string       `json:"model_id"`
-	Revision int64        `json:"revision"`
-	Quote    market.Quote `json:"quote"`
+	ModelID       string       `json:"model_id"`
+	UpstreamModel string       `json:"upstream_model"`
+	Revision      int64        `json:"revision"`
+	Quote         market.Quote `json:"quote"`
 }
 
 // Freeze validates and detaches a book from mutable administrative objects.
@@ -35,7 +37,7 @@ func Freeze(book Book) (*Book, error) {
 		return nil, ErrQuote
 	}
 	for id, offer := range book.Offers {
-		if id != offer.ModelID || offer.Revision < 1 || offer.Quote.ID == "" || offer.Quote.Version < 1 || market.ValidateQuote(offer.Quote) != nil {
+		if id != offer.ModelID || !gatewaycontract.ValidModelID(id) || (offer.UpstreamModel != "" && !gatewaycontract.ValidModelID(offer.UpstreamModel)) || offer.Revision < 1 || offer.Quote.ID == "" || offer.Quote.Version < 1 || market.ValidateQuote(offer.Quote) != nil {
 			return nil, ErrQuote
 		}
 	}
@@ -111,6 +113,22 @@ type Statement struct {
 
 func reference(offer Offer) Reference {
 	return Reference{ModelID: offer.ModelID, GroupModelID: offer.Quote.GroupModelID, Revision: offer.Revision, QuoteID: offer.Quote.ID, QuoteVersion: offer.Quote.Version}
+}
+
+func (b *Book) childOffer(model string) (Offer, bool) {
+	if offer, ok := b.Offers[model]; ok {
+		return offer, true
+	}
+	var match Offer
+	for _, offer := range b.Offers {
+		if offer.UpstreamModel == model && model != "" {
+			if match.ModelID != "" {
+				return Offer{}, false
+			}
+			match = offer
+		}
+	}
+	return match, match.ModelID != ""
 }
 
 func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discountNano, usdRateNano, feeRateNano int64) (Statement, error) {
@@ -204,12 +222,27 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 	if facts.MainReliable && facts.Usage.Detail != nil {
 		for _, iteration := range facts.Usage.Detail.Iterations {
 			model := iteration.Model
-			if model == "" && iteration.Type != "image_generation_call" && iteration.Type != "advisor_message" {
+			if model == "" && (iteration.Type == "" || iteration.Type == "message" || iteration.Type == "compaction") {
 				model = mainModel
 			}
-			offer, ok := book.Offers[model]
+			offer, ok := book.childOffer(model)
 			if !ok {
 				missing(model, iteration.Type, "missing_group_quote")
+				continue
+			}
+			if offer.Quote.BillingUnit != "per_million_tokens" {
+				expected := "request"
+				if offer.Quote.BillingUnit == "per_successful_image" {
+					expected = "successful_image"
+				}
+				reliable := false
+				for _, unit := range facts.Units {
+					measured, found := book.childOffer(unit.ModelID)
+					reliable = reliable || found && measured.ModelID == offer.ModelID && unit.Tool == "" && unit.Unit == expected
+				}
+				if !reliable {
+					missing(offer.ModelID, iteration.Type, "missing_reliable_unit")
+				}
 				continue
 			}
 			if err := addTokens(offer, iteration.Usage, iteration.Type); err != nil {
@@ -226,9 +259,10 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		if model == "" {
 			model = mainModel
 		}
-		offer, ok := book.Offers[model]
+		offer, ok := book.childOffer(model)
 		if !ok {
 			missing(model, unit.Unit, "missing_group_quote")
+			statement.Lines[len(statement.Lines)-1].Unit = &unit
 			continue
 		}
 		if unit.Tool == "" && ((offer.Quote.BillingUnit == "per_million_tokens") || (offer.Quote.BillingUnit == "per_request" && unit.Unit != "request") || (offer.Quote.BillingUnit == "per_successful_image" && unit.Unit != "successful_image")) {
@@ -236,6 +270,8 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		}
 		if unit.Unit == "tool_session" && unit.ReceiptKey == "" {
 			missing(model, unit.Unit, "missing_creation_receipt")
+			statement.Lines[len(statement.Lines)-1].Unit = &unit
+			statement.Lines[len(statement.Lines)-1].Reference = reference(offer)
 			continue
 		}
 		if unit.ReceiptKey != "" && seen[unit.ReceiptKey] {
@@ -244,6 +280,8 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		price, ok := selectUnitPrice(offer.Quote.UnitPrices, unit)
 		if !ok {
 			missing(model, unit.Unit, "missing_unit_price")
+			statement.Lines[len(statement.Lines)-1].Unit = &unit
+			statement.Lines[len(statement.Lines)-1].Reference = reference(offer)
 			continue
 		}
 		rate := ledger.ModelRate(offer.Quote.Currency, usdRateNano)
