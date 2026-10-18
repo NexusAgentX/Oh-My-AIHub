@@ -17,6 +17,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 )
 
 // Retained channel identities used only by historical observation fixtures.
@@ -24,7 +25,7 @@ type fakeChannelStore struct {
 	mu       sync.Mutex
 	channels []*fakeStoredChannel
 }
-type fakeStoredChannel struct{ channel.Channel }
+type fakeStoredChannel struct{ groupchannel.Record }
 
 func newFakeChannelStore(_ *fakeStore) *fakeChannelStore { return &fakeChannelStore{} }
 func (s *fakeChannelStore) find(id string) (*fakeStoredChannel, error) {
@@ -42,10 +43,6 @@ type fakeBrowse struct {
 	channels *fakeChannelStore
 	home     gateway.HomeStats
 	recent   []gateway.CallSummary
-}
-
-func (b *fakeBrowse) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
-	return nil, nil
 }
 
 func (b *fakeBrowse) Home(context.Context, string, time.Time) (gateway.HomeStats, error) {

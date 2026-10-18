@@ -257,14 +257,7 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 			continue
 		}
 		onlineSet[model.ID] = true
-		if model.Custom {
-			// Custom models (ADR-0034) are listed under their own name only.
-			custom := catalog.Model{ID: model.ID, DisplayName: model.ID}
-			byID[model.ID] = custom
-			if allowed(model.ID) {
-				result = append(result, listedModel{id: model.ID, model: custom})
-			}
-		}
+
 	}
 	for _, model := range catalogModels {
 		byID[model.ID] = model

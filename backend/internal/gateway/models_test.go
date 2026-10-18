@@ -160,7 +160,7 @@ func TestListFormatsFollowTheEndpoint(t *testing.T) {
 }
 
 func TestAvailableModelsAreFilteredByFormat(t *testing.T) {
-	models := []catalog.Model{{ID: "gpt-x"}, {ID: "claude-x"}, {ID: "gemini-x"}, {ID: "both-x"}, {ID: "offline-x"}}
+	models := []catalog.Model{{ID: "gpt-x"}, {ID: "claude-x"}, {ID: "gemini-x"}, {ID: "both-x"}, {ID: "offline-x"}, {ID: "custom-claude"}, {ID: "custom-gpt"}}
 	engine := NewEngine(Dependencies{
 		Catalog: catalog.NewService(listingCatalog{models: models}),
 		Store: listingStore{online: []OnlineModel{
@@ -168,8 +168,8 @@ func TestAvailableModelsAreFilteredByFormat(t *testing.T) {
 			{ID: "claude-x", Formats: []channel.Format{channel.FormatAnthropic}},
 			{ID: "gemini-x", Formats: []channel.Format{channel.FormatGemini}},
 			{ID: "both-x", Formats: []channel.Format{channel.FormatOpenAIResponses, channel.FormatAnthropic}},
-			{ID: "custom-claude", Custom: true, Formats: []channel.Format{channel.FormatAnthropic}},
-			{ID: "custom-gpt", Custom: true, Formats: []channel.Format{channel.FormatOpenAIChat}},
+			{ID: "custom-claude", Formats: []channel.Format{channel.FormatAnthropic}},
+			{ID: "custom-gpt", Formats: []channel.Format{channel.FormatOpenAIChat}},
 			{ID: "no-format-x"},
 		}},
 	})

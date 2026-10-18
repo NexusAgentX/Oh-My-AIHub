@@ -90,12 +90,6 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, apikey.ErrLimitReached):
 		writeError(w, http.StatusConflict, "key_limit_reached", "API Key 数量已达上限")
-	case errors.Is(err, channel.ErrGroupManaged):
-		writeError(w, http.StatusConflict, "group_managed_channel", "请通过分组渠道配置修改该渠道")
-	case errors.Is(err, channel.ErrSuspended):
-		writeError(w, http.StatusConflict, "channel_suspended", "渠道已被管理员下架，不能自行上架")
-	case errors.Is(err, channel.ErrConflict):
-		writeError(w, http.StatusConflict, "conflict", "资源状态冲突或标识已被使用")
 	case errors.Is(err, channel.ErrInvalidBaseURL):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_base_url", "Base URL 无效：请填写 HTTPS 中转站根地址，可带 /v1 后缀，不要包含具体接口路径、查询参数或片段")
 	case errors.Is(err, channel.ErrUnsafeUpstream):
@@ -122,8 +116,6 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "own_order", "不能购买自己的卖单")
 	case errors.Is(err, c2c.ErrInvalidCursor):
 		writeBadCursor(w)
-	case errors.Is(err, channel.ErrModelNameTaken):
-		writeError(w, http.StatusUnprocessableEntity, "model_name_taken", "自定义模型不能与模型目录中的模型同名")
 	case errors.Is(err, channel.ErrInvalidInput), errors.Is(err, apikey.ErrInvalidInput), errors.Is(err, routing.ErrInvalidInput), errors.Is(err, c2c.ErrInvalidInput),
 		errors.Is(err, identity.ErrInvalidInput), errors.Is(err, catalog.ErrInvalidInput), errors.Is(err, ledger.ErrInvalidInput),
 		errors.Is(err, ledger.ErrUnbalanced), errors.Is(err, ledger.ErrAmountOverflow), errors.Is(err, money.ErrInvalidAmount),

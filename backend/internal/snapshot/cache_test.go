@@ -122,14 +122,12 @@ func TestBuildFleetIndexesByModelAndFormatInChannelOrder(t *testing.T) {
 	}
 	want := []gateway.OnlineModel{
 		{ID: "a", Formats: []channel.Format{channel.FormatAnthropic, channel.FormatOpenAIChat}},
-		{ID: "b", Custom: true, Formats: []channel.Format{channel.FormatGemini}},
+		{ID: "b", Formats: []channel.Format{channel.FormatGemini}},
 	}
 	if !reflect.DeepEqual(fleet.online, want) {
 		t.Fatalf("online = %+v, want %+v", fleet.online, want)
 	}
-	if _, ok := fleet.customOnline["b"]; !ok || len(fleet.customOnline) != 1 {
-		t.Fatalf("customOnline = %v", fleet.customOnline)
-	}
+
 }
 
 func TestModelListingDoesNotWidenAuxiliaryStateCandidates(t *testing.T) {

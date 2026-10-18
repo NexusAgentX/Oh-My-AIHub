@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -31,7 +30,7 @@ func cacheKeyrings(t *testing.T) (first, second *Keyring) {
 
 func seal(t *testing.T, keyring *Keyring, channelID, plaintext string) EncryptedCredential {
 	t.Helper()
-	sealed, err := keyring.Encrypt(channelID, credentialVersion, plaintext)
+	sealed, err := keyring.Encrypt(channelID, 1, plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,105 +275,6 @@ func TestOpenCredentialErrorsCarryNoPlaintext(t *testing.T) {
 	}
 }
 
-// ---- the service drops the entry when it writes ----
-
-// writeStore answers the few calls Update and Delete make.
-type writeStore struct {
-	Store
-	owner   string
-	updated bool
-	deleted bool
-	failure error
-}
-
-func (s *writeStore) Get(context.Context, string) (Channel, error) {
-	return Channel{Owner: Owner{ID: s.owner}}, nil
-}
-
-func (s *writeStore) Update(context.Context, string, Update) (Channel, error) {
-	s.updated = s.failure == nil
-	return Channel{}, s.failure
-}
-
-func (s *writeStore) SoftDelete(context.Context, string) error {
-	s.deleted = s.failure == nil
-	return s.failure
-}
-
-func opened(keyring *Keyring, channelID string) bool {
-	_, found := keyring.opened.entries.Load(channelID)
-	return found
-}
-
-func TestDeletingAChannelDropsItsOpenedKey(t *testing.T) {
-	keyring, _ := cacheKeyrings(t)
-	store := &writeStore{owner: "owner"}
-	service := NewService(Dependencies{Store: store, Keyring: keyring})
-	open(t, keyring, cacheChannelA, seal(t, keyring, cacheChannelA, cacheSecret))
-	open(t, keyring, cacheChannelB, seal(t, keyring, cacheChannelB, "other-secret"))
-
-	if err := service.Delete(context.Background(), "owner", cacheChannelA); err != nil {
-		t.Fatal(err)
-	}
-	if !store.deleted || opened(keyring, cacheChannelA) {
-		t.Fatalf("deleted %v, plaintext still held %v", store.deleted, opened(keyring, cacheChannelA))
-	}
-	if !opened(keyring, cacheChannelB) {
-		t.Fatal("deleting one channel dropped another's key")
-	}
-}
-
-func TestADeleteThatFailedKeepsTheOpenedKey(t *testing.T) {
-	keyring, _ := cacheKeyrings(t)
-	store := &writeStore{owner: "owner", failure: ErrNotFound}
-	service := NewService(Dependencies{Store: store, Keyring: keyring})
-	open(t, keyring, cacheChannelA, seal(t, keyring, cacheChannelA, cacheSecret))
-	if err := service.Delete(context.Background(), "owner", cacheChannelA); err == nil {
-		t.Fatal("delete did not fail")
-	}
-	if !opened(keyring, cacheChannelA) {
-		t.Fatal("a delete that did not happen dropped the key")
-	}
-	// A foreign owner never reaches the cache.
-	service = NewService(Dependencies{Store: &writeStore{owner: "owner"}, Keyring: keyring})
-	if err := service.Delete(context.Background(), "intruder", cacheChannelA); err == nil || !opened(keyring, cacheChannelA) {
-		t.Fatalf("err = %v, held = %v", err, opened(keyring, cacheChannelA))
-	}
-}
-
-func TestReplacingAChannelKeyDropsTheOldOne(t *testing.T) {
-	keyring, _ := cacheKeyrings(t)
-	store := &writeStore{owner: "owner"}
-	service := NewService(Dependencies{Store: store, Keyring: keyring})
-	open(t, keyring, cacheChannelA, seal(t, keyring, cacheChannelA, cacheSecret))
-
-	// Updating something else leaves the key alone.
-	name := "renamed"
-	if _, err := service.Update(context.Background(), "owner", cacheChannelA, UpdateInput{Name: &name}); err != nil {
-		t.Fatal(err)
-	}
-	if !opened(keyring, cacheChannelA) {
-		t.Fatal("renaming a channel dropped its key")
-	}
-	key := "sk-replacement"
-	if _, err := service.Update(context.Background(), "owner", cacheChannelA, UpdateInput{APIKey: &key}); err != nil {
-		t.Fatal(err)
-	}
-	if !store.updated || opened(keyring, cacheChannelA) {
-		t.Fatalf("updated %v, old plaintext still held %v", store.updated, opened(keyring, cacheChannelA))
-	}
-
-	// An update that failed in the store did not replace the key.
-	open(t, keyring, cacheChannelA, seal(t, keyring, cacheChannelA, cacheSecret))
-	store.failure = ErrNotFound
-	if _, err := service.Update(context.Background(), "owner", cacheChannelA, UpdateInput{APIKey: &key}); err == nil {
-		t.Fatal("update did not fail")
-	}
-	if !opened(keyring, cacheChannelA) {
-		t.Fatal("a failed update dropped the key")
-	}
-}
-
 // ---- what a gateway attempt pays for the key ----
 
 func benchmarkKey(b *testing.B) (*Keyring, EncryptedCredential) {
@@ -383,7 +283,7 @@ func benchmarkKey(b *testing.B) (*Keyring, EncryptedCredential) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	sealed, err := keyring.Encrypt(cacheChannelA, credentialVersion, cacheSecret)
+	sealed, err := keyring.Encrypt(cacheChannelA, 1, cacheSecret)
 	if err != nil {
 		b.Fatal(err)
 	}

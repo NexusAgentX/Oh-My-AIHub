@@ -895,7 +895,7 @@ func (s *codexProbeStore) OnlineModels(context.Context) ([]gateway.OnlineModel, 
 	}
 	return rows, nil
 }
-func (*codexProbeStore) CustomModelOnline(context.Context, string) (bool, error) { return false, nil }
+
 func (s *codexProbeStore) Get(_ context.Context, model string) (catalog.Model, error) {
 	for _, row := range append([]gateway.CandidateRecord{s.row}, s.extraRows...) {
 		if model == row.ModelID {

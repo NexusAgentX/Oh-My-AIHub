@@ -558,7 +558,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	w.Header().Set("X-AIHub-Request-Id", id)
 	e.Events.Publish(Event{Kind: EventCallStarted, At: started, CallID: id, AccountID: key.OwnerID, KeyID: key.KeyID, Model: call.requested, Format: string(format)})
 
-	// Model: alias first, then the key's allowed list, then the catalog.
+	// Model: resolve aliases, enforce the Key restriction, then consult the
+	// approved group-ID aggregate. No legacy custom-model fallback exists.
 	call.modelID = call.requested
 	if target, aliased := key.Aliases[call.requested]; aliased {
 		call.modelID = target
@@ -568,19 +569,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	model, err := e.Catalog.Get(ctx, call.modelID)
-	if errors.Is(err, catalog.ErrNotFound) {
-		// A name outside the catalog may be a channel's custom model
-		// (ADR-0034); each candidate then carries its own prices.
-		custom, customErr := e.Store.CustomModelOnline(ctx, call.modelID)
-		if customErr != nil {
-			e.internalError(w, call, customErr)
-			return
-		}
-		if custom {
-			model = catalog.Model{ID: call.modelID, DisplayName: call.modelID, PriceCurrency: ledger.CurrencyCNY, Enabled: true}
-			err = nil
-		}
-	}
 	if errors.Is(err, catalog.ErrNotFound) || (err == nil && !model.Enabled) {
 		e.finishRejected(w, call, OutcomeRejectedModel, http.StatusNotFound, "model_not_found", "模型不存在或未启用")
 		return

@@ -312,7 +312,6 @@ func (s *Store) RecordChannelEvent(ctx context.Context, channelID, kind, reason 
 func (s *Store) OnlineModels(context.Context) ([]gateway.OnlineModel, error) {
 	return []gateway.OnlineModel{}, nil
 }
-func (s *Store) CustomModelOnline(context.Context, string) (bool, error) { return false, nil }
 
 func (s *Store) Home(ctx context.Context, accountID string, dayStart time.Time) (gateway.HomeStats, error) {
 	var stats gateway.HomeStats

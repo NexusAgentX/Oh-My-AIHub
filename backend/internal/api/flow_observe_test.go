@@ -12,6 +12,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
@@ -99,7 +100,7 @@ func TestCallObservationReports(t *testing.T) {
 		"name": "阿里中转", "group_id": "00000000-0000-4000-8000-000000000062", "api_key": "sk-upstream-test-key-0001",
 	})["id"].(string)
 	// Observation queries also include retained channel identities after deletion.
-	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Channel: channel.Channel{ID: channelID, Owner: channel.Owner{ID: bobID}, Name: "阿里中转"}})
+	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Record: groupchannel.Record{ID: channelID, Owner: channel.Owner{ID: bobID}, Name: "阿里中转"}})
 
 	keyID := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{"name": "默认 Key"})["key"].(map[string]any)["id"].(string)
 	ids := p.observeFixtures(aliceID, channelID, keyID)

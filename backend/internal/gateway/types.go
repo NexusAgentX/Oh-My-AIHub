@@ -284,15 +284,11 @@ type Store interface {
 	// OnlineModels lists, for the model list endpoints, the models that have
 	// at least one listed channel, with the formats those channels serve.
 	OnlineModels(ctx context.Context) ([]OnlineModel, error)
-	// CustomModelOnline reports whether a listed channel offers a custom
-	// model of that name.
-	CustomModelOnline(ctx context.Context, modelID string) (bool, error)
 }
 
-// Models is the model catalog as the engine reads it. *catalog.Service reads
-// the database; the snapshot cache (internal/snapshot, ADR-0040) answers from
-// memory. What comes back may be shared between callers and must not be
-// modified.
+// Models reads the approved group-ID aggregate from the snapshot. It owns
+// no global model entities or prices. Returned metadata may be shared and
+// must not be modified.
 type Models interface {
 	Get(ctx context.Context, id string) (catalog.Model, error)
 	// List returns the catalog in display order; disabled models only when
@@ -323,22 +319,7 @@ type CandidateRecord struct {
 // state such as cooldown is not considered).
 type OnlineModel struct {
 	ID      string
-	Custom  bool
 	Formats []channel.Format
-}
-
-// OnlineChannel is one listed channel offering one model, for browsing.
-type OnlineChannel struct {
-	ModelID        string
-	ChannelID      string
-	ChannelName    string
-	OwnerID        string
-	OwnerName      string
-	Formats        []channel.Format
-	MultiplierNano int64
-	FXDiscount     bool
-	Advanced       channel.Advanced
-	Custom         *channel.CustomPrices
 }
 
 // HomeStats are the counters on the home page.
