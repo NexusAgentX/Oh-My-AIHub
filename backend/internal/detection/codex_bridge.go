@@ -169,6 +169,17 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 			}
 		}
 	}
+	// The bridge is evaluating these configured tiers now, so its synthetic
+	// admission inputs must not wait for the report being produced. Actual
+	// support still comes exclusively from the observed upstream return below.
+	proof["upstream_protocol/codex-special.RL24/service_tier/openai:default"] = true
+	for _, tier := range s.Target.Profile.ServiceTiers {
+		if strings.HasPrefix(tier, "openai:") {
+			if canonical := canonicalNativeTier("codex-special", strings.TrimPrefix(tier, "openai:")); canonical != "" {
+				proof["upstream_protocol/codex-special.RL24/service_tier/"+canonical] = true
+			}
+		}
+	}
 	if upstreamModel == "" {
 		upstreamModel = codexProbeModel // model-less auxiliary witness only
 	}

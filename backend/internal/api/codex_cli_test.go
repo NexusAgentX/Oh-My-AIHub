@@ -72,7 +72,7 @@ func runProductionCodexProbeOutcome(t *testing.T, handler http.Handler, profile 
 	var result codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &result)
 	if success && (err != nil || parseErr != nil || !result.Completed || !result.MarkerMatched || !result.PlatformAuth) {
-		t.Fatalf("official CLI did not complete production-handler profile %s: reason=%s exit=%d metadata=%+v", profile, output.Reason, output.ExitCode, result)
+		t.Fatalf("official CLI did not complete production-handler profile %s: reason=%s resource=%s exit=%d metadata=%+v", profile, output.Reason, output.ResourceFailure, output.ExitCode, result)
 	}
 	if !success && (err == nil || parseErr != nil || result.Protocol != codexprobe.Protocol || result.Version != codexprobe.Version || result.Completed || result.PlatformAuth) {
 		t.Fatalf("revoked platform Key enabled the official client: reason=%s exit=%d metadata=%+v", output.Reason, output.ExitCode, result)
@@ -169,7 +169,7 @@ func TestOfficialCodexCLIUsesProductionHandlers(t *testing.T) {
 				// Adapter errors deliberately contain no raw CLI diagnostics.
 				mu.Lock()
 				defer mu.Unlock()
-				t.Fatalf("official CLI failed: reason=%s exit=%d metadata=%+v paths=%v", output.Reason, output.ExitCode, result, paths)
+				t.Fatalf("official CLI failed: reason=%s resource=%s exit=%d metadata=%+v paths=%v", output.Reason, output.ResourceFailure, output.ExitCode, result, paths)
 			}
 			mu.Lock()
 			defer mu.Unlock()

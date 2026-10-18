@@ -29,11 +29,53 @@ type ProcessSpec struct {
 	VirtualMemoryMiB int
 }
 type ProcessOutput struct {
-	Stdout   []byte `json:"-"`
-	Stderr   []byte `json:"-"`
-	ExitCode int
-	Reason   string
+	Stdout          []byte `json:"-"`
+	Stderr          []byte `json:"-"`
+	ExitCode        int
+	Reason          string
+	ResourceFailure string // fixed diagnostic enum; never a path or child output
 }
+
+type processTreeBudget struct {
+	count    int
+	size     int64
+	exceeded string
+}
+
+func (b *processTreeBudget) visit(_ string, entry fs.DirEntry, walkErr error) error {
+	// SQLite WALs and CLI temporary files can disappear between ReadDir and
+	// Info. Their normal removal is neither an I/O failure nor a budget breach.
+	if errors.Is(walkErr, fs.ErrNotExist) {
+		return nil
+	}
+	if walkErr != nil {
+		return walkErr
+	}
+	info, err := entry.Info()
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info == nil {
+		return fs.ErrInvalid
+	}
+	b.count++
+	if b.count > 2048 {
+		b.exceeded = "temporary_entries"
+		return errClientLimit
+	}
+	if !entry.IsDir() {
+		b.size += info.Size()
+	}
+	if b.size > 16<<20 {
+		b.exceeded = "temporary_bytes"
+		return errClientLimit
+	}
+	return nil
+}
+
 type boundedOutput struct {
 	mu       sync.Mutex
 	buffer   bytes.Buffer
@@ -159,7 +201,8 @@ func RunControlledProcess(ctx context.Context, spec ProcessSpec) (ProcessOutput,
 	stopped := make(chan struct{})
 	watchDone := make(chan struct{})
 	var limitMu sync.Mutex
-	diskLimit := false
+	var watchErr error
+	resourceFailure := ""
 	go func() {
 		defer close(watchDone)
 		ticker := time.NewTicker(200 * time.Millisecond)
@@ -172,30 +215,15 @@ func RunControlledProcess(ctx context.Context, spec ProcessSpec) (ProcessOutput,
 				killProcessGroup(cmd)
 				return
 			case <-ticker.C:
-				count, size := 0, int64(0)
-				walkErr := filepath.WalkDir(dir, func(_ string, entry fs.DirEntry, walkErr error) error {
-					if walkErr != nil {
-						return walkErr
-					}
-					count++
-					if count > 2048 {
-						return errClientLimit
-					}
-					info, err := entry.Info()
-					if err != nil {
-						return err
-					}
-					if !entry.IsDir() {
-						size += info.Size()
-					}
-					if size > 16<<20 {
-						return errClientLimit
-					}
-					return nil
-				})
+				budget := processTreeBudget{}
+				walkErr := filepath.WalkDir(dir, budget.visit)
 				if walkErr != nil {
 					limitMu.Lock()
-					diskLimit = true
+					watchErr = walkErr
+					resourceFailure = budget.exceeded
+					if resourceFailure == "" {
+						resourceFailure = "temporary_storage"
+					}
 					limitMu.Unlock()
 					cancel()
 					killProcessGroup(cmd)
@@ -212,11 +240,21 @@ func RunControlledProcess(ctx context.Context, spec ProcessSpec) (ProcessOutput,
 	out.Stderr = bytes.Clone(stderr.buffer.Bytes())
 	out.Reason = "ok"
 	limitMu.Lock()
-	diskExceeded := diskLimit
+	filesystemErr := watchErr
+	out.ResourceFailure = resourceFailure
 	limitMu.Unlock()
-	if stdout.overflow || stderr.overflow || diskExceeded {
+	if stdout.overflow || stderr.overflow || errors.Is(filesystemErr, errClientLimit) {
+		if stdout.overflow {
+			out.ResourceFailure = "stdout"
+		} else if stderr.overflow {
+			out.ResourceFailure = "stderr"
+		}
 		out.Reason = "body_limit"
 		return out, errClientLimit
+	}
+	if filesystemErr != nil {
+		out.Reason = "detector_error"
+		return out, filesystemErr
 	}
 	if runCtx.Err() != nil {
 		out.Reason = "timeout"
