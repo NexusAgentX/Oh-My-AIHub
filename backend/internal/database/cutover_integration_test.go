@@ -68,9 +68,10 @@ func legacyCutoverDatabase(t *testing.T, version int64) (*sql.DB, string, *goose
 }
 
 func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *testing.T) {
-	// v0.21.0 ends at 0014. Also exercise an already integrated group schema,
-	// including the SQL guard when a caller bypasses the migration CLI.
-	for _, version := range []int64{14, 25} {
+	// The last documented operations baseline v0.18.2 ends at 0010; it is
+	// not a claim about the current target. v0.21.0 ends at 0014. Also exercise
+	// an integrated group schema and direct SQL authorization enforcement.
+	for _, version := range []int64{10, 14, 25} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			db, target, provider := legacyCutoverDatabase(t, version)
 			ctx := context.Background()
@@ -108,23 +109,33 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 			exec("INSERT INTO route_pref_channels(route_pref_id,channel_id,position,excluded) SELECT id,$1,0,false FROM route_prefs WHERE account_id=$2", cid, owner)
 			exec("INSERT INTO api_keys(id,owner_id,name,key_hash,prefix,key_ciphertext,key_nonce,key_key_id,allowed_models,model_aliases) VALUES($1,$2,'Historical key',decode(repeat('01',32),'hex'),'sk-aih-test',$3,$4,$5,ARRAY['old-model'],'{\"alias\":\"old-model\"}')", key, owner, sealedKey.Ciphertext, sealedKey.Nonce, sealedKey.KeyID)
 			exec("INSERT INTO calls(id,account_id,api_key_id,requested_model,model_id,format,final_channel_id,outcome,price_snapshot,completed_at) VALUES($1,$2,$3,'old-model','old-model','openai_responses',$4,'upstream_failed','{\"legacy_price\":7}',now())", call, owner, key, cid)
-			exec("INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at,settled_at) VALUES($1,$2,$3,$4,'synthetic-old-response','{\"synthetic_sealed_history\":true}',now(),now())", call, owner, key, cid)
+			hasBackground := version >= 14
+			if hasBackground {
+				exec("INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at,settled_at) VALUES($1,$2,$3,$4,'synthetic-old-response','{\"synthetic_sealed_history\":true}',now(),now())", call, owner, key, cid)
+			}
+			backgroundRows := "NULL"
+			if hasBackground {
+				backgroundRows = "(SELECT jsonb_agg(to_jsonb(v) ORDER BY call_id) FROM gateway_background_jobs v)"
+			}
 			snapshot := func() string {
 				t.Helper()
 				var value string
-				err := db.QueryRowContext(ctx, `SELECT jsonb_build_object(
+				err := db.QueryRowContext(ctx, fmt.Sprintf(`SELECT jsonb_build_object(
      'versions',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM goose_db_version v),
      'calls',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM calls v),
-     'jobs',(SELECT jsonb_agg(to_jsonb(v) ORDER BY call_id) FROM gateway_background_jobs v),
+     'jobs',%s,
      'channels',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM channels v),
      'models',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM models v),
-     'keys',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM api_keys v))::text`).Scan(&value)
+     'keys',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM api_keys v))::text`, backgroundRows)).Scan(&value)
 				if err != nil {
 					t.Fatal(err)
 				}
 				return value
 			}
 			for _, kind := range []string{"ordinary", "background"} {
+				if kind == "background" && !hasBackground {
+					continue
+				}
 				if kind == "ordinary" {
 					exec("UPDATE calls SET outcome='in_progress' WHERE id=$1", call)
 				} else {
@@ -140,7 +151,9 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 				}
 				// End only these isolated synthetic tasks; no real request is interrupted.
 				exec("UPDATE calls SET outcome='upstream_failed' WHERE id=$1", call)
-				exec("UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1", call)
+				if hasBackground {
+					exec("UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1", call)
+				}
 			}
 			beforeAuth := snapshot()
 			if err := Migrate(ctx, target); !errors.Is(err, ErrCleanupAuthorization) {
