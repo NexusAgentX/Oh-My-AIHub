@@ -55,7 +55,7 @@ export function TypicalCostsPage() {
   const [cursor, setCursor] = useState('')
   const costs = useTypicalCosts(level, model, cursor)
   return <>
-    <PageHeader title="典型费用" description="按可靠业务样本估算，用于报价比较。实际账单按每次可靠用量结算。" actions={<Button variant="secondary" loading={refresh.isPending} onClick={() => refresh.mutate()}>立即更新</Button>} />
+    <PageHeader title="典型费用" description="按可靠业务样本估算，用于报价比较。实际账单按每次可靠用量结算。" actions={<Button variant="secondary" loading={refresh.isPending} disabled={costs.data?.status.running || costs.data?.status.pending} onClick={() => refresh.mutate()}>立即更新</Button>} />
     <InlineError>{refresh.isError ? errorMessage(refresh.error, '请求更新失败') : ''}</InlineError>
     <QueryBoundary query={settings}>{(data) => <SettingsEditor value={data} />}</QueryBoundary>
     <Card title="估算结果"><form className="stack-form" onSubmit={(event) => { event.preventDefault(); setModel(draft.trim()); setCursor('') }}>

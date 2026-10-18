@@ -6716,26 +6716,26 @@ paths:
       x-feature: "496"
       security: [{"sessionCookie":[]}]
       responses:
-        200: {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalPage"}}}}
-        400:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalPage"}}}}
+        "400":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        401:
+        "401":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        403:
+        "403":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        409:
+        "409":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        422:
+        "422":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        500:
+        "500":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        503:
+        "503":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
       parameters: [{"name":"model_id","in":"query","schema":{"type":"string"}},{"name":"level","in":"query","schema":{"type":"string","enum":["model","group","channel"]}},{"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100}},{"name":"cursor","in":"query","schema":{"type":"string"}}]
@@ -6748,26 +6748,26 @@ paths:
       x-feature: "496"
       security: [{"sessionCookie":[]}]
       responses:
-        200: {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
-        400:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
+        "400":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        401:
+        "401":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        403:
+        "403":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        409:
+        "409":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        422:
+        "422":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        500:
+        "500":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        503:
+        "503":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
     put:
@@ -6778,26 +6778,26 @@ paths:
       x-feature: "496"
       security: [{"sessionCookie":[]}]
       responses:
-        200: {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
-        400:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
+        "400":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        401:
+        "401":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        403:
+        "403":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        409:
+        "409":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        422:
+        "422":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        500:
+        "500":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        503:
+        "503":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
       requestBody: {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
@@ -6810,26 +6810,26 @@ paths:
       x-feature: "496"
       security: [{"sessionCookie":[]}]
       responses:
-        202: {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalQueued"}}}}
-        400:
+        "202": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalQueued"}}}}
+        "400":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        401:
+        "401":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        403:
+        "403":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        409:
+        "409":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        422:
+        "422":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        500:
+        "500":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
-        503:
+        "503":
           description: "请求未完成"
           content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
 components:

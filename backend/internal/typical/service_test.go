@@ -183,3 +183,63 @@ func TestInputChangeBeforePublishPreservesPreviousAndConfigIsOptimistic(t *testi
 		t.Fatal("stale settings overwrote new version", err)
 	}
 }
+
+func TestCostLookupRequiresCurrentQuoteDiscountAndFXWithoutWork(t *testing.T) {
+	in, c, samples, at := fixture(t)
+	snap, err := Calculate(t.Context(), in, c, samples, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{}
+	service.install(snap, in)
+	offers, _, err := offerings(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := offers["mb"].digest
+	if got, ok := service.Lookup("c1", "m", "b", version, 400_000_000, in.USDCNYNano); !ok || got.String() != "0.152" {
+		t.Fatal(got, ok)
+	}
+	for _, bad := range []struct {
+		version      string
+		discount, fx int64
+	}{{"new-quote", 400_000_000, in.USDCNYNano}, {version, 500_000_000, in.USDCNYNano}, {version, 400_000_000, in.USDCNYNano + 1}} {
+		if _, ok := service.Lookup("c1", "m", "b", bad.version, bad.discount, bad.fx); ok {
+			t.Fatal("stale cost used", bad)
+		}
+	}
+	if allocs := testing.AllocsPerRun(100, func() { _, _ = service.Lookup("c1", "m", "b", version, 400_000_000, in.USDCNYNano) }); allocs != 0 {
+		t.Fatal("hot cost lookup allocated", allocs)
+	}
+}
+func BenchmarkTypicalCostLookup(b *testing.B) {
+	service := &Service{}
+	service.prices.Store(&costIndex{fx: 7_000_000_000, values: map[costKey]costValue{{"channel", "model"}: {group: "group", version: "version", discount: 800_000_000, cost: 1}}})
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = service.Lookup("channel", "model", "group", "version", 800_000_000, 7_000_000_000)
+	}
+}
+
+func TestUnavailableWarmupStartsUnknownAndRecoversWithoutAffectingSettlement(t *testing.T) {
+	in, c, samples, at := fixture(t)
+	repo := memory(c)
+	repo.fail = errors.New("temporary statistics outage")
+	service, err := New(t.Context(), repo, sourceFunc(func(context.Context) (Input, error) { return in, nil }))
+	if err != nil {
+		t.Fatal("optional estimates blocked startup", err)
+	}
+	snap, status := service.Snapshot()
+	if snap != nil || status.LastError != "update_failed" {
+		t.Fatal("outage became fabricated estimate", snap, status)
+	}
+	repo.fail = nil
+	repo.raw = []RawCall{rawSample(samples[0])}
+	service.now = func() time.Time { return at }
+	if err = service.Step(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if snap, _ = service.Snapshot(); snap == nil {
+		t.Fatal("statistics failed to recover")
+	}
+}

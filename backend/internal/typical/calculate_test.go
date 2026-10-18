@@ -205,3 +205,41 @@ func TestDecodeKeepsReliableUsageAndDiscardsContentAndNetCost(t *testing.T) {
 		t.Fatal("missing reliable usage polluted profile")
 	}
 }
+
+func TestImageProductsAndCacheTTLBucketsUseMeasuredQuantities(t *testing.T) {
+	in, c, samples, at := fixture(t)
+	in.Directory.Quotes[1].Prices = market.TokenPrices{CacheWrite: amount(t, "1"), Details: map[string]money.Amount{"cache_write_5m": amount(t, "2"), "cache_write_1h": amount(t, "10")}}
+	s := samples[1]
+	s.Facts.Usage = ledger.Usage{CacheWriteTokens: 100, Detail: &ledger.UsageDetail{Tokens: map[string]int64{"cache_write_5m": 40, "cache_write_1h": 60}}}
+	snap, err := Calculate(t.Context(), in, c, []Sample{s}, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := row(t, snap, "group", "b"); str(r.Cost) != "6.8" || r.Workload.Tokens["cache_write_1h"] != 60 {
+		t.Fatal("TTL price buckets flattened", r)
+	}
+	for i := range in.Directory.Models {
+		in.Directory.Models[i].ModelType = "image"
+	}
+	in.Directory.Quotes[0].BillingUnit = "per_request"
+	in.Directory.Quotes[0].Prices = market.TokenPrices{}
+	in.Directory.Quotes[0].UnitPrices = []market.UnitPrice{{Unit: "request", Price: amount(t, "1")}}
+	in.Directory.Quotes[1].BillingUnit = "per_successful_image"
+	in.Directory.Quotes[1].Prices = market.TokenPrices{}
+	in.Directory.Quotes[1].UnitPrices = []market.UnitPrice{{Unit: "successful_image", ImageSize: "1024x1024", Price: amount(t, "0.5")}, {Unit: "successful_image", ImageSize: "512x512", Price: amount(t, "0.2")}, {Unit: "successful_image", Price: amount(t, "0.5")}}
+	products := []Sample{}
+	for i, size := range []string{"1024x1024", "512x512"} {
+		p := samples[1]
+		p.ID += size
+		p.Facts = quotepricing.Facts{IndependentImage: true, Units: []quotepricing.Unit{{Unit: "request", QuantityNano: ledger.UnitRate}, {Unit: "successful_image", QuantityNano: int64(i+1) * ledger.UnitRate, ImageSize: size}}}
+		products = append(products, p)
+	}
+	snap, err = Calculate(t.Context(), in, c, products, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := row(t, snap, "group", "b")
+	if str(r.Cost) != "30" || str(r.RequestCost) != "45" || str(r.ReferenceCost) != "66.666666667" || str(r.Ratio) != "0.450000000" || r.Workload.ImagesNano != 3*ledger.UnitRate {
+		t.Fatal("request/product relationship guessed", r)
+	}
+}

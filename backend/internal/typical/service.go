@@ -18,6 +18,7 @@ type Service struct {
 	request chan struct{}
 	running atomic.Bool
 	current atomic.Pointer[Snapshot]
+	prices  atomic.Pointer[costIndex]
 	mu      sync.Mutex
 	status  Status
 	now     func() time.Time
@@ -27,26 +28,26 @@ func New(ctx context.Context, repo Repository, source Source) (*Service, error) 
 	if repo == nil || source == nil {
 		return nil, ErrInvalid
 	}
+	s := &Service{repo: repo, source: source, request: make(chan struct{}, 1), now: func() time.Time { return time.Now().UTC() }}
 	config, err := repo.Config(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if Validate(config) != nil {
+	if err == nil && Validate(config) != nil {
 		return nil, ErrInvalid
 	}
-	s := &Service{repo: repo, source: source, request: make(chan struct{}, 1), now: func() time.Time { return time.Now().UTC() }}
-	previous, err := repo.LoadSnapshot(ctx)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		previous, loadErr := repo.LoadSnapshot(ctx)
+		err = loadErr
+		if err == nil && previous != nil {
+			in, sourceErr := source.Current(ctx)
+			err = sourceErr
+			if err == nil && previous.Version == "typical.v1" && previous.InputVersion == InputVersion(in, config) {
+				s.install(previous, in)
+			}
+		}
 	}
-	if previous != nil {
-		in, err := source.Current(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if previous.Version == "typical.v1" && previous.InputVersion == InputVersion(in, config) {
-			s.current.Store(previous)
-		}
+	// Derived statistics may start unknown during an outage. The bounded worker
+	// retries; failure to warm an estimate must not disable actual settlement.
+	if err != nil {
+		s.status.LastError = "update_failed"
 	}
 	s.Notify()
 	return s, nil
@@ -282,6 +283,6 @@ func (s *Service) Step(ctx context.Context) (err error) {
 	}
 	// Reads also carry the immutable quote/config/waterline provenance. F10
 	// matches its current candidate/rate against this snapshot without SQL.
-	s.current.Store(snap)
+	s.install(snap, in)
 	return nil
 }

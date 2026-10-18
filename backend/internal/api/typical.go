@@ -121,6 +121,10 @@ func (a *app) getTypicalCosts(w http.ResponseWriter, r *http.Request) {
 	scope := hex.EncodeToString(sum[:])
 	after := ""
 	if token := r.URL.Query().Get("cursor"); token != "" {
+		if len(token) > 4096 {
+			writeBadCursor(w)
+			return
+		}
 		raw, err := base64.RawURLEncoding.DecodeString(token)
 		var c struct{ Scope, After string }
 		if len(token) > 4096 || err != nil || json.Unmarshal(raw, &c) != nil || c.Scope != scope {
