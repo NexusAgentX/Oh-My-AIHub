@@ -129,7 +129,7 @@ func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 	for _, option := range options {
 		option(&dependencies)
 	}
-	handler := NewHandler(dependencies)
+	handler := &fixtureHandler{Handler: NewHandler(dependencies), store: store}
 	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, stats: stats, handler: handler}
 }
 
@@ -162,7 +162,7 @@ func (p *platform) member(t *testing.T, username string) (*client, string) {
 // seedModel 由管理员创建一个带两档价格的模型。
 func seedModel(t *testing.T, admin *client, id string) {
 	t.Helper()
-	admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
+	modelSetup(t, admin, map[string]any{
 		"id": id, "display_name": "DeepSeek Chat", "provider": "DeepSeek", "context_window": 128000,
 		"base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_write": "0", "cache_read": "0.15"},
 	})

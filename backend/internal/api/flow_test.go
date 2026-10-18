@@ -283,57 +283,10 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 	admin.expect(t, http.StatusNoContent, http.MethodPost, "/api/auth/logout", nil)
 }
 
-func TestAdminModelsSettingsAndAudit(t *testing.T) {
+func TestAdminSettingsAndAudit(t *testing.T) {
 	spec := loadOpenAPI(t)
 	store := newFakeStore()
 	admin := bootstrap(t, spec, newFakeHandler(store))
-
-	model := map[string]any{
-		"id": "deepseek-chat", "display_name": "DeepSeek Chat",
-		"base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_write": "0", "cache_read": "0.15"},
-		"price_tiers": []map[string]any{{
-			"name": "高峰", "timezone": "Asia/Shanghai", "weekdays": []int{1, 2, 3, 4, 5},
-			"start_minute_of_day": 540, "end_minute_of_day": 720,
-			"prices": map[string]string{"input": "3", "output": "9", "cache_write": "0", "cache_read": "0.3"},
-		}},
-		"provider": "DeepSeek", "context_window": 128000, "max_output_tokens": 8192,
-	}
-	created := admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", model)["model"].(map[string]any)
-	if created["enabled"] != true || created["max_output_tokens"] != float64(8192) || len(created["price_tiers"].([]any)) != 1 || created["price_tiers"].([]any)[0].(map[string]any)["seq"] != float64(1) {
-		t.Fatalf("created model = %v", created)
-	}
-	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", model); recorder.Code != http.StatusConflict {
-		t.Fatalf("duplicate model = %d", recorder.Code)
-	}
-	invalid := map[string]any{"id": "bad/model", "display_name": "x", "base_prices": model["base_prices"]}
-	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", invalid); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("slash model = %d", recorder.Code)
-	}
-	zeroOutput := map[string]any{"id": "zero-output", "display_name": "x", "base_prices": model["base_prices"], "max_output_tokens": 0}
-	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", zeroOutput); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("zero max_output_tokens = %d", recorder.Code)
-	}
-	tooExpensive := map[string]any{"id": "pricey", "display_name": "x", "base_prices": map[string]string{"input": "100000.000000001", "output": "0", "cache_write": "0", "cache_read": "0"}}
-	if recorder := admin.call(t, http.MethodPost, "/api/admin/models", tooExpensive); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("price ceiling = %d", recorder.Code)
-	}
-
-	patched := admin.expect(t, http.StatusOK, http.MethodPatch, "/api/admin/models/deepseek-chat", map[string]any{
-		"enabled": false, "price_tiers": []any{}, "context_window": nil, "max_output_tokens": nil,
-	})["model"].(map[string]any)
-	if patched["enabled"] != false || len(patched["price_tiers"].([]any)) != 0 || patched["context_window"] != nil || patched["max_output_tokens"] != nil || patched["display_name"] != "DeepSeek Chat" {
-		t.Fatalf("patched model = %v", patched)
-	}
-	if recorder := admin.call(t, http.MethodPatch, "/api/admin/models/missing", map[string]any{"enabled": true}); recorder.Code != http.StatusNotFound {
-		t.Fatalf("missing model = %d", recorder.Code)
-	}
-	if recorder := admin.call(t, http.MethodPatch, "/api/admin/models/deepseek-chat", map[string]any{"id": "renamed"}); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("rename model = %d", recorder.Code)
-	}
-	listed := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/models", nil)
-	if len(listed["items"].([]any)) != 1 {
-		t.Fatalf("admin models = %v", listed)
-	}
 
 	current := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/settings", nil)["settings"].(map[string]any)
 	if current["fee_rate_nano"] != float64(1_000_000) || current["c2c_payment_timeout_minutes"] != float64(30) || current["account_max_inflight_calls"] != float64(20) {
@@ -389,7 +342,7 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	}
 
 	// 新账户默认信用额度来自平台设置。
-	created = admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/accounts", map[string]any{"username": "chen", "display_name": "老陈"})["account"].(map[string]any)
+	created := admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/accounts", map[string]any{"username": "chen", "display_name": "老陈"})["account"].(map[string]any)
 	if created["credit_limit"] != "20" {
 		t.Fatalf("default credit limit = %v", created)
 	}
@@ -403,7 +356,7 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 	for _, item := range append(page["items"].([]any), rest["items"].([]any)...) {
 		actions[item.(map[string]any)["action"].(string)] = true
 	}
-	for _, want := range []string{"account.created", "model.created", "model.updated", "settings.updated"} {
+	for _, want := range []string{"account.created", "settings.updated"} {
 		if !actions[want] {
 			t.Fatalf("audit actions = %v, missing %s", actions, want)
 		}
@@ -412,12 +365,4 @@ func TestAdminModelsSettingsAndAudit(t *testing.T) {
 		t.Fatalf("bad audit cursor = %d", recorder.Code)
 	}
 
-	// 删除模型后不再出现在目录里，重复删除得到 404。
-	admin.expect(t, http.StatusNoContent, http.MethodDelete, "/api/admin/models/deepseek-chat", nil)
-	if recorder := admin.call(t, http.MethodDelete, "/api/admin/models/deepseek-chat", nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("delete missing model = %d", recorder.Code)
-	}
-	if listed := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/models", nil); len(listed["items"].([]any)) != 0 {
-		t.Fatalf("models after delete = %v", listed)
-	}
 }

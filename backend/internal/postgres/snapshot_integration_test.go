@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
 
@@ -183,19 +184,18 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	}
 
 	// Model: price, enabled, deleted.
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/models/gpt-test", map[string]any{
-		"base_prices": map[string]string{"input": "20", "output": "40", "cache_write": "12.5", "cache_read": "1"},
-	})
+	input, output := mustAmount(t, "20"), mustAmount(t, "40")
+	e.patchModelFixture("gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output})
 	if got := cost("after a price change", p.expect(t, "after a price change", http.StatusOK, true)); got != 2*base {
 		t.Fatalf("cost after doubling the price = %d, want %d", got, 2*base)
 	}
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/models/gpt-test", map[string]any{"enabled": false})
+	disabled := false
+	e.patchModelFixture("gpt-test", catalog.ModelPatch{Enabled: &disabled})
 	p.expect(t, "disabled model", http.StatusNotFound, false)
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/models/gpt-test", map[string]any{"enabled": true})
+	enabled := true
+	e.patchModelFixture("gpt-test", catalog.ModelPatch{Enabled: &enabled})
 	p.expect(t, "enabled model", http.StatusOK, true)
-	e.apiJSON(e.admin, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": "late-model", "display_name": "Late", "base_prices": map[string]string{"input": "1", "output": "1", "cache_write": "0", "cache_read": "0"},
-	})
+	e.addModelFixture(catalog.Model{ID: "late-model", DisplayName: "Late", Enabled: true, InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "1")})
 	late := func() *httptest.ResponseRecorder {
 		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"late-model"}`), nil)
 	}
@@ -210,7 +210,9 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 	if got := late().Code; got != http.StatusServiceUnavailable {
 		t.Fatalf("model the channel stopped offering = %d", got)
 	}
-	e.apiJSON(e.admin, http.StatusNoContent, http.MethodDelete, "/api/admin/models/late-model", nil)
+	if err := e.catalog.Delete(context.Background(), e.admin.id, "late-model"); err != nil {
+		t.Fatal(err)
+	}
 	if got := late().Code; got != http.StatusNotFound {
 		t.Fatalf("deleted model = %d", got)
 	}

@@ -71,3 +71,20 @@ func TestModelListsOnlyShowModelsServedInTheEndpointFormat(t *testing.T) {
 		}
 	}
 }
+
+func modelIDsOf(t *testing.T, body []byte) []string {
+	t.Helper()
+	var listed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &listed); err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, item := range listed.Data {
+		ids = append(ids, item.ID)
+	}
+	return ids
+}

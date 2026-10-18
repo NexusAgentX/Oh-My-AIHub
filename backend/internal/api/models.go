@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -201,11 +200,6 @@ type adminModelJSON struct {
 	UpdatedAt                time.Time       `json:"updated_at"`
 }
 
-// adminModelListJSON is the OpenAPI AdminModelList schema.
-type adminModelListJSON struct {
-	Items []adminModelJSON `json:"items"`
-}
-
 // adminModelEnvelopeJSON is the OpenAPI AdminModelEnvelope schema.
 type adminModelEnvelopeJSON struct {
 	Model adminModelJSON `json:"model"`
@@ -271,82 +265,6 @@ func newAdminModelJSON(model catalog.Model) adminModelJSON {
 		CreatedAt:                model.CreatedAt,
 		UpdatedAt:                model.UpdatedAt,
 	}
-}
-
-func (a *app) listAdminModels(w http.ResponseWriter, r *http.Request) {
-	models, err := a.catalog.List(r.Context(), true)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	items := make([]adminModelJSON, 0, len(models))
-	for _, model := range models {
-		items = append(items, newAdminModelJSON(model))
-	}
-	writeJSON(w, http.StatusOK, adminModelListJSON{Items: items})
-}
-
-func (a *app) createAdminModel(w http.ResponseWriter, r *http.Request) {
-	var request modelRequest
-	if err := decodeJSON(w, r, &request); err != nil {
-		writeInvalidJSON(w)
-		return
-	}
-	if request.ID == nil || request.DisplayName == nil || request.BasePrices == nil {
-		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "请检查提交内容")
-		return
-	}
-	patch, err := request.patch()
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	model := patch.Apply(catalog.Model{ID: *request.ID, Enabled: true})
-	created, err := a.catalog.Create(r.Context(), accountFromContext(r.Context()).ID, model)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, adminModelEnvelopeJSON{Model: newAdminModelJSON(created)})
-}
-
-func (a *app) updateAdminModel(w http.ResponseWriter, r *http.Request) {
-	var request modelRequest
-	if err := decodeJSON(w, r, &request); err != nil {
-		writeInvalidJSON(w)
-		return
-	}
-	if request.ID != nil {
-		writeError(w, http.StatusUnprocessableEntity, "invalid_input", "模型名不能修改")
-		return
-	}
-	patch, err := request.patch()
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	updated, err := a.catalog.Update(r.Context(), accountFromContext(r.Context()).ID, r.PathValue("modelID"), patch)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, adminModelEnvelopeJSON{Model: newAdminModelJSON(updated)})
-}
-
-func (a *app) deleteAdminModel(w http.ResponseWriter, r *http.Request) {
-	if err := a.catalog.Delete(r.Context(), accountFromContext(r.Context()).ID, r.PathValue("modelID")); err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// registerAdminModelRoutes 注册管理员模型目录路由。
-func (a *app) registerAdminModelRoutes(r *router) {
-	r.admin("GET /api/admin/models", a.listAdminModels)
-	r.admin("POST /api/admin/models", a.createAdminModel)
-	r.admin("PATCH /api/admin/models/{modelID}", a.updateAdminModel)
-	r.admin("DELETE /api/admin/models/{modelID}", a.deleteAdminModel)
 }
 
 func (p pricesRequest) parseTokens() (map[string]money.Amount, error) {

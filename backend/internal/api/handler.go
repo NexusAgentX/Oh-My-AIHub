@@ -130,7 +130,6 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerIdentityRoutes(routes)
 	application.registerPointsRoutes(routes)
 	application.registerAdminAccountRoutes(routes)
-	application.registerAdminModelRoutes(routes)
 	application.registerAdminSettingsRoutes(routes)
 	application.registerKeyRoutes(routes)
 	application.registerBrowseRoutes(routes)

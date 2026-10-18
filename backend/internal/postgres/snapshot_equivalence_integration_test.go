@@ -45,12 +45,8 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 	w.consumer = e.member("consumer", "1000")
 	w.sharerA, w.sharerB, w.sharerC = e.member("sharera", "0"), e.member("sharerb", "0"), e.member("sharerc", "0")
 	relay := okUpstream(t)
-	prices := map[string]string{"input": "1", "output": "2", "cache_write": "0", "cache_read": "0"}
-
-	// Models: a USD one, tiers and fine-grained prices on gpt-test.
-	e.apiJSON(e.admin, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": "usd-model", "display_name": "USD model", "price_currency": "USD", "sort_order": 3, "base_prices": prices,
-	})
+	// Direct isolated fixture setup is independent of retired management APIs.
+	e.addModelFixture(catalog.Model{ID: "usd-model", DisplayName: "USD model", Enabled: true, PriceCurrency: "USD", SortOrder: 3, InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2")})
 	minimum := int64(900)
 	specific := map[string]money.Amount{"input_audio": 0, "output_audio": mustAmount(t, "40")}
 	tiers := []ledger.PriceTier{{Name: "long", MinPromptTokens: &minimum, InputPrice: mustAmount(t, "40"), OutputPrice: mustAmount(t, "20"), TokenPrices: specific}}
@@ -96,9 +92,10 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 		t.Fatalf("delete channel = %d", recorder.Code)
 	}
 	// A new catalog model takes the custom model of the same name over.
-	e.apiJSON(e.admin, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{"id": "convert-me", "display_name": "Convert", "base_prices": prices})
+	e.addModelFixture(catalog.Model{ID: "convert-me", DisplayName: "Convert", Enabled: true, InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2")})
 	// A disabled model keeps its channels.
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/models/claude-test", map[string]any{"enabled": false})
+	disabled := false
+	e.patchModelFixture("claude-test", catalog.ModelPatch{Enabled: &disabled})
 
 	// Keys.
 	defaultID, defaultSecret := e.defaultKey(w.consumer)
