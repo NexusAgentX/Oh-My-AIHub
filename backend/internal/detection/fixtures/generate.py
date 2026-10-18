@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def png(name, colors, alpha=False):
-    width, height = 256, 128
+    width, height = 256, 256
     def chunk(kind, value):
         return struct.pack(">I", len(value)) + kind + value + struct.pack(">I", zlib.crc32(kind + value))
     raw = b"".join(b"\0" + b"".join(bytes(colors[x >= width // 2]) for x in range(width)) for _ in range(height))
