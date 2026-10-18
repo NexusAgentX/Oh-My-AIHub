@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"math"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ type modelMetricKey struct {
 	channel, model string
 	format         channel.Format
 	tier           string
+	stream         bool
 }
 type modelMetricSample struct {
 	end           string
@@ -28,7 +30,7 @@ type modelMetricSample struct {
 	outputTPS     *float64
 }
 type metricHistogram [metricBins]uint32
-type metricCounts struct{ attempts, successes, excluded, clientErrors uint32 }
+type metricCounts struct{ attempts, successes, excluded, clientErrors, anomalyAttempts, anomalyClient uint32 }
 type metricBucket struct {
 	metricCounts
 	latency, speed metricHistogram
@@ -36,10 +38,12 @@ type metricBucket struct {
 type modelMetricWindow struct {
 	buckets                                     map[int64]*metricBucket
 	attempts, successes, excluded, clientErrors int64
+	anomalyAttempts, anomalyClient              int64
 	latency, speed                              [metricBins]uint64
 }
 type modelMetricStats struct {
 	attempts, successes, excluded, clientErrors int64
+	anomalyAttempts, anomalyClient              int64
 	latencySamples, speedSamples                uint64
 	firstOutputP50MS, outputTPSP50              *float64
 }
@@ -138,7 +142,7 @@ func (b *modelMetricsBook) record(key modelMetricKey, sample modelMetricSample, 
 	}
 	// A five-minute counter has a fixed width. Refuse overflow even under
 	// synthetic or pathological rates instead of silently wrapping statistics.
-	if bucket.attempts == math.MaxUint32 || bucket.excluded == math.MaxUint32 {
+	if bucket.attempts == math.MaxUint32 || bucket.excluded == math.MaxUint32 || bucket.anomalyAttempts == math.MaxUint32 {
 		b.dropped++
 		return false
 	}
@@ -148,11 +152,17 @@ func (b *modelMetricsBook) record(key modelMetricKey, sample modelMetricSample, 
 		if sample.end == EndClientError {
 			bucket.clientErrors++
 			window.clientErrors++
+			bucket.anomalyAttempts++
+			window.anomalyAttempts++
+			bucket.anomalyClient++
+			window.anomalyClient++
 		}
 		return true
 	}
 	bucket.attempts++
 	window.attempts++
+	bucket.anomalyAttempts++
+	window.anomalyAttempts++
 	if sample.end != EndCompleted {
 		return true
 	}
@@ -189,6 +199,8 @@ func (b *modelMetricsBook) view(now time.Time) (map[modelMetricKey]modelMetricSt
 			window.successes -= int64(bucket.successes)
 			window.excluded -= int64(bucket.excluded)
 			window.clientErrors -= int64(bucket.clientErrors)
+			window.anomalyAttempts -= int64(bucket.anomalyAttempts)
+			window.anomalyClient -= int64(bucket.anomalyClient)
 			for i := range metricBins {
 				window.latency[i] -= uint64(bucket.latency[i])
 				window.speed[i] -= uint64(bucket.speed[i])
@@ -202,7 +214,102 @@ func (b *modelMetricsBook) view(now time.Time) (map[modelMetricKey]modelMetricSt
 		}
 		latency, ln := metricMedian(&window.latency, false)
 		speed, sn := metricMedian(&window.speed, true)
-		out[key] = modelMetricStats{attempts: window.attempts, successes: window.successes, excluded: window.excluded, clientErrors: window.clientErrors, latencySamples: ln, speedSamples: sn, firstOutputP50MS: latency, outputTPSP50: speed}
+		out[key] = modelMetricStats{attempts: window.attempts, successes: window.successes, excluded: window.excluded, clientErrors: window.clientErrors, anomalyAttempts: window.anomalyAttempts, anomalyClient: window.anomalyClient, latencySamples: ln, speedSamples: sn, firstOutputP50MS: latency, outputTPSP50: speed}
 	}
 	return out, b.dropped
+}
+
+func (b *modelMetricsBook) resetAnomalies(channelID string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for key, window := range b.series {
+		if key.channel != channelID {
+			continue
+		}
+		window.anomalyAttempts, window.anomalyClient = 0, 0
+		for _, bucket := range window.buckets {
+			bucket.anomalyAttempts, bucket.anomalyClient = 0, 0
+		}
+	}
+}
+
+// ModelAttemptHistoryRow is a bounded aggregate of v2 observations. Legacy
+// first-byte and whole-channel metrics cannot warm the new ranking scope.
+type ModelAttemptHistoryRow struct {
+	HistoryTruncated                           bool
+	ChannelID, ModelID, Tier                   string
+	Format                                     channel.Format
+	Stream                                     bool
+	Bucket                                     int64
+	LatencyBin, SpeedBin                       int
+	Counted, Successes, Excluded, ClientErrors int64
+	BeforeEditAttempts, BeforeEditClientErrors int64
+}
+
+type ModelMetricHistory interface {
+	ModelAttemptHistory(context.Context, time.Time, int32) ([]ModelAttemptHistoryRow, error)
+}
+
+func (b *modelMetricsBook) load(rows []ModelAttemptHistoryRow, now time.Time) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	floor, ceiling := statsEpoch(now)-statsBuckets+1, statsEpoch(now)
+	for _, row := range rows {
+		if row.Bucket < floor || row.Bucket > ceiling || row.ModelID == "" || row.ChannelID == "" || row.Tier != requestedMetricTier(row.Format, row.Tier) {
+			continue
+		}
+		if row.Counted < 0 || row.Successes < 0 || row.Successes > row.Counted || row.Excluded < 0 || row.ClientErrors < 0 || row.ClientErrors > row.Excluded || row.Counted+row.Excluded == 0 || row.BeforeEditAttempts < 0 || row.BeforeEditAttempts > row.Counted+row.ClientErrors || row.BeforeEditClientErrors < 0 || row.BeforeEditClientErrors > row.ClientErrors {
+			b.dropped++
+			continue
+		}
+		key := modelMetricKey{channel: row.ChannelID, model: row.ModelID, format: row.Format, tier: row.Tier, stream: row.Stream}
+		window := b.series[key]
+		if window == nil && len(b.series) >= maxMetricSeries {
+			b.dropped++
+			continue
+		}
+		var bucket *metricBucket
+		if window != nil {
+			bucket = window.buckets[row.Bucket]
+		}
+		if bucket == nil && b.buckets >= maxMetricBuckets {
+			b.dropped++
+			continue
+		}
+		if window == nil {
+			window = &modelMetricWindow{buckets: map[int64]*metricBucket{}}
+			b.series[key] = window
+		}
+		if bucket == nil {
+			bucket = &metricBucket{}
+			window.buckets[row.Bucket] = bucket
+			b.buckets++
+		}
+		anomaly := row.Counted + row.ClientErrors - row.BeforeEditAttempts
+		client := row.ClientErrors - row.BeforeEditClientErrors
+		if client > anomaly || row.Counted > math.MaxUint32-int64(bucket.attempts) || row.Excluded > math.MaxUint32-int64(bucket.excluded) || anomaly > math.MaxUint32-int64(bucket.anomalyAttempts) {
+			b.dropped++
+			continue
+		}
+		bucket.attempts += uint32(row.Counted)
+		window.attempts += row.Counted
+		bucket.successes += uint32(row.Successes)
+		window.successes += row.Successes
+		bucket.excluded += uint32(row.Excluded)
+		window.excluded += row.Excluded
+		bucket.clientErrors += uint32(row.ClientErrors)
+		window.clientErrors += row.ClientErrors
+		bucket.anomalyAttempts += uint32(anomaly)
+		window.anomalyAttempts += anomaly
+		bucket.anomalyClient += uint32(client)
+		window.anomalyClient += client
+		if row.LatencyBin >= 0 && row.LatencyBin < metricBins {
+			bucket.latency[row.LatencyBin] += uint32(row.Successes)
+			window.latency[row.LatencyBin] += uint64(row.Successes)
+		}
+		if row.SpeedBin >= 0 && row.SpeedBin < metricBins {
+			bucket.speed[row.SpeedBin] += uint32(row.Successes)
+			window.speed[row.SpeedBin] += uint64(row.Successes)
+		}
+	}
 }

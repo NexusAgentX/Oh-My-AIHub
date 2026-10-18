@@ -68,7 +68,12 @@ var (
 )
 
 // Dependencies wires the gateway.
+type TypicalPriceLookup interface {
+	LookupComparison(channel, model, group, pricingVersion string, discount, fx int64) (money.Amount, string, int64, bool)
+}
+
 type Dependencies struct {
+	TypicalPrices     func() TypicalPriceLookup
 	ContextNamespace  *gatewaycontract.ContextNamespace
 	Resources         resourcestate.Repository
 	ResourceCursors   *gatewaycontract.CursorCodec
@@ -118,6 +123,7 @@ type Engine struct {
 	settingsLoad sync.Mutex
 	statsSnap    atomic.Pointer[statsSnapshot]
 	statsBuild   sync.Mutex
+	modelMetrics *modelMetricsBook
 	// anomalyNotified is when each channel on each model last had its
 	// anomalous_client_errors event; guarded by statsBuild.
 	anomalyNotified map[pairKey]time.Time
@@ -155,7 +161,7 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.StatsBook == nil {
 		dependencies.StatsBook = NewStatsBook()
 	}
-	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
+	return &Engine{Dependencies: dependencies, modelMetrics: newModelMetricsBook(), spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -666,6 +672,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
 		}
 	}
+	e.applyTypicalPrices(candidates, call.modelID, defaults.USDCNYRateNano)
 	sticky := ""
 	if e.Resources == nil && stickyResponseID != "" {
 		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
@@ -673,6 +680,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	stats := e.statsView()
+	modelStats, demoted := stats.forModel(call.modelID, format, call.requestedServiceTier, call.stream)
 	for _, candidate := range candidates {
 		reason := "eligible"
 		switch {
@@ -692,15 +700,15 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			state, why := e.Runtime.Check(candidate.ChannelID, EffectiveLimits(candidate.Advanced, defaults), started)
 			if state != StateAvailable {
 				reason = why
-			} else if _, bad := stats.anomalies[call.modelID][candidate.ChannelID]; bad {
+			} else if _, bad := demoted[candidate.ChannelID]; bad {
 				reason = "demoted"
 			}
 		}
 		call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: reason})
 	}
 	ordered := Rank(RankInput{
-		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
-		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
+		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: modelStats,
+		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
 			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || call.resourceObserver != nil && c.GroupID == "" {
 				return false
@@ -1089,6 +1097,8 @@ func fallbackStatus(status int) bool {
 func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, candidate Candidate, limits Limits, defaults settings.Settings,
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, timeouts attemptTimeouts) attemptResult {
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, UpstreamModel: candidate.UpstreamModel, OffsetMS: millis(e.Now().Sub(call.started))}}
+	result.record.MetricsVersion = 2
+	result.record.MetricTier = requestedMetricTier(call.format, call.requestedServiceTier)
 	var network *NetworkAttempt
 	if call.diagnostics.Network != nil {
 		network = &NetworkAttempt{Phases: make([]NetworkPhase, 0, 5)}
@@ -1502,6 +1512,8 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	observer := NewObserver(call.format, call.stream, response.Header.Get("Content-Type"))
 	if stagedImage != nil {
+		observer.receivedAt = e.Now()
+		observer.trackEffectiveOutput(stagedImage, observer.receivedAt)
 		observer.absorb(stagedImage)
 	}
 	observer.detail.RequestedServiceTier = call.requestedServiceTier
@@ -1689,6 +1701,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	record.EndReason = endReason
 	record.DurationMS = millis(e.Now().Sub(result.started))
 	record.ResponseByte = &written
+	populateAttemptMetrics(call, record, observation, result.started)
 	if observation.ProtocolError {
 		record.ErrorCode, record.ErrorMessage = stringPointer(codeProtocolError), stringPointer(messageProtocolError)
 	} else if stopped != nil {
@@ -1702,14 +1715,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		TTFTMS: &ttftFromStart, DurationMS: duration, ResponseBytes: written, UpstreamResponseID: observation.ResponseID,
 		IntervalP50MS: observation.IntervalP50MS, IntervalP95MS: observation.IntervalP95MS,
 	}
-	speedMillis := duration
-	if call.stream {
-		speedMillis -= ttftFromStart
-	}
-	if !call.polling && call.format != channel.FormatOpenAIImages && observation.Found && observation.Usage.OutputTokens > 0 && speedMillis > 0 {
-		speed := float64(observation.Usage.OutputTokens) * 1000 / float64(speedMillis)
-		finish.TokensPerSecond = &speed
-	}
+	finish.TokensPerSecond = record.OutputTPS
 	pricingAt := e.Now()
 	if observation.Found || candidate.Quotes != nil {
 		self := candidate.OwnerID == call.key.OwnerID

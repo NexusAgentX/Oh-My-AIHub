@@ -14,6 +14,53 @@ import (
 type statsSnapshot struct {
 	channels  map[string]ChannelStats
 	anomalies map[string]map[string]Anomaly // by model, then channel
+	models    map[metricScope]modelRouteStats
+	dropped   uint64
+}
+
+type metricScope struct {
+	model  string
+	format channel.Format
+	tier   string
+	stream bool
+}
+type modelRouteStats struct {
+	channels  map[string]ChannelStats
+	anomalies map[string]Anomaly
+}
+
+func (s *statsSnapshot) forModel(model string, format channel.Format, tier string, stream bool) (map[string]ChannelStats, map[string]Anomaly) {
+	view := s.models[metricScope{model, format, requestedMetricTier(format, tier), stream}]
+	return view.channels, view.anomalies
+}
+
+// ModelStats is an immutable, measured scope. A missing scope stays unknown;
+// whole-channel history is never spread over the models it happens to offer.
+func (e *Engine) ModelStats(model string, format channel.Format, tier string, stream bool) map[string]ChannelStats {
+	stats, _ := e.statsView().forModel(model, format, tier, stream)
+	return stats
+}
+
+func (e *Engine) modelStatsView(now time.Time) (map[metricScope]modelRouteStats, uint64) {
+	rows, dropped := e.modelMetrics.view(now)
+	out := map[metricScope]modelRouteStats{}
+	pairs := map[metricScope][]pairSums{}
+	for key, row := range rows {
+		scope := metricScope{key.model, key.format, key.tier, key.stream}
+		view := out[scope]
+		if view.channels == nil {
+			view.channels = map[string]ChannelStats{}
+		}
+		view.channels[key.channel] = ChannelStats{Attempts: row.attempts, Successes: row.successes, FirstOutputP50MS: row.firstOutputP50MS, FirstOutputSamples: int64(row.latencySamples), OutputTPSP50: row.outputTPSP50, OutputSpeedSamples: int64(row.speedSamples), ExcludedSamples: row.excluded}
+		out[scope] = view
+		pairs[scope] = append(pairs[scope], pairSums{channel: key.channel, total: row.anomalyAttempts, client: row.anomalyClient})
+	}
+	for scope, rows := range pairs {
+		view := out[scope]
+		view.anomalies = detectAnomalies(map[string][]pairSums{scope.model: rows})[scope.model]
+		out[scope] = view
+	}
+	return out, dropped
 }
 
 // Stats returns the current 24h health of the channels that had attempts in the
@@ -46,6 +93,21 @@ func (e *Engine) LoadStats(ctx context.Context) error {
 		return err
 	}
 	e.StatsBook.Load(rows, now)
+	if source, ok := e.Store.(ModelMetricHistory); ok {
+		bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
+		rows, err := source.ModelAttemptHistory(bounded, since, maxMetricBuckets+1)
+		cancel()
+		if err != nil {
+			return err
+		}
+		if len(rows) > maxMetricBuckets || len(rows) > 0 && rows[0].HistoryTruncated {
+			e.Logger.Warn("gateway: model metric warmup truncated; uncovered scopes stay unknown", "row_limit", maxMetricBuckets)
+			// Arbitrarily truncated rows can omit failures of a returned scope.
+			// Cold-start all scopes instead of publishing a biased success rate.
+			rows = nil
+		}
+		e.modelMetrics.load(rows, now)
+	}
 	e.buildStats(true, true)
 	return nil
 }
@@ -63,6 +125,7 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 	now := e.Now()
 	view := e.StatsBook.view(now)
 	snapshot := &statsSnapshot{channels: view.channels, anomalies: detectAnomalies(view.models)}
+	snapshot.models, snapshot.dropped = e.modelStatsView(now)
 	previous := e.statsSnap.Load()
 	var announce []Anomaly
 	for model, channels := range snapshot.anomalies {
@@ -101,6 +164,13 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 // recordAttempt counts a finished attempt of the call in the channel statistics.
 func (e *Engine) recordAttempt(call *callState, candidate Candidate, record Attempt) {
 	e.StatsBook.Record(candidate.ChannelID, call.modelID, call.stream, record, e.Now())
+	if record.SelectionFinal != nil && !*record.SelectionFinal || call.modelID == "" || call.polling {
+		return
+	}
+	// modelID was resolved against the catalog before a candidate was admitted.
+	// Only the fixed tier vocabulary reaches a metric key.
+	key := modelMetricKey{channel: candidate.ChannelID, model: call.modelID, format: call.format, tier: requestedMetricTier(call.format, call.requestedServiceTier), stream: call.stream}
+	e.modelMetrics.record(key, modelMetricSample{end: record.EndReason, firstOutputMS: record.SelectionOutputMS, outputTPS: record.OutputTPS}, e.Now())
 }
 
 // ChannelEdited tells the engine that a channel's configuration was changed (its
@@ -121,6 +191,7 @@ func (e *Engine) recordAttempt(call *callState, candidate Candidate, record Atte
 // calls in flight at the moment of the edit.
 func (e *Engine) ChannelEdited(channelID string) {
 	e.StatsBook.ResetAnomalyStats(channelID)
+	e.modelMetrics.resetAnomalies(channelID)
 	e.statsBuild.Lock()
 	for key := range e.anomalyNotified {
 		if key.channel == channelID {

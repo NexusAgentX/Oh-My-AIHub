@@ -357,8 +357,12 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 			p := candidates[i].PricingModel(m)
 			candidates[i].RateNano = ledger.ModelRate(p.PriceCurrency, defaults.USDCNYRateNano)
 		}
-		stats := e.statsView()
-		candidates = Rank(RankInput{Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels, Demoted: stats.anomalies[model], ConsumerID: key.OwnerID})
+		e.applyTypicalPrices(candidates, model, defaults.USDCNYRateNano)
+		// Auxiliary entry points have no generation cadence of their own. Use
+		// only the verified model context in the matching protocol, never a
+		// channel-wide speed or a made-up model.
+		stats, demoted := e.statsView().forModel(model, protocolFormat(ep.Protocol), "", false)
+		candidates = Rank(RankInput{Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats, Demoted: demoted, ConsumerID: key.OwnerID})
 	}
 	if len(candidates) == 0 {
 		fail(503, "resource_scope_unavailable", "原资源渠道或凭据已不可用")

@@ -4025,10 +4025,10 @@ export interface components {
          */
         Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
         /**
-         * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
+         * @description 调用方式：价格优先（默认）、稳定优先、延迟优先、速率优先、手动排序。fastest 的历史值继续表示延迟。
          * @enum {string}
          */
-        RoutingMode: "cheapest" | "reliable" | "fastest" | "manual";
+        RoutingMode: "cheapest" | "reliable" | "fastest" | "speed" | "manual";
         /**
          * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
          * @enum {string}
@@ -4833,6 +4833,25 @@ export interface components {
             trend: components["schemas"]["AnalysisRow"][];
         };
         CallAttempt: {
+            /**
+             * @description 新观测口径；历史缺失记录不作为首有效输出或可靠 TPS 证据。
+             * @constant
+             */
+            metrics_version?: 2;
+            /** @description 固定词表中的请求档位；空为默认调用上下文。 */
+            metric_tier?: string;
+            /** @description 可靠响应确认的档位，缺失或无法识别为 unknown。 */
+            actual_service_tier?: string;
+            /** @description 本次地址尝试开始至首个非空有效输出；心跳、空帧、元数据不计。 */
+            first_output_ms?: number;
+            /** @description 当前渠道选取开始至有效输出，含同渠道地址回退；明确档位未获实际确认时不用于排名。 */
+            selection_output_ms?: number;
+            /** @enum {string} */
+            output_kind?: "text" | "tool" | "reasoning" | "opaque" | "image" | "audio" | "video";
+            /** @description 首个可见文本或工具输出至可靠结束事件的观测区间；不足 32 个可靠可见输出 token 或 50ms 时不采样。 */
+            generation_ms?: number;
+            /** @description 可靠可见输出 token / generation_ms。思考量须可可靠分离；多候选、媒体、异步轮询及非流式为未知。 */
+            output_tps?: number;
             /**
              * Format: uuid
              * @description 本次实际尝试的分组地址关系 ID，仅为诊断元数据。

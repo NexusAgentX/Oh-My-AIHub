@@ -21,6 +21,14 @@ import (
 
 var allFormats = []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini}
 
+func withoutOutputMetrics(value Observation) Observation {
+	value.ReasoningTokens, value.VisibleTokens = nil, nil
+	value.FirstOutputAt, value.FirstVisibleOutputAt, value.OutputEndAt = time.Time{}, time.Time{}, time.Time{}
+	value.OutputKind = ""
+	value.MultipleOutputs, value.ReasoningOutput, value.OpaqueOutput, value.MediaOutput = false, false, false, false
+	return value
+}
+
 // readerState is everything the reader has learned so far.
 type readerState struct {
 	Usage      any
@@ -78,7 +86,7 @@ func sameReading(t testing.TB, format channel.Format, qwen bool, events []string
 			t.Fatalf("%s: after event %d %q\nreads  %+v\nwas    %+v", format, index, event, got, want)
 		}
 	}
-	got, want := current.Finish(), original.Finish()
+	got, want := withoutOutputMetrics(current.Finish()), original.Finish()
 	// Diagnostics are new; usage equivalence remains checked against the original reader.
 	got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
 	got.ResponseStatus, got.Background = "", false
@@ -399,6 +407,7 @@ func TestObserverMatchesTheOriginalOnFramedStreams(t *testing.T) {
 				got, want := current.Finish(), original.Finish()
 				got.StopReason, got.UsageStatus, got.MaxFrameGapMS = "", "", nil
 				got.ResponseStatus, got.Background = "", false
+				got = withoutOutputMetrics(got)
 				if !reflect.DeepEqual(got, want) || !got.Found {
 					t.Fatalf("%s chunk %d:\nreads %+v\nwas   %+v", format, chunk, got, want)
 				}

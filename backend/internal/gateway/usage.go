@@ -23,18 +23,25 @@ const (
 
 // Observation is what the side-channel reader learned about a response.
 type Observation struct {
-	Units               []quotepricing.Unit
-	ProtocolError       bool
-	ProtocolClientError bool
-	StopReason          string
-	UsageStatus         string
-	MaxFrameGapMS       *int
-	Usage               ledger.Usage
-	Found               bool
-	ResponseStatus      string
-	Background          bool
-	ResponseID          string
-	Frames              int
+	ReasoningTokens, VisibleTokens             *int64
+	FirstOutputAt                              time.Time
+	FirstVisibleOutputAt                       time.Time
+	OutputEndAt                                time.Time
+	OutputKind                                 string
+	MultipleOutputs                            bool
+	ReasoningOutput, OpaqueOutput, MediaOutput bool
+	Units                                      []quotepricing.Unit
+	ProtocolError                              bool
+	ProtocolClientError                        bool
+	StopReason                                 string
+	UsageStatus                                string
+	MaxFrameGapMS                              *int
+	Usage                                      ledger.Usage
+	Found                                      bool
+	ResponseStatus                             string
+	Background                                 bool
+	ResponseID                                 string
+	Frames                                     int
 	// IntervalP50MS and IntervalP95MS describe the gaps between data frames.
 	IntervalP50MS *int
 	IntervalP95MS *int
@@ -43,11 +50,17 @@ type Observation struct {
 // Observer scans a response as it streams past, without ever altering it and
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
-	imageCompleted bool
-	billableUnits  []quotepricing.Unit
-	format         channel.Format
-	stream         bool
-	sse            bool
+	metricReasoningValue, metricVisibleValue                                   int64
+	metricReasoningKnown, metricVisibleKnown                                   bool
+	frameOutputMask                                                            uint8
+	receivedAt, firstOutputAt, firstVisibleOutputAt, lastOutputAt, outputEndAt time.Time
+	outputKind                                                                 string
+	multipleOutputs, reasoningOutput, opaqueOutput, mediaOutput                bool
+	imageCompleted                                                             bool
+	billableUnits                                                              []quotepricing.Unit
+	format                                                                     channel.Format
+	stream                                                                     bool
+	sse                                                                        bool
 
 	eventData    []byte
 	eventSkip    bool
@@ -101,6 +114,7 @@ func NewObserver(format channel.Format, stream bool, contentType string) *Observ
 
 // Write feeds one chunk that arrived at the given time.
 func (o *Observer) Write(chunk []byte, at time.Time) {
+	o.receivedAt = at
 	if o.sse {
 		o.writeSSE(chunk, at)
 		return
@@ -214,8 +228,12 @@ func (o *Observer) handleLine(line []byte, at time.Time) {
 
 func (o *Observer) finishEvent(at time.Time) {
 	payload := bytes.TrimSpace(o.eventData)
+	if !o.eventSkip && o.format == channel.FormatOpenAIChat && bytes.Equal(payload, []byte("[DONE]")) && o.outputEndAt.IsZero() {
+		o.outputEndAt = at
+	}
 	if !o.eventSkip && len(payload) > 0 && payload[0] == '{' {
 		o.frame(at)
+		o.trackEffectiveOutput(payload, at)
 		o.absorb(payload)
 	}
 	if len(o.eventData) > 0 {
@@ -228,21 +246,23 @@ func (o *Observer) finishEvent(at time.Time) {
 // the observation.
 func (o *Observer) Finish() Observation {
 	if o.sse && len(o.line) > 0 && !o.skipLine {
-		o.handleLine(o.line, o.last)
+		o.handleLine(o.line, o.receivedAt)
 		o.line = nil
 	}
 	if o.sse {
-		o.finishEvent(o.last)
+		o.finishEvent(o.receivedAt)
 	}
 	if !o.sse && !o.overflow && len(o.buffer) > 0 {
 		body := bytes.TrimSpace(o.buffer)
 		switch {
 		case len(body) > 0 && body[0] == '{':
+			o.trackEffectiveOutput(body, o.receivedAt)
 			o.absorb(body)
 		case len(body) > 0 && body[0] == '[':
 			var elements []json.RawMessage
 			if json.Unmarshal(body, &elements) == nil {
 				for _, element := range elements {
+					o.trackEffectiveOutput(element, o.receivedAt)
 					o.absorb(element)
 				}
 			}
@@ -273,6 +293,15 @@ func (o *Observer) Finish() Observation {
 		status = "parse_limit"
 	}
 	observation := Observation{Units: o.billableUnits, ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, ResponseStatus: o.responseStatus, Background: o.background, Frames: o.frames}
+	observation.FirstOutputAt, observation.FirstVisibleOutputAt, observation.OutputEndAt = o.firstOutputAt, o.firstVisibleOutputAt, o.outputEndAt
+	observation.OutputKind, observation.MultipleOutputs = o.outputKind, o.multipleOutputs
+	observation.ReasoningOutput, observation.OpaqueOutput, observation.MediaOutput = o.reasoningOutput, o.opaqueOutput, o.mediaOutput
+	if o.metricReasoningKnown {
+		observation.ReasoningTokens = &o.metricReasoningValue
+	}
+	if o.metricVisibleKnown {
+		observation.VisibleTokens = &o.metricVisibleValue
+	}
 	if len(o.intervals) > 0 {
 		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
@@ -303,6 +332,9 @@ func (o *Observer) absorb(raw []byte) {
 	o.observeProtocolError(raw, keys)
 	if keys&(keyStop|keyEnvelope) != 0 {
 		o.observeStop(raw)
+		if o.stopReason != "" && o.stopReason != "other" && o.outputEndAt.IsZero() {
+			o.outputEndAt = o.receivedAt
+		}
 	}
 	switch o.format {
 	case channel.FormatOpenAIImages:
@@ -341,6 +373,9 @@ func (o *Observer) absorb(raw []byte) {
 		}
 	}
 	o.absorbDetails(raw, keys)
+	if keys&(keyUsage|keyUsageMetadata) != 0 {
+		o.observeMetricCounts(raw)
+	}
 }
 
 // OpenAI-compatible usage is cumulative, but each field can arrive separately.
