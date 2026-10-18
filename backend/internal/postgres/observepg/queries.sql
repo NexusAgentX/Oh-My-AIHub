@@ -473,15 +473,22 @@ LIMIT 2003;
 -- a supplier/channel cannot leave an unscoped aggregate behind.
 -- name: DirectoryTargetExists :one
 SELECT CASE WHEN sqlc.arg(supplier)::boolean THEN
- EXISTS(SELECT 1 FROM suppliers WHERE id=sqlc.arg(target_id)::uuid AND visible)
- ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id WHERE c.id=sqlc.arg(target_id)::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active') END::boolean AS visible;
+ EXISTS(SELECT 1 FROM market_suppliers WHERE id=sqlc.arg(target_id)::uuid AND enabled AND deleted_at IS NULL)
+ ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id
+ JOIN market_channels mc ON mc.channel_id=c.id JOIN market_groups g ON g.id=c.market_group_id
+ JOIN market_suppliers s ON s.id=g.supplier_id
+ WHERE c.id=sqlc.arg(target_id)::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND g.enabled AND g.deleted_at IS NULL AND s.enabled AND s.deleted_at IS NULL) END::boolean AS visible;
 
 -- name: AnalyzeDirectory :many
 WITH visible_channels AS MATERIALIZED (
 SELECT c.id, c.name FROM channels c JOIN accounts a ON a.id=c.owner_id
+ JOIN market_channels mc ON mc.channel_id=c.id JOIN market_groups g ON g.id=c.market_group_id
+ JOIN market_suppliers s ON s.id=g.supplier_id
 WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND g.enabled AND g.deleted_at IS NULL AND s.enabled AND s.deleted_at IS NULL
  AND ((NOT sqlc.arg(supplier)::boolean AND c.id=sqlc.arg(target_id)::uuid)
- OR (sqlc.arg(supplier)::boolean AND EXISTS (SELECT 1 FROM supplier_endpoints e JOIN suppliers s ON s.id=e.supplier_id WHERE s.id=sqlc.arg(target_id)::uuid AND s.visible AND e.base_url=c.base_url)))
+ OR (sqlc.arg(supplier)::boolean AND s.id=sqlc.arg(target_id)::uuid))
 ), samples AS MATERIALIZED (
  SELECT c.created_at, coalesce(c.model_id,c.requested_model) AS model, ch.id::text AS channel, ch.name AS channel_name,
  c.format, c.stream::text AS stream,

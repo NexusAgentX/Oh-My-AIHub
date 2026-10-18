@@ -407,9 +407,12 @@ func (q *Queries) AnalyzeCalls(ctx context.Context, arg AnalyzeCallsParams) ([]A
 const analyzeDirectory = `-- name: AnalyzeDirectory :many
 WITH visible_channels AS MATERIALIZED (
 SELECT c.id, c.name FROM channels c JOIN accounts a ON a.id=c.owner_id
+ JOIN market_channels mc ON mc.channel_id=c.id JOIN market_groups g ON g.id=c.market_group_id
+ JOIN market_suppliers s ON s.id=g.supplier_id
 WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND g.enabled AND g.deleted_at IS NULL AND s.enabled AND s.deleted_at IS NULL
  AND ((NOT $1::boolean AND c.id=$2::uuid)
- OR ($1::boolean AND EXISTS (SELECT 1 FROM supplier_endpoints e JOIN suppliers s ON s.id=e.supplier_id WHERE s.id=$2::uuid AND s.visible AND e.base_url=c.base_url)))
+ OR ($1::boolean AND s.id=$2::uuid))
 ), samples AS MATERIALIZED (
  SELECT c.created_at, coalesce(c.model_id,c.requested_model) AS model, ch.id::text AS channel, ch.name AS channel_name,
  c.format, c.stream::text AS stream,
@@ -1167,8 +1170,12 @@ func (q *Queries) ChannelStatusCodes(ctx context.Context, arg ChannelStatusCodes
 
 const directoryTargetExists = `-- name: DirectoryTargetExists :one
 SELECT CASE WHEN $1::boolean THEN
- EXISTS(SELECT 1 FROM suppliers WHERE id=$2::uuid AND visible)
- ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id WHERE c.id=$2::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active') END::boolean AS visible
+ EXISTS(SELECT 1 FROM market_suppliers WHERE id=$2::uuid AND enabled AND deleted_at IS NULL)
+ ELSE EXISTS(SELECT 1 FROM channels c JOIN accounts a ON a.id=c.owner_id
+ JOIN market_channels mc ON mc.channel_id=c.id JOIN market_groups g ON g.id=c.market_group_id
+ JOIN market_suppliers s ON s.id=g.supplier_id
+ WHERE c.id=$2::uuid AND c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
+ AND g.enabled AND g.deleted_at IS NULL AND s.enabled AND s.deleted_at IS NULL) END::boolean AS visible
 `
 
 type DirectoryTargetExistsParams struct {
