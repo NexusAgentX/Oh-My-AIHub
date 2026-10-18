@@ -51,14 +51,20 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	if systemAccounts != 3 || settingsRows != 1 || feeRate != 1_000_000 {
 		t.Fatalf("seed = %d system accounts, %d settings rows, fee %d", systemAccounts, settingsRows, feeRate)
 	}
-	var constraintTriggers int
-	if err := pool.QueryRow(ctx, `
-		SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-		WHERE c.relnamespace = current_schema()::regnamespace AND t.tgconstraint <> 0 AND t.tgname NOT LIKE 'RI_%'`).Scan(&constraintTriggers); err != nil {
+	triggerRows, err := pool.Query(ctx, `
+		SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+		WHERE c.relnamespace = current_schema()::regnamespace AND t.tgconstraint <> 0 AND t.tgname NOT LIKE 'RI_%'
+		ORDER BY t.tgname`)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if constraintTriggers != 1 {
-		t.Fatalf("constraint triggers = %d, want exactly the zero-sum trigger", constraintTriggers)
+	triggers, err := pgx.CollectRows(triggerRows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTriggers := []string{"ledger_transaction_balance", "market_channel_choice_links", "market_channel_config_links", "market_channel_owner_links"}
+	if !slices.Equal(triggers, wantTriggers) {
+		t.Fatalf("constraint triggers = %v, want %v", triggers, wantTriggers)
 	}
 }
 
