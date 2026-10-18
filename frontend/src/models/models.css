@@ -36,7 +36,7 @@
 .price-rules dt { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--ink); font-weight: 600; }
 .price-rules dd { display: grid; gap: 2px; margin: 0; }
 
-.routing-editor { container: routing / inline-size; min-width: 0; display: grid; gap: var(--space-4); }
+.routing-editor { container: routing / inline-size; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .routing-mode { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .routing-list { display: grid; gap: 0; margin: 0; padding: 0; border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); list-style: none; }
 .routing-row {
