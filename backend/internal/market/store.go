@@ -11,12 +11,12 @@ type Change[T any] struct {
 // ACL/report/approval checks in the same transaction as Apply. Nothing here is a
 // public admin bypass. Stable group-address IDs survive reordering.
 type Changes struct {
-	Suppliers      []Change[Supplier]
-	Groups         []Change[Group]
-	Addresses      []Change[Address]
-	GroupAddresses []GroupAddressSet
-	Models         []Change[GroupModel]
-	Quotes         []Quote
+	Suppliers      []Change[Supplier]   `json:"suppliers"`
+	Groups         []Change[Group]      `json:"groups"`
+	Addresses      []Change[Address]    `json:"addresses"`
+	GroupAddresses []GroupAddressSet    `json:"group_addresses"`
+	Models         []Change[GroupModel] `json:"models"`
+	Quotes         []Quote              `json:"quotes"`
 }
 type GroupAddressSet struct {
 	GroupID string         `json:"group_id"`

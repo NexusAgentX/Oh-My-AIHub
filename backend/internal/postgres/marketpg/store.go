@@ -75,7 +75,11 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 			return err
 		}
 		v.Revision = change.BaseRevision + 1
-		p := InsertSupplierParams{ID: v.ID, ContributorID: actor, Name: v.Name, Kind: v.Kind, WebsiteUrl: v.WebsiteURL, IconData: v.IconData, IconSource: v.IconSource, Summary: v.Summary, Description: v.Description, DocsUrl: v.DocsURL, Enabled: v.Enabled, Revision: v.Revision, DeletedAt: v.DeletedAt}
+		contributorID := v.ContributorID
+		if contributorID == "" {
+			contributorID = actor
+		}
+		p := InsertSupplierParams{ID: v.ID, ContributorID: contributorID, Name: v.Name, Kind: v.Kind, WebsiteUrl: v.WebsiteURL, IconData: v.IconData, IconSource: v.IconSource, Summary: v.Summary, Description: v.Description, DocsUrl: v.DocsURL, Enabled: v.Enabled, Revision: v.Revision, DeletedAt: v.DeletedAt}
 		if change.BaseRevision == 0 {
 			_, err = q.InsertSupplier(ctx, p)
 		} else {
