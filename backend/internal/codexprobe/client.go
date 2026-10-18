@@ -61,6 +61,7 @@ type Result struct {
 	ContextVerified   bool    `json:"context_verified"`
 	IsolationVerified bool    `json:"isolation_verified"`
 	ReopenVerified    bool    `json:"reopen_verified"`
+	ShutdownVerified  bool    `json:"shutdown_verified"`
 	Phases            []Phase `json:"phases,omitempty"`
 }
 
@@ -93,7 +94,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" && c.Profile != "notes_lifecycle" && c.Profile != "sequential_tools" && c.Profile != "instructions" && c.Profile != "tier" && c.Profile != "compact" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" && c.Profile != "notes_lifecycle" && c.Profile != "sequential_tools" && c.Profile != "instructions" && c.Profile != "tier" && c.Profile != "compact" && c.Profile != "encrypted" && c.Profile != "search" && c.Profile != "async_compact" {
 		return ErrClient
 	}
 	switch c.Tier {
@@ -129,18 +130,19 @@ type rpcMessage struct {
 }
 
 type dialogue struct {
-	in        io.Writer
-	lines     <-chan []byte
-	next      int
-	completed bool
-	matched   bool
-	rpcError  int
-	tools     bool
-	toolCalls int
-	expected  string
-	thread    string
-	turn      string
-	compacted bool
+	in         io.Writer
+	lines      <-chan []byte
+	next       int
+	completed  bool
+	matched    bool
+	rpcError   int
+	tools      bool
+	toolCalls  int
+	expected   string
+	thread     string
+	turn       string
+	compacted  bool
+	background bool
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -179,7 +181,14 @@ func (d *dialogue) notification(msg rpcMessage) error {
 			turn = scope.Turn.ID
 		}
 		if d.turn != "" && turn != d.turn {
-			return nil
+			var item struct {
+				Item struct {
+					Type string `json:"type"`
+				} `json:"item"`
+			}
+			if !d.background || msg.Method != "item/completed" || json.Unmarshal(msg.Params, &item) != nil || item.Item.Type != "contextCompaction" {
+				return nil
+			}
 		}
 	}
 	if len(msg.ID) > 0 && string(msg.ID) != "null" && msg.Method != "" {
@@ -310,7 +319,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	probeCatalog := ""
 	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools" || c.Profile == "sequential_tools"
 	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle"
-	if notesProfile || toolProfile || c.Profile == "compressed" || c.Profile == "plain" || c.Profile == "instructions" || c.Profile == "tier" || c.Profile == "compact" {
+	if notesProfile || toolProfile || c.Profile == "compressed" || c.Profile == "plain" || c.Profile == "instructions" || c.Profile == "tier" || c.Profile == "compact" || c.Profile == "encrypted" || c.Profile == "search" || c.Profile == "async_compact" {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
 		// provider capability/capacity evidence. The catalog profile below uses
@@ -319,6 +328,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 		model := map[string]any{"slug": c.Model, "display_name": c.Model, "description": "Isolated client activation fixture", "supported_reasoning_levels": []any{}, "shell_type": "shell_command", "visibility": "list", "supported_in_api": true, "priority": 1, "support_verbosity": false, "truncation_policy": map[string]any{"mode": "tokens", "limit": 10000}, "experimental_supported_tools": []any{}, "input_modalities": []string{"text", "image"}, "supports_experimental_context": true, "context_window": 32768, "tool_mode": "direct"}
 		model["model_messages"] = map[string]string{"instructions_template": "Isolated capability probe. Follow the user request and use only declared synthetic tools."}
 		model["use_responses_lite"] = c.Profile == "lite_tools" || c.Profile == "sequential_tools"
+		model["supports_search_tool"] = c.Profile == "search"
 		if c.Profile == "tier" {
 			model["service_tiers"] = []any{map[string]string{"id": "priority", "name": "Fast", "description": "Controlled client activation"}, map[string]string{"id": "flex", "name": "Flex", "description": "Controlled client activation"}, map[string]string{"id": "scale", "name": "Scale", "description": "Controlled client activation"}, map[string]string{"id": "ultrafast", "name": "Ultra", "description": "Controlled client activation"}}
 		}
@@ -331,12 +341,22 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	if c.Tier != "" {
 		probeCatalog += "service_tier = " + strconv.Quote(c.Tier) + "\n"
 	}
+	if c.Profile == "encrypted" {
+		probeCatalog += "model_reasoning_effort = \"low\"\n"
+	}
+	if c.Profile == "async_compact" {
+		probeCatalog += "model_post_turn_compact_threshold_percent = 0\n"
+	}
+	webSearch := "disabled"
+	if c.Profile == "search" {
+		webSearch = "live"
+	}
 	config := fmt.Sprintf(`model = %q
 model_provider = "openai"
 model_context_window = 32768
 openai_base_url = %q
 chatgpt_base_url = %q
-web_search = "disabled"
+web_search = %q
 approval_policy = "never"
 sandbox_mode = "read-only"
 cli_auth_credentials_store = "file"
@@ -347,11 +367,15 @@ enabled = false
 plugins = false
 apps = false
 shell_tool = false
+standalone_web_search = %t
 enable_request_compression = %t
 [features.token_budget]
 enabled = %t
 use_history_notes_extension = %t
-`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "compressed", notesProfile, notesProfile)
+`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", webSearch, probeCatalog, c.Profile == "search", c.Profile == "compressed", notesProfile, notesProfile)
+	if c.Profile == "async_compact" {
+		config += "\n[features.async_compaction]\nenabled = true\nmodel_async_compact_threshold_percent = 1\n"
+	}
 
 	auth, _ := json.Marshal(map[string]string{"personal_access_token": c.Token})
 	if os.WriteFile(filepath.Join(root, "config.toml"), []byte(config), 0600) != nil || os.WriteFile(filepath.Join(root, "auth.json"), auth, 0600) != nil {
@@ -404,7 +428,7 @@ use_history_notes_extension = %t
 			}
 		}
 	}()
-	d := dialogue{in: in, lines: lines, tools: toolProfile}
+	d := dialogue{in: in, lines: lines, tools: toolProfile, background: c.Profile == "async_compact"}
 	defer func() { r.RPCErrorCode, r.ToolCalls = d.rpcError, d.toolCalls }()
 	r.Stage = "initialize"
 	if d.call(ctx, "initialize", map[string]any{"clientInfo": map[string]string{"name": "aihub-codex-probe", "version": "1"}, "capabilities": map[string]bool{"experimentalApi": true}}, nil) != nil {
@@ -472,6 +496,17 @@ use_history_notes_extension = %t
 		d.expected = "OK"
 		prompt = "Remember the exact synthetic code AIHUB-COMPACT-" + thread.Thread.ID + ". Reply with exactly OK."
 	}
+	if c.Profile == "encrypted" {
+		d.expected = "1591"
+		prompt = "Remember the exact synthetic code AIHUB-REASON-" + thread.Thread.ID + ". Calculate 37 times 43 and reply only with the product."
+	}
+	if c.Profile == "search" {
+		prompt = "Use the declared web.run tool to search for the official OpenAI API documentation. Inspect the actual search result and then reply with exactly " + Marker + ". Do not use any other tools or fetch URLs yourself."
+	}
+	if c.Profile == "async_compact" {
+		d.expected = "OK"
+		prompt = asyncSeed(thread.Thread.ID)
+	}
 	if c.Profile == "notes_lifecycle" {
 		note := "AIHUB-NOTE-" + thread.Thread.ID
 		appended := "APPEND-" + thread.Thread.ID
@@ -483,6 +518,20 @@ use_history_notes_extension = %t
 		return r, ErrClient
 	}
 	r.Stage = "turn"
+	if c.Profile == "async_compact" {
+		if !d.matched || runAsyncCompaction(ctx, c, &d, thread.Thread.ID, threadParams, &r) != nil {
+			return r, ErrClient
+		}
+	}
+	if c.Profile == "encrypted" {
+		if !d.matched {
+			return r, ErrClient
+		}
+		d.expected = "AIHUB-REASON-" + thread.Thread.ID
+		if d.runTurn(ctx, thread.Thread.ID, "Return only the exact synthetic code I asked you to remember, without labels or explanation.") != nil {
+			return r, ErrClient
+		}
+	}
 	if c.Profile == "compact" {
 		if !d.matched {
 			return r, ErrClient

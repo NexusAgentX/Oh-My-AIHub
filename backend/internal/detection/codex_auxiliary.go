@@ -76,3 +76,24 @@ func mustNativeJSON(value any) []byte {
 	raw, _ := json.Marshal(value)
 	return raw
 }
+
+func codexSearchStructure(root nativeObject) bool {
+	_, text := root["output"].(string)
+	results := list(root["results"])
+	if !text || len(results) == 0 || len(results) > 256 {
+		return false
+	}
+	found := false
+	for _, raw := range results {
+		value := str(object(raw)["url"])
+		if value == "" {
+			continue
+		}
+		u, err := url.Parse(value)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil {
+			return false
+		}
+		found = true
+	}
+	return found
+}

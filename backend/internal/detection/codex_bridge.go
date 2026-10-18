@@ -71,6 +71,9 @@ type codexBridge struct {
 	contextContinued  map[string]bool
 	contextExecutions []codexContextExecution
 	compactionWindows [][][32]byte
+	reasoningCiphers  map[[32]byte]bool
+	activity          codexProbeActivity
+	profile           string
 }
 
 type codexContextExecution struct {
@@ -86,6 +89,10 @@ type codexUpstreamFailure struct {
 // request/response bodies remain transient memory and never enter reports.
 type codexWireFacts struct {
 	CompactionV1, CompactionV2, CompactionReturned, CompactionReplayed int
+	ReasoningProduced, ReasoningReplayed                               int
+	SearchStructured                                                   bool
+	BackgroundOverlaps, CancelledCompactions                           int
+	SingleSettlement                                                   bool
 	RequestedTier, ActualTier                                          string
 	LiteRequests, StandardRequests, ToolDeclarations                   int
 	ToolCalls, ToolResults, SSE, ReliableUsage                         int
@@ -159,7 +166,7 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	}
 	c := gateway.Candidate{GroupID: "probe-group", GroupModelID: "probe-offering", ChannelID: "probe-channel", CredentialScope: "probe-scope", CredentialRevision: 1, OwnerID: "probe-provider", BaseURL: base.String(), UpstreamModel: upstreamModel, Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof, Advanced: advanced}
 	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
-	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
+	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, reasoningCiphers: map[[32]byte]bool{}, activity: codexProbeActivity{changed: make(chan struct{})}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
 	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
 	b.mux = http.NewServeMux()
 	for _, endpoint := range manifest.Endpoints {
@@ -177,6 +184,7 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 func (b *codexBridge) close() {
 	b.mu.Lock()
 	b.closed = true
+	b.activity.notify()
 	b.mu.Unlock()
 	b.wg.Wait()
 	clear(b.store.hash)
@@ -207,6 +215,16 @@ func (b *codexBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	if r.URL.Path == "/probe/async-state" {
+		b.serveAsyncState(w, r)
+		return
+	}
+	// The official-client harness can observe cancellation even though the
+	// production engine deliberately drains disconnected calls for settlement.
+	observation := make(chan struct{})
+	stop := context.AfterFunc(r.Context(), func() { close(observation) })
+	defer stop()
+	r = r.WithContext(context.WithValue(r.Context(), codexClientCancellationKey{}, (<-chan struct{})(observation)))
 	b.mux.ServeHTTP(w, r)
 }
 
@@ -334,9 +352,38 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	if ep.Replay == "inference" {
 		category = "generate"
 	}
+	compact := false
+	cancelCase := false
+	if ep.ID == "codex.responses" {
+		plain, e := nativeencoding.Decode(req.Context(), req.Header.Get("Content-Encoding"), body)
+		if e == nil {
+			cancelCase = b.profile == "async_compact" && bytes.Contains(plain, []byte("AIHUB-ASYNC-CANCEL-"))
+			root, _ := decodeNative(plain)
+			for _, raw := range list(root["input"]) {
+				compact = compact || str(object(raw)["type"]) == "compaction_trigger"
+			}
+		}
+		b.startActivity(compact)
+	}
 	started := time.Now().UnixNano()
 	response, err := session.Do(req.Context(), Request{EndpointID: ep.ID, Path: ep.Path, Query: req.URL.Query(), Headers: req.Header, Body: body, Category: category, prepared: true})
 	finished := time.Now().UnixNano()
+	if ep.ID == "codex.responses" {
+		cancelled := false
+		if compact && cancelCase {
+			// Gate only delivery of an already-observed genuine result. This
+			// tests client shutdown and gateway draining without inducing an
+			// upstream fault or asserting that the upstream itself cancelled.
+			if client, ok := req.Context().Value(codexClientCancellationKey{}).(<-chan struct{}); ok {
+				select {
+				case <-client:
+					cancelled = true
+				case <-req.Context().Done():
+				}
+			}
+		}
+		b.finishActivity(compact, cancelled)
+	}
 	var failure *codexUpstreamFailure
 	if err == nil && (response.Status < 200 || response.Status >= 300) {
 		failure = &codexUpstreamFailure{State: "inconclusive", Reason: "external_error"}
@@ -375,6 +422,12 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 						wire.CompactionReplayed++
 					}
 				}
+				for _, raw := range list(root["input"]) {
+					item := object(raw)
+					if str(item["type"]) == "reasoning" && b.reasoningCiphers[sha256.Sum256([]byte(str(item["encrypted_content"])))] {
+						wire.ReasoningReplayed++
+					}
+				}
 				b.mu.Unlock()
 				if tier := str(root["service_tier"]); canonicalNativeTier("openai-responses", tier) != "" {
 					wire.RequestedTier = tier
@@ -395,7 +448,11 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 						}
 					}
 					if str(item["type"]) == "function_call" {
-						contextCalls[str(item["call_id"])] = "codex." + str(item["namespace"]) + "." + str(item["name"])
+						endpoint := "codex." + str(item["namespace"]) + "." + str(item["name"])
+						if str(item["namespace"]) == "web" && str(item["name"]) == "run" {
+							endpoint = "codex.search"
+						}
+						contextCalls[str(item["call_id"])] = endpoint
 					}
 				}
 				for _, raw := range list(root["input"]) {
@@ -469,6 +526,17 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	for _, raw := range list(reply.Object["output"]) {
+		item := object(raw)
+		if cipher := str(item["encrypted_content"]); str(item["type"]) == "reasoning" && cipher != "" {
+			if len(b.reasoningCiphers) >= 8 {
+				b.limited = true
+			} else {
+				b.reasoningCiphers[sha256.Sum256([]byte(cipher))] = true
+				wire.ReasoningProduced++
+			}
+		}
+	}
 	if window, valid := codexCompactionWindow(list(reply.Object["output"])); valid && err == nil && response.Status >= 200 && response.Status < 300 {
 		wire.CompactionReturned++
 		if ep.ID == "codex.compact" {
@@ -480,9 +548,20 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 			b.limited = true
 		}
 	}
-	if err == nil && response.Status >= 200 && response.Status < 300 && (strings.HasPrefix(ep.ID, "codex.notes.") && ep.ID != "codex.notes.thread_hint" || strings.HasPrefix(ep.ID, "codex.history.")) {
+	if err == nil && response.Status >= 200 && response.Status < 300 && (strings.HasPrefix(ep.ID, "codex.notes.") && ep.ID != "codex.notes.thread_hint" || strings.HasPrefix(ep.ID, "codex.history.") || ep.ID == "codex.search") {
 		if value, e := decodeNativeValue(response.Body); e == nil {
-			if output, valid := codexContextOutput(value); valid {
+			if ep.ID == "codex.search" {
+				root := object(value)
+				wire.SearchStructured = codexSearchStructure(root)
+			}
+			output, valid := codexContextOutput(value)
+			if ep.ID == "codex.search" {
+				// The pinned CLI uses SearchResponse.output as an input_text
+				// content array, even when encrypted_output is also supplied.
+				text, present := object(value)["output"].(string)
+				output, valid = []any{nativeObject{"type": "input_text", "text": text}}, present
+			}
+			if valid {
 				hash := codexContextOutputHash(output)
 				if b.contextOutputs[hash] == nil && len(b.contextOutputs) >= 128 {
 					b.limited = true
@@ -534,6 +613,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.CompactionV2 += wire.CompactionV2
 	b.wire.CompactionReturned += wire.CompactionReturned
 	b.wire.CompactionReplayed += wire.CompactionReplayed
+	b.wire.ReasoningProduced += wire.ReasoningProduced
+	b.wire.ReasoningReplayed += wire.ReasoningReplayed
+	b.wire.SearchStructured = b.wire.SearchStructured || wire.SearchStructured
 	if wire.RequestedTier != "" {
 		b.wire.RequestedTier = wire.RequestedTier
 	}
@@ -577,12 +659,13 @@ func syntheticToolDeclarations(tools []any) int {
 }
 
 type codexProbeStore struct {
-	mu       sync.Mutex
-	hash     []byte
-	key      gateway.KeyAuth
-	row      gateway.CandidateRecord
-	count    int
-	finished map[string]bool
+	mu              sync.Mutex
+	hash            []byte
+	key             gateway.KeyAuth
+	row             gateway.CandidateRecord
+	count           int
+	finished        map[string]bool
+	duplicateFinish bool
 }
 
 func (s *codexProbeStore) LookupKey(_ context.Context, hash []byte) (gateway.KeyAuth, error) {
@@ -626,6 +709,7 @@ func (s *codexProbeStore) FinishCall(_ context.Context, finish gateway.CallFinis
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.finished[finish.ID] {
+		s.duplicateFinish = true
 		return gateway.FinishResult{}, nil
 	}
 	s.finished[finish.ID] = true

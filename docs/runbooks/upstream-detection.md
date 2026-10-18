@@ -27,6 +27,12 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 
 官方 CLI→正式网关→合成上游回归以 `AIHUB_TEST_CODEX_BINARY` 和 `AIHUB_TEST_CODEX_PROBE` 显式指定上述两个制品，运行 `go -C backend test ./internal/api -run TestOfficialCodexCLIUsesProductionHandlers`。CI 会运行普通推理、平台 PAT 身份与 notes 启用、独立图片模型和工具结果回填；图片另校验独立报价且仅结算一次。驱动器只接受回环桥、固定 profile 和受控临时目录，禁止审批/任意客户端命令；官方 CLI 原始输出只在内存解析，返回固定阶段和布尔结论，取消后清理整个进程组及目录。机制验收不构成真实供应商通过，也不消除仍未注册套件的 pending。
 
+固定版本的 [RemoteCompactionSupport](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/model-provider-info/src/capabilities.rs) 只有 Unsupported/V2；V1 standalone 仍执行上游与平台代理的整个返回窗口续用，不编造 CLI V1 配置。V2 客户端仅安装返回的 compaction 项，保留消息由原请求按客户端规则筛选，不能用合成的 V1 多消息返回窗口冒充其实际安装规则。三层适用断言及汇总依赖由 OpenAPI manifest 声明，不跨层借用结果。
+
+`async_compact` 使用独立配置：TokenBudget 关闭，AsyncCompaction 开启，阈值 1%，固定合成上下文；验证真实前后台请求重叠、结果采用及后来消息保留。后台完成后要在后续前台检查点采用，不能等采用事件后才启动该轮。取消用例在私有桥暂缓交付已取得的上游结果，官方 CLI 关闭独立合成线程后释放；这是 CLI/网关功能检测，不是上游故障诱发，也不声称上游撤销了请求。网关仍按断开后继续读取的既有规则收尾，按每个调用的可靠结果核验单次结算。私有同步入口仅在该执行的回环桥上注册，校验临时平台 Key，不增加生产接口；等待真实事件有执行期限，不做 TTL 或到期测试。
+
+`encrypted` 配置实际进行两轮推理并核验上游密文原样回放；`search` 显式启用 StandaloneWebSearch，核验实际独立 alpha/search、有效结果 URL 结构和固定 CLI 带回的 input_text 输出。固定版本即使同时收到 encrypted_output 也使用 SearchResponse.output；协议直接检测与客户端实际行为分别记录。所有中间内容仍只留在私有执行内存中。
+
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
 
 SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。

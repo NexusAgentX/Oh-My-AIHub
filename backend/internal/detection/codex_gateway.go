@@ -16,6 +16,11 @@ func (r *Registry) RegisterCodexGateway() error {
 			continue
 		}
 		for _, req := range suite.Requirements {
+			if req.ID == "codex-special.RL22" {
+				// Background execution needs the version-checked driver. Its
+				// gateway layer is installed together with that artifact below.
+				continue
+			}
 			if _, implemented := r.definitions[req.ID+"@upstream_protocol"]; !implemented {
 				continue
 			}

@@ -68,19 +68,25 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18", "codex-special.RL21", "codex-special.RL24"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL09", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24"}, req.ID) {
 				continue
 			}
-			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
-				if a, e := codexArtifactDigest(probePath); e != nil || a != probeDigest {
-					return Result{State: "invalid"}
+			layers := []string{"official_cli"}
+			if req.ID == "codex-special.RL22" {
+				layers = append(layers, "gateway_proxy")
+			}
+			for _, layer := range layers {
+				if err := r.Register(Definition{ID: req.ID + "@" + layer, SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: layer, CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
+					if a, e := codexArtifactDigest(probePath); e != nil || a != probeDigest {
+						return Result{State: "invalid"}
+					}
+					if a, e := codexArtifactDigest(binaryPath); e != nil || a != binaryDigest {
+						return Result{State: "invalid"}
+					}
+					return runCodexCLI(ctx, s, req, layer, probePath, binaryPath)
+				}}); err != nil {
+					return err
 				}
-				if a, e := codexArtifactDigest(binaryPath); e != nil || a != binaryDigest {
-					return Result{State: "invalid"}
-				}
-				return runCodexCLI(ctx, s, req, probePath, binaryPath)
-			}}); err != nil {
-				return err
 			}
 		}
 	}
@@ -97,11 +103,11 @@ type codexCLIProof struct {
 	ContextPhases    map[string]map[string]int
 }
 
-func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, probePath, binaryPath string) Result {
+func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, layer, probePath, binaryPath string) Result {
 	if req.ID == "codex-special.RL24" {
 		return runCodexCLITiers(ctx, s, req, probePath, binaryPath)
 	}
-	n := nativeScene{s: s, protocol: "openai-responses", layer: "official_cli", requirement: req, checks: map[string]Assertion{}}
+	n := nativeScene{s: s, protocol: "openai-responses", layer: layer, requirement: req, checks: map[string]Assertion{}}
 	profiles := []string{"lite_tools"}
 	switch req.ID {
 	case "codex-special.RL03":
@@ -112,16 +118,22 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"instructions"}
 	case "codex-special.RL08":
 		profiles = []string{"lite_tools", "plain"}
+	case "codex-special.RL09":
+		profiles = []string{"encrypted"}
 	case "codex-special.RL13":
 		profiles = []string{"notes"}
 	case "codex-special.RL14":
 		profiles = []string{"compressed", "plain"}
 	case "codex-special.RL15":
 		profiles = []string{"catalog"}
+	case "codex-special.RL16":
+		profiles = []string{"search"}
 	case "codex-special.RL18":
 		profiles = []string{"notes_lifecycle"}
 	case "codex-special.RL21":
 		profiles = []string{"compact"}
+	case "codex-special.RL22":
+		profiles = []string{"async_compact"}
 	}
 	for _, profile := range profiles {
 		proof := runCodexCLIProfile(ctx, s, profile, probePath, binaryPath)
@@ -180,6 +192,9 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			} else {
 				n.check("tool_argument_deltas", out, closed && wire.ToolDeltas > 0)
 			}
+		case "codex-special.RL09":
+			n.check("encrypted_reasoning_produced", out, wire.ReasoningProduced > 0)
+			n.check("encrypted_reasoning_continued", out, wire.ReasoningReplayed > 0 && client.Completed && client.MarkerMatched)
 		case "codex-special.RL14":
 			valid := client.Completed && client.MarkerMatched && wire.SSE > 0
 			if profile == "compressed" {
@@ -191,6 +206,10 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			}
 		case "codex-special.RL15":
 			n.check("cli_catalog_consumed", out, client.CatalogModel && client.PlatformAuth && proof.Observed["codex.models"] > 0)
+		case "codex-special.RL16":
+			n.check("native_search", out, proof.Observed["codex.search"] > 0)
+			n.check("search_result_structure", out, wire.SearchStructured)
+			n.check("search_result_continuation", out, client.Completed && client.MarkerMatched && proof.ContextContinued["codex.search"])
 		case "codex-special.RL18":
 			for _, operation := range []string{"write_file", "read_file", "list_files_by_prefix", "search_contents", "append_to_file"} {
 				endpoint := "codex.notes." + operation
@@ -202,6 +221,12 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			n.check("compaction_trigger", out, wire.CompactionV2 > 0 && wire.CompactionV1 == 0)
 			n.check("compaction_output", out, wire.CompactionReturned > 0)
 			n.check("compaction_continuation", out, client.Completed && client.MarkerMatched && wire.CompactionReplayed > 0)
+		case "codex-special.RL22":
+			n.check("effective_background_profile", out, client.Profile == "async_compact" && wire.CompactionV2 > 0 && wire.CompactionV1 == 0)
+			n.check("foreground_overlap", out, wire.BackgroundOverlaps > 0)
+			n.check("result_reuse", out, client.ContextVerified && wire.CompactionReplayed > 0)
+			n.check("cancel_shutdown", out, client.ShutdownVerified && wire.CancelledCompactions > 0)
+			n.check("single_settlement", out, wire.SingleSettlement)
 		}
 	}
 	return n.finish()
@@ -236,6 +261,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	if err != nil {
 		return proof
 	}
+	b.profile = profile
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		b.close()
@@ -263,6 +289,9 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	b.closed = true
 	b.mu.Unlock()
 	b.wg.Wait()
+	b.store.mu.Lock()
+	b.wire.SingleSettlement = b.store.count > 0 && b.store.count == len(b.store.finished) && !b.store.duplicateFinish
+	b.store.mu.Unlock()
 	s.usage.Add(b.usage)
 	refs := append(slices.Clone(bootstrap.witnesses), b.witnesses...)
 	if len(refs) == 0 {
@@ -271,7 +300,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed, ContextContinued: b.contextContinued}
 	if runErr != nil || parseErr != nil || client.Protocol != codexprobe.Protocol || client.Version != codexprobe.Version || client.Profile != profile {
 		stage := "unknown"
-		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "compact", "completed"}, client.Stage) {
+		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "compact", "async_overlap", "async_reuse", "async_shutdown", "completed"}, client.Stage) {
 			stage = client.Stage
 		}
 		proof.State, proof.Reason = "inconclusive", "client_disabled"

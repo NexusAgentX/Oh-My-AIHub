@@ -96,4 +96,7 @@ func (n *nativeScene) codexCompact(ctx context.Context, v2 bool) {
 	next["input"] = append(window, nativeObject{"role": "user", "content": "Reply only with the synthetic code from the compacted conversation."})
 	out := n.codexInfer(ctx, next, "")
 	n.linkedCheck("compaction_continuation", compact, out, contentMatches(out, replayCode) && nativeEndedNormally(out.Reply))
+	if n.requirement.ID == "codex-special.RL22" {
+		n.linkedCheck("result_reuse", compact, out, contentMatches(out, replayCode) && nativeEndedNormally(out.Reply))
+	}
 }
