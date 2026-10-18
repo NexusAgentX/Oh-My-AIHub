@@ -84,8 +84,13 @@ func TestOfficialCodexCompressionIsActuallyEnabledAndHasIndependentPlainControl(
 }
 
 func codexToolStreamFixture(namespace string) string {
-	final := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-cli-call", Name: "synthetic_echo", Namespace: namespace}})
+	return codexCallStreamFixture(nativeCall{ID: "synthetic-cli-call", Name: "synthetic_echo", Namespace: namespace}, nativeObject{"label": "violet", "meta": nativeObject{"ok": true}, "items": []any{nativeObject{"value": 7}}})
+}
+
+func codexCallStreamFixture(call nativeCall, args nativeObject) string {
+	final := nativeFixtureWithCalls("openai-responses", "", []nativeCall{call})
 	item := object(list(final["output"])[0])
+	item["arguments"] = string(mustNativeJSON(args))
 	initial := nativeObject{"id": "resp_fixture", "object": "response", "status": "in_progress", "output": []any{}}
 	added := cloneNative(item)
 	added["arguments"], added["status"] = "", "in_progress"
@@ -172,6 +177,24 @@ func TestMissingCodexArtifactsKeepOfficialLayerPending(t *testing.T) {
 	item := codexLayerItem(t, r, s, "codex-special.RL13", "official_cli")
 	if item.Implemented {
 		t.Fatal("missing official artifact became executable")
+	}
+}
+
+func TestCodexContextPhaseCannotBorrowAnEarlierReadOrInventClockBounds(t *testing.T) {
+	phases := []codexprobe.Phase{{Kind: "notes_primary", Start: 10, End: 20}, {Kind: "notes_isolation", Start: 30, End: 40}, {Kind: "notes_reopen", Start: 50, End: 60}}
+	executions := []codexContextExecution{{Endpoint: "codex.notes.read_file", Start: 11, End: 19}, {Endpoint: "codex.notes.read_file", Start: 32, End: 35}}
+	counts, valid := codexObservedPhases(phases, executions, 1, 80)
+	if !valid || counts["notes_primary"]["codex.notes.read_file"] != 1 || counts["notes_isolation"]["codex.notes.read_file"] != 1 || counts["notes_reopen"]["codex.notes.read_file"] != 0 {
+		t.Fatal("reopen borrowed a read from another actual turn", counts)
+	}
+	phases[2].End = 90
+	if _, valid := codexObservedPhases(phases, executions, 1, 80); valid {
+		t.Fatal("client phase exceeded controlled process execution")
+	}
+	phases[2].End = 60
+	phases[2].Start = 35
+	if _, valid := codexObservedPhases(phases, executions, 1, 80); valid {
+		t.Fatal("overlapping client phase could claim another turn's calls")
 	}
 }
 

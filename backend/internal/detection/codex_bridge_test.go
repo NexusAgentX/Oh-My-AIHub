@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,32 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
+
+func TestPrivateCodexBridgeSaturationIsPlatformFailureNotSupplierEvidence(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"content":"new synthetic context receipt"}`)
+	}))
+	defer up.Close()
+	_, s, _ := codexTestSession(t, up.URL)
+	b, err := newCodexBridge(s, "synthetic-model", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.close()
+	b.requests = 256
+	req := httptest.NewRequest("POST", up.URL+"/backend-api/codex/responses", nil)
+	if _, err := (codexProbeOutbound{bridge: b}).RoundTrip(req); !errors.Is(err, ErrBusy) || !b.limited || s.usage.HTTP != 0 {
+		t.Fatal("request cap produced a supplier result", err)
+	}
+	b.requests, b.limited = 0, false
+	for i := range 128 {
+		b.contextOutputs[[32]byte{byte(i)}] = map[string]bool{"codex.notes.read_file": true}
+	}
+	_, err = b.exchange(context.Background(), Request{EndpointID: "codex.notes.read_file", Path: "/backend-api/codex/alpha/notes/v2/read_file", Headers: http.Header{"Content-Type": {"application/json"}}, Body: []byte(`{"path":"synthetic.txt","context":{"session_id":"owned","current_agent_name":"/root"}}`)})
+	if err != nil || !b.limited || len(b.contextOutputs) != 128 || len(b.store.finished) != 0 {
+		t.Fatal("receipt capacity was silently treated as supplier capability", err)
+	}
+}
 
 func codexLayerItem(t *testing.T, r *Registry, s *Session, id, layer string) Planned {
 	t.Helper()

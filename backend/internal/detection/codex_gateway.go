@@ -110,5 +110,8 @@ func runCodexGateway(ctx context.Context, s *Session, req gatewaycontract.Requir
 		result = n.runCodex(ctx)
 	}
 	s.usage.Add(proxy.usage)
+	if b.limited {
+		result.State, result.Reason = "inconclusive", "platform_unavailable"
+	}
 	return result
 }

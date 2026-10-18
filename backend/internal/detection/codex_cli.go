@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
@@ -88,11 +88,13 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 }
 
 type codexCLIProof struct {
-	Client        codexprobe.Result
-	Wire          codexWireFacts
-	State, Reason string
-	Witnesses     []string
-	Observed      map[string]int
+	Client           codexprobe.Result
+	Wire             codexWireFacts
+	State, Reason    string
+	Witnesses        []string
+	Observed         map[string]int
+	ContextContinued map[string]bool
+	ContextPhases    map[string]map[string]int
 }
 
 func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, probePath, binaryPath string) Result {
@@ -109,6 +111,8 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"compressed", "plain"}
 	case "codex-special.RL15":
 		profiles = []string{"catalog"}
+	case "codex-special.RL18":
+		profiles = []string{"notes_lifecycle"}
 	}
 	for _, profile := range profiles {
 		proof := runCodexCLIProfile(ctx, s, profile, probePath, binaryPath)
@@ -165,6 +169,13 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			}
 		case "codex-special.RL15":
 			n.check("cli_catalog_consumed", out, client.CatalogModel && client.PlatformAuth && proof.Observed["codex.models"] > 0)
+		case "codex-special.RL18":
+			for _, operation := range []string{"write_file", "read_file", "list_files_by_prefix", "search_contents", "append_to_file"} {
+				endpoint := "codex.notes." + operation
+				n.check(operation, out, client.ContextVerified && proof.ContextPhases["notes_primary"][endpoint] > 0 && proof.ContextContinued[endpoint])
+			}
+			n.check("reopen_session", out, client.ContextVerified && client.ReopenVerified && proof.ContextPhases["notes_reopen"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
+			n.check("context_isolation", out, client.ContextVerified && client.IsolationVerified && proof.ContextPhases["notes_isolation"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
 		}
 	}
 	return n.finish()
@@ -207,7 +218,9 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 	serveDone := make(chan struct{})
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
+	executionStarted := time.Now().UnixNano()
 	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
+	executionFinished := time.Now().UnixNano()
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)
 	_ = server.Close()
@@ -222,7 +235,7 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 	if len(refs) == 0 {
 		return proof
 	}
-	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed}
+	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed, ContextContinued: b.contextContinued}
 	if runErr != nil || parseErr != nil || client.Protocol != codexprobe.Protocol || client.Version != codexprobe.Version || client.Profile != profile {
 		stage := "unknown"
 		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "completed"}, client.Stage) {
@@ -240,6 +253,13 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 		}
 		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
 	}
+	if profile == "notes_lifecycle" && proof.State == "pass" {
+		counts, valid := codexObservedPhases(client.Phases, b.contextExecutions, executionStarted, executionFinished)
+		proof.ContextPhases = counts
+		if !valid {
+			proof.State, proof.Reason = "inconclusive", "detector_error"
+		}
+	}
 	if b.limited {
 		proof.State, proof.Reason = "inconclusive", "platform_unavailable"
 	}
@@ -253,4 +273,26 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 		_ = s.Remember(key, data)
 	}
 	return proof
+}
+
+func codexObservedPhases(phases []codexprobe.Phase, executions []codexContextExecution, start, end int64) (map[string]map[string]int, bool) {
+	counts := map[string]map[string]int{}
+	kinds := []string{"notes_primary", "notes_isolation", "notes_reopen"}
+	if len(phases) != len(kinds) || start <= 0 || end < start {
+		return counts, false
+	}
+	previous := start
+	for i, phase := range phases {
+		if phase.Kind != kinds[i] || phase.Start < previous || phase.End < phase.Start || phase.End > end {
+			return counts, false
+		}
+		previous = phase.End
+		counts[phase.Kind] = map[string]int{}
+		for _, execution := range executions {
+			if execution.Start >= phase.Start && execution.End >= execution.Start && execution.End <= phase.End {
+				counts[phase.Kind][execution.Endpoint]++
+			}
+		}
+	}
+	return counts, true
 }

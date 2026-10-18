@@ -74,6 +74,21 @@ func TestContextJSONKeepsStrictDuplicateAndTrailingDataRejection(t *testing.T) {
 	}
 }
 
+func TestContextOutputKeepsActualEncryptedContentAndInlineAttachments(t *testing.T) {
+	input := nativeObject{"encrypted_output": "opaque-context+==", "future": true, "images": []any{nativeObject{"mime_type": "image/png", "data": "synthetic-base64", "detail": "high"}}}
+	output, valid := codexContextOutput(input)
+	items := list(output)
+	if !valid || len(items) != 2 || str(object(items[0])["encrypted_content"]) != "opaque-context+==" || str(object(items[1])["image_url"]) != "data:image/png;base64,synthetic-base64" || object(items[1])["detail"] != "high" || input["images"] == nil {
+		t.Fatal("native context attachments/cipher were removed or the retained reply was mutated")
+	}
+	if _, valid := codexContextOutput(nativeObject{"images": "wrong-type"}); valid {
+		t.Fatal("invalid attachments silently disappeared")
+	}
+	if _, valid := codexContextOutput(nativeObject{"images": nil}); valid {
+		t.Fatal("explicit null attachments bypassed pinned client validation")
+	}
+}
+
 func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *testing.T) {
 	for _, brokenIsolation := range []bool{false, true} {
 		for _, layer := range []string{"upstream_protocol", "gateway_proxy"} {

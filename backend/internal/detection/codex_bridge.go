@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -44,28 +45,36 @@ const codexProbeCredential = "isolated-upstream-placeholder"
 // quote merely exercises the real admission/pricing code; it is not a supplier
 // price. The real test Key stays in the bound parent Session.
 type codexBridge struct {
-	mu        sync.Mutex
-	parent    *Session
-	store     *codexProbeStore
-	engine    *gateway.Engine
-	mux       *http.ServeMux
-	token     string
-	base      *url.URL
-	entry     int
-	witnesses []string
-	separated bool
-	requests  int
-	closed    bool
-	wg        sync.WaitGroup
-	bootstrap []string
-	observed  map[string]int
-	usage     Usage
-	slots     chan struct{}
-	handlers  chan struct{}
-	limited   bool
-	wire      codexWireFacts
-	callIDs   map[string]bool
-	failure   *codexUpstreamFailure
+	mu                sync.Mutex
+	parent            *Session
+	store             *codexProbeStore
+	engine            *gateway.Engine
+	mux               *http.ServeMux
+	token             string
+	base              *url.URL
+	entry             int
+	witnesses         []string
+	separated         bool
+	requests          int
+	closed            bool
+	wg                sync.WaitGroup
+	bootstrap         []string
+	observed          map[string]int
+	usage             Usage
+	slots             chan struct{}
+	handlers          chan struct{}
+	limited           bool
+	wire              codexWireFacts
+	callIDs           map[string]bool
+	failure           *codexUpstreamFailure
+	contextOutputs    map[[32]byte]map[string]bool
+	contextContinued  map[string]bool
+	contextExecutions []codexContextExecution
+}
+
+type codexContextExecution struct {
+	Endpoint   string
+	Start, End int64
 }
 
 type codexUpstreamFailure struct {
@@ -145,7 +154,7 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	}
 	c := gateway.Candidate{GroupID: "probe-group", GroupModelID: "probe-offering", ChannelID: "probe-channel", CredentialScope: "probe-scope", CredentialRevision: 1, OwnerID: "probe-provider", BaseURL: base.String(), UpstreamModel: upstreamModel, Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof, Advanced: advanced}
 	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
-	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
+	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
 	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
 	b.mux = http.NewServeMux()
 	for _, endpoint := range manifest.Endpoints {
@@ -281,6 +290,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	b.mu.Lock()
 	if b.closed || b.requests >= 256 {
+		if b.requests >= 256 {
+			b.limited = true
+		}
 		b.mu.Unlock()
 		return nil, ErrBusy
 	}
@@ -317,7 +329,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	if ep.Replay == "inference" {
 		category = "generate"
 	}
+	started := time.Now().UnixNano()
 	response, err := session.Do(req.Context(), Request{EndpointID: ep.ID, Path: ep.Path, Query: req.URL.Query(), Headers: req.Header, Body: body, Category: category, prepared: true})
+	finished := time.Now().UnixNano()
 	var failure *codexUpstreamFailure
 	if err == nil && (response.Status < 200 || response.Status >= 300) {
 		failure = &codexUpstreamFailure{State: "inconclusive", Reason: "external_error"}
@@ -345,6 +359,13 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		if decodeErr == nil {
 			if root, err := decodeNative(plain); err == nil {
 				lite := false
+				contextCalls := map[string]string{}
+				for _, raw := range list(root["input"]) {
+					item := object(raw)
+					if str(item["type"]) == "function_call" {
+						contextCalls[str(item["call_id"])] = "codex." + str(item["namespace"]) + "." + str(item["name"])
+					}
+				}
 				for _, raw := range list(root["input"]) {
 					item := object(raw)
 					if str(item["type"]) == "additional_tools" {
@@ -352,8 +373,13 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 						wire.ToolDeclarations += syntheticToolDeclarations(list(item["tools"]))
 					}
 					if str(item["type"]) == "function_call_output" {
+						endpoint := contextCalls[str(item["call_id"])]
+						hash := codexContextOutputHash(item["output"])
 						b.mu.Lock()
 						known := b.callIDs[str(item["call_id"])]
+						if b.contextOutputs[hash][endpoint] {
+							b.contextContinued[endpoint] = true
+						}
 						b.mu.Unlock()
 						output, _ := json.Marshal(item["output"])
 						if known && bytes.Contains(output, []byte(codexprobe.Marker)) {
@@ -367,7 +393,15 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 					wire.StandardRequests++
 					wire.ToolDeclarations += syntheticToolDeclarations(list(root["tools"]))
 				}
+			} else {
+				b.mu.Lock()
+				b.limited = true
+				b.mu.Unlock()
 			}
+		} else {
+			b.mu.Lock()
+			b.limited = true
+			b.mu.Unlock()
 		}
 	}
 	if err == nil && response.Status >= 200 && response.Status < 300 && category == "generate" {
@@ -402,13 +436,37 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	if err == nil && response.Status >= 200 && response.Status < 300 && (strings.HasPrefix(ep.ID, "codex.notes.") && ep.ID != "codex.notes.thread_hint" || strings.HasPrefix(ep.ID, "codex.history.")) {
+		if value, e := decodeNativeValue(response.Body); e == nil {
+			if output, valid := codexContextOutput(value); valid {
+				hash := codexContextOutputHash(output)
+				if b.contextOutputs[hash] == nil && len(b.contextOutputs) >= 128 {
+					b.limited = true
+				} else {
+					if b.contextOutputs[hash] == nil {
+						b.contextOutputs[hash] = map[string]bool{}
+					}
+					b.contextOutputs[hash][ep.ID] = true
+				}
+				if len(b.contextExecutions) < 256 {
+					b.contextExecutions = append(b.contextExecutions, codexContextExecution{Endpoint: ep.ID, Start: started, End: finished})
+				} else {
+					b.limited = true
+				}
+			}
+		}
+	}
 	if failure != nil {
 		b.failure = failure
 	}
 	for _, candidate := range reply.Candidates {
 		for _, call := range candidate.Calls {
-			if len(b.callIDs) < 64 && call.ID != "" && call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) {
-				b.callIDs[call.ID] = true
+			if call.ID != "" && call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) {
+				if b.callIDs[call.ID] || len(b.callIDs) < 64 {
+					b.callIDs[call.ID] = true
+				} else {
+					b.limited = true
+				}
 			}
 		}
 	}
@@ -433,6 +491,17 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		return nil, err
 	}
 	return &http.Response{StatusCode: response.Status, Header: response.Headers, Body: io.NopCloser(bytes.NewReader(response.Body)), ContentLength: int64(len(response.Body)), Request: req}, nil
+}
+
+func codexContextOutputHash(value any) [32]byte {
+	// JSON text tool results are semantically compared, since Rust and Go may
+	// serialize object member order differently. Ciphertext/content stays exact.
+	if text, ok := value.(string); ok {
+		if decoded, err := decodeNativeValue([]byte(text)); err == nil {
+			value = decoded
+		}
+	}
+	return sha256.Sum256(mustNativeJSON(value))
 }
 
 func syntheticToolDeclarations(tools []any) int {

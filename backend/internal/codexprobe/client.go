@@ -47,16 +47,28 @@ type Config struct {
 }
 
 type Result struct {
-	Protocol      string `json:"protocol"`
-	Version       string `json:"version"`
-	Profile       string `json:"profile"`
-	Completed     bool   `json:"completed"`
-	MarkerMatched bool   `json:"marker_matched"`
-	PlatformAuth  bool   `json:"platform_auth"`
-	CatalogModel  bool   `json:"catalog_model"`
-	Stage         string `json:"stage"`
-	RPCErrorCode  int    `json:"rpc_error_code,omitempty"`
-	ToolCalls     int    `json:"tool_calls"`
+	Protocol          string  `json:"protocol"`
+	Version           string  `json:"version"`
+	Profile           string  `json:"profile"`
+	Completed         bool    `json:"completed"`
+	MarkerMatched     bool    `json:"marker_matched"`
+	PlatformAuth      bool    `json:"platform_auth"`
+	CatalogModel      bool    `json:"catalog_model"`
+	Stage             string  `json:"stage"`
+	RPCErrorCode      int     `json:"rpc_error_code,omitempty"`
+	ToolCalls         int     `json:"tool_calls"`
+	ContextVerified   bool    `json:"context_verified"`
+	IsolationVerified bool    `json:"isolation_verified"`
+	ReopenVerified    bool    `json:"reopen_verified"`
+	Phases            []Phase `json:"phases,omitempty"`
+}
+
+// Phase bounds associate private bridge receipts with actual client turns.
+// They contain no session identifiers or content and never become API reports.
+type Phase struct {
+	Kind  string `json:"kind"`
+	Start int64  `json:"start"`
+	End   int64  `json:"end"`
 }
 
 func CheckVersion(ctx context.Context, binary string) error {
@@ -80,7 +92,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" && c.Profile != "notes_lifecycle" {
 		return ErrClient
 	}
 	// The caller must be RunControlledProcess, which makes these private roots.
@@ -112,6 +124,9 @@ type dialogue struct {
 	rpcError  int
 	tools     bool
 	toolCalls int
+	expected  string
+	thread    string
+	turn      string
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -131,6 +146,28 @@ func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
 }
 
 func (d *dialogue) notification(msg rpcMessage) error {
+	if d.thread != "" && (msg.Method == "item/completed" || msg.Method == "turn/completed") {
+		var scope struct {
+			Thread string `json:"threadId"`
+			TurnID string `json:"turnId"`
+			Turn   struct {
+				ID string `json:"id"`
+			} `json:"turn"`
+		}
+		if json.Unmarshal(msg.Params, &scope) != nil || scope.Thread == "" {
+			return ErrClient
+		}
+		if scope.Thread != d.thread {
+			return nil
+		}
+		turn := scope.TurnID
+		if msg.Method == "turn/completed" {
+			turn = scope.Turn.ID
+		}
+		if d.turn != "" && turn != d.turn {
+			return nil
+		}
+	}
 	if len(msg.ID) > 0 && string(msg.ID) != "null" && msg.Method != "" {
 		if msg.Method == "item/tool/call" && d.tools && d.toolCalls < 4 {
 			var p struct {
@@ -157,7 +194,11 @@ func (d *dialogue) notification(msg rpcMessage) error {
 		if json.Unmarshal(msg.Params, &p) != nil {
 			return ErrClient
 		}
-		if p.Item.Type == "agentMessage" && strings.TrimSpace(p.Item.Text) == Marker {
+		expected := d.expected
+		if expected == "" {
+			expected = Marker
+		}
+		if p.Item.Type == "agentMessage" && strings.TrimSpace(p.Item.Text) == expected {
 			d.matched = true
 		}
 	}
@@ -171,6 +212,27 @@ func (d *dialogue) notification(msg rpcMessage) error {
 			return ErrClient
 		}
 		d.completed = true
+	}
+	return nil
+}
+
+func (d *dialogue) runTurn(ctx context.Context, thread, prompt string) error {
+	d.thread, d.turn = thread, "pending"
+	d.completed, d.matched = false, false
+	var started struct {
+		Turn struct {
+			ID string `json:"id"`
+		} `json:"turn"`
+	}
+	if d.call(ctx, "turn/start", map[string]any{"threadId": thread, "input": []any{map[string]string{"type": "text", "text": prompt}}}, &started) != nil || started.Turn.ID == "" {
+		return ErrClient
+	}
+	d.turn = started.Turn.ID
+	for !d.completed {
+		msg, err := d.receive(ctx)
+		if err != nil || d.notification(msg) != nil {
+			return ErrClient
+		}
 	}
 	return nil
 }
@@ -230,7 +292,8 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	root := os.Getenv("CODEX_HOME")
 	probeCatalog := ""
 	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools"
-	if c.Profile == "notes" || c.Profile == "image" || toolProfile || c.Profile == "compressed" || c.Profile == "plain" {
+	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle"
+	if notesProfile || toolProfile || c.Profile == "compressed" || c.Profile == "plain" {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
 		// provider capability/capacity evidence. The catalog profile below uses
@@ -265,7 +328,7 @@ enable_request_compression = %t
 [features.token_budget]
 enabled = %t
 use_history_notes_extension = %t
-`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "compressed", c.Profile == "notes" || c.Profile == "image", c.Profile == "notes" || c.Profile == "image")
+`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "compressed", notesProfile, notesProfile)
 	auth, _ := json.Marshal(map[string]string{"personal_access_token": c.Token})
 	if os.WriteFile(filepath.Join(root, "config.toml"), []byte(config), 0600) != nil || os.WriteFile(filepath.Join(root, "auth.json"), auth, 0600) != nil {
 		return r, ErrClient
@@ -366,20 +429,56 @@ use_history_notes_extension = %t
 	if d.call(ctx, "thread/start", threadParams, &thread) != nil || thread.Thread.ID == "" {
 		return r, ErrClient
 	}
+	d.thread = thread.Thread.ID
 	r.Stage = "turn_start"
 	prompt := "Reply with exactly " + Marker + "."
 	if toolProfile {
 		prompt = `Call synthetic_echo exactly once with label="violet", meta={"ok":true}, items=[{"value":7}]. After receiving its result, reply with exactly the result text. No other tools.`
 	}
-	if d.call(ctx, "turn/start", map[string]any{"threadId": thread.Thread.ID, "input": []any{map[string]string{"type": "text", "text": prompt}}}, nil) != nil {
+	if c.Profile == "notes_lifecycle" {
+		note := "AIHUB-NOTE-" + thread.Thread.ID
+		appended := "APPEND-" + thread.Thread.ID
+		d.expected = note + "\n" + appended
+		prompt = fmt.Sprintf("Use the declared notes tools only on the synthetic virtual path aihub-probe-notes.txt: write exactly %q, read it, append exactly %q, read it again, list this exact path prefix, and search within this exact path for AIHUB-NOTE-. Check every actual result. Finally return only the full text actually read from the appended note, without labels or formatting. Do not invent successful results.", note, "\n"+appended)
+	}
+	primaryStarted := time.Now().UnixNano()
+	if d.runTurn(ctx, thread.Thread.ID, prompt) != nil {
 		return r, ErrClient
 	}
 	r.Stage = "turn"
-	for !d.completed {
-		msg, e := d.receive(ctx)
-		if e != nil || d.notification(msg) != nil {
+	if c.Profile == "notes_lifecycle" {
+		r.ContextVerified = d.completed && d.matched
+		r.Phases = append(r.Phases, Phase{Kind: "notes_primary", Start: primaryStarted, End: time.Now().UnixNano()})
+		firstExpected := d.expected
+		firstID := thread.Thread.ID
+		d.completed, d.matched = false, false
+		thread.Thread.ID = ""
+		r.Stage = "thread"
+		if d.call(ctx, "thread/start", threadParams, &thread) != nil || thread.Thread.ID == "" || thread.Thread.ID == firstID {
 			return r, ErrClient
 		}
+		d.thread, d.expected = thread.Thread.ID, "AIHUB-SYNTHETIC-NOTE-MISSING"
+		r.Stage = "turn_start"
+		isolationStarted := time.Now().UnixNano()
+		if d.runTurn(ctx, thread.Thread.ID, "Read the exact synthetic virtual notes path aihub-probe-notes.txt using notes.read_file. Return only its full actual text if present, or exactly AIHUB-SYNTHETIC-NOTE-MISSING if absent. Do not write, copy or invent any note.") != nil {
+			return r, ErrClient
+		}
+		r.Stage = "turn"
+		r.IsolationVerified = d.completed && d.matched
+		r.Phases = append(r.Phases, Phase{Kind: "notes_isolation", Start: isolationStarted, End: time.Now().UnixNano()})
+		d.thread, d.turn, d.expected = firstID, "pending", firstExpected
+		r.Stage = "thread"
+		if d.call(ctx, "thread/resume", map[string]any{"threadId": firstID, "cwd": workspace, "approvalPolicy": "never", "sandbox": "read-only", "model": c.Model}, &thread) != nil || thread.Thread.ID != firstID {
+			return r, ErrClient
+		}
+		r.Stage = "turn_start"
+		reopenStarted := time.Now().UnixNano()
+		if d.runTurn(ctx, firstID, "Read aihub-probe-notes.txt again using notes.read_file. Return only the full actual note text without labels. Do not copy a previous answer or invent a result.") != nil {
+			return r, ErrClient
+		}
+		r.ReopenVerified = d.completed && d.matched
+		r.Phases = append(r.Phases, Phase{Kind: "notes_reopen", Start: reopenStarted, End: time.Now().UnixNano()})
+		d.matched = r.ContextVerified && r.IsolationVerified && r.ReopenVerified
 	}
 	r.Completed, r.MarkerMatched = d.completed, d.matched
 	r.Stage = "completed"

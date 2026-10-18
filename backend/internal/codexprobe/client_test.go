@@ -54,6 +54,23 @@ func TestDynamicProbeToolRejectsArbitraryInputsAndReturnsOnlyFixedResult(t *test
 	}
 }
 
+func TestDialogueCannotUseAnotherThreadOrOldTurnAsProof(t *testing.T) {
+	d := dialogue{thread: "own-thread", turn: "current-turn"}
+	for _, scope := range [][2]string{{"other-thread", "current-turn"}, {"own-thread", "past-turn"}} {
+		params, _ := json.Marshal(map[string]any{"threadId": scope[0], "turnId": scope[1], "item": map[string]string{"type": "agentMessage", "text": Marker}})
+		if err := d.notification(rpcMessage{Method: "item/completed", Params: params}); err != nil || d.matched {
+			t.Fatal("foreign context completion entered this turn's evidence", err)
+		}
+	}
+	params, _ := json.Marshal(map[string]any{"threadId": "own-thread", "turnId": "current-turn", "item": map[string]string{"type": "agentMessage", "text": Marker}})
+	if err := d.notification(rpcMessage{Method: "item/completed", Params: params}); err != nil || !d.matched {
+		t.Fatal("matching turn result was discarded", err)
+	}
+	if err := d.notification(rpcMessage{Method: "turn/completed", Params: json.RawMessage(`{"threadId":"own-thread","turn":{"id":"past-turn","status":"completed"}}`)}); err != nil || d.completed {
+		t.Fatal("old turn completed the current probe", err)
+	}
+}
+
 func TestDialogueRejectsClientSideCommandsAndKeepsOnlySemanticFacts(t *testing.T) {
 	d := dialogue{}
 	if d.notification(rpcMessage{ID: json.RawMessage(`7`), Method: "item/commandExecution/requestApproval"}) == nil {

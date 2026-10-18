@@ -17775,7 +17775,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-19.2",
+    "version": "2026-10-19.3",
     "stage": "discovery",
     "sources": [
       {
@@ -21300,7 +21300,9 @@ x-aihub-gateway-contract:
               "codex.history.list_windows",
               "codex.history.list_items",
               "codex.history.read_item",
-              "codex.history.search_contents"
+              "codex.history.search_contents",
+              "codex.models",
+              "codex.responses"
             ],
             "source_ids": [
               "RL19"
@@ -21577,6 +21579,7 @@ x-aihub-gateway-contract:
       "codex-rl25-operational-scope": "Operational assertions retain this original scope: [\"Codex 专用原生生图\", \"固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。\", \"F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源\", \"固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。\"]",
       "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement.",
       "codex-rl14-endpoint-evidence": "RL14 separately tests the native Codex and public Responses entrances; neither endpoint supplies transport capability evidence for the other. Public assertions are upstream/gateway only; the pinned CLI compression profile uses its actual native endpoint.",
-      "codex-notes-model-prerequisites": "RL18 uses the actual native catalog for an explicit group model prerequisite and actual native model-produced encrypted arguments/output consumption. No invented ciphertext, notes body persistence, resource management API, timed consistency wait or source-channel binding."
+      "codex-notes-model-prerequisites": "RL18 uses the actual native catalog for an explicit group model prerequisite and actual native model-produced encrypted arguments/output consumption. No invented ciphertext, notes body persistence, resource management API, timed consistency wait or source-channel binding.",
+      "codex-history-seed-scope": "RL19 seeds only a synthetic session and known window using pinned CLI history_ingest_requested metadata. It reads only item IDs recovered from that window and matching the unpredictable seeded content, performs immediate observations without waiting, and records missing IDs as failed prerequisites rather than guessing resources or binding source channels."
     }
   }
