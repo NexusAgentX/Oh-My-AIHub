@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"strings"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
 
 // The digest follows detector source changes even in container builds without
@@ -37,5 +40,7 @@ func implementationDigest(source fs.FS, layer string) string {
 		h.Write([]byte{0})
 		h.Write(body)
 	}
+	h.Write([]byte(gatewaycontract.ImplementationVersion()))
+	h.Write([]byte(nativeencoding.ImplementationVersion()))
 	return hex.EncodeToString(h.Sum(nil))
 }

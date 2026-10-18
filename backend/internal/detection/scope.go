@@ -30,6 +30,7 @@ func (r *Registry) scopeVersion(suite gatewaycontract.Suite, item Planned) strin
 			}
 		}
 		req.ConditionalAssertions = slices.Clone(item.Conditional)
+		req.AssertionLayers = nil
 		req.EvidenceLayers = []string{item.Layer}
 		requirements = append(requirements, req)
 		for _, id := range req.Endpoints {

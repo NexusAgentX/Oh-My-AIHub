@@ -34,6 +34,7 @@ func TestScenarioScopeTracksItsOwnEndpointSourceAndAppliedAssertions(t *testing.
 	registry.manifest.Version = "unrelated-new-global-version"
 	registry.manifest.Sources = append(registry.manifest.Sources, gatewaycontract.Source{ID: "unrelated-cli", Version: "new"})
 	registry.manifest.Suites[0].Requirements[0].Assertions[1] = "unrelated_layer_assertion"
+	registry.manifest.Suites[0].Requirements[0].AssertionLayers = map[string][]string{"a/a2": {"official_cli"}}
 	if scope() != original {
 		t.Fatal("unrelated manifest/layer changed this assertion's contract")
 	}
