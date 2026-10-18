@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sync"
 	"testing"
 
@@ -21,14 +22,17 @@ import (
 func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	pool, _ := isolatedDatabase(t)
 	ctx := context.Background()
-	var tables int
-	if err := pool.QueryRow(ctx, `
-		SELECT count(*) FROM information_schema.tables
-		WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name <> 'goose_db_version'`).Scan(&tables); err != nil {
+	rows, err := pool.Query(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE' AND table_name<>'goose_db_version' ORDER BY table_name`)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if tables != 27 {
-		t.Fatalf("schema tables = %d, want 27", tables)
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedTables := []string{"accounts", "api_keys", "audit_log", "c2c_orders", "c2c_trades", "calls", "channel_events", "channel_models", "channels", "forum_attachments", "forum_boards", "forum_replies", "forum_topics", "gateway_background_jobs", "geoip_cache", "geoip_daily_usage", "ledger_accounts", "ledger_entries", "ledger_transactions", "market_addresses", "market_capability_evidence", "market_group_addresses", "market_group_models", "market_groups", "market_model_governance", "market_object_versions", "market_protected_keys", "market_quote_tier_token_prices", "market_quote_tiers", "market_quote_token_prices", "market_quote_unit_prices", "market_quotes", "market_report_bindings", "market_search_settings", "market_suppliers", "model_price_tiers", "models", "route_pref_channels", "route_prefs", "sessions", "settings", "supplier_endpoints", "suppliers"}
+	if !slices.Equal(tables, expectedTables) {
+		t.Fatalf("schema tables = %v, want %v", tables, expectedTables)
 	}
 	var suppliers, supplierEndpoints int
 	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM suppliers), (SELECT count(*) FROM supplier_endpoints)`).Scan(&suppliers, &supplierEndpoints); err != nil {
