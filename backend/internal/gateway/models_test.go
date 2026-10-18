@@ -208,7 +208,7 @@ type approvedListingStore struct {
 	records []CandidateRecord
 }
 
-func (s approvedListingStore) AuxiliaryCandidates(_ context.Context, f channel.Format) ([]CandidateRecord, error) {
+func (s approvedListingStore) ModelListCandidates(_ context.Context, f channel.Format) ([]CandidateRecord, error) {
 	var out []CandidateRecord
 	for _, r := range s.records {
 		if slices.Contains(r.Formats, f) {
@@ -247,6 +247,15 @@ func TestNativeModelListsKeepAliasPermissionsAndConservativeGroupMetadata(t *tes
 		t.Fatal("unknown witness ignored", names, err)
 	}
 }
+func TestNativeListingIncludesPreCutoverInferenceCandidates(t *testing.T) {
+	source := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatOpenAIChat}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: Candidate{ChannelID: "legacy"}}}}
+	e := NewEngine(Dependencies{Catalog: catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main", DisplayName: "Main"}}}), Store: source})
+	names, err := e.availableModels(context.Background(), KeyAuth{Aliases: map[string]string{"alias": "main"}}, listFormats(DialectOpenAI, false))
+	if err != nil || len(names) != 2 || names[0].id != "alias" || names[1].id != "main" {
+		t.Fatal("pre-cutover inference names disappeared", names, err)
+	}
+}
+
 func TestNativeOnlyCodexProbeDoesNotPopulatePublicModelList(t *testing.T) {
 	c := Candidate{ChannelID: "native", GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), KeyProbeEndpoints: map[channel.Format]string{channel.FormatOpenAIResponses: "codex.responses"}, Evidence: map[string]bool{"upstream_protocol/codex-special.RL01/actual_protocol_marker": true}}
 	s := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}}}

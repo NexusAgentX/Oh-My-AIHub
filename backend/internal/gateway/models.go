@@ -302,17 +302,24 @@ type nativeModelWitness struct {
 	candidate Candidate
 }
 
+// ModelListSource includes every inference candidate in the current snapshot.
+// AuxiliarySource has a narrower state/quote contract and cannot stand in for
+// this index while legacy inference remains live before the final cutover.
+type ModelListSource interface {
+	ModelListCandidates(context.Context, channel.Format) ([]CandidateRecord, error)
+}
+
 // The production snapshot already contains approved, governed, callable
 // candidates. The optional source keeps old isolated test/legacy stores usable
 // until final cutover; it never consults a provider's shared account catalog.
 func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string][]nativeModelWitness, bool, error) {
 	out := map[string][]nativeModelWitness{}
-	source, ok := e.Store.(AuxiliarySource)
+	source, ok := e.Store.(ModelListSource)
 	if !ok {
 		return out, false, nil
 	}
 	for _, format := range formats {
-		rows, err := source.AuxiliaryCandidates(ctx, format)
+		rows, err := source.ModelListCandidates(ctx, format)
 		if err != nil {
 			return nil, true, err
 		}
