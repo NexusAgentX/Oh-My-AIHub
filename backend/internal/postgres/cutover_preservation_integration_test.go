@@ -29,8 +29,8 @@ func TestCutoverReadOnlyEvidenceProtectsIndividualBalancesAndLegacyCiphertext(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(ctx, `INSERT INTO channels(id,owner_id,name,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,status)
- VALUES($1,$2,'synthetic legacy history','https://synthetic.example',$3,$4,$5,'unlisted')`, cid, members[0].ID, credential.Ciphertext, credential.Nonce, credential.KeyID); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO channels(id,owner_id,name,api_key_ciphertext,api_key_nonce,api_key_key_id,status,deleted_at)
+ VALUES($1,$2,'synthetic legacy history',$3,$4,$5,'unlisted',now())`, cid, members[0].ID, credential.Ciphertext, credential.Nonce, credential.KeyID); err != nil {
 		t.Fatal(err)
 	}
 	before, err := reader.Inspect(ctx, nil)
@@ -42,7 +42,7 @@ func TestCutoverReadOnlyEvidenceProtectsIndividualBalancesAndLegacyCiphertext(t 
 	}
 	// Old connection configuration may change; the original encrypted bytes,
 	// owner/ID/name and every protected table must remain byte-for-byte intact.
-	if _, err = pool.Exec(ctx, `UPDATE channels SET base_url='https://replacement.example',status='unlisted',deleted_at=now(),updated_at=now() WHERE id=$1`, cid); err != nil {
+	if _, err = pool.Exec(ctx, `UPDATE channels SET summary='retired connection',status='unlisted',deleted_at=now(),updated_at=now() WHERE id=$1`, cid); err != nil {
 		t.Fatal(err)
 	}
 	after, err := reader.Inspect(ctx, &before)

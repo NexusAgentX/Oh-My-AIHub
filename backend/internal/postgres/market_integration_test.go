@@ -245,7 +245,7 @@ func TestMarketBusinessDeletionPreservesProtectedRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(ctx, `INSERT INTO channels(id,owner_id,name,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,market_group_id,status,suspended_reason) VALUES($1,$2,'合成渠道','https://synthetic.example',$3,$4,$5,$6,'suspended','合成暂停')`, id, admin.ID, sealed.Ciphertext, sealed.Nonce, sealed.KeyID, d.Groups[0].ID); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO channels(id,owner_id,name,api_key_ciphertext,api_key_nonce,api_key_key_id,market_group_id,status,suspended_reason) VALUES($1,$2,'合成渠道',$3,$4,$5,$6,'suspended','合成暂停')`, id, admin.ID, sealed.Ciphertext, sealed.Nonce, sealed.KeyID, d.Groups[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Ledger.Adjust(ctx, ledger.Adjustment{ActorID: admin.ID, AccountID: admin.ID, Amount: mustAmount(t, "25"), Reason: "合成保全样本", IdempotencyKey: "market-preserve"}); err != nil {

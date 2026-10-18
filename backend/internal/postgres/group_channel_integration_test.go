@@ -57,7 +57,7 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := groupchannelpg.NewStore(pool)
-	r := groupchannel.Record{ID: id, Owner: channel.Owner{ID: admin.ID}, OwnerActive: true, Name: "合成分组渠道", Status: channel.StatusListed, GroupID: g.ID, BaseURL: d.Addresses[0].BaseURL, Revision: 1, CredentialRevision: 1, ProbeEpoch: 1, AddressIDs: []string{d.GroupAddresses[0].ID}, Credential: sealed}
+	r := groupchannel.Record{ID: id, Owner: channel.Owner{ID: admin.ID}, OwnerActive: true, Name: "合成分组渠道", Status: channel.StatusListed, GroupID: g.ID, Revision: 1, CredentialRevision: 1, ProbeEpoch: 1, AddressIDs: []string{d.GroupAddresses[0].ID}, Credential: sealed}
 	if err = repo.Create(ctx, r, []groupchannel.Choice{{GroupModelID: m.ID, DiscountNano: 0}, {GroupModelID: retainedID, Excluded: true, DiscountNano: 1_000_000_000}}); err != nil {
 		t.Fatal(err)
 	}

@@ -89,7 +89,7 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = provider.Up(ctx); err == nil || !strings.Contains(err.Error(), "finish pending background responses") {
+	if _, err = provider.UpTo(ctx, 15); err == nil || !strings.Contains(err.Error(), "finish pending background responses") {
 		t.Fatalf("pending jobs did not block upgrade: %v", err)
 	}
 	var version int
@@ -121,7 +121,7 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
 	}
 	before := history()
 	for range 2 {
-		if _, err = provider.Up(ctx); err != nil {
+		if _, err = provider.UpTo(ctx, 15); err != nil {
 			t.Fatal(err)
 		}
 		if after := history(); after != before {

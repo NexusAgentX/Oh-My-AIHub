@@ -84,8 +84,8 @@ func (q *Queries) DeleteChoices(ctx context.Context, channelID string) error {
 }
 
 const insertChannel = `-- name: InsertChannel :exec
-INSERT INTO channels(id,owner_id,name,summary,description,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,status,market_group_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+INSERT INTO channels(id,owner_id,name,summary,description,api_key_ciphertext,api_key_nonce,api_key_key_id,status,market_group_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 `
 
 type InsertChannelParams struct {
@@ -94,7 +94,6 @@ type InsertChannelParams struct {
 	Name             string
 	Summary          string
 	Description      string
-	BaseUrl          string
 	ApiKeyCiphertext []byte
 	ApiKeyNonce      []byte
 	ApiKeyKeyID      string
@@ -109,7 +108,6 @@ func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) er
 		arg.Name,
 		arg.Summary,
 		arg.Description,
-		arg.BaseUrl,
 		arg.ApiKeyCiphertext,
 		arg.ApiKeyNonce,
 		arg.ApiKeyKeyID,

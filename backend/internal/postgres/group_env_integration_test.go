@@ -440,9 +440,9 @@ func TestGroupedFixtureStartsEmptyAndUsesApprovedQuotes(t *testing.T) {
 	e := newGroupEnv(t)
 	consumer := e.member("group-consumer", "100")
 	provider := e.member("group-provider", "0")
-	var models, legacyChoices int
-	if err := e.pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM models),(SELECT count(*) FROM channel_models)`).Scan(&models, &legacyChoices); err != nil || models != 0 || legacyChoices != 0 {
-		t.Fatal("group fixture created global configuration", models, legacyChoices, err)
+	var absent bool
+	if err := e.pool.QueryRow(context.Background(), `SELECT to_regclass('models') IS NULL AND to_regclass('channel_models') IS NULL`).Scan(&absent); err != nil || !absent {
+		t.Fatal("retired configuration tables remain", absent, err)
 	}
 	_, key := e.defaultKey(consumer)
 	empty := e.apiJSON(consumer, 200, "GET", "/api/market/channels", nil)

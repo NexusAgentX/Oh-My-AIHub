@@ -91,7 +91,7 @@ func (f *secretFixture) channel(keyring *channel.Keyring, name string, status ch
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	row := groupchannel.Record{ID: id, Owner: channel.Owner{ID: f.seller.ID}, GroupID: f.groupID, Name: name, Status: status, BaseURL: "https://synthetic.example", Credential: sealed, AddressIDs: []string{}}
+	row := groupchannel.Record{ID: id, Owner: channel.Owner{ID: f.seller.ID}, GroupID: f.groupID, Name: name, Status: status, Credential: sealed, AddressIDs: []string{}}
 	if err = groupchannelpg.NewStore(f.pool).Create(ctx, row, nil); err != nil {
 		f.t.Fatal(err)
 	}
