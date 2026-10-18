@@ -13,6 +13,34 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
+func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
+	for _, namespace := range []string{"notes", "history"} {
+		t.Run(namespace, func(t *testing.T) {
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				body, _ := decodeNative(raw)
+				tools := list(body["tools"])
+				if len(tools) != 1 || str(object(tools[0])["description"]) == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"Missing required parameter: tools[0].description"}}`)
+					return
+				}
+				out := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-context-call", Name: "search_contents", Namespace: namespace}})
+				object(list(out["output"])[0])["arguments"] = `{"query":"sealed:synthetic-query"}`
+				_ = json.NewEncoder(w).Encode(out)
+			}))
+			defer up.Close()
+			_, s, _ := codexTestSession(t, up.URL)
+			s.allowed = map[string]bool{"codex.responses": true}
+			n := nativeScene{s: s, protocol: "openai-responses"}
+			args, out := n.codexContextArgumentsFor(context.Background(), "synthetic-model", "synthetic-session", namespace, "search_contents", nativeObject{"query": "synthetic-query"})
+			if out.State != "pass" || str(args["query"]) != "sealed:synthetic-query" {
+				t.Fatal("malformed namespace declaration prevented the real context probe", out.State, out.Reason)
+			}
+		})
+	}
+}
+
 func TestCodexEmptyThreadHintsCannotProveContextIsolation(t *testing.T) {
 	for _, mode := range []string{"isolated", "empty", "shared"} {
 		t.Run(mode, func(t *testing.T) {

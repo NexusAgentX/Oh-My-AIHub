@@ -54,7 +54,7 @@ func (n *nativeScene) codexContextArgumentsFor(ctx context.Context, model, sessi
 	body := codexBase(model)
 	body["client_metadata"] = nativeObject{"session_id": session}
 	body["input"] = []any{nativeObject{"role": "user", "content": "Call only " + namespace + "." + operation + " on this isolated synthetic context, using these exact values. Preserve the required encrypted argument representation. Do not invent a result: " + string(mustNativeJSON(desired))}}
-	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "parameters": nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}}}}}
+	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "description": "Isolated synthetic context tools.", "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "parameters": nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}}}}}
 	body["tool_choice"] = "required"
 	out := n.codexInfer(ctx, body, "")
 	if out.State != "pass" || len(out.Reply.Candidates) != 1 || len(out.Reply.Candidates[0].Calls) != 1 {
