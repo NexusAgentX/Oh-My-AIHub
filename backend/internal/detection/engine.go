@@ -176,7 +176,7 @@ func (s *Service) create(ctx context.Context, actor Actor, target Target, parame
 		}
 		job.Results = resumeResults(job)
 	}
-	if HasPending(plan) {
+	if HasPending(plan) && !hasExecutable(plan) {
 		job.State = "suite_pending"
 		job.ExecutionActive = false
 	}
@@ -303,9 +303,6 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	}
 	job.Target = resolved.Target
 	job.Target.Binding = current
-	if HasPending(plan) {
-		return job, nil
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -323,6 +320,14 @@ func (s *Service) retry(ctx context.Context, actor Actor, id, secret string, sel
 	job.ExecutionActive = true
 	job.Complete = false
 	job.UpdatedAt = time.Now().UTC()
+	if HasPending(plan) && !hasExecutable(plan) {
+		job.State = "suite_pending"
+		job.ExecutionActive = false
+		if err = s.store.Save(ctx, job); err != nil {
+			return Job{}, err
+		}
+		return job, nil
+	}
 	if err = s.store.Save(ctx, job); err != nil {
 		return Job{}, err
 	}
@@ -453,6 +458,9 @@ func (s *Service) execute(id string) {
 	for len(completed) < len(job.Plan.Items) {
 		progressed := false
 		for _, item := range job.Plan.Items {
+			if !item.Implemented {
+				continue
+			}
 			if _, ok := completed[item.ID]; ok {
 				continue
 			}
@@ -493,6 +501,10 @@ func (s *Service) execute(id string) {
 			}
 		}
 		if !progressed {
+			if HasPending(job.Plan) {
+				finish("suite_pending")
+				return
+			}
 			finish("failed")
 			return
 		}

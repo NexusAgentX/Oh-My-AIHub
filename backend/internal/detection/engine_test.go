@@ -625,6 +625,33 @@ func TestThreeEvidenceLayersCannotReplaceEachOther(t *testing.T) {
 		t.Fatalf("independent layers not expressible: %+v %v", plan, err)
 	}
 }
+
+func TestImplementedScenariosRunWhileOtherSuitesRemainPending(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer up.Close()
+	m := newMemoryStore()
+	r, err := NewRegistry(fixtureManifest("native", "future"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	register(t, r, "native", []string{"native"}, nil, fixtureRunner("native"))
+	s := makeService(t, r, m, &fixtureResolver{base: up.URL, digest: "fixed"}, DefaultLimits())
+	job, err := s.Create(context.Background(), Actor{ID: "owner"}, Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "target"}}, testParameters(), "synthetic-secret")
+	if err != nil || job.State != "queued" {
+		t.Fatalf("implemented suite blocked by future work: %+v %v", job, err)
+	}
+	job = m.wait(t, job.ID, "suite_pending", "failed")
+	if job.State != "suite_pending" || len(job.Results) != 1 || job.Results[0].ScenarioID != "native" || job.Usage.HTTP != 1 || job.Complete || job.ReportID == nil {
+		t.Fatalf("partial execution lost evidence or faked completion: %+v", job)
+	}
+	if _, err = s.Resume(context.Background(), Actor{ID: "owner"}, job.ID, "synthetic-secret"); err != nil {
+		t.Fatal(err)
+	}
+	job = m.wait(t, job.ID, "suite_pending", "failed")
+	if job.Usage.HTTP != 1 || len(job.Results) != 1 || job.Complete {
+		t.Fatal("resume repeated completed work or authorized incomplete report")
+	}
+}
 func TestConditionalObservationIsOwnedByManifest(t *testing.T) {
 	manifest := fixtureManifest("a")
 	manifest.Suites[0].Requirements[0].ConditionalAssertions = []string{"a/a2"}

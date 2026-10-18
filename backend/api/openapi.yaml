@@ -12563,7 +12563,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.10",
+    "version": "2026-10-18.12",
     "stage": "discovery",
     "sources": [
       {
@@ -12645,6 +12645,11 @@ x-aihub-gateway-contract:
         "id": "openai-image-variation",
         "url": "https://developers.openai.com/api/reference/python/resources/images/methods/create_variation",
         "version": "retired-native-compatibility-profile"
+      },
+      {
+        "id": "anthropic-on-demand-compaction",
+        "url": "https://platform.claude.com/docs/en/build-with-claude/compaction-on-demand",
+        "version": "compact-2026-09-04"
       }
     ],
     "endpoints": [
@@ -13912,7 +13917,7 @@ x-aihub-gateway-contract:
               "create_store_true",
               "owned_list_get_metadata_messages_delete",
               "bounded_pagination",
-              "no_repeat_inference_fee"
+              "queries_do_not_recount_inference_usage"
             ],
             "credential_dependent": false
           },
@@ -14191,7 +14196,11 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "previous_response_id_three_turns",
-              "conversation_item_reference",
+              "conversation_flow",
+              "item_reference",
+              "conversation_metadata",
+              "owned_item_list_get_delete",
+              "owned_response_retrieve_input_items_delete",
               "store_false_self_contained_replay",
               "unknown_reference_rejected",
               "conflicting_references_rejected"
@@ -14231,7 +14240,7 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
             "credential_dependent": false,
             "conditional_assertions": [
@@ -14383,8 +14392,10 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "background_create",
-              "owned_retrieve_resume_cancel_delete_input_items",
+              "owned_retrieve_input_items_delete",
+              "resume_from_sequence",
               "terminal_usage_once",
+              "owned_cancel",
               "cleanup_only_owned_resources"
             ],
             "credential_dependent": false
@@ -14677,7 +14688,7 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
             "credential_dependent": false,
             "conditional_assertions": [
@@ -15073,7 +15084,7 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
             "credential_dependent": false,
             "conditional_assertions": [
@@ -16062,6 +16073,10 @@ x-aihub-gateway-contract:
       "detection/native-multimodal-fixtures": "多模态探测仅使用固定提交和 SHA-256 校验的自有合成资源，URL 使用无答案提示的文件名。图片以左右色块及双图次序核验；PDF 以两页独立代码核验。Chat 官方协议不支持文件 URL，故其 M06 只测原生 file_data；不虚构 file_url 或转入 Files API。Messages PDF citations 启用后核验 document_index 与 1 起始、右端不含的页范围及真实引用；其他协议可选引用只在观测时验证，不补独立文件授权。",
       "openai-responses/M04": "保留原 M04 作为明确命名的供应商扩展 input_audio/data/format 探测，不伪称 OpenAI Responses 官方音频协议。官方文档当前将这种音频会话形态放在 Chat Completions，Responses 创建参考中也没有 input_audio/output_audio。按扩展实际返回/内容识别/用量如实报告，不用 Chat 成功代证 Responses，不新增独立 Audio、Realtime 或 WS 端点，不做协议转换。",
       "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
-      "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。"
+      "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。",
+      "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
+      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
+      "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
+      "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。"
     }
   }

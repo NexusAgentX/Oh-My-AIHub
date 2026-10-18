@@ -120,13 +120,15 @@ func decodeNative(body []byte) (nativeObject, error) {
 }
 
 type nativeUsage struct {
-	Input      int64
-	Output     int64
-	CacheRead  int64
-	CacheWrite int64
-	Reasoning  int64
-	Reliable   bool
-	Tier       string
+	IterationInput  int64
+	IterationOutput int64
+	Input           int64
+	Output          int64
+	CacheRead       int64
+	CacheWrite      int64
+	Reasoning       int64
+	Reliable        bool
+	Tier            string
 }
 type nativeCall struct {
 	ID        string
@@ -220,6 +222,24 @@ func nativeUsageFrom(protocol string, o nativeObject) nativeUsage {
 		u.Reliable = u.Reliable && safe
 		if tier := str(raw["service_tier"]); tier != "" {
 			u.Tier = tier
+		}
+		if rawIterations, exists := raw["iterations"]; exists {
+			iterations, valid := rawIterations.([]any)
+			u.Reliable = u.Reliable && valid && len(iterations) <= 64
+			for _, rawIteration := range iterations[:min(len(iterations), 64)] {
+				iteration := object(rawIteration)
+				if iteration == nil || str(iteration["type"]) == "" || iteration["iterations"] != nil {
+					u.Reliable = false
+					continue
+				}
+				child := nativeUsageFrom(protocol, nativeObject{"usage": iteration})
+				input, a := addNative(child.Input, child.CacheRead)
+				input, b := addNative(input, child.CacheWrite)
+				u.IterationInput, valid = addNative(u.IterationInput, input)
+				var outputValid bool
+				u.IterationOutput, outputValid = addNative(u.IterationOutput, child.Output)
+				u.Reliable = u.Reliable && child.Reliable && a && b && valid && outputValid
+			}
 		}
 	case "native-generate-content":
 		raw = object(o["usageMetadata"])

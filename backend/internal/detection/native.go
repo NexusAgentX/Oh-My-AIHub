@@ -45,7 +45,7 @@ func (r *Registry) RegisterNative() error {
 		}
 		for _, req := range suite.Requirements {
 			family := req.ID[strings.LastIndex(req.ID, ".")+1:]
-			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations"}, family) {
+			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations", "reasoning", "count_compact", "stored", "state", "background"}, family) {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
@@ -85,6 +85,16 @@ func (r *Registry) RegisterNative() error {
 					scene.video(ctx)
 				case "generations", "edits", "variations":
 					scene.images(ctx)
+				case "reasoning":
+					scene.reasoning(ctx)
+				case "count_compact":
+					scene.countCompact(ctx)
+				case "stored":
+					scene.stored(ctx)
+				case "state":
+					scene.state(ctx)
+				case "background":
+					scene.background(ctx)
 				}
 				return scene.finish()
 			}}); err != nil {
@@ -142,6 +152,9 @@ func outputLimit(protocol string, body nativeObject, n int64) {
 	}
 }
 func (n *nativeScene) infer(ctx context.Context, body nativeObject, stream, memo bool) nativeOutcome {
+	return n.inferHeaders(ctx, body, stream, memo, nil)
+}
+func (n *nativeScene) inferHeaders(ctx context.Context, body nativeObject, stream, memo bool, headers http.Header) nativeOutcome {
 	if stream && n.protocol != "native-generate-content" {
 		body["stream"] = true
 	}
@@ -153,7 +166,12 @@ func (n *nativeScene) infer(ctx context.Context, body nativeObject, stream, memo
 		return nativeOutcome{State: "inconclusive", Reason: "detector_error"}
 	}
 	id, path, query := nativeEndpoint(n.protocol, n.s.Target.Model, stream)
-	return n.call(ctx, Request{EndpointID: id, Path: path, Query: query, Headers: http.Header{"Content-Type": {"application/json"}}, Body: encoded, Category: "generate"}, memo)
+	headers = headers.Clone()
+	if headers == nil {
+		headers = http.Header{}
+	}
+	headers.Set("Content-Type", "application/json")
+	return n.call(ctx, Request{EndpointID: id, Path: path, Query: query, Headers: headers, Body: encoded, Category: "generate"}, memo)
 }
 func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOutcome {
 	var response Response
@@ -230,7 +248,8 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 		raw, _ := json.Marshal(response)
 		_ = n.s.Remember(key, raw)
 	}
-	if !cached && out.Reply.Usage.Reliable {
+	meterReady := n.protocol != "openai-responses" || responseTerminal(out.Reply.Status) || str(out.Reply.Object["object"]) == "response.compaction"
+	if !cached && req.Category == "generate" && meterReady && out.Reply.Usage.Reliable {
 		u := out.Reply.Usage
 		input := u.Input
 		if n.protocol == "native-messages" {
@@ -245,7 +264,9 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 				return out
 			}
 		}
-		if n.s.Meter(input, u.Output, out.Reply.Images, 0) != nil {
+		input, inOK := addNative(input, u.IterationInput)
+		output, outOK := addNative(u.Output, u.IterationOutput)
+		if !inOK || !outOK || n.s.Meter(input, output, 0, 0) != nil {
 			out.Reply.Usage.Reliable = false
 		}
 	}

@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"bytes"
 	"context"
 	"net/url"
 	"slices"
@@ -9,6 +10,23 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 )
+
+func verifiedDeletion(kind, id string, response Response) bool {
+	if response.Status < 200 || response.Status >= 300 {
+		return false
+	}
+	if response.Status == 204 {
+		return len(bytes.TrimSpace(response.Body)) == 0
+	}
+	o, err := decodeNative(response.Body)
+	if err != nil {
+		return false
+	}
+	if kind == "cache" {
+		return len(o) == 0
+	}
+	return str(o["id"]) == id && o["deleted"] == true
+}
 
 // TrackResource accepts only a resource witnessed as created by this task. It
 // stores IDs/cleanup metadata, never the response or any opaque content.
@@ -66,7 +84,7 @@ func (s *Session) Cleanup(ctx context.Context) error {
 		s.allowed = map[string]bool{a.DeleteEndpoint: true}
 		response, callErr := s.Do(ctx, Request{EndpointID: a.DeleteEndpoint, Path: a.DeletePath, Category: "cleanup"})
 		a.Reason = "external_error"
-		if callErr == nil && (response.Status >= 200 && response.Status < 300) {
+		if callErr == nil && verifiedDeletion(a.Kind, a.NativeID, response) {
 			a.Removed = true
 			a.Reason = "ok"
 		}
@@ -99,7 +117,7 @@ func (s *Session) DeleteTracked(ctx context.Context, kind, nativeID string) (Res
 	}
 	response, err := s.Do(ctx, Request{EndpointID: found.DeleteEndpoint, Path: found.DeletePath, Category: "cleanup"})
 	found.Reason = "external_error"
-	if err == nil && response.Status >= 200 && response.Status < 300 {
+	if err == nil && verifiedDeletion(found.Kind, found.NativeID, response) {
 		found.Removed = true
 		found.Reason = "ok"
 	}

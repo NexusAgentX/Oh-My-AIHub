@@ -143,6 +143,15 @@ func HasPending(plan Plan) bool {
 	}
 	return false
 }
+
+func hasExecutable(plan Plan) bool {
+	for _, item := range plan.Items {
+		if item.Implemented && !item.Aggregate {
+			return true
+		}
+	}
+	return false
+}
 func safeCode(value string) bool {
 	return value != "" && len(value) <= 128 && !strings.ContainsAny(value, "\r\n\x00")
 }
