@@ -355,7 +355,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
 	executionStarted := time.Now().UnixNano()
-	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": clientModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
+	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": clientModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: codexprobe.ProbeTimeout + 20*time.Second})
 	executionFinished := time.Now().UnixNano()
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)

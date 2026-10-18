@@ -44,6 +44,8 @@ use_history_notes_extension = true
 
 受控 CLI 使用独立 HOME/CODEX_HOME/临时目录和显式环境，不继承宿主登录或代理。标准输出/错误各限 1 MiB；临时输入、运行目录和子进程组有有限资源保护。实际固定 CLI、网络接线、配置及三层证据由 Codex 专项核验；子进程日志不能直接写入报告。
 
+笔记、历史和图片生命周期包含多次真实推理/工具/恢复操作，不能将单次 HTTP 时限套作整个 CLI 场景的时限。驱动的有界执行窗口由 `codexprobe.ProbeTimeout` 统一定义，父进程另留收尾时间；每次出站仍应用原 HTTP 超时，子进程和文件保护不放宽。本地驱动到时不是上游不支持证据，未完成的场景仍不能用于创建审核。
+
 `mise run build-detection-codex` 构建固定 Go 驱动器并安装官方 `0.163.0` 原生制品；Linux/macOS 的 amd64/arm64 包 SHA-512 固定在安装脚本中，每次均验证，只提取 CLI 可执行文件。源码固定为 `83086188ae0614bd882818ff1aa23f3194962012`，Apache-2.0 LICENSE 与原 NOTICE 位于 `backend/licenses/codex/`。Linux amd64 可执行文件约 283 MiB，下载包约 155 MiB；不安装 npm launcher、语音库或额外工具。制品供后台隔离检测使用，不进入普通网关请求流程。
 
 官方 CLI→正式网关→合成上游回归以 `AIHUB_TEST_CODEX_BINARY` 和 `AIHUB_TEST_CODEX_PROBE` 显式指定上述两个制品，运行 `go -C backend test ./internal/api -run TestOfficialCodexCLIUsesProductionHandlers`。CI 会运行普通推理、平台 PAT 身份与 notes 启用、独立图片模型和工具结果回填；图片另校验独立报价且仅结算一次。驱动器只接受回环桥、固定 profile 和受控临时目录，禁止审批/任意客户端命令；官方 CLI 原始输出只在内存解析，返回固定阶段和布尔结论，取消后清理整个进程组及目录。机制验收不构成真实供应商通过，也不消除仍未注册套件的 pending。

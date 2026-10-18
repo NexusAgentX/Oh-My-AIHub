@@ -27,6 +27,11 @@ const Protocol = "aihub-codex-probe.v1"
 const Marker = "AIHUB-CODEX-READY-6309-蓝鲸🌍"
 const NoopPatch = "*** Begin Patch\n*** End Patch\n"
 
+// ProbeTimeout bounds one isolated CLI lifecycle, which can include many
+// inference/tool/restore turns. It is separate from each upstream HTTP timeout
+// and from the unbudgeted full detection job. The parent reserves cleanup time.
+const ProbeTimeout = 4 * time.Minute
+
 var ErrClient = errors.New("isolated Codex client failed")
 
 type versionOutput struct{ bytes.Buffer }
@@ -424,7 +429,7 @@ use_history_notes_extension = %t
 	if os.WriteFile(filepath.Join(root, "config.toml"), []byte(config), 0600) != nil || os.WriteFile(filepath.Join(root, "auth.json"), auth, 0600) != nil {
 		return r, ErrClient
 	}
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, ProbeTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, c.Binary, "app-server")
 	cmd.Dir = workspace
