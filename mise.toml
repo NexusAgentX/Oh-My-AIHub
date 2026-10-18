@@ -39,13 +39,19 @@ run = "npm --prefix frontend run dev"
 
 [tasks.dev-backend]
 description = "Run the backend development server"
+depends = ["build-detection-sdk"]
 run = '''
 AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
 DATABASE_URL="${DATABASE_URL:-postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable}" \
 PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
+AIHUB_DETECTION_SDK_BINARY="${MISE_PROJECT_ROOT}/backend/bin/aihub-detection-sdk" \
 go -C backend run ./cmd/server
 '''
 env = { COOKIE_SECURE = "false" }
+
+[tasks.build-detection-sdk]
+description = "Build the fixed isolated official-SDK probe"
+run = ["mkdir -p backend/bin", "go -C backend build -trimpath -buildvcs=false -ldflags='-s -w' -o bin/aihub-detection-sdk ./cmd/detection-sdk"]
 
 [tasks.dev-database]
 description = "Start PostgreSQL and apply pending migrations"
@@ -126,6 +132,7 @@ run = [
   "npm --prefix frontend run build",
   "mkdir -p backend/bin",
   "go -C backend build -o bin/server ./cmd/server",
+  { task = "build-detection-sdk" },
 ]
 
 [tasks.up]

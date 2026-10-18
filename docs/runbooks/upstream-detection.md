@@ -16,6 +16,10 @@
 
 受控 CLI 使用独立 HOME/CODEX_HOME/临时目录和显式环境，不继承宿主登录或代理。标准输出/错误各限 1 MiB；临时输入、运行目录和子进程组有有限资源保护。实际固定 CLI、网络接线、配置及三层证据由 Codex 专项核验；子进程日志不能直接写入报告。
 
+官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
+
+SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。
+
 用途根密钥通过现有上游凭据密钥环封装，无新增环境密钥。启动先验证全部已存根密钥；加载的根密钥可在保持明文字节不变的情况下重新封装到活动 Key。先保留旧包装 Key 完成验证与重新封装，再按既有密钥环检查处理历史秘密；删除旧 Key 后打不开任一根密钥必须阻止启动，不能生成新根密钥替代它。会话命名空间身份与包装 Key ID 无关，相关元数据应纳入备份，禁止通过降级迁移丢弃。
 
 ## 开发验证
