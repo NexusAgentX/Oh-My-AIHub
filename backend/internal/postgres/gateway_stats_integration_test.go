@@ -225,7 +225,7 @@ func expectedHistory(calls []syntheticCall, since time.Time) map[historyKey][3]i
 }
 
 func TestStatisticsWindowIsReadFromTheDatabaseOnceAndMatchesTheOldQuery(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	now := time.Now()
 	calls := syntheticHistory(now)
@@ -396,7 +396,7 @@ func setRouting(e *env, consumer person, body map[string]any) {
 func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
 	for _, fastCreatedFirst := range []bool{true, false} {
 		t.Run(fmt.Sprintf("fast channel created first=%v", fastCreatedFirst), func(t *testing.T) {
-			e := newEnv(t)
+			e := newGroupEnv(t)
 			consumer := e.member("consumer", "1000")
 			sharer := e.member("sharer", "0")
 			fast := newScriptedUpstream(t, 0, "")
@@ -454,7 +454,7 @@ func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
 // the lead as soon as the stats are republished.
 func TestReliableModeFollowsTheSuccessRatesCountedInMemory(t *testing.T) {
 	book := gateway.NewStatsBook()
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.StatsBook = book })
+	e := newGroupEnvWith(t, func(d *gateway.Dependencies) { d.StatsBook = book })
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	steady := newScriptedUpstream(t, 0, overloadedBody)
@@ -557,7 +557,7 @@ func eventReasons(e *env, channelID, kind string) []string {
 // owner and the administrators get a channel event, and the next call is
 // answered by another channel. It is not excluded.
 func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	broken := newScriptedUpstream(t, 0, overloadedBody)
@@ -612,19 +612,19 @@ func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
 
 	// The owner sees the event on the channel page (the OpenAPI contract
 	// accepts the new kind) and so does the administrator.
-	detail := e.apiJSON(sharer, http.StatusOK, http.MethodGet, "/api/channels/"+brokenID, nil)
+	detail := e.apiJSON(sharer, http.StatusOK, http.MethodGet, "/api/group-channels/"+brokenID+"/events", nil)
 	var seen bool
-	for _, entry := range detail["events"].([]any) {
+	for _, entry := range detail["items"].([]any) {
 		event := entry.(map[string]any)
 		if event["kind"] == channel.EventAnomalousClientErrors && event["reason"] == "gpt-test: 4xx 20/20 (100%)" {
 			seen = true
 		}
 	}
 	if !seen {
-		t.Fatalf("channel page events = %v", detail["events"])
+		t.Fatalf("channel page events = %v", detail["items"])
 	}
-	adminDetail := e.apiJSON(e.admin, http.StatusOK, http.MethodGet, "/api/admin/channels/"+brokenID, nil)
-	if fmt.Sprint(adminDetail["events"]) == "[]" {
+	adminDetail := e.apiJSON(e.admin, http.StatusOK, http.MethodGet, "/api/group-channels/"+brokenID+"/events", nil)
+	if fmt.Sprint(adminDetail["items"]) == "[]" {
 		t.Fatalf("administrator's channel page has no events: %v", adminDetail)
 	}
 
@@ -644,7 +644,7 @@ func TestChannelAnsweringEverythingWith4xxGoesLastAndIsReported(t *testing.T) {
 // not one channel: the first channel may be flagged while it is the only one
 // with data, and the flag is lifted once the others have shown the same.
 func TestFourXXFromEveryChannelIsNotHeldAgainstOne(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	first := newScriptedUpstream(t, 0, invalidRequestBody)
@@ -700,7 +700,7 @@ func TestStatisticsAreReadFromTheDatabaseOnlyAtStartup(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(traced.Close)
-	e := newEnvOn(t, traced, storepg.New(traced), nil)
+	e := newGroupEnvOn(t, traced, storepg.New(traced), nil)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)

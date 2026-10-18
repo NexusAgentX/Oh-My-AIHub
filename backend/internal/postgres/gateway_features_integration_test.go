@@ -54,7 +54,7 @@ func TestGatewayAppliesChannelHeaderRulesAndUserAgent(t *testing.T) {
 }
 
 func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	pricey := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -64,6 +64,7 @@ func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":"resp_cheap","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
 	})
 	priceyID := e.createChannel(sharer, channelSpec{name: "pricey", upstream: pricey, multiplier: "5"})
+	e.declareGroupedCapabilities(priceyID, "upstream_protocol/openai-responses.state/previous_response_id_three_turns")
 	e.createChannel(sharer, channelSpec{name: "cheap", upstream: cheap, multiplier: "1"})
 	_, secret := e.defaultKey(consumer)
 	// Route the first turn to the pricey channel by ticking only it.

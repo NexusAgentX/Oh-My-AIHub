@@ -16,6 +16,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
@@ -34,12 +35,13 @@ func newGroupEnv(t *testing.T) *env { return newGroupEnvWith(t, nil) }
 func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 	t.Helper()
 	pool, store := isolatedDatabase(t)
-	return newEnvOnMode(t, pool, store, configure, true)
+	return newGroupEnvOn(t, pool, store, configure)
 }
 
 type groupIntegrationEvidence struct {
 	snapshot.Loader
 	Prices *groupIntegrationPriceSource
+	Proofs *groupFixtureProofs
 }
 
 func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
@@ -49,6 +51,7 @@ func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway
 	for i := range rows {
 		c := &rows[i].Candidate
 		c.Evidence = map[string]bool{}
+		l.Proofs.copyInto(c.ChannelID, c.Evidence)
 		c.VerifiedCapacity = map[string]int64{}
 		for _, protocol := range []string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content"} {
 			c.Evidence["upstream_protocol/"+protocol+".stream/text_lifecycle"] = true
@@ -212,6 +215,96 @@ type groupIntegrationPriceSource struct {
 
 func (s *groupIntegrationPriceSource) View() gateway.TypicalPriceLookup { return s.current.Load() }
 
+type groupFixtureProofs struct {
+	mu     sync.RWMutex
+	values map[string]map[string]bool
+}
+
+func (p *groupFixtureProofs) copyInto(channel string, out map[string]bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	for name, value := range p.values[channel] {
+		out[name] = value
+	}
+}
+
+// Extra capability facts belong only to a named controlled engine in a
+// mechanism test. Validate their pinned manifest names, and never persist them
+// as a detection report or permit them outside this _test.go fixture.
+func (e *env) declareGroupedCapabilities(channel string, names ...string) {
+	e.t.Helper()
+	m, err := gatewaycontract.Load()
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, suite := range m.Suites {
+		for _, requirement := range suite.Requirements {
+			for _, assertion := range requirement.Assertions {
+				known["upstream_protocol/"+requirement.ID+"/"+assertion] = true
+			}
+			// Setting evidence projects finite native tier subcapabilities in
+			// addition to the requirement's static assertions. These are the
+			// pinned tiers explicitly exercised by the pricing/scan fixtures.
+			for _, tier := range map[string][]string{
+				"openai-chat-completions.cache_tier": {"openai:fast", "openai:flex", "openai:scale"},
+				"openai-responses.cache_tier":        {"openai:fast"},
+				"native-generate-content.cache_tier": {"gemini:priority"},
+			}[requirement.ID] {
+				known["upstream_protocol/"+requirement.ID+"/service_tier/"+tier] = true
+			}
+		}
+	}
+	for _, name := range names {
+		if !known[name] {
+			e.t.Fatal("fixture capability has no retained assertion", name)
+		}
+	}
+	e.groupProofs.mu.Lock()
+	if e.groupProofs.values[channel] == nil {
+		e.groupProofs.values[channel] = map[string]bool{}
+	}
+	for _, name := range names {
+		e.groupProofs.values[channel][name] = true
+	}
+	e.groupProofs.mu.Unlock()
+	if err := e.groups.Refresh(context.Background()); err != nil {
+		e.t.Fatal(err)
+	}
+}
+
+// Revise only this channel's approved group-model quote. It exercises the
+// append-only publication and refresh path, preserving every prior quote.
+func (e *env) reviseGroupedQuote(channel, model string, edit func(*market.Quote)) market.Quote {
+	e.t.Helper()
+	r, err := e.groupStore.Get(context.Background(), channel)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	d := marketSnapshot(e.t, e.store)
+	var quoteID string
+	for _, m := range d.Models {
+		if m.GroupID == r.GroupID && m.ModelID == model && m.QuoteID != nil {
+			quoteID = *m.QuoteID
+		}
+	}
+	for _, q := range d.Quotes {
+		if q.ID != quoteID {
+			continue
+		}
+		q.ID, q.Version = marketID(e.t), 0
+		edit(&q)
+		after := e.publishGroupFixture(market.Changes{Quotes: []market.Quote{q}})
+		for _, current := range after.Quotes {
+			if current.ID == q.ID {
+				return current
+			}
+		}
+	}
+	e.t.Fatal("missing approved quote", model)
+	return market.Quote{}
+}
+
 type groupLoopbackPorts struct {
 	mu     sync.RWMutex
 	values map[string]bool
@@ -289,6 +382,12 @@ func (e *env) replaceGroupedChannelKey(owner person, id, key string) {
 		e.t.Fatal(err)
 	}
 	e.patchGroupedChannel(owner, id, map[string]any{"api_key": key})
+	e.rebindGroupedCallability(id, before)
+}
+
+func (e *env) rebindGroupedCallability(id string, before groupchannel.Data) {
+	e.t.Helper()
+	ctx := context.Background()
 	r, err := e.groupStore.Get(ctx, id)
 	if err != nil {
 		e.t.Fatal(err)
@@ -317,6 +416,24 @@ func (e *env) replaceGroupedChannelKey(owner person, id, key string) {
 	if err := e.groups.Refresh(ctx); err != nil {
 		e.t.Fatal(err)
 	}
+}
+
+// Resetting a Key probe is asynchronous in the product. Mechanism fixtures
+// explicitly install their declared callability again after verifying pending.
+func (e *env) retestGroupedFixture(owner person, id string) {
+	e.t.Helper()
+	before, err := e.groupStore.Snapshot(context.Background())
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	current := e.apiJSON(owner, 200, "GET", "/api/group-channels/"+id, nil)
+	reply := e.apiJSON(owner, 202, "POST", "/api/group-channels/"+id+"/test", map[string]any{"revision": current["revision"]})
+	for _, raw := range reply["models"].([]any) {
+		if raw.(map[string]any)["probe_state"] != "pending" {
+			e.t.Fatal("retest reused prior key proof", reply)
+		}
+	}
+	e.rebindGroupedCallability(id, before)
 }
 
 func TestGroupedFixtureStartsEmptyAndUsesApprovedQuotes(t *testing.T) {

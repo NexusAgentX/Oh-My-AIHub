@@ -3,59 +3,65 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
-	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
-func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
-	e := newEnv(t)
+func TestGroupUSDQuotesAlwaysConvertAndApplyWholeModelDiscount(t *testing.T) {
+	e := newGroupEnv(t)
 	ctx := context.Background()
-	consumer := e.member("consumer", "100")
-	sharer := e.member("sharer", "0")
-	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":500}}`))
-	})
-	channel := func(name, multiplier string, fxDiscount bool) string {
-		created := e.apiJSON(sharer, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
-			"name": name, "base_url": relay.server.URL, "api_key": "upstream-key-" + name,
-			"models": []any{map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "fx_discount": fxDiscount, "formats": []string{"openai_chat"}}},
-		})
-		return created["channel"].(map[string]any)["id"].(string)
+	consumer, sharer := e.member("consumer", "100"), e.member("sharer", "0")
+	relay := okUpstream(t)
+	early := e.createChannel(sharer, channelSpec{name: "early", upstream: relay, multiplier: "2"})
+	_, secret := e.defaultKey(consumer)
+	choose := func(id string) {
+		t.Helper()
+		e.apiJSON(consumer, 200, "PUT", "/api/routing/gpt-test", map[string]any{"mode": "manual", "order": []string{id}})
 	}
-	// A channel listed while gpt-test was still a CNY model: switching the
-	// model to USD turns its discount on, so its price does not change.
-	early := channel("early", "2", false)
-	currency := ledger.CurrencyUSD
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceCurrency: &currency}); err != nil {
+	send := func() (*httptest.ResponseRecorder, callRow) {
+		t.Helper()
+		reply := e.call(secret, "POST", "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+		if reply.Code != 200 {
+			t.Fatal(reply.Code, reply.Body.String())
+		}
+		return reply, e.callRow(reply.Header().Get("X-AIHub-Request-Id"))
+	}
+	choose(early)
+	original, originalRow := send()
+	if originalRow.CostNano != 40_000_000 {
+		t.Fatal("initial CNY quote", originalRow)
+	}
+	var before []byte
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, original.Header().Get("X-AIHub-Request-Id")).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	var discount bool
-	if err := e.pool.QueryRow(ctx, `SELECT fx_discount FROM channel_models WHERE channel_id = $1`, early).Scan(&discount); err != nil || !discount {
-		t.Fatalf("early channel discount = %v %v", discount, err)
+	e.reviseGroupedQuote(early, "gpt-test", func(q *market.Quote) { q.Currency = "USD" })
+	_, converted := send()
+	if converted.CostNano != 272_000_000 {
+		t.Fatal("changing quote currency must not invent an FX exemption", converted)
 	}
-	e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+early, map[string]any{"status": "unlisted"})
-
-	discounted := channel("discounted", "0.13", true)
-	channel("plain", "1", false)
-	_, secret := e.defaultKey(consumer)
-
-	// gpt-test costs $10/M input and $20/M output: 1000 + 500 tokens are $0.02.
-	// Cheapest first picks the discounted relay: $0.02 × 0.13 = 0.0026 points.
-	first := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
-	if first.Code != http.StatusOK {
-		t.Fatalf("call %d %s", first.Code, first.Body.String())
+	view := e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+early, nil)
+	if view["models"].([]any)[0].(map[string]any)["discount"] != "2" {
+		t.Fatal("quote update changed channel discount", view)
 	}
-	row := e.callRow(first.Header().Get("X-AIHub-Request-Id"))
-	if row.CostNano != 2_600_000 {
-		t.Fatalf("discounted cost = %+v", row)
+	e.patchGroupedChannel(sharer, early, map[string]any{"status": "unlisted"})
+	discounted := e.createChannel(sharer, channelSpec{name: "discounted", upstream: relay, multiplier: "0.13"})
+	plain := e.createChannel(sharer, channelSpec{name: "plain", upstream: relay, multiplier: "1"})
+	for _, id := range []string{discounted, plain} {
+		e.reviseGroupedQuote(id, "gpt-test", func(q *market.Quote) { q.Currency = "USD" })
+	}
+	// The fixture has no USD comparison workload; select explicitly rather than
+	// fabricating a price ranking. Actual billing always uses the frozen quote.
+	choose(discounted)
+	first, row := send()
+	if row.CostNano != 17_680_000 {
+		t.Fatal("USD cost must be .02 * .13 * 6.8", row)
 	}
 	var raw []byte
-	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id = $1`, first.Header().Get("X-AIHub-Request-Id")).Scan(&raw); err != nil {
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, first.Header().Get("X-AIHub-Request-Id")).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
 	var snapshot struct {
@@ -65,20 +71,20 @@ func TestUSDModelSettlesAtTheExchangeRateUnlessDiscounted(t *testing.T) {
 		EffectiveMultiplier string            `json:"effective_multiplier"`
 		Prices              map[string]string `json:"prices"`
 	}
-	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Currency != "USD" || snapshot.Rate == nil || *snapshot.Rate != "6.8" ||
-		!snapshot.FXDiscount || snapshot.EffectiveMultiplier != "0.019117647" || snapshot.Prices["input"] != "1.3" {
-		t.Fatalf("snapshot = %s", raw)
+	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Currency != "USD" || snapshot.Rate == nil || *snapshot.Rate != "6.8" || snapshot.FXDiscount || snapshot.EffectiveMultiplier != "0.13" || snapshot.Prices["input"] != "8.84" {
+		t.Fatalf("USD snapshot=%s err=%v", raw, err)
 	}
-
-	// Without the discount the dollar price is converted: $0.02 × 1 × 6.8 = 0.136.
-	e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+discounted, map[string]any{"status": "unlisted"})
-	second := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
-	if second.Code != http.StatusOK {
-		t.Fatalf("call %d %s", second.Code, second.Body.String())
+	e.patchGroupedChannel(sharer, discounted, map[string]any{"status": "unlisted"})
+	choose(plain)
+	_, row = send()
+	if row.CostNano != 136_000_000 {
+		t.Fatal("USD cost must be .02 * 6.8", row)
 	}
-	if row := e.callRow(second.Header().Get("X-AIHub-Request-Id")); row.CostNano != 136_000_000 {
-		t.Fatalf("converted cost = %+v", row)
+	var after []byte
+	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, original.Header().Get("X-AIHub-Request-Id")).Scan(&after); err != nil || string(before) != string(after) {
+		t.Fatal("currency update rewrote historical CNY pricing", err)
 	}
+	e.assertZeroSum()
 }
 
 type fixedRate int64
@@ -86,7 +92,7 @@ type fixedRate int64
 func (f fixedRate) FetchUSDCNY(context.Context) (int64, error) { return int64(f), nil }
 
 func TestExchangeRateSourceFollowsManualEditsAndSyncs(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	service := settings.NewService(e.store.Settings)
 	current, err := service.Get(ctx)

@@ -46,7 +46,7 @@ func TestGatewayDiagnosticsKeepLedgerLockTailAtTwoStatements(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(traced.Close)
-	e := newEnvOnMode(t, traced, storepg.New(traced), nil, true)
+	e := newGroupEnvOn(t, traced, storepg.New(traced), nil)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})

@@ -25,7 +25,7 @@ type anomalyPair struct {
 
 func newAnomalyPair(t *testing.T) *anomalyPair {
 	t.Helper()
-	p := &anomalyPair{e: newEnv(t)}
+	p := &anomalyPair{e: newGroupEnv(t)}
 	consumer := p.e.member("consumer", "1000")
 	p.owner = p.e.member("sharer", "0")
 	p.broken = newScriptedUpstream(t, 0, overloadedBody)
@@ -90,7 +90,7 @@ func TestEditingABrokenChannelEndsItsDemotionAndStaysEndedAfterARestart(t *testi
 	// The owner corrects the upstream key. The next call already goes to the
 	// cheaper channel again: no refresh ran since the edit.
 	p.fix()
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"api_key": "sk-corrected-0002"})
+	p.e.replaceGroupedChannelKey(p.owner, p.brokenID, "sk-corrected-0002")
 	p.expectFirst("broken", "right after the edit")
 
 	// Neither the next refresh nor a restart brings the old answers back; the
@@ -114,26 +114,30 @@ func TestEveryKindOfChannelEditEndsTheDemotion(t *testing.T) {
 		edit func(p *anomalyPair)
 	}{
 		{"upstream key", func(p *anomalyPair) {
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"api_key": "sk-other-0003"})
+			p.e.replaceGroupedChannelKey(p.owner, p.brokenID, "sk-other-0003")
 		}},
 		{"name", func(p *anomalyPair) {
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"name": "broken, renamed"})
+			p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"name": "broken, renamed"})
 		}},
-		{"models", func(p *anomalyPair) {
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{
-				"models": []any{map[string]any{"model_id": "gpt-test", "upstream_model": "right-name", "multiplier": "1", "formats": []string{"openai_chat"}}},
-			})
+		{"model discount", func(p *anomalyPair) {
+			current := p.e.apiJSON(p.owner, 200, "GET", "/api/group-channels/"+p.brokenID, nil)
+			model := current["models"].([]any)[0].(map[string]any)
+			p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"models": []any{map[string]any{"group_model_id": model["group_model_id"], "discount": "0.9"}}})
 		}},
 		{"unlist and list again", func(p *anomalyPair) {
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"status": "unlisted"})
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"status": "listed"})
+			p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"status": "unlisted"})
+			p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"status": "listed"})
 		}},
 		{"probe results applied", func(p *anomalyPair) {
-			p.e.apiJSON(p.owner, http.StatusOK, http.MethodPost, "/api/channels/"+p.brokenID+"/test", map[string]any{"apply": true})
+			p.e.retestGroupedFixture(p.owner, p.brokenID)
 		}},
 		{"administrator suspends and restores", func(p *anomalyPair) {
-			p.e.apiJSON(p.e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+p.brokenID+"/suspend", map[string]any{"reason": "looking into it"})
-			p.e.apiJSON(p.e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+p.brokenID+"/unsuspend", map[string]any{"reason": "looked"})
+			if reply := p.e.api(p.e.admin, "POST", "/api/admin/group-channels/"+p.brokenID+"/moderate", map[string]any{"reason": "looking into it"}); reply.Code != 204 {
+				p.e.t.Fatal(reply.Code, reply.Body.String())
+			}
+			if reply := p.e.api(p.e.admin, "POST", "/api/admin/group-channels/"+p.brokenID+"/moderate", map[string]any{"reason": ""}); reply.Code != 204 {
+				p.e.t.Fatal(reply.Code, reply.Body.String())
+			}
 		}},
 	}
 	for _, tc := range edits {
@@ -149,24 +153,20 @@ func TestEveryKindOfChannelEditEndsTheDemotion(t *testing.T) {
 	}
 }
 
-// Probing without applying the results changes nothing about the channel, and
-// editing another channel changes nothing about this one.
-func TestAnEditThatDoesNotChangeTheChannelLeavesItDemoted(t *testing.T) {
+// Editing another channel changes nothing about this one.
+func TestEditingAnotherChannelLeavesThisChannelDemoted(t *testing.T) {
 	p := newAnomalyPair(t)
 	p.breakAndFlag()
 	p.fix()
 
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPost, "/api/channels/"+p.brokenID+"/test", map[string]any{"apply": false})
-	p.expectFirst("healthy", "after a probe that only recorded its results")
-
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.healthyID, map[string]any{"name": "healthy, renamed"})
+	p.e.patchGroupedChannel(p.owner, p.healthyID, map[string]any{"name": "healthy, renamed"})
 	p.expectFirst("healthy", "after the other channel was edited")
 
 	p.e.restartGateway()
 	p.expectFirst("healthy", "after a restart")
 
 	// And the edit that does change it lifts it.
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"name": "broken, renamed"})
+	p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"name": "broken, renamed"})
 	p.expectFirst("broken", "after the edit")
 }
 
@@ -176,7 +176,7 @@ func TestAChannelStillBrokenAfterAnEditIsFlaggedAgain(t *testing.T) {
 	p := newAnomalyPair(t)
 	p.breakAndFlag()
 
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"name": "broken, still"})
+	p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"name": "broken, still"})
 	for range 19 {
 		if code := p.call(); code != http.StatusBadRequest {
 			t.Fatalf("call = %d, want the cheaper channel's 400 again", code)
@@ -224,7 +224,7 @@ func TestAttemptHistoryReportsWhatHappenedBeforeTheLastEdit(t *testing.T) {
 	if counted, client, before, beforeClient := history(); counted != 0 || client != 20 || before != 0 || beforeClient != 0 {
 		t.Fatalf("before any edit: counted %d, 4xx %d, before the edit %d (4xx %d)", counted, client, before, beforeClient)
 	}
-	p.e.apiJSON(p.owner, http.StatusOK, http.MethodPatch, "/api/channels/"+p.brokenID, map[string]any{"name": "broken, edited"})
+	p.e.patchGroupedChannel(p.owner, p.brokenID, map[string]any{"name": "broken, edited"})
 	p.fix()
 	for range 3 {
 		if code := p.call(); code != http.StatusOK {

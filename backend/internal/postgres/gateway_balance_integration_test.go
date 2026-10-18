@@ -81,7 +81,7 @@ func tracedEnv(t *testing.T) (*env, *gatewaybench.QueryCounter) {
 		t.Fatal(err)
 	}
 	t.Cleanup(traced.Close)
-	return newEnvOnMode(t, traced, storepg.New(traced), nil, true), counter
+	return newGroupEnvOn(t, traced, storepg.New(traced), nil), counter
 }
 
 // balanceReads is how many times the balance cache read the database (the

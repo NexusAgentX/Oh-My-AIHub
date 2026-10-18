@@ -3,8 +3,8 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"net/http"
 	"strings"
@@ -12,25 +12,25 @@ import (
 )
 
 func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	service := e.catalog
 	specific := map[string]money.Amount{"input_audio": 0, "output_audio": mustAmount(t, "40")}
-	tiers := []ledger.PriceTier{{Name: "actual standard", ServiceTier: "openai:default", InputPrice: mustAmount(t, "10"), OutputPrice: mustAmount(t, "20"), TokenPrices: specific}}
-	saved, err := service.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{TokenPrices: &specific, PriceTiers: &tiers})
-	if err != nil || saved.TokenPrices["output_audio"] != specific["output_audio"] {
-		t.Fatalf("save %+v %v", saved, err)
-	}
-	if value, present := saved.PriceTiers[0].TokenPrices["input_audio"]; !present || value != 0 {
-		t.Fatal("explicit zero lost")
-	}
+	tiers := []market.Tier{{Name: "actual standard", Conditions: market.Conditions{ServiceTier: "openai:default"}, Prices: market.TokenPrices{Input: mustAmount(t, "10"), Output: mustAmount(t, "20"), Details: specific}}}
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"service_tier":"default","choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":500,"prompt_tokens_details":{"audio_tokens":500},"completion_tokens_details":{"audio_tokens":100}}}`))
 	})
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
+	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
+	saved := e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) { q.Prices.Details = specific; q.Tiers = tiers })
+	if saved.Prices.Details["output_audio"] != specific["output_audio"] {
+		t.Fatal("modality price lost", saved)
+	}
+	if value, present := saved.Tiers[0].Prices.Details["input_audio"]; !present || value != 0 {
+		t.Fatal("explicit zero lost")
+	}
+	e.declareGroupedCapabilities(channelID, "upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast")
 	keyID, secret := e.defaultKey(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.017"})
 	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","service_tier":"priority"}`), nil)
@@ -61,10 +61,9 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 	if json.Unmarshal(before, &snap) != nil || snap.Detail.ServiceTier != "openai:default" || snap.Prices["input_audio"] != "0" {
 		t.Fatal(string(before))
 	}
-	empty := map[string]money.Amount{}
-	saved, err = service.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{TokenPrices: &empty, PriceTiers: &[]ledger.PriceTier{}})
-	if err != nil || len(saved.TokenPrices) != 0 {
-		t.Fatal("clear", err)
+	saved = e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) { q.Prices.Details = map[string]money.Amount{}; q.Tiers = nil })
+	if len(saved.Prices.Details) != 0 {
+		t.Fatal("detail prices did not clear")
 	}
 	var after []byte
 	_ = e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after)
@@ -76,19 +75,19 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 // The new alias/partial-frame shapes must reach the same atomic persistence,
 // budget accounting and immutable snapshot path as native usage.
 func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer := e.member("compat-consumer", "100")
 	sharer := e.member("compat-sharer", "0")
 	input, output, write, read := mustAmount(t, "10"), mustAmount(t, "20"), mustAmount(t, "30"), mustAmount(t, "40")
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output, CacheWritePrice: &write, CacheReadPrice: &read}); err != nil {
-		t.Fatal(err)
-	}
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte("data: " + `{"usage":{"prompt_tokens":1000,"prompt_tokens_details":{"cached_tokens":300,"cache_creation_tokens":100,"cache_creation_token_details":{"ephemeral_5m_input_tokens":40,"ephemeral_1h_input_tokens":60}}}}` + "\n\ndata: " + `{"usage":{"completion_tokens":500}}` + "\n\ndata: [DONE]\n\n"))
 	})
-	e.createChannel(sharer, channelSpec{name: "compat-relay", upstream: relay, multiplier: "1"})
+	channelID := e.createChannel(sharer, channelSpec{name: "compat-relay", upstream: relay, multiplier: "1"})
+	e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) {
+		q.Prices = market.TokenPrices{Input: input, Output: output, CacheWrite: write, CacheRead: read}
+	})
 	keyID, secret := e.defaultKey(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.031"})
 	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","stream":true,"stream_options":{"include_usage":true}}`), nil)
@@ -119,9 +118,7 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 		t.Fatalf("snapshot %s err=%v", before, err)
 	}
 	input = mustAmount(t, "100")
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input}); err != nil {
-		t.Fatal(err)
-	}
+	e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) { q.Prices.Input = input })
 	var after []byte
 	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
 		t.Fatal(err)
@@ -132,20 +129,18 @@ func TestCompatibleUsagePersistsSettlesAndExhaustsBudget(t *testing.T) {
 }
 
 func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer := e.member("thinking-consumer", "100")
 	sharer := e.member("thinking-sharer", "0")
 	input, output := mustAmount(t, "10"), mustAmount(t, "20")
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output}); err != nil {
-		t.Fatal(err)
-	}
 	response := `{"choices":[{"message":{"reasoning_content":"private","reasoning":"private"}}],"usage":{"prompt_tokens":1000,"completion_tokens":500,"completion_tokens_details":{"reasoning_tokens":300}}}`
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(response))
 	})
-	e.createChannel(sharer, channelSpec{name: "thinking-relay", upstream: relay, multiplier: "1"})
+	channelID := e.createChannel(sharer, channelSpec{name: "thinking-relay", upstream: relay, multiplier: "1"})
+	e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) { q.Prices.Input = input; q.Prices.Output = output })
 	keyID, secret := e.defaultKey(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.02"})
 	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","enable_thinking":false}`), nil)
@@ -182,16 +177,15 @@ func TestGenericThinkingObservationKeepsBillingBudgetAndSnapshot(t *testing.T) {
 		t.Fatal("snapshot retained content")
 	}
 	threshold := int64(0)
-	tiers := []ledger.PriceTier{{MinPromptTokens: &threshold, InputPrice: input, OutputPrice: mustAmount(t, "40")}}
-	if _, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers}); err != nil {
-		t.Fatal(err)
-	}
+	e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) {
+		q.Tiers = []market.Tier{{Conditions: market.Conditions{MinPromptTokens: &threshold}, Prices: market.TokenPrices{Input: input, Output: mustAmount(t, "40")}}}
+	})
 	var after []byte
 	if err := e.pool.QueryRow(ctx, `SELECT price_snapshot FROM calls WHERE id=$1`, id).Scan(&after); err != nil {
 		t.Fatal(err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("historical snapshot changed after catalog update")
+		t.Fatal("historical snapshot changed after group quote update")
 	}
 	// A later call sees the new token tier; thinking remains a generic observation.
 	next := e.member("next-consumer", "100")
