@@ -135,6 +135,7 @@ const thinkingModeLabels: Record<string, string> = { qwen_thinking: '已输出�
 
 /** 调用类交易的价格快照：档位、倍率、手续费率与四个现价（积分/百万 token）。没有信息的项不显示。 */
 export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
+  if (snapshot.group_quote) return <GroupPriceSnapshot statement={snapshot.group_quote} />
   const detail = snapshot.detail
   const components = snapshot.components ?? []
   const thinking = thinkingModeLabels[detail?.thinking_mode ?? '']
@@ -221,6 +222,62 @@ export function PriceSnapshotView({ snapshot }: { snapshot: PriceSnapshot }) {
       ))}
     </>
   )
+}
+
+const groupChargeKinds: Record<string, string> = {
+  main: '主模型', message: '主推理', advisor_message: '子推理', image_generation_call: '图像子模型',
+  request: '请求', successful_image: '成功图片', tool_call: '工具调用',
+  tool_session: '工具会话', tool_second: '工具运行秒数', tool_query: '工具查询',
+}
+const groupChargeReasons: Record<string, string> = {
+  missing_main_usage: '缺少可靠主模型用量', missing_reliable_unit: '缺少可靠计费单位',
+  missing_group_quote: '缺少同分组开始时报价', missing_creation_receipt: '缺少可靠新建或计费周期事实',
+  missing_unit_price: '缺少适用单位报价', execution_already_billed: '同一次上游执行已计价',
+}
+type GroupStatement = NonNullable<PriceSnapshot['group_quote']>
+function groupChargeItems(line: GroupStatement['components'][number]) {
+  const items: Array<[string, ReactNode]> = []
+  if (line.reason) items.push(['说明', groupChargeReasons[line.reason] ?? line.reason])
+  if (line.quote_id) items.push(['报价版本', `${shortID(line.quote_id)} · ${line.quote_version}`], ['模型修订', String(line.revision)])
+  if (line.currency) {
+    items.push(['币种', line.currency], ['渠道折扣', `${line.discount_nano / 1e9}×`])
+    if (line.currency === 'USD') items.push(['美元汇率', String(line.rate_nano / 1e9)])
+  }
+  if (line.unit) {
+    const unit = line.unit
+    items.push(['用量', `${unit.quantity_nano / 1e9} ${groupChargeKinds[unit.unit] ?? unit.unit}${unit.tool ? ' · ' + unit.tool : ''}`])
+    if (line.unit_price !== undefined) items.push(['单位原价', line.unit_price])
+    const selectors = [unit.image_size, unit.image_quality, unit.image_background, unit.service_tier].filter(Boolean)
+    if (selectors.length) items.push(['实际条件', selectors.join(' · ')])
+  }
+  if (line.usage) {
+    const usage = line.usage
+    items.push(['token 用量', `输入 ${usage.input_tokens} · 输出 ${usage.output_tokens} · 缓存读 ${usage.cache_read_tokens} · 缓存写 ${usage.cache_write_tokens}`])
+  }
+  if (line.selected_prices) {
+    const prices = line.selected_prices
+    items.push(['每百万 token 原价', `输入 ${prices.input} · 输出 ${prices.output} · 缓存读 ${prices.cache_read} · 缓存写 ${prices.cache_write}`])
+    for (const [key, value] of Object.entries(prices.details)) items.push([tokenPriceLabels[key] ?? key, value])
+  }
+  if (line.tier_seq) items.push(['条件价顺序', String(line.tier_seq)])
+  return items
+}
+function GroupPriceSnapshot({ statement }: { statement: GroupStatement }) {
+  const items: Array<[string, ReactNode]> = [
+    ['分组版本', `${shortID(statement.group_id)} · ${statement.group_revision}`],
+    ['报价固定时间', formatDateTime(statement.started_at)],
+    ['计价合计', formatPoints(statement.cost)],
+    ['手续费', `${formatPoints(statement.fee)} · ${feeRateToPercent(statement.fee_rate_nano)}%`],
+  ]
+  if (statement.notes.length) items.push(['计价说明', <span className="detail-lines" key="notes">{statement.notes.map((note) => <span key={note}>{note}</span>)}</span>])
+  return <>
+    <DetailList items={items} />
+    <p className="muted-copy">可靠分项精确合并后统一取整；分项显示值可能有取整差异。</p>
+    {statement.components.map((line, index) => <details key={index} className="group-charge-line">
+      <summary>{line.model_id || '未知模型'} · {groupChargeKinds[line.kind] ?? line.kind} · {line.state === 'unpriced' ? '未计价' : line.state === 'duplicate' ? '已去重' : formatPoints(line.cost)}</summary>
+      <DetailList items={groupChargeItems(line)} />
+    </details>)}
+  </>
 }
 
 export function TransactionDetail({ transaction }: { transaction: LedgerTransaction }) {

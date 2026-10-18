@@ -274,6 +274,41 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 	}
 	err = s.books.InTx(ctx, s.pool, func(tx ledgerpg.Tx) error {
 		q := New(tx)
+		if finish.QuoteStatement != nil && len(finish.QuoteStatement.ReceiptKeys()) > 0 {
+			if _, err := q.LockPendingReceiptCall(ctx, finish.ID); errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+			duplicates := map[string]bool{}
+			for _, key := range finish.QuoteStatement.ReceiptKeys() {
+				count, err := q.ClaimExecutionReceipt(ctx, ClaimExecutionReceiptParams{ReceiptKey: key, CallID: finish.ID})
+				if err != nil {
+					return err
+				}
+				duplicates[key] = count == 0
+			}
+			statement, err := finish.QuoteStatement.Reprice(duplicates)
+			if err != nil {
+				return err
+			}
+			finish.QuoteStatement = &statement
+			finish.Cost, finish.Fee = statement.Cost, statement.Fee
+			finish.PriceSnapshot, err = gateway.WithQuoteStatement(finish.PriceSnapshot, statement)
+			if err != nil {
+				return err
+			}
+			if finish.Bill != nil {
+				bill := *finish.Bill
+				bill.Cost, bill.Fee = finish.Cost, finish.Fee
+				finish.Bill = &bill
+				if bill.Cost+bill.Fee == 0 {
+					finish.Bill = nil
+				}
+			}
+			applied := finish
+			result.Applied = &applied
+		}
 		affected, err := q.FinishCall(ctx, FinishCallParams{
 			Diagnostics: raw, ID: finish.ID, Outcome: finish.Outcome, ModelID: optional(finish.ModelID), FinalChannelID: optional(finish.ChannelID),
 			RoutingMode: optional(finish.RoutingMode), RoutingSource: optional(finish.RoutingSource), Attempts: attempts,

@@ -51,6 +51,8 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 
 - [ADR-0045：检测证据按层留存，审核引用不可变报告](0045-detection-evidence-and-report-snapshots.md)
 
+- [ADR-0046：固定候选报价并在账本锁前认领调用内执行收据](0046-group-quote-settlement-and-execution-receipts.md)
+
 ## 归档
 
 探索期（v0.7.0 原地重写之前）及已失效的记录，只供追溯，不构成当前约束。探索期记录的文件内状态保持原样；被新 ADR 整体取代的记录，文件内状态改为“已取代”。

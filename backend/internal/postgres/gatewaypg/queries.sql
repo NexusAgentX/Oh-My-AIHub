@@ -6,6 +6,15 @@ FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id
 WHERE k.key_hash = $1 AND k.deleted_at IS NULL;
 
+-- Receipt work is absent on ordinary calls. Lock the call before claiming its
+-- sorted receipt set, so duplicate finalizers cannot claim on a closed call.
+-- name: LockPendingReceiptCall :one
+SELECT id FROM calls WHERE id=$1 AND outcome='in_progress' FOR UPDATE;
+
+-- name: ClaimExecutionReceipt :execrows
+INSERT INTO call_execution_receipts(receipt_key,call_id) VALUES($1,$2)
+ON CONFLICT(receipt_key) DO NOTHING;
+
 -- name: TouchKey :exec
 UPDATE api_keys SET last_used_at = $2 WHERE id = $1;
 

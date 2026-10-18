@@ -7,10 +7,35 @@ import (
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
 
 const maxBillingItems = 128
+
+func (o *Observer) billableUnit(tool, unit string, quantity int64, add bool) {
+	if quantity < 0 || quantity > math.MaxInt64/ledger.UnitRate {
+		return
+	}
+	for i := range o.billableUnits {
+		fact := &o.billableUnits[i]
+		if fact.Tool == tool && fact.Unit == unit {
+			if add {
+				if fact.QuantityNano > math.MaxInt64-quantity*ledger.UnitRate {
+					return
+				}
+				fact.QuantityNano += quantity * ledger.UnitRate
+			} else {
+				fact.QuantityNano = quantity * ledger.UnitRate
+			}
+			return
+		}
+	}
+	if len(o.billableUnits) < maxBillingItems {
+		o.billableUnits = append(o.billableUnits, quotepricing.Unit{Tool: tool, Unit: unit, QuantityNano: quantity * ledger.UnitRate})
+	}
+}
 
 func validGeo(value string) bool {
 	if len(value) == 0 || len(value) > 32 {
@@ -39,6 +64,7 @@ func (o *Observer) observeServerTools(usage jsonObject) {
 	server := o.objectOf(usage.get("server_tool_use"))
 	if n, ok := count(server.get("web_search_requests")); ok {
 		o.unit("web_search", n)
+		o.billableUnit("web_search", "tool_call", n, false)
 	}
 	// A request count cannot establish container runtime or allocated memory.
 	if n, ok := count(server.get("code_execution_requests")); ok && n > 0 {
@@ -49,6 +75,12 @@ func (o *Observer) observeServerTools(usage jsonObject) {
 func anthropicIterations(items []anthropicFields, parent *anthropicFields) []ledger.UsageIteration {
 	result := make([]ledger.UsageIteration, 0, len(items))
 	for _, item := range items {
+		if !gatewaycontract.ValidModelID(item.Model) {
+			item.Model = ""
+		}
+		if item.Type != "" && item.Type != "message" && item.Type != "advisor_message" && item.Type != "compaction" {
+			item.Type = "unknown"
+		}
 		value := func(p *int64) int64 {
 			if p == nil {
 				return 0
@@ -122,6 +154,9 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		key := strings.TrimSuffix(kind, "_call")
 		current := o.detail.Units[key] / ledger.FixedPointScale
 		o.unit(key, current+1)
+		if textValue(item.get("status")) == "completed" {
+			o.billableUnit(key, "tool_call", 1, true)
+		}
 	case "code_interpreter_call":
 		// Observe each container once, never once per output chunk.
 		container := textValue(item.get("container_id"))
@@ -159,17 +194,33 @@ func (o *Observer) observeResponseItem(raw []byte) {
 			return
 		}
 		o.unit(key, o.detail.Units[key]/ledger.FixedPointScale+1)
+		o.note("首次观察到容器 ID 不证明新建，缺少可靠新建/周期事实，附加费未计价")
 
 	case "image_generation_call":
 		o.unit("image_generation", o.detail.Units["image_generation"]/ledger.FixedPointScale+1)
 		o.note("图像工具仅作观察，暂不收取图像子模型费用")
+		status := textValue(item.get("status"))
+		if status == "failed" || status == "cancelled" {
+			o.note("图像工具终态失败，子费用未计价")
+			return
+		}
 		model := textValue(item.get("model"))
 		if model == "" {
 			model = o.imageModel
 		}
+		if !gatewaycontract.ValidModelID(model) {
+			model = ""
+		}
 		if model == "" {
 			o.note("图像工具模型缺失，子模型费用未计价")
 			return
+		}
+		if result := item.get("result"); status == "completed" && len(result) > 2 && result[0] == '"' {
+			if len(o.billableUnits) <= maxBillingItems-2 {
+				o.billableUnits = append(o.billableUnits, quotepricing.Unit{Unit: "request", ModelID: model, QuantityNano: ledger.UnitRate}, quotepricing.Unit{Unit: "successful_image", ModelID: model, QuantityNano: ledger.UnitRate})
+			} else {
+				o.note("图像产物超过有界计量上限，部分子费用未计价")
+			}
 		}
 		usage := item.get("usage")
 		child := NewObserver(channel.FormatOpenAIResponses, false, "application/json")
@@ -211,6 +262,8 @@ func (o *Observer) observeGeminiTools(root, usage jsonObject) {
 	if queries > 0 {
 		o.unit("google_search_query", queries)
 		o.unit("google_search_prompt", 1)
+		o.billableUnit("google_search", "tool_query", queries, false)
+		o.billableUnit("google_search", "tool_call", 1, false)
 	}
 	if maps > 0 {
 		// Grounding chunks establish a grounded prompt, not a query count.
