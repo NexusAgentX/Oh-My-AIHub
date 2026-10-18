@@ -8,10 +8,28 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
 func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Candidate, usage ledger.Usage, defaults settings.Settings, feeRate int64) (ledger.PriceResult, []byte, error) {
+	if candidate.Quotes != nil {
+		facts := call.billingFacts
+		facts.Usage = usage
+		statement, err := quotepricing.Calculate(candidate.Quotes, model.ID, facts, call.started, candidate.MultiplierNano, defaults.USDCNYRateNano, feeRate)
+		if err != nil {
+			return ledger.PriceResult{}, nil, err
+		}
+		call.pricedStatement = &statement
+		priced := ledger.PriceResult{Cost: statement.Cost, Fee: statement.Fee}
+		snapshotCandidate := candidate
+		snapshotCandidate.FXDiscount = false
+		snapshotCandidate.Custom = nil
+		snapshotModel := candidate.PricingModel(model)
+		snapshotCandidate.RateNano = ledger.ModelRate(snapshotModel.PriceCurrency, defaults.USDCNYRateNano)
+		raw, err := WithQuoteStatement(priceSnapshot(snapshotModel, priced, snapshotCandidate, defaults.USDCNYRateNano, feeRate, usage, call.started), statement)
+		return priced, raw, err
+	}
 	if usage.Detail == nil || usage.Detail.InferenceGeo == "" {
 		if geo := endpointGeo(candidate.BaseURL); geo != "" {
 			if usage.Detail == nil {
@@ -107,6 +125,20 @@ func boundedModelName(value string) string {
 		return "unknown"
 	}
 	return value
+}
+
+// WithQuoteStatement keeps the historical envelope with versioned provenance.
+func WithQuoteStatement(raw []byte, statement quotepricing.Statement) ([]byte, error) {
+	var saved map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(statement)
+	if err != nil {
+		return nil, err
+	}
+	saved["group_quote"] = encoded
+	return json.Marshal(saved)
 }
 
 func endpointGeo(base string) string {

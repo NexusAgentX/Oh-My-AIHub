@@ -152,6 +152,24 @@ func (q *Queries) ClaimBackground(ctx context.Context, now time.Time) ([]Gateway
 	return items, nil
 }
 
+const claimExecutionReceipt = `-- name: ClaimExecutionReceipt :execrows
+INSERT INTO call_execution_receipts(receipt_key,call_id) VALUES($1,$2)
+ON CONFLICT(receipt_key) DO NOTHING
+`
+
+type ClaimExecutionReceiptParams struct {
+	ReceiptKey string
+	CallID     string
+}
+
+func (q *Queries) ClaimExecutionReceipt(ctx context.Context, arg ClaimExecutionReceiptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimExecutionReceipt, arg.ReceiptKey, arg.CallID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const customModelOnline = `-- name: CustomModelOnline :one
 SELECT EXISTS (
     SELECT 1
@@ -882,6 +900,19 @@ func (q *Queries) LoadGeoCache(ctx context.Context) ([]LoadGeoCacheRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPendingReceiptCall = `-- name: LockPendingReceiptCall :one
+SELECT id FROM calls WHERE id=$1 AND outcome='in_progress' FOR UPDATE
+`
+
+// Receipt work is absent on ordinary calls. Lock the call before claiming its
+// sorted receipt set, so duplicate finalizers cannot claim on a closed call.
+func (q *Queries) LockPendingReceiptCall(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, lockPendingReceiptCall, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
 }
 
 const lookupBackground = `-- name: LookupBackground :one

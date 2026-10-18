@@ -2943,8 +2943,54 @@ export interface components {
                 [key: string]: string;
             };
         };
+        GroupChargeUnit: {
+            unit: string;
+            tool?: string;
+            model_id?: string;
+            quantity_nano: number;
+            image_size?: string;
+            image_quality?: string;
+            image_background?: string;
+            service_tier?: string;
+        };
+        GroupChargeLine: {
+            model_id: string;
+            group_model_id: string;
+            revision: number;
+            quote_id: string;
+            quote_version: number;
+            kind: string;
+            /** @enum {string} */
+            state: "priced" | "unpriced" | "duplicate";
+            reason?: string;
+            currency?: components["schemas"]["PriceCurrency"];
+            rate_nano: number;
+            discount_nano: number;
+            tier_seq: number;
+            usage?: components["schemas"]["InferenceUsage"];
+            selected_prices?: components["schemas"]["MarketTokenPrices"];
+            unit?: components["schemas"]["GroupChargeUnit"];
+            unit_price?: components["schemas"]["Price"];
+            cost: components["schemas"]["Amount"];
+        };
+        /** @description 开始时固定的分组报价与可靠分项；分项展示值可能各自取整，总费用使用精确合并后的一次取整。 */
+        GroupChargeStatement: {
+            notes: string[];
+            /** @constant */
+            version: "group-quote.v1";
+            group_id: string;
+            group_revision: number;
+            config_version: number;
+            started_at: components["schemas"]["Timestamp"];
+            usd_cny_rate_nano: number;
+            fee_rate_nano: number;
+            components: components["schemas"]["GroupChargeLine"][];
+            cost: components["schemas"]["Amount"];
+            fee: components["schemas"]["Amount"];
+        };
         /** @description 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。 */
         PriceSnapshot: {
+            group_quote?: components["schemas"]["GroupChargeStatement"];
             components?: {
                 model: string;
                 kind: string;

@@ -95,7 +95,7 @@ export function CallDetailView({ call, onRefresh }: { call: CallDetail; onRefres
           {call.routing_source === 'key' && <small className="muted"> · Key 单独设置</small>}
         </Row>
         <Row label="价格档">
-          {snapshot ? (
+          {snapshot?.group_quote ? <span>分组报价 · 修订 {snapshot.group_quote.group_revision}</span> : snapshot ? (
             <>
               {snapshot.tier?.name ?? '基准价'} ·{' '}
               <MultiplierText
