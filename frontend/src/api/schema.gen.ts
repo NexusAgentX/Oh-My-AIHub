@@ -2605,6 +2605,8 @@ export interface components {
             response_received: boolean;
             /** Format: date-time */
             at: string;
+            /** @description 本次实际入口，仅执行追溯；不是能力/目录/指纹维度，不参与完整性与路由筛选 */
+            entry_url?: string;
         };
         DetectionAssertion: {
             id: string;

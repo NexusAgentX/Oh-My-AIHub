@@ -104,10 +104,10 @@ func (s *Store) Save(ctx context.Context, job detection.Job) error {
 }
 func (s *Store) Interrupt(ctx context.Context) error { return New(s.pool).InterruptTasks(ctx) }
 func (s *Store) RecordAttempt(ctx context.Context, jobID string, a detection.Attempt) error {
-	return New(s.pool).InsertAttempt(ctx, InsertAttemptParams{ID: a.ID, TaskID: jobID, EndpointID: a.EndpointID, Method: a.Method, PathTemplate: a.Path, Status: int32(a.Status), Reason: a.Reason, Category: a.Category, DurationMs: a.DurationMS, Sent: a.Sent, ResponseReceived: a.ResponseReceived, CreatedAt: a.At})
+	return New(s.pool).InsertAttempt(ctx, InsertAttemptParams{ID: a.ID, TaskID: jobID, EndpointID: a.EndpointID, Method: a.Method, PathTemplate: a.Path, Status: int32(a.Status), Reason: a.Reason, Category: a.Category, DurationMs: a.DurationMS, Sent: a.Sent, ResponseReceived: a.ResponseReceived, CreatedAt: a.At, EntryUrl: a.EntryURL})
 }
 func attemptValue(a DetectionAttempt) detection.Attempt {
-	return detection.Attempt{ID: a.ID, EndpointID: a.EndpointID, Method: a.Method, Path: a.PathTemplate, Status: int(a.Status), Reason: a.Reason, Category: a.Category, DurationMS: a.DurationMs, Sent: a.Sent, ResponseReceived: a.ResponseReceived, At: a.CreatedAt}
+	return detection.Attempt{ID: a.ID, EndpointID: a.EndpointID, Method: a.Method, Path: a.PathTemplate, Status: int(a.Status), Reason: a.Reason, Category: a.Category, DurationMS: a.DurationMs, Sent: a.Sent, ResponseReceived: a.ResponseReceived, At: a.CreatedAt, EntryURL: a.EntryUrl}
 }
 func (s *Store) Attempts(ctx context.Context, jobID string, ids []string) ([]detection.Attempt, error) {
 	if len(ids) > 4096 {

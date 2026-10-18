@@ -83,10 +83,12 @@ const (
 )
 
 type Response struct {
-	AttemptID string
-	Status    int
-	Headers   http.Header
-	Body      []byte
+	PriorAttempts []string
+	Sent          bool
+	AttemptID     string
+	Status        int
+	Headers       http.Header
+	Body          []byte
 }
 
 func (s *Session) Remember(id string, body []byte) error {
@@ -152,6 +154,27 @@ func matchPath(template, path string) bool {
 	return true
 }
 func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
+	if s.entry < 0 || s.entry >= len(s.resolved.Addresses) {
+		return Response{}, ErrInvalid
+	}
+	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
+	defer cancel()
+	var prior []string
+	for {
+		response, err := s.doEntry(callCtx, input)
+		endpoint := s.endpoints[input.EndpointID]
+		beforeWrite := input.Authentication == AuthenticationValid && err != nil && response.AttemptID != "" && !response.Sent && response.Status == 0
+		readSafe := endpoint.Method == http.MethodGet && input.Authentication == AuthenticationValid && response.AttemptID != "" && (err != nil || response.Status == 502 || response.Status == 503 || response.Status == 504)
+		if callCtx.Err() != nil || errors.Is(err, ErrBusy) || !(beforeWrite || readSafe) || s.entry+1 >= len(s.resolved.Addresses) {
+			response.PriorAttempts = prior
+			return response, err
+		}
+		prior = append(prior, response.AttemptID)
+		s.entry++
+	}
+}
+
+func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) {
 	e, ok := s.endpoints[input.EndpointID]
 	if !ok || !s.allowed[e.ID] || !matchPath(e.Path, input.Path) || !containsCategory(input.Category) || len(s.resolved.Addresses) == 0 || (input.Authentication != AuthenticationValid && input.Authentication != AuthenticationInvalid && input.Authentication != AuthenticationAbsent) {
 		return Response{}, ErrInvalid
@@ -176,6 +199,7 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	// One selected entrance per call; scene code may explicitly retry only with
 	// known replay safety. A blind automatic retry can duplicate a tool/write.
 	base := s.resolved.Addresses[s.entry]
+	attempt.EntryURL = base
 	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
 	defer cancel()
 	policy := s.outbound
@@ -300,6 +324,7 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	}
 	attempt.DurationMS = time.Since(start).Milliseconds()
 	output.AttemptID = id
+	output.Sent = attempt.Sent
 	// Metadata writes have their own bounded deadline so cancellation still
 	// records the actual failed/partial attempt. No body/header/secret is saved.
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)

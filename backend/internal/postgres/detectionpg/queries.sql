@@ -13,7 +13,7 @@ UPDATE detection_tasks SET state=$2,complete=$3,metadata=$4,updated_at=$5 WHERE 
 -- name: InterruptTasks :exec
 UPDATE detection_tasks SET state='interrupted',complete=false,metadata=jsonb_set(jsonb_set(jsonb_set(jsonb_set(metadata,'{state}','"interrupted"'),'{complete}','false'),'{updated_at}',to_jsonb(now())),'{execution_active}','false'),updated_at=now() WHERE state IN ('queued','running');
 -- name: InsertAttempt :exec
-INSERT INTO detection_attempts(id,task_id,endpoint_id,method,path_template,status,reason,category,duration_ms,sent,response_received,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);
+INSERT INTO detection_attempts(id,task_id,endpoint_id,method,path_template,status,reason,category,duration_ms,sent,response_received,created_at,entry_url) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);
 -- name: FindAttempts :many
 SELECT * FROM detection_attempts WHERE task_id=$1 AND id=ANY($2::uuid[]) ORDER BY created_at,id;
 -- name: PageAttempts :many

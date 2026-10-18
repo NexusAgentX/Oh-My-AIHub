@@ -176,12 +176,10 @@ func (n *nativeScene) inferHeaders(ctx context.Context, body nativeObject, strea
 func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOutcome {
 	var response Response
 	var err error
-	// Exact request reuse is worker-private. Changing model/config/auth/path or
-	// entry produces a different key. No resource mutation is cached.
-	digestBody, _ := json.Marshal(struct {
-		Request Request
-		Entry   int
-	}{req, n.s.entry})
+	// Exact request reuse is worker-private. All entrances serve the same engine;
+	// changing transport entry cannot turn this into address-specific evidence.
+	// Configuration/auth/path/body remain part of the request. Mutations opt out.
+	digestBody, _ := json.Marshal(req)
 	sum := sha256.Sum256(digestBody)
 	key := "native-" + hex.EncodeToString(sum[:])
 	cached := false
@@ -195,6 +193,11 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 	}
 	if response.AttemptID != "" && !slices.Contains(n.witnesses, response.AttemptID) {
 		n.witnesses = append(n.witnesses, response.AttemptID)
+	}
+	for _, id := range response.PriorAttempts {
+		if !slices.Contains(n.witnesses, id) {
+			n.witnesses = append(n.witnesses, id)
+		}
 	}
 	out := nativeOutcome{Response: response, State: "inconclusive", Reason: "external_error"}
 	if err != nil {
@@ -300,6 +303,9 @@ func unsupportedNative(o nativeObject, status int) bool {
 	return (status == 400 || status == 422) && (strings.Contains(m, "not supported") || strings.Contains(m, "does not support") || strings.Contains(m, "unsupported"))
 }
 func (n *nativeScene) check(label string, out nativeOutcome, valid bool) {
+	// Failed connection attempts stay in result.Attempts for diagnostics. Only
+	// the final operation witnesses this assertion; an unsent attempt cannot be
+	// a positive capability proof.
 	a := Assertion{State: out.State, Reason: out.Reason, AttemptIDs: []string{out.Response.AttemptID}}
 	if out.State == "pass" && !valid {
 		a.State = "fail"
@@ -331,6 +337,9 @@ func (n *nativeScene) uncertain(label string, out nativeOutcome) {
 }
 func (n *nativeScene) finish() Result {
 	r := n.result
+	for _, id := range n.witnesses {
+		r.Attempts = append(r.Attempts, Attempt{ID: id})
+	}
 	r.Assertions = []Assertion{}
 	r.State = "pass"
 	r.Reason = "ok"

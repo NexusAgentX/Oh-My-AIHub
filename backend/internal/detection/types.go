@@ -77,6 +77,7 @@ func (u *Usage) Add(v Usage) {
 }
 
 type Attempt struct {
+	EntryURL         string    `json:"entry_url,omitempty"` // diagnostics only, never a capability dimension
 	ID               string    `json:"id"`
 	EndpointID       string    `json:"endpoint_id"`
 	Method           string    `json:"method"`

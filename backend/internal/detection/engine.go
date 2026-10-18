@@ -573,6 +573,11 @@ func (s *Service) run(ctx context.Context, session *Session, item Planned, compl
 	result.SourceTaskID = session.jobID
 	result.SourceReportID = nil
 	refs := []string{}
+	for _, attempt := range result.Attempts {
+		if !slices.Contains(refs, attempt.ID) {
+			refs = append(refs, attempt.ID)
+		}
+	}
 	for _, a := range result.Assertions {
 		for _, id := range a.AttemptIDs {
 			if !slices.Contains(refs, id) {

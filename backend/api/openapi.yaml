@@ -7890,6 +7890,11 @@ components:
           "at": {
             "type": "string",
             "format": "date-time"
+          },
+          "entry_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "本次实际入口，仅执行追溯；不是能力/目录/指纹维度，不参与完整性与路由筛选"
           }
         },
         "required": [
@@ -12563,7 +12568,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.12",
+    "version": "2026-10-18.13",
     "stage": "discovery",
     "sources": [
       {
@@ -16077,6 +16082,7 @@ x-aihub-gateway-contract:
       "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
       "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
       "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
-      "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。"
+      "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
+      "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。"
     }
   }
