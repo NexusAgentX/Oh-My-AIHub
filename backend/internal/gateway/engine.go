@@ -31,6 +31,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -68,6 +69,7 @@ var (
 
 // Dependencies wires the gateway.
 type Dependencies struct {
+	ContextNamespace  *gatewaycontract.ContextNamespace
 	Resources         resourcestate.Repository
 	ResourceCursors   *gatewaycontract.CursorCodec
 	Ready             func() error
@@ -264,6 +266,8 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	requestEncoding      string
+	codexContext         bool
 	resourceReferences   []gatewaycontract.Reference
 	auxiliaryEndpoint    *gatewaycontract.Endpoint
 	imageMultipart       *imageMultipart
@@ -434,12 +438,14 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 
 	prepareAt := e.Now()
 	call.phase, call.phaseAt = "request", prepareAt
-	body, err := readRequestBody(w, r)
+	body, encoding, err := readNativeRequest(w, r)
 	if err != nil {
 		call.requested = pathModel
-		e.reject(w, call, OutcomeRejectedModel, http.StatusRequestEntityTooLarge, "request_too_large", "请求体过大或读取失败")
+		status, code, message := transportError(err)
+		e.reject(w, call, OutcomeRejectedModel, status, code, message)
 		return
 	}
+	call.requestEncoding = encoding
 
 	// One scan of the body gives the facts of every format: the two members that
 	// pick a price, and for the formats that name the model in the body, the
@@ -449,6 +455,22 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	facts, scan, scanErr := ScanRequest(body)
 	if format == channel.FormatOpenAIImages && strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
 		facts, scan, call.imageMultipart, scanErr = scanImageMultipart(body, r.Header.Get("Content-Type"))
+	}
+	if scanErr == nil && call.imageMultipart == nil {
+		var mapped bool
+		r, body, mapped, err = e.isolateCodexRequest(r, body, scan, format, key)
+		if err != nil {
+			status, code, message := 400, "invalid_context", "会话标识或元数据无效"
+			if errors.Is(err, errContextNamespaceUnavailable) {
+				status, code, message = transportError(err)
+			}
+			e.reject(w, call, OutcomeRejectedModel, status, code, message)
+			return
+		}
+		call.codexContext = mapped
+		if mapped {
+			facts, scan, scanErr = ScanRequest(body)
+		}
 	}
 	call.requestedServiceTier = facts.ServiceTier
 	if call.imageMultipart == nil {
@@ -476,6 +498,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if err = e.prepareResources(ctx, call, body, r.URL.Path); err != nil {
 		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
 		return
+	}
+	if call.requestEncoding != "" {
+		call.resourceRequired = append(call.resourceRequired, nativeZstdRequirement)
 	}
 	if call.requested == "" && call.resourceBinding != nil {
 		call.requested = call.resourceBinding.ContextModelID
@@ -710,6 +735,12 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			tried++
 			call.lastChannelID = candidate.ChannelID
 			result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, timeouts)
+			if result.localError != nil {
+				release()
+				status, code, message := transportError(result.localError)
+				e.finishRejected(w, call, OutcomeRejectedNoChannel, status, code, message)
+				return
+			}
 			if len(candidate.Entrances) > 0 {
 				result.record.AddressID = candidate.Entrances[entry].ID
 			}
@@ -992,7 +1023,9 @@ type attemptResult struct {
 	secret      string
 	failure     *upstreamFailure
 	passthrough *upstreamFailure
-	clientGone  bool
+	// Local codec failures must not trigger supplier health changes or retry.
+	localError error
+	clientGone bool
 	// expired means the call ran out of its time limit during this attempt,
 	// before any answer reached the client.
 	expired bool
@@ -1112,6 +1145,13 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	} else if call.format != channel.FormatGemini {
 		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream)
 	}
+	if call.requestEncoding != "" {
+		upstreamBody, err = nativeencoding.Encode(r.Context(), call.requestEncoding, upstreamBody)
+		if err != nil {
+			result.localError = err
+			return result
+		}
+	}
 	target, err := UpstreamURL(candidate.BaseURL, r.URL.Path, r.URL.RawQuery, call.format, candidate.UpstreamModel, location, secret)
 	if call.auxiliaryEndpoint != nil {
 		target, err = auxiliaryURL(candidate, nativePath(*call.auxiliaryEndpoint, r, candidate.UpstreamModel), r.URL.RawQuery, location, secret)
@@ -1171,6 +1211,12 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
 	}
 	request.Header = UpstreamHeaders(r.Header, location, secret, candidate.Advanced)
+	if call.codexContext {
+		contextWireHeaders(request.Header, r.Header)
+	}
+	if call.requestEncoding != "" || call.codexContext {
+		requestWireHeaders(request.Header, call.requestEncoding)
+	}
 	request.ContentLength = int64(len(upstreamBody))
 
 	response, err := client.Do(request)

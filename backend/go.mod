@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	github.com/anthropics/anthropic-sdk-go v1.82.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/klauspost/compress v1.20.3
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3

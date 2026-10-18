@@ -17,7 +17,6 @@ type contextPatch struct {
 }
 
 // RewriteCodexContext applies the approved identifier-only exception. This is
-// not wired into Serve until F8: ordinary requests retain their current path.
 // It uses the existing byte scanner, preserving every other byte including
 // opaque encrypted contents, input item IDs, notes text and unknown extensions.
 func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract.Principal, namespace *gatewaycontract.ContextNamespace) ([]byte, http.Header, error) {

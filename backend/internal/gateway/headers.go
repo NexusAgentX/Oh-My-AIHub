@@ -32,6 +32,9 @@ var requestHeadersNeverForwarded = map[string]bool{
 	"Authorization": true, "X-Api-Key": true, "X-Goog-Api-Key": true, "X-Aihub-Tag": true,
 	"X-Forwarded-For": true, "X-Forwarded-Host": true, "X-Forwarded-Proto": true, "X-Forwarded-Port": true,
 	"X-Real-Ip": true, "Forwarded": true, "Via": true,
+	// These describe the caller's local platform identity. A provider's own
+	// identity header may only come from its approved channel configuration.
+	"Chatgpt-Account-Id": true, "Chatgpt-User-Id": true,
 }
 
 func connectionTokens(header http.Header) map[string]bool {

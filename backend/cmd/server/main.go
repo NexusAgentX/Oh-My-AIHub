@@ -228,12 +228,22 @@ func main() {
 	}
 	resourceCursors, err := gatewaycontract.NewCursorCodec(cursorRoot)
 	clear(cursorRoot)
-	stopResourceStartup()
 	if err != nil {
 		fatal(logger, "initializing resource cursor codec failed", err)
 	}
+	contextRoot, err := store.Market.ProtectedRoot(resourceStartup, credentialKeyring, "codex-context-root-v1")
+	if err != nil {
+		fatal(logger, "opening Codex context root failed", err)
+	}
+	contextNamespace, err := gatewaycontract.NewContextNamespace(contextRoot)
+	clear(contextRoot)
+	stopResourceStartup()
+	if err != nil {
+		fatal(logger, "initializing Codex context namespace failed", err)
+	}
 	engine := gateway.NewEngine(gateway.Dependencies{
-		Resources: resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
+		ContextNamespace: contextNamespace,
+		Resources:        resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
 		Ready: groupRuntime.Check, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,

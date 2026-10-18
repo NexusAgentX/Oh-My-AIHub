@@ -15,6 +15,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	uuidids "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -24,7 +25,7 @@ func protocolFormat(protocol string) channel.Format {
 	switch protocol {
 	case "openai-chat-completions":
 		return channel.FormatOpenAIChat
-	case "openai-responses":
+	case "openai-responses", "codex-special":
 		return channel.FormatOpenAIResponses
 	case "native-messages":
 		return channel.FormatAnthropic
@@ -152,10 +153,24 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(503, "resource_service_unavailable", "会话资源服务尚未就绪")
 		return
 	}
-	body, err := readRequestBody(w, r)
+	body, encoding, err := readNativeRequest(w, r)
 	if err != nil {
-		fail(413, "request_too_large", "请求体过大或读取失败")
+		fail(transportError(err))
 		return
+	}
+	if len(body) > 0 {
+		_, scan, scanErr := ScanRequest(body)
+		if scanErr == nil {
+			r, body, _, err = e.isolateCodexRequest(r, body, scan, protocolFormat(ep.Protocol), key)
+			if err != nil {
+				if errors.Is(err, errContextNamespaceUnavailable) {
+					fail(transportError(err))
+				} else {
+					fail(400, "invalid_context", "会话标识或元数据无效")
+				}
+				return
+			}
+		}
 	}
 	var object map[string]json.RawMessage
 	if len(body) > 0 && json.Unmarshal(body, &object) != nil {
@@ -245,6 +260,9 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		return
 	}
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
+	if encoding != "" {
+		selection.Required = append(selection.Required, nativeZstdRequirement)
+	}
 	if owned != nil {
 		selection.Reference = &ResourceScope{GroupID: owned.Binding.GroupID, ChannelID: owned.Binding.ChannelID, CredentialScope: owned.CredentialScope}
 	}
@@ -371,6 +389,11 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		}
 		slot.release()
 		if err != nil {
+			var codecError *requestCodecError
+			if errors.As(err, &codecError) {
+				fail(transportError(codecError.cause))
+				return
+			}
 			if ep.Replay == "write" || budget <= 0 || ctx.Err() != nil || owned != nil {
 				fail(502, "upstream_result_unknown", "上游操作未能确认，未重复写入或更换资源归属")
 				return
@@ -407,6 +430,16 @@ func (e *Engine) auxiliaryExchange(ctx context.Context, r *http.Request, ep gate
 				replacement = "models/" + replacement
 			}
 			upstream, _ = UpstreamBody(body, scan, replacement, false)
+		}
+	}
+	encoding, err := nativeencoding.Encoding(r.Header.Values("Content-Encoding"))
+	if err != nil {
+		return nil, nil, &requestCodecError{cause: err}
+	}
+	if encoding != "" {
+		upstream, err = nativeencoding.Encode(ctx, encoding, upstream)
+		if err != nil {
+			return nil, nil, &requestCodecError{cause: err}
 		}
 	}
 	entries := c.Entrances
@@ -452,6 +485,13 @@ func (e *Engine) auxiliaryExchange(ctx context.Context, r *http.Request, ep gate
 			return nil, nil, err
 		}
 		request.Header = UpstreamHeaders(r.Header, location, secret, c.Advanced)
+		mapped, _ := r.Context().Value(codexNamespaceApplied{}).(bool)
+		if mapped {
+			contextWireHeaders(request.Header, r.Header)
+		}
+		if encoding != "" || mapped {
+			requestWireHeaders(request.Header, encoding)
+		}
 		*budget--
 		response, err := client.Do(request)
 		if err != nil {
