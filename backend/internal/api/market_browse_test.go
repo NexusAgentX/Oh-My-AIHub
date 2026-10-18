@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -22,8 +23,7 @@ type browseMarketRepository struct {
 
 func TestMarketRoutingPreferencesCannotRestoreRetiredGlobalModels(t *testing.T) {
 	p, _ := marketModelFixture(t, "approved-model", nil)
-	admin := p.admin(t)
-	seedModel(t, admin, "retired-model")
+	p.store.models["retired-model"] = catalog.Model{ID: "retired-model", Enabled: true}
 	member, _ := p.member(t, "routing-market-only")
 	key := member.expect(t, 201, "POST", "/api/keys", map[string]any{"name": "routing-only"})["key"].(map[string]any)["id"].(string)
 	for _, prefix := range []string{"/api/routing/", "/api/keys/" + key + "/routing/"} {

@@ -5,28 +5,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/localtime"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
-
-// currentPrices are the model's prices at this moment for a request with no
-// prompt tokens yet: for display only. Billing selects the tier from the
-// real request (ADR-0012).
-func currentPrices(model catalog.Model, now time.Time) (ledger.Prices, int) {
-	return ledger.SelectPriceTier(model.BasePrices(), model.PriceTiers, 0, now)
-}
-
-// effectivePricesJSON is the OpenAPI EffectivePrices schema.
-type effectivePricesJSON struct {
-	Input      string `json:"input"`
-	Output     string `json:"output"`
-	CacheWrite string `json:"cache_write"`
-	CacheRead  string `json:"cache_read"`
-}
 
 // defaultKeyJSON is the OpenAPI DefaultKey schema.
 type defaultKeyJSON struct {
@@ -57,35 +40,6 @@ type homeResponseJSON struct {
 	DefaultKey       *defaultKeyJSON   `json:"default_key"`
 	PendingC2CTrades int64             `json:"pending_c2c_trades"`
 	RecentCalls      []callSummaryJSON `json:"recent_calls"`
-}
-
-// newEffectivePricesJSON converts prices in the model's currency into the
-// points a channel charges: multiplier × rate (ledger.ChannelRate).
-func newEffectivePricesJSON(prices ledger.Prices, multiplierNano, rateNano int64) effectivePricesJSON {
-	return effectivePricesJSON{
-		Input:      ledger.ScalePriceAt(prices.InputPerMillion, multiplierNano, rateNano).String(),
-		Output:     ledger.ScalePriceAt(prices.OutputPerMillion, multiplierNano, rateNano).String(),
-		CacheWrite: ledger.ScalePriceAt(prices.CacheWritePerMillion, multiplierNano, rateNano).String(),
-		CacheRead:  ledger.ScalePriceAt(prices.CacheReadPerMillion, multiplierNano, rateNano).String(),
-	}
-}
-
-// channelPricing is how one channel prices one model at the current rate:
-// the conversion rate its multiplier applies with and the multiplier it
-// effectively applies to the model's point price.
-type channelPricing struct {
-	RateNano      int64
-	EffectiveNano int64
-	FXDiscount    bool
-}
-
-func newChannelPricing(model catalog.Model, multiplierNano int64, fxDiscount bool, usdRateNano int64) channelPricing {
-	rate := ledger.ChannelRate(model.PriceCurrency, fxDiscount, usdRateNano)
-	return channelPricing{
-		RateNano:      rate,
-		EffectiveNano: ledger.EffectiveMultiplier(multiplierNano, rate, model.Rate(usdRateNano)),
-		FXDiscount:    model.PriceCurrency == ledger.CurrencyUSD && fxDiscount,
-	}
 }
 
 func ratio(value float64) string { return strconv.FormatFloat(value, 'f', 6, 64) }

@@ -47,7 +47,7 @@ export type ApiKeyDetail = Schemas['ApiKeyDetail']
 export type ApiKeyCreateRequest = Schemas['ApiKeyCreateRequest']
 export type ApiKeyUpdateRequest = Schemas['ApiKeyUpdateRequest']
 
-export type ChannelStatus = Schemas['ChannelStatus']
+export type ChannelStatus = Schemas['GroupChannel']['status']
 export type ChannelEvent = Schemas['ChannelEvent']
 export type ChannelStats = Schemas['ChannelStats']
 export type ChannelFailure = Schemas['ChannelFailure']

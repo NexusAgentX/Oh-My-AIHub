@@ -376,36 +376,17 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 // Once the market service is installed, only its approved model IDs may be
 // configured. An unknown ID must never recover a retired global offering.
 func (a *app) routable(ctx context.Context, modelID string) error {
-	if a.groupChannels != nil {
-		if a.groupChannels.Runtime == nil {
-			return groupchannel.ErrUnavailable
-		}
-		state, err := a.groupChannels.Runtime.Current()
-		if err != nil {
-			return err
-		}
-		if known, enabled := state.ModelState(modelID); known {
-			if enabled {
-				return nil
-			}
-			return catalog.ErrNotFound
-		}
-		return catalog.ErrNotFound
+	if a.groupChannels == nil || a.groupChannels.Runtime == nil {
+		return groupchannel.ErrUnavailable
 	}
-	_, err := a.catalog.Get(ctx, modelID)
-	if !errors.Is(err, catalog.ErrNotFound) {
+	state, err := a.groupChannels.Runtime.Current()
+	if err != nil {
 		return err
 	}
-	online, onlineErr := a.browse.OnlineChannels(ctx)
-	if onlineErr != nil {
-		return onlineErr
+	if known, enabled := state.ModelState(modelID); known && enabled {
+		return nil
 	}
-	for _, entry := range online {
-		if entry.ModelID == modelID && entry.Custom != nil {
-			return nil
-		}
-	}
-	return err
+	return catalog.ErrNotFound
 }
 
 func (a *app) setRouting(w http.ResponseWriter, r *http.Request) {

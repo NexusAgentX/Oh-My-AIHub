@@ -30,6 +30,17 @@ func TestLegacySupplierAndHallRoutesAreRemoved(t *testing.T) {
 	})
 }
 
+func TestLegacyIndependentChannelRoutesAreRemoved(t *testing.T) {
+	const id = "00000000-0000-4000-8000-000000000001"
+	assertRetiredRoutes(t, []struct{ method, path string }{
+		{"GET", "/api/channels"}, {"POST", "/api/channels"}, {"POST", "/api/channels/discover"},
+		{"GET", "/api/channels/" + id}, {"PATCH", "/api/channels/" + id}, {"DELETE", "/api/channels/" + id},
+		{"POST", "/api/channels/" + id + "/test"}, {"GET", "/api/admin/channels"},
+		{"GET", "/api/admin/channels/" + id}, {"POST", "/api/admin/channels/" + id + "/suspend"},
+		{"POST", "/api/admin/channels/" + id + "/unsuspend"},
+	})
+}
+
 func assertRetiredRoutes(t *testing.T, operations []struct{ method, path string }) {
 	t.Helper()
 	p := newPlatform(t)

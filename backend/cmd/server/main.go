@@ -18,7 +18,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
@@ -154,7 +153,6 @@ func main() {
 		fatal(logger, "creating the identity service failed", err)
 	}
 
-	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
 	modelIDs := func(ctx context.Context) ([]string, error) {
 		models, err := cached.Models.List(ctx, true)
@@ -465,23 +463,15 @@ func main() {
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
 			Typical: typicalCosts, GroupChannels: groupService, DetectionMCP: mcpFixture,
-			Contributions: contributions,
-			Detection:     detector,
-			Identity:      identityService,
-			Forum:         forumService,
-			Catalog:       catalogService,
-			Ledger:        ledger.NewService(store.Ledger),
-			Settings:      settingsService,
-			RateSync:      rateSyncer,
-			Audit:         audit.NewService(store.Audit),
-			Keys:          apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
-			Channels: channel.NewService(channel.Dependencies{
-				Store: cached.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
-				BlockedHosts: func(ctx context.Context) ([]string, error) {
-					value, err := settingsService.Get(ctx)
-					return value.ExtraBlockedHosts, err
-				},
-			}),
+			Contributions:     contributions,
+			Detection:         detector,
+			Identity:          identityService,
+			Forum:             forumService,
+			Ledger:            ledger.NewService(store.Ledger),
+			Settings:          settingsService,
+			RateSync:          rateSyncer,
+			Audit:             audit.NewService(store.Audit),
+			Keys:              apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
 			Routing:           cached.Routing,
 			Gateway:           engine,
 			Browse:            store.Gateway,
