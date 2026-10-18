@@ -22,17 +22,19 @@ export function useContribution(id: string) {
   })
 }
 export function useTargets(
-  kind: 'supplier' | 'group' | 'group_model',
+  kind: 'supplier' | 'group' | 'group_model' | 'address',
   cursor: string,
   enabled = true,
+  parentID?: string,
 ) {
   return useQuery({
     enabled,
-    queryKey: ['contributions', 'targets', kind, cursor],
+    queryKey: ['contributions', 'targets', kind, cursor, parentID],
     queryFn: () =>
       apiGet<'contributionTargets'>('/api/contributions/targets', {
         kind,
         cursor,
+        parent_id: parentID,
       }),
   })
 }
@@ -118,5 +120,18 @@ export function useContributionReportChoices(taskID: string, cursor: string) {
         `/api/detection/jobs/${encodeURIComponent(taskID)}/reports`,
         { cursor },
       ),
+  })
+}
+
+export function useReuseContributionAddress(id: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (value: components['schemas']['ContributionReuseAddress']) =>
+      apiSend<'reuseContributionAddress'>(
+        'POST',
+        `/api/contributions/${encodeURIComponent(id)}/addresses`,
+        value,
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['contributions'] }),
   })
 }

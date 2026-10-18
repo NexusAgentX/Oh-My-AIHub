@@ -11,10 +11,11 @@ import (
 )
 
 type Detail struct {
-	Draft          Draft      `json:"draft"`
-	Evaluation     Evaluation `json:"evaluation"`
-	Stage          string     `json:"stage"`
-	LinkedChannels int64      `json:"linked_channels"`
+	Draft          Draft            `json:"draft"`
+	Evaluation     Evaluation       `json:"evaluation"`
+	Stage          string           `json:"stage"`
+	Addresses      []market.Address `json:"addresses"`
+	LinkedChannels int64            `json:"linked_channels"`
 }
 type activeReader interface {
 	ActiveDetections(context.Context, []string) ([]market.EvidenceBinding, error)
@@ -25,18 +26,29 @@ type impactReader interface {
 }
 
 func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, error) {
-	out := Detail{Evaluation: Evaluation{Targets: []TargetReview{}}}
+	out := Detail{Addresses: []market.Address{}, Evaluation: Evaluation{Targets: []TargetReview{}}}
 	draft, err := s.Store.Edit(ctx, id, func(d *Draft, u UnitOfWork) error {
 		if !authorized(actor, *d) {
 			return ErrNotFound
 		}
-		if d.State == "approved" || d.State == "publication_pending" {
-			out.Stage = d.State
-			return nil
-		}
 		live, err := u.Directory(ctx)
 		if err != nil {
 			return err
+		}
+		wanted := map[string]bool{}
+		for _, set := range d.Changes.GroupAddresses {
+			for _, link := range set.Links {
+				wanted[link.AddressID] = true
+			}
+		}
+		for _, address := range live.Addresses {
+			if wanted[address.ID] {
+				out.Addresses = append(out.Addresses, address)
+			}
+		}
+		if d.State == "approved" || d.State == "publication_pending" {
+			out.Stage = d.State
+			return nil
 		}
 		out.Evaluation, err = Evaluate(ctx, actor, *d, live, u, s.Planner)
 		if err != nil {
@@ -171,7 +183,7 @@ type TargetChoice struct {
 	Enabled  bool   `json:"enabled"`
 }
 
-func (s *Service) Choices(ctx context.Context, actor Actor, kind, after string, limit int) ([]TargetChoice, bool, error) {
+func (s *Service) Choices(ctx context.Context, actor Actor, kind, after string, limit int, parentID string) ([]TargetChoice, bool, error) {
 	if actor.ID == "" || limit < 1 || limit > 100 {
 		return nil, false, ErrInvalid
 	}
@@ -181,6 +193,16 @@ func (s *Service) Choices(ctx context.Context, actor Actor, kind, after string, 
 	}
 	items := []TargetChoice{}
 	switch kind {
+	case "address":
+		for _, v := range d.Addresses {
+			if v.DeletedAt == nil && (parentID == "" || v.SupplierID == parentID) {
+				name := v.BaseURL
+				if v.Label != "" {
+					name = v.Label + " · " + name
+				}
+				items = append(items, TargetChoice{ID: v.ID, Name: name, ParentID: v.SupplierID, Enabled: true})
+			}
+		}
 	case "supplier":
 		for _, v := range d.Suppliers {
 			items = append(items, TargetChoice{ID: v.ID, Name: v.Name, Enabled: v.Enabled})

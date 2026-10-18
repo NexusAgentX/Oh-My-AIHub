@@ -15,6 +15,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
 // Explicit synthetic, local-only browser QA. Uses real contribution services,
@@ -73,6 +74,21 @@ func TestContributionUIHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	meta, err = service.Submit(ctx, contribution.Actor{ID: ownerID}, meta.ID, meta.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Approved metadata used to exercise explicit same-supplier address reuse.
+	supplierID := "10000000-0000-4000-8000-000000000001"
+	store.mu.Lock()
+	store.live.Suppliers = append(store.live.Suppliers, market.Supplier{ID: supplierID, ContributorID: ownerID, Name: "合成已批准供应商", Kind: "relay", WebsiteURL: "https://shared.example", Enabled: true, Revision: 1, UpdatedAt: time.Now().UTC()})
+	store.live.Addresses = append(store.live.Addresses, market.Address{ID: "10000000-0000-4000-8000-000000000002", SupplierID: supplierID, BaseURL: "https://shared.example", Label: "共享入口", Revision: 1})
+	store.mu.Unlock()
+	reuseDraft, err := service.New(ctx, contribution.Actor{ID: ownerID}, contribution.NewInput{Kind: "group", ParentID: supplierID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reuseDraft.Changes.Groups[0].Value.Name = "复用入口的合成分组"
+	reuseDraft, err = service.Save(ctx, contribution.Actor{ID: ownerID}, reuseDraft.ID, reuseDraft.Revision, "同供应商地址复用", reuseDraft.Changes, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +163,7 @@ func TestContributionUIHarness(t *testing.T) {
 			close(stopped)
 		}
 	}()
-	fmt.Printf("UI_QA_READY draft=%s review=%s api=http://127.0.0.1:18490\n", draft.ID, meta.ID)
+	fmt.Printf("UI_QA_READY draft=%s review=%s reuse=%s api=http://127.0.0.1:18490\n", draft.ID, meta.ID, reuseDraft.ID)
 	<-stopped
 	shutdown, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

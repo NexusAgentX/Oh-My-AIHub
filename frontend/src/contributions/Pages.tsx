@@ -22,6 +22,7 @@ import {
 } from '../ui'
 import { MarkdownContent } from '../markdown/MarkdownContent'
 import {
+  useReuseContributionAddress,
   useContributionIcon,
   useAddContributionChild,
   useContribution,
@@ -653,6 +654,17 @@ function Editor({ data, reload }: { data: Detail; reload: () => void }) {
                       添加模型报价
                     </Button>
                   </div>
+                  {!c.suppliers.some(
+                    (s) =>
+                      s.value.id === v.supplier_id && s.base_revision === 0,
+                  ) && (
+                    <ReuseAddress
+                      draft={d}
+                      groupID={v.id}
+                      supplierID={v.supplier_id}
+                      disabled={dirty || busy}
+                    />
+                  )}
                 </section>
               )
             })}
@@ -694,6 +706,10 @@ function Editor({ data, reload }: { data: Detail; reload: () => void }) {
                         ?.value.label ||
                         c.addresses.find((v) => v.value.id === link.address_id)
                           ?.value.base_url ||
+                        data.addresses.find((a) => a.id === link.address_id)
+                          ?.label ||
+                        data.addresses.find((a) => a.id === link.address_id)
+                          ?.base_url ||
                         '地址'}
                     </span>
                     <Button
@@ -1263,3 +1279,76 @@ function ChangeDiff({ base, changes }: { base: Changes; changes: Changes }) {
     </Disclosure>
   )
 }
+
+function ReuseAddress({
+  draft,
+  groupID,
+  supplierID,
+  disabled,
+}: {
+  draft: DraftForAddress
+  groupID: string
+  supplierID: string
+  disabled: boolean
+}) {
+  const [cursor, setCursor] = useState(''),
+    [selected, setSelected] = useState('')
+  const choices = useTargets('address', cursor, true, supplierID),
+    action = useReuseContributionAddress(draft.id)
+  return (
+    <Disclosure title="复用同供应商地址">
+      <SelectField
+        label="已批准地址"
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+      >
+        <option value="">请选择地址</option>
+        {choices.data?.items.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </SelectField>
+      <InlineError>
+        {choices.isError && errorMessage(choices.error, '无法读取地址')}
+      </InlineError>
+      <InlineError>
+        {action.isError && errorMessage(action.error, '无法复用地址')}
+      </InlineError>
+      <div className="form-actions">
+        <Button
+          type="button"
+          variant="quiet"
+          disabled={disabled || !cursor}
+          onClick={() => setCursor('')}
+        >
+          第一页
+        </Button>
+        <Button
+          type="button"
+          variant="quiet"
+          disabled={disabled || !choices.data?.next_cursor}
+          onClick={() => setCursor(choices.data?.next_cursor ?? '')}
+        >
+          下一页
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={disabled || !selected}
+          loading={action.isPending}
+          onClick={() =>
+            action.mutate({
+              revision: draft.revision,
+              group_id: groupID,
+              address_id: selected,
+            })
+          }
+        >
+          引用此地址
+        </Button>
+      </div>
+    </Disclosure>
+  )
+}
+type DraftForAddress = Detail['draft']

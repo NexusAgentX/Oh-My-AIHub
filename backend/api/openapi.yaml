@@ -27,6 +27,80 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/contributions/{draftID}/addresses:
+    {
+      "post": {
+        "operationId": "reuseContributionAddress",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "引用同供应商已批准地址",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionReuseAddress"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
   /api/contributions/targets:
     {
       "get": {
@@ -104,8 +178,17 @@ paths:
               "enum": [
                 "supplier",
                 "group",
-                "group_model"
+                "group_model",
+                "address"
               ]
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ]
@@ -5351,6 +5434,30 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    ContributionReuseAddress:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "revision",
+          "group_id",
+          "address_id"
+        ],
+        "additionalProperties": false
+      }
     ContributionTargets:
       {
         "type": "object",
@@ -6539,13 +6646,20 @@ components:
           "linked_channels": {
             "type": "integer",
             "minimum": 0
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionAddress"
+            }
           }
         },
         "required": [
           "draft",
           "evaluation",
           "stage",
-          "linked_channels"
+          "linked_channels",
+          "addresses"
         ],
         "additionalProperties": false
       }

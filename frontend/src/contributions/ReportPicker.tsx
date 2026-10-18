@@ -80,6 +80,9 @@ export function ReportPicker({
           <InlineError>
             {reports.isError && errorMessage(reports.error, '无法加载报告')}
           </InlineError>
+          {reports.data?.items.length === 0 && (
+            <p className="muted-copy">此任务尚未生成可关联的报告。</p>
+          )}
           {reports.data?.items.map((r) => (
             <div key={r.id} className="contribution-order">
               <Checkbox

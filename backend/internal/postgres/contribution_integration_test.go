@@ -199,7 +199,8 @@ func TestContributionPrivateBundleNegativeReviewAndAtomicRetry(t *testing.T) {
 	}
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM market_quotes`).Scan(&quotes); err != nil || quotes != 2 {
 		t.Fatal("concurrent review produced duplicate version", quotes, err)
-	} // Delete through the full review path with real financial/Key rows and an
+	}
+	// Delete through the full review path with real financial/Key rows and an
 	// attached channel. The config cascade must preserve protected history.
 	channelID := marketID(t)
 	sealed, err := upstreamKeyringOf(t, "v1", "v1").Encrypt(channelID, 1, "synthetic-only")

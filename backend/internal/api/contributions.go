@@ -18,6 +18,7 @@ func (a *app) registerContributionRoutes(r *router) {
 			next(w, r.WithContext(ctx))
 		}
 	}
+	r.implement("492", "POST /api/contributions/{draftID}/addresses", accessReady, bounded(a.reuseContributionAddress))
 	r.implement("492", "GET /api/contributions/targets", accessReady, bounded(a.contributionTargets))
 	r.implement("492", "GET /api/contributions", accessReady, bounded(a.listContributions))
 	r.implement("492", "POST /api/contributions", accessReady, bounded(a.newContribution))
@@ -137,7 +138,7 @@ func (a *app) getContribution(w http.ResponseWriter, r *http.Request) {
 		writeContributionError(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"draft": draftJSON(detail.Draft), "evaluation": detail.Evaluation, "stage": detail.Stage, "linked_channels": detail.LinkedChannels})
+	writeJSON(w, 200, map[string]any{"draft": draftJSON(detail.Draft), "evaluation": detail.Evaluation, "stage": detail.Stage, "linked_channels": detail.LinkedChannels, "addresses": detail.Addresses})
 }
 func (a *app) saveContribution(w http.ResponseWriter, r *http.Request) {
 	if !a.contributionReady(w) {
@@ -281,7 +282,12 @@ func (a *app) contributionTargets(w http.ResponseWriter, r *http.Request) {
 		writeBadCursor(w)
 		return
 	}
-	items, more, err := a.contributions.Choices(r.Context(), contributionActor(r), r.URL.Query().Get("kind"), after, limit)
+	parentID := r.URL.Query().Get("parent_id")
+	if parentID != "" && !uuidPattern.MatchString(parentID) {
+		writeContributionError(w, contribution.ErrInvalid)
+		return
+	}
+	items, more, err := a.contributions.Choices(r.Context(), contributionActor(r), r.URL.Query().Get("kind"), after, limit, parentID)
 	if err != nil {
 		writeContributionError(w, err)
 		return
@@ -292,4 +298,33 @@ func (a *app) contributionTargets(w http.ResponseWriter, r *http.Request) {
 		next = &v
 	}
 	writeJSON(w, 200, pageJSON[contribution.TargetChoice]{Items: items, NextCursor: next})
+}
+
+func (a *app) reuseContributionAddress(w http.ResponseWriter, r *http.Request) {
+	if !a.contributionReady(w) {
+		return
+	}
+	id, ok := pathUUID(w, r, "draftID")
+	if !ok {
+		return
+	}
+	var input struct {
+		Revision  int64  `json:"revision"`
+		GroupID   string `json:"group_id"`
+		AddressID string `json:"address_id"`
+	}
+	if decodeJSON(w, r, &input) != nil {
+		writeInvalidJSON(w)
+		return
+	}
+	if !uuidPattern.MatchString(input.GroupID) || !uuidPattern.MatchString(input.AddressID) {
+		writeContributionError(w, contribution.ErrInvalid)
+		return
+	}
+	d, err := a.contributions.ReuseAddress(r.Context(), contributionActor(r), id, input.Revision, input.GroupID, input.AddressID)
+	if err != nil {
+		writeContributionError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"draft": draftJSON(d)})
 }

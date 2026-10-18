@@ -163,6 +163,17 @@ func TestContributionAPIPrivateReviewRevisionAndSchema(t *testing.T) {
 	if d["state"] != "approved" {
 		t.Fatal("approval missing")
 	}
+	// An approved address can be shared by another group of this supplier.
+	addressID := "00000000-0000-4000-8000-000000000005"
+	store.mu.Lock()
+	store.live.Addresses = append(store.live.Addresses, market.Address{ID: addressID, SupplierID: d["target_id"].(string), BaseURL: "https://shared.example", Label: "共享地址", Revision: 1})
+	store.mu.Unlock()
+	owner.expect(t, 200, "GET", "/api/contributions/targets?kind=address&parent_id="+d["target_id"].(string), nil)
+	shared := owner.expect(t, 201, "POST", "/api/contributions", map[string]any{"kind": "group", "parent_id": d["target_id"]})["draft"].(map[string]any)
+	sharedPath := "/api/contributions/" + shared["id"].(string)
+	shared = owner.expect(t, 200, "POST", sharedPath+"/addresses", map[string]any{"revision": shared["revision"], "group_id": shared["target_id"], "address_id": addressID})["draft"].(map[string]any)
+	owner.expect(t, 200, "GET", sharedPath, nil)
+	other.expect(t, 404, "POST", sharedPath+"/addresses", map[string]any{"revision": shared["revision"], "group_id": shared["target_id"], "address_id": addressID})
 	child := owner.expect(t, 201, "POST", "/api/contributions", map[string]any{"kind": "supplier"})["draft"].(map[string]any)
 	childID := child["id"].(string)
 	parent := child["target_id"].(string)
