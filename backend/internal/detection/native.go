@@ -26,6 +26,7 @@ type nativeOutcome struct {
 type nativeScene struct {
 	s           *Session
 	protocol    string
+	layer       string
 	requirement gatewaycontract.Requirement
 	result      Result
 	witnesses   []string
@@ -367,6 +368,9 @@ func (n *nativeScene) finish() Result {
 	r.State = "pass"
 	r.Reason = "ok"
 	for i, label := range n.requirement.Assertions {
+		if n.layer != "" && !n.requirement.AssertionInLayer(AssertionID(n.requirement.ID, i), n.layer) {
+			continue
+		}
 		a, ok := n.checks[label]
 		if !ok {
 			a = Assertion{State: "inconclusive", Reason: "prerequisite_failed", AttemptIDs: slices.Clone(n.witnesses[:min(16, len(n.witnesses))])}

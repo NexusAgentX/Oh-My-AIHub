@@ -17775,7 +17775,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.19",
+    "version": "2026-10-18.20",
     "stage": "discovery",
     "sources": [
       {
@@ -21172,7 +21172,8 @@ x-aihub-gateway-contract:
               "identity.whoami",
               "identity.accounts",
               "codex.responses",
-              "codex.notes.thread_hint"
+              "codex.notes.thread_hint",
+              "codex.models"
             ],
             "source_ids": [
               "RL13"

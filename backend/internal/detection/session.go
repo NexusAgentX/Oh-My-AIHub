@@ -267,6 +267,13 @@ func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) 
 						}
 					}
 				}
+				// Scene code owns the body bytes. Inherited header rules cannot
+				// relabel compressed bytes or turn a plain control into a zstd
+				// witness. NewRequest derives the actual wire length above.
+				req.Header.Del("Content-Encoding")
+				if encoding := input.Headers.Get("Content-Encoding"); encoding != "" {
+					req.Header.Set("Content-Encoding", encoding)
+				}
 				credential := string(s.secret)
 				if input.Authentication == AuthenticationInvalid {
 					credential = "aihub-invalid-" + id

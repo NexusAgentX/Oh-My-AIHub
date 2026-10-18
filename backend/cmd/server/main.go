@@ -339,6 +339,9 @@ func main() {
 	if err = registry.RegisterNative(); err != nil {
 		fatal(logger, "registering native detection suites failed", err)
 	}
+	if err = registry.RegisterCodexNative(); err != nil {
+		fatal(logger, "registering Codex native detection suites failed", err)
+	}
 	var mcpFixture *detection.MCPFixture
 	if origin := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_PUBLIC_ORIGIN")); origin != "" {
 		mcpFixture, err = detection.NewMCPFixture(origin)
