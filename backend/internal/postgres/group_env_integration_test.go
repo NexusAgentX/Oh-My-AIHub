@@ -3,19 +3,24 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
 
@@ -32,11 +37,15 @@ func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 	return newEnvOnMode(t, pool, store, configure, true)
 }
 
-type groupIntegrationEvidence struct{ snapshot.Loader }
+type groupIntegrationEvidence struct {
+	snapshot.Loader
+	Prices *groupIntegrationPriceSource
+}
 
 func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
 	rows, err := l.Loader.LoadCandidates(ctx)
 	rows = append([]gateway.CandidateRecord(nil), rows...)
+	comparisons := &groupComparisonSnapshot{values: map[groupComparisonKey]money.Amount{}}
 	for i := range rows {
 		c := &rows[i].Candidate
 		c.Evidence = map[string]bool{}
@@ -45,11 +54,19 @@ func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway
 			c.Evidence["upstream_protocol/"+protocol+".stream/text_lifecycle"] = true
 			c.VerifiedCapacity[protocol+".length_search@upstream_protocol/max_output"] = 8192
 		}
-		// This fixture fixes the comparison workload at 1000 input/500 output
-		// tokens with 10/20 CNY prices. No unknown live profile is fabricated.
-		c.TypicalCostKnown = true
-		c.TypicalCost = money.FromNano(c.MultiplierNano / 50)
-		c.TypicalUnit, c.TypicalQuantity = "per_request", 1
+		// An explicit 1000-input/500-output synthetic workload is evaluated
+		// off the request path against this immutable CNY quote generation.
+		if c.Quotes != nil {
+			if offer, ok := c.Quotes.Offers[rows[i].ModelID]; ok && offer.Quote.Currency == ledger.CurrencyCNY {
+				statement, calcErr := quotepricing.Calculate(c.Quotes, rows[i].ModelID, quotepricing.Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1000, OutputTokens: 500}}, time.Now(), c.MultiplierNano, ledger.UnitRate, 0)
+				if calcErr == nil {
+					comparisons.values[groupComparisonKey{c.ChannelID, rows[i].ModelID, c.GroupID, c.PricingVersion, c.MultiplierNano}] = statement.Cost
+				}
+			}
+		}
+	}
+	if err == nil {
+		l.Prices.current.Store(comparisons)
 	}
 	return rows, err
 }
@@ -115,9 +132,13 @@ func (e *env) createGroupedChannel(owner person, spec channelSpec) string {
 	}
 	c := market.Changes{}
 	if address.ID == "" {
-		supplier := market.Supplier{ID: marketID(e.t), Name: spec.name + " supplier", Kind: "relay", Enabled: true, WebsiteURL: "https://synthetic.example"}
-		address = market.Address{ID: marketID(e.t), SupplierID: supplier.ID, BaseURL: base}
-		c.Suppliers = append(c.Suppliers, market.Change[market.Supplier]{Value: supplier})
+		supplierID := spec.supplierID
+		if supplierID == "" {
+			supplier := market.Supplier{ID: marketID(e.t), Name: spec.name + " supplier", Kind: "relay", Enabled: true, WebsiteURL: "https://synthetic.example"}
+			supplierID = supplier.ID
+			c.Suppliers = append(c.Suppliers, market.Change[market.Supplier]{Value: supplier})
+		}
+		address = market.Address{ID: marketID(e.t), SupplierID: supplierID, BaseURL: base}
 		c.Addresses = append(c.Addresses, market.Change[market.Address]{Value: address})
 	}
 	g := market.Group{ID: marketID(e.t), SupplierID: address.SupplierID, Name: spec.name + " group", Enabled: true}
@@ -169,32 +190,74 @@ func (e *env) createGroupedChannel(owner person, spec channelSpec) string {
 	return id
 }
 
-func (e *env) installGroupLoopback(port string) {
-	e.t.Helper()
-	current, ok := e.engine.Outbound.(testOutbound)
+type groupComparisonKey struct {
+	Channel, Model, Group, Version string
+	Discount                       int64
+}
+type groupComparisonSnapshot struct {
+	values map[groupComparisonKey]money.Amount
+}
+
+func (s *groupComparisonSnapshot) LookupComparison(channel, model, group, version string, discount, _ int64) (money.Amount, string, int64, bool) {
+	if s == nil {
+		return 0, "", 0, false
+	}
+	price, ok := s.values[groupComparisonKey{channel, model, group, version, discount}]
+	return price, "per_request", 1, ok
+}
+
+type groupIntegrationPriceSource struct {
+	current atomic.Pointer[groupComparisonSnapshot]
+}
+
+func (s *groupIntegrationPriceSource) View() gateway.TypicalPriceLookup { return s.current.Load() }
+
+type groupLoopbackPorts struct {
+	mu     sync.RWMutex
+	values map[string]bool
+}
+
+func groupFixtureOutbound(outbound channel.Outbound) (channel.Outbound, *groupLoopbackPorts) {
+	current, ok := outbound.(testOutbound)
 	if !ok {
-		e.t.Fatal("group integration fixture requires its controlled transport")
+		return outbound, nil
 	}
 	transport, ok := current.client.Transport.(*http.Transport)
 	if !ok {
-		e.t.Fatal("group integration fixture requires an HTTP transport")
+		return outbound, nil
 	}
-	copy := transport.Clone()
-	previous := copy.DialContext
-	copy.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-		if address == net.JoinHostPort("example.com", port) {
-			address = net.JoinHostPort("127.0.0.1", port)
+	registry := &groupLoopbackPorts{values: map[string]bool{}}
+	copied := transport.Clone()
+	previous := copied.DialContext
+	copied.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
 		}
+		registry.mu.RLock()
+		owned := registry.values[port]
+		registry.mu.RUnlock()
+		if host != "example.com" || !owned {
+			return nil, fmt.Errorf("unregistered group fixture upstream")
+		}
+		address = net.JoinHostPort("127.0.0.1", port)
 		if previous != nil {
 			return previous(ctx, network, address)
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, address)
 	}
 	client := *current.client
-	client.Transport = copy
-	e.engine.Outbound = testOutbound{client: &client}
-	e.engineDeps.Outbound = e.engine.Outbound
-	e.t.Cleanup(copy.CloseIdleConnections)
+	client.Transport = copied
+	return testOutbound{client: &client}, registry
+}
+func (e *env) installGroupLoopback(port string) {
+	e.t.Helper()
+	if e.groupPorts == nil {
+		e.t.Fatal("group fixture requires its controlled stable transport")
+	}
+	e.groupPorts.mu.Lock()
+	e.groupPorts.values[port] = true
+	e.groupPorts.mu.Unlock()
 }
 
 // The patch contains the actual group API fields. The helper supplies its

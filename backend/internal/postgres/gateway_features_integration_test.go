@@ -502,9 +502,9 @@ func TestGroupKeyProbesPersistNativeFormatsWithoutBilling(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/chat/completions"):
-			io.WriteString(w, chatBody)
+			io.WriteString(w, `{"id":"fixture","object":"chat.completion","created":1,"model":"gpt-test","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`)
 		case strings.HasSuffix(r.URL.Path, "/messages"):
-			io.WriteString(w, anthropicBody)
+			io.WriteString(w, `{"id":"fixture","type":"message","role":"assistant","model":"gpt-test","content":[{"type":"text","text":"OK"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}`)
 		default:
 			w.WriteHeader(404)
 			io.WriteString(w, "no such route key=upstream-key-test")

@@ -222,10 +222,10 @@ func newPerfStack(t *testing.T, channels, consumers int, dnsDelay time.Duration)
 	s.pool, store = perfDatabase(t, s.counter)
 	withLabel("gateway", func() {
 		quiet := slog.New(slog.NewJSONHandler(io.Discard, nil))
-		s.e = newEnvOn(t, s.pool, store, func(d *gateway.Dependencies) {
+		s.e = newEnvOnMode(t, s.pool, store, func(d *gateway.Dependencies) {
 			d.Outbound = policy
 			d.Logger = quiet
-		})
+		}, true)
 		// What cmd/server runs next to the engine. The refresh is marked so
 		// that its queries are told apart from those of requests.
 		background, stop := context.WithCancel(gatewaybench.Background(context.Background()))

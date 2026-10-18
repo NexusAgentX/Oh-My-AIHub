@@ -190,6 +190,7 @@ type person struct {
 type env struct {
 	groups     *groupchannel.Runtime
 	groupStore *groupchannelpg.Store
+	groupPorts *groupLoopbackPorts
 	t          *testing.T
 	pool       *pgxpool.Pool
 	store      *storepg.Store
@@ -262,12 +263,16 @@ func newEnvOnMode(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, config
 	// Like the server, run the gateway on the cached stores and build every
 	// service that writes the cached data on them (ADR-0040).
 	var groups *groupchannel.Runtime
+	var groupedPrices *groupIntegrationPriceSource
 	var repo *groupchannelpg.Store
 	var options []func(*snapshot.Config)
 	if grouped {
 		repo = groupchannelpg.NewStore(pool)
+		groupedPrices = &groupIntegrationPriceSource{}
 		groups = &groupchannel.Runtime{Repository: repo}
-		options = append(options, func(c *snapshot.Config) { c.Loader = groupIntegrationEvidence{Loader: groups.Wrap(c.Loader)} })
+		options = append(options, func(c *snapshot.Config) {
+			c.Loader = groupIntegrationEvidence{Loader: groups.Wrap(c.Loader), Prices: groupedPrices}
+		})
 	}
 	cached := store.Cached(logger, options...)
 	if grouped {
@@ -335,8 +340,14 @@ func newEnvOnMode(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, config
 		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: gateway.Publishers{bus, e.metrics}, Telemetry: e.metrics,
 	}
+	if grouped {
+		dependencies.TypicalPrices = groupedPrices.View
+	}
 	if configure != nil {
 		configure(&dependencies)
+	}
+	if grouped {
+		dependencies.Outbound, e.groupPorts = groupFixtureOutbound(dependencies.Outbound)
 	}
 	if grouped {
 		dependencies.Ready = groups.Check
@@ -506,6 +517,7 @@ type channelSpec struct {
 	upstream *upstream
 	// baseURL, when set, is used in place of the fake upstream's address; the
 	// performance baseline points channels at host names of its own.
+	supplierID string
 	baseURL    string
 	key        string
 	model      string

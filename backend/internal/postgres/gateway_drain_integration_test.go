@@ -53,6 +53,7 @@ func (e *env) openStream(server *httptest.Server, secret, path, body string, hea
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 	response, err := client.Do(request)
 	if err != nil {
+		e.t.Log(e.logs.String())
 		e.t.Fatal(err)
 	}
 	stream := &liveStream{t: e.t, response: response, reader: bufio.NewReader(response.Body), cancel: cancel}

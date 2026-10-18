@@ -65,7 +65,7 @@ type observed struct {
 }
 
 func newObserved(t *testing.T) *observed {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	o := &observed{env: e}
 	o.consumer = e.member("consumer", "100")
 	o.sharer = e.member("sharer", "0")
@@ -78,7 +78,17 @@ func newObserved(t *testing.T) *observed {
 	good := okUpstream(t)
 	// The flaky channel is the cheapest, fails first and the call falls back to the sharer's.
 	o.brokenID = e.createChannel(o.flaky, channelSpec{name: "flaky-relay", upstream: broken, multiplier: "1"})
-	o.goodID = e.createChannel(o.sharer, channelSpec{name: "good-relay", upstream: good, multiplier: "2"})
+	row, err := e.groupStore.Get(context.Background(), o.brokenID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var supplierID string
+	for _, g := range marketSnapshot(t, e.store).Groups {
+		if g.ID == row.GroupID {
+			supplierID = g.SupplierID
+		}
+	}
+	o.goodID = e.createChannel(o.sharer, channelSpec{name: "good-relay", upstream: good, multiplier: "2", supplierID: supplierID})
 	o.keyID, o.secret = e.defaultKey(o.consumer)
 	o.fellBack = e.chat(o.secret, map[string]string{"X-AIHub-Tag": "suite"})
 	// With the flaky channel in cooldown or still cheapest, further calls also pass the sharer.
@@ -706,7 +716,7 @@ func (o *observed) insertUnbookedCall(account person, channelID, outcome string,
 }
 
 func TestObserveOwnChannelCallsAreNotMissingBookings(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	owner := e.member("owner", "10")
 	relay := okUpstream(t)
 	channelID := e.createChannel(owner, channelSpec{name: "mine", upstream: relay})
@@ -872,7 +882,7 @@ func TestObserveOverviewAttentionRules(t *testing.T) {
 }
 
 func TestObserveOverviewFlagsAFailingChannel(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	broken := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) { w.WriteHeader(http.StatusBadGateway) })
@@ -900,7 +910,7 @@ func TestObserveOverviewFlagsAFailingChannel(t *testing.T) {
 // Feature #348: a consumer whose successful calls often cannot be billed is
 // named in "needs attention" with the channel behind most of them.
 func TestObserveOverviewFlagsConsumersWithUnbilledCalls(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	sharer := e.member("sharer", "0")
 	heavy := e.member("heavy", "0")
 	normal := e.member("normal", "0")
