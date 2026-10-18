@@ -136,7 +136,7 @@ func TestAChannelBecomingAnomalousIsAnnouncedOnceAndRanksLast(t *testing.T) {
 // which client were 4xx, without going through them one by one.
 func (r *statsRig) bulk(channelID string, counted, client int64) {
 	r.book.Load([]AttemptHistoryRow{{ChannelID: channelID, ModelID: "m", Bucket: statsEpoch(*r.clock), TTFTBin: -1, Counted: counted - client, ClientErrors: client}}, *r.clock)
-	r.engine.modelMetrics.load([]ModelAttemptHistoryRow{{ChannelID: channelID, ModelID: "m", Format: channel.FormatOpenAIChat, Bucket: statsEpoch(*r.clock), Counted: counted - client, ClientErrors: client, Excluded: client, LatencyBin: -1, SpeedBin: -1}}, *r.clock)
+	r.engine.modelMetrics.load([]ModelAttemptHistoryRow{{ChannelID: channelID, ModelID: "m", Protocol: "openai-chat-completions", Format: channel.FormatOpenAIChat, Bucket: statsEpoch(*r.clock), Counted: counted - client, ClientErrors: client, Excluded: client, LatencyBin: -1, SpeedBin: -1}}, *r.clock)
 }
 
 func TestAnomalyEventsAreNotRepeatedWithinAnHourOfFlapping(t *testing.T) {

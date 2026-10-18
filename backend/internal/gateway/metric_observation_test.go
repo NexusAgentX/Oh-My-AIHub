@@ -135,3 +135,43 @@ func BenchmarkFinishedOutputTPS(b *testing.B) {
 		}
 	}
 }
+
+func TestPublicResponsesAndCodexHaveSeparateRoutingMeasurements(t *testing.T) {
+	now := time.Now()
+	e := NewEngine(Dependencies{Now: func() time.Time { return now }})
+	for _, row := range []struct {
+		channel, protocol string
+		latency           int
+		tps               float64
+	}{
+		{"a", "openai-responses", 100, 200}, {"b", "openai-responses", 800, 10},
+		{"a", "codex-special", 900, 5}, {"b", "codex-special", 50, 160},
+	} {
+		for range 20 {
+			e.modelMetrics.record(modelMetricKey{channel: row.channel, model: "one", format: channel.FormatOpenAIResponses, protocol: row.protocol, stream: true}, modelMetricSample{end: EndCompleted, firstOutputMS: &row.latency, outputTPS: &row.tps}, now)
+		}
+	}
+	e.RefreshStats()
+	pool := []Candidate{candidate("a", "provider", 1), candidate("b", "provider", 1)}
+	for _, protocol := range []string{"openai-responses", "codex-special"} {
+		stats := e.ModelStatsForProtocol("one", channel.FormatOpenAIResponses, protocol, "", true)
+		want := "ab"
+		if protocol == "codex-special" {
+			want = "ba"
+		}
+		for _, mode := range []routing.Mode{routing.ModeFastest, routing.ModeSpeed} {
+			if got := ids(Rank(RankInput{Mode: mode, Candidates: pool, Stats: stats})); got != want {
+				t.Fatalf("%s/%s borrowed another entry's measurements: %s", protocol, mode, got)
+			}
+		}
+	}
+	if len(e.ModelMetrics("one")["a"]) != 2 {
+		t.Fatal("public view merged native and public measurements")
+	}
+	call := &callState{format: channel.FormatOpenAIResponses, metricProtocol: "codex-special"}
+	record := Attempt{}
+	populateAttemptMetrics(call, &record, Observation{}, now)
+	if record.MetricProtocol != "codex-special" {
+		t.Fatal("persisted observation lost its entry protocol")
+	}
+}

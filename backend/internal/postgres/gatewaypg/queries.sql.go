@@ -980,14 +980,16 @@ WITH limited AS (
      THEN CASE WHEN (att->>'selection_output_ms')::float8=0 THEN 0 ELSE greatest(0,least(191,floor(log(2::numeric,(att->>'selection_output_ms')::numeric)*8)+1))::int END ELSE -1 END AS latency_bin,
    CASE WHEN att->>'end_reason'='completed' AND (att->>'output_tps')::float8>0
      THEN greatest(0,least(191,floor((log(2::numeric,(att->>'output_tps')::numeric)+16)*4)))::int ELSE -1 END AS speed_bin,
-   att->>'end_reason' AS end_reason, c.created_at,c.history_truncated
+   att->>'end_reason' AS end_reason, c.created_at,c.history_truncated,att->>'metric_protocol' AS protocol
  FROM recent c CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
  WHERE att->>'metrics_version'='2' AND c.model_id IS NOT NULL
+   AND att->>'metric_protocol' IN ('openai-chat-completions','openai-responses','native-messages','native-generate-content','openai-images','codex-special')
    AND jsonb_typeof(att->'channel')='object'
    AND att->>'selection_final' IS DISTINCT FROM 'false'
 )
 SELECT a.channel_id,a.model_id::text AS model_id,a.format::text AS format,a.stream,a.tier::text AS tier,a.bucket,
  a.latency_bin::int AS latency_bin,a.speed_bin::int AS speed_bin,
+ a.protocol::text AS protocol,
  bool_or(a.history_truncated)::boolean AS history_truncated,
  count(*) FILTER (WHERE end_reason NOT IN ('client_error','client_disconnected'))::bigint AS counted,
  count(*) FILTER (WHERE end_reason='completed')::bigint AS successes,
@@ -996,8 +998,8 @@ SELECT a.channel_id,a.model_id::text AS model_id,a.format::text AS format,a.stre
  count(*) FILTER (WHERE end_reason<>'client_disconnected' AND a.created_at<ch.updated_at)::bigint AS before_edit_attempts,
  count(*) FILTER (WHERE end_reason='client_error' AND a.created_at<ch.updated_at)::bigint AS before_edit_client_errors
 FROM observed a LEFT JOIN channels ch ON ch.id=a.channel_id
-GROUP BY 1,2,3,4,5,6,7,8
-ORDER BY a.bucket DESC,a.channel_id,a.model_id,a.format,a.stream,a.tier,a.latency_bin,a.speed_bin
+GROUP BY 1,2,3,4,5,6,7,8,9
+ORDER BY a.bucket DESC,a.channel_id,a.model_id,a.format,a.protocol,a.stream,a.tier,a.latency_bin,a.speed_bin
 LIMIT $1::int
 `
 
@@ -1015,6 +1017,7 @@ type ModelAttemptHistoryRow struct {
 	Bucket                 int64
 	LatencyBin             int32
 	SpeedBin               int32
+	Protocol               string
 	HistoryTruncated       bool
 	Counted                int64
 	Successes              int64
@@ -1046,6 +1049,7 @@ func (q *Queries) ModelAttemptHistory(ctx context.Context, arg ModelAttemptHisto
 			&i.Bucket,
 			&i.LatencyBin,
 			&i.SpeedBin,
+			&i.Protocol,
 			&i.HistoryTruncated,
 			&i.Counted,
 			&i.Successes,

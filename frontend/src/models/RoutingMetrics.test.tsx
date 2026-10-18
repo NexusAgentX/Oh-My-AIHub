@@ -13,7 +13,7 @@ describe('model-scoped routing measurements', () => {
   })
   it('does not show missing or thin data as measured zero or mature evidence', () => {
     expect(renderToStaticMarkup(<RoutingMetrics rows={[]} />)).toContain('未知')
-    const html = renderToStaticMarkup(<RoutingMetrics rows={[{ format: 'openai_responses', tier: '', stream: true, attempts: 3, successes: 3, excluded: 2, success_rate: 1, first_output_p50_ms: 0, first_output_samples: 3, output_tps_p50: null, output_samples: 0, min_samples: 20 }]} />)
+    const html = renderToStaticMarkup(<RoutingMetrics rows={[{ protocol: 'openai-responses', format: 'openai_responses', tier: '', stream: true, attempts: 3, successes: 3, excluded: 2, success_rate: 1, first_output_p50_ms: 0, first_output_samples: 3, output_tps_p50: null, output_samples: 0, min_samples: 20 }]} />)
     expect(html).toContain('0 ms')
     expect(html).toContain('未知')
     expect(html).toContain('样本不足')

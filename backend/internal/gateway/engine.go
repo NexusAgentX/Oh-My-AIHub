@@ -272,6 +272,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	metricProtocol       string
 	nativeRequired       nativeRequirements
 	requestEncoding      string
 	codexContext         bool
@@ -396,6 +397,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	callCtx, stopCall := context.WithTimeoutCause(context.WithoutCancel(ctx), e.CallTimeLimit, errCallDeadline)
 	defer stopCall()
 	call := &callState{started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
+	call.metricProtocol = nativeProtocol(format)
+	if strings.HasPrefix(r.URL.Path, "/backend-api/codex/") {
+		call.metricProtocol = "codex-special"
+	}
 	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
 	observed := &observedWriter{ResponseWriter: w}
 	w = observed
@@ -685,7 +690,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		}
 	}
 	stats := e.statsView()
-	modelStats, demoted := stats.forModel(call.modelID, format, call.requestedServiceTier, call.stream)
+	modelStats, demoted := stats.forProtocol(call.modelID, format, callMetricProtocol(call), call.requestedServiceTier, call.stream)
 	capabilityBlocked := false
 	for _, candidate := range candidates {
 		reason := "eligible"
@@ -1124,6 +1129,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	policy channel.Outbound, body []byte, scan objectScan, location authLocation, timeouts attemptTimeouts) attemptResult {
 	result := attemptResult{started: e.Now(), record: Attempt{Channel: &AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, UpstreamModel: candidate.UpstreamModel, OffsetMS: millis(e.Now().Sub(call.started))}}
 	result.record.MetricsVersion = 2
+	result.record.MetricProtocol = callMetricProtocol(call)
 	result.record.MetricTier = requestedMetricTier(call.format, call.requestedServiceTier)
 	var network *NetworkAttempt
 	if call.diagnostics.Network != nil {

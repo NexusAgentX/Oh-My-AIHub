@@ -171,6 +171,7 @@ type CallInsert struct {
 
 // Attempt is one try on one channel (calls.attempts).
 type Attempt struct {
+	MetricProtocol     string           `json:"metric_protocol,omitempty"`
 	MetricsVersion     int              `json:"metrics_version,omitempty"`
 	MetricTier         string           `json:"metric_tier,omitempty"`
 	ActualServiceTier  string           `json:"actual_service_tier,omitempty"`

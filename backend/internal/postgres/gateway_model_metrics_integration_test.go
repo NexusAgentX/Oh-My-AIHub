@@ -17,16 +17,16 @@ func TestModelMetricHistoryUsesCompletedTimeVersionAndSelectionBoundary(t *testi
 	_, err := e.pool.Exec(context.Background(), `INSERT INTO calls(account_id,model_id,requested_model,format,stream,outcome,created_at,completed_at,attempts)
 VALUES($1,'gpt-test','gpt-test','openai_chat',true,'succeeded',now()-interval '25 hours',now()-interval '1 minute',
 jsonb_build_array(
- jsonb_build_object('metrics_version',2,'metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','upstream_error','selection_final',false),
- jsonb_build_object('metrics_version',2,'metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','completed','selection_final',true,'selection_output_ms',200,'output_tps',80)))`, consumer.id, candidate)
+ jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','upstream_error','selection_final',false),
+ jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','completed','selection_final',true,'selection_output_ms',200,'output_tps',80)))`, consumer.id, candidate)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = e.pool.Exec(context.Background(), `INSERT INTO calls(account_id,model_id,requested_model,format,stream,outcome,created_at,completed_at,attempts)
 VALUES($1,'gpt-test','gpt-test','openai_chat',true,'upstream_failed',now()-interval '2 minutes',now()-interval '1 minute',
 jsonb_build_array(
- jsonb_build_object('metrics_version',2,'metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','client_error'),
- jsonb_build_object('metrics_version',2,'metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','client_disconnected'),
+ jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','client_error'),
+ jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','metric_tier','openai:fast','channel',jsonb_build_object('id',$2::text),'end_reason','client_disconnected'),
  jsonb_build_object('channel',jsonb_build_object('id',$2::text),'end_reason','completed','ttft_ms',1)))`, consumer.id, candidate)
 	if err != nil {
 		t.Fatal(err)

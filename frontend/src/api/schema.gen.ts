@@ -4380,6 +4380,11 @@ export interface components {
             items: components["schemas"]["CatalogModel"][];
         };
         ModelRoutingMetric: {
+            /**
+             * @description 实际入口协议；Codex 原生与公共 Responses/Images 分开计量。
+             * @enum {string}
+             */
+            protocol: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images" | "codex-special";
             format: components["schemas"]["Format"];
             /** @description 请求档位；空值代表默认/auto 调用上下文。 */
             tier: string;
@@ -4854,6 +4859,8 @@ export interface components {
             trend: components["schemas"]["AnalysisRow"][];
         };
         CallAttempt: {
+            /** @enum {string} */
+            metric_protocol?: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images" | "codex-special";
             /**
              * @description 新观测口径；历史缺失记录不作为首有效输出或可靠 TPS 证据。
              * @constant

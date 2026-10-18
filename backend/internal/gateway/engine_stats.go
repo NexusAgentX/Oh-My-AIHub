@@ -19,10 +19,11 @@ type statsSnapshot struct {
 }
 
 type metricScope struct {
-	model  string
-	format channel.Format
-	tier   string
-	stream bool
+	protocol string
+	model    string
+	format   channel.Format
+	tier     string
+	stream   bool
 }
 type modelRouteStats struct {
 	channels  map[string]ChannelStats
@@ -30,8 +31,16 @@ type modelRouteStats struct {
 }
 
 func (s *statsSnapshot) forModel(model string, format channel.Format, tier string, stream bool) (map[string]ChannelStats, map[string]Anomaly) {
-	view := s.models[metricScope{model, format, requestedMetricTier(format, tier), stream}]
+	return s.forProtocol(model, format, nativeProtocol(format), tier, stream)
+}
+func (s *statsSnapshot) forProtocol(model string, format channel.Format, protocol, tier string, stream bool) (map[string]ChannelStats, map[string]Anomaly) {
+	view := s.models[metricScope{protocol, model, format, requestedMetricTier(format, tier), stream}]
 	return view.channels, view.anomalies
+}
+
+func (e *Engine) ModelStatsForProtocol(model string, format channel.Format, protocol, tier string, stream bool) map[string]ChannelStats {
+	stats, _ := e.statsView().forProtocol(model, format, protocol, tier, stream)
+	return stats
 }
 
 // ModelStats is an immutable, measured scope. A missing scope stays unknown;
@@ -46,7 +55,7 @@ func (e *Engine) modelStatsView(now time.Time) (map[metricScope]modelRouteStats,
 	out := map[metricScope]modelRouteStats{}
 	pairs := map[metricScope][]pairSums{}
 	for key, row := range rows {
-		scope := metricScope{key.model, key.format, key.tier, key.stream}
+		scope := metricScope{key.protocol, key.model, key.format, key.tier, key.stream}
 		view := out[scope]
 		if view.channels == nil {
 			view.channels = map[string]ChannelStats{}
@@ -139,7 +148,7 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 					continue
 				}
 			}
-			key := modelMetricKey{channel: id, model: scope.model, format: scope.format, tier: scope.tier, stream: scope.stream}
+			key := modelMetricKey{channel: id, model: scope.model, format: scope.format, tier: scope.tier, stream: scope.stream, protocol: scope.protocol}
 			if last, announced := e.anomalyNotified[key]; announced && now.Sub(last) < anomalyRenotifyAfter {
 				continue
 			}
@@ -150,7 +159,7 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 		}
 	}
 	for key, at := range e.anomalyNotified {
-		scope := metricScope{key.model, key.format, key.tier, key.stream}
+		scope := metricScope{key.protocol, key.model, key.format, key.tier, key.stream}
 		if _, flagged := snapshot.models[scope].anomalies[key.channel]; !flagged && now.Sub(at) >= anomalyRenotifyAfter {
 			delete(e.anomalyNotified, key)
 		}
@@ -178,7 +187,7 @@ func (e *Engine) recordAttempt(call *callState, candidate Candidate, record Atte
 	}
 	// modelID was resolved against the catalog before a candidate was admitted.
 	// Only the fixed tier vocabulary reaches a metric key.
-	key := modelMetricKey{channel: candidate.ChannelID, model: call.modelID, format: call.format, tier: requestedMetricTier(call.format, call.requestedServiceTier), stream: call.stream}
+	key := modelMetricKey{channel: candidate.ChannelID, model: call.modelID, format: call.format, tier: requestedMetricTier(call.format, call.requestedServiceTier), stream: call.stream, protocol: callMetricProtocol(call)}
 	e.modelMetrics.record(key, modelMetricSample{end: record.EndReason, firstOutputMS: record.SelectionOutputMS, outputTPS: record.OutputTPS}, e.Now())
 }
 

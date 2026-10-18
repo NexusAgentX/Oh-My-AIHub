@@ -8,6 +8,26 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 )
 
+func normalizeModelMetricKey(key modelMetricKey) modelMetricKey {
+	key.tier = requestedMetricTier(key.format, key.tier)
+	if key.protocol == "" {
+		key.protocol = nativeProtocol(key.format)
+	}
+	return key
+}
+func validMetricProtocol(protocol string, format channel.Format) bool {
+	if protocol == "codex-special" {
+		return format == channel.FormatOpenAIResponses || format == channel.FormatOpenAIImages
+	}
+	return protocol != "" && protocol == nativeProtocol(format)
+}
+func callMetricProtocol(call *callState) string {
+	if call.metricProtocol != "" {
+		return call.metricProtocol
+	}
+	return nativeProtocol(call.format)
+}
+
 // A finite vocabulary prevents request-supplied labels from growing metrics.
 // Empty/auto is the default calling context. Explicit tiers only learn timing
 // from a response that actually confirms that tier (a downgrade is not priority).
@@ -120,6 +140,7 @@ func observedOutputTPS(call *callState, o Observation) (*int, *float64) {
 
 func populateAttemptMetrics(call *callState, record *Attempt, o Observation, started time.Time) {
 	record.MetricsVersion = 2
+	record.MetricProtocol = callMetricProtocol(call)
 	record.MetricTier = requestedMetricTier(call.format, call.requestedServiceTier)
 	record.ActualServiceTier = "unknown"
 	if o.Usage.Detail != nil {

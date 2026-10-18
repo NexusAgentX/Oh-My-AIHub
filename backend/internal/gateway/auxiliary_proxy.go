@@ -375,7 +375,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		// Auxiliary entry points have no generation cadence of their own. Use
 		// only the verified model context in the matching protocol, never a
 		// channel-wide speed or a made-up model.
-		stats, demoted := e.statsView().forModel(model, protocolFormat(ep.Protocol), "", false)
+		stats, demoted := e.statsView().forProtocol(model, protocolFormat(ep.Protocol), ep.Protocol, "", false)
 		candidates = Rank(RankInput{Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats, Demoted: demoted, ConsumerID: key.OwnerID})
 	}
 	if len(candidates) == 0 {

@@ -23,10 +23,10 @@ func TestModelMetricsSeparateModelsProtocolsAndActualTiers(t *testing.T) {
 	book.record(base, modelMetricSample{end: EndClientError}, now)
 	book.record(base, modelMetricSample{end: EndClientDisconnected}, now)
 	view, dropped := book.view(now)
-	if len(view) != 4 || dropped != 0 || view[base].attempts != 1 || view[base].excluded != 2 || view[base].clientErrors != 1 {
-		t.Fatal("scope/excluded counters mixed", view[base])
+	if len(view) != 4 || dropped != 0 || view[normalizeModelMetricKey(base)].attempts != 1 || view[normalizeModelMetricKey(base)].excluded != 2 || view[normalizeModelMetricKey(base)].clientErrors != 1 {
+		t.Fatal("scope/excluded counters mixed", view[normalizeModelMetricKey(base)])
 	}
-	first := view[base]
+	first := view[normalizeModelMetricKey(base)]
 	if first.latencySamples != 1 || first.speedSamples != 1 || first.firstOutputP50MS == nil || *first.firstOutputP50MS < 100 || *first.firstOutputP50MS > 110 || first.outputTPSP50 == nil || *first.outputTPSP50 < 75 || *first.outputTPSP50 > 85 {
 		t.Fatal("reliable histogram sample lost", first)
 	}
@@ -40,7 +40,7 @@ func TestModelMetricsSaturateWithoutUnboundedAllocationAndExpire(t *testing.T) {
 			t.Fatal("series budget smaller than declared")
 		}
 	}
-	if book.record(modelMetricKey{channel: "another-channel", model: "another-approved-model"}, modelMetricSample{end: EndCompleted}, now) || len(book.series) != maxMetricSeries {
+	if book.record(modelMetricKey{channel: "another-channel", model: "another-approved-model", format: channel.FormatOpenAIResponses}, modelMetricSample{end: EndCompleted}, now) || len(book.series) != maxMetricSeries {
 		t.Fatal("series saturation allocated more state")
 	}
 	_, dropped := book.view(now)
@@ -68,14 +68,14 @@ func TestModelMetricsUnknownOutputDoesNotInventTPSOrLatency(t *testing.T) {
 	key := modelMetricKey{channel: "channel", model: "image", format: channel.FormatOpenAIImages}
 	book.record(key, modelMetricSample{end: EndCompleted}, now)
 	view, _ := book.view(now)
-	stats := view[key]
+	stats := view[normalizeModelMetricKey(key)]
 	if stats.attempts != 1 || stats.successes != 1 || stats.outputTPSP50 != nil || stats.firstOutputP50MS != nil {
 		t.Fatal("unknown image measurement invented a value")
 	}
 	zero := 0
 	book.record(key, modelMetricSample{end: EndCompleted, firstOutputMS: &zero}, now)
 	view, _ = book.view(now)
-	if view[key].firstOutputP50MS == nil || *view[key].firstOutputP50MS != 0 {
+	if view[normalizeModelMetricKey(key)].firstOutputP50MS == nil || *view[normalizeModelMetricKey(key)].firstOutputP50MS != 0 {
 		t.Fatal("observed zero latency became unknown")
 	}
 }

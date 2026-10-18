@@ -19,6 +19,7 @@ const (
 // request text. Empty tier is the unrequested/default calling context; explicit
 // tiers use measured actual tiers so a downgrade cannot supply priority speed.
 type modelMetricKey struct {
+	protocol       string
 	channel, model string
 	format         channel.Format
 	tier           string
@@ -112,8 +113,9 @@ func metricMedian(hist *[metricBins]uint64, speed bool) (*float64, uint64) {
 // bucket allocation. Series/bucket saturation drops observation instead of
 // allocating or queuing more work; expired space is recovered by refresh.
 func (b *modelMetricsBook) record(key modelMetricKey, sample modelMetricSample, at time.Time) bool {
+	key = normalizeModelMetricKey(key)
 	epoch := statsEpoch(at)
-	if key.channel == "" || key.model == "" || epoch <= 0 {
+	if key.channel == "" || key.model == "" || epoch <= 0 || !validMetricProtocol(key.protocol, key.format) {
 		return false
 	}
 	b.mu.Lock()
@@ -236,6 +238,7 @@ func (b *modelMetricsBook) resetAnomalies(channelID string) {
 // ModelAttemptHistoryRow is a bounded aggregate of v2 observations. Legacy
 // first-byte and whole-channel metrics cannot warm the new ranking scope.
 type ModelAttemptHistoryRow struct {
+	Protocol                                   string
 	HistoryTruncated                           bool
 	ChannelID, ModelID, Tier                   string
 	Format                                     channel.Format
@@ -255,14 +258,14 @@ func (b *modelMetricsBook) load(rows []ModelAttemptHistoryRow, now time.Time) {
 	defer b.mu.Unlock()
 	floor, ceiling := statsEpoch(now)-statsBuckets+1, statsEpoch(now)
 	for _, row := range rows {
-		if row.Bucket < floor || row.Bucket > ceiling || row.ModelID == "" || row.ChannelID == "" || row.Tier != requestedMetricTier(row.Format, row.Tier) {
+		if row.Bucket < floor || row.Bucket > ceiling || row.ModelID == "" || row.ChannelID == "" || row.Tier != requestedMetricTier(row.Format, row.Tier) || !validMetricProtocol(row.Protocol, row.Format) {
 			continue
 		}
 		if row.Counted < 0 || row.Counted > math.MaxUint32 || row.Successes < 0 || row.Successes > row.Counted || row.Excluded < 0 || row.Excluded > math.MaxUint32 || row.ClientErrors < 0 || row.ClientErrors > row.Excluded || row.Counted+row.Excluded == 0 || row.BeforeEditAttempts < 0 || row.BeforeEditAttempts > row.Counted+row.ClientErrors || row.BeforeEditClientErrors < 0 || row.BeforeEditClientErrors > row.ClientErrors {
 			b.dropped++
 			continue
 		}
-		key := modelMetricKey{channel: row.ChannelID, model: row.ModelID, format: row.Format, tier: row.Tier, stream: row.Stream}
+		key := modelMetricKey{channel: row.ChannelID, model: row.ModelID, format: row.Format, tier: row.Tier, stream: row.Stream, protocol: row.Protocol}
 		window := b.series[key]
 		if window == nil && len(b.series) >= maxMetricSeries {
 			b.dropped++

@@ -73,7 +73,7 @@ func TestModelPageReadsOnlyVersionedModelStatistics(t *testing.T) {
 	if got := successRate(); got != nil {
 		t.Fatalf("legacy history invented model statistics: %v", got)
 	}
-	engine.Store = browseMetricHistory{rows: []gateway.ModelAttemptHistoryRow{{ChannelID: browseTestChannelID, ModelID: "deepseek-chat", Format: channel.FormatOpenAIResponses, Bucket: now.Unix() / 300, Counted: 4, Successes: 3, LatencyBin: -1, SpeedBin: -1}}}
+	engine.Store = browseMetricHistory{rows: []gateway.ModelAttemptHistoryRow{{ChannelID: browseTestChannelID, ModelID: "deepseek-chat", Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Bucket: now.Unix() / 300, Counted: 4, Successes: 3, LatencyBin: -1, SpeedBin: -1}}}
 	if err := engine.LoadStats(context.Background()); err != nil {
 		t.Fatal(err)
 	}

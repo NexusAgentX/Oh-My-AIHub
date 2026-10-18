@@ -44,9 +44,9 @@ func TestRoutingUIHarness(t *testing.T) {
 	admin.expect(t, 201, "POST", "/api/admin/models", map[string]any{"id": model, "display_name": model, "base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_read": "0.15", "cache_write": "0"}})
 	now := time.Now()
 	engine.Store = browseMetricHistory{rows: []gateway.ModelAttemptHistoryRow{
-		{ChannelID: a, ModelID: model, Format: channel.FormatOpenAIResponses, Stream: true, Bucket: now.Unix() / 300, Counted: 40, Successes: 38, Excluded: 5, ClientErrors: 1, LatencyBin: 54, SpeedBin: 89},
-		{ChannelID: a, ModelID: model, Format: channel.FormatAnthropic, Stream: true, Bucket: now.Unix() / 300, Counted: 24, Successes: 24, LatencyBin: 62, SpeedBin: -1},
-		{ChannelID: c, ModelID: model, Format: channel.FormatOpenAIResponses, Stream: true, Bucket: now.Unix() / 300, Counted: 3, Successes: 3, LatencyBin: 0, SpeedBin: -1},
+		{ChannelID: a, ModelID: model, Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Stream: true, Bucket: now.Unix() / 300, Counted: 40, Successes: 38, Excluded: 5, ClientErrors: 1, LatencyBin: 54, SpeedBin: 89},
+		{ChannelID: a, ModelID: model, Protocol: "native-messages", Format: channel.FormatAnthropic, Stream: true, Bucket: now.Unix() / 300, Counted: 24, Successes: 24, LatencyBin: 62, SpeedBin: -1},
+		{ChannelID: c, ModelID: model, Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Stream: true, Bucket: now.Unix() / 300, Counted: 3, Successes: 3, LatencyBin: 0, SpeedBin: -1},
 	}}
 	if err := engine.LoadStats(context.Background()); err != nil {
 		t.Fatal(err)

@@ -24,7 +24,7 @@ func (s *modelHistoryStore) ModelAttemptHistory(_ context.Context, _ time.Time, 
 
 func TestModelMetricsWarmupDoesNotProjectLegacyOrTruncatedHistory(t *testing.T) {
 	now := time.Now()
-	base := ModelAttemptHistoryRow{ChannelID: "channel", ModelID: "one", Format: channel.FormatOpenAIResponses, Stream: true, Bucket: statsEpoch(now), Counted: 30, Successes: 25, Excluded: 10, ClientErrors: 8, LatencyBin: metricBin(100, false), SpeedBin: metricBin(80, true)}
+	base := ModelAttemptHistoryRow{ChannelID: "channel", ModelID: "one", Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Stream: true, Bucket: statsEpoch(now), Counted: 30, Successes: 25, Excluded: 10, ClientErrors: 8, LatencyBin: metricBin(100, false), SpeedBin: metricBin(80, true)}
 	for _, tc := range []struct {
 		name string
 		rows []ModelAttemptHistoryRow
@@ -32,6 +32,7 @@ func TestModelMetricsWarmupDoesNotProjectLegacyOrTruncatedHistory(t *testing.T) 
 	}{
 		{"measured", []ModelAttemptHistoryRow{base}, 30},
 		{"legacy only", nil, 0},
+		{"v2 without actual entrance", []ModelAttemptHistoryRow{func() ModelAttemptHistoryRow { v := base; v.Protocol = ""; return v }()}, 0},
 		{"too many aggregates", make([]ModelAttemptHistoryRow, maxMetricBuckets+1), 0},
 		{"too many calls", []ModelAttemptHistoryRow{func() ModelAttemptHistoryRow { v := base; v.HistoryTruncated = true; return v }()}, 0},
 	} {
@@ -58,20 +59,20 @@ func TestModelMetricsWarmupDoesNotProjectLegacyOrTruncatedHistory(t *testing.T) 
 func TestModelMetricEditOnlyResetsScopedAnomaliesAndPreservesHealth(t *testing.T) {
 	now := time.Now()
 	book := newModelMetricsBook()
-	base := ModelAttemptHistoryRow{ChannelID: "channel", ModelID: "one", Format: channel.FormatOpenAIResponses, Bucket: statsEpoch(now), Counted: 2, Successes: 2, Excluded: 38, ClientErrors: 38, LatencyBin: metricBin(100, false), SpeedBin: -1}
+	base := ModelAttemptHistoryRow{ChannelID: "channel", ModelID: "one", Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Bucket: statsEpoch(now), Counted: 2, Successes: 2, Excluded: 38, ClientErrors: 38, LatencyBin: metricBin(100, false), SpeedBin: -1}
 	book.load([]ModelAttemptHistoryRow{base}, now)
 	key := modelMetricKey{channel: base.ChannelID, model: base.ModelID, format: base.Format}
 	before, _ := book.view(now)
 	book.resetAnomalies("channel")
 	after, _ := book.view(now)
-	if before[key].anomalyClient != 38 || after[key].anomalyAttempts != 0 || after[key].attempts != 2 || after[key].latencySamples != 2 {
-		t.Fatal("edit erased health or retained anomaly", before[key], after[key])
+	if before[normalizeModelMetricKey(key)].anomalyClient != 38 || after[normalizeModelMetricKey(key)].anomalyAttempts != 0 || after[normalizeModelMetricKey(key)].attempts != 2 || after[normalizeModelMetricKey(key)].latencySamples != 2 {
+		t.Fatal("edit erased health or retained anomaly", before[normalizeModelMetricKey(key)], after[normalizeModelMetricKey(key)])
 	}
 	base.BeforeEditAttempts, base.BeforeEditClientErrors = 40, 38
 	fresh := newModelMetricsBook()
 	fresh.load([]ModelAttemptHistoryRow{base}, now)
 	view, _ := fresh.view(now)
-	if view[key].anomalyAttempts != 0 || view[key].attempts != after[key].attempts {
+	if view[normalizeModelMetricKey(key)].anomalyAttempts != 0 || view[normalizeModelMetricKey(key)].attempts != after[normalizeModelMetricKey(key)].attempts {
 		t.Fatal("warmup restored pre-edit anomalies")
 	}
 }

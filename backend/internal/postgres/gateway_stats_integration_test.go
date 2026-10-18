@@ -473,7 +473,7 @@ func TestReliableModeFollowsTheSuccessRatesCountedInMemory(t *testing.T) {
 	}{{steadyID, 28, 2}, {wobblyID, 20, 10}} {
 		_, err := e.pool.Exec(context.Background(), `INSERT INTO calls(account_id,model_id,requested_model,format,stream,outcome,attempts,created_at,completed_at)
 SELECT $1,'gpt-test','gpt-test','openai_chat',false,CASE WHEN n<=$3 THEN 'succeeded' ELSE 'upstream_failed' END,
-jsonb_build_array(jsonb_build_object('metrics_version',2,'channel',jsonb_build_object('id',$2::text,'name','synthetic'),'end_reason',CASE WHEN n<=$3 THEN 'completed' ELSE 'upstream_error' END)),
+jsonb_build_array(jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','channel',jsonb_build_object('id',$2::text,'name','synthetic'),'end_reason',CASE WHEN n<=$3 THEN 'completed' ELSE 'upstream_error' END)),
 now()-interval '2 minutes',now()-interval '2 minutes' FROM generate_series(1,$4::int) AS n`, consumer.id, entry.id, entry.ok, entry.ok+entry.failed)
 		if err != nil {
 			t.Fatal(err)

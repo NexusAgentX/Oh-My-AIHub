@@ -11,6 +11,7 @@ import (
 // credentials or arbitrary response labels. Counts below MinSamples are real
 // observations but do not yet participate in latency/TPS ranking.
 type ModelMetricView struct {
+	Protocol           string         `json:"protocol"`
 	Format             channel.Format `json:"format"`
 	Tier               string         `json:"tier"`
 	Stream             bool           `json:"stream"`
@@ -34,7 +35,7 @@ func (e *Engine) ModelMetrics(model string) map[string][]ModelMetricView {
 			continue
 		}
 		for id, stats := range view.channels {
-			row := ModelMetricView{Format: scope.format, Tier: scope.tier, Stream: scope.stream, Attempts: stats.Attempts, Successes: stats.Successes, Excluded: stats.ExcludedSamples, FirstOutputMS: stats.FirstOutputP50MS, FirstOutputSamples: stats.FirstOutputSamples, OutputTPS: stats.OutputTPSP50, OutputSamples: stats.OutputSpeedSamples, MinSamples: minSamples}
+			row := ModelMetricView{Protocol: scope.protocol, Format: scope.format, Tier: scope.tier, Stream: scope.stream, Attempts: stats.Attempts, Successes: stats.Successes, Excluded: stats.ExcludedSamples, FirstOutputMS: stats.FirstOutputP50MS, FirstOutputSamples: stats.FirstOutputSamples, OutputTPS: stats.OutputTPSP50, OutputSamples: stats.OutputSpeedSamples, MinSamples: minSamples}
 			if stats.Attempts > 0 {
 				rate := stats.SuccessRate()
 				row.SuccessRate = &rate
@@ -45,6 +46,9 @@ func (e *Engine) ModelMetrics(model string) map[string][]ModelMetricView {
 	for _, rows := range out {
 		slices.SortFunc(rows, func(a, b ModelMetricView) int {
 			if n := cmp.Compare(a.Format, b.Format); n != 0 {
+				return n
+			}
+			if n := cmp.Compare(a.Protocol, b.Protocol); n != 0 {
 				return n
 			}
 			if n := cmp.Compare(a.Tier, b.Tier); n != 0 {
