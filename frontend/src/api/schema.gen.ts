@@ -2478,6 +2478,24 @@ export interface components {
             unpriced_tokens: boolean;
             attempt_ids: string[];
         };
+        DetectionSettingEvidence: {
+            /** @enum {string} */
+            kind: "cache" | "service_tier";
+            configured: string;
+            wire: string;
+            actual: string;
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            accepted: boolean;
+            usage_reliable: boolean;
+            /** Format: int64 */
+            cache_write_tokens: number;
+            /** Format: int64 */
+            cache_read_tokens: number;
+            attempt_ids: string[];
+        };
         DetectionCapacityProbe: {
             accepted: boolean;
             semantic: boolean;
@@ -2641,6 +2659,7 @@ export interface components {
             capacity?: components["schemas"]["DetectionCapacityReport"][];
             fingerprint?: components["schemas"]["DetectionFingerprintReport"];
             images?: components["schemas"]["DetectionImageEvidence"][];
+            settings?: components["schemas"]["DetectionSettingEvidence"][];
         };
         DetectionPlanned: {
             credential_dependent: boolean;

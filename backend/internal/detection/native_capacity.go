@@ -35,7 +35,7 @@ func (n *nativeScene) tokenCount(ctx context.Context, body nativeObject) (*int64
 	case "native-generate-content":
 		id, path, key = "gemini.countTokens", "/v1beta/models/"+url.PathEscape(n.s.Target.Model)+":countTokens", "totalTokens"
 		request := nativeObject{"model": "models/" + strings.TrimPrefix(n.s.Target.Model, "models/")}
-		for _, k := range []string{"contents", "systemInstruction", "tools", "toolConfig", "generationConfig"} {
+		for _, k := range []string{"contents", "systemInstruction", "tools", "toolConfig", "generationConfig", "cachedContent"} {
 			if body[k] != nil {
 				request[k] = body[k]
 			}

@@ -83,6 +83,24 @@ function ImageEvidence({ reports }: { reports: NonNullable<Result['images']> }) 
   </section>
 }
 
-export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'|'images'> }) {
-  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}{result.images && result.images.length > 0 && <ImageEvidence reports={result.images} />}</>
+function SettingEvidence({ reports }: { reports: NonNullable<Result['settings']> }) {
+  const [page, setPage] = useState(0)
+  const size = 20
+  const states: Record<string, string> = { pass: '已核验', partial: '部分支持', fail: '未通过', unsupported: '不支持', inconclusive: '未确认' }
+  return <section className="detection-observation">
+    <h3>缓存与实际服务档位</h3>
+    <DataTable caption="缓存与服务档位实测" rows={reports.slice(page * size, (page + 1) * size)} rowKey={(row) => `${row.kind}-${row.configured}-${row.attempt_ids.join('-')}`} empty={<p className="muted-copy">尚无实测记录</p>} columns={[
+      { key: 'configured', header: '检测条件', primary: true, cell: (row) => row.kind === 'cache' ? `缓存 · ${row.configured}` : row.configured },
+      { key: 'wire', header: '请求值', cell: (row) => row.wire },
+      { key: 'accepted', header: '参数接受', cell: (row) => row.accepted ? '已接受' : '未确认' },
+      { key: 'actual', header: '实际观测', cell: (row) => row.kind === 'cache' ? row.usage_reliable ? `写入 ${tokens(row.cache_write_tokens)} · 读取 ${tokens(row.cache_read_tokens)} token` : '用量未知' : row.actual || '返档未知' },
+      { key: 'state', header: '结论', cell: (row) => states[row.state] },
+    ]} />
+    {reports.some((row) => row.kind === 'cache') && <p className="muted-copy">缓存选项只核验参数与即时读写，不表示已验证保持或到期时长。</p>}
+    {reports.length > size && <div className="form-actions"><Button variant="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</Button><span className="num">{page + 1}/{Math.ceil(reports.length / size)}</span><Button variant="quiet" disabled={(page + 1) * size >= reports.length} onClick={() => setPage(page + 1)}>下一页</Button></div>}
+  </section>
+}
+
+export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'|'images'|'settings'> }) {
+  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}{result.images && result.images.length > 0 && <ImageEvidence reports={result.images} />}{result.settings && result.settings.length > 0 && <SettingEvidence reports={result.settings} />}</>
 }

@@ -246,6 +246,7 @@ func nativeUsageFrom(protocol string, o nativeObject) nativeUsage {
 		if raw == nil {
 			return u
 		}
+		u.Tier = str(raw["serviceTier"])
 		u.Input, in = fieldInt(raw, "promptTokenCount")
 		u.Output, out = fieldInt(raw, "candidatesTokenCount")
 		u.Reliable = in && out

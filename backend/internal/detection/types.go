@@ -97,6 +97,7 @@ type Assertion struct {
 	AttemptIDs []string `json:"attempt_ids"`
 }
 type Result struct {
+	Settings       []SettingEvidence   `json:"settings,omitempty"`
 	Images         []ImageEvidence     `json:"images,omitempty"`
 	Capacity       []CapacityReport    `json:"capacity,omitempty"`
 	Fingerprint    *fingerprint.Report `json:"fingerprint,omitempty"`

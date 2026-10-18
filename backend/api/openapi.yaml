@@ -7214,6 +7214,104 @@ components:
           "attempt_ids"
         ]
       }
+    DetectionSettingEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cache",
+              "service_tier"
+            ]
+          },
+          "configured": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "wire": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "actual": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "usage_reliable": {
+            "type": "boolean"
+          },
+          "cache_write_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "attempt_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "configured",
+          "wire",
+          "actual",
+          "state",
+          "reason",
+          "accepted",
+          "usage_reliable",
+          "cache_write_tokens",
+          "cache_read_tokens",
+          "attempt_ids"
+        ]
+      }
     DetectionCapacityProbe:
       {
         "type": "object",
@@ -8083,6 +8181,13 @@ components:
             "maxItems": 256,
             "items": {
               "$ref": "#/components/schemas/DetectionImageEvidence"
+            }
+          },
+          "settings": {
+            "type": "array",
+            "maxItems": 152,
+            "items": {
+              "$ref": "#/components/schemas/DetectionSettingEvidence"
             }
           }
         },
@@ -12568,7 +12673,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.13",
+    "version": "2026-10-18.14",
     "stage": "discovery",
     "sources": [
       {
@@ -12655,6 +12760,21 @@ x-aihub-gateway-contract:
         "id": "anthropic-on-demand-compaction",
         "url": "https://platform.claude.com/docs/en/build-with-claude/compaction-on-demand",
         "version": "compact-2026-09-04"
+      },
+      {
+        "id": "anthropic-service-tier",
+        "url": "https://platform.claude.com/docs/en/api/service-tiers",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "gemini-service-tier",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/priority-inference",
+        "version": "GenerateContent-v1beta-2026-10-18"
+      },
+      {
+        "id": "gemini-caching",
+        "url": "https://ai.google.dev/api/caching",
+        "version": "GenerateContent-v1beta-2026-10-18"
       }
     ],
     "endpoints": [
@@ -14453,6 +14573,21 @@ x-aihub-gateway-contract:
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
             ],
             "credential_dependent": false
+          },
+          {
+            "id": "openai-responses.cache_tier",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "cache_options_acceptance",
+              "immediate_real_write_read_usage",
+              "each_enabled_service_tier_actual_return",
+              "no_wait_for_expiration"
+            ],
+            "credential_dependent": false
           }
         ],
         "evidence_layers": [
@@ -15287,15 +15422,17 @@ x-aihub-gateway-contract:
             "source_ids": [
               "G-C04",
               "G-C05",
-              "G-C06",
-              "G-C08"
+              "G-C06"
             ],
             "conditional_source_ids": [],
             "assertions": [
               "cache_options_acceptance",
               "immediate_real_write_read_usage",
               "each_enabled_service_tier_actual_return",
-              "no_wait_for_expiration"
+              "no_wait_for_expiration",
+              "owned_explicit_cache_lifecycle",
+              "cached_content_generate_and_stream_usage",
+              "native_cached_token_count"
             ],
             "credential_dependent": false
           },
@@ -15341,6 +15478,23 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ],
+            "credential_dependent": false
+          },
+          {
+            "id": "native-generate-content.continuation",
+            "endpoints": [
+              "gemini.generateContent",
+              "gemini.streamGenerateContent"
+            ],
+            "source_ids": [
+              "G-C08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_continuation_signal",
+              "original_contents_and_opaque_token_replay",
+              "per_hop_usage_no_duplication"
             ],
             "credential_dependent": false
           }
@@ -16083,6 +16237,7 @@ x-aihub-gateway-contract:
       "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
       "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
       "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
-      "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。"
+      "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
+      "detection/cache-tier-facts": "缓存接受、即时写/读计数与服务档位独立保存。OpenAI in_memory/24h、Messages 5m/1h 分别真实写读，不等待到期；短期未命中只记未确认，不虚构不支持或保持时长。Gemini 显式缓存只操作当前创建资源，真实生成/流式/计数后删除。每个启用档位各发有意义请求，不与所有功能全排列；Anthropic priority 用原生 auto 请求，standard 用 standard_only，实际 usage 可降到 standard，不能把 auto 接受冒充 priority。Gemini 从原生 usageMetadata.serviceTier/合法实际返档头核验；相互矛盾或缺失留未知。只保留固定/配置选择器、白名单实际档位及数值，不保存任意上游字符串或缓存正文。G-C08 continuationToken 续用另需独立实现，不能由缓存通过代证。"
     }
   }

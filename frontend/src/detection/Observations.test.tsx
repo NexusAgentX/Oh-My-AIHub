@@ -16,6 +16,15 @@ const fingerprint: NonNullable<Result['fingerprint']> = {
 }
 
 describe('detection metadata observations', () => {
+  it('shows an accepted priority request and its actual standard downgrade separately', () => {
+    const html = renderToStaticMarkup(<DetectionObservations result={{ settings: [{ kind: 'service_tier', configured: 'anthropic:priority', wire: 'auto', actual: 'anthropic:standard', accepted: true, usage_reliable: true, state: 'inconclusive', reason: 'not_observed', cache_write_tokens: 0, cache_read_tokens: 0, attempt_ids: ['synthetic-tier-attempt'] }] }} />)
+    expect(html).toContain('anthropic:priority')
+    expect(html).toContain('auto')
+    expect(html).toContain('anthropic:standard')
+    expect(html).toContain('已接受')
+    expect(html).toContain('未确认')
+    expect(html).not.toContain('已核验')
+  })
   it('keeps decoded image products separate from unconfirmed quality and missing token usage', () => {
     const html = renderToStaticMarkup(<DetectionObservations result={{ images: [{ variant: { unit: 'successful_image', size: '256x256', quality: 'high', background: '', service_tier: '' }, transport: 'json', state: 'inconclusive', reason: 'not_observed', requested: 1, returned: 1, verified: 1, products: [{ width: 256, height: 256, format: 'png', transparent: false }], options_confirmed: false, mask_preserved: false, usage_reliable: false, unpriced_tokens: true, attempt_ids: ['synthetic-image-attempt'] }] }} />)
     expect(html).toContain('按成功图片 · 256x256 · high')
