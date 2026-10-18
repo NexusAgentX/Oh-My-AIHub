@@ -40,6 +40,24 @@ func TestGroupCandidateNeverBorrowsCatalogPriceOrFXDiscount(t *testing.T) {
 		t.Fatal("missing quote used global fallback")
 	}
 }
+
+func TestTextRequestQuoteUsesOneReliableRequestRatherThanTokenVolume(t *testing.T) {
+	quote := market.Quote{ID: "request-quote", GroupModelID: "main", Version: 1, Currency: "CNY", BillingUnit: "per_request", UnitPrices: []market.UnitPrice{{Unit: "request", Price: money.FromNano(2_000_000_000)}}}
+	book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "group", GroupRevision: 1, Offers: map[string]quotepricing.Offer{"main": {ModelID: "main", Revision: 1, Quote: quote}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := &callState{started: time.Now(), billingFacts: quotepricing.Facts{MainReliable: true}}
+	priced, _, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate / 2}, ledger.Usage{InputTokens: 99_000_000}, settings.Settings{}, 0)
+	if err != nil || priced.Cost.String() != "1" {
+		t.Fatalf("one request price=%s err=%v", priced.Cost.String(), err)
+	}
+	call.billingFacts.MainReliable = false
+	priced, _, err = NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate}, ledger.Usage{}, settings.Settings{}, 0)
+	if err != nil || priced.Cost != 0 {
+		t.Fatal("missing main usage bypassed existing billing rule", err)
+	}
+}
 func TestNativeImageCountsActualProductsAndRetainsNoContent(t *testing.T) {
 	for _, run := range []struct {
 		body string

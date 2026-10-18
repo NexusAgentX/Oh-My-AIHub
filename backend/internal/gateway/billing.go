@@ -16,6 +16,13 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 	if candidate.Quotes != nil {
 		facts := call.billingFacts
 		facts.Usage = usage
+		if offer, ok := candidate.Quotes.Offers[model.ID]; ok && offer.Quote.BillingUnit == "per_request" && facts.MainReliable && !facts.IndependentImage {
+			tier := ""
+			if usage.Detail != nil {
+				tier = usage.Detail.ServiceTier
+			}
+			facts.Units = append(facts.Units, quotepricing.Unit{Unit: "request", QuantityNano: ledger.UnitRate, ServiceTier: tier})
+		}
 		statement, err := quotepricing.Calculate(candidate.Quotes, model.ID, facts, call.started, candidate.MultiplierNano, defaults.USDCNYRateNano, feeRate)
 		if err != nil {
 			return ledger.PriceResult{}, nil, err

@@ -156,7 +156,7 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		missing(mainModel, "main", "missing_main_usage")
 		return statement, nil
 	}
-	if facts.IndependentImage {
+	if facts.IndependentImage || main.Quote.BillingUnit != "per_million_tokens" {
 		if main.Quote.BillingUnit == "per_million_tokens" && !facts.MainReliable {
 			missing(mainModel, "main", "missing_main_usage")
 			return statement, nil
