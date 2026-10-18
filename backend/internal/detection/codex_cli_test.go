@@ -14,7 +14,74 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexprobe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
+
+func TestOfficialCodexActualUnsupportedIsNotAnUnactivatedClient(t *testing.T) {
+	binary, probe := os.Getenv("AIHUB_TEST_CODEX_BINARY"), os.Getenv("AIHUB_TEST_CODEX_PROBE")
+	if binary == "" || probe == "" {
+		t.Skip("explicit pinned official CLI and probe artifacts required")
+	}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/backend-api/codex/models" {
+			_, _ = io.WriteString(w, `{"models":[{"slug":"synthetic-model"}]}`)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","code":"unsupported_parameter","message":"Unsupported native request."}}`)
+	}))
+	defer up.Close()
+	r, s, service := codexTestSession(t, up.URL)
+	if err := r.RegisterCodexCLI(context.Background(), probe, binary); err != nil {
+		t.Fatal(err)
+	}
+	result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special.RL01", "official_cli"), nil)
+	if result.State != "unsupported" || result.Reason != "unsupported" || result.Usage.Generate != 1 || len(result.Attempts) < 2 {
+		t.Fatal("real upstream rejection was confused with missing activation", result)
+	}
+}
+
+func TestOfficialCodexCompressionIsActuallyEnabledAndHasIndependentPlainControl(t *testing.T) {
+	binary, probe := os.Getenv("AIHUB_TEST_CODEX_BINARY"), os.Getenv("AIHUB_TEST_CODEX_PROBE")
+	if binary == "" || probe == "" {
+		t.Skip("explicit pinned official CLI and probe artifacts required")
+	}
+	seen := map[string]int{}
+	var mu sync.Mutex
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/backend-api/codex/models" {
+			_, _ = io.WriteString(w, `{"models":[{"slug":"synthetic-model"}]}`)
+			return
+		}
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Error("CLI compression used another endpoint", r.URL.Path)
+			w.WriteHeader(404)
+			return
+		}
+		encoding := r.Header.Get("Content-Encoding")
+		wire, _ := io.ReadAll(r.Body)
+		body, err := nativeencoding.Decode(r.Context(), encoding, wire)
+		if err != nil || !strings.Contains(string(body), `"model":"synthetic-model"`) {
+			t.Error("CLI model replacement broke actual compression", err)
+		}
+		mu.Lock()
+		seen[encoding]++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, strings.ReplaceAll(responseStreamFixture(), "你好 🌍", codexprobe.Marker))
+	}))
+	defer up.Close()
+	r, s, service := codexTestSession(t, up.URL)
+	if err := r.RegisterCodexCLI(context.Background(), probe, binary); err != nil {
+		t.Fatal(err)
+	}
+	result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special.RL14", "official_cli"), nil)
+	mu.Lock()
+	defer mu.Unlock()
+	if result.State != "pass" || len(result.Assertions) != 3 || seen["zstd"] != 1 || seen[""] != 1 || result.Usage.Generate != 2 || result.Usage.InputTokens != 20 || result.Usage.OutputTokens != 8 {
+		t.Fatalf("official compression/control did not execute independently: %+v seen=%v", result, seen)
+	}
+}
 
 func codexToolStreamFixture(namespace string) string {
 	final := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-cli-call", Name: "synthetic_echo", Namespace: namespace}})
@@ -72,7 +139,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		if closed {
+		if closed || (syntheticToolDeclarations(list(root["tools"])) == 0 && namespace == "") {
 			_, _ = io.WriteString(w, strings.ReplaceAll(responseStreamFixture(), "你好 🌍", codexprobe.Marker))
 		} else {
 			_, _ = io.WriteString(w, codexToolStreamFixture(namespace))
@@ -83,7 +150,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 	if err := r.RegisterCodexCLI(context.Background(), probe, binary); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"RL01", "RL02", "RL03"} {
+	for _, id := range []string{"RL01", "RL02", "RL03", "RL08"} {
 		result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special."+id, "official_cli"), nil)
 		if result.State != "pass" || result.Layer != "official_cli" {
 			t.Fatalf("official %s tool callback failed: %+v", id, result)
@@ -91,7 +158,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if requests != 4 || s.usage.Generate != 4 || s.usage.InputTokens != 40 || s.usage.OutputTokens != 16 {
+	if requests != 5 || s.usage.Generate != 5 || s.usage.InputTokens != 50 || s.usage.OutputTokens != 20 {
 		t.Fatal("profile reuse duplicated actual calls or metering", requests, s.usage)
 	}
 }

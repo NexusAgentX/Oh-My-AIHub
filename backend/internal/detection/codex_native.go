@@ -21,7 +21,7 @@ func (r *Registry) RegisterCodexNative() error {
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL20", "codex-special.RL21", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL20", "codex-special.RL21", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: engineVersion, Run: func(ctx context.Context, s *Session) Result {
@@ -57,6 +57,10 @@ func (n *nativeScene) runCodex(ctx context.Context) Result {
 		n.check("native_catalog", out, valid)
 	case "codex-special.RL16":
 		n.codexSearch(ctx)
+	case "codex-special.RL18":
+		n.codexNotes(ctx)
+	case "codex-special.RL17":
+		n.codexThreadHint(ctx)
 	case "codex-special.RL25":
 		n.codexImages(ctx)
 	case "codex-special.RL14":

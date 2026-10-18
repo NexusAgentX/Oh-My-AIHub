@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL13", "codex-special.RL15"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
@@ -101,8 +101,12 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 	switch req.ID {
 	case "codex-special.RL03":
 		profiles = []string{"tools", "lite_tools"}
+	case "codex-special.RL08":
+		profiles = []string{"lite_tools", "plain"}
 	case "codex-special.RL13":
 		profiles = []string{"notes"}
+	case "codex-special.RL14":
+		profiles = []string{"compressed", "plain"}
 	case "codex-special.RL15":
 		profiles = []string{"catalog"}
 	}
@@ -141,6 +145,24 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			}
 			n.check("cli_auth_profile", auth, client.PlatformAuth)
 			n.check("features_activated", activation, proof.Observed["codex.notes.thread_hint"] > 0)
+		case "codex-special.RL08":
+			requests := wire.LiteRequests + wire.StandardRequests
+			n.check("sse_lifecycle", out, client.Completed && requests > 0 && wire.SSE == requests)
+			n.check("terminal_usage", out, client.Completed && requests > 0 && wire.ReliableUsage == requests)
+			if profile == "plain" {
+				n.check("text_utf8_deltas", out, client.MarkerMatched && wire.TextDeltas > 0)
+			} else {
+				n.check("tool_argument_deltas", out, closed && wire.ToolDeltas > 0)
+			}
+		case "codex-special.RL14":
+			valid := client.Completed && client.MarkerMatched && wire.SSE > 0
+			if profile == "compressed" {
+				valid = valid && wire.ZstdRequests > 0 && wire.PlainRequests == 0
+				n.check("content_encoding_zstd", out, valid)
+				n.check("native_zstd_request", out, valid)
+			} else {
+				n.check("uncompressed_request", out, valid && wire.PlainRequests > 0 && wire.ZstdRequests == 0)
+			}
 		case "codex-special.RL15":
 			n.check("cli_catalog_consumed", out, client.CatalogModel && client.PlatformAuth && proof.Observed["codex.models"] > 0)
 		}
@@ -206,11 +228,17 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "completed"}, client.Stage) {
 			stage = client.Stage
 		}
-		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "exit_code", output.ExitCode, "reason", output.Reason)
 		proof.State, proof.Reason = "inconclusive", "client_disabled"
+		if parseErr == nil && client.Protocol == codexprobe.Protocol && client.Version == codexprobe.Version && client.Profile == profile && b.failure != nil {
+			// A fixed CLI which actually reached an upstream that rejected its
+			// request supplies a real negative result. Missing activation, local
+			// admission faults and broken adapters remain execution-incomplete.
+			proof.State, proof.Reason = b.failure.State, b.failure.Reason
+		}
 		if ctx.Err() != nil {
 			proof.Reason = "cancelled"
 		}
+		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
 	}
 	if b.limited {
 		proof.State, proof.Reason = "inconclusive", "platform_unavailable"
@@ -220,7 +248,7 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 	if strings.Contains(string(output.Stdout), b.token) {
 		return codexCLIProof{State: "inconclusive", Reason: "detector_error"}
 	}
-	if proof.State == "pass" {
+	if proof.State == "pass" || proof.State == "unsupported" || proof.State == "fail" {
 		data, _ := json.Marshal(proof)
 		_ = s.Remember(key, data)
 	}

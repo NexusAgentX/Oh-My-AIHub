@@ -65,6 +65,11 @@ type codexBridge struct {
 	limited   bool
 	wire      codexWireFacts
 	callIDs   map[string]bool
+	failure   *codexUpstreamFailure
+}
+
+type codexUpstreamFailure struct {
+	State, Reason string
 }
 
 // Only bounded semantic facts leave this private bridge. Call IDs and native
@@ -72,6 +77,8 @@ type codexBridge struct {
 type codexWireFacts struct {
 	LiteRequests, StandardRequests, ToolDeclarations int
 	ToolCalls, ToolResults, SSE, ReliableUsage       int
+	ZstdRequests, PlainRequests                      int
+	TextDeltas, ToolDeltas                           int
 }
 
 func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*codexBridge, error) {
@@ -311,10 +318,29 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		category = "generate"
 	}
 	response, err := session.Do(req.Context(), Request{EndpointID: ep.ID, Path: ep.Path, Query: req.URL.Query(), Headers: req.Header, Body: body, Category: category, prepared: true})
+	var failure *codexUpstreamFailure
+	if err == nil && (response.Status < 200 || response.Status >= 300) {
+		failure = &codexUpstreamFailure{State: "inconclusive", Reason: "external_error"}
+		if response.Status == 401 || response.Status == 403 {
+			failure.Reason = "key_unavailable"
+		} else if response.Status != 429 && response.Status < 500 {
+			if root, e := decodeNative(response.Body); e == nil && nativeError("openai-responses", root) {
+				failure.State, failure.Reason = "fail", "assertion_failed"
+				if unsupportedNative(root, response.Status) {
+					failure.State, failure.Reason = "unsupported", "unsupported"
+				}
+			}
+		}
+	}
 	var usage Usage
 	var reply nativeReply
 	wire := codexWireFacts{}
 	if ep.ID == "codex.responses" {
+		if req.Header.Get("Content-Encoding") == "zstd" {
+			wire.ZstdRequests++
+		} else if req.Header.Get("Content-Encoding") == "" {
+			wire.PlainRequests++
+		}
 		plain, decodeErr := nativeencoding.Decode(req.Context(), req.Header.Get("Content-Encoding"), body)
 		if decodeErr == nil {
 			if root, err := decodeNative(plain); err == nil {
@@ -350,6 +376,12 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 			reply = parsed.Reply
 			if parsed.Valid && parsed.Terminal {
 				wire.SSE++
+				if parsed.TextLifecycle {
+					wire.TextDeltas++
+				}
+				if parsed.ToolLifecycle {
+					wire.ToolDeltas++
+				}
 			}
 		} else if root, decodeErr := decodeNative(response.Body); decodeErr == nil {
 			reply = parseNative("openai-responses", root)
@@ -370,6 +402,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	if failure != nil {
+		b.failure = failure
+	}
 	for _, candidate := range reply.Candidates {
 		for _, call := range candidate.Calls {
 			if len(b.callIDs) < 64 && call.ID != "" && call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) {
@@ -384,6 +419,10 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.ToolResults += wire.ToolResults
 	b.wire.SSE += wire.SSE
 	b.wire.ReliableUsage += wire.ReliableUsage
+	b.wire.ZstdRequests += wire.ZstdRequests
+	b.wire.PlainRequests += wire.PlainRequests
+	b.wire.TextDeltas += wire.TextDeltas
+	b.wire.ToolDeltas += wire.ToolDeltas
 	for _, id := range append(response.PriorAttempts, response.AttemptID) {
 		if id != "" && !slices.Contains(b.witnesses, id) {
 			b.witnesses = append(b.witnesses, id)

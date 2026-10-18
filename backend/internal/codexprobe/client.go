@@ -24,7 +24,7 @@ import (
 
 const Version = "0.163.0"
 const Protocol = "aihub-codex-probe.v1"
-const Marker = "AIHUB-CODEX-READY-6309"
+const Marker = "AIHUB-CODEX-READY-6309-蓝鲸🌍"
 
 var ErrClient = errors.New("isolated Codex client failed")
 
@@ -80,7 +80,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" {
 		return ErrClient
 	}
 	// The caller must be RunControlledProcess, which makes these private roots.
@@ -230,7 +230,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	root := os.Getenv("CODEX_HOME")
 	probeCatalog := ""
 	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools"
-	if c.Profile == "notes" || c.Profile == "image" || toolProfile {
+	if c.Profile == "notes" || c.Profile == "image" || toolProfile || c.Profile == "compressed" || c.Profile == "plain" {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
 		// provider capability/capacity evidence. The catalog profile below uses
@@ -261,11 +261,11 @@ enabled = false
 plugins = false
 apps = false
 shell_tool = false
-enable_request_compression = false
+enable_request_compression = %t
 [features.token_budget]
 enabled = %t
 use_history_notes_extension = %t
-`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "notes" || c.Profile == "image", c.Profile == "notes" || c.Profile == "image")
+`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "compressed", c.Profile == "notes" || c.Profile == "image", c.Profile == "notes" || c.Profile == "image")
 	auth, _ := json.Marshal(map[string]string{"personal_access_token": c.Token})
 	if os.WriteFile(filepath.Join(root, "config.toml"), []byte(config), 0600) != nil || os.WriteFile(filepath.Join(root, "auth.json"), auth, 0600) != nil {
 		return r, ErrClient

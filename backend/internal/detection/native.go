@@ -246,6 +246,7 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 			return out
 		}
 		o, e := decodeNative(response.Body)
+		out.Reply.Object = o
 		if e == nil && nativeError(n.protocol, o) {
 			out.State = "fail"
 			out.Reason = "assertion_failed"
@@ -263,6 +264,10 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 		o, e := decodeNative(response.Body)
 		if e == nil {
 			out.Reply = parseNative(n.protocol, o)
+		} else if strings.HasPrefix(req.EndpointID, "codex.notes.") || strings.HasPrefix(req.EndpointID, "codex.history.") {
+			if value, err := decodeNativeValue(response.Body); err == nil {
+				out.Reply.Object = nativeObject{"context_result": value}
+			}
 		}
 	}
 	out.State = "fail"
