@@ -25,11 +25,11 @@ def png(name, colors, alpha=False):
     (ROOT / name).write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
-png("red-blue.png", [(255, 0, 0), (0, 0, 255)])
-png("green-yellow.png", [(0, 192, 0), (255, 255, 0)])
-png("edit-mask.png", [(0, 0, 0, 0), (0, 0, 0, 255)], alpha=True)
+png("image-a.png", [(255, 0, 0), (0, 0, 255)])
+png("image-b.png", [(0, 192, 0), (255, 255, 0)])
+png("mask-a.png", [(0, 0, 0, 0), (0, 0, 0, 255)], alpha=True)
 
-with wave.open(str(ROOT / "two-beeps.wav"), "wb") as output:
+with wave.open(str(ROOT / "audio-a.wav"), "wb") as output:
     output.setnchannels(1)
     output.setsampwidth(2)
     output.setframerate(16000)
@@ -47,7 +47,7 @@ subprocess.run([
     "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0,format=yuv420p[v]",
     "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "veryfast",
     "-crf", "18", "-movflags", "+faststart", "-map_metadata", "-1",
-    "-fflags", "+bitexact", str(ROOT / "red-then-blue.mp4"),
+    "-fflags", "+bitexact", str(ROOT / "video-a.mp4"),
 ], check=True)
 
 objects = [
@@ -72,10 +72,10 @@ pdf.extend(f"xref\n0 {len(offsets)}\n0000000000 65535 f \n".encode("ascii"))
 for offset in offsets[1:]:
     pdf.extend(f"{offset:010} 00000 n \n".encode("ascii"))
 pdf.extend(f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii"))
-(ROOT / "two-pages.pdf").write_bytes(pdf)
+(ROOT / "document-a.pdf").write_bytes(pdf)
 
 files = {}
-for filename in ["red-blue.png", "green-yellow.png", "edit-mask.png", "two-beeps.wav", "red-then-blue.mp4", "two-pages.pdf"]:
+for filename in ["image-a.png", "image-b.png", "mask-a.png", "audio-a.wav", "video-a.mp4", "document-a.pdf"]:
     data = (ROOT / filename).read_bytes()
     files[filename] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
 (ROOT / "SOURCE.json").write_text(json.dumps({
