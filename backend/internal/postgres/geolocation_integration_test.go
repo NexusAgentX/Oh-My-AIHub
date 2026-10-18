@@ -12,7 +12,7 @@ import (
 )
 
 func TestGeoCacheQuotaAndEnrichmentPreserveCallFacts(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")

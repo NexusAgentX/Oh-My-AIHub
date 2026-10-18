@@ -41,7 +41,7 @@ func receiptFinish(t *testing.T, e *env, consumer, provider person, keyID, recei
 	return gateway.CallFinish{ID: id, AccountID: consumer.id, Outcome: gateway.OutcomeSucceeded, Usage: ledger.Usage{InputTokens: 1_000_000}, PriceSnapshot: snapshot, Cost: statement.Cost, Fee: statement.Fee, QuoteStatement: &statement, Bill: &gateway.Billing{ConsumerID: consumer.id, ProviderID: provider.id, Cost: statement.Cost, Fee: statement.Fee}}
 }
 func TestGroupExecutionReceiptConcurrentFinalizationAndReplay(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer, provider := e.member("receipt-consumer", "100"), e.member("receipt-provider", "0")
 	keyID, _ := e.defaultKey(consumer)
 	first := receiptFinish(t, e, consumer, provider, keyID, strings.Repeat("a", 64))
@@ -89,7 +89,7 @@ func TestGroupExecutionReceiptConcurrentFinalizationAndReplay(t *testing.T) {
 	e.assertZeroSum()
 }
 func TestExecutionReceiptsRollbackWithCallAndLedger(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer, provider := e.member("rollback-consumer", "100"), e.member("rollback-provider", "0")
 	keyID, _ := e.defaultKey(consumer)
 	finish := receiptFinish(t, e, consumer, provider, keyID, strings.Repeat("b", 64))

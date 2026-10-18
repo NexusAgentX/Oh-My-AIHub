@@ -81,7 +81,7 @@ func tracedEnv(t *testing.T) (*env, *gatewaybench.QueryCounter) {
 		t.Fatal(err)
 	}
 	t.Cleanup(traced.Close)
-	return newEnvOn(t, traced, storepg.New(traced), nil), counter
+	return newEnvOnMode(t, traced, storepg.New(traced), nil, true), counter
 }
 
 // balanceReads is how many times the balance cache read the database (the
@@ -97,7 +97,7 @@ const listing = `{"amount":"%s","unit_price_fen":92,"payment_methods":[{"channel
 // next request: a balance that falls to the limit is refused at once, one that
 // rises above it is let through at once.
 func TestBookingsAndCreditLimitChangesReachTheNextRequestAtOnce(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
@@ -311,7 +311,7 @@ func TestAPostingThatDoesNotCommitDoesNotChangeTheCachedBalances(t *testing.T) {
 // Requests, settlements, adjustments and credit-limit changes all at once: when
 // the work is over, the gateway sees exactly what the database holds.
 func TestBalancesFollowTheDatabaseUnderConcurrentWork(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay})
@@ -379,7 +379,7 @@ func TestBalancesFollowTheDatabaseUnderConcurrentWork(t *testing.T) {
 // reload, and until then it is not seen: the cache is really what the
 // requests read.
 func TestPeriodicReloadPicksUpBalancesChangedBehindTheServer(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	fast := e.store.Cached(slog.New(slog.NewTextHandler(io.Discard, nil)), func(c *snapshot.Config) { c.Interval = 50 * time.Millisecond })
 	ctx := context.Background()
