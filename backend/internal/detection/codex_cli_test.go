@@ -90,6 +90,7 @@ func codexToolStreamFixture(namespace string) string {
 func codexCallStreamFixture(call nativeCall, args nativeObject) string {
 	final := nativeFixtureWithCalls("openai-responses", "", []nativeCall{call})
 	item := object(list(final["output"])[0])
+	item["id"] = "fc_" + call.ID
 	item["arguments"] = string(mustNativeJSON(args))
 	initial := nativeObject{"id": "resp_fixture", "object": "response", "status": "in_progress", "output": []any{}}
 	added := cloneNative(item)
@@ -128,6 +129,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 			t.Error("invalid native request", err)
 		}
 		closed, namespace := false, ""
+		sequentialResults := map[string]bool{}
 		for _, raw := range list(root["input"]) {
 			item := object(raw)
 			if str(item["type"]) == "additional_tools" {
@@ -142,9 +144,18 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 				data, _ := json.Marshal(item["output"])
 				closed = strings.Contains(string(data), codexprobe.Marker)
 			}
+			if str(item["type"]) == "function_call_output" && strings.HasPrefix(str(item["call_id"]), "sequential-") {
+				sequentialResults[str(item["call_id"])] = true
+			}
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		if closed || (syntheticToolDeclarations(list(root["tools"])) == 0 && namespace == "") {
+		if strings.Contains(string(body), "exactly twice") && len(sequentialResults) < 2 {
+			id := "sequential-first"
+			if len(sequentialResults) == 1 {
+				id = "sequential-second"
+			}
+			_, _ = io.WriteString(w, codexCallStreamFixture(nativeCall{ID: id, Name: "synthetic_echo", Namespace: namespace}, nativeObject{"label": "violet", "meta": nativeObject{"ok": true}, "items": []any{nativeObject{"value": 7}}}))
+		} else if len(sequentialResults) == 2 || closed || (syntheticToolDeclarations(list(root["tools"])) == 0 && namespace == "") {
 			_, _ = io.WriteString(w, strings.ReplaceAll(responseStreamFixture(), "你好 🌍", codexprobe.Marker))
 		} else {
 			_, _ = io.WriteString(w, codexToolStreamFixture(namespace))
@@ -155,7 +166,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 	if err := r.RegisterCodexCLI(context.Background(), probe, binary); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"RL01", "RL02", "RL03", "RL08"} {
+	for _, id := range []string{"RL01", "RL02", "RL03", "RL04", "RL05", "RL06", "RL08"} {
 		result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special."+id, "official_cli"), nil)
 		if result.State != "pass" || result.Layer != "official_cli" {
 			t.Fatalf("official %s tool callback failed: %+v", id, result)
@@ -163,7 +174,7 @@ func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if requests != 5 || s.usage.Generate != 5 || s.usage.InputTokens != 50 || s.usage.OutputTokens != 20 {
+	if requests != 9 || s.usage.Generate != 9 || s.usage.InputTokens != 90 || s.usage.OutputTokens != 36 {
 		t.Fatal("profile reuse duplicated actual calls or metering", requests, s.usage)
 	}
 }

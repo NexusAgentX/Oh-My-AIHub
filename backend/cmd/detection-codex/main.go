@@ -26,7 +26,7 @@ func main() {
 	if len(os.Args) != 2 || os.Args[1] != "--probe" {
 		os.Exit(2)
 	}
-	r, err := codexprobe.Run(ctx, codexprobe.Config{Binary: binary, Origin: os.Getenv("AIHUB_CODEX_BRIDGE_ORIGIN"), Token: os.Getenv("AIHUB_CODEX_BRIDGE_TOKEN"), Model: os.Getenv("AIHUB_CODEX_MODEL"), Profile: os.Getenv("AIHUB_CODEX_PROFILE"), CA: os.Getenv("AIHUB_CODEX_CA")})
+	r, err := codexprobe.Run(ctx, codexprobe.Config{Binary: binary, Origin: os.Getenv("AIHUB_CODEX_BRIDGE_ORIGIN"), Token: os.Getenv("AIHUB_CODEX_BRIDGE_TOKEN"), Model: os.Getenv("AIHUB_CODEX_MODEL"), Profile: os.Getenv("AIHUB_CODEX_PROFILE"), CA: os.Getenv("AIHUB_CODEX_CA"), Tier: os.Getenv("AIHUB_CODEX_TIER")})
 	_ = json.NewEncoder(os.Stdout).Encode(r)
 	if err != nil {
 		// Do not print raw diagnostics or upstream bodies.

@@ -151,14 +151,18 @@ func (n *nativeScene) codexEncoding(ctx context.Context) {
 	}
 }
 
-func (n *nativeScene) codexTiers(ctx context.Context) {
+func codexServiceTiers(profile TestProfile) []string {
 	tiers := []string{"openai:default"}
-	for _, tier := range n.s.Target.Profile.ServiceTiers {
+	for _, tier := range profile.ServiceTiers {
 		if strings.HasPrefix(tier, "openai:") && canonicalNativeTier("openai-responses", nativeRequestedTier(tier)) != "" && !slices.Contains(tiers, tier) {
 			tiers = append(tiers, tier)
 		}
 	}
-	for _, configured := range tiers {
+	return tiers
+}
+
+func (n *nativeScene) codexTiers(ctx context.Context) {
+	for _, configured := range codexServiceTiers(n.s.Target.Profile) {
 		if ctx.Err() != nil {
 			return
 		}

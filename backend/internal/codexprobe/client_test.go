@@ -24,6 +24,8 @@ func TestProbeRejectsHostLoginAndExternalBridge(t *testing.T) {
 		func(c *Config) { c.Profile = "arbitrary-command" },
 		func(c *Config) { c.CA = "../host.pem" },
 		func(c *Config) { c.CA = "/private/host.pem" },
+		func(c *Config) { c.Tier = "priority" },
+		func(c *Config) { c.Profile, c.Tier = "tier", "unknown\nconfig=true" },
 	} {
 		c := base
 		mutate(&c)

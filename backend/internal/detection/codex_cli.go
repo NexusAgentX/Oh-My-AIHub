@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18", "codex-special.RL24"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
@@ -98,11 +98,18 @@ type codexCLIProof struct {
 }
 
 func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, probePath, binaryPath string) Result {
+	if req.ID == "codex-special.RL24" {
+		return runCodexCLITiers(ctx, s, req, probePath, binaryPath)
+	}
 	n := nativeScene{s: s, protocol: "openai-responses", layer: "official_cli", requirement: req, checks: map[string]Assertion{}}
 	profiles := []string{"lite_tools"}
 	switch req.ID {
 	case "codex-special.RL03":
 		profiles = []string{"tools", "lite_tools"}
+	case "codex-special.RL04":
+		profiles = []string{"sequential_tools"}
+	case "codex-special.RL06":
+		profiles = []string{"instructions"}
 	case "codex-special.RL08":
 		profiles = []string{"lite_tools", "plain"}
 	case "codex-special.RL13":
@@ -139,6 +146,19 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 				label, shape = "lite_tools_roundtrip", wire.LiteRequests >= 2 && wire.StandardRequests == 0
 			}
 			n.check(label, out, closed && shape)
+		case "codex-special.RL04":
+			requests := wire.LiteRequests + wire.StandardRequests
+			n.check("parallel_parameter_accepted", out, client.Completed && requests > 0 && wire.ParallelDisabled == requests)
+			n.check("parallel_calls_disabled", out, client.Completed && client.MarkerMatched && client.ToolCalls == 2 && wire.UniqueToolCalls == 2 && wire.ToolCalls == 2 && wire.ToolResults >= 3 && wire.MaxCallsPerResponse == 1 && wire.SSE >= 3)
+		case "codex-special.RL05":
+			n.check("reasoning_context_parameter", out, wire.AllTurns >= 2)
+			n.check("multi_turn_continuation", out, closed && wire.AllTurns >= 2)
+		case "codex-special.RL06":
+			// The pinned CLI carries base instructions as native developer input,
+			// rather than fabricating a top-level legacy instructions parameter.
+			for _, label := range req.Assertions {
+				n.check(label, out, client.Completed && client.MarkerMatched && wire.DeveloperInstructions > 0)
+			}
 		case "codex-special.RL13":
 			auth, activation := out, out
 			if client.PlatformAuth && client.Protocol == codexprobe.Protocol {
@@ -181,8 +201,15 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 	return n.finish()
 }
 
-func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, binaryPath string) (proof codexCLIProof) {
+func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, binaryPath string) codexCLIProof {
+	return runCodexCLIProfileWithTier(ctx, s, profile, "", probePath, binaryPath)
+}
+
+func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, probePath, binaryPath string) (proof codexCLIProof) {
 	key := "codex-cli-profile-v1:" + profile
+	if tier != "" {
+		key += ":" + tier
+	}
 	if cached := s.Recall(key); len(cached) > 0 && json.Unmarshal(cached, &proof) == nil {
 		return proof
 	}
@@ -219,7 +246,7 @@ func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, bin
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
 	executionStarted := time.Now().UnixNano()
-	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
+	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
 	executionFinished := time.Now().UnixNano()
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)

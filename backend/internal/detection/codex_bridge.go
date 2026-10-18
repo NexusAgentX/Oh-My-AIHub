@@ -84,10 +84,13 @@ type codexUpstreamFailure struct {
 // Only bounded semantic facts leave this private bridge. Call IDs and native
 // request/response bodies remain transient memory and never enter reports.
 type codexWireFacts struct {
-	LiteRequests, StandardRequests, ToolDeclarations int
-	ToolCalls, ToolResults, SSE, ReliableUsage       int
-	ZstdRequests, PlainRequests                      int
-	TextDeltas, ToolDeltas                           int
+	RequestedTier, ActualTier                         string
+	LiteRequests, StandardRequests, ToolDeclarations  int
+	ToolCalls, ToolResults, SSE, ReliableUsage        int
+	ZstdRequests, PlainRequests                       int
+	TextDeltas, ToolDeltas                            int
+	AllTurns, ParallelDisabled, DeveloperInstructions int
+	UniqueToolCalls, MaxCallsPerResponse              int
 }
 
 func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*codexBridge, error) {
@@ -359,9 +362,24 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		if decodeErr == nil {
 			if root, err := decodeNative(plain); err == nil {
 				lite := false
+				if tier := str(root["service_tier"]); canonicalNativeTier("openai-responses", tier) != "" {
+					wire.RequestedTier = tier
+				}
+				if str(object(root["reasoning"])["context"]) == "all_turns" {
+					wire.AllTurns++
+				}
+				if root["parallel_tool_calls"] == false {
+					wire.ParallelDisabled++
+				}
 				contextCalls := map[string]string{}
 				for _, raw := range list(root["input"]) {
 					item := object(raw)
+					if str(item["role"]) == "developer" {
+						text, _ := json.Marshal(item["content"])
+						if bytes.Contains(text, []byte(codexprobe.Marker)) {
+							wire.DeveloperInstructions++
+						}
+					}
 					if str(item["type"]) == "function_call" {
 						contextCalls[str(item["call_id"])] = "codex." + str(item["namespace"]) + "." + str(item["name"])
 					}
@@ -425,6 +443,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 			wire.ReliableUsage++
 		}
 		for _, candidate := range reply.Candidates {
+			wire.MaxCallsPerResponse += len(candidate.Calls)
 			for _, call := range candidate.Calls {
 				if call.Name == "synthetic_echo" && call.ID != "" && matchesNativeSchema(call.Arguments) {
 					wire.ToolCalls++
@@ -481,6 +500,17 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.PlainRequests += wire.PlainRequests
 	b.wire.TextDeltas += wire.TextDeltas
 	b.wire.ToolDeltas += wire.ToolDeltas
+	b.wire.AllTurns += wire.AllTurns
+	b.wire.ParallelDisabled += wire.ParallelDisabled
+	b.wire.DeveloperInstructions += wire.DeveloperInstructions
+	b.wire.UniqueToolCalls = len(b.callIDs)
+	b.wire.MaxCallsPerResponse = max(b.wire.MaxCallsPerResponse, wire.MaxCallsPerResponse)
+	if wire.RequestedTier != "" {
+		b.wire.RequestedTier = wire.RequestedTier
+	}
+	if actual := canonicalNativeTier("openai-responses", reply.Usage.Tier); actual != "" {
+		b.wire.ActualTier = actual
+	}
 	for _, id := range append(response.PriorAttempts, response.AttemptID) {
 		if id != "" && !slices.Contains(b.witnesses, id) {
 			b.witnesses = append(b.witnesses, id)
