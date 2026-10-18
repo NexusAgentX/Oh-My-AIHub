@@ -120,13 +120,9 @@ type loader struct {
 }
 
 func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
-	legacy, err := l.Loader.LoadCandidates(ctx)
-	if err != nil {
-		return nil, err
-	}
 	d := l.r.directory.Load()
 	if d == nil {
-		return legacy, nil
+		return []gateway.CandidateRecord{}, nil
 	}
 	data, err := l.r.Repository.Snapshot(ctx)
 	if err != nil {
@@ -183,29 +179,22 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 	if err != nil {
 		return nil, err
 	}
-	l.r.state.Store(&State{Directory: *d, Data: data, Views: views, Candidates: records, Reports: facts, Version: version})
-	legacy = append(legacy, records...)
-	sort.SliceStable(legacy, func(i, j int) bool {
-		if legacy[i].ModelID != legacy[j].ModelID {
-			return legacy[i].ModelID < legacy[j].ModelID
+	sort.SliceStable(records, func(i, j int) bool {
+		if records[i].ModelID != records[j].ModelID {
+			return records[i].ModelID < records[j].ModelID
 		}
-		return legacy[i].Candidate.ChannelID < legacy[j].Candidate.ChannelID
+		return records[i].Candidate.ChannelID < records[j].Candidate.ChannelID
 	})
-	return legacy, nil
+	l.r.state.Store(&State{Directory: *d, Data: data, Views: views, Candidates: records, Reports: facts, Version: version})
+	return records, nil
 }
 func (l *loader) LoadModels(ctx context.Context) ([]catalog.Model, error) {
-	models, err := l.Loader.LoadModels(ctx)
-	if err != nil {
-		return nil, err
-	}
+	models := []catalog.Model{}
 	d := l.r.directory.Load()
 	if d == nil {
 		return models, nil
 	}
 	seen := map[string]int{}
-	for i, m := range models {
-		seen[m.ID] = i
-	}
 	enabled := map[string]bool{}
 	for _, s := range d.Suppliers {
 		enabled[s.ID] = s.Enabled && s.DeletedAt == nil

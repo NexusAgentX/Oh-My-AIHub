@@ -120,7 +120,7 @@ func main() {
 	// surface when someone uses the channel, API key or order.
 	checkContext, cancelCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	checked, err := keyringcheck.Verify(checkContext,
-		keyringcheck.Sources{Channels: store.Channels, APIKeys: store.Keys, C2COrders: store.C2C},
+		keyringcheck.Sources{Channels: store.ChannelHistory, APIKeys: store.Keys, C2COrders: store.C2C},
 		keyringcheck.Keyrings{Upstream: credentialKeyring, C2C: c2cKeyring})
 	cancelCheck()
 	if err != nil {
@@ -168,15 +168,7 @@ func main() {
 		}
 		return ids, nil
 	}
-	// Keys may also name custom models of channels (ADR-0034).
-	keyModelIDs := func(ctx context.Context) ([]string, error) {
-		ids, err := modelIDs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		custom, err := store.Channels.CustomModelNames(ctx)
-		return append(ids, custom...), err
-	}
+	keyModelIDs := modelIDs
 	bus := gateway.NewBus()
 	var platformMetrics *metrics.Metrics
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {

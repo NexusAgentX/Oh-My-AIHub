@@ -4,6 +4,7 @@
 package postgres
 
 import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelrefpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/forumpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
@@ -23,9 +24,10 @@ import (
 )
 
 type Store struct {
-	Market        *marketpg.Store
-	Contributions *contributionpg.Store
-	Suppliers     *supplierpg.Store
+	ChannelHistory *channelrefpg.Store
+	Market         *marketpg.Store
+	Contributions  *contributionpg.Store
+	Suppliers      *supplierpg.Store
 	// Books is where the stores that book (ledger, gateway, C2C, observe)
 	// report what their ledger transactions did; Cached subscribes the
 	// gateway's balance cache to it.
@@ -48,21 +50,22 @@ type Store struct {
 func New(pool *pgxpool.Pool) *Store {
 	books := ledgerpg.NewBooks()
 	return &Store{
-		Market:        marketpg.NewStore(pool),
-		Contributions: contributionpg.NewStore(pool),
-		Books:         books,
-		Suppliers:     supplierpg.NewStore(pool),
-		Forum:         forumpg.NewStore(pool),
-		Identity:      identitypg.NewStore(pool),
-		Catalog:       catalogpg.NewStore(pool),
-		Settings:      settingspg.NewStore(pool),
-		Audit:         auditpg.NewStore(pool),
-		Ledger:        ledgerpg.NewStore(pool, books),
-		Channels:      channelpg.NewStore(pool),
-		Keys:          keypg.NewStore(pool),
-		Routes:        keypg.NewRoutes(pool),
-		Gateway:       gatewaypg.NewStore(pool, books),
-		C2C:           c2cpg.NewStore(pool, books),
-		Observe:       observepg.NewStore(pool, books),
+		ChannelHistory: channelrefpg.New(pool),
+		Market:         marketpg.NewStore(pool),
+		Contributions:  contributionpg.NewStore(pool),
+		Books:          books,
+		Suppliers:      supplierpg.NewStore(pool),
+		Forum:          forumpg.NewStore(pool),
+		Identity:       identitypg.NewStore(pool),
+		Catalog:        catalogpg.NewStore(pool),
+		Settings:       settingspg.NewStore(pool),
+		Audit:          auditpg.NewStore(pool),
+		Ledger:         ledgerpg.NewStore(pool, books),
+		Channels:       channelpg.NewStore(pool),
+		Keys:           keypg.NewStore(pool),
+		Routes:         keypg.NewRoutes(pool),
+		Gateway:        gatewaypg.NewStore(pool, books),
+		C2C:            c2cpg.NewStore(pool, books),
+		Observe:        observepg.NewStore(pool, books),
 	}
 }

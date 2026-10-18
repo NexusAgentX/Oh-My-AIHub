@@ -3,8 +3,8 @@
 // missing historical key ID or a damaged ciphertext stops the server at boot
 // instead of surfacing when someone uses the channel, API key or order.
 //
-// It covers the three places ciphertext lives: upstream keys of undeleted
-// channels and platform API keys (both under the upstream credential keyring)
+// It covers the three places ciphertext lives: upstream keys of retained
+// channel identities and undeleted platform API keys (both under the upstream credential keyring)
 // and the payment methods of C2C orders (under the C2C private data keyring).
 // Plaintext is discarded the moment it is decrypted; nothing is cached. There
 // is no re-encryption here: an old key ID can only be dropped once no stored
@@ -49,10 +49,10 @@ type MethodsSource interface {
 	OrderMethodsAfter(ctx context.Context, afterID string, limit int) ([]c2c.StoredMethods, error)
 }
 
-// Sources are the stores to read the ciphertext from. Channels returns only
-// undeleted channels and APIKeys only undeleted keys: deleted records are never
-// decrypted again. C2COrders returns every order, because finished orders are
-// still shown to sellers and administrators.
+// Sources are the stores to read the ciphertext from. Channels includes retained
+// history identities even after business deletion; configuration retirement
+// cannot remove their historical key IDs. APIKeys returns undeleted keys.
+// C2COrders returns every order, including finished historical orders.
 type Sources struct {
 	Channels  CredentialSource
 	APIKeys   CredentialSource

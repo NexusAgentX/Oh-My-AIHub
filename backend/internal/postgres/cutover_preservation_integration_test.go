@@ -7,6 +7,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/cutover"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/cutoverpg"
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -59,6 +60,26 @@ func TestCutoverReadOnlyEvidenceProtectsIndividualBalancesAndLegacyCiphertext(t 
 	secret, err := keyring.OpenCredential(cid, encrypted)
 	if err != nil || secret != "synthetic-upstream-key" {
 		t.Fatal("historical AAD/ciphertext lost", err)
+	}
+	historical, err := store.ChannelHistory.CredentialsAfter(ctx, "", 500)
+	if err != nil || len(historical) != 1 || historical[0].RecordID != cid || historical[0].Sealed.Version != 1 {
+		t.Fatal("deleted history disappeared from startup verification", err)
+	}
+	reopened, err := keyring.Decrypt(historical[0].RecordID, historical[0].Sealed)
+	if err != nil || reopened != "synthetic-upstream-key" {
+		t.Fatal("historical AAD changed", err)
+	}
+	if rest, err := store.ChannelHistory.CredentialsAfter(ctx, cid, 500); err != nil || len(rest) != 0 {
+		t.Fatal("history cursor repeated rows", err)
+	}
+	sources := keyringcheck.Sources{Channels: store.ChannelHistory, APIKeys: store.Keys, C2COrders: store.C2C}
+	private := privateKeyringOf(t, "private", "private")
+	verified, err := keyringcheck.Verify(ctx, sources, keyringcheck.Keyrings{Upstream: keyring, C2C: private})
+	if err != nil || verified.Channels != 1 {
+		t.Fatal("startup did not verify preserved history", verified.Channels, err)
+	}
+	if _, err = keyringcheck.Verify(ctx, sources, keyringcheck.Keyrings{Upstream: upstreamKeyringOf(t, "new", "new"), C2C: private}); err == nil {
+		t.Fatal("startup accepted a keyring missing a retained historical key ID")
 	}
 	// Deliberately corrupt only an isolated synthetic fixture while keeping
 	// total balance zero. A row-count/total-only checker would miss this.
