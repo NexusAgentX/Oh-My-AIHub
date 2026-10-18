@@ -30,12 +30,16 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaybench"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
 
 // ---- a loopback stand-in for the pinned egress policy ----
@@ -184,9 +188,11 @@ type person struct {
 }
 
 type env struct {
-	t     *testing.T
-	pool  *pgxpool.Pool
-	store *storepg.Store
+	groups     *groupchannel.Runtime
+	groupStore *groupchannelpg.Store
+	t          *testing.T
+	pool       *pgxpool.Pool
+	store      *storepg.Store
 	// cached is what the gateway and the services run on (ADR-0040); a test
 	// that changes cached data goes through the env's services, or through
 	// cached.Cache.Invalidate after writing SQL itself.
@@ -245,13 +251,30 @@ func newEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 // newEnvOn is newEnvWith on a database the caller has set up, for the
 // performance baseline, which counts the statements its pool sends.
 func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure func(*gateway.Dependencies)) *env {
+	return newEnvOnMode(t, pool, store, configure, false)
+}
+
+func newEnvOnMode(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure func(*gateway.Dependencies), grouped bool) *env {
 	t.Helper()
 	ctx := context.Background()
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	// Like the server, run the gateway on the cached stores and build every
 	// service that writes the cached data on them (ADR-0040).
-	cached := store.Cached(logger)
+	var groups *groupchannel.Runtime
+	var repo *groupchannelpg.Store
+	var options []func(*snapshot.Config)
+	if grouped {
+		repo = groupchannelpg.NewStore(pool)
+		groups = &groupchannel.Runtime{Repository: repo}
+		options = append(options, func(c *snapshot.Config) { c.Loader = groupIntegrationEvidence{Loader: groups.Wrap(c.Loader)} })
+	}
+	cached := store.Cached(logger, options...)
+	if grouped {
+		groups.Rebuild = func(ctx context.Context) error {
+			return cached.Cache.InvalidateChecked(ctx, snapshot.DomainModels|snapshot.DomainFleet)
+		}
+	}
 	service, admin, _ := accountsOn(t, cached.Identity)
 
 	secret := make([]byte, 32)
@@ -262,17 +285,19 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	}
 	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
-	for _, id := range []string{"gpt-test", "claude-test", "gemini-test"} {
-		if _, err := catalogService.Create(ctx, admin.ID, catalog.Model{
-			ID: id, DisplayName: strings.ToUpper(id), Enabled: true, Provider: "test",
-			InputPrice: mustAmount(t, priceInput), OutputPrice: mustAmount(t, priceOutput),
-			CacheWritePrice: mustAmount(t, "12.5"), CacheReadPrice: mustAmount(t, "1"),
-		}); err != nil {
-			t.Fatal(err)
+	if !grouped {
+		for _, id := range []string{"gpt-test", "claude-test", "gemini-test"} {
+			if _, err := catalogService.Create(ctx, admin.ID, catalog.Model{
+				ID: id, DisplayName: strings.ToUpper(id), Enabled: true, Provider: "test",
+				InputPrice: mustAmount(t, priceInput), OutputPrice: mustAmount(t, priceOutput),
+				CacheWritePrice: mustAmount(t, "12.5"), CacheReadPrice: mustAmount(t, "1"),
+			}); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	modelIDs := func(ctx context.Context) ([]string, error) {
-		models, err := catalogService.List(ctx, true)
+		models, err := cached.Models.List(ctx, true)
 		ids := make([]string, 0, len(models))
 		for _, model := range models {
 			ids = append(ids, model.ID)
@@ -288,6 +313,16 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	}
 	outbound := testOutbound{client: &http.Client{Transport: testTransport}}
 	e := &env{t: t, pool: pool, store: store, cached: cached, catalog: catalogService, logs: logs, service: service, people: map[string]person{}, keyring: keyring}
+	e.groups, e.groupStore = groups, repo
+	if grouped {
+		groups.CredentialScope = func(r groupchannel.Record) (string, error) {
+			value, err := keyring.OpenCredential(r.ID, r.Credential)
+			if err != nil {
+				return "", err
+			}
+			return market.CredentialScope(secret, r.GroupID, []byte(value))
+		}
+	}
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		_ = store.Gateway.RecordChannelEvent(context.Background(), channelID, kind, reason)
 	})
@@ -302,10 +337,16 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	if configure != nil {
 		configure(&dependencies)
 	}
+	if grouped {
+		dependencies.Ready = groups.Check
+	}
 	e.engineDeps = dependencies
 	e.engine = gateway.NewEngine(dependencies)
 	// As in the server: editing a channel clears its 4xx anomaly figures.
 	cached.Cache.OnChannelEdited(e.engine.ChannelEdited)
+	if grouped {
+		groups.Edited = e.engine.ChannelEdited
+	}
 	e.observe = observe.NewService(store.Observe)
 	// Rows are stamped by the database's clock and the observation windows end
 	// at the service's "now". Keep both on the database's clock: with the host's,
@@ -321,7 +362,7 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 	go func() { defer close(diagnosticDone); store.Gateway.RunDiagnostics(diagnosticContext) }()
 	t.Cleanup(func() { stopDiagnostics(); <-diagnosticDone })
 	e.newHandler = func(engine *gateway.Engine) http.Handler {
-		return api.NewHandler(api.Dependencies{
+		d := api.Dependencies{
 			Identity: service, Catalog: catalogService, Ledger: ledger.NewService(store.Ledger), Settings: settingsService,
 			Audit: audit.NewService(store.Audit), Keys: apikey.NewService(cached.Keys, keyring, modelIDs),
 			Channels: channel.NewService(channel.Dependencies{
@@ -332,10 +373,18 @@ func newEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure 
 				},
 			}),
 			Routing: cached.Routing, Gateway: engine, Browse: store.Gateway, Observe: e.observe, Feed: e.feed, C2C: c2c.NewService(store.C2C, c2cKeyring), CookieSecure: false,
-		})
+		}
+		if grouped {
+			d.GroupChannels = &groupchannel.Service{Runtime: groups, Repository: repo, Keyring: keyring}
+			d.Catalog, d.Channels = nil, nil
+		}
+		return api.NewHandler(d)
 	}
 	e.handler = e.newHandler(e.engine)
 	e.admin = e.login(admin.Username, "Founder-password-2026", admin.ID, false)
+	if grouped {
+		e.seedGroupModelIDs()
+	}
 	return e
 }
 
@@ -361,6 +410,9 @@ func (e *env) restartGateway() {
 	dependencies.StatsBook = nil
 	engine := gateway.NewEngine(dependencies)
 	e.cached.Cache.OnChannelEdited(engine.ChannelEdited)
+	if e.groups != nil {
+		e.groups.Edited = engine.ChannelEdited
+	}
 	if err := engine.LoadStats(context.Background()); err != nil {
 		e.t.Fatal(err)
 	}
@@ -465,6 +517,9 @@ type channelSpec struct {
 
 func (e *env) createChannel(owner person, spec channelSpec) string {
 	e.t.Helper()
+	if e.groups != nil {
+		return e.createGroupedChannel(owner, spec)
+	}
 	if spec.model == "" {
 		spec.model = "gpt-test"
 	}

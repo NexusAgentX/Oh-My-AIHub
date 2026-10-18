@@ -69,7 +69,7 @@ func stallAfter(t *testing.T, write func(http.ResponseWriter)) func(http.Respons
 // A stream can outlive both its idle and non-streaming request timeout
 // while output keeps arriving.
 func TestGatewayStreamOutlivesTheRequestTimeoutWhileOutputKeepsFlowing(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	steady := newUpstream(t, pacedChatStream(8, 500*time.Millisecond))
@@ -96,7 +96,7 @@ func TestGatewayStreamOutlivesTheRequestTimeoutWhileOutputKeepsFlowing(t *testin
 }
 
 func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) {
-	e := newEnvWith(t, slowCloseOutbound)
+	e := newGroupEnvWith(t, slowCloseOutbound)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	silent := newUpstream(t, stallAfter(t, func(w http.ResponseWriter) {
@@ -127,7 +127,7 @@ func TestGatewayInterruptsAStreamThatFallsSilentAfterItsFirstByte(t *testing.T) 
 }
 
 func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheRequestTimeout(t *testing.T) {
-	e := newEnvWith(t, slowCloseOutbound)
+	e := newGroupEnvWith(t, slowCloseOutbound)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	slow := newUpstream(t, stallAfter(t, func(http.ResponseWriter) {}))
@@ -158,7 +158,7 @@ func TestGatewayFallsBackWhenANonStreamingRequestExceedsTheRequestTimeout(t *tes
 // The total timeout of a non-streaming request covers reading the whole body,
 // too: an answer that stalls half way is an interruption, not a fallback.
 func TestGatewayInterruptsANonStreamingAnswerThatStallsMidBody(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	half := newUpstream(t, stallAfter(t, func(w http.ResponseWriter) {
@@ -186,7 +186,7 @@ func TestGatewayInterruptsANonStreamingAnswerThatStallsMidBody(t *testing.T) {
 // The call time limit stops a stream that is still talking, blames nobody, and
 // bills what was read.
 func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
-	e := newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = 1500 * time.Millisecond }))
+	e := newGroupEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = 1500 * time.Millisecond }))
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	endless := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -232,7 +232,7 @@ func TestGatewayStopsACallAtItsTimeLimitAndBillsWhatWasRead(t *testing.T) {
 // A call that runs out of time before any output answers the client with an
 // error of its own and does not go on to the next candidate.
 func TestGatewayAnswersWhenTheCallTimeLimitPassesBeforeAnyOutput(t *testing.T) {
-	e := newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = time.Second }))
+	e := newGroupEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.CallTimeLimit = time.Second }))
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	stuck := newUpstream(t, stallAfter(t, func(http.ResponseWriter) {}))

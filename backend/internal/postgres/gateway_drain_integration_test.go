@@ -21,7 +21,7 @@ import (
 const drainTestWindow = 1500 * time.Millisecond
 
 func newDrainEnv(t *testing.T) *env {
-	return newEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.DrainWindow = drainTestWindow }))
+	return newGroupEnvWith(t, withDependencies(slowCloseOutbound, func(d *gateway.Dependencies) { d.DrainWindow = drainTestWindow }))
 }
 
 // liveGateway serves the environment's handler on a real server.
@@ -270,7 +270,7 @@ func TestGatewayCancelsTheUpstreamAtOnceWhenTheClientLeavesBeforeAnyOutput(t *te
 		{"streaming before the first byte", `{"model":"gpt-test","stream":true}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 30 * time.Second })
+			e := newGroupEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 30 * time.Second })
 			consumer := e.member("consumer", "100")
 			sharer := e.member("sharer", "0")
 			var cancelled atomic.Bool
@@ -334,7 +334,7 @@ func TestGatewayCancelsTheUpstreamAtOnceWhenTheClientLeavesBeforeAnyOutput(t *te
 // The channel's concurrency slot stays taken while the gateway reads on, and
 // is given back when the call has been settled.
 func TestGatewayHoldsTheChannelSlotWhileItReadsOnAfterTheClientLeft(t *testing.T) {
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 2 * time.Second })
+	e := newGroupEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 2 * time.Second })
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	upstream := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {

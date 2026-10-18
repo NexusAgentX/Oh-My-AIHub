@@ -85,7 +85,7 @@ func TestGatewayDiagnosticsKeepLedgerLockTailAtTwoStatements(t *testing.T) {
 }
 
 func TestGatewaySettlesWhileCallAnalysesCompete(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})

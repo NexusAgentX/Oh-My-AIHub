@@ -1,0 +1,226 @@
+package postgres_test
+
+import (
+	"context"
+	"encoding/json"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
+)
+
+// newGroupEnv runs the same database/auth/settlement infrastructure as the old
+// integration fixture, using approved group quotes and the real group-channel
+// handlers. It never seeds models or channel_models. The explicit synthetic
+// stream and capacity facts below exercise forwarding mechanics, not provider
+// detection: no report/evidence rows are published or accepted as real proof.
+func newGroupEnv(t *testing.T) *env { return newGroupEnvWith(t, nil) }
+
+func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
+	t.Helper()
+	pool, store := isolatedDatabase(t)
+	return newEnvOnMode(t, pool, store, configure, true)
+}
+
+type groupIntegrationEvidence struct{ snapshot.Loader }
+
+func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
+	rows, err := l.Loader.LoadCandidates(ctx)
+	rows = append([]gateway.CandidateRecord(nil), rows...)
+	for i := range rows {
+		c := &rows[i].Candidate
+		c.Evidence = map[string]bool{}
+		c.VerifiedCapacity = map[string]int64{}
+		for _, protocol := range []string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content"} {
+			c.Evidence["upstream_protocol/"+protocol+".stream/text_lifecycle"] = true
+			c.VerifiedCapacity[protocol+".length_search@upstream_protocol/max_output"] = 8192
+		}
+		// This fixture fixes the comparison workload at 1000 input/500 output
+		// tokens with 10/20 CNY prices. No unknown live profile is fabricated.
+		c.TypicalCostKnown = true
+		c.TypicalCost = money.FromNano(c.MultiplierNano / 50)
+		c.TypicalUnit, c.TypicalQuantity = "per_request", 1
+	}
+	return rows, err
+}
+
+func (e *env) publishGroupFixture(changes market.Changes) market.Directory {
+	e.t.Helper()
+	marketApply(e.t, e.store, e.admin.id, changes)
+	d := marketSnapshot(e.t, e.store)
+	if err := e.groups.Install(context.Background(), d); err != nil {
+		e.t.Fatal(err)
+	}
+	return d
+}
+
+func (e *env) seedGroupModelIDs() {
+	e.t.Helper()
+	s := market.Supplier{ID: marketID(e.t), Name: "Synthetic ID directory", Kind: "relay", Enabled: true, WebsiteURL: "https://synthetic.example"}
+	g := market.Group{ID: marketID(e.t), SupplierID: s.ID, Name: "Approved IDs without channels", Enabled: true}
+	c := market.Changes{Suppliers: []market.Change[market.Supplier]{{Value: s}}, Groups: []market.Change[market.Group]{{Value: g}}}
+	for _, model := range []string{"gpt-test", "claude-test", "gemini-test"} {
+		c.Models = append(c.Models, market.Change[market.GroupModel]{Value: market.GroupModel{ID: marketID(e.t), GroupID: g.ID, ModelID: model, ModelType: "text", Enabled: true}})
+	}
+	e.publishGroupFixture(c)
+}
+
+func (e *env) createGroupedChannel(owner person, spec channelSpec) string {
+	e.t.Helper()
+	if spec.model == "" {
+		spec.model = "gpt-test"
+	}
+	if spec.multiplier == "" {
+		spec.multiplier = "2"
+	}
+	if spec.key == "" {
+		spec.key = "upstream-key-" + spec.name
+	}
+	if spec.formats == nil {
+		spec.formats = []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
+	}
+	base := spec.baseURL
+	if base == "" {
+		base = spec.upstream.server.URL
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	// The market uses the real hostname normalizer. httptest's certificate
+	// includes example.com; only this fixture's transport resolves that host
+	// and its exact owned port to its loopback TLS server.
+	if u.Hostname() == "127.0.0.1" {
+		port := u.Port()
+		u.Host = net.JoinHostPort("example.com", port)
+		base = u.String()
+		e.installGroupLoopback(port)
+	}
+	d := marketSnapshot(e.t, e.store)
+	var address market.Address
+	for _, a := range d.Addresses {
+		if a.BaseURL == base {
+			address = a
+		}
+	}
+	c := market.Changes{}
+	if address.ID == "" {
+		supplier := market.Supplier{ID: marketID(e.t), Name: spec.name + " supplier", Kind: "relay", Enabled: true, WebsiteURL: "https://synthetic.example"}
+		address = market.Address{ID: marketID(e.t), SupplierID: supplier.ID, BaseURL: base}
+		c.Suppliers = append(c.Suppliers, market.Change[market.Supplier]{Value: supplier})
+		c.Addresses = append(c.Addresses, market.Change[market.Address]{Value: address})
+	}
+	g := market.Group{ID: marketID(e.t), SupplierID: address.SupplierID, Name: spec.name + " group", Enabled: true}
+	m := market.GroupModel{ID: marketID(e.t), GroupID: g.ID, ModelID: spec.model, UpstreamModel: spec.upstreamAs, ModelType: "text", Enabled: true}
+	link := market.GroupAddress{ID: marketID(e.t), GroupID: g.ID, AddressID: address.ID, SupplierID: address.SupplierID}
+	c.Groups = []market.Change[market.Group]{{Value: g}}
+	c.Models = []market.Change[market.GroupModel]{{Value: m}}
+	c.GroupAddresses = []market.GroupAddressSet{{GroupID: g.ID, Links: []market.GroupAddress{link}}}
+	c.Quotes = []market.Quote{{ID: marketID(e.t), GroupModelID: m.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(e.t, "10"), Output: mustAmount(e.t, "20"), CacheWrite: mustAmount(e.t, "12.5"), CacheRead: mustAmount(e.t, "1")}}}
+	d = e.publishGroupFixture(c)
+	var overrides market.Defaults
+	if spec.advanced != nil {
+		raw, _ := json.Marshal(spec.advanced)
+		if err := json.Unmarshal(raw, &overrides); err != nil {
+			e.t.Fatal(err)
+		}
+	}
+	body := map[string]any{"group_id": g.ID, "name": spec.name, "api_key": spec.key, "overrides": overrides, "models": []any{map[string]any{"group_model_id": m.ID, "discount": spec.multiplier}}}
+	created := e.apiJSON(owner, http.StatusCreated, http.MethodPost, "/api/group-channels", body)
+	id := created["id"].(string)
+	r, err := e.groupStore.Get(context.Background(), id)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	for _, v := range d.Groups {
+		if v.ID == g.ID {
+			g = v
+		}
+	}
+	for _, v := range d.Models {
+		if v.ID == m.ID {
+			m = v
+		}
+	}
+	tests := map[channel.Format]channel.FormatTest{}
+	for _, format := range spec.formats {
+		tests[channel.Format(format)] = channel.FormatTest{OK: true, TestedAt: time.Now()}
+	}
+	ok, err := e.groupStore.SaveProbe(context.Background(), r, g, m, groupchannel.Probe{ChannelID: id, GroupModelID: m.ID, Binding: groupchannel.ProbeBinding(r, g, m), Tests: tests, TestedAt: time.Now()})
+	if err != nil || !ok {
+		e.t.Fatal("synthetic callability fixture rejected", err)
+	}
+	if err := e.groups.Refresh(context.Background()); err != nil {
+		e.t.Fatal(err)
+	}
+	if spec.status != "" && spec.status != "listed" {
+		e.apiJSON(owner, http.StatusOK, http.MethodPatch, "/api/group-channels/"+id, map[string]any{"revision": created["revision"], "status": spec.status})
+	}
+	return id
+}
+
+func (e *env) installGroupLoopback(port string) {
+	e.t.Helper()
+	current, ok := e.engine.Outbound.(testOutbound)
+	if !ok {
+		e.t.Fatal("group integration fixture requires its controlled transport")
+	}
+	transport, ok := current.client.Transport.(*http.Transport)
+	if !ok {
+		e.t.Fatal("group integration fixture requires an HTTP transport")
+	}
+	copy := transport.Clone()
+	previous := copy.DialContext
+	copy.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		if address == net.JoinHostPort("example.com", port) {
+			address = net.JoinHostPort("127.0.0.1", port)
+		}
+		if previous != nil {
+			return previous(ctx, network, address)
+		}
+		return (&net.Dialer{}).DialContext(ctx, network, address)
+	}
+	client := *current.client
+	client.Transport = copy
+	e.engine.Outbound = testOutbound{client: &client}
+	e.engineDeps.Outbound = e.engine.Outbound
+	e.t.Cleanup(copy.CloseIdleConnections)
+}
+
+func TestGroupedFixtureStartsEmptyAndUsesApprovedQuotes(t *testing.T) {
+	e := newGroupEnv(t)
+	consumer := e.member("group-consumer", "100")
+	provider := e.member("group-provider", "0")
+	var models, legacyChoices int
+	if err := e.pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM models),(SELECT count(*) FROM channel_models)`).Scan(&models, &legacyChoices); err != nil || models != 0 || legacyChoices != 0 {
+		t.Fatal("group fixture created global configuration", models, legacyChoices, err)
+	}
+	_, key := e.defaultKey(consumer)
+	empty := e.apiJSON(consumer, 200, "GET", "/api/market/channels", nil)
+	if empty["total"] != float64(0) {
+		t.Fatal(empty)
+	}
+	id := e.createChannel(provider, channelSpec{name: "group-provider", upstream: okUpstream(t)})
+	reply := e.call(key, "POST", "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
+	if reply.Code != 200 {
+		t.Fatalf("group call failed: %d %s", reply.Code, reply.Body.String())
+	}
+	row := e.callRow(reply.Header().Get("X-AIHub-Request-Id"))
+	if row.FinalChannel != id || !row.HasLedgerTx || row.CostNano != 40_000_000 {
+		t.Fatalf("group settlement: %+v", row)
+	}
+	var price string
+	if err := e.pool.QueryRow(context.Background(), `SELECT price_snapshot::text FROM calls WHERE id=$1`, reply.Header().Get("X-AIHub-Request-Id")).Scan(&price); err != nil || !strings.Contains(price, "quote_id") {
+		t.Fatal("missing independent quote", price, err)
+	}
+	e.assertZeroSum()
+}
