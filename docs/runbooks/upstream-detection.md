@@ -37,6 +37,8 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 
 RL17 复用 notes 生命周期的实际 CLI 请求。固定客户端会缓存初始 thread_hint，不能假设本地恢复线程就会重新获取。检测在首次私有会话的实际 CLI hint 请求前，用实际模型生成的加密参数向同一隔离上下文写入合成标记；该准备调用单独留上游证据与计量，不能代替 CLI hint。本人 hint 须观察到标记，另一会话不得包含本人任一合成标记；只有空 hint 时仍是无法核验。RL18 的恢复阶段仍要求实际新读回执与返回结果续用，不能借旧读取或 hint 满足。
 
+RL07 分别运行真实 Namespace 动态回调与内置 freeform apply_patch 的空补丁闭环；后者校验实际无操作诊断、参数分片和 call/result，不宣称文件写入能力。私有桥只交付规范空补丁，任何改变文件的内容或其他客户端工具在执行前拒绝。RL12 先复用标准/Lite 独立工具证据，再在同一个隔离官方客户端中用两个本地协议配置别名指向同一实际上游模型，分别把工具历史续用到另一格式。CLI 自身生成对应原生声明，网关不转换；两个方向均须识别到同一实际 call/result 的格式切换，不以两次独立工具成功代替兼容回放。
+
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
 
 SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。

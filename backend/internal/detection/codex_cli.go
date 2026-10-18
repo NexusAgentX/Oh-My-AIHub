@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL09", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
 			layers := []string{"official_cli"}
@@ -117,10 +117,14 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"sequential_tools"}
 	case "codex-special.RL06":
 		profiles = []string{"instructions"}
+	case "codex-special.RL07":
+		profiles = []string{"namespace_tools", "custom_tool"}
 	case "codex-special.RL08":
 		profiles = []string{"lite_tools", "plain"}
 	case "codex-special.RL09":
 		profiles = []string{"encrypted"}
+	case "codex-special.RL12":
+		profiles = []string{"tools", "lite_tools", "cross_tools"}
 	case "codex-special.RL13":
 		profiles = []string{"notes"}
 	case "codex-special.RL14":
@@ -175,6 +179,26 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			// rather than fabricating a top-level legacy instructions parameter.
 			for _, label := range req.Assertions {
 				n.check(label, out, client.Completed && client.MarkerMatched && wire.DeveloperInstructions > 0)
+			}
+		case "codex-special.RL07":
+			valid := closed && wire.NamespaceDeclarations > 0 && wire.NamespaceCalls == 1 && wire.NamespaceResults > 0
+			label := "namespace_tools_roundtrip"
+			if profile == "custom_tool" {
+				label = "custom_tools_roundtrip"
+				valid = client.Completed && client.MarkerMatched && wire.CustomDeclarations > 0 && wire.CustomCalls == 1 && wire.CustomResults > 0 && wire.SSE >= 2
+			}
+			n.check(label, out, valid)
+			n.check("argument_fragments", out, valid && wire.ToolDeltas > 0)
+			n.check("call_result_association", out, valid)
+		case "codex-special.RL12":
+			if profile == "cross_tools" {
+				n.check("compatible_replay", out, client.Completed && client.MarkerMatched && client.ToolCalls == 2 && wire.ToolCalls == 2 && wire.CrossShapeReplays == 2 && wire.StandardRequests >= 3 && wire.LiteRequests >= 3 && wire.SSE >= 6)
+			} else {
+				label, shape := "standard_native_roundtrip", wire.StandardRequests >= 2 && wire.LiteRequests == 0
+				if profile == "lite_tools" {
+					label, shape = "lite_native_roundtrip", wire.LiteRequests >= 2 && wire.StandardRequests == 0
+				}
+				n.check(label, out, closed && shape)
 			}
 		case "codex-special.RL13":
 			auth, activation := out, out
@@ -282,6 +306,9 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 		return proof
 	}
 	b.profile = profile
+	if profile == "cross_tools" {
+		b.store.key.Aliases = map[string]string{codexProbeModel + "-lite": codexProbeModel}
+	}
 	clientModel := codexProbeModel
 	if profile == "image_lifecycle" {
 		if err := b.configureCLIImage(catalog.Reply.Object); err != nil {

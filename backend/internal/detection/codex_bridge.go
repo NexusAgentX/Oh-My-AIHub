@@ -78,6 +78,7 @@ type codexBridge struct {
 	noteMarker        string
 	hintMarker        string
 	hintSeedStarted   bool
+	replayShapes      map[string]uint8
 }
 
 type codexContextExecution struct {
@@ -93,6 +94,9 @@ type codexUpstreamFailure struct {
 // Only bounded semantic facts leave this private bridge. Call IDs and native
 // request/response bodies remain transient memory and never enter reports.
 type codexWireFacts struct {
+	CrossShapeReplays                                                  int
+	NamespaceDeclarations, NamespaceCalls, NamespaceResults            int
+	CustomDeclarations, CustomCalls, CustomResults                     int
 	HintSeeded                                                         bool
 	ImageGenerations, ImageEdits, ImageContinued                       int
 	ImagePermission                                                    bool
@@ -176,6 +180,7 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
 	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, reasoningCiphers: map[[32]byte]bool{}, imageOutputs: map[[32]byte]bool{}, activity: codexProbeActivity{changed: make(chan struct{})}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
 	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
+	b.replayShapes = map[string]uint8{}
 	b.mux = http.NewServeMux()
 	for _, endpoint := range manifest.Endpoints {
 		if h := b.engine.CodexHandler(endpoint); h != nil {
@@ -434,6 +439,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 				}
 				lite := false
 				for _, raw := range list(root["input"]) {
+					lite = lite || str(object(raw)["type"]) == "additional_tools"
 					if str(object(raw)["type"]) == "compaction_trigger" {
 						wire.CompactionV2++
 					}
@@ -482,6 +488,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 					if str(item["type"]) == "additional_tools" {
 						lite = true
 						wire.ToolDeclarations += syntheticToolDeclarations(list(item["tools"]))
+						codexProbeToolKinds(list(item["tools"]), &wire)
 					}
 					if str(item["type"]) == "function_call_output" {
 						endpoint := contextCalls[str(item["call_id"])]
@@ -503,6 +510,29 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 						output, _ := json.Marshal(item["output"])
 						if known && bytes.Contains(output, []byte(codexprobe.Marker)) {
 							wire.ToolResults++
+							shape := uint8(1)
+							if lite {
+								shape = 2
+							}
+							b.mu.Lock()
+							previous := b.replayShapes[str(item["call_id"])]
+							if previous != 0 && previous != shape && previous != 3 {
+								wire.CrossShapeReplays++
+							}
+							b.replayShapes[str(item["call_id"])] = previous | shape
+							b.mu.Unlock()
+							if endpoint == "codex.synthetic.synthetic_echo" {
+								wire.NamespaceResults++
+							}
+						}
+					}
+					if str(item["type"]) == "custom_tool_call_output" {
+						b.mu.Lock()
+						known := b.callIDs[str(item["call_id"])]
+						b.mu.Unlock()
+						text := strings.ToLower(string(mustNativeJSON(item["output"])))
+						if known && (strings.Contains(text, "no files were modified") || strings.Contains(text, "empty patch")) {
+							wire.CustomResults++
 						}
 					}
 				}
@@ -511,6 +541,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 				} else {
 					wire.StandardRequests++
 					wire.ToolDeclarations += syntheticToolDeclarations(list(root["tools"]))
+					codexProbeToolKinds(list(root["tools"]), &wire)
 				}
 			} else {
 				b.mu.Lock()
@@ -549,12 +580,21 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 			for _, call := range candidate.Calls {
 				if call.Name == "synthetic_echo" && call.ID != "" && matchesNativeSchema(call.Arguments) {
 					wire.ToolCalls++
+					if call.Namespace == "synthetic" {
+						wire.NamespaceCalls++
+					}
+				}
+				if call.Name == "apply_patch" && call.ID != "" && call.Custom == codexprobe.NoopPatch {
+					wire.CustomCalls++
 				}
 			}
 		}
 	}
-	unsafeImage := b.profile == "image_lifecycle" && ep.ID == "codex.responses" && err == nil && response.Status >= 200 && response.Status < 300 && (!validStream || !safeCLIImageOutput(reply.Object))
-	if unsafeImage {
+	unsafeClient := false
+	if ep.ID == "codex.responses" && err == nil && response.Status >= 200 && response.Status < 300 {
+		unsafeClient = b.profile == "image_lifecycle" && (!validStream || !safeCLIImageOutput(reply.Object)) || b.profile == "custom_tool" && (!validStream || !safeCLINoopOutput(reply.Object))
+	}
+	if unsafeClient {
 		failure = &codexUpstreamFailure{State: "fail", Reason: "assertion_failed"}
 	}
 	b.mu.Lock()
@@ -631,7 +671,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	for _, candidate := range reply.Candidates {
 		for _, call := range candidate.Calls {
-			if call.ID != "" && call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) {
+			if call.ID != "" && (call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) || call.Name == "apply_patch" && call.Custom == codexprobe.NoopPatch) {
 				if b.callIDs[call.ID] || len(b.callIDs) < 64 {
 					b.callIDs[call.ID] = true
 				} else {
@@ -666,6 +706,13 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.ImageGenerations += wire.ImageGenerations
 	b.wire.ImageEdits += wire.ImageEdits
 	b.wire.ImageContinued += wire.ImageContinued
+	b.wire.CrossShapeReplays += wire.CrossShapeReplays
+	b.wire.NamespaceDeclarations += wire.NamespaceDeclarations
+	b.wire.NamespaceCalls += wire.NamespaceCalls
+	b.wire.NamespaceResults += wire.NamespaceResults
+	b.wire.CustomDeclarations += wire.CustomDeclarations
+	b.wire.CustomCalls += wire.CustomCalls
+	b.wire.CustomResults += wire.CustomResults
 	if wire.RequestedTier != "" {
 		b.wire.RequestedTier = wire.RequestedTier
 	}
@@ -681,7 +728,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	if unsafeImage {
+	if unsafeClient {
 		return nil, ErrInvalid
 	}
 	return &http.Response{StatusCode: response.Status, Header: response.Headers, Body: io.NopCloser(bytes.NewReader(response.Body)), ContentLength: int64(len(response.Body)), Request: req}, nil
