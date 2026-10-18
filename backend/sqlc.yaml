@@ -48,6 +48,28 @@ sql:
             go_type: { type: "int32", pointer: true }
           # 金额：BIGINT 纳积分（ADR-0006）。sqlc 只按列覆盖，新增金额列须在此登记，
           # 否则会生成裸 int64。
+          - column: "market_quotes.input_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quotes.output_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quotes.cache_write_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quotes.cache_read_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_tiers.input_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_tiers.output_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_tiers.cache_write_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_tiers.cache_read_price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_token_prices.price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_tier_token_prices.price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
+          - column: "market_quote_unit_prices.price_nano"
+            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "accounts.credit_limit_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount" }
           - column: "settings.default_credit_limit_nano"
@@ -189,3 +211,11 @@ sql:
         <<: *gen
         package: supplierpg
         out: internal/postgres/supplierpg
+  - <<: *domain
+    queries: internal/postgres/marketpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: marketpg
+        out: internal/postgres/marketpg
+        emit_json_tags: true
