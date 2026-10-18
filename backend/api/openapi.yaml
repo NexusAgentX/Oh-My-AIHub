@@ -6707,6 +6707,131 @@ paths:
       }
     }
 
+  /api/typical-costs:
+    get:
+      operationId: "listTypicalCosts"
+      tags: ["models"]
+      summary: "站内、分组和渠道模型典型费用"
+      x-access: "ready"
+      x-feature: "496"
+      security: [{"sessionCookie":[]}]
+      responses:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalPage"}}}}
+        "400":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "401":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "403":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "409":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "422":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "500":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "503":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+      parameters: [{"name":"model_id","in":"query","schema":{"type":"string"}},{"name":"level","in":"query","schema":{"type":"string","enum":["model","group","channel"]}},{"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100}},{"name":"cursor","in":"query","schema":{"type":"string"}}]
+  /api/admin/typical-costs/settings:
+    get:
+      operationId: "getTypicalSettings"
+      tags: ["admin-settings"]
+      summary: "典型费用参数"
+      x-access: "admin"
+      x-feature: "496"
+      security: [{"sessionCookie":[]}]
+      responses:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
+        "400":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "401":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "403":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "409":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "422":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "500":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "503":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+    put:
+      operationId: "updateTypicalSettings"
+      tags: ["admin-settings"]
+      summary: "更新典型费用参数"
+      x-access: "admin"
+      x-feature: "496"
+      security: [{"sessionCookie":[]}]
+      responses:
+        "200": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
+        "400":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "401":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "403":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "409":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "422":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "500":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "503":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+      requestBody: {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalConfig"}}}}
+  /api/admin/typical-costs/refresh:
+    post:
+      operationId: "refreshTypicalCosts"
+      tags: ["admin-settings"]
+      summary: "请求立即更新典型费用"
+      x-access: "admin"
+      x-feature: "496"
+      security: [{"sessionCookie":[]}]
+      responses:
+        "202": {"description":"成功","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TypicalQueued"}}}}
+        "400":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "401":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "403":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "409":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "422":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "500":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
+        "503":
+          description: "请求未完成"
+          content: {"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}
 components:
   securitySchemes:
     sessionCookie: {type: apiKey, in: cookie, name: oma_session, description: 登录后由服务端设置的 HttpOnly 会话 Cookie。}
@@ -15367,6 +15492,102 @@ components:
       required: [items]
       additionalProperties: false
 
+    TypicalConfig:
+      type: "object"
+      properties:
+        version: {"type":"integer","minimum":1}
+        window_days: {"type":"integer","minimum":1,"maximum":90}
+        min_samples: {"type":"integer","minimum":1,"maximum":20000}
+        interval_seconds: {"type":"integer","minimum":30,"maximum":86400}
+        typical_tokens: {"type":"integer","minimum":1,"maximum":1000000000}
+        typical_requests: {"type":"integer","minimum":1,"maximum":1000000}
+        typical_images: {"type":"integer","minimum":1,"maximum":1000000}
+      required: ["version","window_days","min_samples","interval_seconds","typical_tokens","typical_requests","typical_images"]
+      additionalProperties: false
+    TypicalWorkload:
+      type: "object"
+      properties:
+        requests: {"type":"integer","minimum":0}
+        input_tokens: {"type":"integer","minimum":0}
+        output_tokens: {"type":"integer","minimum":0}
+        cache_write_tokens: {"type":"integer","minimum":0}
+        cache_read_tokens: {"type":"integer","minimum":0}
+        images_nano: {"type":"integer","minimum":0}
+        tokens: {"type":"object","additionalProperties":{"type":"integer","minimum":0}}
+        service_tiers: {"type":"object","additionalProperties":{"type":"integer","minimum":0}}
+        units_nano: {"type":"object","additionalProperties":{"type":"integer","minimum":0}}
+      required: ["requests","input_tokens","output_tokens","cache_write_tokens","cache_read_tokens","images_nano","tokens","service_tiers","units_nano"]
+      additionalProperties: false
+    TypicalEstimate:
+      type: "object"
+      properties:
+        group_name: {"type":"string"}
+        supplier_name: {"type":"string"}
+        channel_name: {"type":"string"}
+        model_id: {"type":"string"}
+        group_id: {"type":"string"}
+        channel_id: {"type":"string"}
+        group_model_id: {"type":"string"}
+        quote_id: {"type":"string"}
+        pricing_version: {"type":"string"}
+        reason: {"type":"string"}
+        reference_group_model_id: {"type":"string"}
+        unit: {"type":"string"}
+        source: {"type":"string"}
+        level: {"type":"string","enum":["model","group","channel"]}
+        state: {"type":"string","enum":["estimated","unknown"]}
+        cost: {"type":["string","null"]}
+        request_cost: {"type":["string","null"]}
+        fee: {"type":["string","null"]}
+        reference_cost: {"type":["string","null"]}
+        ratio: {"type":["string","null"]}
+        cache_read_share: {"type":["string","null"]}
+        quote_version: {"type":"integer","minimum":0}
+        quantity: {"type":"integer","minimum":0}
+        request_quantity: {"type":"integer","minimum":0}
+        samples: {"type":"integer","minimum":0}
+        own_samples: {"type":"integer","minimum":0}
+        workload: {"$ref":"#/components/schemas/TypicalWorkload"}
+      required: ["level","model_id","pricing_version","state","cost","request_cost","request_quantity","fee","reference_cost","ratio","unit","quantity","samples","own_samples","source","cache_read_share","workload"]
+      additionalProperties: false
+    TypicalSnapshot:
+      type: "object"
+      properties:
+        usd_cny_rate_nano: {"type":"integer","minimum":0}
+        fee_rate_nano: {"type":"integer","minimum":0,"maximum":1000000000}
+        version: {"type":"string"}
+        config: {"$ref":"#/components/schemas/TypicalConfig"}
+        input_version: {"type":"string"}
+        updated_at: {"type":"string","format":"date-time"}
+        window_start: {"type":"string","format":"date-time"}
+        watermark: {"type":"string","format":"date-time"}
+        reconciled_at: {"type":"string","format":"date-time"}
+      required: ["usd_cny_rate_nano","fee_rate_nano","version","config","input_version","updated_at","window_start","watermark","reconciled_at"]
+      additionalProperties: false
+    TypicalStatus:
+      type: "object"
+      properties:
+        running: {"type":"boolean"}
+        pending: {"type":"boolean"}
+        last_attempt: {"type":"string","format":"date-time"}
+        last_error: {"type":"string"}
+        saturated: {"type":"boolean"}
+      required: ["running","pending","last_attempt","last_error","saturated"]
+      additionalProperties: false
+    TypicalPage:
+      type: "object"
+      properties:
+        snapshot: {"anyOf":[{"$ref":"#/components/schemas/TypicalSnapshot"},{"type":"null"}]}
+        status: {"$ref":"#/components/schemas/TypicalStatus"}
+        items: {"type":"array","items":{"$ref":"#/components/schemas/TypicalEstimate"}}
+        next_cursor: {"type":["string","null"]}
+      required: ["snapshot","status","items","next_cursor"]
+      additionalProperties: false
+    TypicalQueued:
+      type: "object"
+      properties: {"queued":{"type":"boolean"}}
+      required: ["queued"]
+      additionalProperties: false
 x-aihub-gateway-contract:
   {
     "version": "2026-10-18.18",

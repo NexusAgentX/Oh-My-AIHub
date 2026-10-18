@@ -22,6 +22,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
 const (
@@ -30,6 +31,7 @@ const (
 )
 
 type Dependencies struct {
+	Typical       *typical.Service
 	GroupChannels *groupchannel.Service
 	DetectionMCP  *detection.MCPFixture
 	Contributions *contribution.Service
@@ -57,6 +59,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	typical           *typical.Service
 	groupChannels     *groupchannel.Service
 	detectionMCP      *detection.MCPFixture
 	contributions     *contribution.Service
@@ -93,6 +96,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		typical:           dependencies.Typical,
 		groupChannels:     dependencies.GroupChannels,
 		detectionMCP:      dependencies.DetectionMCP,
 		contributions:     dependencies.Contributions,
@@ -138,6 +142,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerDetectionRoutes(routes)
 	application.registerContributionRoutes(routes)
 	application.registerGroupChannelRoutes(routes)
+	application.registerTypicalRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

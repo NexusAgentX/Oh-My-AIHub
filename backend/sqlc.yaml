@@ -240,6 +240,13 @@ sql:
         <<: *gen
         package: groupchannelpg
         out: internal/postgres/groupchannelpg
+  - <<: *domain
+    queries: internal/postgres/typicalpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: typicalpg
+        out: internal/postgres/typicalpg
 
   - <<: *domain
     queries: internal/postgres/resourcepg/queries.sql

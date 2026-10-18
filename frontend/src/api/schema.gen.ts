@@ -2606,6 +2606,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/typical-costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 站内、分组和渠道模型典型费用 */
+        get: operations["listTypicalCosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/typical-costs/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 典型费用参数 */
+        get: operations["getTypicalSettings"];
+        /** 更新典型费用参数 */
+        put: operations["updateTypicalSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/typical-costs/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 请求立即更新典型费用 */
+        post: operations["refreshTypicalCosts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5634,6 +5686,95 @@ export interface components {
         };
         GroupChannelEvents: {
             items: components["schemas"]["ChannelEvent"][];
+        };
+        TypicalConfig: {
+            version: number;
+            window_days: number;
+            min_samples: number;
+            interval_seconds: number;
+            typical_tokens: number;
+            typical_requests: number;
+            typical_images: number;
+        };
+        TypicalWorkload: {
+            requests: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_write_tokens: number;
+            cache_read_tokens: number;
+            images_nano: number;
+            tokens: {
+                [key: string]: number;
+            };
+            service_tiers: {
+                [key: string]: number;
+            };
+            units_nano: {
+                [key: string]: number;
+            };
+        };
+        TypicalEstimate: {
+            group_name?: string;
+            supplier_name?: string;
+            channel_name?: string;
+            model_id: string;
+            group_id?: string;
+            channel_id?: string;
+            group_model_id?: string;
+            quote_id?: string;
+            pricing_version: string;
+            reason?: string;
+            reference_group_model_id?: string;
+            unit: string;
+            source: string;
+            /** @enum {string} */
+            level: "model" | "group" | "channel";
+            /** @enum {string} */
+            state: "estimated" | "unknown";
+            cost: string | null;
+            request_cost: string | null;
+            fee: string | null;
+            reference_cost: string | null;
+            ratio: string | null;
+            cache_read_share: string | null;
+            quote_version?: number;
+            quantity: number;
+            request_quantity: number;
+            samples: number;
+            own_samples: number;
+            workload: components["schemas"]["TypicalWorkload"];
+        };
+        TypicalSnapshot: {
+            usd_cny_rate_nano: number;
+            fee_rate_nano: number;
+            version: string;
+            config: components["schemas"]["TypicalConfig"];
+            input_version: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            window_start: string;
+            /** Format: date-time */
+            watermark: string;
+            /** Format: date-time */
+            reconciled_at: string;
+        };
+        TypicalStatus: {
+            running: boolean;
+            pending: boolean;
+            /** Format: date-time */
+            last_attempt: string;
+            last_error: string;
+            saturated: boolean;
+        };
+        TypicalPage: {
+            snapshot: components["schemas"]["TypicalSnapshot"] | null;
+            status: components["schemas"]["TypicalStatus"];
+            items: components["schemas"]["TypicalEstimate"][];
+            next_cursor: string | null;
+        };
+        TypicalQueued: {
+            queued: boolean;
         };
     };
     responses: {
@@ -11197,6 +11338,347 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listTypicalCosts: {
+        parameters: {
+            query?: {
+                model_id?: string;
+                level?: "model" | "group" | "channel";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypicalPage"];
+                };
+            };
+            /** @description 请求未完成 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTypicalSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypicalConfig"];
+                };
+            };
+            /** @description 请求未完成 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateTypicalSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TypicalConfig"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypicalConfig"];
+                };
+            };
+            /** @description 请求未完成 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshTypicalCosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypicalQueued"];
+                };
+            };
+            /** @description 请求未完成 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求未完成 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
