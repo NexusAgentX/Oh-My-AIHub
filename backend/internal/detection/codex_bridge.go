@@ -70,6 +70,7 @@ type codexBridge struct {
 	contextOutputs    map[[32]byte]map[string]bool
 	contextContinued  map[string]bool
 	contextExecutions []codexContextExecution
+	compactionWindows [][][32]byte
 }
 
 type codexContextExecution struct {
@@ -84,13 +85,14 @@ type codexUpstreamFailure struct {
 // Only bounded semantic facts leave this private bridge. Call IDs and native
 // request/response bodies remain transient memory and never enter reports.
 type codexWireFacts struct {
-	RequestedTier, ActualTier                         string
-	LiteRequests, StandardRequests, ToolDeclarations  int
-	ToolCalls, ToolResults, SSE, ReliableUsage        int
-	ZstdRequests, PlainRequests                       int
-	TextDeltas, ToolDeltas                            int
-	AllTurns, ParallelDisabled, DeveloperInstructions int
-	UniqueToolCalls, MaxCallsPerResponse              int
+	CompactionV1, CompactionV2, CompactionReturned, CompactionReplayed int
+	RequestedTier, ActualTier                                          string
+	LiteRequests, StandardRequests, ToolDeclarations                   int
+	ToolCalls, ToolResults, SSE, ReliableUsage                         int
+	ZstdRequests, PlainRequests                                        int
+	TextDeltas, ToolDeltas                                             int
+	AllTurns, ParallelDisabled, DeveloperInstructions                  int
+	UniqueToolCalls, MaxCallsPerResponse                               int
 }
 
 func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*codexBridge, error) {
@@ -362,6 +364,18 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		if decodeErr == nil {
 			if root, err := decodeNative(plain); err == nil {
 				lite := false
+				for _, raw := range list(root["input"]) {
+					if str(object(raw)["type"]) == "compaction_trigger" {
+						wire.CompactionV2++
+					}
+				}
+				b.mu.Lock()
+				for _, window := range b.compactionWindows {
+					if codexCompactionReplayed(list(root["input"]), window) {
+						wire.CompactionReplayed++
+					}
+				}
+				b.mu.Unlock()
 				if tier := str(root["service_tier"]); canonicalNativeTier("openai-responses", tier) != "" {
 					wire.RequestedTier = tier
 				}
@@ -455,6 +469,17 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	if window, valid := codexCompactionWindow(list(reply.Object["output"])); valid && err == nil && response.Status >= 200 && response.Status < 300 {
+		wire.CompactionReturned++
+		if ep.ID == "codex.compact" {
+			wire.CompactionV1++
+		}
+		if len(b.compactionWindows) < 8 {
+			b.compactionWindows = append(b.compactionWindows, window)
+		} else {
+			b.limited = true
+		}
+	}
 	if err == nil && response.Status >= 200 && response.Status < 300 && (strings.HasPrefix(ep.ID, "codex.notes.") && ep.ID != "codex.notes.thread_hint" || strings.HasPrefix(ep.ID, "codex.history.")) {
 		if value, e := decodeNativeValue(response.Body); e == nil {
 			if output, valid := codexContextOutput(value); valid {
@@ -505,6 +530,10 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.DeveloperInstructions += wire.DeveloperInstructions
 	b.wire.UniqueToolCalls = len(b.callIDs)
 	b.wire.MaxCallsPerResponse = max(b.wire.MaxCallsPerResponse, wire.MaxCallsPerResponse)
+	b.wire.CompactionV1 += wire.CompactionV1
+	b.wire.CompactionV2 += wire.CompactionV2
+	b.wire.CompactionReturned += wire.CompactionReturned
+	b.wire.CompactionReplayed += wire.CompactionReplayed
 	if wire.RequestedTier != "" {
 		b.wire.RequestedTier = wire.RequestedTier
 	}

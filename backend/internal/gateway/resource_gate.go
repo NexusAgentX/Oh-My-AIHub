@@ -40,7 +40,7 @@ func resourceMatch(c Candidate, r *resourcestate.Record) bool {
 }
 func supportsAll(c Candidate, required []CapabilityRequirement) bool {
 	for _, r := range required {
-		if !c.Evidence[r.Layer+"/"+r.ID] {
+		if !r.supportedBy(c.Evidence) {
 			return false
 		}
 	}

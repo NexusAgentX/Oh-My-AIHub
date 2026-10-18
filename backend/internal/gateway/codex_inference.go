@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+var codexCompactionResume = CapabilityRequirement{Layer: "upstream_protocol", ID: "codex-special.RL20/compaction_continuation", Alternative: "codex-special.RL21/compaction_continuation"}
+
 // Only the registered Codex request surface uses these extension requirements.
 // Plain inference keeps its existing scan and capability rules.
 func codexInferenceRequirements(path string, body []byte, encoding string) []CapabilityRequirement {
@@ -80,6 +82,14 @@ func codexInferenceRequirements(path string, body []byte, encoding string) []Cap
 			add("RL21", "compaction_trigger")
 		case "context_compaction":
 			add("RL21", "compaction_continuation")
+		case "compaction":
+			found := false
+			for _, required := range result {
+				found = found || required == codexCompactionResume
+			}
+			if !found {
+				result = append(result, codexCompactionResume)
+			}
 		case "reasoning":
 			if len(o.get("encrypted_content")) > 0 {
 				add("RL09", "encrypted_reasoning_continued")

@@ -157,3 +157,26 @@ func TestCodexPlainAndSpecialToolsRequireOnlyRequestedCapabilities(t *testing.T)
 		}
 	}
 }
+
+func TestSelfContainedCompactionRequiresCompatibleResumeProofOnOneCandidate(t *testing.T) {
+	input := []byte(`{"model":"m","input":[{"type":"compaction","id":"unregistered-internal-id","encrypted_content":"opaque"}]}`)
+	required := codexInferenceRequirements("/backend-api/codex/responses", input, "")
+	base := "upstream_protocol/codex-special.RL14/uncompressed_request"
+	for _, capability := range []string{"RL20/compaction_continuation", "RL21/compaction_continuation"} {
+		candidate := Candidate{Evidence: map[string]bool{base: true, "upstream_protocol/codex-special." + capability: true}}
+		if !supportsAll(candidate, required) {
+			t.Fatal("native compatible resume was unnecessarily bound to the producing API", capability)
+		}
+	}
+	if supportsAll(Candidate{Evidence: map[string]bool{base: true}}, required) {
+		t.Fatal("unverified compacted state reached an arbitrary candidate")
+	}
+	if supportsAll(Candidate{Evidence: map[string]bool{"upstream_protocol/codex-special.RL21/compaction_continuation": true}}, required) {
+		t.Fatal("alternative proof relaxed another hard requirement")
+	}
+	parts := strings.TrimSuffix(strings.Repeat(`{"type":"compaction","encrypted_content":"opaque"},`, 1024), ",")
+	repeated := codexInferenceRequirements("/backend-api/codex/responses", []byte(`{"model":"m","input":[`+parts+`]}`), "")
+	if len(repeated) != len(required) {
+		t.Fatal("repeated state expanded routing requirements", len(repeated))
+	}
+}

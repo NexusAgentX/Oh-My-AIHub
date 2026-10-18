@@ -58,7 +58,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 	if err != nil {
 		return err
 	}
-	output, err := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--version"}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: 15 * time.Second})
+	output, err := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--version"}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: 15 * time.Second})
 	var version map[string]string
 	if err != nil || json.Unmarshal(output.Stdout, &version) != nil || len(version) != 2 || version["protocol"] != codexprobe.Protocol || version["version"] != codexprobe.Version {
 		return ErrInvalid
@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18", "codex-special.RL24"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL18", "codex-special.RL21", "codex-special.RL24"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
@@ -120,6 +120,8 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"catalog"}
 	case "codex-special.RL18":
 		profiles = []string{"notes_lifecycle"}
+	case "codex-special.RL21":
+		profiles = []string{"compact"}
 	}
 	for _, profile := range profiles {
 		proof := runCodexCLIProfile(ctx, s, profile, probePath, binaryPath)
@@ -196,6 +198,10 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			}
 			n.check("reopen_session", out, client.ContextVerified && client.ReopenVerified && proof.ContextPhases["notes_reopen"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
 			n.check("context_isolation", out, client.ContextVerified && client.IsolationVerified && proof.ContextPhases["notes_isolation"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
+		case "codex-special.RL21":
+			n.check("compaction_trigger", out, wire.CompactionV2 > 0 && wire.CompactionV1 == 0)
+			n.check("compaction_output", out, wire.CompactionReturned > 0)
+			n.check("compaction_continuation", out, client.Completed && client.MarkerMatched && wire.CompactionReplayed > 0)
 		}
 	}
 	return n.finish()
@@ -246,7 +252,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
 	executionStarted := time.Now().UnixNano()
-	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
+	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
 	executionFinished := time.Now().UnixNano()
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)
@@ -265,7 +271,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed, ContextContinued: b.contextContinued}
 	if runErr != nil || parseErr != nil || client.Protocol != codexprobe.Protocol || client.Version != codexprobe.Version || client.Profile != profile {
 		stage := "unknown"
-		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "completed"}, client.Stage) {
+		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "compact", "completed"}, client.Stage) {
 			stage = client.Stage
 		}
 		proof.State, proof.Reason = "inconclusive", "client_disabled"
@@ -278,7 +284,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 		if ctx.Err() != nil {
 			proof.Reason = "cancelled"
 		}
-		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
+		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "rpc_error_code", client.RPCErrorCode, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
 	}
 	if profile == "notes_lifecycle" && proof.State == "pass" {
 		counts, valid := codexObservedPhases(client.Phases, b.contextExecutions, executionStarted, executionFinished)

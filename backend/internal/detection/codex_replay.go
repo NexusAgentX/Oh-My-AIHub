@@ -68,16 +68,13 @@ func (n *nativeScene) codexCompact(ctx context.Context, v2 bool) {
 		compact = n.call(ctx, Request{EndpointID: "codex.compact", Path: "/backend-api/codex/responses/compact", Headers: http.Header{"Content-Type": {"application/json"}}, Body: encoded, Category: "generate"}, true)
 	}
 	window := list(compact.Reply.Object["output"])
-	kind := "compaction"
-	if v2 {
-		kind = "context_compaction"
-	}
 	valid := len(window) > 0
 	found := false
 	for _, raw := range window {
 		item := object(raw)
 		valid = valid && item != nil && str(item["type"]) != ""
-		found = found || str(item["type"]) == kind && str(item["encrypted_content"]) != ""
+		kind := str(item["type"])
+		found = found || (kind == "compaction" || v2 && kind == "context_compaction") && str(item["encrypted_content"]) != ""
 	}
 	if v2 {
 		// A compacted window can include retained input messages. Its root

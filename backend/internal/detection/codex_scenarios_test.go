@@ -114,12 +114,16 @@ func TestCodexEncryptedReasoningPreservesEntireOpaqueWindow(t *testing.T) {
 }
 
 func TestCodexCompactionV1AndV2PreserveDifferentNativeWindows(t *testing.T) {
-	for _, v2 := range []bool{false, true} {
-		t.Run(map[bool]string{false: "v1", true: "v2"}[v2], func(t *testing.T) {
+	for _, version := range []string{"v1", "v2", "v2_context_tag"} {
+		t.Run(version, func(t *testing.T) {
+			v2 := version != "v1"
 			calls := 0
 			kind, id, firstPath := "compaction", "RL20", "/backend-api/codex/responses/compact"
 			if v2 {
-				kind, id, firstPath = "context_compaction", "RL21", "/backend-api/codex/responses"
+				id, firstPath = "RL21", "/backend-api/codex/responses"
+			}
+			if version == "v2_context_tag" {
+				kind = "context_compaction"
 			}
 			window := []any{nativeObject{"type": "message", "role": "user", "content": []any{nativeObject{"type": "input_text", "text": "retained-prefix"}}}, nativeObject{"type": kind, "id": "opaque-compaction-id", "encrypted_content": "synthetic-compaction+cipher==", "unknown": nativeObject{"retain": true}}, nativeObject{"type": "message", "role": "assistant", "content": []any{nativeObject{"type": "output_text", "text": "retained-tail"}}}}
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
