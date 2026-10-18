@@ -26,6 +26,7 @@ type nativeOutcome struct {
 type nativeScene struct {
 	s           *Session
 	protocol    string
+	layer       string
 	requirement gatewaycontract.Requirement
 	result      Result
 	witnesses   []string
@@ -245,6 +246,7 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 			return out
 		}
 		o, e := decodeNative(response.Body)
+		out.Reply.Object = o
 		if e == nil && nativeError(n.protocol, o) {
 			out.State = "fail"
 			out.Reason = "assertion_failed"
@@ -262,6 +264,10 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 		o, e := decodeNative(response.Body)
 		if e == nil {
 			out.Reply = parseNative(n.protocol, o)
+		} else if strings.HasPrefix(req.EndpointID, "codex.notes.") || strings.HasPrefix(req.EndpointID, "codex.history.") {
+			if value, err := decodeNativeValue(response.Body); err == nil {
+				out.Reply.Object = nativeObject{"context_result": value}
+			}
 		}
 	}
 	out.State = "fail"
@@ -367,6 +373,9 @@ func (n *nativeScene) finish() Result {
 	r.State = "pass"
 	r.Reason = "ok"
 	for i, label := range n.requirement.Assertions {
+		if n.layer != "" && !n.requirement.AssertionInLayer(AssertionID(n.requirement.ID, i), n.layer) {
+			continue
+		}
 		a, ok := n.checks[label]
 		if !ok {
 			a = Assertion{State: "inconclusive", Reason: "prerequisite_failed", AttemptIDs: slices.Clone(n.witnesses[:min(16, len(n.witnesses))])}

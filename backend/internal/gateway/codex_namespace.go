@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -16,8 +17,7 @@ type contextPatch struct {
 	value      []byte
 }
 
-// RewriteCodexContext applies the approved identifier-only exception. This is
-// not wired into Serve until F8: ordinary requests retain their current path.
+// RewriteCodexContext applies the approved identifier-only exception.
 // It uses the existing byte scanner, preserving every other byte including
 // opaque encrypted contents, input item IDs, notes text and unknown extensions.
 func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract.Principal, namespace *gatewaycontract.ContextNamespace) ([]byte, http.Header, error) {
@@ -30,16 +30,53 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 	if len(body) > gatewaycontract.MaxContractRequestBytes || !json.Valid(body) {
 		return nil, nil, errMalformedJSON
 	}
+	var identifiers map[string]string
+	mappedIdentifier := func(id string) (string, error) {
+		if mapped, ok := identifiers[id]; ok {
+			return mapped, nil
+		}
+		mapped, err := namespace.Identifier(actor, id)
+		if err != nil {
+			return "", err
+		}
+		if identifiers == nil {
+			identifiers = make(map[string]string, 16)
+		}
+		if len(identifiers) < 16 {
+			identifiers[id] = mapped
+		}
+		return mapped, nil
+	}
 	identifier := func(raw []byte) ([]byte, error) {
 		var id string
 		if json.Unmarshal(raw, &id) != nil {
 			return nil, errMalformedJSON
 		}
-		mapped, err := namespace.Identifier(actor, id)
+		mapped, err := mappedIdentifier(id)
 		if err != nil {
 			return nil, err
 		}
 		return json.Marshal(mapped)
+	}
+	windowIdentifier := func(raw []byte) ([]byte, error) {
+		// A declared UUID:counter fits even with escaped JSON characters.
+		// Larger opaque future values need no decoding or transformation.
+		if len(raw) > 2048 {
+			return raw, nil
+		}
+		var value string
+		if json.Unmarshal(raw, &value) != nil {
+			return nil, errMalformedJSON
+		}
+		thread, counter, logical := codexLogicalWindow(value)
+		if !logical {
+			return raw, nil
+		}
+		mapped, err := mappedIdentifier(thread)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(mapped + ":" + counter)
 	}
 	identityFields := []string{"session_id", "thread_id", "parent_thread_id", "forked_from_thread_id"}
 	var rewrite func([]byte, string) ([]byte, error)
@@ -86,6 +123,9 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 				if slices.Contains(identityFields, name) {
 					kind = "id"
 				}
+				if name == "window_id" {
+					kind = "window"
+				}
 			case "client_metadata":
 				if slices.Contains(identityFields, name) || name == "x-codex-parent-thread-id" {
 					kind = "id"
@@ -93,9 +133,15 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 				if name == "x-codex-turn-metadata" {
 					kind = "metadata-string"
 				}
+				if name == "x-codex-window-id" {
+					kind = "window"
+				}
 			}
 			if kind == "" {
 				return
+			}
+			if position == "root" && bytes.Equal(bytes.TrimSpace(input[start:end]), []byte("null")) {
+				return // Optional containers carry no identifier to protect.
 			}
 			if seen[name] {
 				fieldErr = errors.New("duplicate context identifier field")
@@ -108,6 +154,8 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 			var value []byte
 			if kind == "id" {
 				value, fieldErr = identifier(input[start:end])
+			} else if kind == "window" {
+				value, fieldErr = windowIdentifier(input[start:end])
 			} else {
 				value, fieldErr = rewrite(input[start:end], kind)
 			}
@@ -163,12 +211,27 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 			if len(values) != 1 {
 				return nil, nil, errors.New("duplicate context header")
 			}
-			mapped, err := namespace.Identifier(actor, values[0])
+			mapped, err := mappedIdentifier(values[0])
 			if err != nil {
 				return nil, nil, err
 			}
 			next.Set(name, mapped)
 		}
+	}
+	if values := valuesFor("x-codex-window-id"); len(values) > 0 {
+		if len(values) != 1 {
+			return nil, nil, errors.New("duplicate context header")
+		}
+		encoded, _ := json.Marshal(values[0])
+		value, err := windowIdentifier(encoded)
+		if err != nil {
+			return nil, nil, err
+		}
+		var mapped string
+		if json.Unmarshal(value, &mapped) != nil {
+			return nil, nil, errMalformedJSON
+		}
+		next.Set("x-codex-window-id", mapped)
 	}
 	if values := valuesFor("x-codex-turn-metadata"); len(values) > 0 {
 		if len(values) != 1 || len(values[0]) > 64<<10 || !json.Valid([]byte(values[0])) {
@@ -181,4 +244,33 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 		next.Set("x-codex-turn-metadata", string(value))
 	}
 	return output, next, nil
+}
+
+// The pinned CLI uses thread-UUID:counter for transport window metadata. It is
+// a derived session identifier, distinct from context_window_id and the opaque
+// IDs returned by history. Only this declared syntax is mapped.
+func codexLogicalWindow(value string) (string, string, bool) {
+	if len(value) < 38 || len(value) > 57 || value[36] != ':' {
+		return "", "", false
+	}
+	for i := range 36 {
+		c := value[i]
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if c != '-' {
+				return "", "", false
+			}
+		} else if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+			return "", "", false
+		}
+	}
+	counter := value[37:]
+	for i := range len(counter) {
+		if counter[i] < '0' || counter[i] > '9' {
+			return "", "", false
+		}
+	}
+	if _, err := strconv.ParseUint(counter, 10, 64); err != nil {
+		return "", "", false
+	}
+	return value[:36], counter, true
 }

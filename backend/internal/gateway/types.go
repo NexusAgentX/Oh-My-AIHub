@@ -63,6 +63,9 @@ type Candidate struct {
 	// Keys are proof-layer + "/" + independent capability ID.
 	Evidence         map[string]bool
 	VerifiedCapacity map[string]int64
+	// The minimal Key probe's chosen primary entrance is distinct from wire
+	// format. A native-only Codex probe cannot prove the public primary API.
+	KeyProbeEndpoints map[channel.Format]string
 	// Quotes is immutable. A missing group offer never uses a global price.
 	Quotes         *quotepricing.Book
 	ChannelID      string

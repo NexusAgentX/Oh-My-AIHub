@@ -32,6 +32,9 @@ var requestHeadersNeverForwarded = map[string]bool{
 	"Authorization": true, "X-Api-Key": true, "X-Goog-Api-Key": true, "X-Aihub-Tag": true,
 	"X-Forwarded-For": true, "X-Forwarded-Host": true, "X-Forwarded-Proto": true, "X-Forwarded-Port": true,
 	"X-Real-Ip": true, "Forwarded": true, "Via": true,
+	// These describe the caller's local platform identity. A provider's own
+	// identity header may only come from its approved channel configuration.
+	"Chatgpt-Account-Id": true, "Chatgpt-User-Id": true, "X-Openai-Actor-Authorization": true,
 }
 
 func connectionTokens(header http.Header) map[string]bool {
@@ -126,7 +129,7 @@ func ClientResponseHeaders(upstream http.Header, decompressed bool) http.Header 
 	extra := connectionTokens(upstream)
 	for name, values := range upstream {
 		canonical := http.CanonicalHeaderKey(name)
-		if hopByHop[canonical] || extra[canonical] || canonical == "Set-Cookie" || canonical == "X-Aihub-Request-Id" {
+		if hopByHop[canonical] || extra[canonical] || canonical == "Set-Cookie" || canonical == "X-Aihub-Request-Id" || canonical == "Chatgpt-Account-Id" || canonical == "Chatgpt-User-Id" || canonical == "X-Openai-Actor-Authorization" {
 			continue
 		}
 		if decompressed && (canonical == "Content-Length" || canonical == "Content-Encoding") {

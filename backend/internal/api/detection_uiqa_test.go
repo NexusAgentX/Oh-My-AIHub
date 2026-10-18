@@ -22,6 +22,14 @@ import (
 // Explicit opt-in synthetic HTTP harness for actual browser QA. It uses the
 // real handlers/services and no database, host login, paid key or upstream.
 func TestDetectionUIHarness(t *testing.T) {
+	testDetectionUIHarness(t, false)
+}
+
+func TestCodexDetectionUIHarness(t *testing.T) {
+	testDetectionUIHarness(t, true)
+}
+
+func testDetectionUIHarness(t *testing.T, codex bool) {
 	if os.Getenv("AIHUB_DETECTION_UI_QA") != "1" {
 		t.Skip("explicit synthetic UI harness only")
 	}
@@ -54,6 +62,19 @@ func TestDetectionUIHarness(t *testing.T) {
 	job.Target.Model = "demo-text-2026"
 	job.Usage = detection.Usage{HTTP: 8, Generate: 3, Count: 1, Query: 2, Cleanup: 2, InputTokens: 1234, OutputTokens: 56}
 	job.Results = []detection.Result{}
+	if codex {
+		items := []detection.Planned{}
+		for _, item := range job.Plan.Items {
+			if strings.HasPrefix(item.ID, "codex-special.RL09") || item.ID == "codex-special.RL21@official_cli" {
+				items = append(items, item)
+			}
+		}
+		if len(items) != 4 {
+			t.Fatal("Codex report fixture lost the three actual proof layers")
+		}
+		job.Plan.Items = items
+		job.Target.Model = "codex-synthetic-2026"
+	}
 	for i := 0; i < 4; i++ {
 		item := job.Plan.Items[i]
 		item.Implemented = true
@@ -69,7 +90,17 @@ func TestDetectionUIHarness(t *testing.T) {
 		for _, a := range item.Assertions {
 			result.Assertions = append(result.Assertions, detection.Assertion{ID: a, State: state, Reason: reason, AttemptIDs: []string{}})
 		}
-		uiDetectionMetadata(t, &result, i, job.Parameters)
+		if codex {
+			if item.ID == "codex-special.RL21@official_cli" {
+				result.State, result.Reason = "inconclusive", "client_disabled"
+				for k := range result.Assertions {
+					result.Assertions[k].State, result.Assertions[k].Reason = "inconclusive", "client_disabled"
+				}
+			}
+			result.Attempts = []detection.Attempt{{ID: "synthetic-receipt", EndpointID: "codex.responses", Method: "POST", Path: "/backend-api/codex/responses", Status: 200, Reason: "ok", Category: "generate", DurationMS: 12, Sent: true, ResponseReceived: true, At: job.CreatedAt}}
+		} else {
+			uiDetectionMetadata(t, &result, i, job.Parameters)
+		}
 		job.Results = append(job.Results, result)
 	}
 	job.UpdatedAt = job.CreatedAt.Add(time.Second)

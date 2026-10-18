@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	apicontract "github.com/NexusAgentX/Oh-My-AIHub/backend/api"
@@ -58,16 +59,24 @@ type Suite struct {
 }
 
 type Requirement struct {
-	ModelTypes            []string `yaml:"model_types,omitempty"`
-	CredentialDependent   bool     `yaml:"credential_dependent"`
-	ConditionalAssertions []string `yaml:"conditional_assertions,omitempty"`
-	EvidenceLayers        []string `yaml:"evidence_layers,omitempty"`
-	ID                    string   `yaml:"id"`
-	Endpoints             []string `yaml:"endpoints"`
-	SourceIDs             []string `yaml:"source_ids"`
-	Conditional           []string `yaml:"conditional_source_ids"`
-	Assertions            []string `yaml:"assertions"`
-	AggregateOf           []string `yaml:"aggregate_of,omitempty"`
+	// Missing entries inherit the requirement's proof layers. A restricted
+	// assertion keeps its original ID, even when its layer has fewer assertions.
+	AssertionLayers       map[string][]string `yaml:"assertion_layers,omitempty"`
+	ModelTypes            []string            `yaml:"model_types,omitempty"`
+	CredentialDependent   bool                `yaml:"credential_dependent"`
+	ConditionalAssertions []string            `yaml:"conditional_assertions,omitempty"`
+	EvidenceLayers        []string            `yaml:"evidence_layers,omitempty"`
+	ID                    string              `yaml:"id"`
+	Endpoints             []string            `yaml:"endpoints"`
+	SourceIDs             []string            `yaml:"source_ids"`
+	Conditional           []string            `yaml:"conditional_source_ids"`
+	Assertions            []string            `yaml:"assertions"`
+	AggregateOf           []string            `yaml:"aggregate_of,omitempty"`
+}
+
+func (r Requirement) AssertionInLayer(id, layer string) bool {
+	layers, restricted := r.AssertionLayers[id]
+	return !restricted || slices.Contains(layers, layer)
 }
 
 type Exclusion struct {
@@ -202,6 +211,31 @@ func (m Manifest) Validate() error {
 			assertionIDs := map[string]bool{}
 			for i := range r.Assertions {
 				assertionIDs[fmt.Sprintf("%s/a%d", r.ID, i+1)] = true
+			}
+			allowedLayers := layers
+			if len(override) > 0 {
+				allowedLayers = override
+			}
+			for id, assertionLayers := range r.AssertionLayers {
+				if !assertionIDs[id] || len(assertionLayers) == 0 {
+					return fmt.Errorf("invalid assertion evidence layer %s", id)
+				}
+				seen := map[string]bool{}
+				for _, layer := range assertionLayers {
+					if !allowedLayers[layer] || seen[layer] {
+						return fmt.Errorf("invalid assertion evidence layer %s", id)
+					}
+					seen[layer] = true
+				}
+			}
+			for layer := range allowedLayers {
+				covered := false
+				for id := range assertionIDs {
+					covered = covered || r.AssertionInLayer(id, layer)
+				}
+				if !covered {
+					return fmt.Errorf("missing assertion for %s evidence layer %s", r.ID, layer)
+				}
 			}
 			conditionalIDs := map[string]bool{}
 			for _, id := range r.ConditionalAssertions {

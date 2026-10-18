@@ -13,7 +13,13 @@ import (
 var ErrManualOrderRequired = errors.New("an explicit manual channel order is required")
 var ErrCapabilityCandidates = errors.New("no authorized candidate has current support evidence")
 
-type CapabilityRequirement struct{ Layer, ID string }
+// Alternative names another valid proof for the same requested native
+// capability; it never combines separate candidates' evidence.
+type CapabilityRequirement struct{ Layer, ID, Alternative string }
+
+func (r CapabilityRequirement) supportedBy(evidence map[string]bool) bool {
+	return evidence[r.Layer+"/"+r.ID] || r.Alternative != "" && evidence[r.Layer+"/"+r.Alternative]
+}
 
 // ResourceScope is supplied by trusted owner/Key resource metadata, never by
 // self-reported session IDs, opaque ciphertext or notes/history identifiers.
@@ -60,7 +66,7 @@ func SelectAuxiliary(records []CandidateRecord, in AuxiliarySelection) ([]Candid
 		}
 		supported := true
 		for _, req := range in.Required {
-			if !c.Evidence[req.Layer+"/"+req.ID] {
+			if !req.supportedBy(c.Evidence) {
 				supported = false
 				break
 			}

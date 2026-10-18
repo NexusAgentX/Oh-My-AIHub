@@ -13,6 +13,7 @@ func TestUpstreamHeadersDropCredentialsAndApplyRules(t *testing.T) {
 		"Authorization": {"Bearer sk-aih-secret"}, "Cookie": {"a=b"}, "X-Aihub-Tag": {"batch"}, "Accept-Encoding": {"br"},
 		"Connection": {"keep-alive, X-Hop"}, "X-Hop": {"1"}, "X-Forwarded-For": {"1.2.3.4"}, "X-Keep": {"yes"},
 		"Anthropic-Version": {"2023-06-01"}, "User-Agent": {"client-ua"}, "X-Drop": {"me"},
+		"X-Openai-Actor-Authorization": {"client-actor-credential"},
 	}
 	advanced := channel.Advanced{UserAgent: &ua, HeaderRules: channel.HeaderRules{
 		Set: []channel.HeaderSet{{Name: "x-extra", Value: "1"}, {Name: "X-Keep", Value: "overwritten"}}, Remove: []string{"x-drop"},
@@ -21,7 +22,7 @@ func TestUpstreamHeadersDropCredentialsAndApplyRules(t *testing.T) {
 	if got.Get("Authorization") != "Bearer upstream-key" || got.Get("User-Agent") != "relay-ua/1" || got.Get("X-Extra") != "1" || got.Get("X-Keep") != "overwritten" {
 		t.Fatalf("headers = %#v", got)
 	}
-	for _, name := range []string{"Cookie", "X-Aihub-Tag", "Accept-Encoding", "X-Hop", "Connection", "X-Forwarded-For", "X-Drop"} {
+	for _, name := range []string{"Cookie", "X-Aihub-Tag", "Accept-Encoding", "X-Hop", "Connection", "X-Forwarded-For", "X-Drop", "X-Openai-Actor-Authorization"} {
 		if got.Get(name) != "" {
 			t.Fatalf("%s was forwarded: %#v", name, got)
 		}
@@ -38,6 +39,10 @@ func TestUpstreamHeadersDropCredentialsAndApplyRules(t *testing.T) {
 	query := UpstreamHeaders(client, authQuery, "k", channel.Advanced{})
 	if query.Get("Authorization") != "" || query.Get("X-Api-Key") != "" || query.Get("X-Goog-Api-Key") != "" {
 		t.Fatalf("query auth must send no credential header: %#v", query)
+	}
+	advanced.HeaderRules.Set = append(advanced.HeaderRules.Set, channel.HeaderSet{Name: "X-Openai-Actor-Authorization", Value: "provider-configured-actor"})
+	if got := UpstreamHeaders(client, authBearer, "upstream-key", advanced); got.Get("X-Openai-Actor-Authorization") != "provider-configured-actor" {
+		t.Fatal("approved provider configuration was replaced by client identity")
 	}
 }
 
@@ -60,12 +65,13 @@ func TestClientResponseHeaders(t *testing.T) {
 	upstream := http.Header{
 		"Content-Type": {"text/event-stream"}, "Set-Cookie": {"s=1"}, "Transfer-Encoding": {"chunked"}, "Content-Length": {"10"},
 		"Content-Encoding": {"gzip"}, "X-Request-Id": {"up-1"}, "Connection": {"X-Conn"}, "X-Conn": {"1"},
+		"X-Openai-Actor-Authorization": {"provider-actor-credential"},
 	}
 	got := ClientResponseHeaders(upstream, true)
 	if got.Get("Content-Type") == "" || got.Get("X-Request-Id") == "" {
 		t.Fatalf("lost headers: %#v", got)
 	}
-	for _, name := range []string{"Set-Cookie", "Transfer-Encoding", "Content-Length", "Content-Encoding", "X-Conn", "Connection"} {
+	for _, name := range []string{"Set-Cookie", "Transfer-Encoding", "Content-Length", "Content-Encoding", "X-Conn", "Connection", "X-Openai-Actor-Authorization"} {
 		if got.Get(name) != "" {
 			t.Fatalf("%s kept: %#v", name, got)
 		}

@@ -121,3 +121,26 @@ func TestHeadersAndTimeoutInheritanceKeepsNullDistinct(t *testing.T) {
 		t.Fatal("inherited headers rejected")
 	}
 }
+
+func TestSnapshotKeepsKeyProbeEntranceSeparateFromProtocolSupport(t *testing.T) {
+	d, data := fixture()
+	data.Probes[0].Tests = map[channel.Format]channel.FormatTest{
+		channel.FormatOpenAIResponses: {OK: true, EndpointID: "codex.responses"},
+		channel.FormatOpenAIImages:    {OK: false, EndpointID: "codex.images"},
+	}
+	records, views, err := Build(d, data, nil)
+	if err != nil || len(records) != 1 {
+		t.Fatal("native-only probe did not create candidate", err)
+	}
+	c := records[0].Candidate
+	if c.KeyProbeEndpoints[channel.FormatOpenAIResponses] != "codex.responses" || len(c.KeyProbeEndpoints) != 1 || len(c.Evidence) != 0 {
+		t.Fatal("key entrance lost or promoted into capability evidence", c.KeyProbeEndpoints)
+	}
+	if views["channel"].Models[0].FormatTests[channel.FormatOpenAIResponses].EndpointID != "codex.responses" {
+		t.Fatal("probe entrance missing from owner diagnostics")
+	}
+	delete(data.Probes[0].Tests, channel.FormatOpenAIResponses)
+	if c.KeyProbeEndpoints[channel.FormatOpenAIResponses] != "codex.responses" {
+		t.Fatal("published candidate map reused mutable probe storage")
+	}
+}

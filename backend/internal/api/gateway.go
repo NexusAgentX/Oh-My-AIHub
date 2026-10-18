@@ -70,6 +70,13 @@ func (a *app) registerGatewayRoutes(r *router) {
 	r.implement("B", "GET /v1beta/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, true) })
 	existing := map[string]bool{"chat.create": true, "responses.create": true, "responses.get": true, "responses.cancel": true, "messages.create": true, "gemini.generateContent": true, "gemini.streamGenerateContent": true, "gemini.countTokens": true}
 	for _, endpoint := range manifest.Endpoints {
+		if endpoint.Feature == "F8" {
+			handler := a.gateway.CodexHandler(endpoint)
+			if handler != nil {
+				r.implement("497", endpoint.Method+" "+endpoint.Path, accessGatewayKey, handler)
+			}
+			continue
+		}
 		if endpoint.Feature != "F7" || existing[endpoint.ID] {
 			continue
 		}
@@ -84,6 +91,7 @@ func (a *app) registerGatewayRoutes(r *router) {
 	}
 	r.mux.HandleFunc("/v1/", unsupportedEndpoint)
 	r.mux.HandleFunc("/v1beta/", unsupportedEndpoint)
+	r.mux.HandleFunc("/backend-api/", unsupportedEndpoint)
 }
 
 func protocolFormatForAPI(protocol string) channel.Format {

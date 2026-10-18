@@ -80,3 +80,12 @@ func ValidateBasicReply(protocol string, body []byte) bool {
 	// proves Key callability; it does not prove any reasoning capability.
 	return r.Structure && (r.Text != "" || r.Images > 0 || r.Usage.Reliable && r.Usage.Output > 0)
 }
+
+// ValidateBasicStreamReply checks a genuine terminal native stream, including
+// a small output budget used entirely on reasoning. It proves Key callability,
+// never a report capability or a speed/price estimate.
+func ValidateBasicStreamReply(protocol string, body []byte) bool {
+	stream := parseNativeStream(protocol, body, 256<<10)
+	r := stream.Reply
+	return stream.Valid && stream.Terminal && r.Structure && (r.Text != "" || r.Images > 0 || r.Usage.Reliable && r.Usage.Output > 0)
+}

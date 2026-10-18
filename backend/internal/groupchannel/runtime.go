@@ -389,9 +389,23 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 					for _, c := range p.Capacity {
 						capacity[c.ScenarioID+"/"+c.Kind] = c.VerifiedLower
 					}
+					for _, setting := range p.Settings {
+						if capability := setting.RoutingCapability(); capability != "" {
+							evidence["upstream_protocol/"+capability] = true
+						}
+					}
 				}
 			}
-			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, ConfigRevision: r.Revision, CredentialRevision: r.CredentialRevision, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential, Evidence: evidence, VerifiedCapacity: capacity}})
+			var probeEndpoints map[channel.Format]string
+			for format, test := range mv.FormatTests {
+				if test.OK && test.EndpointID != "" {
+					if probeEndpoints == nil {
+						probeEndpoints = map[channel.Format]string{}
+					}
+					probeEndpoints[format] = test.EndpointID
+				}
+			}
+			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, ConfigRevision: r.Revision, CredentialRevision: r.CredentialRevision, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential, Evidence: evidence, VerifiedCapacity: capacity, KeyProbeEndpoints: probeEndpoints}})
 		}
 		sort.Slice(v.Models, func(i, j int) bool { return v.Models[i].ModelID < v.Models[j].ModelID })
 		if v.Available && !slices.ContainsFunc(v.Models, func(m ModelView) bool {

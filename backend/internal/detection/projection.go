@@ -3,6 +3,7 @@ package detection
 import (
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
@@ -72,6 +73,7 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 			}
 		}
 		for _, setting := range result.Settings {
+			setting.ScenarioID, setting.Layer = result.ScenarioID, result.Layer
 			setting.AttemptIDs = slices.Clone(setting.AttemptIDs)
 			p.Settings = append(p.Settings, setting)
 		}
@@ -91,12 +93,10 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 	return p
 }
 func assertionRequirement(item Planned, assertion string) string {
-	for _, req := range item.Requirements {
-		for i := range item.Assertions {
-			if AssertionID(req, i) == assertion {
-				return req
-			}
-		}
+	// Layer-specific plans may contain a3 without a1/a2. Result validation has
+	// already checked membership; preserve the actual requirement ID.
+	if i := strings.LastIndex(assertion, "/a"); i > 0 && slices.Contains(item.Requirements, assertion[:i]) {
+		return assertion[:i]
 	}
 	return ""
 }

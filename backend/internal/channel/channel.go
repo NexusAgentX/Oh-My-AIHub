@@ -67,6 +67,7 @@ type Advanced struct {
 }
 
 type FormatTest struct {
+	EndpointID string    `json:"endpoint_id,omitempty"`
 	OK         bool      `json:"ok"`
 	StatusCode *int      `json:"status_code"`
 	Error      *string   `json:"error"`

@@ -109,6 +109,12 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 	}
 	included := map[string]bool{}
 	reqOwner := map[string]string{}
+	reqLayers := map[string][]string{}
+	for _, suite := range r.manifest.Suites {
+		for _, req := range suite.Requirements {
+			reqLayers[req.ID] = requiredLayers(suite, req)
+		}
+	}
 	for _, suite := range r.manifest.Suites {
 		if !applies(suite, t) {
 			continue
@@ -144,18 +150,25 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 					for _, member := range suite.Requirements {
 						if member.ID == required {
 							item.CredentialDependent = item.CredentialDependent || member.CredentialDependent
-							item.Conditional = append(item.Conditional, member.ConditionalAssertions...)
 							for i, label := range member.Assertions {
 								assertion := AssertionID(member.ID, i)
+								if !member.AssertionInLayer(assertion, layer) {
+									continue
+								}
 								item.Assertions = append(item.Assertions, assertion)
 								item.AssertionLabels[assertion] = label
+							}
+							for _, id := range member.ConditionalAssertions {
+								if member.AssertionInLayer(id, layer) {
+									item.Conditional = append(item.Conditional, id)
+								}
 							}
 						}
 					}
 				}
 				if item.Aggregate {
 					item.Dependencies = slices.Clone(req.AggregateOf)
-					item.CodeVersion = "aggregate.v1"
+					item.CodeVersion = "aggregate.v2"
 				}
 				p.Items = append(p.Items, item)
 			}
@@ -165,11 +178,17 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 	for i := range p.Items {
 		item := &p.Items[i]
 		if item.Aggregate {
-			for j, req := range item.Dependencies {
+			dependencies := []string{}
+			for _, req := range item.Dependencies {
 				if owner := reqOwner[claimKey(req, item.Layer)]; owner != "" {
-					item.Dependencies[j] = owner
+					dependencies = append(dependencies, owner)
+				} else if layers, known := reqLayers[req]; !known || slices.Contains(layers, item.Layer) {
+					// Only an explicitly inapplicable proof layer is omitted.
+					// Unknown or missing applicable dependencies still fail below.
+					dependencies = append(dependencies, req)
 				}
 			}
+			item.Dependencies = dependencies
 		}
 	}
 	// Validate the entire graph even when dependencies or adapters are missing;

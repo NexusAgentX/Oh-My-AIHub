@@ -39,12 +39,14 @@ run = "npm --prefix frontend run dev"
 
 [tasks.dev-backend]
 description = "Run the backend development server"
-depends = ["build-detection-sdk"]
+depends = ["build-detection-sdk", "build-detection-codex"]
 run = '''
 AIHUB_DB_PORT="${POSTGRES_PORT:-55432}"
 DATABASE_URL="${DATABASE_URL:-postgres://oh_my_aihub@127.0.0.1:${AIHUB_DB_PORT}/oh_my_aihub?sslmode=disable}" \
 PGPASSWORD="${POSTGRES_PASSWORD:-oh-my-aihub-development}" \
 AIHUB_DETECTION_SDK_BINARY="${MISE_PROJECT_ROOT}/backend/bin/aihub-detection-sdk" \
+AIHUB_DETECTION_CODEX_PROBE="${MISE_PROJECT_ROOT}/backend/bin/aihub-detection-codex" \
+AIHUB_CODEX_BINARY="${MISE_PROJECT_ROOT}/backend/bin/codex" \
 go -C backend run ./cmd/server
 '''
 env = { COOKIE_SECURE = "false" }
@@ -52,6 +54,15 @@ env = { COOKIE_SECURE = "false" }
 [tasks.build-detection-sdk]
 description = "Build the fixed isolated official-SDK probe"
 run = ["mkdir -p backend/bin", "go -C backend build -trimpath -buildvcs=false -ldflags='-s -w' -o bin/aihub-detection-sdk ./cmd/detection-sdk"]
+
+[tasks.install-detection-codex]
+description = "Install checksum-pinned official Codex 0.163.0 for isolated probes"
+run = "sh backend/scripts/install-codex.sh"
+
+[tasks.build-detection-codex]
+description = "Build the fixed isolated official Codex probe"
+depends = ["install-detection-codex"]
+run = "go -C backend build -trimpath -buildvcs=false -ldflags='-s -w' -o bin/aihub-detection-codex ./cmd/detection-codex"
 
 [tasks.dev-database]
 description = "Start PostgreSQL and apply pending migrations"
@@ -133,6 +144,7 @@ run = [
   "mkdir -p backend/bin",
   "go -C backend build -o bin/server ./cmd/server",
   { task = "build-detection-sdk" },
+  { task = "build-detection-codex" },
 ]
 
 [tasks.up]
