@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -22,6 +23,12 @@ import (
 type codexRouteStore struct {
 	proxyStore
 	rows []gateway.CandidateRecord
+}
+
+type codexFixtureModels struct{ proxyModels }
+
+func (codexFixtureModels) Get(_ context.Context, id string) (catalog.Model, error) {
+	return catalog.Model{ID: id, Enabled: true, PriceCurrency: "CNY"}, nil
 }
 
 func (s *codexRouteStore) AuxiliaryCandidates(context.Context, channel.Format) ([]gateway.CandidateRecord, error) {
@@ -84,7 +91,7 @@ func newCodexContextFixture(t *testing.T, upstream *httptest.Server) (http.Handl
 		t.Fatal(err)
 	}
 	records := &proxyRecords{}
-	engine := gateway.NewEngine(gateway.Dependencies{ContextNamespace: namespace, Store: store, Catalog: proxyModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream), Resources: records})
+	engine := gateway.NewEngine(gateway.Dependencies{ContextNamespace: namespace, Store: store, Catalog: codexFixtureModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream), Resources: records})
 	return NewHandler(Dependencies{Gateway: engine}), store, records
 }
 

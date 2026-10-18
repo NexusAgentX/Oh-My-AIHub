@@ -2,7 +2,7 @@
 
 任务和报告只存必要执行元数据；不保存请求、响应、密文或 history/notes 正文，也不产生平台积分过账。真实检测须使用明确提供的测试 Key，维护者自行在上游控制限额。原生 F4 已实现套件会执行；缺 SDK/MCP 配置或未注册的 F8 套件显示 `suite_pending`，不能以此批准真实创建或宣称供应商通过。
 
-Codex 原生适配器现执行 RL13 上游认证、RL15 原生目录、RL14 zstd/未压缩推理和 RL24 各启用服务档位。目录使用固定客户端版本参数，认证与目录可复用相同真实请求；只检查目录结构，不把其中的上下文、工具或套餐声明当成实测能力。压缩和档位均访问 `/backend-api/codex/responses`，不借用公共 `/v1/responses` 的成功。请求档位、实际返档与可靠用量分别记录，降档不证明请求档位通过。这些只是 `upstream_protocol` 层；未实现的 Codex 场景、平台代理和官方 CLI 证据继续保持待完成。
+Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具往返、RL05 多轮 reasoning context、RL06 指令、RL09 加密推理续用、RL13 上游认证、RL15 原生目录、RL14 zstd/未压缩推理、RL20/21 完整压缩窗口续用和 RL24 各启用服务档位。相同真实请求复用，不把目录中的上下文、工具或套餐声明当成实测能力；独立操作、协议形态、压缩前后及跨形态回放各保留实际证据。均访问对应 Codex 原生路径，不借用公共 `/v1/responses` 的成功。请求档位、实际返档与可靠用量分别记录，降档不证明请求档位通过。这些只是 `upstream_protocol` 层；未实现的 Codex 场景、平台代理和官方 CLI 报告证据继续保持待完成。
 
 ## 操作与故障恢复
 
@@ -17,6 +17,10 @@ Codex 原生适配器现执行 RL13 上游认证、RL15 原生目录、RL14 zstd
 默认 worker、队列、用户活跃任务、单次请求/响应/SSE 及内存产物限制在 `detection.DefaultLimits` 统一维护。检测元数据和后台读取使用独立两连接池，不占转发/结算池；队列满返回 `detection_busy`，无平台累计预算耗尽状态。请求和各轮结果分开追加，长任务不将所有请求/正文保留在内存。
 
 受控 CLI 使用独立 HOME/CODEX_HOME/临时目录和显式环境，不继承宿主登录或代理。标准输出/错误各限 1 MiB；临时输入、运行目录和子进程组有有限资源保护。实际固定 CLI、网络接线、配置及三层证据由 Codex 专项核验；子进程日志不能直接写入报告。
+
+`mise run build-detection-codex` 构建固定 Go 驱动器并安装官方 `0.163.0` 原生制品；Linux/macOS 的 amd64/arm64 包 SHA-512 固定在安装脚本中，每次均验证，只提取 CLI 可执行文件。源码固定为 `83086188ae0614bd882818ff1aa23f3194962012`，Apache-2.0 LICENSE 与原 NOTICE 位于 `backend/licenses/codex/`。Linux amd64 可执行文件约 283 MiB，下载包约 155 MiB；不安装 npm launcher、语音库或额外工具。制品供后台隔离检测使用，不进入普通网关请求流程。
+
+官方 CLI→正式网关→合成上游回归以 `AIHUB_TEST_CODEX_BINARY` 和 `AIHUB_TEST_CODEX_PROBE` 显式指定上述两个制品，运行 `go -C backend test ./internal/api -run TestOfficialCodexCLIUsesProductionHandlers`。CI 会运行普通推理、平台 PAT 身份与 notes 启用、独立图片模型和工具结果回填；图片另校验独立报价且仅结算一次。驱动器只接受回环桥、固定 profile 和受控临时目录，禁止审批/任意客户端命令；官方 CLI 原始输出只在内存解析，返回固定阶段和布尔结论，取消后清理整个进程组及目录。机制验收不构成真实供应商通过，也不消除仍未注册套件的 pending。
 
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
 

@@ -71,21 +71,7 @@ func (a *app) registerGatewayRoutes(r *router) {
 	existing := map[string]bool{"chat.create": true, "responses.create": true, "responses.get": true, "responses.cancel": true, "messages.create": true, "gemini.generateContent": true, "gemini.streamGenerateContent": true, "gemini.countTokens": true}
 	for _, endpoint := range manifest.Endpoints {
 		if endpoint.Feature == "F8" {
-			var handler http.HandlerFunc
-			switch {
-			case endpoint.ID == "identity.whoami":
-				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeCodexIdentity(w, req, false) }
-			case endpoint.ID == "identity.accounts":
-				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeCodexIdentity(w, req, true) }
-			case endpoint.Scope == "context_acl_only" || endpoint.ID == "codex.models":
-				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeAuxiliary(w, req, endpoint) }
-			case endpoint.Replay == "inference":
-				format := channel.FormatOpenAIResponses
-				if strings.HasPrefix(endpoint.ID, "codex.images") {
-					format = channel.FormatOpenAIImages
-				}
-				handler = serve(format)
-			}
+			handler := a.gateway.CodexHandler(endpoint)
 			if handler != nil {
 				r.implement("497", endpoint.Method+" "+endpoint.Path, accessGatewayKey, handler)
 			}
