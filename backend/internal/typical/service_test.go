@@ -27,7 +27,7 @@ type memoryRepo struct {
 func memory(c Config) *memoryRepo {
 	return &memoryRepo{c: c, cp: Checkpoint{Generation: 1}, samples: map[string]Sample{}}
 }
-func (m *memoryRepo) Config(context.Context) (Config, error) { return m.c, nil }
+func (m *memoryRepo) Config(context.Context) (Config, error) { return m.c, m.fail }
 func (m *memoryRepo) SetConfig(_ context.Context, _ string, c Config) (Config, error) {
 	if c.Version != m.c.Version {
 		return Config{}, ErrConflict
