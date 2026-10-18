@@ -45,7 +45,7 @@ func (r *Registry) RegisterNative() error {
 		}
 		for _, req := range suite.Requirements {
 			family := req.ID[strings.LastIndex(req.ID, ".")+1:]
-			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document"}, family) {
+			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video"}, family) {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
@@ -79,6 +79,10 @@ func (r *Registry) RegisterNative() error {
 					scene.vision(ctx)
 				case "document":
 					scene.documents(ctx)
+				case "audio":
+					scene.audio(ctx)
+				case "video":
+					scene.video(ctx)
 				}
 				return scene.finish()
 			}}); err != nil {
@@ -239,7 +243,9 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 				return out
 			}
 		}
-		_ = n.s.Meter(input, u.Output, out.Reply.Images, 0)
+		if n.s.Meter(input, u.Output, out.Reply.Images, 0) != nil {
+			out.Reply.Usage.Reliable = false
+		}
 	}
 	return out
 }

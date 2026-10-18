@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -313,6 +314,11 @@ func containsCategory(category string) bool {
 func (s *Session) Meter(input, output, images, tools int64) error {
 	if input < 0 || output < 0 || images < 0 || tools < 0 {
 		return ErrInvalid
+	}
+	for _, pair := range [][2]int64{{s.usage.InputTokens, input}, {s.usage.OutputTokens, output}, {s.usage.Images, images}, {s.usage.Tools, tools}} {
+		if pair[0] > math.MaxInt64-pair[1] {
+			return ErrInvalid
+		}
 	}
 	s.usage.InputTokens += input
 	s.usage.OutputTokens += output

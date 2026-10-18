@@ -208,10 +208,16 @@ func nativeUsageFrom(protocol string, o nativeObject) nativeUsage {
 				u.Reliable = u.Reliable && valid
 			}
 		}
-		if n, valid := fieldInt(object(raw["output_tokens_details"]), "thinking_tokens"); valid {
+		if v, exists := object(raw["output_tokens_details"])["thinking_tokens"]; exists {
+			n, valid := integer(v)
 			u.Reasoning = n
-			u.Reliable = u.Reliable && n <= u.Output
+			u.Reliable = u.Reliable && valid && n <= u.Output
 		}
+		all, safe := addNative(u.Input, u.CacheWrite)
+		if safe {
+			_, safe = addNative(all, u.CacheRead)
+		}
+		u.Reliable = u.Reliable && safe
 		if tier := str(raw["service_tier"]); tier != "" {
 			u.Tier = tier
 		}
@@ -241,6 +247,9 @@ func nativeUsageFrom(protocol string, o nativeObject) nativeUsage {
 			n, valid := integer(v)
 			sum, safe = addNative(sum, n)
 			u.Reliable = u.Reliable && valid && safe
+			var inputSafe bool
+			u.Input, inputSafe = addNative(u.Input, n)
+			u.Reliable = u.Reliable && inputSafe
 		}
 		u.Reliable = u.Reliable && tok && safe && sum == total
 	}

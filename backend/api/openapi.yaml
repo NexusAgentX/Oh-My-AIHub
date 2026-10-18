@@ -12411,7 +12411,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.8",
+    "version": "2026-10-18.9",
     "stage": "discovery",
     "sources": [
       {
@@ -12468,6 +12468,16 @@ x-aihub-gateway-contract:
         "id": "anthropic-citations",
         "url": "https://platform.claude.com/docs/en/build-with-claude/citations",
         "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-chat-audio",
+        "url": "https://developers.openai.com/api/docs/guides/audio-chat-completions",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "gemini-generate-content-audio",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/speech-generation",
+        "version": "GenerateContent-v1beta-profile-2026-10-18"
       }
     ],
     "endpoints": [
@@ -14108,8 +14118,7 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_inline_input_when_applicable",
-              "native_output_when_applicable",
+              "vendor_extension.input_audio",
               "actual_content_and_usage"
             ],
             "credential_dependent": false
@@ -14973,7 +14982,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_inline_or_url_content_recognition",
+              "inline_video_content_recognition",
+              "url_video_content_recognition",
               "no_files_upload"
             ],
             "credential_dependent": false
@@ -15876,6 +15886,8 @@ x-aihub-gateway-contract:
       "detection/native-evidence": "F4 按原生协议逐项验证结构、语义与可靠用量；真实长度与参数接受独立，搜索额外计数请求纳入实际消耗。SSE 使用原生流式端点，计数/压缩场景允许调用对应原生生成端点验证完整窗口续用。指纹固定 lmfpd 0.0.1792242250521 / 50a364bc686279094265f34f18f5501eac1d73f4，三条完整样本、离线 Go 等价评分，只保存库内相对排名，不证明身份。",
       "detection/native-applicability": "保留每个原始 ID 的场景归属，将通用模板断言细化为实际原生字段。Messages 不虚构 json_object/custom/namespace；Gemini 使用 allowedFunctionNames、VALIDATED、parametersJsonSchema 和 responseJsonSchema，不加入旧 responseSchema 专项；Chat SSE 不虚构原生推理事件。OpenAI custom、allowed_tools 及 Responses namespace 分别验证，temperature/top_p/effort/verbosity 分开投影。缺少偶发多调用或可选 thinking/签名事件只按明确条件断言记录未观测，不代替主动适用检测。",
       "detection/group-negative-prerequisite": "分组基础负例先复用同一凭据/协议的有界模型目录，从实际返回的模型 ID 构造合法基础体，再分别执行无效/缺失鉴权、随机未知模型和无效 JSON。模型元数据仅作请求构造和元数据结构证据，不提升为容量支持；Gemini 多候选额外使用其原生流式端点。",
-      "detection/native-multimodal-fixtures": "多模态探测仅使用固定提交和 SHA-256 校验的自有合成资源，URL 使用无答案提示的文件名。图片以左右色块及双图次序核验；PDF 以两页独立代码核验。Chat 官方协议不支持文件 URL，故其 M06 只测原生 file_data；不虚构 file_url 或转入 Files API。Messages PDF citations 启用后核验 document_index 与 1 起始、右端不含的页范围及真实引用；其他协议可选引用只在观测时验证，不补独立文件授权。"
+      "detection/native-multimodal-fixtures": "多模态探测仅使用固定提交和 SHA-256 校验的自有合成资源，URL 使用无答案提示的文件名。图片以左右色块及双图次序核验；PDF 以两页独立代码核验。Chat 官方协议不支持文件 URL，故其 M06 只测原生 file_data；不虚构 file_url 或转入 Files API。Messages PDF citations 启用后核验 document_index 与 1 起始、右端不含的页范围及真实引用；其他协议可选引用只在观测时验证，不补独立文件授权。",
+      "openai-responses/M04": "保留原 M04 作为明确命名的供应商扩展 input_audio/data/format 探测，不伪称 OpenAI Responses 官方音频协议。官方文档当前将这种音频会话形态放在 Chat Completions，Responses 创建参考中也没有 input_audio/output_audio。按扩展实际返回/内容识别/用量如实报告，不用 Chat 成功代证 Responses，不新增独立 Audio、Realtime 或 WS 端点，不做协议转换。",
+      "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。"
     }
   }
