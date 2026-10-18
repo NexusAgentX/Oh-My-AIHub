@@ -444,12 +444,22 @@ func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key Ke
 	}
 	ctx, stop := context.WithTimeout(r.Context(), e.CallTimeLimit)
 	defer stop()
-	timeouts := resolveTimeouts(metadata.Settings, routing.Pref{}).withChannel(metadata.Candidate.Advanced)
-	var timer *time.Timer
-	if timeouts.ttft > 0 {
-		timer = time.AfterFunc(timeouts.ttft, stop)
-		defer timer.Stop()
+	timeouts := frozenBackgroundTimeouts(metadata)
+	stream := r.URL.Query().Get("stream") == "true"
+	var firstByte, total, idle *time.Timer
+	if stream && timeouts.ttft > 0 {
+		firstByte = time.AfterFunc(timeouts.ttft, stop)
 	}
+	if !stream && timeouts.request > 0 {
+		total = time.AfterFunc(timeouts.request, stop)
+	}
+	defer func() {
+		for _, timer := range []*time.Timer{firstByte, total, idle} {
+			if timer != nil {
+				timer.Stop()
+			}
+		}
+	}()
 	response, secret, err := e.backgroundExchange(ctx, metadata, id, method, operation, r.URL.RawQuery, body)
 	if err != nil {
 		var limitErr *http.MaxBytesError
@@ -462,25 +472,36 @@ func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key Ke
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		// Error bodies use the non-streaming request bound after headers, like
+		// ordinary inference. They cannot consume an unbounded stream read.
+		if firstByte != nil {
+			firstByte.Stop()
+		}
+		if stream && timeouts.request > 0 {
+			total = time.AfterFunc(timeouts.request, stop)
+		}
+
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 		newUpstreamFailure(response, payload, secret).write(w, job.CallID)
 		return
 	}
-	if owned != nil {
-		if timer != nil {
-			timer.Stop()
+	// Headers are not a first response byte. Track every actual body read,
+	// including bounded JSON buffering, with the same timeout stages as inference.
+	response.Body = backgroundReadBody{ReadCloser: response.Body, ctx: ctx, read: func() {
+		if firstByte != nil {
+			firstByte.Stop()
+			firstByte = nil
 		}
-		if timeouts.idle > 0 && isResourceSSE(response.Header.Get("Content-Type")) {
-			timer = time.AfterFunc(timeouts.idle, stop)
-			defer timer.Stop()
-		} else {
-			timer = nil
-		}
-		err := e.forwardBackgroundResource(w, r, response, key, metadata, job, owned, cancel, func() {
-			if timer != nil {
-				timer.Reset(timeouts.idle)
+		if stream && timeouts.idle > 0 {
+			if idle == nil {
+				idle = time.AfterFunc(timeouts.idle, stop)
+			} else {
+				idle.Reset(timeouts.idle)
 			}
-		})
+		}
+	}}
+	if owned != nil {
+		err := e.forwardBackgroundResource(w, r, response, key, metadata, job, owned, cancel)
 		if err != nil {
 			WriteError(w, DialectOf(r), 502, "upstream_failed", "读取上游响应失败", job.CallID)
 		}
@@ -491,23 +512,11 @@ func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key Ke
 	}
 	w.Header().Set("X-AIHub-Request-Id", job.CallID)
 	w.WriteHeader(response.StatusCode)
-	if timer != nil {
-		timer.Stop()
-	}
-	if timeouts.idle > 0 && r.URL.Query().Get("stream") == "true" {
-		timer = time.AfterFunc(timeouts.idle, stop)
-		defer timer.Stop()
-	} else {
-		timer = nil
-	}
 	buffer := getChunk()
 	defer putChunk(buffer)
 	for {
 		n, readErr := response.Body.Read(*buffer)
 		if n > 0 {
-			if timer != nil {
-				timer.Reset(timeouts.idle)
-			}
 			_ = http.NewResponseController(w).SetWriteDeadline(e.Now().Add(clientWriteLimit))
 			if _, err := w.Write((*buffer)[:n]); err != nil {
 				return

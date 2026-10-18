@@ -12,7 +12,7 @@ import (
 
 // The frozen task remains the producer chain for child identities. Reads never
 // settle it or create another call; its worker remains the only finalizer.
-func (e *Engine) forwardBackgroundResource(w http.ResponseWriter, r *http.Request, response *http.Response, key KeyAuth, metadata backgroundMetadata, job BackgroundJob, owned *resourcestate.Record, cancel bool, read func()) error {
+func (e *Engine) forwardBackgroundResource(w http.ResponseWriter, r *http.Request, response *http.Response, key KeyAuth, metadata backgroundMetadata, job BackgroundJob, owned *resourcestate.Record, cancel bool) error {
 	copyHeaders := func() {
 		for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 			w.Header()[name] = values
@@ -33,6 +33,7 @@ func (e *Engine) forwardBackgroundResource(w http.ResponseWriter, r *http.Reques
 			return err
 		}
 		copyHeaders()
+		_ = http.NewResponseController(w).SetWriteDeadline(e.Now().Add(clientWriteLimit))
 		w.WriteHeader(response.StatusCode)
 		_, _ = w.Write(payload)
 		return nil
@@ -69,7 +70,6 @@ func (e *Engine) forwardBackgroundResource(w http.ResponseWriter, r *http.Reques
 	for {
 		n, err := response.Body.Read(*buffer)
 		if n > 0 {
-			read()
 			if err := gate.write((*buffer)[:n]); err != nil {
 				return finishError(err)
 			}
