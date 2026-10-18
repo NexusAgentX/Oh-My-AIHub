@@ -29,6 +29,7 @@ export const adminRoutes = (
         path="disputes/:tradeID"
       />
       <Route lazy={async () => ({ Component: (await import('./SettingsPage')).SettingsPage })} path="settings" />
+ <Route lazy={async()=>({Component:(await import('../detection/SearchPage')).DetectionSearchPage})} path="detection-search" />
     </Route>
   </Route>
 )

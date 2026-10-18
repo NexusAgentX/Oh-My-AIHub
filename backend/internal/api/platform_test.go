@@ -68,7 +68,7 @@ func (b *fakeEvents) publish(event gateway.Event) {
 
 const testKeyring = "k1=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 
-func newPlatform(t *testing.T) *platform {
+func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 	t.Helper()
 	store := newFakeStore()
 	identityService, err := identitytest.NewService(store, time.Hour)
@@ -119,14 +119,18 @@ func newPlatform(t *testing.T) *platform {
 
 	c2cStore := newFakeC2CStore(store)
 	rates := &fakeRateSource{rateNano: 7_100_000_000}
-	handler := NewHandler(Dependencies{
+	dependencies := Dependencies{
 		Suppliers: &supplier.Service{Store: &fakeSupplierStore{channels: channelStore}, Outbound: outbound},
 		Identity:  identityService, Catalog: catalogService, Ledger: ledger.NewService(store), Settings: settingsService,
 		RateSync: settings.NewRateSyncer(store, rates),
 		Audit:    audit.NewService(store), Keys: apikey.NewService(newFakeKeyStore(), keyring, knownModels), Channels: channelService,
 		Routing: routingStore, Gateway: engine, Browse: browse, C2C: c2c.NewService(c2cStore, c2cKeyring),
 		Observe: observeService, Feed: feed, Forum: forum.NewService(newFakeForumStore(store)), CookieSecure: true,
-	})
+	}
+	for _, option := range options {
+		option(&dependencies)
+	}
+	handler := NewHandler(dependencies)
 	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, stats: stats, handler: handler}
 }
 

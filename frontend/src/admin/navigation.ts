@@ -19,6 +19,7 @@ export const adminNavigation: AdminNavItem[] = [
   { label: '渠道', to: '/admin/channels', icon: 'shield' },
   { label: '申诉', to: '/admin/disputes', icon: 'scale' },
   { label: '设置', to: '/admin/settings', icon: 'settings' },
+ {label:'检测参数',to:'/admin/detection-search',icon:'flask'},
 ]
 
 export const adminTabCount = 4

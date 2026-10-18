@@ -263,6 +263,24 @@ func (q *Queries) GetGroupModel(ctx context.Context, id string) (MarketGroupMode
 	return i, err
 }
 
+const getProtectedRoot = `-- name: GetProtectedRoot :one
+SELECT purpose, encryption_key_id, credential_version, nonce, ciphertext, created_at FROM market_protected_keys WHERE purpose=$1
+`
+
+func (q *Queries) GetProtectedRoot(ctx context.Context, purpose string) (MarketProtectedKey, error) {
+	row := q.db.QueryRow(ctx, getProtectedRoot, purpose)
+	var i MarketProtectedKey
+	err := row.Scan(
+		&i.Purpose,
+		&i.EncryptionKeyID,
+		&i.CredentialVersion,
+		&i.Nonce,
+		&i.Ciphertext,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getQuote = `-- name: GetQuote :one
 SELECT id, group_model_id, version, currency, billing_unit, input_price_nano, output_price_nano, cache_write_price_nano, cache_read_price_nano, created_at FROM market_quotes WHERE id=$1
 `
@@ -504,6 +522,29 @@ func (q *Queries) InsertGroupModel(ctx context.Context, arg InsertGroupModelPara
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertProtectedRoot = `-- name: InsertProtectedRoot :exec
+INSERT INTO market_protected_keys(purpose,encryption_key_id,credential_version,nonce,ciphertext) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertProtectedRootParams struct {
+	Purpose           string `json:"purpose"`
+	EncryptionKeyID   string `json:"encryption_key_id"`
+	CredentialVersion int64  `json:"credential_version"`
+	Nonce             []byte `json:"nonce"`
+	Ciphertext        []byte `json:"ciphertext"`
+}
+
+func (q *Queries) InsertProtectedRoot(ctx context.Context, arg InsertProtectedRootParams) error {
+	_, err := q.db.Exec(ctx, insertProtectedRoot,
+		arg.Purpose,
+		arg.EncryptionKeyID,
+		arg.CredentialVersion,
+		arg.Nonce,
+		arg.Ciphertext,
+	)
+	return err
 }
 
 const insertQuote = `-- name: InsertQuote :one
@@ -864,6 +905,37 @@ func (q *Queries) ListGroups(ctx context.Context) ([]MarketGroup, error) {
 	return items, nil
 }
 
+const listProtectedRoots = `-- name: ListProtectedRoots :many
+SELECT purpose, encryption_key_id, credential_version, nonce, ciphertext, created_at FROM market_protected_keys ORDER BY purpose
+`
+
+func (q *Queries) ListProtectedRoots(ctx context.Context) ([]MarketProtectedKey, error) {
+	rows, err := q.db.Query(ctx, listProtectedRoots)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MarketProtectedKey
+	for rows.Next() {
+		var i MarketProtectedKey
+		if err := rows.Scan(
+			&i.Purpose,
+			&i.EncryptionKeyID,
+			&i.CredentialVersion,
+			&i.Nonce,
+			&i.Ciphertext,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSuppliers = `-- name: ListSuppliers :many
 SELECT id, contributor_id, name, kind, website_url, icon_data, icon_source, summary, description, docs_url, enabled, revision, deleted_at, updated_at FROM market_suppliers WHERE deleted_at IS NULL ORDER BY id
 `
@@ -929,6 +1001,15 @@ func (q *Queries) LockModel(ctx context.Context, id string) (MarketGroupModel, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const lockProtectedRoot = `-- name: LockProtectedRoot :exec
+SELECT pg_advisory_xact_lock(hashtextextended('market-protected:'||$1,0))
+`
+
+func (q *Queries) LockProtectedRoot(ctx context.Context, dollar_1 *string) error {
+	_, err := q.db.Exec(ctx, lockProtectedRoot, dollar_1)
+	return err
 }
 
 const modelsForGroup = `-- name: ModelsForGroup :many
@@ -1049,6 +1130,29 @@ UPDATE market_group_addresses SET deleted_at=now() WHERE group_id=$1 AND deleted
 
 func (q *Queries) RetireGroupAddresses(ctx context.Context, groupID string) error {
 	_, err := q.db.Exec(ctx, retireGroupAddresses, groupID)
+	return err
+}
+
+const rewrapProtectedRoot = `-- name: RewrapProtectedRoot :exec
+UPDATE market_protected_keys SET encryption_key_id=$2,credential_version=$3,nonce=$4,ciphertext=$5 WHERE purpose=$1
+`
+
+type RewrapProtectedRootParams struct {
+	Purpose           string `json:"purpose"`
+	EncryptionKeyID   string `json:"encryption_key_id"`
+	CredentialVersion int64  `json:"credential_version"`
+	Nonce             []byte `json:"nonce"`
+	Ciphertext        []byte `json:"ciphertext"`
+}
+
+func (q *Queries) RewrapProtectedRoot(ctx context.Context, arg RewrapProtectedRootParams) error {
+	_, err := q.db.Exec(ctx, rewrapProtectedRoot,
+		arg.Purpose,
+		arg.EncryptionKeyID,
+		arg.CredentialVersion,
+		arg.Nonce,
+		arg.Ciphertext,
+	)
 	return err
 }
 

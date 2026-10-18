@@ -4,6 +4,194 @@
  */
 
 export interface paths {
+    "/api/detection/jobs/{taskID}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取不可变历史报告 */
+        get: operations["listDetectionReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/reports/{reportID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取不可变历史报告 */
+        get: operations["getDetectionReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看自己的检测任务；管理员可治理全部任务 */
+        get: operations["listDetectionJobs"];
+        put?: never;
+        /** 为已授权目标创建完整检测计划，缺套件明确待实现 */
+        post: operations["startDetectionJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看任务、独立断言、版本与用量 */
+        get: operations["getDetectionJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 取消检测并保留已发生消耗与清理记录 */
+        post: operations["cancelDetectionJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重填同范围凭据恢复中断任务 */
+        post: operations["resumeDetectionJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}/retest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 选择场景复测并保留独立有效证据 */
+        post: operations["retestDetectionJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页查看脱敏请求执行元数据 */
+        get: operations["listDetectionAttempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/detection/jobs/{taskID}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看本任务尚待清理的资源归属元数据 */
+        get: operations["listDetectionArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/detection/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看上下文及最大输出搜索参数 */
+        get: operations["getDetectionParameters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/detection/search/{target}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 版本化修改搜索参数并记录审计 */
+        put: operations["updateDetectionSearch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channel-hall/{channelID}/analysis": {
         parameters: {
             query?: never;
@@ -1730,6 +1918,220 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DetectionReportsPage: {
+            items: components["schemas"]["DetectionReportSummary"][];
+            next_cursor: string | null;
+        };
+        DetectionReportSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            task_id: string;
+            state: string;
+            complete: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        DetectionSearchSettings: {
+            version: string;
+            /** @enum {string} */
+            method: "binary" | "ternary";
+            low: number;
+            high: number;
+            hard_maximum: number;
+            /** @enum {string} */
+            precision_mode: "absolute" | "relative";
+            precision: number;
+            rounds: number;
+            rechecks: number;
+        };
+        DetectionParameters: {
+            context: components["schemas"]["DetectionSearchSettings"];
+            max_output: components["schemas"]["DetectionSearchSettings"];
+        };
+        DetectionTarget: {
+            /** Format: uuid */
+            group_id: string;
+            binding: components["schemas"]["MarketEvidenceBinding"];
+            /** @enum {string} */
+            model_type: "" | "text" | "image";
+            model: string;
+            service_tier: string;
+        };
+        DetectionUsage: {
+            http: number;
+            generate: number;
+            count: number;
+            query: number;
+            cleanup: number;
+            input_tokens: number;
+            output_tokens: number;
+            images: number;
+            tools: number;
+        };
+        DetectionAttempt: {
+            /** Format: uuid */
+            id: string;
+            endpoint_id: string;
+            /** @enum {string} */
+            method: "GET" | "POST" | "PATCH" | "DELETE";
+            path: string;
+            status: number;
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            /** @enum {string} */
+            category: "generate" | "count" | "query" | "cleanup";
+            duration_ms: number;
+            sent: boolean;
+            response_received: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        DetectionAssertion: {
+            id: string;
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive" | "unobserved";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            attempt_ids: string[];
+        };
+        DetectionResult: {
+            /** Format: uuid */
+            source_task_id: string;
+            source_report_id: string | null;
+            /** Format: uuid */
+            id: string;
+            scenario_id: string;
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            /** @enum {string} */
+            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
+            /** @enum {string} */
+            source: "real_upstream" | "synthetic";
+            assertions: components["schemas"]["DetectionAssertion"][];
+            attempts: components["schemas"]["DetectionAttempt"][];
+            usage: components["schemas"]["DetectionUsage"];
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at: string;
+        };
+        DetectionPlanned: {
+            credential_dependent: boolean;
+            assertion_labels: {
+                [key: string]: string;
+            };
+            id: string;
+            suite_id: string;
+            requirements: string[];
+            assertions: string[];
+            conditional: string[];
+            dependencies: string[];
+            aggregate: boolean;
+            implemented: boolean;
+            code_version: string;
+            /** @enum {string} */
+            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
+            estimated_http: number | null;
+        };
+        DetectionPlan: {
+            engine_version: string;
+            manifest_version: string;
+            registry_version: string;
+            items: components["schemas"]["DetectionPlanned"][];
+        };
+        DetectionJob: {
+            /** Format: uuid */
+            requested_by_id: string;
+            continued_from_id: string | null;
+            pending_cleanup: components["schemas"]["DetectionArtifact"][];
+            report_id: string | null;
+            execution_active: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            target: components["schemas"]["DetectionTarget"];
+            parameters: components["schemas"]["DetectionParameters"];
+            plan: components["schemas"]["DetectionPlan"];
+            /** @enum {string} */
+            state: "queued" | "running" | "finished" | "cancelled" | "interrupted" | "suite_pending" | "failed" | "outdated";
+            complete: boolean;
+            results: components["schemas"]["DetectionResult"][];
+            usage: components["schemas"]["DetectionUsage"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DetectionSummary: {
+            execution_active: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            target: components["schemas"]["DetectionTarget"];
+            /** @enum {string} */
+            state: "queued" | "running" | "finished" | "cancelled" | "interrupted" | "suite_pending" | "failed" | "outdated";
+            complete: boolean;
+            scenarios: number;
+            finished_scenarios: number;
+            usage: components["schemas"]["DetectionUsage"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DetectionArtifact: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "response" | "conversation" | "cache" | "stored_chat";
+            native_id: string;
+            delete_endpoint: string;
+            delete_path: string;
+            /** Format: uuid */
+            producer_attempt_id: string;
+            removed: boolean;
+            /** @enum {string} */
+            reason: "ok" | "external_error" | "invalid_response" | "key_unavailable";
+        };
+        DetectionJobEnvelope: {
+            job: components["schemas"]["DetectionJob"];
+        };
+        DetectionParametersEnvelope: {
+            parameters: components["schemas"]["DetectionParameters"];
+        };
+        DetectionSearchEnvelope: {
+            settings: components["schemas"]["DetectionSearchSettings"];
+        };
+        DetectionArtifactsEnvelope: {
+            items: components["schemas"]["DetectionArtifact"][];
+        };
+        DetectionJobsPage: {
+            items: components["schemas"]["DetectionSummary"][];
+            next_cursor: string | null;
+        };
+        DetectionAttemptsPage: {
+            items: components["schemas"]["DetectionAttempt"][];
+            next_cursor: string | null;
+        };
+        DetectionCreate: {
+            /** @enum {string} */
+            target_kind: "group" | "group_model";
+            /** Format: uuid */
+            target_id: string;
+            api_key: string;
+        };
+        DetectionResume: {
+            api_key: string;
+        };
+        DetectionRetest: {
+            api_key: string;
+            scenarios: string[];
+        };
         /** @description 非负价格，最多100000，9位小数；0为明确免费。 */
         MarketPrice: string;
         MarketHeaderSet: {
@@ -4084,6 +4486,379 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listDetectionReports: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 只读历史报告，后续复测不改写此证据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionReportsPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getDetectionReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 只读历史报告，后续复测不改写此证据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listDetectionJobs: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查看自己的检测任务；管理员可治理全部任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobsPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    startDetectionJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionCreate"];
+            };
+        };
+        responses: {
+            /** @description 为已授权目标创建完整检测计划，缺套件明确待实现 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getDetectionJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查看任务、独立断言、版本与用量 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    cancelDetectionJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 取消检测并保留已发生消耗与清理记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    resumeDetectionJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionResume"];
+            };
+        };
+        responses: {
+            /** @description 重填同范围凭据恢复中断任务 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    retestDetectionJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRetest"];
+            };
+        };
+        responses: {
+            /** @description 选择场景复测并保留独立有效证据 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionJobEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listDetectionAttempts: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页查看脱敏请求执行元数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionAttemptsPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listDetectionArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查看本任务尚待清理的资源归属元数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionArtifactsEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getDetectionParameters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查看上下文及最大输出搜索参数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionParametersEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateDetectionSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target: "context" | "max_output";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionSearchSettings"];
+            };
+        };
+        responses: {
+            /** @description 版本化修改搜索参数并记录审计 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionSearchEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     analyzeHallChannel: {
         parameters: {
             query: {
