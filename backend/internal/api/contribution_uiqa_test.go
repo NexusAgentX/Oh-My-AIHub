@@ -35,7 +35,13 @@ func TestContributionUIHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := &contribution.Service{Store: store, Live: store, Planner: registry, Publisher: runtime}
-	p := newPlatform(t, func(d *Dependencies) { d.Contributions = service; d.CookieSecure = false })
+	detectorStore := newAPIDetectorStore()
+	detector, err := detection.New(ctx, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: contribution.DraftResolver{Service: service}, Outbound: &unusedDetectorOutbound{}, Limits: detection.DefaultLimits(), CredentialRoot: make([]byte, 32), Synthetic: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer detector.Close()
+	p := newPlatform(t, func(d *Dependencies) { d.Contributions = service; d.Detection = detector; d.CookieSecure = false })
 	admin := &client{spec: p.spec, handler: p.handler}
 	admin.expect(t, 201, "POST", "/api/instance/initialize", map[string]string{"username": "qaadmin", "display_name": "合成验收管理员", "password": "Synthetic-QA-2026"})
 	owner, ownerID := p.member(t, "qa-contributor")

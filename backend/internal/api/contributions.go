@@ -1,26 +1,35 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
 func (a *app) registerContributionRoutes(r *router) {
-	r.implement("492", "GET /api/contributions/targets", accessReady, a.contributionTargets)
-	r.implement("492", "GET /api/contributions", accessReady, a.listContributions)
-	r.implement("492", "POST /api/contributions", accessReady, a.newContribution)
-	r.implement("492", "GET /api/contributions/{draftID}", accessReady, a.getContribution)
-	r.implement("492", "PUT /api/contributions/{draftID}", accessReady, a.saveContribution)
-	r.implement("492", "POST /api/contributions/{draftID}/children", accessReady, a.addContributionChild)
-	r.implement("492", "POST /api/contributions/{draftID}/submit", accessReady, a.submitContribution)
-	r.implement("492", "POST /api/contributions/{draftID}/withdraw", accessReady, a.withdrawContribution)
-	r.implement("492", "GET /api/admin/contributions", accessAdmin, a.reviewContributions)
-	r.implement("492", "POST /api/admin/contributions/{draftID}/approve", accessAdmin, a.approveContribution)
-	r.implement("492", "POST /api/admin/contributions/{draftID}/reject", accessAdmin, a.rejectContribution)
-	r.implement("492", "POST /api/contributions/icon", accessReady, a.fetchSupplierIcon)
+	bounded := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+			defer cancel()
+			next(w, r.WithContext(ctx))
+		}
+	}
+	r.implement("492", "GET /api/contributions/targets", accessReady, bounded(a.contributionTargets))
+	r.implement("492", "GET /api/contributions", accessReady, bounded(a.listContributions))
+	r.implement("492", "POST /api/contributions", accessReady, bounded(a.newContribution))
+	r.implement("492", "GET /api/contributions/{draftID}", accessReady, bounded(a.getContribution))
+	r.implement("492", "PUT /api/contributions/{draftID}", accessReady, bounded(a.saveContribution))
+	r.implement("492", "POST /api/contributions/{draftID}/children", accessReady, bounded(a.addContributionChild))
+	r.implement("492", "POST /api/contributions/{draftID}/submit", accessReady, bounded(a.submitContribution))
+	r.implement("492", "POST /api/contributions/{draftID}/withdraw", accessReady, bounded(a.withdrawContribution))
+	r.implement("492", "GET /api/admin/contributions", accessAdmin, bounded(a.reviewContributions))
+	r.implement("492", "POST /api/admin/contributions/{draftID}/approve", accessAdmin, bounded(a.approveContribution))
+	r.implement("492", "POST /api/admin/contributions/{draftID}/reject", accessAdmin, bounded(a.rejectContribution))
+	r.implement("492", "POST /api/contributions/icon", accessReady, bounded(a.fetchSupplierIcon))
 }
 func contributionActor(r *http.Request) contribution.Actor {
 	actor := accountFromContext(r.Context())
@@ -159,7 +168,7 @@ func (a *app) saveContribution(w http.ResponseWriter, r *http.Request) {
 		writeContributionError(w, err)
 		return
 	}
-	d, err := a.contributions.Save(r.Context(), contributionActor(r), id, input.Revision, input.Title, changes, input.ReportIDs, declared)
+	d, err := a.contributions.Save(r.Context(), contributionActor(r), id, input.Revision, input.Title, changes, input.ReportIDs, declared, input.Changes.priceBlanks())
 	if err != nil {
 		writeContributionError(w, err)
 		return

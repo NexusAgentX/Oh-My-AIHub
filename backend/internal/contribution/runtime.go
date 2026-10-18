@@ -67,6 +67,12 @@ func (r *Runtime) Reload(ctx context.Context) error {
 func (r *Runtime) Invalidate(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// A different committed mutation cannot clear an approval whose COMMIT
+	// outcome is still being resolved. Its changes join the next privileged
+	// refresh; stale candidate reads stay closed in the meantime.
+	if v := r.current.Load(); v != nil && v.blocked {
+		return ErrPublication
+	}
 	r.prior = r.current.Load()
 	blocked := &runtimeView{blocked: true}
 	if r.prior != nil {

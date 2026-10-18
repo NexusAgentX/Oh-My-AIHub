@@ -11,6 +11,7 @@ CREATE TABLE market_contributions (
  base_document jsonb NOT NULL CHECK(jsonb_typeof(base_document)='object' AND octet_length(base_document::text)<=8388608),
  report_ids uuid[] NOT NULL DEFAULT '{}',
  task_ids uuid[] NOT NULL DEFAULT '{}',
+ price_blanks jsonb NOT NULL DEFAULT '{}' CHECK(jsonb_typeof(price_blanks)='object' AND octet_length(price_blanks::text)<=2097152),
  pending_prices uuid[] NOT NULL DEFAULT '{}',
  review_reason text NOT NULL DEFAULT '' CHECK(char_length(review_reason)<=1000),
  reviewed_by uuid REFERENCES accounts(id),

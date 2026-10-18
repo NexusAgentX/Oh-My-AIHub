@@ -53,6 +53,9 @@ func payload(c market.Changes) ([]byte, error) {
 }
 func value(row MarketContribution) (contribution.Draft, error) {
 	d := contribution.Draft{ID: row.ID, OwnerID: row.OwnerID, Title: row.Title, Kind: row.Kind, TargetID: row.TargetID, State: row.State, Revision: row.Revision, ReportIDs: append([]string{}, row.ReportIds...), TaskIDs: append([]string{}, row.TaskIds...), PendingPrices: append([]string{}, row.PendingPrices...), ReviewReason: row.ReviewReason, ReviewedBy: row.ReviewedBy, SubmittedAt: row.SubmittedAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	if market.Decode(row.PriceBlanks, &d.PriceBlanks) != nil {
+		return d, contribution.ErrInvalid
+	}
 	if market.Decode(row.Document, &d.Changes) != nil || market.Decode(row.BaseDocument, &d.Base) != nil {
 		return d, contribution.ErrInvalid
 	}
@@ -63,12 +66,19 @@ func (s *Store) Create(ctx context.Context, d contribution.Draft) error {
 	if err != nil {
 		return err
 	}
+	if d.PriceBlanks == nil {
+		d.PriceBlanks = map[string][]string{}
+	}
+	blanks, err := json.Marshal(d.PriceBlanks)
+	if err != nil {
+		return contribution.ErrInvalid
+	}
 	base, err := payload(d.Base)
 	if err != nil {
 		return err
 	}
 	return domainError(pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		err := New(tx).InsertContribution(ctx, InsertContributionParams{ID: d.ID, OwnerID: d.OwnerID, Kind: d.Kind, TargetID: d.TargetID, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
+		err := New(tx).InsertContribution(ctx, InsertContributionParams{PriceBlanks: blanks, ID: d.ID, OwnerID: d.OwnerID, Kind: d.Kind, TargetID: d.TargetID, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
 		if err != nil {
 			return err
 		}
@@ -103,6 +113,8 @@ func (s *Store) List(ctx context.Context, actor contribution.Actor, queue bool, 
 	return out, nil
 }
 func (s *Store) Edit(ctx context.Context, id string, fn func(*contribution.Draft, contribution.UnitOfWork) error) (contribution.Draft, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if err != nil {
 		return contribution.Draft{}, domainError(err)
@@ -112,6 +124,12 @@ func (s *Store) Edit(ctx context.Context, id string, fn func(*contribution.Draft
 		defer cancel()
 		_ = tx.Rollback(cleanup)
 	}()
+	// A transaction-scoped fence survives a lost COMMIT acknowledgement. The
+	// next publication/recovery cannot rebuild a directory while that COMMIT
+	// is still in progress. Serializable conflicts remain explicit conflicts.
+	if _, err = tx.Exec(ctx, publicationFenceSQL); err != nil {
+		return contribution.Draft{}, domainError(err)
+	}
 	q := New(tx)
 	row, err := q.LockContribution(ctx, id)
 	if err != nil {
@@ -135,11 +153,18 @@ func (s *Store) Edit(ctx context.Context, id string, fn func(*contribution.Draft
 		if err != nil {
 			return d, err
 		}
+		if d.PriceBlanks == nil {
+			d.PriceBlanks = map[string][]string{}
+		}
+		blanks, err := json.Marshal(d.PriceBlanks)
+		if err != nil {
+			return d, contribution.ErrInvalid
+		}
 		base, err := payload(d.Base)
 		if err != nil {
 			return d, err
 		}
-		count, err := q.UpdateContribution(ctx, UpdateContributionParams{ID: d.ID, BaseRevision: row.Revision, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, UpdatedAt: d.UpdatedAt})
+		count, err := q.UpdateContribution(ctx, UpdateContributionParams{PriceBlanks: blanks, ID: d.ID, BaseRevision: row.Revision, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, UpdatedAt: d.UpdatedAt})
 		if err != nil {
 			return d, domainError(err)
 		}
@@ -246,4 +271,40 @@ func (u *unit) AffectedChannels(ctx context.Context, c market.Changes) (int64, e
 		return 0, nil
 	}
 	return New(u.tx).LinkedChannelCount(ctx, groups)
+}
+
+func (u *unit) ActiveDetections(ctx context.Context, tasks []string) ([]market.EvidenceBinding, error) {
+	out := []market.EvidenceBinding{}
+	if len(tasks) == 0 {
+		return out, nil
+	}
+	rows, err := New(u.tx).ActiveDetectionBindings(ctx, tasks)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range rows {
+		out = append(out, market.EvidenceBinding{TargetKind: v.TargetKind, TargetID: v.TargetID, TargetRevision: v.TargetRevision, CapabilityDigest: v.CapabilityDigest})
+	}
+	return out, nil
+}
+
+// The key is reserved for market contribution publication in this database.
+const publicationFenceSQL = `SELECT pg_advisory_xact_lock(4704367245194902356)`
+
+// SyncPublications waits for any pre-restart COMMIT to finish before boot
+// reads a new runtime snapshot. No durable or session-level lock is retained.
+func (s *Store) SyncPublications(ctx context.Context) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+		defer cancel()
+		_ = tx.Rollback(cleanup)
+	}()
+	if _, err = tx.Exec(ctx, publicationFenceSQL); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

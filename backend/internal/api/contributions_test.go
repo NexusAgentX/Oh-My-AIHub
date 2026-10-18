@@ -76,7 +76,7 @@ func (s *apiReviewStore) Edit(ctx context.Context, id string, f func(*contributi
 	}
 	next := reviewClone(d)
 	before := reviewClone(s.live)
-	if err := f(&next, apiReviewUnit{s}); err != nil {
+	if err := f(&next, apiReviewUnit{s: s, id: id}); err != nil {
 		s.live = before
 		return contribution.Draft{}, err
 	}
@@ -92,7 +92,10 @@ func (s *apiReviewStore) Apply(context.Context, string, market.Changes) error {
 	return market.ErrInvalid
 }
 
-type apiReviewUnit struct{ s *apiReviewStore }
+type apiReviewUnit struct {
+	s  *apiReviewStore
+	id string
+}
 
 func (u apiReviewUnit) Directory(context.Context) (market.Directory, error) {
 	return reviewClone(u.s.live), nil
@@ -104,7 +107,7 @@ func (u apiReviewUnit) ApprovedReports(context.Context, []string) ([]string, err
 	return []string{}, nil
 }
 func (u apiReviewUnit) Publish(_ context.Context, _ string, c market.Changes) error {
-	d, _, err := contribution.Overlay(contribution.Draft{Changes: c}, u.s.live)
+	d, _, err := contribution.Overlay(contribution.Draft{OwnerID: u.s.drafts[u.id].OwnerID, Changes: c}, u.s.live)
 	u.s.live = d
 	return err
 }
@@ -197,5 +200,17 @@ func TestContributionMoneyUsesDecimalsAndBlankDoesNotBecomeFree(t *testing.T) {
 	c.Quotes[0].Prices.Input = "0.0000000001"
 	if _, _, err = c.domain(); err == nil {
 		t.Fatal("excess precision silently rounded")
+	}
+}
+
+func TestContributionPartialPricesPreserveBlankAndExplicitZero(t *testing.T) {
+	input := contributionChanges{Quotes: []contributionQuote{{ID: "quote", GroupModelID: "model", BillingUnit: "per_million_tokens", Prices: contributionPrices{Input: "1.25", Output: "", CacheWrite: "0", CacheRead: "0.1", Details: map[string]string{"input_audio": ""}}, Tiers: []contributionTier{{Prices: contributionPrices{Input: "", Output: "3", CacheWrite: "0", CacheRead: "0"}}}, UnitPrices: []contributionUnit{{Unit: "tool_call", Tool: "web_search", Price: ""}}}}}
+	domain, declared, err := input.domain()
+	if err != nil || len(declared) != 0 {
+		t.Fatal("unfinished price declared complete", err)
+	}
+	output := changesJSON(domain, []string{"model"}, input.priceBlanks()).Quotes[0]
+	if output.Prices.Input != "1.25" || output.Prices.Output != "" || output.Prices.CacheWrite != "0" || output.Prices.CacheRead != "0.1" || output.Prices.Details["input_audio"] != "" || output.Tiers[0].Prices.Input != "" || output.Tiers[0].Prices.Output != "3" || output.UnitPrices[0].Price != "" {
+		t.Fatalf("partial prices changed meaning: %+v", output)
 	}
 }

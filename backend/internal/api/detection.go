@@ -232,6 +232,12 @@ func (a *app) rerunDetection(w http.ResponseWriter, r *http.Request, partial boo
 		writeDetectionError(w, err)
 		return
 	}
+	if job.Target.DraftID != "" && a.contributions != nil {
+		if err := a.contributions.TrackTask(r.Context(), contributionActor(r), job); err != nil {
+			writeJSON(w, 202, map[string]any{"job": job, "draft_linked": false})
+			return
+		}
+	}
 	writeJSON(w, 202, map[string]any{"job": job})
 }
 func (a *app) detectionAttempts(w http.ResponseWriter, r *http.Request) {

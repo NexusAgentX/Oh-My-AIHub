@@ -16,6 +16,10 @@ type Detail struct {
 	Stage          string     `json:"stage"`
 	LinkedChannels int64      `json:"linked_channels"`
 }
+type activeReader interface {
+	ActiveDetections(context.Context, []string) ([]market.EvidenceBinding, error)
+}
+
 type impactReader interface {
 	AffectedChannels(context.Context, market.Changes) (int64, error)
 }
@@ -53,10 +57,32 @@ func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, e
 				return err
 			}
 		}
+		detecting := false
+		if reader, ok := u.(activeReader); ok && err == nil && !out.Evaluation.Ready && len(d.TaskIDs) > 0 {
+			active, activeErr := reader.ActiveDetections(ctx, d.TaskIDs)
+			if activeErr != nil {
+				return activeErr
+			}
+			_, targets, overlayErr := Overlay(*d, live)
+			if overlayErr != nil {
+				return overlayErr
+			}
+			for _, a := range active {
+				for _, t := range targets {
+					b := t.Binding
+					if a.TargetID == b.TargetID && a.TargetKind == b.TargetKind && a.CapabilityDigest == b.CapabilityDigest && a.TargetRevision <= b.TargetRevision {
+						detecting = true
+					}
+				}
+			}
+		}
 		if out.Stage == "" {
 			out.Stage = d.State
 			if d.State == "draft" || d.State == "rejected" || d.State == "withdrawn" {
 				out.Stage = "draft"
+				if detecting {
+					out.Stage = "detecting"
+				}
 				if len(d.PendingPrices) == 0 && out.Evaluation.Ready {
 					out.Stage = "ready"
 				}

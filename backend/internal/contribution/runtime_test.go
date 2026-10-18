@@ -36,6 +36,9 @@ func TestPublicationBarrierCannotBeClearedByBackgroundReload(t *testing.T) {
 		t.Fatal("request read caused rebuild")
 	}
 	runtime.Block()
+	if err := runtime.Invalidate(ctx); !errors.Is(err, ErrPublication) || calls != 1 {
+		t.Fatal("another mutation cleared approval barrier")
+	}
 	if err := runtime.Reload(ctx); !errors.Is(err, ErrPublication) || calls != 1 {
 		t.Fatal("background reload cleared barrier")
 	}

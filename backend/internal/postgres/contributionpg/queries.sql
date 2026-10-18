@@ -1,6 +1,6 @@
 -- name: InsertContribution :exec
-INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,report_ids,task_ids,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18);
+INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,report_ids,task_ids,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at,price_blanks)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,sqlc.arg(price_blanks));
 
 -- name: GetContribution :one
 SELECT * FROM market_contributions WHERE id=$1;
@@ -9,7 +9,7 @@ SELECT * FROM market_contributions WHERE id=$1;
 SELECT * FROM market_contributions WHERE id=$1 FOR UPDATE;
 
 -- name: UpdateContribution :execrows
-UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,report_ids=$7,task_ids=$8,review_reason=$9,reviewed_by=$10,submitted_at=$11,published_at=$12,updated_at=$13,pending_prices=sqlc.arg(pending_prices)
+UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,report_ids=$7,task_ids=$8,review_reason=$9,reviewed_by=$10,submitted_at=$11,published_at=$12,updated_at=$13,pending_prices=sqlc.arg(pending_prices),price_blanks=sqlc.arg(price_blanks)
 WHERE id=$1 AND revision=sqlc.arg(base_revision);
 
 -- name: ListContributions :many
@@ -33,3 +33,9 @@ ON CONFLICT(report_id,capability,layer) DO NOTHING;
 
 -- name: LinkedChannelCount :one
 SELECT count(*)::bigint FROM channels WHERE deleted_at IS NULL AND market_group_id=ANY(sqlc.arg(group_ids)::uuid[]);
+
+-- name: ActiveDetectionBindings :many
+SELECT b.target_kind,b.target_id,b.target_revision,b.capability_digest
+FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
+WHERE t.id=ANY(sqlc.arg(task_ids)::uuid[]) AND t.state IN ('queued','running')
+ AND t.metadata->>'execution_active'='true';

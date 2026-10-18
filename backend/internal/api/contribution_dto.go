@@ -1,7 +1,11 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
@@ -85,10 +89,10 @@ func pricesJSON(p market.TokenPrices, blank bool) contributionPrices {
 	}
 	return out
 }
-func changesJSON(c market.Changes, pending []string) contributionChanges {
+func changesJSON(c market.Changes, pending []string, blanks ...map[string][]string) contributionChanges {
 	out := contributionChanges{Suppliers: append([]market.Change[market.Supplier]{}, c.Suppliers...), Groups: append([]market.Change[market.Group]{}, c.Groups...), Addresses: append([]market.Change[market.Address]{}, c.Addresses...), Models: append([]market.Change[market.GroupModel]{}, c.Models...), GroupAddresses: append([]market.GroupAddressSet{}, c.GroupAddresses...), Governance: append([]market.Change[market.ModelRule]{}, c.Governance...), Quotes: []contributionQuote{}}
 	for _, q := range c.Quotes {
-		blank := slices.Contains(pending, q.GroupModelID)
+		blank := len(blanks) == 0 && slices.Contains(pending, q.GroupModelID)
 		v := contributionQuote{ID: q.ID, GroupModelID: q.GroupModelID, Version: q.Version, Currency: q.Currency, BillingUnit: q.BillingUnit, Prices: pricesJSON(q.Prices, blank), Tiers: []contributionTier{}, UnitPrices: []contributionUnit{}, CreatedAt: q.CreatedAt}
 		for _, t := range q.Tiers {
 			v.Tiers = append(v.Tiers, contributionTier{Name: t.Name, Conditions: t.Conditions, Prices: pricesJSON(t.Prices, false)})
@@ -96,12 +100,15 @@ func changesJSON(c market.Changes, pending []string) contributionChanges {
 		for _, u := range q.UnitPrices {
 			v.UnitPrices = append(v.UnitPrices, contributionUnit{Unit: u.Unit, Tool: u.Tool, ImageSize: u.ImageSize, ImageQuality: u.ImageQuality, ImageBackground: u.ImageBackground, ServiceTier: u.ServiceTier, Price: u.Price.String()})
 		}
+		if len(blanks) > 0 {
+			maskQuoteBlanks(&v, blanks[0][q.GroupModelID])
+		}
 		out.Quotes = append(out.Quotes, v)
 	}
 	return out
 }
 func draftJSON(d contribution.Draft) contributionDraft {
-	return contributionDraft{ID: d.ID, OwnerID: d.OwnerID, Title: d.Title, Kind: d.Kind, TargetID: d.TargetID, State: d.State, Revision: d.Revision, Changes: changesJSON(d.Changes, d.PendingPrices), Base: changesJSON(d.Base, nil), ReportIDs: append([]string{}, d.ReportIDs...), TaskIDs: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return contributionDraft{ID: d.ID, OwnerID: d.OwnerID, Title: d.Title, Kind: d.Kind, TargetID: d.TargetID, State: d.State, Revision: d.Revision, Changes: changesJSON(d.Changes, d.PendingPrices, d.PriceBlanks), Base: changesJSON(d.Base, nil), ReportIDs: append([]string{}, d.ReportIDs...), TaskIDs: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 func (c contributionChanges) domain() (market.Changes, []string, error) {
 	out := market.Changes{Suppliers: c.Suppliers, Groups: c.Groups, Addresses: c.Addresses, GroupAddresses: c.GroupAddresses, Models: c.Models, Governance: c.Governance, Quotes: []market.Quote{}}
@@ -182,4 +189,76 @@ func (c contributionChanges) domain() (market.Changes, []string, error) {
 		}
 	}
 	return out, declared, nil
+}
+
+// Price presence belongs to the private proposal. Persisting it separately
+// preserves an explicit zero and each unfinished cell across draft saves.
+func (c contributionChanges) priceBlanks() map[string][]string {
+	out := map[string][]string{}
+	for _, q := range c.Quotes {
+		paths := []string{}
+		prices := func(prefix string, p contributionPrices) {
+			for _, v := range []struct{ key, raw string }{{"input", p.Input}, {"output", p.Output}, {"cache_write", p.CacheWrite}, {"cache_read", p.CacheRead}} {
+				if v.raw == "" {
+					paths = append(paths, prefix+"/"+v.key)
+				}
+			}
+			for k, v := range p.Details {
+				if v == "" {
+					paths = append(paths, prefix+"/details/"+strings.ReplaceAll(strings.ReplaceAll(k, "~", "~0"), "/", "~1"))
+				}
+			}
+		}
+		prices("/prices", q.Prices)
+		for i, t := range q.Tiers {
+			prices("/tiers/"+strconv.Itoa(i)+"/prices", t.Prices)
+		}
+		for i, u := range q.UnitPrices {
+			if u.Price == "" {
+				paths = append(paths, "/unit_prices/"+strconv.Itoa(i)+"/price")
+			}
+		}
+		out[q.GroupModelID] = paths
+	}
+	return out
+}
+func maskQuoteBlanks(q *contributionQuote, paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	data, _ := json.Marshal(q)
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var root any
+	if decoder.Decode(&root) != nil {
+		return
+	}
+	for _, path := range paths {
+		parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+		node := root
+		for i, part := range parts {
+			part = strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
+			switch v := node.(type) {
+			case map[string]any:
+				if i == len(parts)-1 {
+					if _, ok := v[part]; ok {
+						v[part] = ""
+					}
+				} else {
+					node = v[part]
+				}
+			case []any:
+				index, err := strconv.Atoi(part)
+				if err != nil || index < 0 || index >= len(v) {
+					node = nil
+					continue
+				}
+				node = v[index]
+			default:
+				node = nil
+			}
+		}
+	}
+	data, _ = json.Marshal(root)
+	_ = json.Unmarshal(data, q)
 }

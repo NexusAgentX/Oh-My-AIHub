@@ -296,11 +296,15 @@ func main() {
 	}
 	defer reviewPool.Close()
 	reviewMarket := marketpg.NewStore(reviewPool)
+	reviewStore := contributionpg.NewStore(reviewPool)
+	if err = reviewStore.SyncPublications(reviewStartup); err != nil {
+		fatal(logger, "waiting for market publication recovery fence failed", err)
+	}
 	marketRuntime := contribution.NewRuntime(reviewMarket, nil)
 	if err = marketRuntime.Refresh(reviewStartup); err != nil {
 		fatal(logger, "loading approved market failed", err)
 	}
-	contributions := &contribution.Service{Store: contributionpg.NewStore(reviewPool), Live: reviewMarket, Planner: registry, Publisher: marketRuntime, Outbound: outboundPolicy}
+	contributions := &contribution.Service{Store: reviewStore, Live: reviewMarket, Planner: registry, Publisher: marketRuntime, Outbound: outboundPolicy}
 	if err = contributions.Recover(reviewStartup); err != nil {
 		fatal(logger, "recovering committed market publications failed", err)
 	}

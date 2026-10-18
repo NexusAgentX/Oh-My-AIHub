@@ -27,24 +27,25 @@ type Actor struct {
 	Admin bool
 }
 type Draft struct {
-	ID            string         `json:"id"`
-	OwnerID       string         `json:"owner_id"`
-	Title         string         `json:"title"`
-	Kind          string         `json:"kind"`
-	TargetID      string         `json:"target_id"`
-	State         string         `json:"state"`
-	Revision      int64          `json:"revision"`
-	Changes       market.Changes `json:"changes"`
-	Base          market.Changes `json:"base"`
-	ReportIDs     []string       `json:"report_ids"`
-	TaskIDs       []string       `json:"task_ids"`
-	PendingPrices []string       `json:"pending_prices"`
-	ReviewReason  string         `json:"review_reason"`
-	ReviewedBy    *string        `json:"reviewed_by"`
-	SubmittedAt   *time.Time     `json:"submitted_at"`
-	PublishedAt   *time.Time     `json:"published_at"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	ID            string              `json:"id"`
+	OwnerID       string              `json:"owner_id"`
+	Title         string              `json:"title"`
+	Kind          string              `json:"kind"`
+	TargetID      string              `json:"target_id"`
+	State         string              `json:"state"`
+	Revision      int64               `json:"revision"`
+	Changes       market.Changes      `json:"changes"`
+	Base          market.Changes      `json:"base"`
+	ReportIDs     []string            `json:"report_ids"`
+	TaskIDs       []string            `json:"task_ids"`
+	PriceBlanks   map[string][]string `json:"price_blanks"`
+	PendingPrices []string            `json:"pending_prices"`
+	ReviewReason  string              `json:"review_reason"`
+	ReviewedBy    *string             `json:"reviewed_by"`
+	SubmittedAt   *time.Time          `json:"submitted_at"`
+	PublishedAt   *time.Time          `json:"published_at"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
 }
 type Cursor struct {
 	At time.Time

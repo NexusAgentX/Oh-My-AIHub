@@ -7,6 +7,7 @@ info:
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
+- {name: contributions, description: 私有市场贡献、完整报告审核与治理}
 - {name: detection, description: 上游能力检测、报告与搜索设置}
 - {name: forum, description: 登录成员论坛与私密工单}
 - {name: instance, description: 实例与健康检查}

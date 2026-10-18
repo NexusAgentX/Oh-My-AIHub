@@ -10,6 +10,45 @@ import (
 	"time"
 )
 
+const activeDetectionBindings = `-- name: ActiveDetectionBindings :many
+SELECT b.target_kind,b.target_id,b.target_revision,b.capability_digest
+FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
+WHERE t.id=ANY($1::uuid[]) AND t.state IN ('queued','running')
+ AND t.metadata->>'execution_active'='true'
+`
+
+type ActiveDetectionBindingsRow struct {
+	TargetKind       string `json:"target_kind"`
+	TargetID         string `json:"target_id"`
+	TargetRevision   int64  `json:"target_revision"`
+	CapabilityDigest string `json:"capability_digest"`
+}
+
+func (q *Queries) ActiveDetectionBindings(ctx context.Context, taskIds []string) ([]ActiveDetectionBindingsRow, error) {
+	rows, err := q.db.Query(ctx, activeDetectionBindings, taskIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActiveDetectionBindingsRow
+	for rows.Next() {
+		var i ActiveDetectionBindingsRow
+		if err := rows.Scan(
+			&i.TargetKind,
+			&i.TargetID,
+			&i.TargetRevision,
+			&i.CapabilityDigest,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const approvedReportReferences = `-- name: ApprovedReportReferences :many
 SELECT DISTINCT ON (b.target_id) b.id FROM market_report_bindings b
 JOIN market_capability_evidence e ON e.report_id=b.id
@@ -39,7 +78,7 @@ func (q *Queries) ApprovedReportReferences(ctx context.Context, targetIds []stri
 }
 
 const getContribution = `-- name: GetContribution :one
-SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1
+SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1
 `
 
 func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContribution, error) {
@@ -57,6 +96,7 @@ func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContrib
 		&i.BaseDocument,
 		&i.ReportIds,
 		&i.TaskIds,
+		&i.PriceBlanks,
 		&i.PendingPrices,
 		&i.ReviewReason,
 		&i.ReviewedBy,
@@ -69,8 +109,8 @@ func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContrib
 }
 
 const insertContribution = `-- name: InsertContribution :exec
-INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,report_ids,task_ids,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,report_ids,task_ids,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at,price_blanks)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 `
 
 type InsertContributionParams struct {
@@ -92,6 +132,7 @@ type InsertContributionParams struct {
 	PublishedAt   *time.Time `json:"published_at"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	PriceBlanks   []byte     `json:"price_blanks"`
 }
 
 func (q *Queries) InsertContribution(ctx context.Context, arg InsertContributionParams) error {
@@ -114,6 +155,7 @@ func (q *Queries) InsertContribution(ctx context.Context, arg InsertContribution
 		arg.PublishedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.PriceBlanks,
 	)
 	return err
 }
@@ -189,7 +231,7 @@ func (q *Queries) ListContributions(ctx context.Context, arg ListContributionsPa
 }
 
 const lockContribution = `-- name: LockContribution :one
-SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1 FOR UPDATE
+SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockContribution(ctx context.Context, id string) (MarketContribution, error) {
@@ -207,6 +249,7 @@ func (q *Queries) LockContribution(ctx context.Context, id string) (MarketContri
 		&i.BaseDocument,
 		&i.ReportIds,
 		&i.TaskIds,
+		&i.PriceBlanks,
 		&i.PendingPrices,
 		&i.ReviewReason,
 		&i.ReviewedBy,
@@ -236,8 +279,8 @@ func (q *Queries) PublishEvidence(ctx context.Context, arg PublishEvidenceParams
 }
 
 const updateContribution = `-- name: UpdateContribution :execrows
-UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,report_ids=$7,task_ids=$8,review_reason=$9,reviewed_by=$10,submitted_at=$11,published_at=$12,updated_at=$13,pending_prices=$14
-WHERE id=$1 AND revision=$15
+UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,report_ids=$7,task_ids=$8,review_reason=$9,reviewed_by=$10,submitted_at=$11,published_at=$12,updated_at=$13,pending_prices=$14,price_blanks=$15
+WHERE id=$1 AND revision=$16
 `
 
 type UpdateContributionParams struct {
@@ -255,6 +298,7 @@ type UpdateContributionParams struct {
 	PublishedAt   *time.Time `json:"published_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	PendingPrices []string   `json:"pending_prices"`
+	PriceBlanks   []byte     `json:"price_blanks"`
 	BaseRevision  int64      `json:"base_revision"`
 }
 
@@ -274,6 +318,7 @@ func (q *Queries) UpdateContribution(ctx context.Context, arg UpdateContribution
 		arg.PublishedAt,
 		arg.UpdatedAt,
 		arg.PendingPrices,
+		arg.PriceBlanks,
 		arg.BaseRevision,
 	)
 	if err != nil {

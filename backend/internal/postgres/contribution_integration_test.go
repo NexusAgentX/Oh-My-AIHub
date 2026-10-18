@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
@@ -197,7 +199,61 @@ func TestContributionPrivateBundleNegativeReviewAndAtomicRetry(t *testing.T) {
 	}
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM market_quotes`).Scan(&quotes); err != nil || quotes != 2 {
 		t.Fatal("concurrent review produced duplicate version", quotes, err)
+	} // Delete through the full review path with real financial/Key rows and an
+	// attached channel. The config cascade must preserve protected history.
+	channelID := marketID(t)
+	sealed, err := upstreamKeyringOf(t, "v1", "v1").Encrypt(channelID, 1, "synthetic-only")
+	if err != nil {
+		t.Fatal(err)
 	}
+	if _, err = pool.Exec(ctx, `INSERT INTO channels(id,owner_id,name,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,market_group_id,status,suspended_reason) VALUES($1,$2,'合成渠道','https://synthetic.example',$3,$4,$5,$6,'suspended','合成暂停')`, channelID, owner.ID, sealed.Ciphertext, sealed.Nonce, sealed.KeyID, live.Groups[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Ledger.Adjust(ctx, ledger.Adjustment{ActorID: admin.ID, AccountID: owner.ID, Amount: mustAmount(t, "25"), Reason: "合成保全样本", IdempotencyKey: "contribution-preserve"}); err != nil {
+		t.Fatal(err)
+	}
+	keys := apikey.NewService(s.Keys, upstreamKeyringOf(t, "v1", "v1"), func(context.Context) ([]string, error) { return nil, nil })
+	if _, _, err = keys.Create(ctx, owner.ID, apikey.CreateInput{Name: "合成平台Key", Settings: apikey.Settings{Status: apikey.StatusEnabled}}); err != nil {
+		t.Fatal(err)
+	}
+	beforeProtected := marketProtectedRows(t, pool)
+	removal, err := service.New(ctx, owner, contribution.NewInput{Kind: "group", TargetID: live.Groups[0].ID, Action: "delete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, err := service.Detail(ctx, reviewer, removal.ID)
+	if err != nil || detail.LinkedChannels != 1 {
+		t.Fatal("cascade impact absent", detail.LinkedChannels, err)
+	}
+	removal, err = service.Submit(ctx, owner, removal.ID, removal.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Approve(ctx, reviewer, removal.ID, removal.Revision, "合成删除审核"); err != nil {
+		t.Fatal(err)
+	}
+	removal, err = service.New(ctx, owner, contribution.NewInput{Kind: "supplier", TargetID: live.Suppliers[0].ID, Action: "delete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removal, err = service.Submit(ctx, owner, removal.ID, removal.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Approve(ctx, reviewer, removal.ID, removal.Revision, ""); err != nil {
+		t.Fatal(err)
+	}
+	var deleted bool
+	if err = pool.QueryRow(ctx, `SELECT deleted_at IS NOT NULL AND status='unlisted' AND suspended_reason IS NULL FROM channels WHERE id=$1`, channelID).Scan(&deleted); err != nil || !deleted {
+		t.Fatal("review did not cascade channel business deletion", err)
+	}
+	if after := marketProtectedRows(t, pool); after != beforeProtected {
+		t.Fatal("review deletion changed protected history, balances, accounts or Keys")
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM market_quotes`).Scan(&quotes); err != nil || quotes != 2 {
+		t.Fatal("historical quotes lost during deletion", quotes, err)
+	}
+
 }
 func TestContributionModelGovernanceNeedsAdminAndPreservesExactID(t *testing.T) {
 	_, s := isolatedDatabase(t)
@@ -224,5 +280,32 @@ func TestContributionModelGovernanceNeedsAdminAndPreservesExactID(t *testing.T) 
 	live := marketSnapshot(t, s)
 	if len(live.Governance) != 1 || live.Governance[0].ModelID != input.TargetID || !live.Governance[0].Disabled || len(live.Models) != 0 {
 		t.Fatal("governance created catalog or changed ID", live)
+	}
+}
+
+func TestContributionRecoveryFenceWaitsForEarlierTransaction(t *testing.T) {
+	pool, s := isolatedDatabase(t)
+	ctx := context.Background()
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(4704367245194902356)`); err != nil {
+		t.Fatal(err)
+	}
+	waiting, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	err = s.Contributions.SyncPublications(waiting)
+	cancel()
+	if err == nil {
+		t.Fatal("boot passed an outstanding publication")
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	released, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	if err = s.Contributions.SyncPublications(released); err != nil {
+		t.Fatal("publication fence leaked after transaction", err)
 	}
 }

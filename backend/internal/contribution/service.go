@@ -33,7 +33,7 @@ func (s *Service) List(ctx context.Context, actor Actor, queue bool, cursor *Cur
 	}
 	return s.Store.List(ctx, actor, queue, cursor, limit)
 }
-func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, reports []string, declaredPrices []string) (Draft, error) {
+func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, reports []string, declaredPrices []string, blanks ...map[string][]string) (Draft, error) {
 	if title == "" || utf8.RuneCountInString(title) > 128 || len(reports) > 1024 {
 		return Draft{}, ErrInvalid
 	}
@@ -67,8 +67,18 @@ func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int
 		draft.Title = title
 		draft.Changes = changes
 		draft.ReportIDs = append([]string{}, reports...)
+		priorBlanks := draft.PriceBlanks
+		draft.PriceBlanks = map[string][]string{}
 		draft.PendingPrices = []string{}
 		for _, quote := range changes.Quotes {
+			if len(blanks) > 0 {
+				draft.PriceBlanks[quote.GroupModelID] = slices.Clone(blanks[0][quote.GroupModelID])
+			} else if !slices.Contains(declaredPrices, quote.GroupModelID) {
+				draft.PriceBlanks[quote.GroupModelID] = slices.Clone(priorBlanks[quote.GroupModelID])
+				if len(draft.PriceBlanks[quote.GroupModelID]) == 0 {
+					draft.PriceBlanks[quote.GroupModelID] = defaultPriceBlanks()
+				}
+			}
 			if !slices.Contains(declaredPrices, quote.GroupModelID) {
 				draft.PendingPrices = append(draft.PendingPrices, quote.GroupModelID)
 			}
@@ -420,4 +430,8 @@ func (s *Service) Recover(ctx context.Context) error {
 		last := items[len(items)-1]
 		cursor = &Cursor{At: last.CreatedAt, ID: last.ID}
 	}
+}
+
+func defaultPriceBlanks() []string {
+	return []string{"/prices/input", "/prices/output", "/prices/cache_write", "/prices/cache_read"}
 }

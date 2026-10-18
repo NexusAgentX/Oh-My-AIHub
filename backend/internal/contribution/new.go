@@ -212,6 +212,7 @@ func (s *Service) New(ctx context.Context, actor Actor, input NewInput) (Draft, 
 	}
 	draft.Base = base
 	draft.PendingPrices = []string{}
+	draft.PriceBlanks = map[string][]string{}
 	for _, quote := range c.Quotes {
 		known := false
 		for _, prior := range base.Quotes {
@@ -219,6 +220,7 @@ func (s *Service) New(ctx context.Context, actor Actor, input NewInput) (Draft, 
 		}
 		if !known {
 			draft.PendingPrices = append(draft.PendingPrices, quote.GroupModelID)
+			draft.PriceBlanks[quote.GroupModelID] = defaultPriceBlanks()
 		}
 	}
 	if err = s.Store.Create(ctx, draft); err != nil {
@@ -328,6 +330,10 @@ func (s *Service) AddChild(ctx context.Context, actor Actor, id string, revision
 			modelID, err = addModel(&draft.Changes, parentID, modelType)
 			if err == nil {
 				draft.PendingPrices = append(draft.PendingPrices, modelID)
+				if draft.PriceBlanks == nil {
+					draft.PriceBlanks = map[string][]string{}
+				}
+				draft.PriceBlanks[modelID] = defaultPriceBlanks()
 			}
 		case "address":
 			supplierID := ""
