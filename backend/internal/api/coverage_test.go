@@ -19,6 +19,7 @@ import (
 // coverageExceptions 是门禁的显式例外清单：operation（“METHOD /path”，与规范一致）到不在本包验证的原因。
 // 新增例外必须写明原因；例外被覆盖或不再存在于规范时门禁同样失败，保证清单只会变短。
 var coverageExceptions = map[string]string{
+	"POST /api/detection/mcp":                "原生 JSON-RPC 合成回调而非应用 JSON REST 响应；detection 的真实 HTTP 回归校验临时令牌、初始化/列表/工具结果/撤销，api 校验无 Origin、Cookie 与平台 Key 不能取得探针",
 	"POST /v1/chat/completions":              gatewayPassthrough,
 	"POST /v1/responses":                     gatewayPassthrough,
 	"GET /v1/responses/{responseID}":         gatewayPassthrough,

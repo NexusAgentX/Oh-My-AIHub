@@ -2103,6 +2103,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/detection/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 检测任务专用合成 MCP 回调
+         * @description 只接受活跃检测任务的随机临时 Bearer 令牌；提供固定只读合成工具及 Streamable HTTP JSON-RPC 初始化/列表/调用。不接受平台 Key、会话 Cookie、资源 URL、文件或任意工具；未配置或无有效令牌返回404。无正文持久化。
+         */
+        post: operations["detectionMCPFixture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2440,6 +2460,142 @@ export interface components {
             context: components["schemas"]["DetectionSearchSettings"];
             max_output: components["schemas"]["DetectionSearchSettings"];
         };
+        DetectionImageVariant: {
+            /** @enum {string} */
+            unit: "" | "request" | "successful_image";
+            size: string;
+            quality: string;
+            background: string;
+            service_tier: string;
+        };
+        DetectionTestProfile: {
+            service_tiers: string[] | null;
+            images: components["schemas"]["DetectionImageVariant"][] | null;
+        };
+        DetectionImageProperties: {
+            width: number;
+            height: number;
+            /** @enum {string} */
+            format: "png" | "jpeg";
+            transparent: boolean;
+        };
+        DetectionImageEvidence: {
+            variant: components["schemas"]["DetectionImageVariant"];
+            /** @enum {string} */
+            transport: "json" | "json_url" | "multipart" | "sse";
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive" | "unobserved";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            /** @constant */
+            requested: 1;
+            returned: number;
+            verified: number;
+            products: components["schemas"]["DetectionImageProperties"][];
+            options_confirmed: boolean;
+            mask_preserved: boolean;
+            usage_reliable: boolean;
+            unpriced_tokens: boolean;
+            attempt_ids: string[];
+        };
+        DetectionSettingEvidence: {
+            /** @enum {string} */
+            kind: "cache" | "service_tier";
+            configured: string;
+            wire: string;
+            actual: string;
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            accepted: boolean;
+            usage_reliable: boolean;
+            /** Format: int64 */
+            cache_write_tokens: number;
+            /** Format: int64 */
+            cache_read_tokens: number;
+            attempt_ids: string[];
+        };
+        DetectionCapacityProbe: {
+            accepted: boolean;
+            semantic: boolean;
+            actual: number | null;
+            input_overhead: number | null;
+            length_error: boolean;
+            failure_upper: number | null;
+            approximate: boolean;
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            attempt_ids: string[];
+            requested_approximate: boolean;
+        };
+        DetectionCapacityStep: {
+            /** Format: int64 */
+            requested: number;
+            round: number;
+            recheck: number;
+            accepted: boolean;
+            semantic: boolean;
+            actual: number | null;
+            input_overhead: number | null;
+            length_error: boolean;
+            failure_upper: number | null;
+            approximate: boolean;
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            attempt_ids: string[];
+            requested_approximate: boolean;
+        };
+        DetectionCapacityReport: {
+            /** @enum {string} */
+            kind: "context" | "max_output";
+            /** @enum {string} */
+            unit: "tokens";
+            declared: number | null;
+            settings: components["schemas"]["DetectionSearchSettings"];
+            parameter_accepted_lower: number | null;
+            parameter_rejected_upper: number | null;
+            verified_lower: number | null;
+            proven_failure_upper: number | null;
+            completed: boolean;
+            /** @enum {string} */
+            stop: "rounds" | "precision" | "cancelled" | "non_monotonic" | "configured_bound" | "unconfirmed";
+            steps: components["schemas"]["DetectionCapacityStep"][];
+        };
+        DetectionFingerprintDiagnostic: {
+            index: number;
+            /** Format: int64 */
+            parsed_numbers: number;
+            /** Format: int64 */
+            minimum_numbers: number;
+            accepted: boolean;
+            /** Format: int64 */
+            raw_out_of_range_count: number;
+        };
+        DetectionFingerprintRanking: {
+            model: string;
+            display_name: string;
+            family: string;
+            family_name: string;
+            score: number;
+            probability: number | null;
+        };
+        DetectionFingerprintReport: {
+            version: string;
+            commit: string;
+            detector_sha256: string;
+            reference_sha256: string;
+            base_sha256: string;
+            reference_built_at: string;
+            calibration_sha256: string;
+            /** @enum {string} */
+            decision: "unscorable" | "ranked";
+            used_outputs: number;
+            diagnostics: components["schemas"]["DetectionFingerprintDiagnostic"][];
+            /** @enum {string} */
+            probability_scope: "unavailable" | "reference-closed-set";
+            results: components["schemas"]["DetectionFingerprintRanking"][];
+        };
         DetectionTarget: {
             /** Format: uuid */
             group_id: string;
@@ -2453,6 +2609,11 @@ export interface components {
              * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
              */
             draft_id?: string;
+            /** Format: int64 */
+            context_window?: number;
+            /** Format: int64 */
+            max_output_tokens?: number;
+            profile: components["schemas"]["DetectionTestProfile"];
         };
         DetectionUsage: {
             http: number;
@@ -2482,6 +2643,8 @@ export interface components {
             response_received: boolean;
             /** Format: date-time */
             at: string;
+            /** @description 本次实际入口，仅执行追溯；不是能力/目录/指纹维度，不参与完整性与路由筛选 */
+            entry_url?: string;
         };
         DetectionAssertion: {
             id: string;
@@ -2490,6 +2653,14 @@ export interface components {
             /** @enum {string} */
             reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
             attempt_ids: string[];
+        };
+        DetectionQuotaEvidence: {
+            /** @enum {string} */
+            header: "x-ratelimit-remaining-requests" | "x-ratelimit-remaining-tokens" | "anthropic-ratelimit-requests-remaining" | "anthropic-ratelimit-input-tokens-remaining" | "anthropic-ratelimit-output-tokens-remaining" | "anthropic-ratelimit-tokens-remaining";
+            /** Format: int64 */
+            remaining: number;
+            /** Format: uuid */
+            attempt_id: string;
         };
         DetectionResult: {
             /** Format: uuid */
@@ -2513,6 +2684,12 @@ export interface components {
             started_at: string;
             /** Format: date-time */
             finished_at: string;
+            capacity?: components["schemas"]["DetectionCapacityReport"][];
+            fingerprint?: components["schemas"]["DetectionFingerprintReport"];
+            images?: components["schemas"]["DetectionImageEvidence"][];
+            settings?: components["schemas"]["DetectionSettingEvidence"][];
+            /** @description 仅凭据所有者/管理员诊断；不是公开分组能力或模型价格，不据此推断金额余额。 */
+            quotas?: components["schemas"]["DetectionQuotaEvidence"][];
         };
         DetectionPlanned: {
             credential_dependent: boolean;
@@ -9355,6 +9532,69 @@ export interface operations {
         responses: {
             /** @description 原生响应（含流式）与原生错误。 */
             default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    detectionMCPFixture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description JSON-RPC 合成响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description 初始化通知已接收 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 不属于固定合成协议 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 无活跃探针或令牌无效 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 请求超过16KiB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 单探针回调请求保护 */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

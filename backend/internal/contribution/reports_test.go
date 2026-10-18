@@ -99,3 +99,37 @@ func TestPriceRevisionReusesCompatibleEvidenceButChangedHeadersAndInterruptedRep
 		t.Fatal("interrupted report counted as complete", err)
 	}
 }
+
+func TestNewlyEnabledPricingTierRequiresNewSelectorEvidence(t *testing.T) {
+	live, targets, err := Overlay(starterDraft(), market.Directory{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &memoryReview{reports: map[string]detection.Job{}}
+	for i, target := range targets {
+		id := []string{"group-report", "model-report"}[i]
+		repo.reports[id] = negativeReport(target, id)
+	}
+	quote := live.Quotes[0]
+	quote.ID = "quote-with-new-tier"
+	quote.Tiers = []market.Tier{{Conditions: market.Conditions{ServiceTier: "openai:fast"}, Prices: quote.Prices}}
+	draft := Draft{OwnerID: "member", Changes: market.Changes{Models: []market.Change[market.GroupModel]{{BaseRevision: 1, Value: live.Models[0]}}, Quotes: []market.Quote{quote}}, ReportIDs: []string{"group-report", "model-report"}}
+	evaluation, err := Evaluate(context.Background(), Actor{ID: "member"}, draft, live, repo, reportPlanner{})
+	if err != nil || evaluation.Ready {
+		t.Fatal("old default-tier report authorized a new enabled tier", err)
+	}
+	_, updated, err := Overlay(draft, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range updated {
+		if target.Binding.TargetKind == "group_model" {
+			repo.reports["new-tier-report"] = negativeReport(target, "new-tier-report")
+		}
+	}
+	draft.ReportIDs = append(draft.ReportIDs, "new-tier-report")
+	evaluation, err = Evaluate(context.Background(), Actor{ID: "member"}, draft, live, repo, reportPlanner{})
+	if err != nil || !evaluation.Ready {
+		t.Fatal("fresh complete negative selector evidence did not qualify", err)
+	}
+}

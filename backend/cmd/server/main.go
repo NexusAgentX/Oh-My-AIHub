@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -261,8 +262,9 @@ func main() {
 	}()
 
 	// Detector state/queries use two private connections; saturation cannot
-	// consume gateway/settlement pool slots. No protocol suites are registered
-	// until their implementations land, so current plans remain suite_pending.
+	// consume gateway/settlement pool slots. Missing protocol suites remain in
+	// the full plan; implemented scenarios can execute without authorizing an
+	// incomplete creation report.
 	detectorStartup, cancelDetectorStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	defer cancelDetectorStartup()
 	detectorPool, err := database.OpenLimited(detectorStartup, databaseURL, 2)
@@ -286,6 +288,33 @@ func main() {
 	registry, err := detection.NewRegistry(manifest)
 	if err != nil {
 		fatal(logger, "loading detection registry failed", err)
+	}
+	if err = registry.RegisterNative(); err != nil {
+		fatal(logger, "registering native detection suites failed", err)
+	}
+	var mcpFixture *detection.MCPFixture
+	if origin := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_PUBLIC_ORIGIN")); origin != "" {
+		mcpFixture, err = detection.NewMCPFixture(origin)
+		if err != nil {
+			fatal(logger, "invalid detection callback origin", err)
+		}
+	}
+	if err = registry.RegisterMCP(mcpFixture); err != nil {
+		fatal(logger, "registering MCP detection failed", err)
+	}
+	sdkBinary := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_SDK_BINARY"))
+	if sdkBinary == "" {
+		executable, executableErr := os.Executable()
+		if executableErr != nil {
+			fatal(logger, "locating SDK detection artifact failed", executableErr)
+		}
+		sdkBinary = filepath.Join(filepath.Dir(executable), "aihub-detection-sdk")
+	}
+	sdkStartup, cancelSDKStartup := context.WithTimeout(context.Background(), 15*time.Second)
+	err = registry.RegisterSDK(sdkStartup, sdkBinary)
+	cancelSDKStartup()
+	if err != nil {
+		fatal(logger, "validating SDK detection artifact failed", err)
 	}
 	// Review transactions and directory rebuilds use two separate connections;
 	// no long review transaction holds a gateway or detector pool slot.
@@ -327,6 +356,7 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
+			DetectionMCP:  mcpFixture,
 			Contributions: contributions,
 			Detection:     detector,
 			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},

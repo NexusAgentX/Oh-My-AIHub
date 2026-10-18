@@ -3,7 +3,7 @@ openapi: 3.1.0
 info:
   title: Oh-My-AIHub API
   version: 0.7.0-dev
-  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；论坛列表使用页码分页（page / limit → items / total / page / limit）；其余列表使用游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
+  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；论坛列表使用页码分页（page / limit → items / total / page / limit）；其余列表使用游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin；任务临时令牌认证的固定 /api/detection/mcp 回调除外。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
@@ -5030,6 +5030,61 @@ paths:
       - {geminiQueryKey: []}
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
+  /api/detection/mcp:
+    {
+      "post": {
+        "operationId": "detectionMCPFixture",
+        "summary": "检测任务专用合成 MCP 回调",
+        "description": "只接受活跃检测任务的随机临时 Bearer 令牌；提供固定只读合成工具及 Streamable HTTP JSON-RPC 初始化/列表/调用。不接受平台 Key、会话 Cookie、资源 URL、文件或任意工具；未配置或无有效令牌返回404。无正文持久化。",
+        "tags": [
+          "Detection"
+        ],
+        "security": [],
+        "x-access": "public",
+        "x-feature": "493",
+        "x-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC 合成响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "初始化通知已接收"
+          },
+          "400": {
+            "description": "不属于固定合成协议"
+          },
+          "404": {
+            "description": "无活跃探针或令牌无效"
+          },
+          "413": {
+            "description": "请求超过16KiB"
+          },
+          "429": {
+            "description": "单探针回调请求保护"
+          }
+        }
+      }
+    }
+
 components:
   securitySchemes:
     sessionCookie: {type: apiKey, in: cookie, name: oma_session, description: 登录后由服务端设置的 HttpOnly 会话 Cookie。}
@@ -6997,6 +7052,814 @@ components:
         ],
         "additionalProperties": false
       }
+    DetectionImageVariant:
+      {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "enum": [
+              "",
+              "request",
+              "successful_image"
+            ]
+          },
+          "size": {
+            "type": "string"
+          },
+          "quality": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "service_tier": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "size",
+          "quality",
+          "background",
+          "service_tier"
+        ],
+        "additionalProperties": false
+      }
+    DetectionTestProfile:
+      {
+        "type": "object",
+        "properties": {
+          "service_tiers": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 144
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DetectionImageVariant"
+                },
+                "maxItems": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service_tiers",
+          "images"
+        ],
+        "additionalProperties": false
+      }
+    DetectionImageProperties:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg"
+            ]
+          },
+          "transparent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "format",
+          "transparent"
+        ]
+      }
+    DetectionImageEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "variant": {
+            "$ref": "#/components/schemas/DetectionImageVariant"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "json",
+              "json_url",
+              "multipart",
+              "sse"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive",
+              "unobserved"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "requested": {
+            "type": "integer",
+            "const": 1
+          },
+          "returned": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "verified": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32
+          },
+          "products": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/DetectionImageProperties"
+            }
+          },
+          "options_confirmed": {
+            "type": "boolean"
+          },
+          "mask_preserved": {
+            "type": "boolean"
+          },
+          "usage_reliable": {
+            "type": "boolean"
+          },
+          "unpriced_tokens": {
+            "type": "boolean"
+          },
+          "attempt_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "variant",
+          "transport",
+          "state",
+          "reason",
+          "requested",
+          "returned",
+          "verified",
+          "products",
+          "options_confirmed",
+          "mask_preserved",
+          "usage_reliable",
+          "unpriced_tokens",
+          "attempt_ids"
+        ]
+      }
+    DetectionSettingEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cache",
+              "service_tier"
+            ]
+          },
+          "configured": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "wire": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "actual": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "usage_reliable": {
+            "type": "boolean"
+          },
+          "cache_write_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "attempt_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "configured",
+          "wire",
+          "actual",
+          "state",
+          "reason",
+          "accepted",
+          "usage_reliable",
+          "cache_write_tokens",
+          "cache_read_tokens",
+          "attempt_ids"
+        ]
+      }
+    DetectionCapacityProbe:
+      {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "semantic": {
+            "type": "boolean"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_overhead": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "length_error": {
+            "type": "boolean"
+          },
+          "failure_upper": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approximate": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "attempt_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 16
+          },
+          "requested_approximate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted",
+          "semantic",
+          "actual",
+          "input_overhead",
+          "length_error",
+          "failure_upper",
+          "approximate",
+          "reason",
+          "attempt_ids",
+          "requested_approximate"
+        ],
+        "additionalProperties": false
+      }
+    DetectionCapacityStep:
+      {
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "recheck": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "semantic": {
+            "type": "boolean"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_overhead": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "length_error": {
+            "type": "boolean"
+          },
+          "failure_upper": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approximate": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "attempt_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 16
+          },
+          "requested_approximate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requested",
+          "round",
+          "recheck",
+          "accepted",
+          "semantic",
+          "actual",
+          "input_overhead",
+          "length_error",
+          "failure_upper",
+          "approximate",
+          "reason",
+          "attempt_ids",
+          "requested_approximate"
+        ],
+        "additionalProperties": false
+      }
+    DetectionCapacityReport:
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "context",
+              "max_output"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "tokens"
+            ]
+          },
+          "declared": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DetectionSearchSettings"
+          },
+          "parameter_accepted_lower": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameter_rejected_upper": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verified_lower": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proven_failure_upper": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "stop": {
+            "type": "string",
+            "enum": [
+              "rounds",
+              "precision",
+              "cancelled",
+              "non_monotonic",
+              "configured_bound",
+              "unconfirmed"
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionCapacityStep"
+            },
+            "maxItems": 2304
+          }
+        },
+        "required": [
+          "kind",
+          "unit",
+          "declared",
+          "settings",
+          "parameter_accepted_lower",
+          "parameter_rejected_upper",
+          "verified_lower",
+          "proven_failure_upper",
+          "completed",
+          "stop",
+          "steps"
+        ],
+        "additionalProperties": false
+      }
+    DetectionFingerprintDiagnostic:
+      {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "parsed_numbers": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "minimum_numbers": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "raw_out_of_range_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "index",
+          "parsed_numbers",
+          "minimum_numbers",
+          "accepted",
+          "raw_out_of_range_count"
+        ],
+        "additionalProperties": false
+      }
+    DetectionFingerprintRanking:
+      {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "family_name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "model",
+          "display_name",
+          "family",
+          "family_name",
+          "score",
+          "probability"
+        ],
+        "additionalProperties": false
+      }
+    DetectionFingerprintReport:
+      {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "detector_sha256": {
+            "type": "string"
+          },
+          "reference_sha256": {
+            "type": "string"
+          },
+          "base_sha256": {
+            "type": "string"
+          },
+          "reference_built_at": {
+            "type": "string"
+          },
+          "calibration_sha256": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "unscorable",
+              "ranked"
+            ]
+          },
+          "used_outputs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionFingerprintDiagnostic"
+            },
+            "maxItems": 3
+          },
+          "probability_scope": {
+            "type": "string",
+            "enum": [
+              "unavailable",
+              "reference-closed-set"
+            ]
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionFingerprintRanking"
+            },
+            "maxItems": 60
+          }
+        },
+        "required": [
+          "version",
+          "commit",
+          "detector_sha256",
+          "reference_sha256",
+          "base_sha256",
+          "reference_built_at",
+          "calibration_sha256",
+          "decision",
+          "used_outputs",
+          "diagnostics",
+          "probability_scope",
+          "results"
+        ],
+        "additionalProperties": false
+      }
     DetectionTarget:
       {
         "type": "object",
@@ -7027,6 +7890,19 @@ components:
             "type": "string",
             "format": "uuid",
             "description": "私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置"
+          },
+          "context_window": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "profile": {
+            "$ref": "#/components/schemas/DetectionTestProfile"
           }
         },
         "required": [
@@ -7034,7 +7910,8 @@ components:
           "binding",
           "model_type",
           "model",
-          "service_tier"
+          "service_tier",
+          "profile"
         ],
         "additionalProperties": false
       }
@@ -7166,6 +8043,11 @@ components:
           "at": {
             "type": "string",
             "format": "date-time"
+          },
+          "entry_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "本次实际入口，仅执行追溯；不是能力/目录/指纹维度，不参与完整性与路由筛选"
           }
         },
         "required": [
@@ -7241,10 +8123,58 @@ components:
         ],
         "additionalProperties": false
       }
+    DetectionQuotaEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "header",
+          "remaining",
+          "attempt_id"
+        ],
+        "properties": {
+          "header": {
+            "type": "string",
+            "enum": [
+              "x-ratelimit-remaining-requests",
+              "x-ratelimit-remaining-tokens",
+              "anthropic-ratelimit-requests-remaining",
+              "anthropic-ratelimit-input-tokens-remaining",
+              "anthropic-ratelimit-output-tokens-remaining",
+              "anthropic-ratelimit-tokens-remaining"
+            ]
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+
     DetectionResult:
       {
         "type": "object",
-        "properties": {"source_task_id":{"type": "string", "format": "uuid"},"source_report_id":{"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+        "properties": {
+          "source_task_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_report_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -7323,9 +8253,43 @@ components:
           "finished_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "capacity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionCapacityReport"
+            },
+            "maxItems": 2
+          },
+          "fingerprint": {
+            "$ref": "#/components/schemas/DetectionFingerprintReport"
+          },
+          "images": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/components/schemas/DetectionImageEvidence"
+            }
+          },
+          "settings": {
+            "type": "array",
+            "maxItems": 152,
+            "items": {
+              "$ref": "#/components/schemas/DetectionSettingEvidence"
+            }
+          },
+          "quotas": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/components/schemas/DetectionQuotaEvidence"
+            },
+            "description": "仅凭据所有者/管理员诊断；不是公开分组能力或模型价格，不据此推断金额余额。"
           }
         },
-        "required": ["source_task_id","source_report_id",
+        "required": [
+          "source_task_id",
+          "source_report_id",
           "id",
           "scenario_id",
           "state",
@@ -11805,7 +12769,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.5",
+    "version": "2026-10-18.18",
     "stage": "discovery",
     "sources": [
       {
@@ -11847,6 +12811,96 @@ x-aihub-gateway-contract:
         "id": "codex",
         "url": "https://github.com/openai/codex/tree/83086188ae0614bd882818ff1aa23f3194962012/codex-rs",
         "version": "0.163.0 / 83086188ae0614bd882818ff1aa23f3194962012"
+      },
+      {
+        "id": "aihub-synthetic-fixtures",
+        "url": "https://github.com/NexusAgentX/Oh-My-AIHub/tree/fd4b33dd945b0197e03a27dd2f7d681b8a508faf/backend/internal/detection/fixtures",
+        "version": "fd4b33dd945b0197e03a27dd2f7d681b8a508faf"
+      },
+      {
+        "id": "openai-file-inputs",
+        "url": "https://developers.openai.com/api/docs/guides/file-inputs",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "anthropic-citations",
+        "url": "https://platform.claude.com/docs/en/build-with-claude/citations",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-chat-audio",
+        "url": "https://developers.openai.com/api/docs/guides/audio-chat-completions",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "gemini-generate-content-audio",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/speech-generation",
+        "version": "GenerateContent-v1beta-profile-2026-10-18"
+      },
+      {
+        "id": "openai-image-generation",
+        "url": "https://developers.openai.com/api/reference/resources/images/methods/generate",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-image-edit",
+        "url": "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-image-variation",
+        "url": "https://developers.openai.com/api/reference/python/resources/images/methods/create_variation",
+        "version": "retired-native-compatibility-profile"
+      },
+      {
+        "id": "anthropic-on-demand-compaction",
+        "url": "https://platform.claude.com/docs/en/build-with-claude/compaction-on-demand",
+        "version": "compact-2026-09-04"
+      },
+      {
+        "id": "anthropic-service-tier",
+        "url": "https://platform.claude.com/docs/en/api/service-tiers",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "gemini-service-tier",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/priority-inference",
+        "version": "GenerateContent-v1beta-2026-10-18"
+      },
+      {
+        "id": "gemini-caching",
+        "url": "https://ai.google.dev/api/caching",
+        "version": "GenerateContent-v1beta-2026-10-18"
+      },
+      {
+        "id": "gemini-continuation",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/long-decode",
+        "version": "GenerateContent-v1beta-2026-10-18"
+      },
+      {
+        "id": "anthropic-go-sdk",
+        "url": "https://github.com/anthropics/anthropic-sdk-go/tree/v1.82.0",
+        "version": "v1.82.0"
+      },
+      {
+        "id": "google-genai-go-sdk",
+        "url": "https://github.com/googleapis/go-genai/tree/v1.75.0",
+        "version": "v1.75.0"
+      },
+      {
+        "id": "openai-mcp-profile",
+        "url": "https://developers.openai.com/api/docs/guides/tools-connectors-mcp",
+        "version": "2026-10-18-native-approval-profile"
+      },
+      {
+        "id": "anthropic-mcp-profile",
+        "url": "https://platform.claude.com/docs/en/agents-and-tools/mcp-connector",
+        "version": "mcp-client-2025-11-20"
+      },
+      {
+        "id": "mcp-streamable-profile",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports",
+        "version": "2025-06-18-json"
       }
     ],
     "endpoints": [
@@ -12874,6 +13928,19 @@ x-aihub-gateway-contract:
         "replay": "read",
         "feature": "F8",
         "auth": "platform_key"
+      },
+      {
+        "id": "models.gemini.v1.list",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1/models",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
       }
     ],
     "suites": [
@@ -12942,7 +14009,6 @@ x-aihub-gateway-contract:
             "assertions": [
               "text_lifecycle",
               "tool_lifecycle_when_applicable",
-              "reasoning_lifecycle_when_applicable",
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
             ],
@@ -12972,11 +14038,18 @@ x-aihub-gateway-contract:
               "required",
               "named_tool",
               "call_result_association",
-              "strict_schema_when_native",
-              "parallel_native_control",
-              "custom_allowed_namespace_when_native"
+              "strict_schema",
+              "parallel_tool_calls_false",
+              "parallel_tool_calls_true",
+              "multiple_calls_and_results_when_observed",
+              "allowed_tools",
+              "custom_tool",
+              "custom_tool_round_trip"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "openai-chat-completions.tools/a10"
+            ]
           },
           {
             "id": "openai-chat-completions.multi",
@@ -13011,12 +14084,15 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_current_output_controls",
-              "json_object_when_native",
-              "strict_schema_when_native",
-              "nested_enum_required",
-              "stop_or_length_control",
-              "representative_current_sampling_effort_verbosity"
+              "json_object",
+              "json_schema_strict",
+              "schema_nested_enum_required",
+              "max_completion_tokens",
+              "controlled_length_termination",
+              "stop",
+              "temperature",
+              "top_p",
+              "reasoning_effort"
             ],
             "credential_dependent": false
           },
@@ -13066,8 +14142,6 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "native_inline_content_recognition",
-              "native_url_when_supported",
-              "citations_when_native",
               "no_external_file_id_authorization"
             ],
             "credential_dependent": false
@@ -13107,7 +14181,7 @@ x-aihub-gateway-contract:
               "create_store_true",
               "owned_list_get_metadata_messages_delete",
               "bounded_pagination",
-              "no_repeat_inference_fee"
+              "queries_do_not_recount_inference_usage"
             ],
             "credential_dependent": false
           },
@@ -13158,7 +14232,8 @@ x-aihub-gateway-contract:
           {
             "id": "openai-chat-completions.errors",
             "endpoints": [
-              "chat.create"
+              "chat.create",
+              "models.openai.list"
             ],
             "source_ids": [
               "R01",
@@ -13178,7 +14253,10 @@ x-aihub-gateway-contract:
               "native_error_structure",
               "natural_service_errors_observed_only"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "conditional_assertions": [
+              "openai-chat-completions.errors/a5"
+            ]
           },
           {
             "id": "openai-chat-completions.catalog",
@@ -13194,6 +14272,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "openai-chat-completions.quota",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "openai-chat-completions.quota/a1",
+              "openai-chat-completions.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -13243,12 +14339,13 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_current_output_controls",
-              "json_object_when_native",
-              "strict_schema_when_native",
-              "nested_enum_required",
-              "stop_or_length_control",
-              "representative_current_sampling_effort_verbosity"
+              "json_object",
+              "json_schema_strict",
+              "schema_nested_enum_required",
+              "max_output_tokens",
+              "controlled_length_termination",
+              "reasoning.effort",
+              "text.verbosity"
             ],
             "credential_dependent": false
           },
@@ -13305,7 +14402,10 @@ x-aihub-gateway-contract:
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "openai-responses.stream/a3"
+            ]
           },
           {
             "id": "openai-responses.tools",
@@ -13332,11 +14432,20 @@ x-aihub-gateway-contract:
               "required",
               "named_tool",
               "call_result_association",
-              "strict_schema_when_native",
-              "parallel_native_control",
-              "custom_allowed_namespace_when_native"
+              "strict_schema",
+              "parallel_tool_calls_false",
+              "parallel_tool_calls_true",
+              "multiple_calls_and_results_when_observed",
+              "allowed_tools",
+              "custom_tool",
+              "custom_tool_round_trip",
+              "namespace",
+              "namespace_round_trip"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "openai-responses.tools/a10"
+            ]
           },
           {
             "id": "openai-responses.state",
@@ -13369,7 +14478,11 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "previous_response_id_three_turns",
-              "conversation_item_reference",
+              "conversation_flow",
+              "item_reference",
+              "conversation_metadata",
+              "owned_item_list_get_delete",
+              "owned_response_retrieve_input_items_delete",
               "store_false_self_contained_replay",
               "unknown_reference_rejected",
               "conflicting_references_rejected"
@@ -13379,7 +14492,8 @@ x-aihub-gateway-contract:
           {
             "id": "openai-responses.context",
             "endpoints": [
-              "responses.create"
+              "responses.create",
+              "responses.count"
             ],
             "source_ids": [
               "C08"
@@ -13408,9 +14522,12 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "openai-responses.reasoning/a2"
+            ]
           },
           {
             "id": "openai-responses.vision",
@@ -13444,7 +14561,10 @@ x-aihub-gateway-contract:
               "citations_when_native",
               "no_external_file_id_authorization"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "openai-responses.document/a3"
+            ]
           },
           {
             "id": "openai-responses.audio",
@@ -13456,8 +14576,7 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_inline_input_when_applicable",
-              "native_output_when_applicable",
+              "vendor_extension.input_audio",
               "actual_content_and_usage"
             ],
             "credential_dependent": false
@@ -13555,8 +14674,10 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "background_create",
-              "owned_retrieve_resume_cancel_delete_input_items",
+              "owned_retrieve_input_items_delete",
+              "resume_from_sequence",
               "terminal_usage_once",
+              "owned_cancel",
               "cleanup_only_owned_resources"
             ],
             "credential_dependent": false
@@ -13565,7 +14686,8 @@ x-aihub-gateway-contract:
             "id": "openai-responses.count_compact",
             "endpoints": [
               "responses.count",
-              "responses.compact"
+              "responses.compact",
+              "responses.create"
             ],
             "source_ids": [
               "A08"
@@ -13595,7 +14717,8 @@ x-aihub-gateway-contract:
           {
             "id": "openai-responses.length_search",
             "endpoints": [
-              "responses.create"
+              "responses.create",
+              "responses.count"
             ],
             "source_ids": [],
             "conditional_source_ids": [],
@@ -13605,6 +14728,21 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ],
+            "credential_dependent": false
+          },
+          {
+            "id": "openai-responses.cache_tier",
+            "endpoints": [
+              "responses.create"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "assertions": [
+              "cache_options_acceptance",
+              "immediate_real_write_read_usage",
+              "each_enabled_service_tier_actual_return",
+              "no_wait_for_expiration"
             ],
             "credential_dependent": false
           }
@@ -13626,7 +14764,8 @@ x-aihub-gateway-contract:
           {
             "id": "openai-responses.errors",
             "endpoints": [
-              "responses.create"
+              "responses.create",
+              "models.openai.list"
             ],
             "source_ids": [
               "R08",
@@ -13647,7 +14786,10 @@ x-aihub-gateway-contract:
               "native_error_structure",
               "natural_service_errors_observed_only"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "conditional_assertions": [
+              "openai-responses.errors/a5"
+            ]
           },
           {
             "id": "openai-responses.catalog",
@@ -13663,6 +14805,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "openai-responses.quota",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "openai-responses.quota/a1",
+              "openai-responses.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -13727,7 +14887,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-messages.context",
             "endpoints": [
-              "messages.create"
+              "messages.create",
+              "messages.count"
             ],
             "source_ids": [
               "A-O09"
@@ -13771,7 +14932,10 @@ x-aihub-gateway-contract:
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-messages.stream/a3"
+            ]
           },
           {
             "id": "native-messages.tools",
@@ -13797,11 +14961,15 @@ x-aihub-gateway-contract:
               "required",
               "named_tool",
               "call_result_association",
-              "strict_schema_when_native",
-              "parallel_native_control",
-              "custom_allowed_namespace_when_native"
+              "strict_schema",
+              "parallel_tool_calls_false",
+              "parallel_tool_calls_true",
+              "multiple_calls_and_results_when_observed"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-messages.tools/a10"
+            ]
           },
           {
             "id": "native-messages.server_tools",
@@ -13835,9 +15003,12 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-messages.reasoning/a2"
+            ]
           },
           {
             "id": "native-messages.output",
@@ -13850,12 +15021,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_current_output_controls",
-              "json_object_when_native",
-              "strict_schema_when_native",
-              "nested_enum_required",
-              "stop_or_length_control",
-              "representative_current_sampling_effort_verbosity"
+              "output_config.format",
+              "schema_nested_enum_required",
+              "stop_sequences"
             ],
             "credential_dependent": false
           },
@@ -13916,7 +15084,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-messages.count_compact",
             "endpoints": [
-              "messages.count"
+              "messages.count",
+              "messages.create"
             ],
             "source_ids": [
               "A-M08"
@@ -13978,7 +15147,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-messages.length_search",
             "endpoints": [
-              "messages.create"
+              "messages.create",
+              "messages.count"
             ],
             "source_ids": [],
             "conditional_source_ids": [],
@@ -14008,7 +15178,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-messages.errors",
             "endpoints": [
-              "messages.create"
+              "messages.create",
+              "models.anthropic.list"
             ],
             "source_ids": [
               "A-E01",
@@ -14028,7 +15199,10 @@ x-aihub-gateway-contract:
               "native_error_structure",
               "natural_service_errors_observed_only"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "conditional_assertions": [
+              "native-messages.errors/a5"
+            ]
           },
           {
             "id": "native-messages.catalog",
@@ -14044,6 +15218,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "native-messages.quota",
+            "endpoints": [
+              "models.anthropic.list",
+              "models.anthropic.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "native-messages.quota/a1",
+              "native-messages.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -14107,7 +15299,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-generate-content.multi",
             "endpoints": [
-              "gemini.generateContent"
+              "gemini.generateContent",
+              "gemini.streamGenerateContent"
             ],
             "source_ids": [
               "G-O10",
@@ -14124,7 +15317,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-generate-content.stream",
             "endpoints": [
-              "gemini.generateContent"
+              "gemini.generateContent",
+              "gemini.streamGenerateContent"
             ],
             "source_ids": [
               "G-S01",
@@ -14148,7 +15342,10 @@ x-aihub-gateway-contract:
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-generate-content.stream/a3"
+            ]
           },
           {
             "id": "native-generate-content.tools",
@@ -14176,11 +15373,16 @@ x-aihub-gateway-contract:
               "required",
               "named_tool",
               "call_result_association",
-              "strict_schema_when_native",
-              "parallel_native_control",
-              "custom_allowed_namespace_when_native"
+              "VALIDATED",
+              "allowedFunctionNames",
+              "function_call_id_echo_when_present",
+              "multiple_calls_and_results_when_observed"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-generate-content.tools/a9",
+              "native-generate-content.tools/a10"
+            ]
           },
           {
             "id": "native-generate-content.server_echo",
@@ -14215,9 +15417,12 @@ x-aihub-gateway-contract:
               "native_current_configuration",
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
-              "no_source_stickiness"
+              "self_contained_replay_without_resource_reference"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-generate-content.reasoning/a2"
+            ]
           },
           {
             "id": "native-generate-content.output",
@@ -14232,12 +15437,15 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_current_output_controls",
-              "json_object_when_native",
-              "strict_schema_when_native",
-              "nested_enum_required",
-              "stop_or_length_control",
-              "representative_current_sampling_effort_verbosity"
+              "responseMimeType",
+              "responseJsonSchema",
+              "schema_nested_enum_required",
+              "maxOutputTokens",
+              "controlled_length_termination",
+              "stopSequences",
+              "temperature",
+              "topP",
+              "topK"
             ],
             "credential_dependent": false
           },
@@ -14285,7 +15493,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "native_inline_or_url_content_recognition",
+              "inline_video_content_recognition",
+              "url_video_content_recognition",
               "no_files_upload"
             ],
             "credential_dependent": false
@@ -14305,7 +15514,10 @@ x-aihub-gateway-contract:
               "citations_when_native",
               "no_external_file_id_authorization"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-generate-content.document/a3"
+            ]
           },
           {
             "id": "native-generate-content.image_tool",
@@ -14383,7 +15595,10 @@ x-aihub-gateway-contract:
               "native_safety_configuration",
               "feedback_only_if_observed"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "conditional_assertions": [
+              "native-generate-content.safety/a2"
+            ]
           },
           {
             "id": "native-generate-content.cache_tier",
@@ -14400,15 +15615,17 @@ x-aihub-gateway-contract:
             "source_ids": [
               "G-C04",
               "G-C05",
-              "G-C06",
-              "G-C08"
+              "G-C06"
             ],
             "conditional_source_ids": [],
             "assertions": [
               "cache_options_acceptance",
               "immediate_real_write_read_usage",
               "each_enabled_service_tier_actual_return",
-              "no_wait_for_expiration"
+              "no_wait_for_expiration",
+              "owned_explicit_cache_lifecycle",
+              "cached_content_generate_and_stream_usage",
+              "native_cached_token_count"
             ],
             "credential_dependent": false
           },
@@ -14443,7 +15660,8 @@ x-aihub-gateway-contract:
           {
             "id": "native-generate-content.length_search",
             "endpoints": [
-              "gemini.generateContent"
+              "gemini.generateContent",
+              "gemini.countTokens"
             ],
             "source_ids": [],
             "conditional_source_ids": [],
@@ -14453,6 +15671,23 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
+            ],
+            "credential_dependent": false
+          },
+          {
+            "id": "native-generate-content.continuation",
+            "endpoints": [
+              "gemini.generateContent",
+              "gemini.streamGenerateContent"
+            ],
+            "source_ids": [
+              "G-C08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "native_continuation_signal",
+              "original_contents_and_opaque_token_replay",
+              "per_hop_usage_no_duplication"
             ],
             "credential_dependent": false
           }
@@ -14474,12 +15709,11 @@ x-aihub-gateway-contract:
           {
             "id": "native-generate-content.errors",
             "endpoints": [
-              "gemini.generateContent"
+              "gemini.generateContent",
+              "models.gemini.list"
             ],
             "source_ids": [
-              "G-B08",
               "G-B09",
-              "G-C09",
               "G-E01",
               "G-E02",
               "G-E03",
@@ -14497,7 +15731,10 @@ x-aihub-gateway-contract:
               "native_error_structure",
               "natural_service_errors_observed_only"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "conditional_assertions": [
+              "native-generate-content.errors/a5"
+            ]
           },
           {
             "id": "native-generate-content.catalog",
@@ -14505,12 +15742,48 @@ x-aihub-gateway-contract:
               "models.gemini.list",
               "models.gemini.get"
             ],
-            "source_ids": [],
+            "source_ids": [
+              "G-C09"
+            ],
             "conditional_source_ids": [],
             "assertions": [
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
+            ],
+            "credential_dependent": true
+          },
+          {
+            "id": "native-generate-content.quota",
+            "endpoints": [
+              "models.gemini.list",
+              "models.gemini.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "native-generate-content.quota/a1",
+              "native-generate-content.quota/a2"
+            ]
+          },
+          {
+            "id": "native-generate-content.versions",
+            "endpoints": [
+              "models.gemini.list",
+              "models.gemini.v1.list"
+            ],
+            "source_ids": [
+              "G-B08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "v1beta_native_directory",
+              "v1_native_directory"
             ],
             "credential_dependent": true
           }
@@ -14537,7 +15810,8 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_sse_lifecycle"
             ],
             "credential_dependent": true
           },
@@ -14553,7 +15827,11 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_sse_lifecycle",
+              "native_multipart",
+              "inline_url_mask_multiple_images",
+              "masked_edit_preserves_unmasked_region"
             ],
             "credential_dependent": false
           },
@@ -14569,7 +15847,8 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_multipart"
             ],
             "credential_dependent": false
           }
@@ -15173,6 +16452,25 @@ x-aihub-gateway-contract:
       "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
       "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。",
       "codex-special/context-wire-mapping": "只处理固定CLI的context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。不递归改input/opaque item id、window/item引用、notes路径、正文或密文，不改current_agent_name。只在Codex上下文协议启用，未知扩展原样保留；重复标识/头拒绝，空值可选metadata保留。解压/映射/模型替换后由F8正确重建编码与长度。",
-      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。"
+      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。",
+      "detection/native-evidence": "F4 按原生协议逐项验证结构、语义与可靠用量；真实长度与参数接受独立，搜索额外计数请求纳入实际消耗。SSE 使用原生流式端点，计数/压缩场景允许调用对应原生生成端点验证完整窗口续用。指纹固定 lmfpd 0.0.1792242250521 / 50a364bc686279094265f34f18f5501eac1d73f4，三条完整样本、离线 Go 等价评分，只保存库内相对排名，不证明身份。",
+      "detection/native-applicability": "保留每个原始 ID 的场景归属，将通用模板断言细化为实际原生字段。Messages 不虚构 json_object/custom/namespace；Gemini 使用 allowedFunctionNames、VALIDATED、parametersJsonSchema 和 responseJsonSchema，不加入旧 responseSchema 专项；Chat SSE 不虚构原生推理事件。OpenAI custom、allowed_tools 及 Responses namespace 分别验证，temperature/top_p/effort/verbosity 分开投影。缺少偶发多调用或可选 thinking/签名事件只按明确条件断言记录未观测，不代替主动适用检测。",
+      "detection/group-negative-prerequisite": "分组基础负例先复用同一凭据/协议的有界模型目录，从实际返回的模型 ID 构造合法基础体，再分别执行无效/缺失鉴权、随机未知模型和无效 JSON。模型元数据仅作请求构造和元数据结构证据，不提升为容量支持；Gemini 多候选额外使用其原生流式端点。",
+      "detection/native-multimodal-fixtures": "多模态探测仅使用固定提交和 SHA-256 校验的自有合成资源，URL 使用无答案提示的文件名。图片以左右色块及双图次序核验；PDF 以两页独立代码核验。Chat 官方协议不支持文件 URL，故其 M06 只测原生 file_data；不虚构 file_url 或转入 Files API。Messages PDF citations 启用后核验 document_index 与 1 起始、右端不含的页范围及真实引用；其他协议可选引用只在观测时验证，不补独立文件授权。",
+      "openai-responses/M04": "保留原 M04 作为明确命名的供应商扩展 input_audio/data/format 探测，不伪称 OpenAI Responses 官方音频协议。官方文档当前将这种音频会话形态放在 Chat Completions，Responses 创建参考中也没有 input_audio/output_audio。按扩展实际返回/内容识别/用量如实报告，不用 Chat 成功代证 Responses，不新增独立 Audio、Realtime 或 WS 端点，不做协议转换。",
+      "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
+      "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。",
+      "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
+      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
+      "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
+      "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
+      "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
+      "detection/cache-tier-facts": "缓存接受、即时写/读计数与服务档位独立保存。OpenAI in_memory/24h、Messages 5m/1h 分别真实写读，不等待到期；短期未命中只记未确认，不虚构不支持或保持时长。Gemini 显式缓存只操作当前创建资源，真实生成/流式/计数后删除。每个启用档位各发有意义请求，不与所有功能全排列；Anthropic priority 用原生 auto 请求，standard 用 standard_only，实际 usage 可降到 standard，不能把 auto 接受冒充 priority。Gemini 从原生 usageMetadata.serviceTier/合法实际返档头核验；相互矛盾或缺失留未知。只保留固定/配置选择器、白名单实际档位及数值，不保存任意上游字符串或缓存正文。G-C08 continuationToken 续用另需独立实现，不能由缓存通过代证。",
+      "gemini/G-C08": "continuationToken 独立场景，不能由显式缓存通过代证。复用真实 JSON 控制长度请求，在原生候选返回 MAX_TOKENS/CONTINUATION 与 token 时保持原 contents 不变、完整携带 opaque token 并单调增加总输出上限，验证一次真实后续 hop/逐次 usage；不追加先前输出，不把 SDK 自动累计再相加。未出现 token 记无法确认，不假造 token、不换成文档示例模型，也不为触发每 hop 32K/64K 阈值另开耐久/吞吐长跑。只保存断言/数值及真实尝试元数据，不保存 token 或正文。",
+      "detection/fixed-sdk": "Messages/GenerateContent 各使用一个固定官方 Go SDK 版本真实构造、发送并解析基础请求；SDK本身不放入网关server进程。单独应用制品 aihub-detection-sdk 在 fresh HOME/显式环境的受控子进程中运行，避免 Google SDK 无条件读取宿主环境/ADC。子进程只持一次性回环桥令牌与占位Key，真实测试Key始终留在 Session.Do 固定出站中。桥限制为当前模型/已登记单个原生端点及一次请求，关闭SDK重试/自动续用，短答响应限256KiB，正文/SDK原始错误不入报告。启动核验SDK实际构建版本和制品SHA，版本加入计划CodeVersion；缺制品不注册相应套件，保留待实现而非冒充检测完成。两SDK直接依赖仅由独立worker使用：Anthropic MIT、Google Apache-2.0；SDK的资源/WS类型不表示网关开放这些范围外接口。",
+      "detection/builtins": "调用内工具固定为 Responses web_search/code_interpreter/image_generation，Messages web_search_20250305/code_execution_20250825，GenerateContent googleSearch/urlContext/codeExecution/IMAGE及GOOGLE_SEARCH_WEB、URL_CONTEXT原生ToolCall/ToolResponse整块回放。只有实际工具块、关联结果、可核验语义/产物支持能力；auto未调用为未知，缺代码执行计费回执不从container_id猜费用。不下载工具输出文件，不开放容器/工具资源CRUD。",
+      "detection/mcp": "远端MCP仅使用本应用固定合成fixture v1（JSON Streamable HTTP 2025-06-18/2025-03-26）：每任务随机临时Bearer令牌，固定空参数只读工具返回未写入提示的随机marker，须同时有实际回调与上游原生结果。Responses测试always审批请求及明确批准后执行，Messages固定mcp-client-2025-11-20和mcp_toolset精确allowlist。AIHUB_DETECTION_PUBLIC_ORIGIN配置本应用公网HTTPS origin；缺配置保持MCP套件pending，不减全测分母。回调不接收平台Key/宿主认证/文件/任意URL，不持久化正文，单探针64请求/4工具调用、16活跃探针、请求16KiB均为局部资源保护。",
+      "detection/version-quota": "GenerateContent分组分别验证v1与v1beta原生模型目录，独立子断言，不由一版本推导另一版本；G-C09元数据归目录场景。余额/配额原生适配范围为已固定六种OpenAI/Anthropic剩余量header；共享真实目录请求，字段缺失为条件未观测，数字错误独立失败，不等待重置、不诱发额度耗尽。固定原生推理Key契约没有统一金额余额入口：明确记录未暴露，不发送组织/管理员管理API、不猜余额、不试任意中转站私有路径；供应商私有金额余额适配需先固定真实接口/认证契约。数值只在所有者/管理员报告中，不投影到公开市场/路由画像。",
+      "detection/capability-projection": "Project只接受完整封存且目标/能力摘要/manifest/实现/参数/凭据范围匹配的真实报告，按独立断言与证明层级投影。partial/unknown/unobserved不能当支持；金额/地址/自然年龄不使证据失效。上下文只投影有精确实际计量步骤支撑的已验证下界，不用声明/参数接受/硬上界/指纹猜容量或身份。后台构建纯内存投影，热路径无新增I/O。"
     }
   }

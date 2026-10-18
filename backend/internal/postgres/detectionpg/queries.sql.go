@@ -11,7 +11,7 @@ import (
 )
 
 const findAttempts = `-- name: FindAttempts :many
-SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at FROM detection_attempts WHERE task_id=$1 AND id=ANY($2::uuid[]) ORDER BY created_at,id
+SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at, entry_url FROM detection_attempts WHERE task_id=$1 AND id=ANY($2::uuid[]) ORDER BY created_at,id
 `
 
 type FindAttemptsParams struct {
@@ -41,6 +41,7 @@ func (q *Queries) FindAttempts(ctx context.Context, arg FindAttemptsParams) ([]D
 			&i.Sent,
 			&i.ResponseReceived,
 			&i.CreatedAt,
+			&i.EntryUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -148,7 +149,7 @@ func (q *Queries) InsertArtifact(ctx context.Context, arg InsertArtifactParams) 
 }
 
 const insertAttempt = `-- name: InsertAttempt :exec
-INSERT INTO detection_attempts(id,task_id,endpoint_id,method,path_template,status,reason,category,duration_ms,sent,response_received,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+INSERT INTO detection_attempts(id,task_id,endpoint_id,method,path_template,status,reason,category,duration_ms,sent,response_received,created_at,entry_url) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 `
 
 type InsertAttemptParams struct {
@@ -164,6 +165,7 @@ type InsertAttemptParams struct {
 	Sent             bool
 	ResponseReceived bool
 	CreatedAt        time.Time
+	EntryUrl         string
 }
 
 func (q *Queries) InsertAttempt(ctx context.Context, arg InsertAttemptParams) error {
@@ -180,6 +182,7 @@ func (q *Queries) InsertAttempt(ctx context.Context, arg InsertAttemptParams) er
 		arg.Sent,
 		arg.ResponseReceived,
 		arg.CreatedAt,
+		arg.EntryUrl,
 	)
 	return err
 }
@@ -499,7 +502,7 @@ func (q *Queries) LockSearchSetting(ctx context.Context, dollar_1 *string) error
 }
 
 const pageAttempts = `-- name: PageAttempts :many
-SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at FROM detection_attempts WHERE task_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4
+SELECT id, task_id, endpoint_id, method, path_template, status, reason, category, duration_ms, sent, response_received, created_at, entry_url FROM detection_attempts WHERE task_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4
 `
 
 type PageAttemptsParams struct {
@@ -536,6 +539,7 @@ func (q *Queries) PageAttempts(ctx context.Context, arg PageAttemptsParams) ([]D
 			&i.Sent,
 			&i.ResponseReceived,
 			&i.CreatedAt,
+			&i.EntryUrl,
 		); err != nil {
 			return nil, err
 		}

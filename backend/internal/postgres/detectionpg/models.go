@@ -33,6 +33,7 @@ type DetectionAttempt struct {
 	Sent             bool
 	ResponseReceived bool
 	CreatedAt        time.Time
+	EntryUrl         string
 }
 
 type MarketSearchSetting struct {
