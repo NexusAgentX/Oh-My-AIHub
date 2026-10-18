@@ -30,6 +30,12 @@ type Resource struct {
 	AccountID string
 	KeyID     string
 	Binding   Binding
+	// CredentialScope is a protected, stable equality tag for the real upstream
+	// credential within the group. It must not be channel-local: two channels
+	// sharing the same upstream Key share this collision domain. Never return it
+	// to consumers. Codex context ownership has neither this tag nor Binding.
+	CredentialScope string
+	CreationID      string
 }
 
 type Reference struct {
@@ -98,18 +104,56 @@ func ResolveReferences(actor Principal, refs []Reference, lookup Lookup) (*Bindi
 			return nil, ErrNotFound
 		}
 		if contextOnly(ref.Kind) {
-			if match.Binding != (Binding{}) {
+			if match.Binding != (Binding{}) || match.CredentialScope != "" {
 				return nil, ErrConflict
+			}
+			for _, r := range rows {
+				if r.Kind == ref.Kind && r.ID == ref.ID && r.ParentID == ref.ParentID && (r.AccountID != match.AccountID || r.KeyID != match.KeyID) {
+					return nil, ErrAmbiguous
+				}
 			}
 			continue
 		}
 		b := match.Binding
-		if b.GroupID == "" || b.ChannelID == "" || b.CredentialVersion == "" || (selected != nil && *selected != b) {
+		if b.GroupID == "" || b.ChannelID == "" || b.CredentialVersion == "" || match.CredentialScope == "" || match.CreationID == "" || (selected != nil && *selected != b) {
 			return nil, ErrConflict
+		}
+		for _, r := range rows {
+			if sameRemoteID(*match, r) && r != *match {
+				return nil, ErrAmbiguous
+			}
 		}
 		selected = &b
 	}
 	return selected, nil
+}
+
+func sameRemoteID(a, b Resource) bool {
+	return a.Kind == b.Kind && a.ID == b.ID && a.ParentID == b.ParentID && a.Binding.GroupID == b.Binding.GroupID && a.CredentialScope == b.CredentialScope
+}
+
+// CheckRemoteCreation validates an observation from a successful gateway create
+// operation, never a client ownership claim or a shared-account list. The real
+// index must atomically check + persist before exposing the ID; on collision it
+// must retain a quarantine marker so the old owner cannot read overwritten data.
+// Reobserving the exact same creation operation is idempotent.
+func CheckRemoteCreation(actor Principal, observed Resource, collisions []Resource) error {
+	if !actor.Active || actor.AccountID == "" || actor.KeyID == "" {
+		return ErrInactive
+	}
+	if !remoteResource(observed.Kind) || observed.ID == "" || (observed.Kind == "item" && observed.ParentID == "") || observed.AccountID != actor.AccountID || observed.KeyID != actor.KeyID ||
+		observed.Binding.GroupID == "" || observed.Binding.ChannelID == "" || observed.Binding.CredentialVersion == "" || observed.CredentialScope == "" || observed.CreationID == "" {
+		return ErrConflict
+	}
+	if len(collisions) > 16 {
+		return ErrAmbiguous
+	}
+	for _, prior := range collisions {
+		if sameRemoteID(observed, prior) && prior != observed {
+			return ErrAmbiguous
+		}
+	}
+	return nil
 }
 
 // CursorScope binds a server-validated native cursor to its original ACL,

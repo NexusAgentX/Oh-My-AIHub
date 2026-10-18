@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -121,7 +123,7 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 	actor := gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}
 	first := gatewaycontract.Binding{GroupID: "g", ChannelID: "a", CredentialVersion: "original"}
 	rows := []gatewaycontract.Resource{
-		{Kind: "response", ID: "resp-a", AccountID: "a", KeyID: "k", Binding: first},
+		{Kind: "response", ID: "resp-a", AccountID: "a", KeyID: "k", Binding: first, CredentialScope: "upstream-key", CreationID: "creation-a"},
 		{Kind: "codex_note", ID: "session/path", AccountID: "a", KeyID: "k"},
 	}
 	lookup := func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return rows, nil }
@@ -176,5 +178,99 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 		if err != nil || len(got) != 1 || got[0].ChannelID != id {
 			t.Fatal("context source locked routing", got, err)
 		}
+	}
+}
+
+func TestSameGroupEntryFallbackKeepsScopeAndDoesNotReplayUnknownWrites(t *testing.T) {
+	actor := gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}
+	binding := gatewaycontract.Binding{GroupID: "g", ChannelID: "c", CredentialVersion: "v1"}
+	var visits []string // handler calls are sequential; each response is drained.
+	var visitsMu sync.Mutex
+	entry := func(name string, status int) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			visitsMu.Lock()
+			visits = append(visits, name)
+			visitsMu.Unlock()
+			if r.Header.Get("Authorization") != "Bearer synthetic-original-key" {
+				t.Error("fallback changed credential scope")
+			}
+			w.WriteHeader(status)
+			_, _ = io.WriteString(w, `{"id":"resp-owned"}`)
+		}))
+	}
+	first, second := entry("cf", 503), entry("direct", 200)
+	defer first.Close()
+	defer second.Close()
+	lookup := func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) {
+		return []gatewaycontract.Resource{{Kind: "response", ID: "resp-owned", AccountID: "a", KeyID: "k", Binding: binding, CredentialScope: "upstream-key", CreationID: "creation-a"}}, nil
+	}
+	bound, err := gatewaycontract.ResolveReferences(actor, []gatewaycontract.Reference{{Kind: "response", ID: "resp-owned"}}, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := gatewaycontract.Candidate{Binding: binding, Enabled: true, Authorized: true, Callable: true}
+	if _, err := gatewaycontract.Candidates(gatewaycontract.Selection{Bound: bound}, []gatewaycontract.Candidate{candidate}); err != nil {
+		t.Fatal(err)
+	}
+	addresses := []string{first.URL, second.URL}
+	for i, address := range addresses {
+		req, _ := http.NewRequest(http.MethodGet, address+"/v1/responses/resp-owned", nil)
+		req.Header.Set("Authorization", "Bearer synthetic-original-key")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode == 200 {
+			break
+		}
+		if i == len(addresses)-1 || !gatewaycontract.MayReplay(gatewaycontract.Endpoint{Replay: "read"}, true, false, false) {
+			t.Fatal("same-engine read could not use selected fallback")
+		}
+	}
+	visitsMu.Lock()
+	if !slices.Equal(visits, []string{"cf", "direct"}) {
+		t.Error("selected address order changed", visits)
+	}
+	visitsMu.Unlock()
+	if gatewaycontract.MayReplay(gatewaycontract.Endpoint{Replay: "write"}, true, false, false) {
+		t.Fatal("unknown write result may duplicate on fallback")
+	}
+	for _, change := range []string{"rotated", "deleted", "no_addresses"} {
+		next := candidate
+		switch change {
+		case "rotated":
+			next.CredentialVersion = "v2"
+		case "deleted":
+			next.Enabled = false
+		case "no_addresses":
+			next.Callable = false
+		}
+		if _, err := gatewaycontract.Candidates(gatewaycontract.Selection{Bound: bound}, []gatewaycontract.Candidate{next}); err == nil {
+			t.Errorf("%s resource scope silently changed", change)
+		}
+	}
+}
+
+func TestUnregisteredContextCannotBeClaimedByReadingItFirst(t *testing.T) {
+	var reached atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached.Add(1)
+		_, _ = io.WriteString(w, `{"text":"synthetic-other-owner-context"}`)
+	}))
+	defer upstream.Close()
+	for _, actor := range []gatewaycontract.Principal{{AccountID: "a", KeyID: "ka", Active: true}, {AccountID: "b", KeyID: "kb", Active: true}} {
+		bound, err := gatewaycontract.ResolveReferences(actor, []gatewaycontract.Reference{{Kind: "codex_session", ID: "unknown-shared-session"}}, func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return nil, nil })
+		if err == nil {
+			res, err := http.Get(upstream.URL + "/backend-api/codex/alpha/notes/v2/thread_hint")
+			if err == nil {
+				_ = res.Body.Close()
+			}
+			t.Fatal("unregistered shared session acquired an owner", bound)
+		}
+	}
+	if reached.Load() != 0 {
+		t.Fatal("an ownership guess reached shared upstream context")
 	}
 }

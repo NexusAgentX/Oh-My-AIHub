@@ -343,3 +343,47 @@ func TestBackgroundCapacityRestoreAndRelease(t *testing.T) {
 		t.Fatal("restored reservations leaked")
 	}
 }
+
+// F0 discovery evidence reuses the real background path: the normal channel /
+// model store is deliberately absent, as after business deletion. Only retained
+// encrypted metadata may finish the already-registered call. New client reads
+// and cancellation still authenticate the current platform Key.
+func TestRegisteredBackgroundSurvivesRevocationWithOriginalCredentialAndQuote(t *testing.T) {
+	var requests atomic.Int32
+	e, store, job := followupFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.Header.Get("Authorization") != "Bearer synthetic-upstream-key" {
+			t.Error("registered call changed upstream credential")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"resp_followup","status":"completed","usage":{"input_tokens":100,"output_tokens":20}}`)
+	})
+	// Rotation retains v1 for historical snapshots while new encryption uses v2.
+	rotated, err := channel.ParseKeyring("v1="+base64.StdEncoding.EncodeToString(make([]byte, 32))+",v2="+base64.StdEncoding.EncodeToString([]byte(strings.Repeat("2", 32))), "v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Keyring = rotated
+	store.key.Enabled = false
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		w := httptest.NewRecorder()
+		e.ServeResponse(w, followupRequest(t.Context(), method, ""), method == http.MethodPost)
+		if w.Code != http.StatusUnauthorized || requests.Load() != 0 {
+			t.Fatal("revoked Key could issue a new resource operation")
+		}
+	}
+	if err := e.RestoreBackground(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	e.pollBackgroundJob(t.Context(), job)
+	got := store.finished[job.CallID]
+	if requests.Load() != 1 || got.Cost.String() != "0.0002" || got.Bill == nil || !store.jobs[job.CallID].Settled || e.inflight.Count("consumer") != 0 {
+		t.Fatalf("original background quote/credential was lost: requests=%d charge=%s settled=%t", requests.Load(), got.Cost.String(), store.jobs[job.CallID].Settled)
+	}
+	// The store's terminal-state guard, rather than a second inference charge,
+	// remains the settlement boundary if the same terminal fact is observed twice.
+	e.pollBackgroundJob(t.Context(), job)
+	if len(store.finished) != 1 {
+		t.Fatal("duplicate terminal observation charged twice")
+	}
+}

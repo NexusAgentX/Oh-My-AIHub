@@ -3677,6 +3677,21 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    GatewayCapacitySearch:
+      type: object
+      description: F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。
+      additionalProperties: false
+      required: [version, method, low, high, hard_maximum, precision_mode, precision, rounds, rechecks]
+      properties:
+        version: {type: string, minLength: 1, readOnly: true}
+        method: {type: string, enum: [binary, ternary], default: binary}
+        low: {type: integer, format: int64, minimum: 0}
+        high: {type: integer, format: int64, minimum: 1}
+        hard_maximum: {type: integer, format: int64, minimum: 1}
+        precision_mode: {type: string, enum: [absolute, relative]}
+        precision: {type: number, exclusiveMinimum: 0}
+        rounds: {type: integer, minimum: 1}
+        rechecks: {type: integer, minimum: 0}
     ForumAuthor:
       type: object
       additionalProperties: false
@@ -6664,7 +6679,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.1",
+    "version": "2026-10-18.2",
     "stage": "discovery",
     "sources": [
       {
@@ -7320,6 +7335,17 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "text"
         ]
       },
       {
@@ -7337,6 +7363,23 @@ x-aihub-gateway-contract:
         "headers": [
           "x-openai-tool-output-truncation-policy",
           "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7353,6 +7396,23 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "start_line",
+          "stop_line"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7369,6 +7429,23 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "prefix",
+          "max_results",
+          "file_order_by",
+          "file_order"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7386,6 +7463,25 @@ x-aihub-gateway-contract:
         "headers": [
           "x-openai-tool-output-truncation-policy",
           "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query",
+          "path_prefix",
+          "max_matches_per_file",
+          "max_files",
+          "recent_file_first"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7403,6 +7499,23 @@ x-aihub-gateway-contract:
         "headers": [
           "x-openai-tool-output-truncation-policy",
           "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "path",
+          "text"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7419,6 +7532,22 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "recent_first"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7435,6 +7564,27 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "recent_first",
+          "tool_namespace",
+          "role",
+          "tool_name",
+          "window_id",
+          "max_chars_per_item"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7451,6 +7601,26 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "x-openai-tool-output-truncation-policy"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "item_id",
+          "window_id",
+          "offset_chars",
+          "limit_chars"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "item_id",
+          "window_id"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -7468,6 +7638,28 @@ x-aihub-gateway-contract:
         "headers": [
           "x-openai-tool-output-truncation-policy",
           "x-openai-encrypted-tool-arguments:true"
+        ],
+        "fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "agent_name",
+          "limit",
+          "query",
+          "recent_first",
+          "tool_namespace",
+          "role",
+          "tool_name",
+          "window_id"
+        ],
+        "required_fields": [
+          "context.session_id",
+          "context.current_agent_name",
+          "query"
+        ],
+        "return_fields": [
+          "encrypted_output (optional opaque)",
+          "images[].data/mime_type/detail (optional)",
+          "native JSON result (preserve unknown fields)"
         ]
       },
       {
@@ -9597,6 +9789,13 @@ x-aihub-gateway-contract:
       "native-generate-content/G-M04": "保留无需独立 Files 的原生视频输入，独立记录适用形态及内容理解。",
       "native-generate-content/G-M05": "保留无需独立 Files 的原生 PDF/文档输入，核验内容，不能为检测补建上传服务。",
       "native-generate-content/G-M09": "保留模型调用内的具体代码/MCP工具执行及可靠结果，适用工具/授权分别取证；不依赖容器/Files/工具资源 CRUD。",
-      "native-generate-content/G-E08": "部分保留并入真实流完整性/中断记录；独立并发性能、主动断流/超时诱发和长时间耐久测试移出。"
+      "native-generate-content/G-E08": "部分保留并入真实流完整性/中断记录；独立并发性能、主动断流/超时诱发和长时间耐久测试移出。",
+      "gateway/capacity-search": "后台参数契约见 components/schemas/GatewayCapacitySearch；上下文与最大输出分别配置，任务固定版本。无平台累计费用/HTTP/token/图片/工具/总时长硬预算。范围与轮数属于有限算法，前置失败/短回答/外部错误不当长度上界。",
+      "gateway/creation-ownership": "可信创建返回在暴露 ID 前原子登记账号/平台 Key、操作 ID、原 Binding 和受保护的真实凭据等值标签；同组同实际上游 Key 的不同渠道共享原生 ID 碰撞域。碰撞须保留隔离标记，旧归属也不可继续读取可能已被替换的数据。非创建列表/客户端自报 ID 不证明首次归属；子项先核验父级。正式持久化归 F1/F7，检测 fixture 不代替事务索引。",
+      "gateway/pagination": "在服务端过滤未登记/他人资源，重算返回列表的首末 ID/has_more，不透出共享 totals；默认原型每页至多100项、单次最多4页/合计1MiB，空页仍可给继续游标。原生游标以32字节保护密钥的AES-GCM封装，绑定账号/Key/资源/父级/规范化请求摘要；标准资源另绑原 Binding，context 游标不含渠道来源。原生游标至多2048字节，拒绝重复/超长/篡改，正式适配器先限制网络读取并映射原生分页字段。",
+      "codex-special/first-context-ownership": "客户端 session/agent/path/window/item 不是首次归属证明，thread_hint 的 text 也不是所有权声明。未知外部上下文失败关闭，不向共享上游试读再认领；正式 F8 须提供可信的首次会话归属/隔离证明。CLI 合成启用实验只证明扩展已调用，不证明任意共享上游首次归属安全；该前置未就绪不记为供应商 unsupported，不以来源粘性或保存正文补齐。",
+      "codex-special/profiles": "固定0.163.0：内置openai provider及平台身份兼容。history/notes配置 features.token_budget.enabled=true、use_history_notes_extension=true；后台V2另用 features.async_compaction.enabled=true 且 token_budget.enabled=false、use_history_notes_extension=false，要求provider远程压缩能力V2。两配置互斥，不把两开关均true当生效证明。remote_compaction_v2在该版本已是移除的无效开关。",
+      "codex-special/compaction": "V1原生POST codex/responses/compact；V2通过普通codex/responses输入type=compaction_trigger，返回完整type=compaction窗口并续用；后台V2是客户端执行方式，非background=true，不是context_management。固定源码sources/codex，三层证据独立，当前CLI原型未证明压缩实际触发。",
+      "gateway/evidence-layers": "upstream_protocol、gateway_proxy、official_cli分别记录目标、方法/路径、模型/凭据范围摘要、代码/客户端/配置/范围版本及结果；官方CLI+合成后端证据仅official_cli_with_synthetic_backend，不能投影真实供应商能力。client_not_enabled、configuration_error、platform_endpoint_pending、detector_error与真实unsupported分别归类。"
     }
   }

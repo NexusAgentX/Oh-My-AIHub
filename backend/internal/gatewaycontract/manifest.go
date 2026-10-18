@@ -42,6 +42,9 @@ type Endpoint struct {
 	Replay   string   `yaml:"replay"`
 	Source   string   `yaml:"source"`
 	Headers  []string `yaml:"headers,omitempty"`
+	Fields   []string `yaml:"fields,omitempty"`
+	Required []string `yaml:"required_fields,omitempty"`
+	Returns  []string `yaml:"return_fields,omitempty"`
 }
 
 type Suite struct {
@@ -118,7 +121,7 @@ func (m Manifest) Validate() error {
 		if e.Feature != "F7" && e.Feature != "F8" && e.Feature != "F11" {
 			return fmt.Errorf("invalid feature for %s", e.ID)
 		}
-		if e.Auth != "platform_key" && e.Auth != "owner_or_admin" && e.Auth != "identity_decision_pending" {
+		if e.Auth != "platform_key" && e.Auth != "owner_or_admin" {
 			return fmt.Errorf("invalid auth for %s", e.ID)
 		}
 		if e.Scope != "stateless" && e.Scope != "remote_resource" && e.Scope != "context_acl_only" {
@@ -126,6 +129,18 @@ func (m Manifest) Validate() error {
 		}
 		if e.Model == "" || e.Billing == "" || (e.Replay != "read" && e.Replay != "write" && e.Replay != "inference") {
 			return fmt.Errorf("incomplete policy for %s", e.ID)
+		}
+		fields := map[string]bool{}
+		for _, field := range e.Fields {
+			if field == "" || fields[field] {
+				return fmt.Errorf("invalid field for %s", e.ID)
+			}
+			fields[field] = true
+		}
+		for _, field := range e.Required {
+			if !fields[field] {
+				return fmt.Errorf("missing required field %s for %s", field, e.ID)
+			}
 		}
 		endpoints[e.ID] = true
 	}

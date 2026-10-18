@@ -10,11 +10,11 @@ func TestOwnershipAndIndependentReferenceConflicts(t *testing.T) {
 	a := Binding{"group-a", "channel-a", "cred-v1"}
 	b := Binding{"group-b", "channel-b", "cred-v2"}
 	rows := []Resource{
-		{"response", "same-id", "", "account-a", "key-a", a},
-		{"response", "same-id", "", "account-b", "key-b", b},
-		{"conversation", "conv-b", "", "account-a", "key-a", b},
-		{"item", "item-a", "conv-a", "account-a", "key-a", a},
-		{"codex_note", "session/path", "", "account-a", "key-a", Binding{}},
+		{"response", "same-id", "", "account-a", "key-a", a, "upstream-a", "creation-a"},
+		{"response", "same-id", "", "account-b", "key-b", b, "upstream-b", "creation-b"},
+		{"conversation", "conv-b", "", "account-a", "key-a", b, "upstream-b", "creation-c"},
+		{"item", "item-a", "conv-a", "account-a", "key-a", a, "upstream-a", "creation-d"},
+		{"codex_note", "session/path", "", "account-a", "key-a", Binding{}, "", ""},
 	}
 	lookup := func(Reference) ([]Resource, error) { return rows, nil }
 	got, err := ResolveReferences(actor, []Reference{{Kind: "response", ID: "same-id"}}, lookup)
@@ -40,7 +40,7 @@ func TestOwnershipAndIndependentReferenceConflicts(t *testing.T) {
 			}
 		})
 	}
-	rows = append(rows, Resource{"response", "same-id", "", "account-a", "key-a", b})
+	rows = append(rows, Resource{"response", "same-id", "", "account-a", "key-a", b, "upstream-b", "creation-e"})
 	if _, err := ResolveReferences(actor, []Reference{{Kind: "response", ID: "same-id"}}, lookup); !errors.Is(err, ErrAmbiguous) {
 		t.Fatal("ambiguous bare ID routed arbitrarily", err)
 	}
@@ -98,6 +98,63 @@ func TestCursorAndWriteReplayBoundaries(t *testing.T) {
 	} {
 		if got := MayReplay(Endpoint{Replay: tc.policy}, tc.sent, tc.rejected, tc.output); got != tc.want {
 			t.Errorf("%+v got %t", tc, got)
+		}
+	}
+}
+
+func TestCreationCollisionWithSharedCredentialQuarantinesBothOwners(t *testing.T) {
+	a, b := Principal{"a", "key-a", true}, Principal{"b", "key-b", true}
+	first := Resource{Kind: "conversation", ID: "upstream-reused-id", AccountID: "a", KeyID: "key-a", Binding: Binding{"group", "channel-a", "version-1"}, CredentialScope: "same-actual-upstream-key", CreationID: "operation-a"}
+	if err := CheckRemoteCreation(a, first, nil); err != nil {
+		t.Fatal(err)
+	}
+	rows := []Resource{first}
+	if err := CheckRemoteCreation(a, first, rows); err != nil {
+		t.Fatal("same successful operation could not be reobserved", err)
+	}
+	second := first
+	second.AccountID, second.KeyID, second.CreationID = "b", "key-b", "operation-b"
+	second.Binding.ChannelID, second.Binding.CredentialVersion = "channel-b", "version-2"
+	if err := CheckRemoteCreation(b, second, rows); !errors.Is(err, ErrAmbiguous) {
+		t.Fatal("same real credential escaped collision checks through another channel", err)
+	}
+	// A real transactional index persists a quarantine marker on this failure.
+	// Keeping both synthetic observations demonstrates why preserving only the
+	// first owner is insufficient: the second creation may have replaced data.
+	rows = append(rows, second)
+	for _, actor := range []Principal{a, b} {
+		if _, err := ResolveReferences(actor, []Reference{{Kind: "conversation", ID: first.ID}}, func(Reference) ([]Resource, error) { return rows, nil }); !errors.Is(err, ErrAmbiguous) {
+			t.Fatal("collided remote ID was still readable", err)
+		}
+	}
+	for _, change := range []string{"no_operation", "no_scope", "unowned", "wrong_kind", "no_parent"} {
+		invalid := first
+		switch change {
+		case "no_operation":
+			invalid.CreationID = ""
+		case "no_scope":
+			invalid.CredentialScope = ""
+		case "unowned":
+			invalid.KeyID = "other"
+		case "wrong_kind":
+			invalid.Kind = "file"
+		case "no_parent":
+			invalid.Kind = "item"
+		}
+		if CheckRemoteCreation(a, invalid, nil) == nil {
+			t.Errorf("%s created an ownership record", change)
+		}
+	}
+}
+
+func TestContextCollisionCannotBecomeOwnerOrSourceBinding(t *testing.T) {
+	rows := []Resource{
+		{Kind: "codex_note", ID: "session/notes/path", AccountID: "a", KeyID: "ka"},
+		{Kind: "codex_note", ID: "session/notes/path", AccountID: "b", KeyID: "kb"},
+	}
+	for _, actor := range []Principal{{"a", "ka", true}, {"b", "kb", true}} {
+		if _, err := ResolveReferences(actor, []Reference{{Kind: "codex_note", ID: rows[0].ID}}, func(Reference) ([]Resource, error) { return rows, nil }); !errors.Is(err, ErrAmbiguous) {
+			t.Fatal("duplicate context ID trusted a client's ownership claim", err)
 		}
 	}
 }

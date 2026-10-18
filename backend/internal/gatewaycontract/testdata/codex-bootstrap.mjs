@@ -184,7 +184,8 @@ use_history_notes_extension = true
   } finally {
     clearTimeout(deadline);
     stop();
-    await closed;
+    const forceClose = setTimeout(() => killGroup('SIGKILL'), 1500);
+    try { await closed; } finally { clearTimeout(forceClose); }
     killGroup('SIGKILL');
     abortExperiment = () => {};
     lines.close();

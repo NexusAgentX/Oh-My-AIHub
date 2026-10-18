@@ -73,7 +73,7 @@ func TestManifestTraceabilityAndScope(t *testing.T) {
 }
 
 func TestManifestRejectsBrokenHandoffs(t *testing.T) {
-	for _, name := range []string{"missing_endpoint", "duplicate_id", "missing_source", "wrong_feature", "self_aggregate", "aggregate_cycle"} {
+	for _, name := range []string{"missing_endpoint", "duplicate_id", "missing_source", "wrong_feature", "self_aggregate", "aggregate_cycle", "missing_required_field", "pending_identity"} {
 		t.Run(name, func(t *testing.T) {
 			m, err := Load()
 			if err != nil {
@@ -95,6 +95,10 @@ func TestManifestRejectsBrokenHandoffs(t *testing.T) {
 				a, b := &m.Suites[0].Requirements[0], &m.Suites[0].Requirements[1]
 				a.AggregateOf = []string{b.ID}
 				b.AggregateOf = []string{a.ID}
+			case "missing_required_field":
+				m.Endpoints[0].Required = []string{"not-declared"}
+			case "pending_identity":
+				m.Endpoints[0].Auth = "identity_decision_pending"
 			}
 			if m.Validate() == nil {
 				t.Fatal("broken manifest accepted")
