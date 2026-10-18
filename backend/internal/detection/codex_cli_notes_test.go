@@ -63,8 +63,25 @@ func testOfficialCodexNotesLifecycle(t *testing.T, shared bool) {
 					}
 				}
 			}
+			if encoded, seed := strings.CutPrefix(prompt, "Call only notes.write_file on this isolated synthetic context, using these exact values. Preserve the required encrypted argument representation. Do not invent a result: "); seed {
+				desired, err := decodeNative([]byte(encoded))
+				if err != nil || str(desired["path"]) != "aihub-thread-hint.txt" {
+					t.Error("invalid synthetic hint seed")
+					w.WriteHeader(400)
+					return
+				}
+				desired["text"] = "sealed:" + str(desired["text"])
+				w.Header().Set("Content-Type", "text/event-stream")
+				_, _ = io.WriteString(w, codexCallStreamFixture(nativeCall{ID: "hint-seed", Name: "write_file", Namespace: "notes"}, desired))
+				return
+			}
 			phase := phases[session]
 			phases[session]++
+			if phase > 20 {
+				t.Error("synthetic note model failed to reach its expected closure")
+				w.WriteHeader(400)
+				return
+			}
 			operation, args, final := "", nativeObject{}, ""
 			if strings.Contains(prompt, "write exactly") && phase < 6 {
 				matches := quoted.FindAllStringSubmatch(prompt, -1)
@@ -136,7 +153,7 @@ func testOfficialCodexNotesLifecycle(t *testing.T, shared bool) {
 		var value any = nativeObject{"ok": true}
 		switch operation {
 		case "thread_hint":
-			_, _ = io.WriteString(w, `{"text":""}`)
+			_ = json.NewEncoder(w).Encode(nativeObject{"text": notes[session]})
 			return
 		case "write_file":
 			notes[session] = strings.TrimPrefix(str(body["text"]), "sealed:")
@@ -164,7 +181,11 @@ func testOfficialCodexNotesLifecycle(t *testing.T, shared bool) {
 		t.Fatal(err)
 	}
 	result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special.RL18", "official_cli"), nil)
+	hint := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special.RL17", "official_cli"), nil)
 	if shared {
+		if hint.State != "fail" || hint.Assertions[1].State != "fail" {
+			t.Fatal("shared thread hint content was not detected", hint)
+		}
 		if len(result.Assertions) != 7 || result.Assertions[6].State != "fail" {
 			t.Fatal("official CLI failed to detect the actual foreign note result", result)
 		}
@@ -175,11 +196,11 @@ func testOfficialCodexNotesLifecycle(t *testing.T, shared bool) {
 		}
 		return
 	}
-	if result.State != "pass" || len(result.Assertions) != 7 {
+	if result.State != "pass" || len(result.Assertions) != 7 || hint.State != "pass" || hint.Usage.HTTP != 0 {
 		var proof codexCLIProof
 		_ = json.Unmarshal(s.Recall("codex-cli-profile-v1:notes_lifecycle"), &proof)
 		t.Logf("semantic metadata client=%+v observed=%v continued=%v phases=%v", proof.Client, proof.Observed, proof.ContextContinued, proof.ContextPhases)
-		t.Fatalf("official note lifecycle did not complete: %+v", result)
+		t.Fatalf("official note lifecycle/hint did not complete: %+v %+v", result, hint)
 	}
 	mu.Lock()
 	defer mu.Unlock()

@@ -74,11 +74,16 @@ type codexBridge struct {
 	reasoningCiphers  map[[32]byte]bool
 	activity          codexProbeActivity
 	profile           string
+	imageOutputs      map[[32]byte]bool
+	noteMarker        string
+	hintMarker        string
+	hintSeedStarted   bool
 }
 
 type codexContextExecution struct {
-	Endpoint   string
-	Start, End int64
+	Endpoint                          string
+	Start, End                        int64
+	HintShape, HintKnown, HintMatched bool
 }
 
 type codexUpstreamFailure struct {
@@ -88,6 +93,9 @@ type codexUpstreamFailure struct {
 // Only bounded semantic facts leave this private bridge. Call IDs and native
 // request/response bodies remain transient memory and never enter reports.
 type codexWireFacts struct {
+	HintSeeded                                                         bool
+	ImageGenerations, ImageEdits, ImageContinued                       int
+	ImagePermission                                                    bool
 	CompactionV1, CompactionV2, CompactionReturned, CompactionReplayed int
 	ReasoningProduced, ReasoningReplayed                               int
 	SearchStructured                                                   bool
@@ -166,7 +174,7 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	}
 	c := gateway.Candidate{GroupID: "probe-group", GroupModelID: "probe-offering", ChannelID: "probe-channel", CredentialScope: "probe-scope", CredentialRevision: 1, OwnerID: "probe-provider", BaseURL: base.String(), UpstreamModel: upstreamModel, Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof, Advanced: advanced}
 	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
-	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, reasoningCiphers: map[[32]byte]bool{}, activity: codexProbeActivity{changed: make(chan struct{})}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
+	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, reasoningCiphers: map[[32]byte]bool{}, imageOutputs: map[[32]byte]bool{}, activity: codexProbeActivity{changed: make(chan struct{})}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
 	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
 	b.mux = http.NewServeMux()
 	for _, endpoint := range manifest.Endpoints {
@@ -348,6 +356,11 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	session.usage = Usage{}
 	session.allowed = map[string]bool{ep.ID: true}
 	session.retained, session.retainedBytes = nil, 0
+	defer func() { session.secret = nil; session.clear() }()
+	seedWitnesses := []string{}
+	if b.profile == "notes_lifecycle" && ep.ID == "codex.notes.thread_hint" {
+		seedWitnesses = b.seedCLIHint(req.Context(), &session, body)
+	}
 	category := "query"
 	if ep.Replay == "inference" {
 		category = "generate"
@@ -367,6 +380,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	started := time.Now().UnixNano()
 	response, err := session.Do(req.Context(), Request{EndpointID: ep.ID, Path: ep.Path, Query: req.URL.Query(), Headers: req.Header, Body: body, Category: category, prepared: true})
+	response.PriorAttempts = append(seedWitnesses, response.PriorAttempts...)
 	finished := time.Now().UnixNano()
 	if ep.ID == "codex.responses" {
 		cancelled := false
@@ -400,6 +414,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	var usage Usage
 	var reply nativeReply
+	validStream := false
 	wire := codexWireFacts{}
 	if ep.ID == "codex.responses" {
 		if req.Header.Get("Content-Encoding") == "zstd" {
@@ -410,6 +425,13 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		plain, decodeErr := nativeencoding.Decode(req.Context(), req.Header.Get("Content-Encoding"), body)
 		if decodeErr == nil {
 			if root, err := decodeNative(plain); err == nil {
+				if b.profile == "notes_lifecycle" {
+					b.mu.Lock()
+					if b.noteMarker == "" {
+						b.noteMarker = codexNoteMarker.FindString(string(plain))
+					}
+					b.mu.Unlock()
+				}
 				lite := false
 				for _, raw := range list(root["input"]) {
 					if str(object(raw)["type"]) == "compaction_trigger" {
@@ -466,6 +488,14 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 						hash := codexContextOutputHash(item["output"])
 						b.mu.Lock()
 						known := b.callIDs[str(item["call_id"])]
+						if endpoint == "codex.image_gen.imagegen" {
+							for _, raw := range list(item["output"]) {
+								part := object(raw)
+								if str(part["type"]) == "input_image" && b.imageOutputs[sha256.Sum256([]byte(str(part["image_url"])))] {
+									wire.ImageContinued++
+								}
+							}
+						}
 						if b.contextOutputs[hash][endpoint] {
 							b.contextContinued[endpoint] = true
 						}
@@ -497,6 +527,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		if strings.Contains(response.Headers.Get("Content-Type"), "text/event-stream") {
 			parsed := parseNativeStream("openai-responses", response.Body, b.parent.limits.EventBytes)
 			reply = parsed.Reply
+			validStream = parsed.Valid && parsed.Terminal
 			if parsed.Valid && parsed.Terminal {
 				wire.SSE++
 				if parsed.TextLifecycle {
@@ -522,10 +553,26 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 			}
 		}
 	}
+	unsafeImage := b.profile == "image_lifecycle" && ep.ID == "codex.responses" && err == nil && response.Status >= 200 && response.Status < 300 && (!validStream || !safeCLIImageOutput(reply.Object))
+	if unsafeImage {
+		failure = &codexUpstreamFailure{State: "fail", Reason: "assertion_failed"}
+	}
 	b.mu.Lock()
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	if ep.ID == "codex.notes.thread_hint" && err == nil && response.Status >= 200 && response.Status < 300 {
+		root, e := decodeNative(response.Body)
+		text, shape := root["text"].(string)
+		if len(b.contextExecutions) >= 256 {
+			b.limited = true
+		} else {
+			b.contextExecutions = append(b.contextExecutions, codexContextExecution{Endpoint: ep.ID, Start: started, End: finished, HintShape: e == nil && shape, HintKnown: b.hintMarker != "" || b.noteMarker != "", HintMatched: b.noteMarker != "" && strings.Contains(text, b.noteMarker) || b.hintMarker != "" && strings.Contains(text, b.hintMarker)})
+		}
+	}
+	if err == nil && response.Status >= 200 && response.Status < 300 && (ep.ID == "codex.images" || ep.ID == "codex.images.edit") {
+		b.observeCLIImage(ep.ID, response, &wire)
+	}
 	for _, raw := range list(reply.Object["output"]) {
 		item := object(raw)
 		if cipher := str(item["encrypted_content"]); str(item["type"]) == "reasoning" && cipher != "" {
@@ -616,6 +663,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.wire.ReasoningProduced += wire.ReasoningProduced
 	b.wire.ReasoningReplayed += wire.ReasoningReplayed
 	b.wire.SearchStructured = b.wire.SearchStructured || wire.SearchStructured
+	b.wire.ImageGenerations += wire.ImageGenerations
+	b.wire.ImageEdits += wire.ImageEdits
+	b.wire.ImageContinued += wire.ImageContinued
 	if wire.RequestedTier != "" {
 		b.wire.RequestedTier = wire.RequestedTier
 	}
@@ -630,6 +680,9 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.mu.Unlock()
 	if err != nil {
 		return nil, err
+	}
+	if unsafeImage {
+		return nil, ErrInvalid
 	}
 	return &http.Response{StatusCode: response.Status, Header: response.Headers, Body: io.NopCloser(bytes.NewReader(response.Body)), ContentLength: int64(len(response.Body)), Request: req}, nil
 }
@@ -663,6 +716,7 @@ type codexProbeStore struct {
 	hash            []byte
 	key             gateway.KeyAuth
 	row             gateway.CandidateRecord
+	extraRows       []gateway.CandidateRecord
 	count           int
 	finished        map[string]bool
 	duplicateFinish bool
@@ -682,13 +736,15 @@ func (*codexProbeStore) KeySpend(context.Context, string, time.Time) (gateway.Sp
 	return gateway.Spend{}, nil
 }
 func (s *codexProbeStore) Candidates(_ context.Context, model string, format channel.Format) ([]gateway.Candidate, error) {
-	if model != s.row.ModelID || !slices.Contains(s.row.Formats, format) {
-		return nil, nil
+	for _, row := range append([]gateway.CandidateRecord{s.row}, s.extraRows...) {
+		if model == row.ModelID && slices.Contains(row.Formats, format) {
+			return []gateway.Candidate{row.Candidate}, nil
+		}
 	}
-	return []gateway.Candidate{s.row.Candidate}, nil
+	return nil, nil
 }
 func (s *codexProbeStore) AuxiliaryCandidates(context.Context, channel.Format) ([]gateway.CandidateRecord, error) {
-	return []gateway.CandidateRecord{s.row}, nil
+	return append([]gateway.CandidateRecord{s.row}, s.extraRows...), nil
 }
 func (*codexProbeStore) AttemptHistory(context.Context, time.Time) ([]gateway.AttemptHistoryRow, error) {
 	return nil, nil
@@ -718,18 +774,27 @@ func (s *codexProbeStore) FinishCall(_ context.Context, finish gateway.CallFinis
 func (*codexProbeStore) SweepStaleCalls(context.Context, time.Time) (int64, error)        { return 0, nil }
 func (*codexProbeStore) RecordChannelEvent(context.Context, string, string, string) error { return nil }
 func (s *codexProbeStore) OnlineModels(context.Context) ([]gateway.OnlineModel, error) {
-	return []gateway.OnlineModel{{ID: s.row.ModelID, Formats: s.row.Formats}}, nil
+	rows := []gateway.OnlineModel{{ID: s.row.ModelID, Formats: s.row.Formats}}
+	for _, row := range s.extraRows {
+		rows = append(rows, gateway.OnlineModel{ID: row.ModelID, Formats: row.Formats})
+	}
+	return rows, nil
 }
 func (*codexProbeStore) CustomModelOnline(context.Context, string) (bool, error) { return false, nil }
 func (s *codexProbeStore) Get(_ context.Context, model string) (catalog.Model, error) {
-	if model != s.row.ModelID {
-		return catalog.Model{}, catalog.ErrNotFound
+	for _, row := range append([]gateway.CandidateRecord{s.row}, s.extraRows...) {
+		if model == row.ModelID {
+			return catalog.Model{ID: model, Enabled: true}, nil
+		}
 	}
-	return catalog.Model{ID: s.row.ModelID, Enabled: true}, nil
+	return catalog.Model{}, catalog.ErrNotFound
 }
 func (s *codexProbeStore) List(ctx context.Context, _ bool) ([]catalog.Model, error) {
-	m, err := s.Get(ctx, s.row.ModelID)
-	return []catalog.Model{m}, err
+	models := []catalog.Model{{ID: s.row.ModelID, Enabled: true}}
+	for _, row := range s.extraRows {
+		models = append(models, catalog.Model{ID: row.ModelID, Enabled: true})
+	}
+	return models, nil
 }
 
 type codexProbeSettings struct{}

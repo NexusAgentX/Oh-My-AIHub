@@ -62,6 +62,7 @@ type Result struct {
 	IsolationVerified bool    `json:"isolation_verified"`
 	ReopenVerified    bool    `json:"reopen_verified"`
 	ShutdownVerified  bool    `json:"shutdown_verified"`
+	ImageCalls        int     `json:"image_calls"`
 	Phases            []Phase `json:"phases,omitempty"`
 }
 
@@ -94,7 +95,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" && c.Profile != "notes_lifecycle" && c.Profile != "sequential_tools" && c.Profile != "instructions" && c.Profile != "tier" && c.Profile != "compact" && c.Profile != "encrypted" && c.Profile != "search" && c.Profile != "async_compact" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" && c.Profile != "compressed" && c.Profile != "plain" && c.Profile != "notes_lifecycle" && c.Profile != "sequential_tools" && c.Profile != "instructions" && c.Profile != "tier" && c.Profile != "compact" && c.Profile != "encrypted" && c.Profile != "search" && c.Profile != "async_compact" && c.Profile != "image_lifecycle" {
 		return ErrClient
 	}
 	switch c.Tier {
@@ -143,6 +144,7 @@ type dialogue struct {
 	turn       string
 	compacted  bool
 	background bool
+	imageCalls int
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -210,8 +212,9 @@ func (d *dialogue) notification(msg rpcMessage) error {
 	if msg.Method == "item/completed" {
 		var p struct {
 			Item struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
+				Type   string `json:"type"`
+				Text   string `json:"text"`
+				Status string `json:"status"`
 			} `json:"item"`
 		}
 		if json.Unmarshal(msg.Params, &p) != nil {
@@ -226,6 +229,9 @@ func (d *dialogue) notification(msg rpcMessage) error {
 		}
 		if p.Item.Type == "contextCompaction" {
 			d.compacted = true
+		}
+		if p.Item.Type == "imageGeneration" && p.Item.Status == "completed" {
+			d.imageCalls++
 		}
 	}
 	if msg.Method == "turn/completed" {
@@ -318,7 +324,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	root := os.Getenv("CODEX_HOME")
 	probeCatalog := ""
 	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools" || c.Profile == "sequential_tools"
-	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle"
+	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle" || c.Profile == "image_lifecycle"
 	if notesProfile || toolProfile || c.Profile == "compressed" || c.Profile == "plain" || c.Profile == "instructions" || c.Profile == "tier" || c.Profile == "compact" || c.Profile == "encrypted" || c.Profile == "search" || c.Profile == "async_compact" {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
@@ -429,7 +435,7 @@ use_history_notes_extension = %t
 		}
 	}()
 	d := dialogue{in: in, lines: lines, tools: toolProfile, background: c.Profile == "async_compact"}
-	defer func() { r.RPCErrorCode, r.ToolCalls = d.rpcError, d.toolCalls }()
+	defer func() { r.RPCErrorCode, r.ToolCalls, r.ImageCalls = d.rpcError, d.toolCalls, d.imageCalls }()
 	r.Stage = "initialize"
 	if d.call(ctx, "initialize", map[string]any{"clientInfo": map[string]string{"name": "aihub-codex-probe", "version": "1"}, "capabilities": map[string]bool{"experimentalApi": true}}, nil) != nil {
 		return r, ErrClient
@@ -507,6 +513,9 @@ use_history_notes_extension = %t
 		d.expected = "OK"
 		prompt = asyncSeed(thread.Thread.ID)
 	}
+	if c.Profile == "image_lifecycle" {
+		prompt = "Use image_gen.imagegen to generate exactly one simple blue circle on white, with no text. After receiving the actual image, reply with exactly " + Marker + ". No local commands or file reads."
+	}
 	if c.Profile == "notes_lifecycle" {
 		note := "AIHUB-NOTE-" + thread.Thread.ID
 		appended := "APPEND-" + thread.Thread.ID
@@ -518,6 +527,11 @@ use_history_notes_extension = %t
 		return r, ErrClient
 	}
 	r.Stage = "turn"
+	if c.Profile == "image_lifecycle" {
+		if !d.matched || d.imageCalls != 1 || d.runTurn(ctx, thread.Thread.ID, "Use image_gen.imagegen to edit the last generated image: change the blue circle to green, with num_last_images_to_include=1. Do not use file paths or local commands. After receiving the actual edited image, reply with exactly "+Marker+".") != nil {
+			return r, ErrClient
+		}
+	}
 	if c.Profile == "async_compact" {
 		if !d.matched || runAsyncCompaction(ctx, c, &d, thread.Thread.ID, threadParams, &r) != nil {
 			return r, ErrClient

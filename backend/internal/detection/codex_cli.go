@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL09", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL09", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
 			layers := []string{"official_cli"}
@@ -101,6 +101,7 @@ type codexCLIProof struct {
 	Observed         map[string]int
 	ContextContinued map[string]bool
 	ContextPhases    map[string]map[string]int
+	Hints            map[string]codexHintFacts
 }
 
 func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, layer, probePath, binaryPath string) Result {
@@ -128,12 +129,14 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"catalog"}
 	case "codex-special.RL16":
 		profiles = []string{"search"}
-	case "codex-special.RL18":
+	case "codex-special.RL17", "codex-special.RL18":
 		profiles = []string{"notes_lifecycle"}
 	case "codex-special.RL21":
 		profiles = []string{"compact"}
 	case "codex-special.RL22":
 		profiles = []string{"async_compact"}
+	case "codex-special.RL25":
+		profiles = []string{"image_lifecycle"}
 	}
 	for _, profile := range profiles {
 		proof := runCodexCLIProfile(ctx, s, profile, probePath, binaryPath)
@@ -210,6 +213,17 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			n.check("native_search", out, proof.Observed["codex.search"] > 0)
 			n.check("search_result_structure", out, wire.SearchStructured)
 			n.check("search_result_continuation", out, client.Completed && client.MarkerMatched && proof.ContextContinued["codex.search"])
+		case "codex-special.RL17":
+			own, other := proof.Hints["notes_primary"], proof.Hints["notes_isolation"]
+			n.check("thread_hint", out, own.Observed > 0 && own.Shaped == own.Observed && other.Observed > 0 && other.Shaped == other.Observed)
+			isolated := out
+			if !wire.HintSeeded && isolated.State == "pass" {
+				isolated.State, isolated.Reason = "inconclusive", "prerequisite_failed"
+			}
+			if own.Matched == 0 && other.Matched == 0 && isolated.State == "pass" {
+				isolated.State, isolated.Reason = "inconclusive", "not_observed"
+			}
+			n.check("context_isolation", isolated, own.Known > 0 && own.Matched > 0 && other.Known > 0 && other.Matched == 0)
 		case "codex-special.RL18":
 			for _, operation := range []string{"write_file", "read_file", "list_files_by_prefix", "search_contents", "append_to_file"} {
 				endpoint := "codex.notes." + operation
@@ -227,6 +241,11 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 			n.check("result_reuse", out, client.ContextVerified && wire.CompactionReplayed > 0)
 			n.check("cancel_shutdown", out, client.ShutdownVerified && wire.CancelledCompactions > 0)
 			n.check("single_settlement", out, wire.SingleSettlement)
+		case "codex-special.RL25":
+			n.check("native_generation", out, wire.ImageGenerations == 1)
+			n.check("native_edit", out, wire.ImageEdits == 1)
+			n.check("image_model_permission", out, wire.ImagePermission)
+			n.check("reliable_products", out, client.Completed && client.MarkerMatched && client.ImageCalls == 2 && wire.ImageGenerations == 1 && wire.ImageEdits == 1 && wire.ImageContinued >= 2 && wire.SingleSettlement)
 		}
 	}
 	return n.finish()
@@ -248,6 +267,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	s.allowed["codex.models"] = true
 	bootstrap := nativeScene{s: s, protocol: "openai-responses", checks: map[string]Assertion{}}
 	catalog, _ := bootstrap.codexCatalog(ctx)
+	proof.Witnesses = slices.Clone(bootstrap.witnesses)
 	model := s.Target.Model
 	if model == "" {
 		for _, raw := range list(catalog.Reply.Object["models"]) {
@@ -262,6 +282,18 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 		return proof
 	}
 	b.profile = profile
+	clientModel := codexProbeModel
+	if profile == "image_lifecycle" {
+		if err := b.configureCLIImage(catalog.Reply.Object); err != nil {
+			proof.Reason = "detector_error"
+			if err == ErrNotFound {
+				proof.Reason = "prerequisite_failed"
+			}
+			b.close()
+			return proof
+		}
+		clientModel = codexProbeTextModel
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		b.close()
@@ -278,7 +310,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
 	executionStarted := time.Now().UnixNano()
-	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
+	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": clientModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_TIER": tier, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
 	executionFinished := time.Now().UnixNano()
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)
@@ -292,6 +324,9 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	b.store.mu.Lock()
 	b.wire.SingleSettlement = b.store.count > 0 && b.store.count == len(b.store.finished) && !b.store.duplicateFinish
 	b.store.mu.Unlock()
+	if profile == "image_lifecycle" {
+		b.wire.ImagePermission = b.verifyCLIImagePermission(ctx)
+	}
 	s.usage.Add(b.usage)
 	refs := append(slices.Clone(bootstrap.witnesses), b.witnesses...)
 	if len(refs) == 0 {
@@ -318,6 +353,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	if profile == "notes_lifecycle" && proof.State == "pass" {
 		counts, valid := codexObservedPhases(client.Phases, b.contextExecutions, executionStarted, executionFinished)
 		proof.ContextPhases = counts
+		proof.Hints = codexHintPhases(client.Phases, b.contextExecutions)
 		if !valid {
 			proof.State, proof.Reason = "inconclusive", "detector_error"
 		}

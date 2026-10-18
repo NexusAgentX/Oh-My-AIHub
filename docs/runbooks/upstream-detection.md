@@ -33,6 +33,10 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 
 `encrypted` 配置实际进行两轮推理并核验上游密文原样回放；`search` 显式启用 StandaloneWebSearch，核验实际独立 alpha/search、有效结果 URL 结构和固定 CLI 带回的 input_text 输出。固定版本即使同时收到 encrypted_output 也使用 SearchResponse.output；协议直接检测与客户端实际行为分别记录。所有中间内容仍只留在私有执行内存中。
 
+`image_lifecycle` 让 CLI 实际生成图片，再以刚收到的图片编辑并继续推理。图像模型单独保持权限与按产物的测试报价；主对话使用目录中另一个文本候选并实际验证可调用，不将目录声明当作支持。缺少伴随文本模型时保留实际目录证据并标前置无法核验。检测用零价报价不参与真实业务或供应商估价。私有执行仅允许此次内存图片、固定 imagegen 工具和合成输入，不接收模型要求读取宿主路径或执行其他客户端命令；该检测保护不改变生产透明转发。
+
+RL17 复用 notes 生命周期的实际 CLI 请求。固定客户端会缓存初始 thread_hint，不能假设本地恢复线程就会重新获取。检测在首次私有会话的实际 CLI hint 请求前，用实际模型生成的加密参数向同一隔离上下文写入合成标记；该准备调用单独留上游证据与计量，不能代替 CLI hint。本人 hint 须观察到标记，另一会话不得包含本人任一合成标记；只有空 hint 时仍是无法核验。RL18 的恢复阶段仍要求实际新读回执与返回结果续用，不能借旧读取或 hint 满足。
+
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
 
 SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。
