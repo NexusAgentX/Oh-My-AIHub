@@ -17,7 +17,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/localtime"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/channelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/ledgerpg"
 )
 
@@ -114,91 +113,10 @@ func (s *Store) KeySpend(ctx context.Context, keyID string, now time.Time) (gate
 	return gateway.Spend{Today: money.FromNano(row.TodayNano), Month: money.FromNano(row.MonthNano), Total: money.FromNano(row.TotalNano)}, nil
 }
 
-func (s *Store) Candidates(ctx context.Context, modelID string, format channel.Format) ([]gateway.Candidate, error) {
-	rows, err := s.q.ListCandidates(ctx, ListCandidatesParams{ModelID: modelID, Format: string(format)})
-	if err != nil {
-		return nil, err
-	}
-	candidates := make([]gateway.Candidate, 0, len(rows))
-	for _, row := range rows {
-		candidates = append(candidates, candidate(candidateColumns(row)))
-	}
-	return candidates, nil
-}
-
-// candidateColumns are the columns ListCandidates and ListAllCandidates have
-// in common.
-type candidateColumns struct {
-	ID, OwnerID, Name, BaseUrl    string
-	ApiKeyCiphertext, ApiKeyNonce []byte
-	ApiKeyKeyID                   string
-
-	UserAgent                                      *string
-	HeaderRules                                    []byte
-	ConcurrencyLimit, RpmLimit                     *int32
-	TtftTimeoutMs, RequestTimeoutMs, IdleTimeoutMs *int32
-	CooldownFailures, CooldownSeconds              *int32
-	UpstreamModel                                  string
-	MultiplierNano                                 int64
-	FxDiscount, IsCustom                           bool
-	CustomInputPriceNanoPerMillion                 *money.Amount
-	CustomOutputPriceNanoPerMillion                *money.Amount
-	CustomCacheWritePriceNanoPerMillion            *money.Amount
-	CustomCacheReadPriceNanoPerMillion             *money.Amount
-}
-
-func candidate(row candidateColumns) gateway.Candidate {
-	var rules struct {
-		Set []struct {
-			Name  string `json:"name"`
-			Value string `json:"value"`
-		} `json:"set"`
-		Remove []string `json:"remove"`
-	}
-	_ = json.Unmarshal(row.HeaderRules, &rules)
-	advanced := channel.Advanced{
-		UserAgent: row.UserAgent, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit,
-		TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
-		CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
-		HeaderRules: channel.HeaderRules{Remove: rules.Remove},
-	}
-	for _, rule := range rules.Set {
-		advanced.HeaderRules.Set = append(advanced.HeaderRules.Set, channel.HeaderSet{Name: rule.Name, Value: rule.Value})
-	}
-	return gateway.Candidate{
-		ChannelID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseURL: row.BaseUrl, UpstreamModel: row.UpstreamModel,
-		MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount, Advanced: advanced,
-		Credential: channel.EncryptedCredential{Version: 1, KeyID: row.ApiKeyKeyID, Nonce: row.ApiKeyNonce, Ciphertext: row.ApiKeyCiphertext},
-		Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
-			row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
-	}
-}
-
-// LoadCandidates reads every channel model Candidates can offer, for the
-// candidate snapshot (internal/snapshot). Filtering the records by model and
-// format gives what Candidates returns for that pair, in the same order.
-func (s *Store) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
-	rows, err := s.q.ListAllCandidates(ctx)
-	if err != nil {
-		return nil, err
-	}
-	records := make([]gateway.CandidateRecord, 0, len(rows))
-	for _, row := range rows {
-		formats := make([]channel.Format, 0, len(row.Formats))
-		for _, format := range row.Formats {
-			formats = append(formats, channel.Format(format))
-		}
-		records = append(records, gateway.CandidateRecord{ModelID: row.ModelID, Formats: formats, Candidate: candidate(candidateColumns{
-			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseUrl: row.BaseUrl, ApiKeyCiphertext: row.ApiKeyCiphertext,
-			ApiKeyNonce: row.ApiKeyNonce, ApiKeyKeyID: row.ApiKeyKeyID, UserAgent: row.UserAgent, HeaderRules: row.HeaderRules,
-			ConcurrencyLimit: row.ConcurrencyLimit, RpmLimit: row.RpmLimit, TtftTimeoutMs: row.TtftTimeoutMs, RequestTimeoutMs: row.RequestTimeoutMs, IdleTimeoutMs: row.IdleTimeoutMs, CooldownFailures: row.CooldownFailures,
-			CooldownSeconds: row.CooldownSeconds, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano,
-			FxDiscount: row.FxDiscount, IsCustom: row.IsCustom,
-			CustomInputPriceNanoPerMillion: row.CustomInputPriceNanoPerMillion, CustomOutputPriceNanoPerMillion: row.CustomOutputPriceNanoPerMillion,
-			CustomCacheWritePriceNanoPerMillion: row.CustomCacheWritePriceNanoPerMillion, CustomCacheReadPriceNanoPerMillion: row.CustomCacheReadPriceNanoPerMillion,
-		})})
-	}
-	return records, nil
+// Candidates and OnlineModels are provided by the published group snapshot.
+// Direct persistence has no directory fallback, including during startup.
+func (s *Store) Candidates(context.Context, string, channel.Format) ([]gateway.Candidate, error) {
+	return []gateway.Candidate{}, nil
 }
 
 // AttemptHistory reads the attempts of the statistics window for
@@ -388,65 +306,13 @@ func (s *Store) SweepStaleCalls(ctx context.Context, before time.Time) (int64, e
 }
 
 func (s *Store) RecordChannelEvent(ctx context.Context, channelID, kind, reason string) error {
-	return channelpg.RecordEvent(ctx, s.pool, channelID, kind, reason)
+	return s.q.InsertChannelEvent(ctx, InsertChannelEventParams{ChannelID: channelID, Kind: kind, Reason: reason})
 }
 
-func customPrices(custom bool, input, output, cacheWrite, cacheRead *money.Amount) *channel.CustomPrices {
-	if !custom {
-		return nil
-	}
-	value := func(amount *money.Amount) money.Amount {
-		if amount == nil {
-			return 0
-		}
-		return *amount
-	}
-	return &channel.CustomPrices{Input: value(input), Output: value(output), CacheWrite: value(cacheWrite), CacheRead: value(cacheRead)}
+func (s *Store) OnlineModels(context.Context) ([]gateway.OnlineModel, error) {
+	return []gateway.OnlineModel{}, nil
 }
-
-func (s *Store) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, error) {
-	rows, err := s.q.ListOnlineModels(ctx)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]gateway.OnlineModel, 0, len(rows))
-	for _, row := range rows {
-		online := gateway.OnlineModel{ID: row.ModelID, Custom: row.Custom, Formats: make([]channel.Format, 0, len(row.Formats))}
-		for _, format := range row.Formats {
-			online.Formats = append(online.Formats, channel.Format(format))
-		}
-		result = append(result, online)
-	}
-	return result, nil
-}
-
-func (s *Store) CustomModelOnline(ctx context.Context, modelID string) (bool, error) {
-	return s.q.CustomModelOnline(ctx, modelID)
-}
-
-func (s *Store) OnlineChannels(ctx context.Context) ([]gateway.OnlineChannel, error) {
-	rows, err := s.q.ListOnlineChannelModels(ctx)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]gateway.OnlineChannel, 0, len(rows))
-	for _, row := range rows {
-		online := gateway.OnlineChannel{
-			ModelID: row.ModelID, ChannelID: row.ChannelID, ChannelName: row.ChannelName, OwnerID: row.OwnerID, OwnerName: row.OwnerName,
-			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
-			Advanced: channel.Advanced{
-				ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
-			},
-			Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
-				row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),
-		}
-		for _, format := range row.Formats {
-			online.Formats = append(online.Formats, channel.Format(format))
-		}
-		result = append(result, online)
-	}
-	return result, nil
-}
+func (s *Store) CustomModelOnline(context.Context, string) (bool, error) { return false, nil }
 
 func (s *Store) Home(ctx context.Context, accountID string, dayStart time.Time) (gateway.HomeStats, error) {
 	var stats gateway.HomeStats

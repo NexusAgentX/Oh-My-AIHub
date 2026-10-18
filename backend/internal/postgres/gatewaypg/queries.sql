@@ -36,55 +36,6 @@ FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id
 WHERE k.deleted_at IS NULL;
 
--- name: ListCandidates :many
-SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
-  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY c.id;
-
--- Every row ListCandidates can return, for any model and format, for the
--- candidate snapshot (ADR-0040): same columns and conditions, with the model
--- and the formats the row serves instead of the two filters. Rows come in
--- model order and, within a model, in channel id order, the order of
--- ListCandidates.
--- name: ListAllCandidates :many
-SELECT cm.model_id, cm.formats,
-       c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier
-  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY cm.model_id, c.id;
-
--- The attempts of calls started in the window the engine keeps channel statistics
--- for, grouped for Engine.LoadStats, which runs once at startup: from then on the
--- statistics are counted in memory and nothing runs this periodically.
--- A row is one channel on one model in one five-minute bucket of the call's start
--- and, for completed attempts of streaming calls, one first-token bin (bin edges
--- are passed in, so database and engine bin identically; -1 for the rest).
--- Attempts the client abandoned (client_disconnected) are left out. A client_error
--- (an upstream 4xx that is the request's own fault) says nothing about the
--- channel's health, so it is not "counted", but it is kept per model for the 4xx
--- anomaly rule. The first-token figure counts streaming calls only: a
--- non-streaming call's first byte is the whole answer, which would rank a
--- channel by how long its answers are instead of how fast it starts.
--- The before_edit_* columns count the attempts of calls started before the
--- channel was last edited (channels.updated_at): the gateway leaves them out of
--- the 4xx anomaly rule, which judges a channel afresh after every edit, but not
--- out of the success rate and first-token time. The channel is joined by its
--- ID; a channel that no longer exists has no edit time and nothing is "before".
 -- name: AttemptHistory :many
 SELECT (att->'channel'->>'id')::uuid AS channel_id,
        coalesce(c.model_id, '')::text AS model_id,
@@ -193,39 +144,6 @@ UPDATE calls SET outcome = 'interrupted', completed_at = now()
 WHERE outcome = 'in_progress' AND created_at < $1
 AND NOT EXISTS (SELECT 1 FROM gateway_background_jobs j WHERE j.call_id=calls.id AND j.settled_at IS NULL);
 
--- Models that ListCandidates could serve in at least one format, with those
--- formats; the static conditions are the same, runtime state is not considered.
--- name: ListOnlineModels :many
-SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
-FROM channel_models cm
-CROSS JOIN LATERAL unnest(cm.formats) AS f
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-GROUP BY cm.model_id
-ORDER BY cm.model_id;
-
--- name: CustomModelOnline :one
-SELECT EXISTS (
-    SELECT 1
-    FROM channel_models cm
-    JOIN channels c ON c.id = cm.channel_id
-    JOIN accounts a ON a.id = c.owner_id
-    WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
-      AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-);
-
--- name: ListOnlineChannelModels :many
-SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.cooldown_failures, c.cooldown_seconds,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY cm.model_id, c.id;
-
 -- name: HomeToday :one
 SELECT coalesce(sum(cost_nano + fee_nano), 0)::bigint AS spend_nano,
        count(*)::bigint AS calls,
@@ -311,3 +229,6 @@ UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_
 
 -- name: SettleBackground :exec
 UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL;
+
+-- name: InsertChannelEvent :exec
+INSERT INTO channel_events (channel_id,kind,reason) VALUES ($1,$2,$3);

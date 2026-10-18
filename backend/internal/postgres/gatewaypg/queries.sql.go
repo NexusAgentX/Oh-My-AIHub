@@ -50,23 +50,6 @@ type AttemptHistoryRow struct {
 	BeforeEditClientErrors int64
 }
 
-// The attempts of calls started in the window the engine keeps channel statistics
-// for, grouped for Engine.LoadStats, which runs once at startup: from then on the
-// statistics are counted in memory and nothing runs this periodically.
-// A row is one channel on one model in one five-minute bucket of the call's start
-// and, for completed attempts of streaming calls, one first-token bin (bin edges
-// are passed in, so database and engine bin identically; -1 for the rest).
-// Attempts the client abandoned (client_disconnected) are left out. A client_error
-// (an upstream 4xx that is the request's own fault) says nothing about the
-// channel's health, so it is not "counted", but it is kept per model for the 4xx
-// anomaly rule. The first-token figure counts streaming calls only: a
-// non-streaming call's first byte is the whole answer, which would rank a
-// channel by how long its answers are instead of how fast it starts.
-// The before_edit_* columns count the attempts of calls started before the
-// channel was last edited (channels.updated_at): the gateway leaves them out of
-// the 4xx anomaly rule, which judges a channel afresh after every edit, but not
-// out of the success rate and first-token time. The channel is joined by its
-// ID; a channel that no longer exists has no edit time and nothing is "before".
 func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) ([]AttemptHistoryRow, error) {
 	rows, err := q.db.Query(ctx, attemptHistory, arg.Edges, arg.Since)
 	if err != nil {
@@ -153,24 +136,6 @@ func (q *Queries) ClaimExecutionReceipt(ctx context.Context, arg ClaimExecutionR
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const customModelOnline = `-- name: CustomModelOnline :one
-SELECT EXISTS (
-    SELECT 1
-    FROM channel_models cm
-    JOIN channels c ON c.id = cm.channel_id
-    JOIN accounts a ON a.id = c.owner_id
-    WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
-      AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-)
-`
-
-func (q *Queries) CustomModelOnline(ctx context.Context, modelID string) (bool, error) {
-	row := q.db.QueryRow(ctx, customModelOnline, modelID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const enrichCallLocations = `-- name: EnrichCallLocations :exec
@@ -357,6 +322,21 @@ func (q *Queries) InsertCall(ctx context.Context, arg InsertCallParams) (string,
 	return id, err
 }
 
+const insertChannelEvent = `-- name: InsertChannelEvent :exec
+INSERT INTO channel_events (channel_id,kind,reason) VALUES ($1,$2,$3)
+`
+
+type InsertChannelEventParams struct {
+	ChannelID string
+	Kind      string
+	Reason    string
+}
+
+func (q *Queries) InsertChannelEvent(ctx context.Context, arg InsertChannelEventParams) error {
+	_, err := q.db.Exec(ctx, insertChannelEvent, arg.ChannelID, arg.Kind, arg.Reason)
+	return err
+}
+
 const keySpend = `-- name: KeySpend :one
 SELECT coalesce(sum(cost_nano + fee_nano) FILTER (WHERE created_at >= $1), 0)::bigint AS today_nano,
        coalesce(sum(cost_nano + fee_nano) FILTER (WHERE created_at >= $2), 0)::bigint AS month_nano,
@@ -382,102 +362,6 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 	var i KeySpendRow
 	err := row.Scan(&i.TodayNano, &i.MonthNano, &i.TotalNano)
 	return i, err
-}
-
-const listAllCandidates = `-- name: ListAllCandidates :many
-SELECT cm.model_id, cm.formats,
-       c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier
-  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY cm.model_id, c.id
-`
-
-type ListAllCandidatesRow struct {
-	ModelID                             string
-	Formats                             []string
-	ID                                  string
-	OwnerID                             string
-	Name                                string
-	BaseUrl                             string
-	ApiKeyCiphertext                    []byte
-	ApiKeyNonce                         []byte
-	ApiKeyKeyID                         string
-	UserAgent                           *string
-	HeaderRules                         []byte
-	ConcurrencyLimit                    *int32
-	RpmLimit                            *int32
-	TtftTimeoutMs                       *int32
-	RequestTimeoutMs                    *int32
-	IdleTimeoutMs                       *int32
-	CooldownFailures                    *int32
-	CooldownSeconds                     *int32
-	UpstreamModel                       string
-	MultiplierNano                      int64
-	FxDiscount                          bool
-	IsCustom                            bool
-	CustomInputPriceNanoPerMillion      *money.Amount
-	CustomOutputPriceNanoPerMillion     *money.Amount
-	CustomCacheWritePriceNanoPerMillion *money.Amount
-	CustomCacheReadPriceNanoPerMillion  *money.Amount
-}
-
-// Every row ListCandidates can return, for any model and format, for the
-// candidate snapshot (ADR-0040): same columns and conditions, with the model
-// and the formats the row serves instead of the two filters. Rows come in
-// model order and, within a model, in channel id order, the order of
-// ListCandidates.
-func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, listAllCandidates)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListAllCandidatesRow
-	for rows.Next() {
-		var i ListAllCandidatesRow
-		if err := rows.Scan(
-			&i.ModelID,
-			&i.Formats,
-			&i.ID,
-			&i.OwnerID,
-			&i.Name,
-			&i.BaseUrl,
-			&i.ApiKeyCiphertext,
-			&i.ApiKeyNonce,
-			&i.ApiKeyKeyID,
-			&i.UserAgent,
-			&i.HeaderRules,
-			&i.ConcurrencyLimit,
-			&i.RpmLimit,
-			&i.TtftTimeoutMs,
-			&i.RequestTimeoutMs,
-			&i.IdleTimeoutMs,
-			&i.CooldownFailures,
-			&i.CooldownSeconds,
-			&i.UpstreamModel,
-			&i.MultiplierNano,
-			&i.FxDiscount,
-			&i.IsCustom,
-			&i.CustomInputPriceNanoPerMillion,
-			&i.CustomOutputPriceNanoPerMillion,
-			&i.CustomCacheWritePriceNanoPerMillion,
-			&i.CustomCacheReadPriceNanoPerMillion,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listAllKeys = `-- name: ListAllKeys :many
@@ -531,206 +415,6 @@ func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
 			&i.ModelAliases,
 			&i.AccountStatus,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listCandidates = `-- name: ListCandidates :many
-SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
-       cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(cm.formats)
-  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY c.id
-`
-
-type ListCandidatesParams struct {
-	ModelID string
-	Format  string
-}
-
-type ListCandidatesRow struct {
-	ID                                  string
-	OwnerID                             string
-	Name                                string
-	BaseUrl                             string
-	ApiKeyCiphertext                    []byte
-	ApiKeyNonce                         []byte
-	ApiKeyKeyID                         string
-	UserAgent                           *string
-	HeaderRules                         []byte
-	ConcurrencyLimit                    *int32
-	RpmLimit                            *int32
-	TtftTimeoutMs                       *int32
-	RequestTimeoutMs                    *int32
-	IdleTimeoutMs                       *int32
-	CooldownFailures                    *int32
-	CooldownSeconds                     *int32
-	UpstreamModel                       string
-	MultiplierNano                      int64
-	FxDiscount                          bool
-	IsCustom                            bool
-	CustomInputPriceNanoPerMillion      *money.Amount
-	CustomOutputPriceNanoPerMillion     *money.Amount
-	CustomCacheWritePriceNanoPerMillion *money.Amount
-	CustomCacheReadPriceNanoPerMillion  *money.Amount
-}
-
-func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, listCandidates, arg.ModelID, arg.Format)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListCandidatesRow
-	for rows.Next() {
-		var i ListCandidatesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OwnerID,
-			&i.Name,
-			&i.BaseUrl,
-			&i.ApiKeyCiphertext,
-			&i.ApiKeyNonce,
-			&i.ApiKeyKeyID,
-			&i.UserAgent,
-			&i.HeaderRules,
-			&i.ConcurrencyLimit,
-			&i.RpmLimit,
-			&i.TtftTimeoutMs,
-			&i.RequestTimeoutMs,
-			&i.IdleTimeoutMs,
-			&i.CooldownFailures,
-			&i.CooldownSeconds,
-			&i.UpstreamModel,
-			&i.MultiplierNano,
-			&i.FxDiscount,
-			&i.IsCustom,
-			&i.CustomInputPriceNanoPerMillion,
-			&i.CustomOutputPriceNanoPerMillion,
-			&i.CustomCacheWritePriceNanoPerMillion,
-			&i.CustomCacheReadPriceNanoPerMillion,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
-SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.cooldown_failures, c.cooldown_seconds,
-       cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
-       cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
-FROM channel_models cm
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-ORDER BY cm.model_id, c.id
-`
-
-type ListOnlineChannelModelsRow struct {
-	ModelID                             string
-	ChannelID                           string
-	ChannelName                         string
-	OwnerID                             string
-	OwnerName                           string
-	Formats                             []string
-	MultiplierNano                      int64
-	FxDiscount                          bool
-	ConcurrencyLimit                    *int32
-	RpmLimit                            *int32
-	CooldownFailures                    *int32
-	CooldownSeconds                     *int32
-	IsCustom                            bool
-	CustomInputPriceNanoPerMillion      *money.Amount
-	CustomOutputPriceNanoPerMillion     *money.Amount
-	CustomCacheWritePriceNanoPerMillion *money.Amount
-	CustomCacheReadPriceNanoPerMillion  *money.Amount
-}
-
-func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChannelModelsRow, error) {
-	rows, err := q.db.Query(ctx, listOnlineChannelModels)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListOnlineChannelModelsRow
-	for rows.Next() {
-		var i ListOnlineChannelModelsRow
-		if err := rows.Scan(
-			&i.ModelID,
-			&i.ChannelID,
-			&i.ChannelName,
-			&i.OwnerID,
-			&i.OwnerName,
-			&i.Formats,
-			&i.MultiplierNano,
-			&i.FxDiscount,
-			&i.ConcurrencyLimit,
-			&i.RpmLimit,
-			&i.CooldownFailures,
-			&i.CooldownSeconds,
-			&i.IsCustom,
-			&i.CustomInputPriceNanoPerMillion,
-			&i.CustomOutputPriceNanoPerMillion,
-			&i.CustomCacheWritePriceNanoPerMillion,
-			&i.CustomCacheReadPriceNanoPerMillion,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOnlineModels = `-- name: ListOnlineModels :many
-SELECT cm.model_id, bool_or(cm.is_custom)::boolean AS custom, array_agg(DISTINCT f)::text[] AS formats
-FROM channel_models cm
-CROSS JOIN LATERAL unnest(cm.formats) AS f
-JOIN channels c ON c.id = cm.channel_id
-JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
-GROUP BY cm.model_id
-ORDER BY cm.model_id
-`
-
-type ListOnlineModelsRow struct {
-	ModelID string
-	Custom  bool
-	Formats []string
-}
-
-// Models that ListCandidates could serve in at least one format, with those
-// formats; the static conditions are the same, runtime state is not considered.
-func (q *Queries) ListOnlineModels(ctx context.Context) ([]ListOnlineModelsRow, error) {
-	rows, err := q.db.Query(ctx, listOnlineModels)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListOnlineModelsRow
-	for rows.Next() {
-		var i ListOnlineModelsRow
-		if err := rows.Scan(&i.ModelID, &i.Custom, &i.Formats); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

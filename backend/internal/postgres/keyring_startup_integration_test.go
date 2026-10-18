@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -16,11 +15,13 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 )
 
 // keyringSpec builds "id=base64-key" entries whose key material depends only on
@@ -55,12 +56,13 @@ func privateKeyringOf(t *testing.T, active string, ids ...string) *c2c.Keyring {
 // secretFixture writes channels, platform API keys and C2C orders through the
 // real services, sealed under whichever keyrings a call passes in.
 type secretFixture struct {
-	t      *testing.T
-	pool   *pgxpool.Pool
-	store  *storepg.Store
-	admin  identity.Account
-	seller identity.AdminAccount
-	funded int
+	t       *testing.T
+	pool    *pgxpool.Pool
+	store   *storepg.Store
+	admin   identity.Account
+	seller  identity.AdminAccount
+	funded  int
+	groupID string
 }
 
 func newSecretFixture(t *testing.T) *secretFixture {
@@ -77,28 +79,28 @@ const (
 
 func (f *secretFixture) channel(keyring *channel.Keyring, name string, status channel.Status) string {
 	f.t.Helper()
-	service := channel.NewService(channel.Dependencies{
-		Store: f.store.Channels, Keyring: keyring, Outbound: testOutbound{client: &http.Client{}},
-		KnownModels:  func(context.Context) ([]string, error) { return nil, nil },
-		BlockedHosts: func(context.Context) ([]string, error) { return nil, nil },
-	})
-	created, err := service.Create(context.Background(), f.seller.ID, channel.CreateInput{
-		Name: name, BaseURL: "https://relay.example.com", APIKey: testUpstreamSecret + "-" + name, Status: status,
-		Models: []channel.Model{{
-			ModelID: "foo-1", MultiplierNano: money.Scale, Formats: []channel.Format{channel.FormatOpenAIChat},
-			Custom: &channel.CustomPrices{Input: mustAmount(f.t, "1"), Output: mustAmount(f.t, "1")},
-		}},
-	})
-	if err != nil {
-		f.t.Fatalf("create channel %s: %v", name, err)
+	ctx := context.Background()
+	if f.groupID == "" {
+		supplier := market.Supplier{ID: marketID(f.t), Name: "Synthetic keyring supplier", Kind: "relay", Enabled: true}
+		group := market.Group{ID: marketID(f.t), SupplierID: supplier.ID, Name: "Synthetic keyring group", Enabled: true}
+		marketApply(f.t, f.store, f.admin.ID, market.Changes{Suppliers: []market.Change[market.Supplier]{{Value: supplier}}, Groups: []market.Change[market.Group]{{Value: group}}})
+		f.groupID = group.ID
 	}
-	return created.ID
+	id := marketID(f.t)
+	sealed, err := keyring.Encrypt(id, 1, testUpstreamSecret+"-"+name)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	row := groupchannel.Record{ID: id, Owner: channel.Owner{ID: f.seller.ID}, GroupID: f.groupID, Name: name, Status: status, BaseURL: "https://synthetic.example", Credential: sealed, AddressIDs: []string{}}
+	if err = groupchannelpg.NewStore(f.pool).Create(ctx, row, nil); err != nil {
+		f.t.Fatal(err)
+	}
+	return id
 }
-
 func (f *secretFixture) deleteChannel(id string) {
 	f.t.Helper()
-	if err := f.store.Channels.SoftDelete(context.Background(), id); err != nil {
-		f.t.Fatalf("delete channel: %v", err)
+	if err := groupchannelpg.NewStore(f.pool).Delete(context.Background(), id, 1); err != nil {
+		f.t.Fatal(err)
 	}
 }
 
@@ -148,7 +150,7 @@ func (f *secretFixture) closeOrder(keyring *c2c.Keyring, id string) {
 
 func (f *secretFixture) verify(upstream *channel.Keyring, private *c2c.Keyring) (keyringcheck.Report, error) {
 	return keyringcheck.Verify(context.Background(),
-		keyringcheck.Sources{Channels: f.store.Channels, APIKeys: f.store.Keys, C2COrders: f.store.C2C},
+		keyringcheck.Sources{Channels: f.store.ChannelHistory, APIKeys: f.store.Keys, C2COrders: f.store.C2C},
 		keyringcheck.Keyrings{Upstream: upstream, C2C: private})
 }
 
@@ -158,8 +160,9 @@ func TestKeyringCheckReadsEverySecretStillInUse(t *testing.T) {
 	oldPrivate, currentPrivate := privateKeyringOf(t, "c1", "c1"), privateKeyringOf(t, "c2", "c1", "c2")
 
 	// Written under the old keys: a listed and an unlisted channel, an enabled and
-	// a disabled platform key, an open and a closed order. Channels and keys
-	// that were deleted again are never decrypted, so they must not count.
+	// a disabled platform key, an open and a closed order. Deleted channels
+	// retain sealed historical references and remain part of startup checks;
+	// deleted platform keys cannot authenticate and are not loaded.
 	live := f.channel(old, "live", channel.StatusListed)
 	unlisted := f.channel(old, "unlisted", channel.StatusUnlisted)
 	deletedChannel := f.channel(old, "deleted", channel.StatusListed)
@@ -181,8 +184,8 @@ func TestKeyringCheckReadsEverySecretStillInUse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete keyrings: %v", err)
 	}
-	if want := (keyringcheck.Report{Channels: 3, APIKeys: 3, C2COrders: 3}); report != want {
-		t.Fatalf("report = %+v, want %+v (deleted channel and key must be skipped)", report, want)
+	if want := (keyringcheck.Report{Channels: 4, APIKeys: 3, C2COrders: 3}); report != want {
+		t.Fatalf("report = %+v, want %+v (retained channels are checked; deleted Key is skipped)", report, want)
 	}
 
 	// The historical keys were left out: exactly the records sealed under them
@@ -197,7 +200,7 @@ func TestKeyringCheckReadsEverySecretStillInUse(t *testing.T) {
 		got = append(got, failure.Kind+" "+failure.ID)
 	}
 	want := []string{
-		"channel " + live, "channel " + unlisted, "api_key " + liveKey, "api_key " + disabledKey,
+		"channel " + live, "channel " + unlisted, "channel " + deletedChannel, "api_key " + liveKey, "api_key " + disabledKey,
 		"c2c_order " + openOrder, "c2c_order " + closedOrder,
 	}
 	slices.Sort(got)
@@ -205,7 +208,7 @@ func TestKeyringCheckReadsEverySecretStillInUse(t *testing.T) {
 	if !slices.Equal(got, want) || failed.Total != len(want) {
 		t.Fatalf("failures = %v (total %d), want %v", got, failed.Total, want)
 	}
-	for _, leaked := range []string{testUpstreamSecret, liveSecret, disabledSecret, testPaymentAccount, deletedChannel, deletedKey, currentKey, currentOrder} {
+	for _, leaked := range []string{testUpstreamSecret, liveSecret, disabledSecret, testPaymentAccount, deletedKey, currentKey, currentOrder} {
 		if strings.Contains(err.Error(), leaked) {
 			t.Fatalf("message contains %q: %s", leaked, err.Error())
 		}
@@ -238,8 +241,8 @@ func TestKeyringCheckSourcesPageInIDOrder(t *testing.T) {
 		query string
 		page  func(afterID string, limit int) ([]string, error)
 	}{
-		{"channels", `SELECT id FROM channels WHERE deleted_at IS NULL ORDER BY id`, func(afterID string, limit int) ([]string, error) {
-			rows, err := f.store.Channels.CredentialsAfter(ctx, afterID, limit)
+		{"channels", `SELECT id FROM channels ORDER BY id`, func(afterID string, limit int) ([]string, error) {
+			rows, err := f.store.ChannelHistory.CredentialsAfter(ctx, afterID, limit)
 			ids := make([]string, len(rows))
 			for index, row := range rows {
 				ids[index] = row.RecordID
@@ -276,8 +279,12 @@ func TestKeyringCheckSourcesPageInIDOrder(t *testing.T) {
 			want = append(want, id)
 		}
 		rows.Close()
-		if len(want) != 5 {
-			t.Fatalf("%s: %d rows stored, want 5", source.name, len(want))
+		expected := 5
+		if source.name == "channels" {
+			expected = 6
+		}
+		if len(want) != expected {
+			t.Fatalf("%s: %d rows stored, want %d", source.name, len(want), expected)
 		}
 
 		var got []string
@@ -295,7 +302,11 @@ func TestKeyringCheckSourcesPageInIDOrder(t *testing.T) {
 			}
 			afterID = page[len(page)-1]
 		}
-		if !slices.Equal(got, want) || !slices.Equal(sizes, []int{2, 2, 1}) {
+		pageSizes := []int{2, 2, 1}
+		if source.name == "channels" {
+			pageSizes = []int{2, 2, 2, 0}
+		}
+		if !slices.Equal(got, want) || !slices.Equal(sizes, pageSizes) {
 			t.Fatalf("%s: paged %v in pages %v, want %v", source.name, got, sizes, want)
 		}
 	}

@@ -69,10 +69,6 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 		t.Fatal("stored credential did not round-trip", e)
 	}
 
-	legacy, err := s.Channels.Get(ctx, id)
-	if err != nil || legacy.GroupID == nil || *legacy.GroupID != g.ID {
-		t.Fatal("legacy management guard cannot identify group channel", err)
-	}
 	historyID, err := s.Gateway.InsertCall(ctx, gateway.CallInsert{AccountID: admin.ID, RequestedModel: m.ModelID, Format: channel.FormatOpenAIChat, Stream: true, Outcome: gateway.OutcomeInProgress})
 	if err != nil {
 		t.Fatal(err)

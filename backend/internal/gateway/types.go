@@ -380,7 +380,6 @@ type CallSummary struct {
 
 // Browse is the read side behind the model pages and the home page.
 type Browse interface {
-	OnlineChannels(ctx context.Context) ([]OnlineChannel, error)
 	Home(ctx context.Context, accountID string, dayStart time.Time) (HomeStats, error)
 	RecentCalls(ctx context.Context, accountID string, limit int) ([]CallSummary, error)
 }
