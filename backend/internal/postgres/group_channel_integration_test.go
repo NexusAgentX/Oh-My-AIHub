@@ -36,7 +36,17 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 	change.Quotes = []market.Quote{{ID: qid, GroupModelID: change.Models[0].Value.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(t, "2")}}}
 	marketApply(t, s, admin.ID, change)
 	d := marketSnapshot(t, s)
-	g, m := d.Groups[0], d.Models[0]
+	g := d.Groups[0]
+	var m market.GroupModel
+	for _, candidate := range d.Models {
+		if candidate.ID == change.Models[0].Value.ID {
+			m = candidate
+			break
+		}
+	}
+	if m.ID == "" {
+		t.Fatal("quoted fixture model missing")
+	}
 	keyring, err := channel.ParseKeyring("fixture="+base64.StdEncoding.EncodeToString(make([]byte, 32)), "fixture")
 	if err != nil {
 		t.Fatal(err)
