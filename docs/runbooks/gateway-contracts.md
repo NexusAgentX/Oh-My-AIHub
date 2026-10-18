@@ -49,7 +49,7 @@ rm -rf "$AIHUB_CLI_LAB"
 
 这一步证明固定客户端的启用和合成生图工具闭环，不证明真实 notes 写读/历史恢复、跨供应商兼容、正式平台端点、模型目录、zstd 或真实上游生图已通过。fixture 会拒绝未实现路径，目录失败后使用客户端内置目录；它没有伪造一份已通过的供应商目录。客户端可能先尝试 WebSocket 再回退到 HTTP/SSE，不能把回退记录为 WebSocket 支持。`responses_websockets` 系列在该版本已经移除，不将这些无效开关作为禁用 WS 的证据。
 
-合成后端返回空 thread_hint 只证明调用发生。它没有标准的“创建会话并证明所有者”语义，不能据此把客户端提交的未知 session 先登记给第一个调用者。正式 F8 必须证明实际原生协议下的首次归属；未证明时按既定安全边界失败关闭并标记平台前置未就绪，不写供应商 unsupported，不增加来源粘性。
+合成后端返回空 thread_hint 只证明调用发生，不单独证明首次归属。维护者已确认对会话编号作账号/平台 Key 命名空间隔离：`TestCodexNamespaceIsolatesOwnersAndPreservesNativeContents` 验证同一原始编号在不同账号/Key 下分离，重启保持稳定，猜测他人内部编号不能逃逸；原始正文、密文和普通 item ID 保留。正式 F7/F8 仍需验证保护密钥持久化及实际平台代理入口，不能把原型当供应商支持证据。
 
 后台 V2 压缩需要独立配置：固定版本要求启用 `features.async_compaction`、关闭 token budget，且 provider 的远程压缩能力为 V2；它与上述 notes 配置互斥。精确配置及十个 history/notes 操作的字段/必要头只维护在 OpenAPI 扩展，不能将此启用实验解释成后台压缩或全部辅助操作通过。
 

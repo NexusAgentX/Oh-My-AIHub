@@ -6679,7 +6679,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.3",
+    "version": "2026-10-18.4",
     "stage": "discovery",
     "sources": [
       {
@@ -9856,13 +9856,15 @@ x-aihub-gateway-contract:
       "gateway/capacity-search": "后台参数契约见 components/schemas/GatewayCapacitySearch；上下文与最大输出分别配置，任务固定版本。无平台累计费用/HTTP/token/图片/工具/总时长硬预算。范围与轮数属于有限算法，前置失败/短回答/外部错误不当长度上界。",
       "gateway/creation-ownership": "可信创建返回在暴露 ID 前原子登记账号/平台 Key、操作 ID、原 Binding 和受保护的真实凭据等值标签；同组同实际上游 Key 的不同渠道共享原生 ID 碰撞域。碰撞须保留隔离标记，旧归属也不可继续读取可能已被替换的数据。非创建列表/客户端自报 ID 不证明首次归属；子项先核验父级。正式持久化归 F1/F7，检测 fixture 不代替事务索引。",
       "gateway/pagination": "在服务端过滤未登记/他人资源，重算返回列表的首末 ID/has_more，不透出共享 totals；默认原型每页至多100项、单次最多4页/合计1MiB，空页仍可给继续游标。原生游标以32字节保护密钥的AES-GCM封装，绑定账号/Key/资源/父级/规范化请求摘要；标准资源另绑原 Binding，context 游标不含渠道来源。原生游标至多2048字节，拒绝重复/超长/篡改，正式适配器先限制网络读取并映射原生分页字段。",
-      "codex-special/first-context-ownership": "客户端 session/agent/path/window/item 不是首次归属证明，thread_hint 的 text 也不是所有权声明。未知外部上下文失败关闭，不向共享上游试读再认领；正式 F8 须提供可信的首次会话归属/隔离证明。CLI 合成启用实验只证明扩展已调用，不证明任意共享上游首次归属安全；该前置未就绪不记为供应商 unsupported，不以来源粘性或保存正文补齐。",
+      "codex-special/first-context-ownership": "维护者第32条已确认会话编号隔离：使用现有密钥环加密持久化的稳定随机根密钥，对平台账号ID、平台Key ID和原始session/thread标识作长度分隔HMAC-SHA256，生成UUIDv8内部编号。命名空间不含供应商/分组/渠道/上游凭据，原始ID相同的其他账号/Key得到不同内部ID，猜到他人内部ID也不能逃逸自身命名空间。新会话可在经过此隔离后安全初始化；普通标准远端资源仍不能凭自报ID认领。",
       "codex-special/profiles": "固定0.163.0：内置openai provider及平台身份兼容。history/notes配置 features.token_budget.enabled=true、use_history_notes_extension=true；后台V2另用 features.async_compaction.enabled=true 且 token_budget.enabled=false、use_history_notes_extension=false，要求provider远程压缩能力V2。两配置互斥，不把两开关均true当生效证明。remote_compaction_v2在该版本已是移除的无效开关。",
       "codex-special/compaction": "V1原生POST codex/responses/compact；V2通过普通codex/responses输入type=compaction_trigger，返回完整type=compaction窗口并续用；后台V2是客户端执行方式，非background=true，不是context_management。固定源码sources/codex，三层证据独立，当前CLI原型未证明压缩实际触发。",
       "gateway/evidence-layers": "upstream_protocol、gateway_proxy、official_cli分别记录目标、方法/路径、模型/凭据范围摘要、代码/客户端/配置/范围版本及结果；官方CLI+合成后端证据仅official_cli_with_synthetic_backend，不能投影真实供应商能力。client_not_enabled、configuration_error、platform_endpoint_pending、detector_error与真实unsupported分别归类。",
       "codex-special/images": "固定源码codex-api/src/images.rs及endpoint/images.rs：generations和edits均原生JSON；edits含images[{image_url}]，不依赖Files。字段model为实际图像模型，非主对话模型；模型/权限/报价单独核验。ImageReference::File仅表示源码形态，不授权共享外部file_id。",
       "gateway/item-reference": "原生item_reference可能仅含id：按可信索引的账号/Key与原始父级元数据解析，唯一才绑定；有显式父级时严格校验。跨父级/来源同ID无法消歧时拒绝，不以空父级错误拒绝所有已登记项。",
       "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
-      "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。"
+      "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。",
+      "codex-special/context-wire-mapping": "只处理固定CLI的context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。不递归改input/opaque item id、window/item引用、notes路径、正文或密文，不改current_agent_name。只在Codex上下文协议启用，未知扩展原样保留；重复标识/头拒绝，空值可选metadata保留。解压/映射/模型替换后由F8正确重建编码与长度。",
+      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。"
     }
   }
