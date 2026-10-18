@@ -347,8 +347,6 @@ func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, confi
 
 	e.engineDeps = dependencies
 	e.engine = gateway.NewEngine(dependencies)
-	// As in the server: editing a channel clears its 4xx anomaly figures.
-	cached.Cache.OnChannelEdited(e.engine.ChannelEdited)
 
 	groups.Edited = e.engine.ChannelEdited
 
@@ -406,7 +404,6 @@ func (e *env) restartGateway() {
 	dependencies := e.engineDeps
 	dependencies.StatsBook = nil
 	engine := gateway.NewEngine(dependencies)
-	e.cached.Cache.OnChannelEdited(engine.ChannelEdited)
 	if e.groups != nil {
 		e.groups.Edited = engine.ChannelEdited
 	}

@@ -7,11 +7,8 @@ import (
 	"slices"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -32,10 +29,6 @@ func wrappedStores() []wrapped {
 	return []wrapped{
 		{"apikey.Store", reflect.TypeFor[apikey.Store](), keyStoreWrites, keyStoreOthers,
 			func(c *Cache, fail error) any { return c.Keys(stubKeys{fail: fail, created: true}) }},
-		{"channel.Store", reflect.TypeFor[channel.Store](), channelStoreWrites, channelStoreOthers,
-			func(c *Cache, fail error) any { return c.Channels(stubChannels{fail: fail}) }},
-		{"catalog.Store", reflect.TypeFor[catalog.Store](), catalogStoreWrites, catalogStoreOthers,
-			func(c *Cache, fail error) any { return c.Catalog(stubCatalog{fail: fail}) }},
 		{"identity.Store", reflect.TypeFor[identity.Store](), identityStoreWrites, identityStoreOthers,
 			func(c *Cache, fail error) any { return c.Identity(stubIdentity{fail: fail}) }},
 		{"routing.Store", reflect.TypeFor[routing.Store](), routingStoreWrites, routingStoreOthers,
@@ -189,96 +182,6 @@ func TestEnsureDefaultInvalidatesOnlyWhenItCreatedTheKey(t *testing.T) {
 	}
 }
 
-// A write to the channel store is either an edit of an existing channel, which
-// makes the gateway forget the channel's 4xx answers, or the creation of a new
-// one; a method added to the store has to be decided on, like in the test above.
-func TestEveryChannelWriteIsDecidedOnForTheAnomalyStats(t *testing.T) {
-	decided := append(slices.Clone(channelStoreEdits), channelStoreNotEdits...)
-	sort.Strings(decided)
-	writes := writeNames(channelStoreWrites)
-	sort.Strings(writes)
-	if !slices.Equal(decided, writes) {
-		t.Fatalf("channelStoreEdits and channelStoreNotEdits together are %v, the channel store's writes are %v", decided, writes)
-	}
-}
-
-// Editing a channel calls the hook with its ID once the write has succeeded and
-// the snapshots are rebuilt; creating one, failing, a probe that only records
-// its results, and reads never do.
-func TestChannelEditsReachTheEditHook(t *testing.T) {
-	ctx := context.Background()
-	newHooked := func(fail error) (channel.Store, *Cache, *[]string) {
-		cache := newTestCache(&fakeLoader{})
-		var edited []string
-		cache.OnChannelEdited(func(id string) {
-			if stale := staleDomains(cache) & DomainFleet; stale != 0 {
-				t.Errorf("the hook ran for %s before the fleet was rebuilt", id)
-			}
-			edited = append(edited, id)
-		})
-		return cache.Channels(stubChannels{fail: fail}), cache, &edited
-	}
-
-	store, _, edited := newHooked(nil)
-	if _, err := store.Update(ctx, "u", channel.Update{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SoftDelete(ctx, "d"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.SaveTests(ctx, "s", nil, time.Time{}, true); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.Suspend(ctx, "admin", "p", "reason"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.Unsuspend(ctx, "admin", "q", "reason"); err != nil {
-		t.Fatal(err)
-	}
-	if want := []string{"u", "d", "s", "p", "q"}; !slices.Equal(*edited, want) {
-		t.Fatalf("edited channels = %v, want %v", *edited, want)
-	}
-
-	// Not edits.
-	store, _, edited = newHooked(nil)
-	if _, err := store.Create(ctx, channel.NewChannel{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.SaveTests(ctx, "s", nil, time.Time{}, false); err != nil {
-		t.Fatal(err)
-	}
-	if len(*edited) != 0 {
-		t.Fatalf("hook ran for %v", *edited)
-	}
-
-	// A write that failed changed nothing.
-	failing := errors.New("rolled back")
-	store, _, edited = newHooked(failing)
-	_, _ = store.Update(ctx, "u", channel.Update{})
-	_ = store.SoftDelete(ctx, "d")
-	_, _ = store.SaveTests(ctx, "s", nil, time.Time{}, true)
-	_, _ = store.Suspend(ctx, "admin", "p", "reason")
-	_, _ = store.Unsuspend(ctx, "admin", "q", "reason")
-	if len(*edited) != 0 {
-		t.Fatalf("hook ran for %v after failed writes", *edited)
-	}
-
-	// No hook registered is fine, and a second registration replaces the first.
-	bare := newTestCache(&fakeLoader{})
-	if _, err := bare.Channels(stubChannels{}).Update(ctx, "u", channel.Update{}); err != nil {
-		t.Fatal(err)
-	}
-	var first, second int
-	bare.OnChannelEdited(func(string) { first++ })
-	bare.OnChannelEdited(func(string) { second++ })
-	if _, err := bare.Channels(stubChannels{}).Update(ctx, "u", channel.Update{}); err != nil {
-		t.Fatal(err)
-	}
-	if first != 0 || second != 1 {
-		t.Fatalf("hooks called %d and %d times, want 0 and 1", first, second)
-	}
-}
-
 // The stubs implement only the writes: a wrapper passes every other method
 // straight through to the store it wraps, so it cannot invalidate on them.
 type stubKeys struct {
@@ -297,41 +200,6 @@ func (s stubKeys) Update(context.Context, string, string, apikey.Update) (apikey
 	return apikey.Key{}, s.fail
 }
 func (s stubKeys) Delete(context.Context, string, string) error { return s.fail }
-
-type stubChannels struct {
-	channel.Store
-	fail error
-}
-
-func (s stubChannels) Create(context.Context, channel.NewChannel) (channel.Channel, error) {
-	return channel.Channel{}, s.fail
-}
-func (s stubChannels) Update(context.Context, string, channel.Update) (channel.Channel, error) {
-	return channel.Channel{}, s.fail
-}
-func (s stubChannels) SoftDelete(context.Context, string) error { return s.fail }
-func (s stubChannels) SaveTests(context.Context, string, []channel.TestOutcome, time.Time, bool) (channel.Channel, error) {
-	return channel.Channel{}, s.fail
-}
-func (s stubChannels) Suspend(context.Context, string, string, string) (channel.Channel, error) {
-	return channel.Channel{}, s.fail
-}
-func (s stubChannels) Unsuspend(context.Context, string, string, string) (channel.Channel, error) {
-	return channel.Channel{}, s.fail
-}
-
-type stubCatalog struct {
-	catalog.Store
-	fail error
-}
-
-func (s stubCatalog) CreateModel(context.Context, string, catalog.Model) (catalog.Model, error) {
-	return catalog.Model{}, s.fail
-}
-func (s stubCatalog) UpdateModel(context.Context, string, string, func(catalog.Model) (catalog.Model, error)) (catalog.Model, error) {
-	return catalog.Model{}, s.fail
-}
-func (s stubCatalog) DeleteModel(context.Context, string, string) error { return s.fail }
 
 type stubIdentity struct {
 	identity.Store

@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
@@ -102,9 +101,6 @@ type Cache struct {
 	sticky *responseLRU
 
 	balances *balanceBook
-
-	// edited is the hook of OnChannelEdited.
-	edited atomic.Pointer[func(string)]
 }
 
 // New builds a Cache. Nothing is loaded yet: the first read of a snapshot

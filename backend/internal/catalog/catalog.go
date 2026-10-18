@@ -1,5 +1,5 @@
-// Package catalog is the model catalog: model names, four base prices
-// (points per million tokens) and conditional price tiers (ADR-0012).
+// Package catalog defines read-only aggregate model metadata and historical
+// pricing values. Model identity and current quotes belong to supplier groups.
 package catalog
 
 import (
@@ -113,144 +113,22 @@ func (m Model) BasePrices() ledger.Prices {
 	}
 }
 
-// ModelPatch changes the given fields; PriceTiers non-nil replaces the whole tier list.
-type ModelPatch struct {
-	DisplayName     *string
-	PriceCurrency   *string
-	InputPrice      *money.Amount
-	OutputPrice     *money.Amount
-	CacheWritePrice *money.Amount
-	CacheReadPrice  *money.Amount
-
-	TokenPrices              *map[string]money.Amount
-	PriceTiers               *[]ledger.PriceTier
-	Enabled                  *bool
-	SortOrder                *int32
-	Provider                 *string
-	ContextWindow            **int64
-	MaxOutputTokens          **int64
-	InputModalities          *[]string
-	OutputModalities         *[]string
-	SupportsTools            *bool
-	SupportsStructuredOutput *bool
-	SupportsVision           *bool
-	ParameterInfo            *string
-}
-
-func (p ModelPatch) empty() bool {
-	return p == ModelPatch{}
-}
-
-// Apply returns the model with the patch applied.
-func (p ModelPatch) Apply(model Model) Model {
-	set := func(target *string, value *string) {
-		if value != nil {
-			*target = *value
-		}
-	}
-	setAmount := func(target *money.Amount, value *money.Amount) {
-		if value != nil {
-			*target = *value
-		}
-	}
-	setBool := func(target *bool, value *bool) {
-		if value != nil {
-			*target = *value
-		}
-	}
-	set(&model.DisplayName, p.DisplayName)
-	set(&model.PriceCurrency, p.PriceCurrency)
-	setAmount(&model.InputPrice, p.InputPrice)
-	setAmount(&model.OutputPrice, p.OutputPrice)
-	setAmount(&model.CacheWritePrice, p.CacheWritePrice)
-	setAmount(&model.CacheReadPrice, p.CacheReadPrice)
-	if p.TokenPrices != nil {
-		model.TokenPrices = *p.TokenPrices
-	}
-	if p.PriceTiers != nil {
-		model.PriceTiers = *p.PriceTiers
-	}
-	setBool(&model.Enabled, p.Enabled)
-	if p.SortOrder != nil {
-		model.SortOrder = *p.SortOrder
-	}
-	set(&model.Provider, p.Provider)
-	if p.ContextWindow != nil {
-		model.ContextWindow = *p.ContextWindow
-	}
-	if p.MaxOutputTokens != nil {
-		model.MaxOutputTokens = *p.MaxOutputTokens
-	}
-	if p.InputModalities != nil {
-		model.InputModalities = *p.InputModalities
-	}
-	if p.OutputModalities != nil {
-		model.OutputModalities = *p.OutputModalities
-	}
-	setBool(&model.SupportsTools, p.SupportsTools)
-	setBool(&model.SupportsStructuredOutput, p.SupportsStructuredOutput)
-	setBool(&model.SupportsVision, p.SupportsVision)
-	set(&model.ParameterInfo, p.ParameterInfo)
-	return model
-}
-
+// Store reads an aggregate model query. It has no entity creation, update,
+// deletion or pricing-publication API; approved group records own those facts.
 type Store interface {
-	DeleteModel(ctx context.Context, actorID, id string) error
-	ListModels(ctx context.Context, includeDisabled bool) ([]Model, error)
-	GetModel(ctx context.Context, id string) (Model, error)
-	// CreateModel inserts the model and its tiers and records an audit row.
-	CreateModel(ctx context.Context, actorID string, model Model) (Model, error)
-	// UpdateModel locks the model, passes the current value to mutate and
-	// stores the result (replacing tiers) with an audit row, in one transaction.
-	// When the price currency changes, the FX discount of every channel offering
-	// the model is set to (new currency is USD), so switching a model whose
-	// figures were dollars all along keeps every channel's price unchanged.
-	UpdateModel(ctx context.Context, actorID, id string, mutate func(Model) (Model, error)) (Model, error)
+	ListModels(context.Context, bool) ([]Model, error)
+	GetModel(context.Context, string) (Model, error)
 }
+type Service struct{ store Store }
 
-type Service struct {
-	store Store
-}
-
-func NewService(store Store) *Service {
-	return &Service{store: store}
-}
-
+func NewService(store Store) *Service { return &Service{store: store} }
 func (s *Service) List(ctx context.Context, includeDisabled bool) ([]Model, error) {
 	return s.store.ListModels(ctx, includeDisabled)
 }
-
 func (s *Service) Get(ctx context.Context, id string) (Model, error) {
 	return s.store.GetModel(ctx, strings.TrimSpace(id))
 }
 
-func (s *Service) Create(ctx context.Context, actorID string, model Model) (Model, error) {
-	model = Normalize(model)
-	if err := Validate(model); err != nil {
-		return Model{}, err
-	}
-	return s.store.CreateModel(ctx, actorID, model)
-}
-
-func (s *Service) Update(ctx context.Context, actorID, id string, patch ModelPatch) (Model, error) {
-	if patch.empty() {
-		return Model{}, ErrInvalidInput
-	}
-	return s.store.UpdateModel(ctx, actorID, id, func(current Model) (Model, error) {
-		updated := Normalize(patch.Apply(current))
-		if err := Validate(updated); err != nil {
-			return Model{}, err
-		}
-		return updated, nil
-	})
-}
-
-func (s *Service) Delete(ctx context.Context, actorID, id string) error {
-	return s.store.DeleteModel(ctx, actorID, id)
-}
-
-// Normalize trims text, deduplicates modalities and tier weekdays and fills
-// the default tier timezone.
 func Normalize(model Model) Model {
 	model.ID = strings.TrimSpace(model.ID)
 	model.DisplayName = strings.TrimSpace(model.DisplayName)
