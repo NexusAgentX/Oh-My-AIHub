@@ -84,6 +84,9 @@ type ListedResource struct {
 type NativePage struct {
 	Items []ListedResource
 	Next  string
+	// Stop ends this bounded scan while preserving an encrypted continuation.
+	// Adapters use it when the shared outbound-attempt budget is exhausted.
+	Stop bool
 }
 
 // FetchPage must bound network/body reads before allocating a page, request at
@@ -160,7 +163,7 @@ func ReadOwnedPage(ctx context.Context, actor Principal, scope CursorScope, toke
 		}
 		seen[page.Next] = true
 		native = page.Next
-		if len(result.Items) == limit {
+		if len(result.Items) == limit || page.Stop {
 			break
 		}
 	}
@@ -170,4 +173,60 @@ func ReadOwnedPage(ctx context.Context, actor Principal, scope CursorScope, toke
 		return OwnedPage{}, err
 	}
 	return result, nil
+}
+
+// WrapPageCursor carries the authenticated scope needed to select a bound
+// channel before ReadOwnedPage opens its native continuation. Native IDs and
+// engine metadata remain encrypted; caller-controlled routing hints are absent.
+func (c *CursorCodec) WrapPageCursor(scope CursorScope, token string) (string, error) {
+	if token == "" {
+		return "", nil
+	}
+	if c == nil || len(token) > 4096 {
+		return "", ErrPage
+	}
+	raw, err := json.Marshal(struct {
+		Scope CursorScope `json:"scope"`
+		Token string      `json:"token"`
+	}{scope, token})
+	if err != nil || len(raw) > 10<<10 {
+		return "", ErrPage
+	}
+	nonce := make([]byte, c.aead.NonceSize())
+	if _, err = rand.Read(nonce); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(c.aead.Seal(nonce, nonce, raw, []byte("aihub-resource-page-v1"))), nil
+}
+func (c *CursorCodec) UnwrapPageCursor(actor Principal, token string) (CursorScope, string, error) {
+	if c == nil || len(token) > 16<<10 {
+		return CursorScope{}, "", ErrPage
+	}
+	data, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil || len(data) < c.aead.NonceSize()+c.aead.Overhead() {
+		return CursorScope{}, "", ErrPage
+	}
+	n := c.aead.NonceSize()
+	raw, err := c.aead.Open(nil, data[:n], data[n:], []byte("aihub-resource-page-v1"))
+	if err != nil {
+		return CursorScope{}, "", ErrPage
+	}
+	var page struct {
+		Scope CursorScope `json:"scope"`
+		Token string      `json:"token"`
+	}
+	if json.Unmarshal(raw, &page) != nil || page.Scope.Authorize(actor, page.Scope) != nil || len(page.Token) > 4096 || page.Token == "" {
+		return CursorScope{}, "", ErrPage
+	}
+	return page.Scope, page.Token, nil
+}
+
+// OwnedBoundary admits an SDK's own visible last_id as a boundary after the
+// handler has resolved its durable ownership. Shared-account raw cursors and
+// client ownership claims must never be passed as resource metadata.
+func (c *CursorCodec) OwnedBoundary(actor Principal, scope CursorScope, resource Resource) (string, error) {
+	if c == nil || scope.Authorize(actor, scope) != nil || resource.AccountID != actor.AccountID || resource.KeyID != actor.KeyID || resource.Kind != scope.Kind || resource.ParentID != scope.ParentID || resource.Binding != scope.Binding || resource.CredentialScope == "" || resource.CreationID == "" {
+		return "", ErrPage
+	}
+	return c.seal(scope, resource.ID)
 }

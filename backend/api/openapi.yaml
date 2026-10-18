@@ -27,6 +27,876 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /v1/chat/completions/{completionID}:
+    {
+      "get": {
+        "operationId": "proxyChatGet",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "chat.get",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "completionID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "proxyChatUpdate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "chat.update",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "completionID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "proxyChatDelete",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "chat.delete",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "completionID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/chat/completions/{completionID}/messages:
+    {
+      "get": {
+        "operationId": "proxyChatMessages",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "chat.messages",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "completionID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/responses/{responseID}/input_items:
+    {
+      "get": {
+        "operationId": "proxyResponsesItems",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "responses.items",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "responseID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/responses/input_tokens:
+    {
+      "post": {
+        "operationId": "proxyResponsesCount",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "responses.count",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/responses/compact:
+    {
+      "post": {
+        "operationId": "proxyResponsesCompact",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "responses.compact",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/conversations:
+    {
+      "post": {
+        "operationId": "proxyConversationsCreate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.create",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/conversations/{conversationID}:
+    {
+      "get": {
+        "operationId": "proxyConversationsGet",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.get",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "proxyConversationsUpdate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.update",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "proxyConversationsDelete",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.delete",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/conversations/{conversationID}/items:
+    {
+      "post": {
+        "operationId": "proxyConversationsItemsCreate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.items.create",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "proxyConversationsItemsList",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.items.list",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/conversations/{conversationID}/items/{itemID}:
+    {
+      "get": {
+        "operationId": "proxyConversationsItemsGet",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.items.get",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "itemID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "proxyConversationsItemsDelete",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "conversations.items.delete",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "itemID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
+  /v1/images/generations:
+    {
+      "post": {
+        "operationId": "proxyImagesGenerations",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "images.generations",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "单次原生图片编辑/变体的图片与参数；仅替换 model 字段字节，不提供独立 Files 服务。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/images/edits:
+    {
+      "post": {
+        "operationId": "proxyImagesEdits",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "images.edits",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "单次原生图片编辑/变体的图片与参数；仅替换 model 字段字节，不提供独立 Files 服务。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/images/variations:
+    {
+      "post": {
+        "operationId": "proxyImagesVariations",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "images.variations",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "单次原生图片编辑/变体的图片与参数；仅替换 model 字段字节，不提供独立 Files 服务。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1/messages/count_tokens:
+    {
+      "post": {
+        "operationId": "proxyMessagesCount",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "messages.count",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1beta/cachedContents:
+    {
+      "post": {
+        "operationId": "proxyCacheCreate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "cache.create",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      },
+      "get": {
+        "operationId": "proxyCacheList",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "cache.list",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
+    }
+  /v1beta/cachedContents/{cacheID}:
+    {
+      "get": {
+        "operationId": "proxyCacheGet",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "cache.get",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cacheID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "proxyCacheUpdate",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "cache.update",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "原生请求正文。"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cacheID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "proxyCacheDelete",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "cache.delete",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cacheID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
+    }
   /api/group-channels/{channelID}/events:
     {
       "get": {
@@ -5593,6 +6463,28 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /v1/chat/completions:
+    get:
+      {
+        "operationId": "proxyChatList",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "chat.list",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": []
+      }
     post:
       operationId: proxyOpenAIChat
       tags: [gateway]
@@ -5627,6 +6519,38 @@ paths:
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
   /v1/responses/{responseID}:
+    delete:
+      {
+        "operationId": "proxyResponsesDelete",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "responses.delete",
+        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
+        "x-access": "gateway_key",
+        "x-feature": "495",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "原生响应（含流式）与原生错误。"
+          }
+        },
+        "parameters": [
+          {
+            "name": "responseID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ]
+      }
     get:
       operationId: retrieveOpenAIResponse
       tags: [gateway]
@@ -10748,8 +11672,8 @@ components:
     Date: {type: string, format: date, description: 日期（YYYY-MM-DD，Asia/Shanghai）。}
     Format:
       type: string
-      enum: [openai_chat, openai_responses, anthropic, gemini]
-      description: 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini。网关不做格式转换。
+      enum: [openai_chat, openai_responses, anthropic, gemini, openai_images]
+      description: 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini、Images。网关不做格式转换。
     RoutingMode: {type: string, enum: [cheapest, reliable, fastest, manual], description: 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。}
     CallOutcome:
       type: string

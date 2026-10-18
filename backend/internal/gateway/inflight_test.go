@@ -262,7 +262,11 @@ func (f *serveFixture) serve(path string, format channel.Format, header map[stri
 		request.Header.Set(name, value)
 	}
 	recorder := httptest.NewRecorder()
-	f.engine.Serve(recorder, request, format, "", false)
+	pathModel := ""
+	if format == channel.FormatGemini {
+		pathModel = strings.TrimPrefix(strings.Split(path, ":generateContent")[0], "/v1beta/models/")
+	}
+	f.engine.Serve(recorder, request, format, pathModel, false)
 	return recorder
 }
 

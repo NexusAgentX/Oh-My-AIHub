@@ -85,6 +85,18 @@ func RequestReferences(protocol string, body []byte) ([]Reference, error) {
 			return err
 		}
 		for _, message := range messages {
+			if protocol == "openai-chat-completions" {
+				var role string
+				_ = json.Unmarshal(message["role"], &role)
+				var audio struct {
+					ID json.RawMessage `json:"id"`
+				}
+				if role == "assistant" && json.Unmarshal(message["audio"], &audio) == nil {
+					if err := appendString("audio", audio.ID); err != nil {
+						return err
+					}
+				}
+			}
 			var content []map[string]json.RawMessage
 			if value := message[key]; len(value) > 0 && value[0] == '[' {
 				if err := json.Unmarshal(value, &content); err != nil {
@@ -169,6 +181,19 @@ func RequestReferences(protocol string, body []byte) ([]Reference, error) {
 						return nil, err
 					}
 				}
+				if tool.Type == "code_interpreter" && len(tool.Container) > 0 && tool.Container[0] == '{' {
+					var auto struct {
+						Files []json.RawMessage `json:"file_ids"`
+					}
+					if json.Unmarshal(tool.Container, &auto) != nil {
+						return nil, errors.New("invalid container reference")
+					}
+					for _, id := range auto.Files {
+						if err := appendString("file", id); err != nil {
+							return nil, err
+						}
+					}
+				}
 			}
 		}
 	case "native-generate-content":
@@ -179,6 +204,11 @@ func RequestReferences(protocol string, body []byte) ([]Reference, error) {
 			return nil, err
 		}
 	case "openai-chat-completions", "native-messages":
+		if protocol == "native-messages" {
+			if err := appendString("container", object["container"]); err != nil {
+				return nil, err
+			}
+		}
 		// Prompt cache keys and self-contained thinking/signatures are hints or
 		// contents, not references to remotely owned resources.
 		if err := inspectMessages(object["messages"], "content"); err != nil {

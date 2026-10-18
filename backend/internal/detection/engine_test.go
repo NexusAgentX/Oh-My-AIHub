@@ -645,6 +645,25 @@ func TestImplementedScenariosRunWhileOtherSuitesRemainPending(t *testing.T) {
 	if job.State != "suite_pending" || len(job.Results) != 1 || job.Results[0].ScenarioID != "native" || job.Usage.HTTP != 1 || job.Complete || job.ReportID == nil {
 		t.Fatalf("partial execution lost evidence or faked completion: %+v", job)
 	}
+	// Terminal persistence precedes execute's deferred secret/slot cleanup.
+	// Wait for that worker boundary; Resume is allowed to report busy before it.
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for {
+		s.mu.Lock()
+		idle := s.live[job.ID] == nil
+		s.mu.Unlock()
+		if idle {
+			break
+		}
+		select {
+		case <-tick.C:
+		case <-deadline.C:
+			t.Fatal("terminal worker did not release its slot")
+		}
+	}
 	if _, err = s.Resume(context.Background(), Actor{ID: "owner"}, job.ID, "synthetic-secret"); err != nil {
 		t.Fatal(err)
 	}
