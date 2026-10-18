@@ -20,6 +20,22 @@ type probePolicy struct {
 }
 
 func (p probePolicy) FreshClient(context.Context, string) (*http.Client, error) { return p.client, nil }
+
+func TestProbeDoesNotSpendForDisabledOrDeletedSupplier(t *testing.T) {
+	for _, deleted := range []bool{false, true} {
+		d, data := fixture()
+		data.Probes = nil
+		if deleted {
+			d.Suppliers[0].DeletedAt = &data.Channels[0].UpdatedAt
+		} else {
+			d.Suppliers[0].Enabled = false
+		}
+		if got := pendingModels(&State{Directory: d, Data: data}, data.Channels[0]); len(got) != 0 {
+			t.Fatal("disabled supplier scheduled paid probe", got)
+		}
+	}
+}
+
 func TestKeyProbeUsesNativeBodyInheritedHeadersAndOrderedEntrances(t *testing.T) {
 	for _, invalid := range []bool{false, true} {
 		t.Run(map[bool]string{false: "fallback", true: "invalid native reply"}[invalid], func(t *testing.T) {

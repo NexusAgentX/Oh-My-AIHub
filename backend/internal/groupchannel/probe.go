@@ -57,14 +57,8 @@ func (p *Prober) Notify() {
 	}
 }
 func pendingModels(state *State, r Record) []market.GroupModel {
-	var g market.Group
-	for _, v := range state.Directory.Groups {
-		if v.ID == r.GroupID {
-			g = v
-			break
-		}
-	}
-	if g.ID == "" || !g.Enabled || g.DeletedAt != nil || !r.OwnerActive || r.Status == channel.StatusSuspended || len(selected(state.Directory, r)) == 0 {
+	g, err := group(state.Directory, r.GroupID)
+	if err != nil || !r.OwnerActive || r.Status == channel.StatusSuspended || len(selected(state.Directory, r)) == 0 {
 		return nil
 	}
 	choices := map[string]bool{}
