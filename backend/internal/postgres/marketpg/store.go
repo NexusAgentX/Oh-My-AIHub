@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -56,13 +57,35 @@ func (s *Store) Apply(ctx context.Context, actor string, changes market.Changes)
 // Apply composes into the contribution approval transaction. It is not an HTTP
 // approval bypass; the caller checks current actor/report/draft permission first.
 func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error {
-	if actor == "" || len(c.Suppliers)+len(c.Groups)+len(c.Addresses)+len(c.Models)+len(c.Quotes)+len(c.GroupAddresses) > 1024 {
+	if actor == "" || len(c.Governance)+len(c.Suppliers)+len(c.Groups)+len(c.Addresses)+len(c.Models)+len(c.Quotes)+len(c.GroupAddresses) > 1024 {
 		return market.ErrInvalid
 	}
 	q := New(tx)
 	changedGroups := map[string]bool{}
 	audit := func(kind, id string, revision int64) error {
 		return auditpg.Record(ctx, tx, auditpg.Event{ActorID: actor, Action: "market." + kind + ".published", TargetType: kind, TargetID: id, Detail: map[string]any{"revision": revision}})
+	}
+	for _, change := range c.Governance {
+		v := change.Value
+		if change.BaseRevision < 0 || !gatewaycontract.ValidModelID(v.ModelID) || utf8.RuneCountInString(v.Reason) > 1000 {
+			return market.ErrInvalid
+		}
+		var count int64
+		var err error
+		if change.BaseRevision == 0 {
+			count, err = q.InsertModelRule(ctx, InsertModelRuleParams{ModelID: v.ModelID, Disabled: v.Disabled, Reason: v.Reason, ActorID: actor})
+		} else {
+			count, err = q.UpdateModelRule(ctx, UpdateModelRuleParams{ModelID: v.ModelID, Disabled: v.Disabled, Reason: v.Reason, ActorID: actor, BaseRevision: change.BaseRevision})
+		}
+		if err != nil {
+			return domainError(err)
+		}
+		if count != 1 {
+			return market.ErrConflict
+		}
+		if err = audit("model_id", v.ModelID, change.BaseRevision+1); err != nil {
+			return err
+		}
 	}
 	for _, change := range c.Suppliers {
 		v := change.Value
@@ -75,7 +98,11 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 			return err
 		}
 		v.Revision = change.BaseRevision + 1
-		p := InsertSupplierParams{ID: v.ID, ContributorID: actor, Name: v.Name, Kind: v.Kind, WebsiteUrl: v.WebsiteURL, IconData: v.IconData, IconSource: v.IconSource, Summary: v.Summary, Description: v.Description, DocsUrl: v.DocsURL, Enabled: v.Enabled, Revision: v.Revision, DeletedAt: v.DeletedAt}
+		contributorID := v.ContributorID
+		if contributorID == "" {
+			contributorID = actor
+		}
+		p := InsertSupplierParams{ID: v.ID, ContributorID: contributorID, Name: v.Name, Kind: v.Kind, WebsiteUrl: v.WebsiteURL, IconData: v.IconData, IconSource: v.IconSource, Summary: v.Summary, Description: v.Description, DocsUrl: v.DocsURL, Enabled: v.Enabled, Revision: v.Revision, DeletedAt: v.DeletedAt}
 		if change.BaseRevision == 0 {
 			_, err = q.InsertSupplier(ctx, p)
 		} else {

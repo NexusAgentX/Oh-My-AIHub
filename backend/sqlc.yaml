@@ -226,3 +226,11 @@ sql:
         <<: *gen
         package: detectionpg
         out: internal/postgres/detectionpg
+  - <<: *domain
+    queries: internal/postgres/contributionpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: contributionpg
+        out: internal/postgres/contributionpg
+        emit_json_tags: true

@@ -7,6 +7,7 @@ info:
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
+- {name: contributions, description: 私有市场贡献、完整报告审核与治理}
 - {name: detection, description: 上游能力检测、报告与搜索设置}
 - {name: forum, description: 登录成员论坛与私密工单}
 - {name: instance, description: 实例与健康检查}
@@ -26,6 +27,950 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/contributions/{draftID}/addresses:
+    {
+      "post": {
+        "operationId": "reuseContributionAddress",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "引用同供应商已批准地址",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionReuseAddress"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions/targets:
+    {
+      "get": {
+        "operationId": "contributionTargets",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "选择已生效的贡献目标",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionTargets"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "supplier",
+                "group",
+                "group_model",
+                "address"
+              ]
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions:
+    {
+      "get": {
+        "operationId": "listContributions",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "listContributions",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "newContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "newContribution",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionNew"
+              }
+            }
+          }
+        }
+      }
+    }
+  /api/contributions/{draftID}:
+    {
+      "get": {
+        "operationId": "getContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "getContribution",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "saveContribution",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionSave"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions/{draftID}/children:
+    {
+      "post": {
+        "operationId": "addContributionChild",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "addContributionChild",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionChild"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions/{draftID}/submit:
+    {
+      "post": {
+        "operationId": "submitContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "submitContribution",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions/{draftID}/withdraw:
+    {
+      "post": {
+        "operationId": "withdrawContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "withdrawContribution",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/admin/contributions/{draftID}/approve:
+    {
+      "post": {
+        "operationId": "approveContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "approveContribution",
+        "x-access": "admin",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "已提交待刷新或提交结果未知；不得显示为回滚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionPublicationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/admin/contributions/{draftID}/reject:
+    {
+      "post": {
+        "operationId": "rejectContribution",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "rejectContribution",
+        "x-access": "admin",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "draftID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/admin/contributions:
+    {
+      "get": {
+        "operationId": "reviewContributions",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "reviewContributions",
+        "x-access": "admin",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  /api/contributions/icon:
+    {
+      "post": {
+        "operationId": "fetchContributionIcon",
+        "tags": [
+          "contributions"
+        ],
+        "summary": "fetchContributionIcon",
+        "x-access": "ready",
+        "x-feature": "492",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierIcon"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierIconInput"
+              }
+            }
+          }
+        }
+      }
+    }
   /api/detection/jobs/{taskID}/reports:
     {
       "get": {
@@ -4489,6 +5434,1432 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    ContributionReuseAddress:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "revision",
+          "group_id",
+          "address_id"
+        ],
+        "additionalProperties": false
+      }
+    ContributionTargets:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parent_id": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "parent_id",
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    ContributionSupplier:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contributor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "official_api",
+              "official_subscription",
+              "relay"
+            ]
+          },
+          "website_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "icon_data": {
+            "type": "string",
+            "maxLength": 350000
+          },
+          "icon_source": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "docs_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "contributor_id",
+          "name",
+          "kind",
+          "website_url",
+          "icon_data",
+          "icon_source",
+          "summary",
+          "description",
+          "docs_url",
+          "enabled",
+          "revision",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    ContributionGroup:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "status_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/MarketDefaults"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "connection_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capability_digest": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "supplier_id",
+          "name",
+          "description",
+          "status_url",
+          "defaults",
+          "enabled",
+          "revision",
+          "connection_version",
+          "capability_digest",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    ContributionAddress:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "base_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "supplier_id",
+          "base_url",
+          "label",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    ContributionGroupAddress:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "address_id",
+          "supplier_id",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    ContributionGroupModel:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "upstream_model": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "is_reference": {
+            "type": "boolean"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capability_digest": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "model_id",
+          "display_name",
+          "upstream_model",
+          "model_type",
+          "context_window",
+          "max_output_tokens",
+          "notes",
+          "enabled",
+          "is_reference",
+          "quote_id",
+          "revision",
+          "capability_digest",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "分组内的模型报价身份，model_id精确区分大小写；不创建全局模型目录实体。model_id/上游名采用F0的原生命名空间校验。"
+      }
+    ContributionTokenPrices:
+      {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/ContributionPrice"
+          },
+          "output": {
+            "$ref": "#/components/schemas/ContributionPrice"
+          },
+          "cache_write": {
+            "$ref": "#/components/schemas/ContributionPrice"
+          },
+          "cache_read": {
+            "$ref": "#/components/schemas/ContributionPrice"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ContributionPrice"
+            },
+            "maxProperties": 16,
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "input_text",
+                "input_image",
+                "input_audio",
+                "input_video",
+                "output_text",
+                "output_image",
+                "output_audio",
+                "output_video",
+                "cache_read_text",
+                "cache_read_image",
+                "cache_read_audio",
+                "cache_read_video",
+                "cache_write_5m",
+                "cache_write_1h"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input",
+          "output",
+          "cache_write",
+          "cache_read",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    ContributionPriceConditions:
+      {
+        "type": "object",
+        "properties": {
+          "service_tier": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "min_prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "maxItems": 7
+          },
+          "start_minute": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1439
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_minute": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service_tier",
+          "min_prompt_tokens",
+          "max_prompt_tokens",
+          "timezone",
+          "weekdays",
+          "start_minute",
+          "end_minute"
+        ],
+        "additionalProperties": false
+      }
+    ContributionPriceTier:
+      {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ContributionPriceConditions"
+          },
+          "prices": {
+            "$ref": "#/components/schemas/ContributionTokenPrices"
+          }
+        },
+        "required": [
+          "name",
+          "conditions",
+          "prices"
+        ],
+        "additionalProperties": false
+      }
+    ContributionUnitPrice:
+      {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "enum": [
+              "request",
+              "successful_image",
+              "tool_call",
+              "tool_session",
+              "tool_second",
+              "tool_query"
+            ]
+          },
+          "tool": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "image_size": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "image_quality": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "image_background": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "service_tier": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "price": {
+            "$ref": "#/components/schemas/ContributionPrice"
+          }
+        },
+        "required": [
+          "unit",
+          "tool",
+          "image_size",
+          "image_quality",
+          "image_background",
+          "service_tier",
+          "price"
+        ],
+        "additionalProperties": false
+      }
+    ContributionQuote:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_model_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "CNY",
+              "USD"
+            ]
+          },
+          "billing_unit": {
+            "type": "string",
+            "enum": [
+              "per_million_tokens",
+              "per_request",
+              "per_successful_image"
+            ]
+          },
+          "prices": {
+            "$ref": "#/components/schemas/ContributionTokenPrices"
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionPriceTier"
+            },
+            "maxItems": 16
+          },
+          "unit_prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionUnitPrice"
+            },
+            "maxItems": 128
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "group_model_id",
+          "version",
+          "currency",
+          "billing_unit",
+          "prices",
+          "tiers",
+          "unit_prices",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "description": "追加且不可变的候选报价版本。CNY为积分，USD在调用开始固定汇率；折扣作用于整张表，手续费独立。"
+      }
+    ContributionPrice:
+      {
+        "type": "string",
+        "pattern": "^(?:|(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?)$",
+        "description": "十进制价格；草稿允许空，空值阻止提交，不代表免费。明确的0可提交。"
+      }
+    ContributionModelRule:
+      {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "model_id",
+          "disabled",
+          "reason",
+          "revision",
+          "actor_id",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    ContributionGroupAddressSet:
+      {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionGroupAddress"
+            },
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "group_id",
+          "links"
+        ],
+        "additionalProperties": false
+      }
+    ContributionChanges:
+      {
+        "type": "object",
+        "properties": {
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/ContributionSupplier"
+                },
+                "base_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "base_revision"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 1024
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/ContributionGroup"
+                },
+                "base_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "base_revision"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 1024
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/ContributionAddress"
+                },
+                "base_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "base_revision"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 1024
+          },
+          "group_addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionGroupAddressSet"
+            },
+            "maxItems": 1024
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/ContributionGroupModel"
+                },
+                "base_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "base_revision"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 1024
+          },
+          "quotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionQuote"
+            },
+            "maxItems": 1024
+          },
+          "governance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/ContributionModelRule"
+                },
+                "base_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "base_revision"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 1024
+          }
+        },
+        "required": [
+          "suppliers",
+          "groups",
+          "addresses",
+          "group_addresses",
+          "models",
+          "quotes",
+          "governance"
+        ],
+        "additionalProperties": false
+      }
+    ContributionDraft:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "group",
+              "group_model",
+              "model_id"
+            ]
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "submitted",
+              "rejected",
+              "withdrawn",
+              "publication_pending",
+              "approved"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "changes": {
+            "$ref": "#/components/schemas/ContributionChanges"
+          },
+          "base": {
+            "$ref": "#/components/schemas/ContributionChanges"
+          },
+          "report_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1024
+          },
+          "task_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1024
+          },
+          "pending_prices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1024
+          },
+          "review_reason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "owner_id",
+          "title",
+          "kind",
+          "target_id",
+          "state",
+          "revision",
+          "changes",
+          "base",
+          "report_ids",
+          "task_ids",
+          "pending_prices",
+          "review_reason",
+          "reviewed_by",
+          "submitted_at",
+          "published_at",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    ContributionSummary:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "state",
+          "revision",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    ContributionReportUse:
+      {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_kind": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "manifest_version": {
+            "type": "string"
+          },
+          "code_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_id",
+          "target_kind",
+          "target_id",
+          "reused",
+          "finished_at",
+          "manifest_version",
+          "code_version"
+        ],
+        "additionalProperties": false
+      }
+    ContributionTargetReview:
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "report_required",
+              "suite_pending"
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContributionReportUse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "model_id",
+          "state",
+          "report"
+        ],
+        "additionalProperties": false
+      }
+    ContributionEvaluation:
+      {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionTargetReview"
+            },
+            "maxItems": 1024
+          }
+        },
+        "required": [
+          "ready",
+          "targets"
+        ],
+        "additionalProperties": false
+      }
+    ContributionDetail:
+      {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ContributionDraft"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/ContributionEvaluation"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "linked_channels": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionAddress"
+            }
+          }
+        },
+        "required": [
+          "draft",
+          "evaluation",
+          "stage",
+          "linked_channels",
+          "addresses"
+        ],
+        "additionalProperties": false
+      }
+    ContributionEnvelope:
+      {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ContributionDraft"
+          }
+        },
+        "required": [
+          "draft"
+        ],
+        "additionalProperties": false
+      }
+    ContributionPage:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionSummary"
+            },
+            "maxItems": 100
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    ContributionNew:
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "group",
+              "group_model",
+              "model_id"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "parent_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "edit",
+              "delete",
+              "disable",
+              "restore"
+            ]
+          },
+          "starter": {
+            "type": "boolean"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      }
+    ContributionSave:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "changes": {
+            "$ref": "#/components/schemas/ContributionChanges"
+          },
+          "report_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1024
+          }
+        },
+        "required": [
+          "revision",
+          "title",
+          "changes",
+          "report_ids"
+        ],
+        "additionalProperties": false
+      }
+    ContributionChild:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "group",
+              "group_model",
+              "address"
+            ]
+          },
+          "parent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "kind",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      }
+    ContributionAction:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    ContributionPublicationError:
+      {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "publication_pending",
+              "publication_unknown"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/ContributionDraft"
+          }
+        },
+        "required": [
+          "error",
+          "message",
+          "draft"
+        ],
+        "additionalProperties": false
+      }
     DetectionReportsPage:
       {
         "type": "object",
@@ -4651,6 +7022,11 @@ components:
           },
           "service_tier": {
             "type": "string"
+          },
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置"
           }
         },
         "required": [
@@ -5277,6 +7653,9 @@ components:
         "properties": {
           "job": {
             "$ref": "#/components/schemas/DetectionJob"
+          },
+          "draft_linked": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -5400,6 +7779,11 @@ components:
             "minLength": 1,
             "maxLength": 8192,
             "writeOnly": true
+          },
+          "draft_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置"
           }
         },
         "required": [

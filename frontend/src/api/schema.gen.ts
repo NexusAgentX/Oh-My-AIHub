@@ -4,6 +4,195 @@
  */
 
 export interface paths {
+    "/api/contributions/{draftID}/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 引用同供应商已批准地址 */
+        post: operations["reuseContributionAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 选择已生效的贡献目标 */
+        get: operations["contributionTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listContributions */
+        get: operations["listContributions"];
+        put?: never;
+        /** newContribution */
+        post: operations["newContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/{draftID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getContribution */
+        get: operations["getContribution"];
+        /** saveContribution */
+        put: operations["saveContribution"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/{draftID}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** addContributionChild */
+        post: operations["addContributionChild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/{draftID}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** submitContribution */
+        post: operations["submitContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/{draftID}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** withdrawContribution */
+        post: operations["withdrawContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/contributions/{draftID}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** approveContribution */
+        post: operations["approveContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/contributions/{draftID}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** rejectContribution */
+        post: operations["rejectContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** reviewContributions */
+        get: operations["reviewContributions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contributions/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** fetchContributionIcon */
+        post: operations["fetchContributionIcon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/detection/jobs/{taskID}/reports": {
         parameters: {
             query?: never;
@@ -1918,6 +2107,308 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ContributionReuseAddress: {
+            revision: number;
+            /** Format: uuid */
+            group_id: string;
+            /** Format: uuid */
+            address_id: string;
+        };
+        ContributionTargets: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                parent_id: string;
+                enabled: boolean;
+            }[];
+            next_cursor: string | null;
+        };
+        ContributionSupplier: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contributor_id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official_api" | "official_subscription" | "relay";
+            website_url: string;
+            icon_data: string;
+            icon_source: string;
+            summary: string;
+            description: string;
+            docs_url: string;
+            enabled: boolean;
+            revision: number;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionGroup: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            name: string;
+            description: string;
+            status_url: string;
+            defaults: components["schemas"]["MarketDefaults"];
+            enabled: boolean;
+            revision: number;
+            connection_version: number;
+            capability_digest: string;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionAddress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            base_url: string;
+            label: string;
+            revision: number;
+            deleted_at?: string | null;
+        };
+        ContributionGroupAddress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_id: string;
+            /** Format: uuid */
+            address_id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            position: number;
+            deleted_at?: string | null;
+        };
+        /** @description 分组内的模型报价身份，model_id精确区分大小写；不创建全局模型目录实体。model_id/上游名采用F0的原生命名空间校验。 */
+        ContributionGroupModel: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_id: string;
+            model_id: string;
+            display_name: string;
+            upstream_model: string;
+            /** @enum {string} */
+            model_type: "text" | "image";
+            context_window: number | null;
+            max_output_tokens: number | null;
+            notes: string;
+            enabled: boolean;
+            is_reference: boolean;
+            quote_id: string | null;
+            revision: number;
+            capability_digest: string;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionTokenPrices: {
+            input: components["schemas"]["ContributionPrice"];
+            output: components["schemas"]["ContributionPrice"];
+            cache_write: components["schemas"]["ContributionPrice"];
+            cache_read: components["schemas"]["ContributionPrice"];
+            details: {
+                [key: string]: components["schemas"]["ContributionPrice"];
+            };
+        };
+        ContributionPriceConditions: {
+            service_tier: string;
+            min_prompt_tokens: number | null;
+            max_prompt_tokens: number | null;
+            timezone: string;
+            weekdays: number[];
+            start_minute: number | null;
+            end_minute: number | null;
+        };
+        ContributionPriceTier: {
+            name: string;
+            conditions: components["schemas"]["ContributionPriceConditions"];
+            prices: components["schemas"]["ContributionTokenPrices"];
+        };
+        ContributionUnitPrice: {
+            /** @enum {string} */
+            unit: "request" | "successful_image" | "tool_call" | "tool_session" | "tool_second" | "tool_query";
+            tool: string;
+            image_size: string;
+            image_quality: string;
+            image_background: string;
+            service_tier: string;
+            price: components["schemas"]["ContributionPrice"];
+        };
+        /** @description 追加且不可变的候选报价版本。CNY为积分，USD在调用开始固定汇率；折扣作用于整张表，手续费独立。 */
+        ContributionQuote: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_model_id: string;
+            version: number;
+            /** @enum {string} */
+            currency: "CNY" | "USD";
+            /** @enum {string} */
+            billing_unit: "per_million_tokens" | "per_request" | "per_successful_image";
+            prices: components["schemas"]["ContributionTokenPrices"];
+            tiers: components["schemas"]["ContributionPriceTier"][];
+            unit_prices: components["schemas"]["ContributionUnitPrice"][];
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @description 十进制价格；草稿允许空，空值阻止提交，不代表免费。明确的0可提交。 */
+        ContributionPrice: string;
+        ContributionModelRule: {
+            model_id: string;
+            disabled: boolean;
+            reason: string;
+            revision: number;
+            actor_id: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionGroupAddressSet: {
+            /** Format: uuid */
+            group_id: string;
+            links: components["schemas"]["ContributionGroupAddress"][];
+        };
+        ContributionChanges: {
+            suppliers: {
+                value: components["schemas"]["ContributionSupplier"];
+                base_revision: number;
+            }[];
+            groups: {
+                value: components["schemas"]["ContributionGroup"];
+                base_revision: number;
+            }[];
+            addresses: {
+                value: components["schemas"]["ContributionAddress"];
+                base_revision: number;
+            }[];
+            group_addresses: components["schemas"]["ContributionGroupAddressSet"][];
+            models: {
+                value: components["schemas"]["ContributionGroupModel"];
+                base_revision: number;
+            }[];
+            quotes: components["schemas"]["ContributionQuote"][];
+            governance: {
+                value: components["schemas"]["ContributionModelRule"];
+                base_revision: number;
+            }[];
+        };
+        ContributionDraft: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            title: string;
+            /** @enum {string} */
+            kind: "supplier" | "group" | "group_model" | "model_id";
+            target_id: string;
+            /** @enum {string} */
+            state: "draft" | "submitted" | "rejected" | "withdrawn" | "publication_pending" | "approved";
+            revision: number;
+            changes: components["schemas"]["ContributionChanges"];
+            base: components["schemas"]["ContributionChanges"];
+            report_ids: string[];
+            task_ids: string[];
+            pending_prices: string[];
+            review_reason: string;
+            reviewed_by: string | null;
+            submitted_at: string | null;
+            published_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionSummary: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            kind: string;
+            state: string;
+            revision: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ContributionReportUse: {
+            /** Format: uuid */
+            report_id: string;
+            target_kind: string;
+            /** Format: uuid */
+            target_id: string;
+            reused: boolean;
+            /** Format: date-time */
+            finished_at: string;
+            manifest_version: string;
+            code_version: string;
+        };
+        ContributionTargetReview: {
+            kind: string;
+            /** Format: uuid */
+            id: string;
+            model_id: string;
+            /** @enum {string} */
+            state: "ready" | "report_required" | "suite_pending";
+            report: components["schemas"]["ContributionReportUse"] | null;
+        };
+        ContributionEvaluation: {
+            ready: boolean;
+            targets: components["schemas"]["ContributionTargetReview"][];
+        };
+        ContributionDetail: {
+            draft: components["schemas"]["ContributionDraft"];
+            evaluation: components["schemas"]["ContributionEvaluation"];
+            stage: string;
+            linked_channels: number;
+            addresses: components["schemas"]["ContributionAddress"][];
+        };
+        ContributionEnvelope: {
+            draft: components["schemas"]["ContributionDraft"];
+        };
+        ContributionPage: {
+            items: components["schemas"]["ContributionSummary"][];
+            next_cursor: string | null;
+        };
+        ContributionNew: {
+            /** @enum {string} */
+            kind: "supplier" | "group" | "group_model" | "model_id";
+            target_id?: string;
+            parent_id?: string;
+            /** @enum {string} */
+            action?: "edit" | "delete" | "disable" | "restore";
+            starter?: boolean;
+            /** @enum {string} */
+            model_type?: "text" | "image";
+        };
+        ContributionSave: {
+            revision: number;
+            title: string;
+            changes: components["schemas"]["ContributionChanges"];
+            report_ids: string[];
+        };
+        ContributionChild: {
+            revision: number;
+            /** @enum {string} */
+            kind: "group" | "group_model" | "address";
+            /** Format: uuid */
+            parent_id: string;
+            /** @enum {string} */
+            model_type?: "text" | "image";
+        };
+        ContributionAction: {
+            revision: number;
+            reason?: string;
+        };
+        ContributionPublicationError: {
+            /** @enum {string} */
+            error: "publication_pending" | "publication_unknown";
+            message: string;
+            draft: components["schemas"]["ContributionDraft"];
+        };
         DetectionReportsPage: {
             items: components["schemas"]["DetectionReportSummary"][];
             next_cursor: string | null;
@@ -1957,6 +2448,11 @@ export interface components {
             model_type: "" | "text" | "image";
             model: string;
             service_tier: string;
+            /**
+             * Format: uuid
+             * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
+             */
+            draft_id?: string;
         };
         DetectionUsage: {
             http: number;
@@ -2100,6 +2596,7 @@ export interface components {
         };
         DetectionJobEnvelope: {
             job: components["schemas"]["DetectionJob"];
+            draft_linked?: boolean;
         };
         DetectionParametersEnvelope: {
             parameters: components["schemas"]["DetectionParameters"];
@@ -2124,6 +2621,11 @@ export interface components {
             /** Format: uuid */
             target_id: string;
             api_key: string;
+            /**
+             * Format: uuid
+             * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
+             */
+            draft_id?: string;
         };
         DetectionResume: {
             api_key: string;
@@ -4532,6 +5034,441 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    reuseContributionAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionReuseAddress"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    contributionTargets: {
+        parameters: {
+            query: {
+                limit?: number;
+                cursor?: string;
+                kind: "supplier" | "group" | "group_model" | "address";
+                parent_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionTargets"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listContributions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    newContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionNew"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    saveContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionSave"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    addContributionChild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionChild"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    submitContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionAction"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    withdrawContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionAction"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    approveContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionAction"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            /** @description 已提交待刷新或提交结果未知；不得显示为回滚 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionPublicationError"];
+                };
+            };
+        };
+    };
+    rejectContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionAction"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    reviewContributions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    fetchContributionIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierIconInput"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierIcon"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     listDetectionReports: {
         parameters: {
             query?: {

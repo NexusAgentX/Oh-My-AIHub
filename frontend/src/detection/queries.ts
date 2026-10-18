@@ -4,8 +4,8 @@ import type { components } from '../api/schema.gen'
 export type Job = components['schemas']['DetectionJob']
 export type SearchSettings = components['schemas']['DetectionSearchSettings']
 export const detectionKeys = { all: ['detection'] as const, list: (cursor: string) => ['detection', 'jobs', cursor] as const, job: (id: string) => ['detection', 'job', id] as const, parameters: ['detection', 'parameters'] as const }
-export function useDetectionJobs(cursor: string) {
-  return useQuery({ queryKey: detectionKeys.list(cursor), queryFn: () => apiGet<'listDetectionJobs'>('/api/detection/jobs', { cursor }) })
+export function useDetectionJobs(cursor: string,enabled=true) {
+  return useQuery({ enabled,queryKey: detectionKeys.list(cursor), queryFn: () => apiGet<'listDetectionJobs'>('/api/detection/jobs', { cursor }) })
 }
 export function useDetectionJob(id: string) {
   return useQuery({ queryKey: detectionKeys.job(id), queryFn: () => apiGet<'getDetectionJob'>(`/api/detection/jobs/${encodeURIComponent(id)}`), refetchInterval: (query) => query.state.data?.job.execution_active ? 2000 : false })
@@ -15,13 +15,13 @@ export function useDetectionArtifacts(id: string, updatedAt: string, active: boo
 }
 export function useDetectionAction() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: async ({ id, action, key, scenarios, target }: { id?: string; action: 'start' | 'cancel' | 'resume' | 'retest'; key?: string; scenarios?: string[]; target?: { target_id: string; target_kind: 'group' | 'group_model' } }) => {
+  return useMutation({ mutationFn: async ({ id, action, key, scenarios, target }: { id?: string; action: 'start' | 'cancel' | 'resume' | 'retest'; key?: string; scenarios?: string[]; target?: { draft_id?:string; target_id: string; target_kind: 'group' | 'group_model' } }) => {
     const path = `/api/detection/jobs/${encodeURIComponent(id ?? '')}`
     if (action === 'start' && target) return apiSend<'startDetectionJob'>('POST', '/api/detection/jobs', { ...target, api_key: key ?? '' })
     if (action === 'cancel') return apiSend<'cancelDetectionJob'>('POST', `${path}/cancel`)
     if (action === 'retest') return apiSend<'retestDetectionJob'>('POST', `${path}/retest`, { api_key: key ?? '', scenarios: scenarios ?? [] })
     return apiSend<'resumeDetectionJob'>('POST', `${path}/resume`, { api_key: key ?? '' })
-  }, onSettled: (_data, _error, variables) => { variables.key = undefined }, onSuccess: () => client.invalidateQueries({ queryKey: detectionKeys.all }) })
+  }, onSettled: (_data, _error, variables) => { variables.key = undefined }, onSuccess: async () => {await Promise.all([client.invalidateQueries({ queryKey: detectionKeys.all }),client.invalidateQueries({queryKey:["contributions"]})])} })
 }
 export function useDetectionParameters() { return useQuery({ queryKey: detectionKeys.parameters, queryFn: () => apiGet<'getDetectionParameters'>('/api/admin/detection/search') }) }
 export function useUpdateDetectionSearch() {

@@ -45,7 +45,14 @@ func ModelValue(r MarketGroupModel) market.GroupModel {
 // F5 turns this into the runtime snapshot; forwarding performs no price JOIN.
 func Read(ctx context.Context, db DBTX) (market.Directory, error) {
 	q := New(db)
-	d := market.Directory{Suppliers: []market.Supplier{}, Groups: []market.Group{}, Addresses: []market.Address{}, GroupAddresses: []market.GroupAddress{}, Models: []market.GroupModel{}, Quotes: []market.Quote{}}
+	d := market.Directory{Governance: []market.ModelRule{}, Suppliers: []market.Supplier{}, Groups: []market.Group{}, Addresses: []market.Address{}, GroupAddresses: []market.GroupAddress{}, Models: []market.GroupModel{}, Quotes: []market.Quote{}}
+	rules, err := q.ListModelRules(ctx)
+	if err != nil {
+		return d, err
+	}
+	for _, v := range rules {
+		d.Governance = append(d.Governance, market.ModelRule{ModelID: v.ModelID, Disabled: v.Disabled, Reason: v.Reason, Revision: v.Revision, ActorID: v.ActorID, UpdatedAt: v.UpdatedAt})
+	}
 	suppliers, err := q.ListSuppliers(ctx)
 	if err != nil {
 		return d, err

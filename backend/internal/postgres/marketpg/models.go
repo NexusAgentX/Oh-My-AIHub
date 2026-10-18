@@ -70,6 +70,15 @@ type MarketGroupModel struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+type MarketModelGovernance struct {
+	ModelID   string    `json:"model_id"`
+	Disabled  bool      `json:"disabled"`
+	Reason    string    `json:"reason"`
+	Revision  int64     `json:"revision"`
+	ActorID   string    `json:"actor_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type MarketObjectVersion struct {
 	TargetKind string    `json:"target_kind"`
 	TargetID   string    `json:"target_id"`

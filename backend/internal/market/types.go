@@ -183,3 +183,13 @@ type Capability struct {
 	Reason   string `json:"reason"`
 	ReportID string `json:"report_id"`
 }
+
+// ModelRule governs an exact ID; it does not create a model catalog entry.
+type ModelRule struct {
+	ModelID   string    `json:"model_id"`
+	Disabled  bool      `json:"disabled"`
+	Reason    string    `json:"reason"`
+	Revision  int64     `json:"revision"`
+	ActorID   string    `json:"actor_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

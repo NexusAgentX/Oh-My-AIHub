@@ -524,6 +524,31 @@ func (q *Queries) InsertGroupModel(ctx context.Context, arg InsertGroupModelPara
 	return i, err
 }
 
+const insertModelRule = `-- name: InsertModelRule :execrows
+INSERT INTO market_model_governance(model_id,disabled,reason,revision,actor_id) VALUES($1,$2,$3,1,$4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertModelRuleParams struct {
+	ModelID  string `json:"model_id"`
+	Disabled bool   `json:"disabled"`
+	Reason   string `json:"reason"`
+	ActorID  string `json:"actor_id"`
+}
+
+func (q *Queries) InsertModelRule(ctx context.Context, arg InsertModelRuleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertModelRule,
+		arg.ModelID,
+		arg.Disabled,
+		arg.Reason,
+		arg.ActorID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertProtectedRoot = `-- name: InsertProtectedRoot :exec
 INSERT INTO market_protected_keys(purpose,encryption_key_id,credential_version,nonce,ciphertext) VALUES($1,$2,$3,$4,$5)
 `
@@ -893,6 +918,37 @@ func (q *Queries) ListGroups(ctx context.Context) ([]MarketGroup, error) {
 			&i.ConnectionVersion,
 			&i.CapabilityDigest,
 			&i.DeletedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listModelRules = `-- name: ListModelRules :many
+SELECT model_id, disabled, reason, revision, actor_id, updated_at FROM market_model_governance ORDER BY model_id
+`
+
+func (q *Queries) ListModelRules(ctx context.Context) ([]MarketModelGovernance, error) {
+	rows, err := q.db.Query(ctx, listModelRules)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MarketModelGovernance
+	for rows.Next() {
+		var i MarketModelGovernance
+		if err := rows.Scan(
+			&i.ModelID,
+			&i.Disabled,
+			&i.Reason,
+			&i.Revision,
+			&i.ActorID,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -1345,6 +1401,33 @@ func (q *Queries) UpdateGroupModel(ctx context.Context, arg UpdateGroupModelPara
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateModelRule = `-- name: UpdateModelRule :execrows
+UPDATE market_model_governance SET disabled=$2,reason=$3,revision=revision+1,actor_id=$4,updated_at=now()
+WHERE model_id=$1 AND revision=$5
+`
+
+type UpdateModelRuleParams struct {
+	ModelID      string `json:"model_id"`
+	Disabled     bool   `json:"disabled"`
+	Reason       string `json:"reason"`
+	ActorID      string `json:"actor_id"`
+	BaseRevision int64  `json:"base_revision"`
+}
+
+func (q *Queries) UpdateModelRule(ctx context.Context, arg UpdateModelRuleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateModelRule,
+		arg.ModelID,
+		arg.Disabled,
+		arg.Reason,
+		arg.ActorID,
+		arg.BaseRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateSupplier = `-- name: UpdateSupplier :one

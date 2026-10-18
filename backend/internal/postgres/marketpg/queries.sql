@@ -119,3 +119,14 @@ SELECT * FROM market_protected_keys ORDER BY purpose;
 INSERT INTO market_protected_keys(purpose,encryption_key_id,credential_version,nonce,ciphertext) VALUES($1,$2,$3,$4,$5);
 -- name: RewrapProtectedRoot :exec
 UPDATE market_protected_keys SET encryption_key_id=$2,credential_version=$3,nonce=$4,ciphertext=$5 WHERE purpose=$1;
+
+-- name: ListModelRules :many
+SELECT * FROM market_model_governance ORDER BY model_id;
+
+-- name: InsertModelRule :execrows
+INSERT INTO market_model_governance(model_id,disabled,reason,revision,actor_id) VALUES($1,$2,$3,1,$4)
+ON CONFLICT DO NOTHING;
+
+-- name: UpdateModelRule :execrows
+UPDATE market_model_governance SET disabled=$2,reason=$3,revision=revision+1,actor_id=$4,updated_at=now()
+WHERE model_id=$1 AND revision=sqlc.arg(base_revision);
