@@ -7922,10 +7922,63 @@ components:
         geo_multipliers: {type: object, additionalProperties: {type: string}}
       required: [input, output, cache_write, cache_read]
       additionalProperties: false
+    GroupChargeUnit:
+      type: object
+      properties:
+        unit: {type: string}
+        tool: {type: string}
+        model_id: {type: string}
+        quantity_nano: {type: integer, minimum: 0}
+        image_size: {type: string}
+        image_quality: {type: string}
+        image_background: {type: string}
+        service_tier: {type: string}
+      required: [unit, quantity_nano]
+      additionalProperties: false
+    GroupChargeLine:
+      type: object
+      properties:
+        model_id: {type: string}
+        group_model_id: {type: string}
+        revision: {type: integer, minimum: 0}
+        quote_id: {type: string}
+        quote_version: {type: integer, minimum: 0}
+        kind: {type: string}
+        state: {type: string, enum: [priced, unpriced, duplicate]}
+        reason: {type: string}
+        currency: {$ref: '#/components/schemas/PriceCurrency'}
+        rate_nano: {type: integer, minimum: 0}
+        discount_nano: {type: integer, minimum: 0}
+        tier_seq: {type: integer, minimum: 0}
+        usage: {$ref: '#/components/schemas/InferenceUsage'}
+        selected_prices: {$ref: '#/components/schemas/MarketTokenPrices'}
+        unit: {$ref: '#/components/schemas/GroupChargeUnit'}
+        unit_price: {$ref: '#/components/schemas/Price'}
+        cost: {$ref: '#/components/schemas/Amount'}
+      required: [model_id, group_model_id, revision, quote_id, quote_version, kind, state, rate_nano, discount_nano, tier_seq, cost]
+      additionalProperties: false
+    GroupChargeStatement:
+      type: object
+      description: 开始时固定的分组报价与可靠分项；分项展示值可能各自取整，总费用使用精确合并后的一次取整。
+      properties:
+        notes: {type: array, items: {type: string}}
+        version: {type: string, const: group-quote.v1}
+        group_id: {type: string}
+        group_revision: {type: integer, minimum: 1}
+        config_version: {type: integer, minimum: 0}
+        started_at: {$ref: '#/components/schemas/Timestamp'}
+        usd_cny_rate_nano: {type: integer, minimum: 0}
+        fee_rate_nano: {type: integer, minimum: 0}
+        components: {type: array, items: {$ref: '#/components/schemas/GroupChargeLine'}}
+        cost: {$ref: '#/components/schemas/Amount'}
+        fee: {$ref: '#/components/schemas/Amount'}
+      required: [notes, version, group_id, group_revision, config_version, started_at, usd_cny_rate_nano, fee_rate_nano, components, cost, fee]
+      additionalProperties: false
     PriceSnapshot:
       type: object
       description: 计费时的价格快照。base_prices 与 selected_prices 按模型币种（currency，旧快照缺省为 CNY），prices 为积分。
       properties:
+        group_quote: {$ref: '#/components/schemas/GroupChargeStatement'}
         components:
           type: array
           items:

@@ -30,6 +30,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -287,6 +288,8 @@ type callState struct {
 	usageInjected   bool
 	hints           billingHints
 	submodels       []catalog.Model
+	pricedStatement *quotepricing.Statement
+	billingFacts    quotepricing.Facts
 	pending         bool
 	polling         bool
 	completed       bool
@@ -595,6 +598,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	for index := range candidates {
 		pricing := candidates[index].PricingModel(model)
 		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
+		if candidates[index].Quotes != nil {
+			candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
+		}
 	}
 	for _, candidate := range candidates {
 		if limits := EffectiveLimits(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
@@ -1510,17 +1516,21 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		finish.TokensPerSecond = &speed
 	}
 	pricingAt := e.Now()
-	if observation.Found {
+	if observation.Found || candidate.Quotes != nil {
 		self := candidate.OwnerID == call.key.OwnerID
 		feeRate := defaults.FeeRateNano
 		if self {
 			feeRate = 0
 		}
+		call.billingFacts = quotepricing.Facts{Usage: observation.Usage, MainReliable: observation.Found, IterationsReplace: call.format == channel.FormatAnthropic, Units: observation.Units}
 		priced, snapshot, err := e.priceUsage(call, model, candidate, observation.Usage, defaults, feeRate)
 		if err != nil {
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
 			finish.PriceSnapshot = snapshot
+			if !observation.ProtocolError {
+				finish.QuoteStatement = call.pricedStatement
+			}
 			// Explicit upstream failure is not charged (PRODUCT.md), but reliable
 			// usage and its contemporaneous price snapshot remain diagnostic facts.
 			if !observation.ProtocolError {
@@ -1531,7 +1541,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
-	if !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.Iterations) > 0 {
+	if candidate.Quotes == nil && !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.Iterations) > 0 {
 		observation.Usage.Detail.Notes = appendNote(observation.Usage.Detail.Notes, "主模型用量缺失，未计费")
 		finish.PriceSnapshot = priceSnapshot(model, ledger.PriceResult{}, candidate, defaults.USDCNYRateNano, 0, observation.Usage, call.started)
 	}
@@ -1546,6 +1556,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish, status int, usage ledger.Usage) {
 	ctx := context.WithoutCancel(context.Background())
 	outcome, err := e.finishCall(ctx, call, finish)
+	if err == nil && outcome.Applied != nil {
+		finish = *outcome.Applied
+	}
 	closed := err == nil
 	finished := outcome.Finished
 
@@ -1554,6 +1567,7 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 		e.Events.Publish(Event{Kind: EventSettlementFailed, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format)})
 		fallback := finish
 		fallback.Bill = nil
+		fallback.QuoteStatement = nil
 		if retryResult, retryErr := e.finishCall(ctx, call, fallback); retryErr != nil {
 			e.Logger.Error("gateway: closing call failed", "request_id", call.id, "error", retryErr)
 		} else {

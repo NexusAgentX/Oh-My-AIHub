@@ -9,6 +9,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
 
 var (
@@ -52,6 +53,8 @@ type KeyAuth struct {
 // Candidate is one channel offering the requested model in the requested
 // format.
 type Candidate struct {
+	// Quotes is immutable. A missing group offer never uses a global price.
+	Quotes         *quotepricing.Book
 	ChannelID      string
 	OwnerID        string
 	Name           string
@@ -73,6 +76,18 @@ type Candidate struct {
 // PricingModel is the model a candidate bills: the catalog model itself, or
 // for a custom model the channel's own point prices without tiers.
 func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
+	if c.Quotes != nil {
+		offer, ok := c.Quotes.Offers[model.ID]
+		if !ok {
+			return catalog.Model{ID: model.ID}
+		}
+		quote := offer.Quote
+		result := catalog.Model{ID: model.ID, DisplayName: model.ID, Enabled: true, PriceCurrency: quote.Currency, InputPrice: quote.Prices.Input, OutputPrice: quote.Prices.Output, CacheWritePrice: quote.Prices.CacheWrite, CacheReadPrice: quote.Prices.CacheRead, TokenPrices: quote.Prices.Details}
+		for _, tier := range quote.Tiers {
+			result.PriceTiers = append(result.PriceTiers, tier.Ledger())
+		}
+		return result
+	}
 	if c.Custom == nil {
 		return model
 	}
@@ -156,6 +171,7 @@ type Billing struct {
 // CallFinish closes a call record and, when Bill is set, books the ledger
 // transaction "call:<id>" in the same database transaction.
 type CallFinish struct {
+	QuoteStatement     *quotepricing.Statement
 	Background         bool
 	Diagnostics        *Diagnostics
 	ID                 string
@@ -185,6 +201,8 @@ type CallFinish struct {
 type FinishResult struct {
 	Finished bool
 	TxID     string
+	// Applied includes transaction-adjusted amounts after receipt deduplication.
+	Applied *CallFinish
 }
 
 // Store is the persistence the gateway needs.

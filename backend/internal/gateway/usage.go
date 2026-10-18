@@ -9,6 +9,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 
 // Observation is what the side-channel reader learned about a response.
 type Observation struct {
+	Units               []quotepricing.Unit
 	ProtocolError       bool
 	ProtocolClientError bool
 	StopReason          string
@@ -41,9 +43,10 @@ type Observation struct {
 // Observer scans a response as it streams past, without ever altering it and
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
-	format channel.Format
-	stream bool
-	sse    bool
+	billableUnits []quotepricing.Unit
+	format        channel.Format
+	stream        bool
+	sse           bool
 
 	eventData    []byte
 	eventSkip    bool
@@ -252,12 +255,15 @@ func (o *Observer) Finish() Observation {
 		}
 	}
 	status := "missing"
+	for i := range o.billableUnits {
+		o.billableUnits[i].ServiceTier = o.detail.ServiceTier
+	}
 	if o.found {
 		status = "reported"
 	} else if o.overflow || o.parseLimited {
 		status = "parse_limit"
 	}
-	observation := Observation{ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, ResponseStatus: o.responseStatus, Background: o.background, Frames: o.frames}
+	observation := Observation{Units: o.billableUnits, ProtocolError: o.protocolError, ProtocolClientError: o.protocolClientError, StopReason: o.stopReason, UsageStatus: status, Usage: o.usage, Found: o.found, ResponseID: o.responseID, ResponseStatus: o.responseStatus, Background: o.background, Frames: o.frames}
 	if len(o.intervals) > 0 {
 		observation.MaxFrameGapMS = millis(o.maxGap)
 		sorted := slices.Clone(o.intervals)
