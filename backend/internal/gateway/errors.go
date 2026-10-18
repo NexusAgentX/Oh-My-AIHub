@@ -23,6 +23,8 @@ func DialectOf(r *http.Request) Dialect {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/v1beta/") || r.URL.Path == "/v1beta":
 		return DialectGemini
+	case (r.URL.Path == "/v1/models" || strings.HasPrefix(r.URL.Path, "/v1/models/")) && (r.Header.Get("x-goog-api-key") != "" || r.URL.Query().Get("key") != ""):
+		return DialectGemini
 	case r.URL.Path == "/v1/messages" || strings.HasPrefix(r.URL.Path, "/v1/messages/") || r.Header.Get("anthropic-version") != "":
 		return DialectAnthropic
 	}

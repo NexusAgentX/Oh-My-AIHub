@@ -84,6 +84,7 @@ type app struct {
 	cookieSecure      bool
 	cookieName        string
 	trustedProxyCIDRs []netip.Prefix
+	gatewayEndpoints  map[string]bool
 	rateLimits
 }
 
@@ -143,6 +144,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerContributionRoutes(routes)
 	application.registerGroupChannelRoutes(routes)
 	application.registerTypicalRoutes(routes)
+	application.registerMarketBrowseRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

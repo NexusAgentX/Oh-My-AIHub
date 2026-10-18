@@ -269,7 +269,7 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 			t.Errorf("%s: 非外部入口必须位于 /api/ 下", key)
 		}
 		switch operation.body["x-feature"] {
-		case "A", "B", "C", "G", "239", "407", "490", "492", "493", "494", "495", "496", "497":
+		case "A", "B", "C", "G", "239", "407", "490", "492", "493", "494", "495", "496", "497", "499":
 		default:
 			t.Errorf("%s: x-feature 须为已实现 Feature", key)
 		}

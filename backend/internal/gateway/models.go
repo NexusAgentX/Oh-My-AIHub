@@ -25,26 +25,11 @@ var unknownRelease = time.Unix(0, 0).UTC()
 // listFormats). Aliases of such models are listed too, since that is the name
 // the client sends.
 func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool) {
-	ctx := r.Context()
-	dialect := DialectOf(r)
-	key, _, ok := e.authenticate(w, r)
+	names, dialect, ok := e.modelNamesForRequest(w, r, gemini)
 	if !ok {
 		return
 	}
-	if !key.AccountActive {
-		WriteError(w, dialect, http.StatusForbidden, "account_disabled", "账号已停用", "")
-		return
-	}
-	if !keyUsable(key, e.Now()) {
-		WriteError(w, dialect, http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期", "")
-		return
-	}
-	names, err := e.availableModels(ctx, key, listFormats(dialect, gemini))
-	if err != nil {
-		e.Logger.Error("gateway: listing models failed", "error", err)
-		WriteError(w, dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
-		return
-	}
+	gemini = gemini || dialect == DialectGemini
 	var body map[string]any
 	switch {
 	case gemini:
@@ -63,17 +48,73 @@ func (e *Engine) ListModels(w http.ResponseWriter, r *http.Request, gemini bool)
 	writeJSONBody(w, body)
 }
 
+// GetModel uses the same account/Key, alias, protocol and candidate scope as
+// listing. Metadata is generated locally; no shared upstream catalog is read.
+func (e *Engine) GetModel(w http.ResponseWriter, r *http.Request, id string, gemini bool) {
+	names, dialect, ok := e.modelNamesForRequest(w, r, gemini)
+	if !ok {
+		return
+	}
+	index := indexOf(names, id)
+	if index < 0 {
+		WriteError(w, dialect, http.StatusNotFound, "model_not_found", "模型不存在或当前 Key 无可用候选", "")
+		return
+	}
+	one := names[index : index+1]
+	var body map[string]any
+	switch {
+	case gemini || dialect == DialectGemini:
+		page, _ := geminiModelPage(one, url.Values{})
+		body = page["models"].([]map[string]any)[0]
+	case dialect == DialectAnthropic:
+		body = anthropicModelPage(one, url.Values{})["data"].([]map[string]any)[0]
+	default:
+		body = openAIModelList(one)["data"].([]map[string]any)[0]
+	}
+	w.Header().Set("Content-Type", "application/json")
+	writeJSONBody(w, body)
+}
+func (e *Engine) modelNamesForRequest(w http.ResponseWriter, r *http.Request, gemini bool) ([]listedModel, Dialect, bool) {
+	ctx := r.Context()
+	dialect := DialectOf(r)
+	if e.Ready != nil {
+		if err := e.Ready(); err != nil {
+			WriteError(w, dialect, http.StatusServiceUnavailable, "market_unavailable", "供应商配置正在同步，请稍后重试", "")
+			return nil, dialect, false
+		}
+	}
+	key, _, ok := e.authenticate(w, r)
+	if !ok {
+		return nil, dialect, false
+	}
+	if !key.AccountActive {
+		WriteError(w, dialect, http.StatusForbidden, "account_disabled", "账号已停用", "")
+		return nil, dialect, false
+	}
+	if !keyUsable(key, e.Now()) {
+		WriteError(w, dialect, http.StatusUnauthorized, "invalid_api_key", "API Key 已停用或过期", "")
+		return nil, dialect, false
+	}
+	names, err := e.availableModels(ctx, key, listFormats(dialect, gemini))
+	if err != nil {
+		e.Logger.Error("gateway: listing models failed", "error", err)
+		WriteError(w, dialect, http.StatusInternalServerError, "internal_error", "服务暂时无法完成操作", "")
+		return nil, dialect, false
+	}
+	return names, dialect, true
+}
+
 // listFormats are the formats a model list is for: a model is listed when a
 // channel serves any of them. The OpenAI shape lists models reachable through
 // either OpenAI format; the other shapes list their own.
 func listFormats(dialect Dialect, gemini bool) []channel.Format {
 	switch {
-	case gemini:
+	case gemini || dialect == DialectGemini:
 		return []channel.Format{channel.FormatGemini}
 	case dialect == DialectAnthropic:
 		return []channel.Format{channel.FormatAnthropic}
 	}
-	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}
+	return []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImages}
 }
 
 // openAIModelList is OpenAI's unpaged {"object":"list","data":[Model]}.
@@ -154,9 +195,13 @@ func geminiModelPage(names []listedModel, query url.Values) (map[string]any, boo
 	end := min(start+size, len(names))
 	models := make([]map[string]any, 0, end-start)
 	for _, name := range names[start:end] {
+		methods := name.generationMethods
+		if methods == nil {
+			methods = []string{"generateContent", "streamGenerateContent"}
+		}
 		item := map[string]any{
 			"name": "models/" + name.id, "baseModelId": name.id, "version": name.id, "displayName": name.model.DisplayName,
-			"supportedGenerationMethods": []string{"generateContent", "streamGenerateContent"},
+			"supportedGenerationMethods": methods,
 		}
 		if name.model.ContextWindow != nil {
 			item["inputTokenLimit"] = *name.model.ContextWindow
@@ -180,8 +225,9 @@ func indexOf(names []listedModel, id string) int {
 // listedModel is a name a client may send (a catalog ID or a key alias) with
 // the catalog model it resolves to.
 type listedModel struct {
-	id    string
-	model catalog.Model
+	id                string
+	model             catalog.Model
+	generationMethods []string
 }
 
 // availableModels are the names the key may send that a channel serves in one
@@ -196,11 +242,18 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		return nil, err
 	}
 	onlineSet := map[string]bool{}
+	witnesses, strict, err := e.nativeModelWitnesses(ctx, formats)
+	if err != nil {
+		return nil, err
+	}
 	byID := map[string]catalog.Model{}
 	var result []listedModel
 	allowed := func(id string) bool { return len(key.AllowedModels) == 0 || containsString(key.AllowedModels, id) }
 	for _, model := range online {
 		if !slices.ContainsFunc(model.Formats, func(format channel.Format) bool { return slices.Contains(formats, format) }) {
+			continue
+		}
+		if strict && len(witnesses[model.ID]) == 0 {
 			continue
 		}
 		onlineSet[model.ID] = true
@@ -220,13 +273,93 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		}
 		result = append(result, listedModel{id: model.ID, model: model})
 	}
+	// Alias resolution has precedence over a canonical spelling at inference.
+	// Do not list the shadowed canonical model or emit duplicate names.
+	byName := map[string]listedModel{}
+	for _, name := range result {
+		if _, shadowed := key.Aliases[name.id]; !shadowed {
+			byName[name.id] = name
+		}
+	}
 	for alias, target := range key.Aliases {
 		if model, ok := byID[target]; ok && onlineSet[target] && allowed(target) {
-			result = append(result, listedModel{id: alias, model: model})
+			byName[alias] = listedModel{id: alias, model: model}
 		}
+	}
+	result = result[:0]
+	for _, name := range byName {
+		if entries := witnesses[name.model.ID]; len(entries) > 0 {
+			name = conservativeListedModel(name, entries)
+		}
+		result = append(result, name)
 	}
 	sort.SliceStable(result, func(i, j int) bool { return result[i].id < result[j].id })
 	return result, nil
+}
+
+type nativeModelWitness struct {
+	format    channel.Format
+	candidate Candidate
+}
+
+// The production snapshot already contains approved, governed, callable
+// candidates. The optional source keeps old isolated test/legacy stores usable
+// until final cutover; it never consults a provider's shared account catalog.
+func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string][]nativeModelWitness, bool, error) {
+	out := map[string][]nativeModelWitness{}
+	source, ok := e.Store.(AuxiliarySource)
+	if !ok {
+		return out, false, nil
+	}
+	for _, format := range formats {
+		rows, err := source.AuxiliaryCandidates(ctx, format)
+		if err != nil {
+			return nil, true, err
+		}
+		path := map[channel.Format]string{channel.FormatOpenAIChat: "/v1/chat/completions", channel.FormatOpenAIResponses: "/v1/responses", channel.FormatAnthropic: "/v1/messages", channel.FormatGemini: "/v1beta/models", channel.FormatOpenAIImages: "/v1/images/generations"}[format]
+		for _, row := range rows {
+			if !slices.Contains(row.Formats, format) || !row.Candidate.ValidOffering(row.ModelID) || !keyProbeMatchesEndpoint(row.Candidate, format, path) {
+				continue
+			}
+			out[row.ModelID] = append(out[row.ModelID], nativeModelWitness{format, row.Candidate})
+		}
+	}
+	return out, true, nil
+}
+func conservativeListedModel(name listedModel, entries []nativeModelWitness) listedModel {
+	group := slices.ContainsFunc(entries, func(v nativeModelWitness) bool { return v.candidate.GroupID != "" })
+	if !group {
+		return name
+	}
+	// The model ID is the aggregate title. An optional bound is present only
+	// when every eligible witness on these endpoint formats proves it.
+	name.model = catalog.Model{ID: name.model.ID, DisplayName: name.model.ID, Enabled: true}
+	context, output := int64(0), int64(0)
+	contextKnown, outputKnown, stream := true, true, true
+	for _, v := range entries {
+		prefix := nativeProtocol(v.format) + ".length_search@upstream_protocol/"
+		c, o := v.candidate.VerifiedCapacity[prefix+"context"], v.candidate.VerifiedCapacity[prefix+"max_output"]
+		contextKnown = contextKnown && c > 0
+		outputKnown = outputKnown && o > 0
+		if c > 0 && (context == 0 || c < context) {
+			context = c
+		}
+		if o > 0 && (output == 0 || o < output) {
+			output = o
+		}
+		stream = stream && v.candidate.Evidence["upstream_protocol/"+nativeProtocol(v.format)+".stream/text_lifecycle"]
+	}
+	if contextKnown {
+		name.model.ContextWindow = &context
+	}
+	if outputKnown {
+		name.model.MaxOutputTokens = &output
+	}
+	name.generationMethods = []string{"generateContent"}
+	if stream {
+		name.generationMethods = append(name.generationMethods, "streamGenerateContent")
+	}
+	return name
 }
 
 // callTimeLimit is the longest one call may run, from its start to its end and

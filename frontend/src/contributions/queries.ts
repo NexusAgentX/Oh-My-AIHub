@@ -87,7 +87,7 @@ export function useContributionAction(id: string) {
           return apiSend<'rejectContribution'>('POST', `${base}/reject`, body)
       }
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['contributions'] }),
+    onSettled: () => Promise.all([client.invalidateQueries({queryKey:['contributions']}),client.invalidateQueries({queryKey:['market']}),client.invalidateQueries({queryKey:['group-channels']})]),
   })
 }
 export function useAddContributionChild(id: string) {

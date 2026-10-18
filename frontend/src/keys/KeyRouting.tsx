@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/query'
 import type { RoutingPreference } from '../api/types'
 import { routingModeLabels } from '../calls'
-import { useModel, useModels } from '../models/queries'
+import { useMarketModel,useMarketNames } from '../market/queries'
 import { RoutingEditor } from '../models/RoutingEditor'
 import { draftFromPreference, sameDraft, toRoutingInput, type RoutingDraft } from '../models/routing'
 import { Button, ConfirmDialog, InlineError, QueryBoundary, Segmented } from '../ui'
@@ -35,10 +35,10 @@ function KeyModelRouting({
   saved: boolean
   onRemoved: () => void
 }) {
-  const model = useModel(preference.model_id)
+  const model = useMarketModel(preference.model_id,new URLSearchParams())
   const { set, remove } = useKeyRouting(keyId)
   const [draft, setDraft] = useState<RoutingDraft | null>(null)
-  const channels = model.data?.channels
+  const channels = model.data?.routing_channels
   // 未保存的条目每次渲染都会生成新对象，用序列化值作为依赖避免反复重置草稿
   const preferenceKey = JSON.stringify(preference)
   useEffect(() => {
@@ -83,7 +83,7 @@ function KeyModelRouting({
 
 /** Key 的路由：跟随账号，或按模型单独设置。 */
 export function KeyRoutingSection({ keyId, routing }: { keyId: string; routing: RoutingPreference[] }) {
-  const models = useModels()
+  const models = useMarketNames()
   const { remove } = useKeyRouting(keyId)
   const [pending, setPending] = useState<string[]>([])
   const [custom, setCustom] = useState(routing.length > 0)
@@ -138,7 +138,7 @@ export function KeyRoutingSection({ keyId, routing }: { keyId: string; routing: 
               <option value="">选择模型</option>
               {choices.map((model) => (
                 <option key={model.id} value={model.id}>
-                  {model.custom ? `${model.id}（自定义）` : model.id}
+                  {model.id}
                 </option>
               ))}
             </select>

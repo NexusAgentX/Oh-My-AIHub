@@ -4,6 +4,142 @@
  */
 
 export interface paths {
+    "/v1/models/{model}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read authorized local native model metadata */
+        get: operations["getNativeModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listMarketChannels */
+        get: operations["listMarketChannels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/channels/{channelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getMarketChannel */
+        get: operations["getMarketChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listMarketModels */
+        get: operations["listMarketModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/models/{modelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getMarketModel */
+        get: operations["getMarketModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listMarketSuppliers */
+        get: operations["listMarketSuppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/groups/{groupID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getMarketGroup */
+        get: operations["getMarketGroup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/reports/{reportID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getMarketPublicReport */
+        get: operations["getMarketPublicReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/backend-api/codex/responses": {
         parameters: {
             query?: never;
@@ -2839,7 +2975,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read authorized local native model metadata */
+        get: operations["getGeminiNativeModel"];
         put?: never;
         /**
          * Gemini generateContent / streamGenerateContent
@@ -2860,8 +2997,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * OpenAI / Anthropic 风格模型列表
-         * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         * OpenAI / Anthropic / Gemini 风格模型列表
+         * @description 按平台 Key 权限返回本站生效模型及别名。Anthropic 由版本请求头选择，Gemini 由 x-goog-api-key 或 key 选择；不访问上游共享账号总目录。
          */
         get: operations["listGatewayModels"];
         put?: never;
@@ -2968,6 +3105,202 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MarketReportEndpoint: {
+            id: string;
+            method: string;
+            path: string;
+            proxy_supported: boolean;
+        };
+        NativeModelMetadata: ({
+            id?: string;
+            name?: string;
+            object?: string;
+            type?: string;
+        } & {
+            [key: string]: unknown;
+        }) | unknown | unknown;
+        MarketHallChannel: {
+            id: string;
+            name: string;
+            summary: string;
+            description: string;
+            group_id: string;
+            group_name: string;
+            supplier_id: string;
+            supplier_name: string;
+            is_mine: boolean;
+            models: string[];
+            formats: components["schemas"]["GroupChannelFormat"][];
+        };
+        MarketHallPage: {
+            items: components["schemas"]["MarketHallChannel"][];
+            total: number;
+            next_cursor: string | null;
+        };
+        MarketBrowsePrice: {
+            amount: components["schemas"]["MarketPrice"];
+            unit: string;
+            quantity: number;
+            self_net_zero: boolean;
+        };
+        MarketBrowseWitness: {
+            protocol: string;
+            group_model_id: string;
+            group_id: string;
+            supplier_id: string;
+            format: string;
+            channel_ids: string[];
+            online_channel_ids: string[];
+        };
+        MarketBrowseModel: {
+            id: string;
+            protocols: string[];
+            model_types: string[];
+            formats: components["schemas"]["GroupChannelFormat"][];
+            offers: components["schemas"]["MarketBrowseWitness"][];
+            online_channels: number;
+            price: components["schemas"]["MarketBrowsePrice"] | null;
+        };
+        MarketBrowseSupplier: {
+            id: string;
+            name: string;
+            kind: string;
+            website_url: string;
+            icon_data: string;
+            icon_source: string;
+            summary: string;
+            description: string;
+            docs_url: string;
+            groups: string[];
+        };
+        MarketBrowseGroup: {
+            id: string;
+            supplier_id: string;
+            name: string;
+            description: string;
+            status_url: string;
+            model_ids: string[];
+        };
+        MarketBrowseCapabilities: {
+            supported: string[];
+            context_lower: number;
+            output_lower: number;
+        };
+        MarketBrowseChannel: {
+            id: string;
+            name: string;
+            summary: string;
+            description: string;
+            group_id: string;
+            group_model_id: string;
+            model_id: string;
+            protocol: string;
+            discount: string;
+            capabilities: components["schemas"]["MarketBrowseCapabilities"];
+            price: components["schemas"]["MarketBrowsePrice"] | null;
+        };
+        MarketBrowseOffer: {
+            id: string;
+            model_id: string;
+            display_name: string;
+            group_id: string;
+            model_type: string;
+            declared_context: number | null;
+            declared_output: number | null;
+            reference: boolean;
+            quote: components["schemas"]["MarketQuote"] | null;
+        };
+        MarketBrowsePage: {
+            items: components["schemas"]["MarketBrowseModel"][];
+            total: number;
+            next_cursor: string | null;
+            price_sort_fallback: boolean;
+            suppliers: components["schemas"]["MarketBrowseSupplier"][];
+            groups: components["schemas"]["MarketBrowseGroup"][];
+        };
+        MarketBrowseRoutingChannel: {
+            id: string;
+            name: string;
+            multiplier: string;
+            /** @enum {string} */
+            state: "available" | "cooldown" | "limited";
+            is_mine: boolean;
+            formats: components["schemas"]["GroupChannelFormat"][];
+            cooldown_remaining_seconds: number | null;
+            routing_metrics: components["schemas"]["ModelRoutingMetric"][];
+            typical_price: components["schemas"]["MarketBrowsePrice"] | null;
+        };
+        MarketBrowseDetail: {
+            model: components["schemas"]["MarketBrowseModel"];
+            offers: components["schemas"]["MarketBrowseOffer"][];
+            channels: components["schemas"]["MarketBrowseChannel"][];
+            suppliers: components["schemas"]["MarketBrowseSupplier"][];
+            groups: components["schemas"]["MarketBrowseGroup"][];
+            routing: components["schemas"]["RoutingPreference"];
+            routing_channels: components["schemas"]["MarketBrowseRoutingChannel"][];
+        };
+        MarketBrowseSuppliers: {
+            items: components["schemas"]["MarketBrowseSupplier"][];
+            groups: components["schemas"]["MarketBrowseGroup"][];
+        };
+        MarketBrowseGroupDetail: {
+            group: components["schemas"]["MarketBrowseGroup"];
+            supplier: components["schemas"]["MarketBrowseSupplier"];
+            reports: string[];
+        };
+        MarketReportAssertion: {
+            id: string;
+            label: string;
+            state: string;
+            reason: string;
+        };
+        MarketReportSource: {
+            id: string;
+            url: string;
+            version: string;
+        };
+        MarketReportExclusion: {
+            protocol: string;
+            source_ids: string[];
+            reason: string;
+        };
+        MarketReportScenario: {
+            id: string;
+            layer: string;
+            state: string;
+            reason: string;
+            scope_version: string;
+            code_version: string;
+            current: boolean;
+            aggregate: boolean;
+            source_ids: string[];
+            assertions: components["schemas"]["MarketReportAssertion"][];
+            estimated_http: number | null;
+            usage: components["schemas"]["DetectionUsage"];
+            capacity: components["schemas"]["DetectionCapacityReport"][] | null;
+            settings: components["schemas"]["DetectionSettingEvidence"][] | null;
+            images: components["schemas"]["DetectionImageEvidence"][] | null;
+            fingerprint: components["schemas"]["DetectionFingerprintReport"] | null;
+            endpoints: components["schemas"]["MarketReportEndpoint"][];
+        };
+        MarketPublicReport: {
+            id: string;
+            target_kind: string;
+            target_id: string;
+            group_id: string;
+            state: string;
+            validity: string;
+            manifest_version: string;
+            registry_version: string;
+            complete: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            parameters: components["schemas"]["DetectionParameters"];
+            usage: components["schemas"]["DetectionUsage"];
+            scenarios: components["schemas"]["MarketReportScenario"][];
+            sources: components["schemas"]["MarketReportSource"][];
+            exclusions: components["schemas"]["MarketReportExclusion"][];
+        };
         CodexNativeCatalog: {
             models: ({
                 slug: string;
@@ -6376,6 +6709,607 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getNativeModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native model metadata in the selected protocol */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeModelMetadata"];
+                };
+            };
+            /** @description Native protocol error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listMarketChannels: {
+        parameters: {
+            query?: {
+                model_id?: string;
+                supplier_id?: string;
+                group_id?: string;
+                q?: string;
+                model_type?: string;
+                format?: string;
+                protocol?: string;
+                sort?: string;
+                features?: string;
+                cursor?: string;
+                min_context?: number;
+                min_output?: number;
+                limit?: number;
+                only_online?: boolean;
+                channel_q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketHallPage"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMarketChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketHallChannel"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listMarketModels: {
+        parameters: {
+            query?: {
+                model_id?: string;
+                supplier_id?: string;
+                group_id?: string;
+                q?: string;
+                model_type?: string;
+                format?: string;
+                protocol?: string;
+                sort?: string;
+                features?: string;
+                cursor?: string;
+                min_context?: number;
+                min_output?: number;
+                limit?: number;
+                only_online?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketBrowsePage"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMarketModel: {
+        parameters: {
+            query?: {
+                model_id?: string;
+                supplier_id?: string;
+                group_id?: string;
+                q?: string;
+                model_type?: string;
+                format?: string;
+                protocol?: string;
+                sort?: string;
+                features?: string;
+                cursor?: string;
+                min_context?: number;
+                min_output?: number;
+                limit?: number;
+                only_online?: boolean;
+            };
+            header?: never;
+            path: {
+                modelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketBrowseDetail"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listMarketSuppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketBrowseSuppliers"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMarketGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketBrowseGroupDetail"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMarketPublicReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved account-scoped projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketPublicReport"];
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     proxyCodexResponses: {
         parameters: {
             query?: never;
@@ -13333,6 +14267,35 @@ export interface operations {
         };
         responses: {
             /** @description 原生响应（含流式）与原生错误。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getGeminiNativeModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native model metadata in the selected protocol */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeModelMetadata"];
+                };
+            };
+            /** @description Native protocol error */
             default: {
                 headers: {
                     [name: string]: unknown;

@@ -10,6 +10,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
@@ -24,6 +25,11 @@ type State struct {
 	Directory market.Directory
 	Data      Data
 	Views     map[string]View
+	// Private immutable inputs for account-scoped catalog projections. These
+	// records contain credentials and must never be serialized as an API DTO.
+	Candidates []gateway.CandidateRecord
+	Reports    map[string]detection.Projection
+	Version    string
 }
 type Runtime struct {
 	Repository      Repository
@@ -98,7 +104,8 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 	if err != nil {
 		return nil, err
 	}
-	records, views, err := Build(*d, data, l.r.Planner)
+	facts := projectReports(*d, data, l.r.Planner)
+	records, views, err := build(*d, data, facts)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +151,11 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 			}
 		}
 	}
-	l.r.state.Store(&State{Directory: *d, Data: data, Views: views})
+	version, err := ids.NewUUID()
+	if err != nil {
+		return nil, err
+	}
+	l.r.state.Store(&State{Directory: *d, Data: data, Views: views, Candidates: records, Reports: facts, Version: version})
 	legacy = append(legacy, records...)
 	sort.SliceStable(legacy, func(i, j int) bool {
 		if legacy[i].ModelID != legacy[j].ModelID {
@@ -276,6 +287,16 @@ func projection(d market.Directory, j detection.Job, p Planner) detection.Projec
 	return detection.ProjectForPlan(j, current, plan)
 }
 func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateRecord, map[string]View, error) {
+	return build(d, data, projectReports(d, data, planner))
+}
+func projectReports(d market.Directory, data Data, planner Planner) map[string]detection.Projection {
+	facts := map[string]detection.Projection{}
+	for _, j := range data.Reports {
+		facts[j.Target.Binding.TargetID] = projection(d, j, planner)
+	}
+	return facts
+}
+func build(d market.Directory, data Data, facts map[string]detection.Projection) ([]gateway.CandidateRecord, map[string]View, error) {
 	pricingVersions, err := typical.PricingVersions(d)
 	if err != nil {
 		return nil, nil, err
@@ -287,7 +308,6 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 	models := map[string][]market.GroupModel{}
 	choices := map[string]Choice{}
 	probes := map[string]Probe{}
-	facts := map[string]detection.Projection{}
 	for _, g := range d.Groups {
 		groups[g.ID] = g
 	}
@@ -310,9 +330,6 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 	}
 	for _, p := range data.Probes {
 		probes[p.ChannelID+"/"+p.GroupModelID] = p
-	}
-	for _, j := range data.Reports {
-		facts[j.Target.Binding.TargetID] = projection(d, j, planner)
 	}
 	records := []gateway.CandidateRecord{}
 	views := map[string]View{}

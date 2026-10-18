@@ -12,14 +12,14 @@ import {
   type CallFilterState,
 } from '../calls'
 import { useKeys } from '../keys/queries'
-import { useModels } from '../models/queries'
+import { useMarketNames } from '../market/queries'
 import { Card, PageHeader } from '../ui'
 
 export function UsagePage() {
   const [search, setSearch] = useSearchParams()
   const [filters, setFilters] = useState<CallFilterState>(emptyCallFilters)
   const keys = useKeys()
-  const models = useModels()
+  const models = useMarketNames()
   const params = useMemo(() => filtersToParams(filters), [filters])
   const openCall = search.get('call')
   const setOpenCall = (id: string | null) => {

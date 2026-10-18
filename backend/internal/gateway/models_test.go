@@ -142,7 +142,7 @@ func TestListFormatsFollowTheEndpoint(t *testing.T) {
 		headers map[string]string
 		want    []channel.Format
 	}{
-		{"openai", "/v1/models", nil, []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}},
+		{"openai", "/v1/models", nil, []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatOpenAIImages}},
 		{"anthropic", "/v1/models", map[string]string{"anthropic-version": "2023-06-01"}, []channel.Format{channel.FormatAnthropic}},
 		{"gemini", "/v1beta/models", nil, []channel.Format{channel.FormatGemini}},
 		{"gemini ignores anthropic-version", "/v1beta/models", map[string]string{"anthropic-version": "2023-06-01"}, []channel.Format{channel.FormatGemini}},
@@ -200,5 +200,64 @@ func TestAvailableModelsAreFilteredByFormat(t *testing.T) {
 	names, err := engine.availableModels(context.Background(), limited, listFormats(DialectAnthropic, false))
 	if err != nil || len(names) != 1 || names[0].id != "claude-x" {
 		t.Fatalf("limited anthropic list = %v, %v", names, err)
+	}
+}
+
+type approvedListingStore struct {
+	listingStore
+	records []CandidateRecord
+}
+
+func (s approvedListingStore) AuxiliaryCandidates(_ context.Context, f channel.Format) ([]CandidateRecord, error) {
+	var out []CandidateRecord
+	for _, r := range s.records {
+		if slices.Contains(r.Formats, f) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+func TestNativeModelListsKeepAliasPermissionsAndConservativeGroupMetadata(t *testing.T) {
+	ctx := context.Background()
+	large := int64(999999)
+	catalogSource := catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main", DisplayName: "Unrelated global title", ContextWindow: &large, MaxOutputTokens: &large}, {ID: "blocked"}}})
+	makeCandidate := func(id string, context, output int64) Candidate {
+		return Candidate{ChannelID: id, GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), VerifiedCapacity: map[string]int64{"native-generate-content.length_search@upstream_protocol/context": context, "native-generate-content.length_search@upstream_protocol/max_output": output}, Evidence: map[string]bool{}}
+	}
+	a, b := makeCandidate("a", 8192, 2048), makeCandidate("b", 4096, 0)
+	source := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatGemini}}, {ID: "blocked", Formats: []channel.Format{channel.FormatGemini}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: a}, {ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: b}}}
+	e := NewEngine(Dependencies{Catalog: catalogSource, Store: source})
+	key := KeyAuth{AllowedModels: []string{"main"}, Aliases: map[string]string{"alias": "main", "main": "blocked"}}
+	names, err := e.availableModels(ctx, key, []channel.Format{channel.FormatGemini})
+	if err != nil || len(names) != 1 || names[0].id != "alias" || names[0].model.DisplayName != "main" || names[0].model.ContextWindow == nil || *names[0].model.ContextWindow != 4096 || names[0].model.MaxOutputTokens != nil {
+		t.Fatal("alias bypass or misleading metadata", names, err)
+	}
+	page, ok := geminiModelPage(names, url.Values{})
+	if !ok {
+		t.Fatal("page rejected")
+	}
+	item := page["models"].([]map[string]any)[0]
+	if _, exists := item["outputTokenLimit"]; exists || !slices.Equal(item["supportedGenerationMethods"].([]string), []string{"generateContent"}) {
+		t.Fatal("unknown limit or stream support fabricated", item)
+	}
+	source.records[1].Candidate.VerifiedCapacity = nil
+	e.Store = source
+	names, err = e.availableModels(ctx, key, []channel.Format{channel.FormatGemini})
+	if err != nil || names[0].model.ContextWindow != nil {
+		t.Fatal("unknown witness ignored", names, err)
+	}
+}
+func TestNativeOnlyCodexProbeDoesNotPopulatePublicModelList(t *testing.T) {
+	c := Candidate{ChannelID: "native", GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), KeyProbeEndpoints: map[channel.Format]string{channel.FormatOpenAIResponses: "codex.responses"}, Evidence: map[string]bool{"upstream_protocol/codex-special.RL01/actual_protocol_marker": true}}
+	s := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}}}
+	e := NewEngine(Dependencies{Catalog: catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main"}}}), Store: s})
+	names, err := e.availableModels(context.Background(), KeyAuth{Aliases: map[string]string{"alias": "main"}}, listFormats(DialectOpenAI, false))
+	if err != nil || len(names) != 0 {
+		t.Fatal("native probe leaked a public model", names, err)
+	}
+	c.Evidence["upstream_protocol/openai-responses.base/accepted_native_message_shapes"] = true
+	names, err = e.availableModels(context.Background(), KeyAuth{}, listFormats(DialectOpenAI, false))
+	if err != nil || len(names) != 1 || names[0].id != "main" {
+		t.Fatal("independent public proof was lost", names, err)
 	}
 }

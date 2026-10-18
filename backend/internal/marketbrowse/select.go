@@ -34,6 +34,16 @@ type Price struct {
 	Quantity    int64        `json:"quantity"`
 	SelfNetZero bool         `json:"self_net_zero"`
 }
+
+func (p Price) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Amount      string `json:"amount"`
+		Unit        string `json:"unit"`
+		Quantity    int64  `json:"quantity"`
+		SelfNetZero bool   `json:"self_net_zero"`
+	}{p.Amount.String(), p.Unit, p.Quantity, p.SelfNetZero})
+}
+
 type Channel struct {
 	ID, OwnerID                string
 	Visible, Enabled, Routable bool
@@ -166,8 +176,21 @@ func priceLess(a, b *Price) bool {
 // on each witness before grouping, counting, sorting or pagination. No union of
 // unrelated groups, protocols or channels can create a matching witness.
 func Select(offers []Offering, scope Scope, q Query, after string, limit int) (Page, error) {
+	if limit < 1 || limit > 100 {
+		return Page{Items: []Model{}}, ErrFilter
+	}
+	return selectPage(offers, scope, q, after, limit)
+}
+
+// FilterAll shares the exact same-candidate and authorization rules with the
+// model catalog, for in-process channel projections which paginate afterwards.
+// It never exposes an unbounded HTTP model page.
+func FilterAll(offers []Offering, scope Scope, q Query) (Page, error) {
+	return selectPage(offers, scope, q, "", max(1, len(offers)))
+}
+func selectPage(offers []Offering, scope Scope, q Query, after string, limit int) (Page, error) {
 	page := Page{Items: []Model{}}
-	if scope.Version == "" || scope.ActorID == "" || !q.validate() || limit < 1 || limit > 100 {
+	if scope.Version == "" || scope.ActorID == "" || !q.validate() || limit < 1 {
 		return page, ErrFilter
 	}
 	q.Search = strings.TrimSpace(q.Search)

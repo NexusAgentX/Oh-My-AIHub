@@ -81,7 +81,7 @@ function stamp(v: string) {
   return new Date(v).toLocaleString('zh-CN', { hour12: false })
 }
 
-export function ContributionsPage({ queue = false }: { queue?: boolean }) {
+export function ContributionsPage({ queue = false, initialKind='supplier',title }: { queue?: boolean;initialKind?:Kind;title?:string }) {
   const [cursor, setCursor] = useState(''),
     [creating, setCreating] = useState(false)
   const query = useContributions(queue, cursor),
@@ -89,7 +89,7 @@ export function ContributionsPage({ queue = false }: { queue?: boolean }) {
   return (
     <>
       <PageHeader
-        title={queue ? '贡献审核' : '我的贡献'}
+        title={title??(queue ? '贡献审核' : '我的贡献')}
         actions={
           <Button type="button" onClick={() => setCreating(true)}>
             新建贡献
@@ -156,6 +156,7 @@ export function ContributionsPage({ queue = false }: { queue?: boolean }) {
         </QueryBoundary>
       </Card>
       <NewContribution
+		initialKind={initialKind}
         open={creating}
         close={() => setCreating(false)}
         onCreated={(id) =>
@@ -169,18 +170,20 @@ export function ContributionQueuePage() {
   return <ContributionsPage queue />
 }
 function NewContribution({
+	initialKind,
   open,
   close,
   onCreated,
 }: {
+	initialKind:Kind
   open: boolean
   close: () => void
   onCreated: (id: string) => void
 }) {
   const { account } = useAuth(),
     action = useNewContribution()
-  const [kind, setKind] = useState<Kind>('supplier'),
-    [mode, setMode] = useState('new'),
+  const [kind, setKind] = useState<Kind>(initialKind),
+    [mode, setMode] = useState(initialKind==='model_id'?'disable':'new'),
     [selected, setSelected] = useState(''),
     [cursor, setCursor] = useState(''),
     [starter, setStarter] = useState(true)
