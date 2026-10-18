@@ -1,77 +1,36 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
-
-type onlineChannelsFixture struct {
-	gateway.Browse
-	online []gateway.OnlineChannel
-}
-
-func (b onlineChannelsFixture) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
-	return b.online, nil
-}
 
 // 模型页的渠道行把成功率、首字延迟、冷却剩余写成 null 或字符串；
 // 这些分支由处理器内联拼装，门禁只校验形状，这里钉住各状态下的取值。
 func TestModelPageReportsEachChannelsState(t *testing.T) {
 	const idPrefix = "00000000-0000-4000-8000-00000000"
-	store := newFakeStore()
-	policy, err := channel.NewOutboundPolicy(nil, nil)
-	if err != nil {
-		t.Fatal(err)
+	one := int32(1)
+	records := []groupchannel.Record{
+		{ID: idPrefix + "a001", Name: "无统计"},
+		{ID: idPrefix + "a002", Name: "无首字延迟"},
+		{ID: idPrefix + "a003", Name: "有首字延迟"},
+		{ID: idPrefix + "a004", Name: "冷却中", Overrides: market.Defaults{CooldownFailures: &one}},
+		{ID: idPrefix + "a005", Name: "并发已满", Overrides: market.Defaults{ConcurrencyLimit: &one}},
 	}
-	// a002: four attempts, three completed, none of them streaming (no first
-	// token figure); a003: ten attempts, nine completed streams starting after 420 ms.
-	book := gateway.NewStatsBook()
+	p, engine := marketModelFixture(t, "m1", records)
+	admin := p.admin(t)
 	now := time.Now()
 	for range 3 {
-		book.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
+		p.stats.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
 	}
-	book.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
-	seedChannelHealth(book, idPrefix+"a003", "m1")
-	engine := gateway.NewEngine(gateway.Dependencies{Settings: settings.NewService(store), Outbound: policy, StatsBook: book})
-	identityService, err := identity.NewService(store, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	one := int32(1)
-	line := func(suffix, name string, advanced channel.Advanced) gateway.OnlineChannel {
-		return gateway.OnlineChannel{
-			ModelID: "m1", ChannelID: idPrefix + suffix, ChannelName: name, OwnerID: idPrefix + "00ff", OwnerName: "车主",
-			Formats: []channel.Format{channel.FormatAnthropic, channel.FormatOpenAIChat}, MultiplierNano: 1_250_000_000, Advanced: advanced,
-		}
-	}
-	browse := onlineChannelsFixture{online: []gateway.OnlineChannel{
-		line("a001", "无统计", channel.Advanced{}),
-		line("a002", "无首字延迟", channel.Advanced{}),
-		line("a003", "有首字延迟", channel.Advanced{}),
-		line("a004", "冷却中", channel.Advanced{CooldownFailures: &one}),
-		line("a005", "并发已满", channel.Advanced{ConcurrencyLimit: &one}),
-	}}
-	handler := NewHandler(Dependencies{
-		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
-		Settings: settings.NewService(store), Audit: audit.NewService(store), CookieSecure: true,
-		Gateway: engine, Browse: browse, Routing: noRoutingPreferences{},
-	})
-	admin := bootstrap(t, loadOpenAPI(t), handler)
-	admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": "m1", "display_name": "模型一",
-		"base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_write": "0", "cache_read": "0.15"},
-	})
+	p.stats.Record(idPrefix+"a002", "m1", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
+	seedChannelHealth(p.stats, idPrefix+"a003", "m1")
 
 	// A cooldown and a held concurrency slot give the "cooldown" and "limited" states.
 	engine.State().Failure(idPrefix+"a004", gateway.Limits{CooldownAfter: 1, CooldownFor: time.Hour}, time.Now(), "test")
@@ -81,10 +40,11 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	}
 	defer release()
 
-	page := admin.expect(t, http.StatusOK, http.MethodGet, "/api/models/m1", nil)
+	page := admin.expect(t, http.StatusOK, http.MethodGet, "/api/market/models/m1", nil)
 	type row struct {
-		state, successRate string
-		ttft, cooldown     any
+		state    string
+		metrics  int
+		cooldown any
 	}
 	want := map[string]row{
 		"无统计":   {state: "available"},
@@ -94,11 +54,10 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 		"并发已满":  {state: "limited"},
 	}
 	got := map[string]row{}
-	for _, entry := range page["channels"].([]any) {
+	for _, entry := range page["routing_channels"].([]any) {
 		channelRow := entry.(map[string]any)
-		successRate, _ := channelRow["success_rate_24h"].(string)
 		got[channelRow["name"].(string)] = row{
-			state: channelRow["state"].(string), successRate: successRate, ttft: channelRow["ttft_p50_ms"],
+			state: channelRow["state"].(string), metrics: len(channelRow["routing_metrics"].([]any)),
 			cooldown: channelRow["cooldown_remaining_seconds"],
 		}
 	}

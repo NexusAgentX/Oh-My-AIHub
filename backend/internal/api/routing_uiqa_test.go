@@ -18,6 +18,15 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 )
 
+type onlineChannelsFixture struct {
+	gateway.Browse
+	online []gateway.OnlineChannel
+}
+
+func (b onlineChannelsFixture) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
+	return b.online, nil
+}
+
 // Explicit loopback-only synthetic browser fixture. Uses real model/routing
 // handlers and versioned metric loading, with no database or paid upstream.
 func TestRoutingUIHarness(t *testing.T) {
