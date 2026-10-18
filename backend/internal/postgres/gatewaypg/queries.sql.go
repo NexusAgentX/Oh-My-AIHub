@@ -268,23 +268,6 @@ func (q *Queries) FinishCall(ctx context.Context, arg FinishCallParams) (int64, 
 	return result.RowsAffected(), nil
 }
 
-const homeChannels = `-- name: HomeChannels :one
-SELECT count(*) FILTER (WHERE status = 'listed')::bigint AS online, count(*)::bigint AS total
-FROM channels WHERE owner_id = $1 AND deleted_at IS NULL
-`
-
-type HomeChannelsRow struct {
-	Online int64
-	Total  int64
-}
-
-func (q *Queries) HomeChannels(ctx context.Context, ownerID string) (HomeChannelsRow, error) {
-	row := q.db.QueryRow(ctx, homeChannels, ownerID)
-	var i HomeChannelsRow
-	err := row.Scan(&i.Online, &i.Total)
-	return i, err
-}
-
 const homePendingTrades = `-- name: HomePendingTrades :one
 SELECT count(*)::bigint FROM c2c_trades
 WHERE (buyer_id = $1 AND status = 'awaiting_payment') OR (seller_id = $1 AND status = 'paid')

@@ -232,10 +232,6 @@ SELECT coalesce(sum(cost_nano + fee_nano), 0)::bigint AS spend_nano,
        count(*) FILTER (WHERE outcome IN ('succeeded', 'succeeded_unbilled'))::bigint AS succeeded
 FROM calls WHERE account_id = $1 AND created_at >= $2;
 
--- name: HomeChannels :one
-SELECT count(*) FILTER (WHERE status = 'listed')::bigint AS online, count(*)::bigint AS total
-FROM channels WHERE owner_id = $1 AND deleted_at IS NULL;
-
 -- name: HomeRevenue :one
 SELECT coalesce(sum(c.cost_nano), 0)::bigint
 FROM calls c JOIN channels ch ON ch.id = c.final_channel_id

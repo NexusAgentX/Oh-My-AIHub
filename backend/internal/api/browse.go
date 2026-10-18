@@ -7,6 +7,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/localtime"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -139,6 +140,19 @@ func widenMillis(value *int32) *int {
 func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	accountID := accountFromContext(ctx).ID
+	var marketState *groupchannel.State
+	if a.groupChannels != nil {
+		if a.groupChannels.Runtime == nil {
+			writeGroupChannelError(w, groupchannel.ErrUnavailable)
+			return
+		}
+		var err error
+		marketState, err = a.groupChannels.Runtime.Current()
+		if err != nil {
+			writeGroupChannelError(w, err)
+			return
+		}
+	}
 	if err := a.keys.EnsureDefault(ctx, accountID); err != nil {
 		writeDomainError(w, err)
 		return
@@ -152,6 +166,17 @@ func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeDomainError(w, err)
 		return
+	}
+	if marketState != nil {
+		stats.ChannelsOnline, stats.ChannelsTotal = 0, 0
+		for _, v := range marketState.Views {
+			if v.Owner.ID == accountID {
+				stats.ChannelsTotal++
+				if v.Available {
+					stats.ChannelsOnline++
+				}
+			}
+		}
 	}
 	recent, err := a.browse.RecentCalls(ctx, accountID, 5)
 	if err != nil {

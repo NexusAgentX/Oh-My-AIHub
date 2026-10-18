@@ -455,11 +455,6 @@ func (s *Store) Home(ctx context.Context, accountID string, dayStart time.Time) 
 		return stats, err
 	}
 	stats.TodaySpend, stats.TodayCalls, stats.TodaySucceeded = money.FromNano(today.SpendNano), today.Calls, today.Succeeded
-	channels, err := s.q.HomeChannels(ctx, accountID)
-	if err != nil {
-		return stats, err
-	}
-	stats.ChannelsOnline, stats.ChannelsTotal = channels.Online, channels.Total
 	revenue, err := s.q.HomeRevenue(ctx, HomeRevenueParams{OwnerID: accountID, CreatedAt: dayStart})
 	if err != nil {
 		return stats, err
