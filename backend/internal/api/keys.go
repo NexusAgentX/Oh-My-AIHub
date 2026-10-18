@@ -373,10 +373,13 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 	writeJSON(w, http.StatusOK, newRoutingPreferenceJSON(saved))
 }
 
-// routable accepts a catalog model or a custom model a listed channel offers
-// (ADR-0034).
+// Once the market service is installed, only its approved model IDs may be
+// configured. An unknown ID must never recover a retired global offering.
 func (a *app) routable(ctx context.Context, modelID string) error {
-	if a.groupChannels != nil && a.groupChannels.Runtime != nil {
+	if a.groupChannels != nil {
+		if a.groupChannels.Runtime == nil {
+			return groupchannel.ErrUnavailable
+		}
 		state, err := a.groupChannels.Runtime.Current()
 		if err != nil {
 			return err
@@ -387,6 +390,7 @@ func (a *app) routable(ctx context.Context, modelID string) error {
 			}
 			return catalog.ErrNotFound
 		}
+		return catalog.ErrNotFound
 	}
 	_, err := a.catalog.Get(ctx, modelID)
 	if !errors.Is(err, catalog.ErrNotFound) {

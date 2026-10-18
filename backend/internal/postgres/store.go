@@ -8,7 +8,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/forumpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/supplierpg"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -27,7 +26,6 @@ type Store struct {
 	ChannelHistory *channelrefpg.Store
 	Market         *marketpg.Store
 	Contributions  *contributionpg.Store
-	Suppliers      *supplierpg.Store
 	// Books is where the stores that book (ledger, gateway, C2C, observe)
 	// report what their ledger transactions did; Cached subscribes the
 	// gateway's balance cache to it.
@@ -54,7 +52,6 @@ func New(pool *pgxpool.Pool) *Store {
 		Market:         marketpg.NewStore(pool),
 		Contributions:  contributionpg.NewStore(pool),
 		Books:          books,
-		Suppliers:      supplierpg.NewStore(pool),
 		Forum:          forumpg.NewStore(pool),
 		Identity:       identitypg.NewStore(pool),
 		Catalog:        catalogpg.NewStore(pool),
