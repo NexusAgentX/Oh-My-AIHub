@@ -46,6 +46,9 @@ func TestCodexOpaqueContinuationCrossesChannelsAndCredentials(t *testing.T) {
 			handler, store, records := newCodexContextFixture(t, up)
 			for i := range store.rows {
 				store.rows[i].Formats = append(store.rows[i].Formats, channel.FormatAnthropic)
+				store.rows[i].Candidate.Evidence["upstream_protocol/native-messages.reasoning/complete_opaque_signature_or_encrypted_replay"] = true
+				store.rows[i].Candidate.VerifiedCapacity = map[string]int64{"native-messages.length_search@upstream_protocol/max_output": 32}
+				store.rows[i].Candidate.Advanced.HeaderRules.Set = append(store.rows[i].Candidate.Advanced.HeaderRules.Set, channel.HeaderSet{Name: "Anthropic-Version", Value: "2023-06-01"})
 			}
 			if relation == "same_group" {
 				store.rows[1].Candidate.GroupID = store.rows[0].Candidate.GroupID

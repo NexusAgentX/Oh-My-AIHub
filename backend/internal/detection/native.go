@@ -51,7 +51,7 @@ func (r *Registry) RegisterNative() error {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
-			code := sha256.Sum256([]byte(engineVersion + fingerprint.ImplementationVersion() + fixtureVersion))
+			code := sha256.Sum256([]byte(nativeEngineVersion + fingerprint.ImplementationVersion() + fixtureVersion))
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, CodeVersion: hex.EncodeToString(code[:]), Layer: "upstream_protocol", Run: func(ctx context.Context, s *Session) Result {
 				scene := &nativeScene{s: s, protocol: protocol, requirement: requirement, checks: map[string]Assertion{}}
 				switch family {

@@ -2,6 +2,8 @@ package detection
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,13 +36,50 @@ func TestControlledClientBoundsOutputAndTerminatesChildren(t *testing.T) {
 		t.Skip("controlled process requires Linux/macOS")
 	}
 	output, err := RunControlledProcess(context.Background(), ProcessSpec{Executable: "/bin/sh", Args: []string{"-c", "head -c 2097152 /dev/zero"}, Timeout: 3 * time.Second})
-	if err == nil || output.Reason != "body_limit" || len(output.Stdout) > 1<<20 {
+	if err == nil || output.Reason != "body_limit" || output.ResourceFailure != "stdout" || len(output.Stdout) > 1<<20 {
 		t.Fatalf("output bound: %d %s %v", len(output.Stdout), output.Reason, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := RunControlledProcess(ctx, ProcessSpec{Executable: "/bin/sh", Args: []string{"-c", "sleep 30"}, Timeout: time.Second}); err == nil {
 		t.Fatal("cancelled subprocess continued")
+	}
+}
+
+type transientProcessEntry struct {
+	fs.DirEntry
+	err error
+}
+
+func (e transientProcessEntry) Info() (fs.FileInfo, error) { return nil, e.err }
+
+func TestControlledClientTemporaryTreeSeparatesRemovalErrorsAndLimits(t *testing.T) {
+	var budget processTreeBudget
+	if err := budget.visit("removed", nil, fs.ErrNotExist); err != nil {
+		t.Fatal("removed directory treated as failure", err)
+	}
+	if err := budget.visit("removed", transientProcessEntry{err: fs.ErrNotExist}, nil); err != nil || budget.count != 0 {
+		t.Fatal("removed file consumed budget", err, budget)
+	}
+	if err := budget.visit("denied", transientProcessEntry{err: fs.ErrPermission}, nil); !errors.Is(err, fs.ErrPermission) || budget.exceeded != "" {
+		t.Fatal("storage error treated as a resource limit", err, budget)
+	}
+	path := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(path, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := fs.FileInfoToDirEntry(info)
+	budget = processTreeBudget{count: 2048}
+	if err := budget.visit(path, entry, nil); !errors.Is(err, errClientLimit) || budget.exceeded != "temporary_entries" {
+		t.Fatal("entry limit not enforced", err, budget)
+	}
+	budget = processTreeBudget{size: 16 << 20}
+	if err := budget.visit(path, entry, nil); !errors.Is(err, errClientLimit) || budget.exceeded != "temporary_bytes" {
+		t.Fatal("byte limit not enforced", err, budget)
 	}
 }
 

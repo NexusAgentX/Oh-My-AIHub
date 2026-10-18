@@ -36,7 +36,7 @@
 .price-rules dt { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--ink); font-weight: 600; }
 .price-rules dd { display: grid; gap: 2px; margin: 0; }
 
-.routing-editor { container: routing / inline-size; min-width: 0; display: grid; gap: var(--space-4); }
+.routing-editor { container: routing / inline-size; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .routing-mode { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .routing-list { display: grid; gap: 0; margin: 0; padding: 0; border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); list-style: none; }
 .routing-row {
@@ -71,7 +71,13 @@
 .routing-name a { overflow-wrap: anywhere; font-weight: 700; }
 .routing-owner { overflow-wrap: anywhere; }
 .routing-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-.routing-metrics { display: grid; grid-template-columns: 112px 104px 72px 56px; gap: var(--space-4); align-items: start; margin: 0; font-size: var(--text-sm); }
+.routing-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; margin: 0; font-size: var(--text-sm); }
+.routing-model-metrics { grid-column: 1 / -1; display: grid; gap: var(--space-3); min-width: 0; }
+.routing-model-metrics .routing-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.routing-model-metrics .routing-metrics dd { white-space: normal; overflow-wrap: anywhere; }
+.routing-model-metrics small { display: block; color: var(--muted); font-weight: 400; }
+.routing-row-off .routing-model-metrics { opacity: 0.5; }
+.routing-model-metrics-empty { grid-column: 1 / -1; }
 .routing-metrics dt { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
 .routing-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 
@@ -80,6 +86,7 @@
   .routing-list-manual .routing-row { grid-template-columns: auto minmax(0, 1fr); }
   .routing-list-manual .routing-row { grid-template-columns: auto auto minmax(0, 1fr); }
   .routing-metrics { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); }
+  .routing-model-metrics .routing-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
   .price-rules > div { grid-template-columns: 1fr; gap: 2px; }

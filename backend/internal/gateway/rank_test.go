@@ -56,16 +56,52 @@ func TestRankReliableUsesMedianForThinSamples(t *testing.T) {
 	}
 }
 
-func TestRankFastestOrdersByTTFTWithUnknownAtMedian(t *testing.T) {
+func TestRankFastestUsesEffectiveOutputAndLeavesUnknownBehindMeasuredLatency(t *testing.T) {
 	fast, slow := 200.0, 900.0
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1)}
-	stats := map[string]ChannelStats{"a": {Attempts: 30, Successes: 30, TTFTP50MS: &slow}, "b": {Attempts: 30, Successes: 30, TTFTP50MS: &fast}}
+	stats := map[string]ChannelStats{"a": {Attempts: 30, Successes: 30, TTFTP50MS: &fast, FirstOutputP50MS: &slow, FirstOutputSamples: 30}, "b": {Attempts: 30, Successes: 30, TTFTP50MS: &slow, FirstOutputP50MS: &fast, FirstOutputSamples: 30}}
 	got := ids(Rank(RankInput{Mode: routing.ModeFastest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
-	if got != "bca" { // c is unknown: median of {200, 900} is 900, ties a, id order puts a first... verified below
-		t.Logf("order = %s", got)
+	if got != "bac" {
+		t.Fatalf("first byte or unknown metric displaced effective output: %s", got)
 	}
-	if got[0] != 'b' {
-		t.Fatalf("fastest channel is not first: %s", got)
+}
+
+func TestRankSpeedIsIndependentOfLatencyAndDoesNotUseThinSamples(t *testing.T) {
+	fast, slow, high, low := 200.0, 900.0, 160.0, 40.0
+	candidates := []Candidate{candidate("a", "provider", 1), candidate("b", "provider", 1), candidate("c", "provider", 1)}
+	stats := map[string]ChannelStats{
+		"a": {FirstOutputP50MS: &fast, FirstOutputSamples: 30, OutputTPSP50: &low, OutputSpeedSamples: 30},
+		"b": {FirstOutputP50MS: &slow, FirstOutputSamples: 30, OutputTPSP50: &high, OutputSpeedSamples: 30},
+		"c": {OutputTPSP50: &high, OutputSpeedSamples: 1},
+	}
+	if got := ids(Rank(RankInput{Mode: routing.ModeSpeed, Candidates: candidates, Stats: stats})); got != "bac" {
+		t.Fatal("speed borrowed latency/thin sample", got)
+	}
+	if got := ids(Rank(RankInput{Mode: routing.ModeFastest, Candidates: candidates, Stats: stats})); got != "abc" {
+		t.Fatal("latency borrowed output speed", got)
+	}
+}
+
+func TestRankGroupPricesUseExactTypicalCostAndKeepUnknownDistinctFromFree(t *testing.T) {
+	candidates := []Candidate{
+		{ChannelID: "a", GroupID: "g", OwnerID: "provider", MultiplierNano: 1, TypicalCost: 100, TypicalCostKnown: true},
+		{ChannelID: "b", GroupID: "g", OwnerID: "provider", MultiplierNano: 9_000_000_000, TypicalCost: 25, TypicalCostKnown: true},
+		{ChannelID: "c", GroupID: "g", OwnerID: "provider", TypicalCostKnown: true},
+		{ChannelID: "d", GroupID: "g", OwnerID: "consumer"},
+		{ChannelID: "e", GroupID: "g", OwnerID: "provider"},
+	}
+	for i := range candidates {
+		candidates[i].TypicalUnit = "tokens"
+		candidates[i].TypicalQuantity = 1_000_000
+	}
+	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, ConsumerID: "consumer"})); got != "cdbae" {
+		t.Fatal("typical/zero/unknown cost ordering failed", got)
+	}
+	candidates = candidates[:2]
+	candidates[0].TypicalCost = 9_007_199_254_740_994
+	candidates[1].TypicalCost = 9_007_199_254_740_993
+	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates})); got != "ba" {
+		t.Fatal("price comparison lost fixed-point precision", got)
 	}
 }
 

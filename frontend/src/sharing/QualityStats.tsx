@@ -60,7 +60,7 @@ export const qualityMetrics: QualityMetric[] = [
     (key === 'speed' ? [10, 50, 95] : [50, 95, 99]).map(
       (p): QualityMetric => ({
         key: `${key}_p${p}`,
-        label: `${{ ttft: '流式首响应', duration: '尝试耗时', speed: '输出速度', gap: '最大帧间隔' }[key]} P${p}`,
+        label: `${{ ttft: '流式首响应', duration: '尝试耗时', speed: '有效输出速率', gap: '最大帧间隔' }[key]} P${p}`,
         unit: key === 'speed' ? 'tokens/s' : 'ms',
         sample: `${key}_samples`,
         read: (v) => v[`${key}_p${p}` as keyof Values],
@@ -548,7 +548,7 @@ export function QualityStats({
                   有效尝试，请求错误与客户端断开单列为不计入样本。供应商按原始样本汇总，不平均渠道成功率或分位数。
                 </p>
                 <p>
-                  首响应仅统计成功的流式尝试；耗时统计所有已测量的尝试；输出速度和最大帧间隔仅取最终成功流式尝试的测量值。最大帧间隔分位数表示各次调用最大停顿的分布。少量样本的分位数参考价值有限。
+                  首响应仅统计成功流式尝试的首字节；耗时统计所有已测量的尝试；有效输出速率仅使用新口径的可靠用量与输出区间，不混入历史平均速度。最大帧间隔取最终成功流式尝试，表示各次调用最大停顿的分布。少量样本的分位数参考价值有限。
                 </p>
                 <p>
                   缓存读取占比 = 缓存读取输入 token / 全部输入

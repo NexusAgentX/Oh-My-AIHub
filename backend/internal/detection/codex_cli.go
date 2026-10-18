@@ -393,7 +393,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 		if ctx.Err() != nil {
 			proof.Reason = "cancelled"
 		}
-		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "rpc_error_code", client.RPCErrorCode, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
+		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "rpc_error_code", client.RPCErrorCode, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason, "resource_failure", output.ResourceFailure)
 		if profile == "history_lifecycle" {
 			slog.Warn("history observer metadata", "observed", b.historyWindow != "", "length", len(b.historyWindow))
 		}

@@ -12280,6 +12280,10 @@ components:
           "code_version": {
             "type": "string"
           },
+          "scope_version": {
+            "type": "string",
+            "description": "Fingerprint of this scenario's protocol, endpoint and assertion scope; independent of unrelated suites."
+          },
           "layer": {
             "type": "string",
             "enum": [
@@ -12311,6 +12315,7 @@ components:
           "aggregate",
           "implemented",
           "code_version",
+          "scope_version",
           "layer",
           "estimated_http"
         ],
@@ -13984,7 +13989,7 @@ components:
       type: string
       enum: [openai_chat, openai_responses, anthropic, gemini, openai_images]
       description: 原生 API 格式：OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini、Images。网关不做格式转换。
-    RoutingMode: {type: string, enum: [cheapest, reliable, fastest, manual], description: 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。}
+    RoutingMode: {type: string, enum: [cheapest, reliable, fastest, speed, manual], description: 调用方式：价格优先（默认）、稳定优先、延迟优先、速率优先、手动排序。fastest 的历史值继续表示延迟。}
     CallOutcome:
       type: string
       enum: [rejected_balance, rejected_budget, rejected_key, rejected_model, rejected_format, rejected_no_channel, rejected_inflight, upstream_failed, interrupted, client_disconnected, succeeded, succeeded_unbilled, in_progress]
@@ -14481,10 +14486,29 @@ components:
           items: {$ref: '#/components/schemas/CatalogModel'}
       required: [items]
       additionalProperties: false
+    ModelRoutingMetric:
+      type: object
+      properties:
+        protocol: {type: string, enum: [openai-chat-completions, openai-responses, native-messages, native-generate-content, openai-images, codex-special], description: 实际入口协议；Codex 原生与公共 Responses/Images 分开计量。}
+        format: {$ref: '#/components/schemas/Format'}
+        tier: {type: string, description: 请求档位；空值代表默认/auto 调用上下文。}
+        stream: {type: boolean}
+        attempts: {type: integer, minimum: 0}
+        successes: {type: integer, minimum: 0}
+        excluded: {type: integer, minimum: 0, description: 客户端错误/主动断开，排除于可用率。}
+        success_rate: {type: [number, 'null'], minimum: 0, maximum: 1}
+        first_output_p50_ms: {type: [number, 'null'], minimum: 0}
+        first_output_samples: {type: integer, minimum: 0}
+        output_tps_p50: {type: [number, 'null'], exclusiveMinimum: 0}
+        output_samples: {type: integer, minimum: 0}
+        min_samples: {type: integer, minimum: 1, description: 对应统计至少达到此样本数才用于自身指标排序。}
+      required: [protocol, format, tier, stream, attempts, successes, excluded, success_rate, first_output_p50_ms, first_output_samples, output_tps_p50, output_samples, min_samples]
+      additionalProperties: false
     ModelChannel:
       {
         "type": "object",
         "properties": {
+          "routing_metrics": {"type":"array","items":{"$ref":"#/components/schemas/ModelRoutingMetric"},"description":"该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。"},
           "id": {
             "type": "string",
             "format": "uuid"
@@ -15199,6 +15223,7 @@ components:
     RouteDecision:
       type: object
       properties:
+        missing_capability: {type: string, description: 固定能力 ID 或版本/已验证容量缺失原因，不含请求内容或上游配置。}
         channel: {$ref: '#/components/schemas/ChannelRef'}
         reason: {type: string}
         rank: {type: integer}
@@ -15311,6 +15336,15 @@ components:
     CallAttempt:
       type: object
       properties:
+        metric_protocol: {type: string, enum: [openai-chat-completions, openai-responses, native-messages, native-generate-content, openai-images, codex-special]}
+        metrics_version: {type: integer, const: 2, description: 新观测口径；历史缺失记录不作为首有效输出或可靠 TPS 证据。}
+        metric_tier: {type: string, description: 固定词表中的请求档位；空为默认调用上下文。}
+        actual_service_tier: {type: string, description: 可靠响应确认的档位，缺失或无法识别为 unknown。}
+        first_output_ms: {type: integer, minimum: 0, description: 本次地址尝试开始至首个非空有效输出；心跳、空帧、元数据不计。}
+        selection_output_ms: {type: integer, minimum: 0, description: 当前渠道选取开始至有效输出，含同渠道地址回退；明确档位未获实际确认时不用于排名。}
+        output_kind: {type: string, enum: [text, tool, reasoning, opaque, image, audio, video]}
+        generation_ms: {type: integer, minimum: 50, description: 首个可见文本或工具输出至可靠结束事件的观测区间；不足 32 个可靠可见输出 token 或 50ms 时不采样。}
+        output_tps: {type: number, exclusiveMinimum: 0, description: 可靠可见输出 token / generation_ms。思考量须可可靠分离；多候选、媒体、异步轮询及非流式为未知。}
         address_id: {type: string, format: uuid, description: 本次实际尝试的分组地址关系 ID，仅为诊断元数据。}
         fallback_level: {type: string, enum: [address, channel], description: 本次回退发生在同渠道地址之间或渠道之间。}
         selection_final: {type: boolean, description: 同渠道选取的最后一次实际尝试；健康统计每次选取只计一次。}
@@ -15536,7 +15570,7 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/PriceSnapshot'}
           - {type: 'null'}
-        output_tokens_per_second: {type: [number, 'null']}
+        output_tokens_per_second: {type: [number, 'null'], description: metrics_version=2 的尝试使用可靠可见输出量和实际输出区间；其他历史记录保留原平均速度，不能进入新速率排名或可靠速率聚合。}
         inter_token_p50_ms: {type: [integer, 'null']}
         inter_token_p95_ms: {type: [integer, 'null']}
         response_bytes: {type: [integer, 'null']}

@@ -97,6 +97,7 @@ func (r *statsRig) record(channelID string, n, client int) {
 			reason = EndClientError
 		}
 		r.book.Record(channelID, "m", false, attemptOf(reason, -1), *r.clock)
+		r.engine.modelMetrics.record(modelMetricKey{channel: channelID, model: "m", format: channel.FormatOpenAIChat}, modelMetricSample{end: reason}, *r.clock)
 	}
 }
 
@@ -135,6 +136,7 @@ func TestAChannelBecomingAnomalousIsAnnouncedOnceAndRanksLast(t *testing.T) {
 // which client were 4xx, without going through them one by one.
 func (r *statsRig) bulk(channelID string, counted, client int64) {
 	r.book.Load([]AttemptHistoryRow{{ChannelID: channelID, ModelID: "m", Bucket: statsEpoch(*r.clock), TTFTBin: -1, Counted: counted - client, ClientErrors: client}}, *r.clock)
+	r.engine.modelMetrics.load([]ModelAttemptHistoryRow{{ChannelID: channelID, ModelID: "m", Protocol: "openai-chat-completions", Format: channel.FormatOpenAIChat, Bucket: statsEpoch(*r.clock), Counted: counted - client, ClientErrors: client, Excluded: client, LatencyBin: -1, SpeedBin: -1}}, *r.clock)
 }
 
 func TestAnomalyEventsAreNotRepeatedWithinAnHourOfFlapping(t *testing.T) {
@@ -182,6 +184,7 @@ func TestAnomaliesFoundWhileLoadingAreNotAnnounced(t *testing.T) {
 	// A new anomaly after the load is announced.
 	for range 30 {
 		rig.book.Record("worse", "m2", false, attemptOf(EndClientError, -1), *rig.clock)
+		rig.engine.modelMetrics.record(modelMetricKey{channel: "worse", model: "m2", format: channel.FormatOpenAIChat}, modelMetricSample{end: EndClientError}, *rig.clock)
 	}
 	rig.engine.RefreshStats()
 	if got := rig.announcements(); len(got) != 1 || got[0].channel != "worse" || !strings.HasPrefix(got[0].reason, "m2: ") {

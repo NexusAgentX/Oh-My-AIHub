@@ -24,7 +24,7 @@ func (r *Registry) RegisterCodexNative() error {
 			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL19", "codex-special.RL20", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
-			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: engineVersion, Run: func(ctx context.Context, s *Session) Result {
+			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: nativeEngineVersion, Run: func(ctx context.Context, s *Session) Result {
 				n := nativeScene{s: s, protocol: "openai-responses", layer: "upstream_protocol", requirement: req, checks: map[string]Assertion{}}
 				return n.runCodex(ctx)
 			}}); err != nil {

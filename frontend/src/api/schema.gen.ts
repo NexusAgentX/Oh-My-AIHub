@@ -3577,6 +3577,8 @@ export interface components {
             aggregate: boolean;
             implemented: boolean;
             code_version: string;
+            /** @description Fingerprint of this scenario's protocol, endpoint and assertion scope; independent of unrelated suites. */
+            scope_version: string;
             /** @enum {string} */
             layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
             estimated_http: number | null;
@@ -4023,10 +4025,10 @@ export interface components {
          */
         Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
         /**
-         * @description 调用方式：便宜优先（默认）、稳定优先、快速优先、手动排序。
+         * @description 调用方式：价格优先（默认）、稳定优先、延迟优先、速率优先、手动排序。fastest 的历史值继续表示延迟。
          * @enum {string}
          */
-        RoutingMode: "cheapest" | "reliable" | "fastest" | "manual";
+        RoutingMode: "cheapest" | "reliable" | "fastest" | "speed" | "manual";
         /**
          * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
          * @enum {string}
@@ -4377,7 +4379,31 @@ export interface components {
         CatalogModelList: {
             items: components["schemas"]["CatalogModel"][];
         };
+        ModelRoutingMetric: {
+            /**
+             * @description 实际入口协议；Codex 原生与公共 Responses/Images 分开计量。
+             * @enum {string}
+             */
+            protocol: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images" | "codex-special";
+            format: components["schemas"]["Format"];
+            /** @description 请求档位；空值代表默认/auto 调用上下文。 */
+            tier: string;
+            stream: boolean;
+            attempts: number;
+            successes: number;
+            /** @description 客户端错误/主动断开，排除于可用率。 */
+            excluded: number;
+            success_rate: number | null;
+            first_output_p50_ms: number | null;
+            first_output_samples: number;
+            output_tps_p50: number | null;
+            output_samples: number;
+            /** @description 对应统计至少达到此样本数才用于自身指标排序。 */
+            min_samples: number;
+        };
         ModelChannel: {
+            /** @description 该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。 */
+            routing_metrics?: components["schemas"]["ModelRoutingMetric"][];
             /** Format: uuid */
             id: string;
             name: string;
@@ -4731,6 +4757,8 @@ export interface components {
             duration_ms: number;
         };
         RouteDecision: {
+            /** @description 固定能力 ID 或版本/已验证容量缺失原因，不含请求内容或上游配置。 */
+            missing_capability?: string;
             channel: components["schemas"]["ChannelRef"];
             reason: string;
             rank: number;
@@ -4831,6 +4859,27 @@ export interface components {
             trend: components["schemas"]["AnalysisRow"][];
         };
         CallAttempt: {
+            /** @enum {string} */
+            metric_protocol?: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images" | "codex-special";
+            /**
+             * @description 新观测口径；历史缺失记录不作为首有效输出或可靠 TPS 证据。
+             * @constant
+             */
+            metrics_version?: 2;
+            /** @description 固定词表中的请求档位；空为默认调用上下文。 */
+            metric_tier?: string;
+            /** @description 可靠响应确认的档位，缺失或无法识别为 unknown。 */
+            actual_service_tier?: string;
+            /** @description 本次地址尝试开始至首个非空有效输出；心跳、空帧、元数据不计。 */
+            first_output_ms?: number;
+            /** @description 当前渠道选取开始至有效输出，含同渠道地址回退；明确档位未获实际确认时不用于排名。 */
+            selection_output_ms?: number;
+            /** @enum {string} */
+            output_kind?: "text" | "tool" | "reasoning" | "opaque" | "image" | "audio" | "video";
+            /** @description 首个可见文本或工具输出至可靠结束事件的观测区间；不足 32 个可靠可见输出 token 或 50ms 时不采样。 */
+            generation_ms?: number;
+            /** @description 可靠可见输出 token / generation_ms。思考量须可可靠分离；多候选、媒体、异步轮询及非流式为未知。 */
+            output_tps?: number;
             /**
              * Format: uuid
              * @description 本次实际尝试的分组地址关系 ID，仅为诊断元数据。
@@ -5039,6 +5088,7 @@ export interface components {
             client_user_agent: string | null;
             attempts: components["schemas"]["CallAttempt"][];
             price_snapshot: components["schemas"]["PriceSnapshot"] | null;
+            /** @description metrics_version=2 的尝试使用可靠可见输出量和实际输出区间；其他历史记录保留原平均速度，不能进入新速率排名或可靠速率聚合。 */
             output_tokens_per_second: number | null;
             inter_token_p50_ms: number | null;
             inter_token_p95_ms: number | null;

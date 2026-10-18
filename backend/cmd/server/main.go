@@ -463,6 +463,7 @@ func main() {
 	if err != nil {
 		fatal(logger, "starting typical cost estimates failed", err)
 	}
+	engine.TypicalPrices = func() gateway.TypicalPriceLookup { return typicalCosts.Prices() }
 	groupRuntime.Notify = func() { groupProber.Notify(); typicalCosts.Notify() }
 	typicalContext, stopTypical := context.WithCancel(backgroundContext)
 	typicalDone := make(chan struct{})
