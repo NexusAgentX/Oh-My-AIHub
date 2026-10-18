@@ -10095,6 +10095,10 @@ components:
           "code_version": {
             "type": "string"
           },
+          "scope_version": {
+            "type": "string",
+            "description": "Fingerprint of this scenario's protocol, endpoint and assertion scope; independent of unrelated suites."
+          },
           "layer": {
             "type": "string",
             "enum": [
@@ -10126,6 +10130,7 @@ components:
           "aggregate",
           "implemented",
           "code_version",
+          "scope_version",
           "layer",
           "estimated_http"
         ],

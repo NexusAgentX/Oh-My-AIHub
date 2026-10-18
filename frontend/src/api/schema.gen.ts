@@ -3240,6 +3240,8 @@ export interface components {
             aggregate: boolean;
             implemented: boolean;
             code_version: string;
+            /** @description Fingerprint of this scenario's protocol, endpoint and assertion scope; independent of unrelated suites. */
+            scope_version: string;
             /** @enum {string} */
             layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
             estimated_http: number | null;

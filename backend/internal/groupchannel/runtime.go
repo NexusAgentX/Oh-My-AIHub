@@ -272,7 +272,7 @@ func projection(d market.Directory, j detection.Job, p Planner) detection.Projec
 	if !detection.CompatibleProfile(j.Target.Profile, resolved.Target.Profile) {
 		return detection.Projection{}
 	}
-	return detection.Project(j, current)
+	return detection.ProjectForPlan(j, current, plan)
 }
 func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateRecord, map[string]View, error) {
 	groups := map[string]market.Group{}

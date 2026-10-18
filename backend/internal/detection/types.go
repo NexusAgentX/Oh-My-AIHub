@@ -128,6 +128,7 @@ type Planned struct {
 	Aggregate           bool              `json:"aggregate"`
 	Implemented         bool              `json:"implemented"`
 	CodeVersion         string            `json:"code_version"`
+	ScopeVersion        string            `json:"scope_version"`
 	Layer               string            `json:"layer"`
 	EstimatedHTTP       *int64            `json:"estimated_http"`
 }

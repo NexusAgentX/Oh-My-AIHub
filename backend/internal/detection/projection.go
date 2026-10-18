@@ -30,6 +30,59 @@ type VerifiedCapacity struct {
 // address are deliberately absent. Each assertion remains independent: a
 // missing receipt cannot erase a verified tool execution or prove billing.
 func Project(job Job, current market.EvidenceBinding) Projection {
+	return project(job, current, nil)
+}
+
+// ProjectForPlan preserves independently current proof layers after an
+// unrelated adapter/artifact/manifest update. It never relaxes creation's full
+// report gate, target/configuration/credential binding or real HTTP witnesses.
+func ProjectForPlan(job Job, current market.EvidenceBinding, plan Plan) Projection {
+	if plan.ManifestVersion == "" || plan.ManifestVersion != current.ManifestVersion || plan.RegistryVersion == "" || plan.RegistryVersion != current.CodeVersion {
+		return Projection{}
+	}
+	current.ManifestVersion = job.Target.Binding.ManifestVersion
+	current.CodeVersion = job.Target.Binding.CodeVersion
+	return project(job, current, &plan)
+}
+
+func currentScenarios(previous, current Plan) map[string]bool {
+	old, next := map[string]Planned{}, map[string]Planned{}
+	for _, item := range previous.Items {
+		old[item.ID] = item
+	}
+	for _, item := range current.Items {
+		next[item.ID] = item
+	}
+	usable, visiting := map[string]bool{}, map[string]bool{}
+	var check func(string) bool
+	check = func(id string) bool {
+		if value, found := usable[id]; found {
+			return value
+		}
+		a, b := old[id], next[id]
+		if visiting[id] || a.ID == "" || b.ID == "" || !a.Implemented || !b.Implemented || a.Layer != b.Layer || a.CodeVersion == "" || a.CodeVersion != b.CodeVersion || a.ScopeVersion == "" || a.ScopeVersion != b.ScopeVersion {
+			usable[id] = false
+			return false
+		}
+		visiting[id] = true
+		for _, dep := range b.Dependencies {
+			if !check(dep) {
+				usable[id] = false
+				delete(visiting, id)
+				return false
+			}
+		}
+		delete(visiting, id)
+		usable[id] = true
+		return true
+	}
+	for id := range old {
+		check(id)
+	}
+	return usable
+}
+
+func project(job Job, current market.EvidenceBinding, plan *Plan) Projection {
 	p := Projection{Capabilities: []market.Capability{}, Capacity: []VerifiedCapacity{}, Settings: []SettingEvidence{}, Images: []ImageEvidence{}}
 	if job.ReportID == nil || *job.ReportID == "" || job.ExecutionActive || !Complete(job) || !market.CompatibleBinding(job.Target.Binding, current) {
 		return p
@@ -38,6 +91,11 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 	for _, item := range job.Plan.Items {
 		items[item.ID] = item
 	}
+	var usable map[string]bool
+	if plan != nil {
+		usable = currentScenarios(job.Plan, *plan)
+	}
+	matched := false
 	for _, result := range job.Results {
 		if result.Source != "real_upstream" {
 			return Projection{}
@@ -53,6 +111,10 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 		if ValidateResult(item, result, witnesses) != nil {
 			return Projection{}
 		}
+		if usable != nil && !usable[item.ID] {
+			continue
+		}
+		matched = true
 		for _, a := range result.Assertions {
 			label := item.AssertionLabels[a.ID]
 			if label == "" {
@@ -87,7 +149,7 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 		}
 		return p.Capabilities[i].ID < p.Capabilities[j].ID
 	})
-	p.Valid = true
+	p.Valid = matched
 	return p
 }
 func assertionRequirement(item Planned, assertion string) string {
