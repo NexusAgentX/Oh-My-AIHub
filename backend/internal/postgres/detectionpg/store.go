@@ -257,7 +257,13 @@ func (s *Store) Finish(ctx context.Context, job detection.Job) (detection.Job, e
 	return job, err
 }
 func (s *Store) GetReport(ctx context.Context, id string) (detection.Job, error) {
-	row, err := New(s.pool).GetReport(ctx, id)
+	return ReadReport(ctx, s.pool, id)
+}
+
+// ReadReport composes immutable report validation into the review transaction
+// without taking another pool connection while its draft row is locked.
+func ReadReport(ctx context.Context, db DBTX, id string) (detection.Job, error) {
+	row, err := New(db).GetReport(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return detection.Job{}, detection.ErrNotFound
 	}

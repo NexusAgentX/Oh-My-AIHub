@@ -125,6 +125,7 @@ func (a *app) createDetectionJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
+		DraftID    string `json:"draft_id"`
 		TargetKind string `json:"target_kind"`
 		TargetID   string `json:"target_id"`
 		APIKey     string `json:"api_key"`
@@ -133,7 +134,7 @@ func (a *app) createDetectionJob(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
-	if !uuidPattern.MatchString(input.TargetID) || (input.TargetKind != "group" && input.TargetKind != "group_model") {
+	if input.DraftID != "" && !uuidPattern.MatchString(input.DraftID) || !uuidPattern.MatchString(input.TargetID) || (input.TargetKind != "group" && input.TargetKind != "group_model") {
 		writeDetectionError(w, detection.ErrInvalid)
 		return
 	}
@@ -142,11 +143,19 @@ func (a *app) createDetectionJob(w http.ResponseWriter, r *http.Request) {
 		writeDetectionError(w, detection.ErrBusy)
 		return
 	}
-	job, err := a.detection.Start(r.Context(), actor, detection.Target{Binding: market.EvidenceBinding{TargetKind: input.TargetKind, TargetID: input.TargetID}}, input.APIKey)
+	job, err := a.detection.Start(r.Context(), actor, detection.Target{DraftID: input.DraftID, Binding: market.EvidenceBinding{TargetKind: input.TargetKind, TargetID: input.TargetID}}, input.APIKey)
 	input.APIKey = ""
 	if err != nil {
 		writeDetectionError(w, err)
 		return
+	}
+	if input.DraftID != "" && a.contributions != nil {
+		if err := a.contributions.TrackTask(r.Context(), contributionActor(r), job); err != nil {
+			// A durable task remains discoverable even if concurrent editing prevented
+			// attaching it. Do not claim that an already running task was rolled back.
+			writeJSON(w, 202, map[string]any{"job": job, "draft_linked": false})
+			return
+		}
 	}
 	writeJSON(w, 202, map[string]any{"job": job})
 }

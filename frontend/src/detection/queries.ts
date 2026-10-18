@@ -15,7 +15,7 @@ export function useDetectionArtifacts(id: string, updatedAt: string, active: boo
 }
 export function useDetectionAction() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: async ({ id, action, key, scenarios, target }: { id?: string; action: 'start' | 'cancel' | 'resume' | 'retest'; key?: string; scenarios?: string[]; target?: { target_id: string; target_kind: 'group' | 'group_model' } }) => {
+  return useMutation({ mutationFn: async ({ id, action, key, scenarios, target }: { id?: string; action: 'start' | 'cancel' | 'resume' | 'retest'; key?: string; scenarios?: string[]; target?: { draft_id?:string; target_id: string; target_kind: 'group' | 'group_model' } }) => {
     const path = `/api/detection/jobs/${encodeURIComponent(id ?? '')}`
     if (action === 'start' && target) return apiSend<'startDetectionJob'>('POST', '/api/detection/jobs', { ...target, api_key: key ?? '' })
     if (action === 'cancel') return apiSend<'cancelDetectionJob'>('POST', `${path}/cancel`)

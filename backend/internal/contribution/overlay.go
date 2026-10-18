@@ -5,7 +5,9 @@ import (
 	"sort"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
+	"unicode/utf8"
 )
 
 // Overlay validates a proposal against its live bases and constructs only its
@@ -13,7 +15,7 @@ import (
 // no unapproved value is installed in the live directory.
 func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.Target, error) {
 	c := draft.Changes
-	if len(c.Suppliers)+len(c.Groups)+len(c.Addresses)+len(c.GroupAddresses)+len(c.Models)+len(c.Quotes) > 1024 {
+	if len(c.Governance)+len(c.Suppliers)+len(c.Groups)+len(c.Addresses)+len(c.GroupAddresses)+len(c.Models)+len(c.Quotes) > 1024 {
 		return market.Directory{}, nil, ErrInvalid
 	}
 	suppliers := map[string]market.Supplier{}
@@ -101,11 +103,13 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		addresses[v.ID] = v
 	}
 	links := slices.Clone(live.GroupAddresses)
+	setSeen := map[string]bool{}
 	for _, set := range c.GroupAddresses {
 		group, ok := groups[set.GroupID]
-		if !ok || !changedGroups[set.GroupID] || group.DeletedAt != nil || len(set.Links) > 32 {
+		if !ok || setSeen[set.GroupID] || !changedGroups[set.GroupID] || group.DeletedAt != nil || len(set.Links) > 32 {
 			return market.Directory{}, nil, ErrInvalid
 		}
+		setSeen[set.GroupID] = true
 		links = slices.DeleteFunc(links, func(link market.GroupAddress) bool { return link.GroupID == set.GroupID })
 		seen := map[string]bool{}
 		for i, link := range set.Links {
@@ -153,7 +157,30 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		}
 		quotes[model.ID] = quote
 	}
-	out := market.Directory{Suppliers: []market.Supplier{}, Groups: []market.Group{}, Addresses: []market.Address{}, GroupAddresses: []market.GroupAddress{}, Models: []market.GroupModel{}, Quotes: []market.Quote{}}
+	out := market.Directory{Governance: slices.Clone(live.Governance), Suppliers: []market.Supplier{}, Groups: []market.Group{}, Addresses: []market.Address{}, GroupAddresses: []market.GroupAddress{}, Models: []market.GroupModel{}, Quotes: []market.Quote{}}
+	for _, change := range c.Governance {
+		v := change.Value
+		prior := int64(0)
+		index := -1
+		for i, rule := range out.Governance {
+			if rule.ModelID == v.ModelID {
+				prior = rule.Revision
+				index = i
+			}
+		}
+		if !gatewaycontract.ValidModelID(v.ModelID) || utf8.RuneCountInString(v.Reason) > 1000 {
+			return market.Directory{}, nil, ErrInvalid
+		}
+		if err := check("rule:"+v.ModelID, change.BaseRevision, prior, index >= 0); err != nil {
+			return market.Directory{}, nil, err
+		}
+		v.Revision = change.BaseRevision + 1
+		if index < 0 {
+			out.Governance = append(out.Governance, v)
+		} else {
+			out.Governance[index] = v
+		}
+	}
 	for _, v := range suppliers {
 		if v.DeletedAt == nil {
 			out.Suppliers = append(out.Suppliers, v)
@@ -215,6 +242,15 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 	modelTypes := map[string]string{}
 	references := map[string]bool{}
 	for _, model := range out.Models {
+		if model.IsReference {
+			group := groups[model.GroupID]
+			if suppliers[group.SupplierID].Kind != "official_api" {
+				return market.Directory{}, nil, ErrInvalid
+			}
+		}
+		if !model.Enabled {
+			continue
+		}
 		if prior, exists := modelTypes[model.ModelID]; exists && prior != model.ModelType {
 			return market.Directory{}, nil, ErrConflict
 		}

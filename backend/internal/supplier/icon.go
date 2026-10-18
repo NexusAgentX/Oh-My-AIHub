@@ -113,7 +113,7 @@ func iconDownloadError(err error) error {
 	return ErrIconDownload
 }
 
-// FetchIcon is administrator-only at the HTTP boundary. Each request uses
+// FetchIcon serves authenticated contribution and administrator forms. Each request uses
 // the existing DNS-pinned egress policy; redirects, credentials and proxies
 // are not permitted. No website is contacted during directory browsing.
 func (s *Service) FetchIcon(ctx context.Context, raw string) (string, string, error) {

@@ -19,6 +19,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
@@ -31,6 +32,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
@@ -285,9 +287,27 @@ func main() {
 	if err != nil {
 		fatal(logger, "loading detection registry failed", err)
 	}
+	// Review transactions and directory rebuilds use two separate connections;
+	// no long review transaction holds a gateway or detector pool slot.
+	reviewStartup, cancelReviewStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	reviewPool, err := database.OpenLimited(reviewStartup, databaseURL, 2)
+	if err != nil {
+		fatal(logger, "opening contribution database pool failed", err)
+	}
+	defer reviewPool.Close()
+	reviewMarket := marketpg.NewStore(reviewPool)
+	marketRuntime := contribution.NewRuntime(reviewMarket, nil)
+	if err = marketRuntime.Refresh(reviewStartup); err != nil {
+		fatal(logger, "loading approved market failed", err)
+	}
+	contributions := &contribution.Service{Store: contributionpg.NewStore(reviewPool), Live: reviewMarket, Planner: registry, Publisher: marketRuntime, Outbound: outboundPolicy}
+	if err = contributions.Recover(reviewStartup); err != nil {
+		fatal(logger, "recovering committed market publications failed", err)
+	}
+	cancelReviewStartup()
 	detectorStore := detectionpg.NewStore(detectorPool)
 	detectorSettings := settings.NewService(settingspg.NewStore(detectorPool))
-	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: detectionpg.DirectoryResolver{Market: detectorMarket}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
+	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: contribution.DraftResolver{Service: contributions, Fallback: detectionpg.DirectoryResolver{Market: detectorMarket}}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
 		value, err := detectorSettings.Get(ctx)
 		if err != nil {
 			return nil, err
@@ -303,16 +323,17 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			Detection: detector,
-			Suppliers: &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
-			Identity:  identityService,
-			Forum:     forumService,
-			Catalog:   catalogService,
-			Ledger:    ledger.NewService(store.Ledger),
-			Settings:  settingsService,
-			RateSync:  rateSyncer,
-			Audit:     audit.NewService(store.Audit),
-			Keys:      apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
+			Contributions: contributions,
+			Detection:     detector,
+			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
+			Identity:      identityService,
+			Forum:         forumService,
+			Catalog:       catalogService,
+			Ledger:        ledger.NewService(store.Ledger),
+			Settings:      settingsService,
+			RateSync:      rateSyncer,
+			Audit:         audit.NewService(store.Audit),
+			Keys:          apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
 			Channels: channel.NewService(channel.Dependencies{
 				Store: cached.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
 				BlockedHosts: func(ctx context.Context) ([]string, error) {

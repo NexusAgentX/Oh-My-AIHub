@@ -179,7 +179,7 @@ func TestConcurrentReviewAndAdminEditCannotOverwriteAnotherRevision(t *testing.T
 	}
 	changes := clone(submitted.Changes)
 	changes.Suppliers[0].Value.Name = "Admin revision"
-	edited, err := s.Save(ctx, Actor{ID: "admin", Admin: true}, "draft", submitted.Revision, "Admin edit", changes, nil)
+	edited, err := s.Save(ctx, Actor{ID: "admin", Admin: true}, "draft", submitted.Revision, "Admin edit", changes, nil, nil)
 	if err != nil || edited.State != "draft" || edited.SubmittedAt != nil {
 		t.Fatal("admin edit retained obsolete submission", err)
 	}
@@ -195,10 +195,10 @@ func TestDraftPermissionsIdentityAndCommitAcknowledgement(t *testing.T) {
 	}
 	changes := clone(repo.draft.Changes)
 	changes.Suppliers[0].Value.ID = "foreign"
-	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Injected", changes, nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Injected", changes, nil, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatal("foreign object injected", err)
 	}
-	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Empty", market.Changes{}, nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Empty", market.Changes{}, nil, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatal("empty proposal became ready", err)
 	}
 	submitted, err := s.Submit(ctx, Actor{ID: "member"}, "draft", 1)

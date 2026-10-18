@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
  * 新增图标时在 paths 中补一条，并保持 1.8 描边、圆角端点。
  */
 const paths = {
+ contribute: <><path d="M14 4 20 10M4 20l5-1L21 7a2 2 0 0 0-4-4L5 15z"/><path d="M4 20h16"/></>,
  flask: <path d="M9 3h6M10 3v6l-6 10a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L14 9V3M7 15h10" />,
   globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c-5 5-5 13 0 18M12 3c5 5 5 13 0 18" /></>,
   // 导航

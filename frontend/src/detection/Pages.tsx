@@ -23,7 +23,7 @@ export function DetectionPage() {
   const action = useDetectionAction()
   const navigate = useNavigate()
   const { account } = useAuth()
-  const submit = (event: FormEvent) => { event.preventDefault(); if (!canStart) return; const secret = key; setKey(''); action.mutate({ action: 'start', key: secret, target: { target_id: targetID, target_kind: kind } }, { onSuccess: ({ job }) => navigate(`/detection/${job.id}`) }) }
+  const submit = (event: FormEvent) => { event.preventDefault(); if (!canStart) return; const secret = key; setKey(''); action.mutate({ action: 'start', key: secret, target: { target_id: targetID, target_kind: kind, draft_id: params.get("draft_id")??undefined } }, { onSuccess: ({ job }) => navigate(`/detection/${job.id}`) }) }
   return <>
     <PageHeader title="检测报告" actions={account?.is_admin && <ButtonLink to="/admin/detection-search">搜索参数</ButtonLink>} />
     {canStart && <Card title="创建检测"><form className="stack-form" onSubmit={submit}>

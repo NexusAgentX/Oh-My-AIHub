@@ -33,7 +33,7 @@ func (s *Service) List(ctx context.Context, actor Actor, queue bool, cursor *Cur
 	}
 	return s.Store.List(ctx, actor, queue, cursor, limit)
 }
-func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, reports []string) (Draft, error) {
+func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, reports []string, declaredPrices []string) (Draft, error) {
 	if title == "" || utf8.RuneCountInString(title) > 128 || len(reports) > 1024 {
 		return Draft{}, ErrInvalid
 	}
@@ -43,6 +43,9 @@ func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int
 		}
 		if draft.Revision != revision || !editable(actor, *draft) {
 			return ErrConflict
+		}
+		if len(changes.Governance) > 0 && !actor.Admin {
+			return ErrInvalid
 		}
 		if !sameIdentities(draft.Changes, changes) || !rootPresent(*draft, changes) {
 			return ErrInvalid
@@ -64,6 +67,12 @@ func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int
 		draft.Title = title
 		draft.Changes = changes
 		draft.ReportIDs = append([]string{}, reports...)
+		draft.PendingPrices = []string{}
+		for _, quote := range changes.Quotes {
+			if !slices.Contains(declaredPrices, quote.GroupModelID) {
+				draft.PendingPrices = append(draft.PendingPrices, quote.GroupModelID)
+			}
+		}
 		draft.State = "draft"
 		draft.ReviewReason = ""
 		draft.ReviewedBy = nil
@@ -88,6 +97,9 @@ func (s *Service) Submit(ctx context.Context, actor Actor, id string, revision i
 		}
 		if draft.Revision != revision || !editable(actor, *draft) {
 			return ErrConflict
+		}
+		if len(draft.PendingPrices) > 0 {
+			return ErrInvalid
 		}
 		live, err := u.Directory(ctx)
 		if err != nil {
@@ -169,6 +181,9 @@ func (s *Service) Approve(ctx context.Context, actor Actor, id string, revision 
 		if draft.State != "submitted" {
 			return ErrConflict
 		}
+		if len(draft.PendingPrices) > 0 {
+			return ErrInvalid
+		}
 		live, err := u.Directory(ctx)
 		if err != nil {
 			return err
@@ -243,12 +258,19 @@ func (s *Service) Approve(ctx context.Context, actor Actor, id string, revision 
 	return finished, nil
 }
 func (s *Service) validateAddresses(ctx context.Context, draft Draft) error {
-	if len(draft.Changes.Addresses) > 0 && s.Outbound == nil {
-		return ErrInvalid
-	}
 	for _, change := range draft.Changes.Addresses {
 		if change.Value.DeletedAt != nil {
 			continue
+		}
+		unchanged := false
+		for _, base := range draft.Base.Addresses {
+			unchanged = unchanged || base.Value.ID == change.Value.ID && base.Value.BaseURL == change.Value.BaseURL && base.Value.SupplierID == change.Value.SupplierID
+		}
+		if unchanged {
+			continue
+		}
+		if s.Outbound == nil {
+			return ErrInvalid
 		}
 		if _, err := s.Outbound.ValidateBaseURL(ctx, change.Value.BaseURL); err != nil {
 			return market.ErrInvalid
@@ -261,6 +283,14 @@ func (s *Service) validateAddresses(ctx context.Context, draft Draft) error {
 // foreign object or replace its base revision behind the review.
 func sameIdentities(old, next market.Changes) bool {
 	known := map[string]int64{}
+	for _, v := range old.Governance {
+		known["rule:"+v.Value.ModelID] = v.BaseRevision
+	}
+	for _, v := range next.Governance {
+		if base, ok := known["rule:"+v.Value.ModelID]; !ok || base != v.BaseRevision {
+			return false
+		}
+	}
 	for _, v := range old.Suppliers {
 		known["supplier:"+v.Value.ID] = v.BaseRevision
 	}
@@ -320,6 +350,12 @@ func sameIdentities(old, next market.Changes) bool {
 
 func rootPresent(draft Draft, c market.Changes) bool {
 	switch draft.Kind {
+	case "model_id":
+		for _, change := range c.Governance {
+			if change.Value.ModelID == draft.TargetID {
+				return true
+			}
+		}
 	case "supplier":
 		for _, change := range c.Suppliers {
 			if change.Value.ID == draft.TargetID {
@@ -352,4 +388,36 @@ func newDraft(actor Actor, kind, targetID, title string, c market.Changes) (Draf
 	}
 	now := time.Now().UTC()
 	return Draft{ID: id, OwnerID: actor.ID, Title: title, Kind: kind, TargetID: targetID, State: "draft", Revision: 1, Changes: c, ReportIDs: []string{}, TaskIDs: []string{}, CreatedAt: now, UpdatedAt: now}, nil
+}
+
+// Recover completes only already committed publications after a restart. It
+// never approves a submitted proposal or replays market changes.
+func (s *Service) Recover(ctx context.Context) error {
+	var cursor *Cursor
+	for {
+		items, err := s.Store.List(ctx, Actor{ID: "00000000-0000-0000-0000-000000000000", Admin: true}, true, cursor, 100)
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			if item.State != "publication_pending" {
+				continue
+			}
+			d, err := s.Store.Get(ctx, item.ID)
+			if err != nil {
+				return err
+			}
+			if d.ReviewedBy == nil {
+				return ErrInvalid
+			}
+			if _, err = s.Approve(ctx, Actor{ID: *d.ReviewedBy, Admin: true}, d.ID, d.Revision, d.ReviewReason); err != nil {
+				return err
+			}
+		}
+		if len(items) < 100 {
+			return nil
+		}
+		last := items[len(items)-1]
+		cursor = &Cursor{At: last.CreatedAt, ID: last.ID}
+	}
 }

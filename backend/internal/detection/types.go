@@ -24,6 +24,7 @@ type Actor struct {
 	Admin bool
 }
 type Target struct {
+	DraftID     string                 `json:"draft_id,omitempty"`
 	GroupID     string                 `json:"group_id"`
 	Binding     market.EvidenceBinding `json:"binding"`
 	ModelType   string                 `json:"model_type"`

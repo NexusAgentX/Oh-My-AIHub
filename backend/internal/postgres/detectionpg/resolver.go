@@ -19,37 +19,20 @@ func (r DirectoryResolver) Resolve(ctx context.Context, actor detection.Actor, i
 	if err != nil {
 		return detection.Resolved{}, err
 	}
-	var model *market.GroupModel
-	groupID := ""
-	if input.Binding.TargetKind == "group_model" {
-		for i := range d.Models {
-			if d.Models[i].ID == input.Binding.TargetID {
-				model = &d.Models[i]
-				groupID = model.GroupID
-				break
-			}
-		}
-		if model == nil {
-			return detection.Resolved{}, detection.ErrNotFound
-		}
-	} else if input.Binding.TargetKind == "group" {
-		groupID = input.Binding.TargetID
-	} else {
-		return detection.Resolved{}, detection.ErrInvalid
+	resolved, err := detection.ResolveDirectory(d, input)
+	if err != nil {
+		return detection.Resolved{}, err
 	}
-	var group *market.Group
-	for i := range d.Groups {
-		if d.Groups[i].ID == groupID {
-			group = &d.Groups[i]
+	var supplierID string
+	for _, g := range d.Groups {
+		if g.ID == resolved.Target.GroupID {
+			supplierID = g.SupplierID
 			break
 		}
 	}
-	if group == nil {
-		return detection.Resolved{}, detection.ErrNotFound
-	}
 	authorized := false
-	for _, supplier := range d.Suppliers {
-		if supplier.ID == group.SupplierID && (actor.Admin || supplier.ContributorID == actor.ID) {
+	for _, v := range d.Suppliers {
+		if v.ID == supplierID && (actor.Admin || v.ContributorID == actor.ID) {
 			authorized = true
 			break
 		}
@@ -57,31 +40,5 @@ func (r DirectoryResolver) Resolve(ctx context.Context, actor detection.Actor, i
 	if !authorized {
 		return detection.Resolved{}, detection.ErrNotFound
 	}
-	target := detection.Target{GroupID: group.ID, Binding: market.EvidenceBinding{TargetKind: "group", TargetID: group.ID, TargetRevision: group.Revision, CapabilityDigest: group.CapabilityDigest}}
-	if model != nil {
-		target.Binding.TargetKind = "group_model"
-		target.Binding.TargetID = model.ID
-		target.Binding.TargetRevision = model.Revision
-		target.Binding.CapabilityDigest = model.CapabilityDigest
-		target.ModelType = model.ModelType
-		target.Model = model.UpstreamModel
-	}
-	result := detection.Resolved{Target: target, Addresses: []string{}}
-	if group.Defaults.UserAgent != nil {
-		result.UserAgent = *group.Defaults.UserAgent
-	}
-	if group.Defaults.HeaderRules != nil {
-		result.Headers = *group.Defaults.HeaderRules
-	}
-	for _, link := range d.GroupAddresses {
-		if link.GroupID == group.ID {
-			for _, address := range d.Addresses {
-				if address.ID == link.AddressID {
-					result.Addresses = append(result.Addresses, address.BaseURL)
-					break
-				}
-			}
-		}
-	}
-	return result, nil
+	return resolved, nil
 }

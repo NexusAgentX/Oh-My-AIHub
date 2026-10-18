@@ -11,6 +11,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -28,13 +29,14 @@ const (
 )
 
 type Dependencies struct {
-	Detection *detection.Service
-	Suppliers *supplier.Service
-	Forum     *forum.Service
-	Identity  *identity.Service
-	Catalog   *catalog.Service
-	Ledger    *ledger.Service
-	Settings  *settings.Service
+	Contributions *contribution.Service
+	Detection     *detection.Service
+	Suppliers     *supplier.Service
+	Forum         *forum.Service
+	Identity      *identity.Service
+	Catalog       *catalog.Service
+	Ledger        *ledger.Service
+	Settings      *settings.Service
 	// RateSync fetches the USD/CNY rate on demand; nil disables manual sync.
 	RateSync          *settings.RateSyncer
 	Audit             *audit.Service
@@ -52,6 +54,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	contributions     *contribution.Service
 	detection         *detection.Service
 	suppliers         *supplier.Service
 	forum             *forum.Service
@@ -85,6 +88,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		contributions:     dependencies.Contributions,
 		detection:         dependencies.Detection,
 		suppliers:         dependencies.Suppliers,
 		forum:             dependencies.Forum,
@@ -125,6 +129,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerObserveRoutes(routes)
 	application.registerForumRoutes(routes)
 	application.registerDetectionRoutes(routes)
+	application.registerContributionRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }
