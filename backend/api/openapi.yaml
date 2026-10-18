@@ -6679,7 +6679,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.2",
+    "version": "2026-10-18.3",
     "stage": "discovery",
     "sources": [
       {
@@ -7319,7 +7319,68 @@ x-aihub-gateway-contract:
         "billing": "reliable_operation",
         "replay": "inference",
         "feature": "F8",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "fields": [
+          "model",
+          "prompt",
+          "background",
+          "n",
+          "quality",
+          "size"
+        ],
+        "required_fields": [
+          "model",
+          "prompt"
+        ],
+        "return_fields": [
+          "created",
+          "data[].b64_json",
+          "data[].generation_id (optional)",
+          "background/quality/size (optional)"
+        ],
+        "headers": [
+          "originator (client attribution only)",
+          "x-codex-image-turn-id (context only)",
+          "x-codex-imagegen-request-id (response)"
+        ]
+      },
+      {
+        "id": "codex.images.edit",
+        "protocol": "codex-special",
+        "method": "POST",
+        "path": "/backend-api/codex/images/edits",
+        "source": "codex",
+        "scope": "stateless",
+        "model": "actual_image_model",
+        "billing": "reliable_operation",
+        "replay": "inference",
+        "feature": "F8",
+        "auth": "platform_key",
+        "fields": [
+          "model",
+          "prompt",
+          "background",
+          "n",
+          "quality",
+          "size",
+          "images[].image_url"
+        ],
+        "required_fields": [
+          "model",
+          "prompt",
+          "images[].image_url"
+        ],
+        "return_fields": [
+          "created",
+          "data[].b64_json",
+          "data[].generation_id (optional)",
+          "background/quality/size (optional)"
+        ],
+        "headers": [
+          "originator (client attribution only)",
+          "x-codex-image-turn-id (context only)",
+          "x-codex-imagegen-request-id (response)"
+        ]
       },
       {
         "id": "codex.notes.thread_hint",
@@ -9541,7 +9602,8 @@ x-aihub-gateway-contract:
           {
             "id": "codex-special.RL25",
             "endpoints": [
-              "codex.images"
+              "codex.images",
+              "codex.images.edit"
             ],
             "source_ids": [
               "RL25"
@@ -9550,7 +9612,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "Codex 专用原生生图",
               "固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。",
-              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源"
+              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源",
+              "固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。"
             ]
           }
         ]
@@ -9796,6 +9859,10 @@ x-aihub-gateway-contract:
       "codex-special/first-context-ownership": "客户端 session/agent/path/window/item 不是首次归属证明，thread_hint 的 text 也不是所有权声明。未知外部上下文失败关闭，不向共享上游试读再认领；正式 F8 须提供可信的首次会话归属/隔离证明。CLI 合成启用实验只证明扩展已调用，不证明任意共享上游首次归属安全；该前置未就绪不记为供应商 unsupported，不以来源粘性或保存正文补齐。",
       "codex-special/profiles": "固定0.163.0：内置openai provider及平台身份兼容。history/notes配置 features.token_budget.enabled=true、use_history_notes_extension=true；后台V2另用 features.async_compaction.enabled=true 且 token_budget.enabled=false、use_history_notes_extension=false，要求provider远程压缩能力V2。两配置互斥，不把两开关均true当生效证明。remote_compaction_v2在该版本已是移除的无效开关。",
       "codex-special/compaction": "V1原生POST codex/responses/compact；V2通过普通codex/responses输入type=compaction_trigger，返回完整type=compaction窗口并续用；后台V2是客户端执行方式，非background=true，不是context_management。固定源码sources/codex，三层证据独立，当前CLI原型未证明压缩实际触发。",
-      "gateway/evidence-layers": "upstream_protocol、gateway_proxy、official_cli分别记录目标、方法/路径、模型/凭据范围摘要、代码/客户端/配置/范围版本及结果；官方CLI+合成后端证据仅official_cli_with_synthetic_backend，不能投影真实供应商能力。client_not_enabled、configuration_error、platform_endpoint_pending、detector_error与真实unsupported分别归类。"
+      "gateway/evidence-layers": "upstream_protocol、gateway_proxy、official_cli分别记录目标、方法/路径、模型/凭据范围摘要、代码/客户端/配置/范围版本及结果；官方CLI+合成后端证据仅official_cli_with_synthetic_backend，不能投影真实供应商能力。client_not_enabled、configuration_error、platform_endpoint_pending、detector_error与真实unsupported分别归类。",
+      "codex-special/images": "固定源码codex-api/src/images.rs及endpoint/images.rs：generations和edits均原生JSON；edits含images[{image_url}]，不依赖Files。字段model为实际图像模型，非主对话模型；模型/权限/报价单独核验。ImageReference::File仅表示源码形态，不授权共享外部file_id。",
+      "gateway/item-reference": "原生item_reference可能仅含id：按可信索引的账号/Key与原始父级元数据解析，唯一才绑定；有显式父级时严格校验。跨父级/来源同ID无法消歧时拒绝，不以空父级错误拒绝所有已登记项。",
+      "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
+      "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。"
     }
   }
