@@ -6509,7 +6509,11 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
-          description: 分析查询超时
+          description: 分析查询超时或市场发布尚未完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/suppliers/{supplierID}/analysis:
     get:
       operationId: analyzeSupplier
@@ -6580,7 +6584,11 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
-          description: 分析查询超时
+          description: 分析查询超时或市场发布尚未完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/suppliers/preview:
     post:
       operationId: previewSupplierImpact
