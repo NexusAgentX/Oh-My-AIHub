@@ -105,6 +105,11 @@ func assertionRequirement(item Planned, assertion string) string {
 // requested proof layer. Unknown, stale, partial, conditional-not-observed and
 // unsupported never silently fall back to another model/protocol.
 func (p Projection) Supports(layer string, required []string) bool {
+	// Basic callability is established by the channel Key probe. An unrelated
+	// unknown advanced capability must not disable an ordinary request.
+	if len(required) == 0 {
+		return true
+	}
 	if !p.Valid {
 		return false
 	}

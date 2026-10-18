@@ -16,6 +16,9 @@ func projectionFixture() Job {
 	return j
 }
 func TestProjectionKeepsIndependentCapabilitiesAndRejectsStaleOrSyntheticProof(t *testing.T) {
+	if !(Projection{}).Supports("upstream_protocol", nil) {
+		t.Fatal("unrelated unknown capabilities disabled an ordinary request")
+	}
 	j := projectionFixture()
 	current := j.Target.Binding
 	current.TargetRevision = 2
