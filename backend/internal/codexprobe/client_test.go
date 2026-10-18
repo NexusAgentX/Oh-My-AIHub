@@ -1,6 +1,7 @@
 package codexprobe
 
 import (
+	"bytes"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,23 @@ func TestProbeRejectsHostLoginAndExternalBridge(t *testing.T) {
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
 	if base.validate() == nil {
 		t.Fatal("ordinary host login profile accepted")
+	}
+}
+
+func TestDynamicProbeToolRejectsArbitraryInputsAndReturnsOnlyFixedResult(t *testing.T) {
+	var output bytes.Buffer
+	d := dialogue{in: &output, tools: true}
+	for _, params := range []string{
+		`{"tool":"shell_command","arguments":{"command":"anything"}}`,
+		`{"tool":"synthetic_echo","arguments":{"label":"violet","meta":{"ok":true},"items":[{"value":8}]}}`,
+	} {
+		if d.notification(rpcMessage{ID: json.RawMessage(`91`), Method: "item/tool/call", Params: json.RawMessage(params)}) == nil || output.Len() != 0 {
+			t.Fatal("uncontrolled tool or wrong semantic arguments accepted")
+		}
+	}
+	params := json.RawMessage(`{"tool":"synthetic_echo","arguments":{"label":"violet","meta":{"ok":true},"items":[{"value":7}]}}`)
+	if d.notification(rpcMessage{ID: json.RawMessage(`91`), Method: "item/tool/call", Params: params}) != nil || d.toolCalls != 1 || !strings.Contains(output.String(), Marker) {
+		t.Fatal("fixed synthetic callback did not complete")
 	}
 }
 

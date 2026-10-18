@@ -56,6 +56,7 @@ type Result struct {
 	CatalogModel  bool   `json:"catalog_model"`
 	Stage         string `json:"stage"`
 	RPCErrorCode  int    `json:"rpc_error_code,omitempty"`
+	ToolCalls     int    `json:"tool_calls"`
 }
 
 func CheckVersion(ctx context.Context, binary string) error {
@@ -79,7 +80,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" && c.Profile != "tools" && c.Profile != "lite_tools" {
 		return ErrClient
 	}
 	// The caller must be RunControlledProcess, which makes these private roots.
@@ -109,6 +110,8 @@ type dialogue struct {
 	completed bool
 	matched   bool
 	rpcError  int
+	tools     bool
+	toolCalls int
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -129,6 +132,18 @@ func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
 
 func (d *dialogue) notification(msg rpcMessage) error {
 	if len(msg.ID) > 0 && string(msg.ID) != "null" && msg.Method != "" {
+		if msg.Method == "item/tool/call" && d.tools && d.toolCalls < 4 {
+			var p struct {
+				Tool      string         `json:"tool"`
+				Arguments map[string]any `json:"arguments"`
+			}
+			if json.Unmarshal(msg.Params, &p) == nil && p.Tool == "synthetic_echo" && validSyntheticArguments(p.Arguments) {
+				d.toolCalls++
+				if json.NewEncoder(d.in).Encode(map[string]any{"id": msg.ID, "result": map[string]any{"contentItems": []any{map[string]string{"type": "inputText", "text": Marker}}, "success": true}}) == nil {
+					return nil
+				}
+			}
+		}
 		// No approvals or arbitrary client RPCs are part of this fixed probe.
 		return ErrClient
 	}
@@ -158,6 +173,18 @@ func (d *dialogue) notification(msg rpcMessage) error {
 		d.completed = true
 	}
 	return nil
+}
+
+const syntheticArgumentsSchema = `{"type":"object","properties":{"label":{"type":"string","enum":["violet"]},"meta":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","properties":{"value":{"type":"integer","enum":[7]}},"required":["value"],"additionalProperties":false}}},"required":["label","meta","items"],"additionalProperties":false}`
+
+func validSyntheticArguments(args map[string]any) bool {
+	meta, _ := args["meta"].(map[string]any)
+	items, _ := args["items"].([]any)
+	if len(args) != 3 || args["label"] != "violet" || len(meta) != 1 || meta["ok"] != true || len(items) != 1 {
+		return false
+	}
+	item, _ := items[0].(map[string]any)
+	return len(item) == 1 && item["value"] == float64(7)
 }
 
 func (d *dialogue) call(ctx context.Context, method string, params any, result any) error {
@@ -202,7 +229,8 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	}
 	root := os.Getenv("CODEX_HOME")
 	probeCatalog := ""
-	if c.Profile == "notes" || c.Profile == "image" {
+	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools"
+	if c.Profile == "notes" || c.Profile == "image" || toolProfile {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
 		// provider capability/capacity evidence. The catalog profile below uses
@@ -210,6 +238,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 		path := filepath.Join(root, "probe-models.json")
 		model := map[string]any{"slug": c.Model, "display_name": c.Model, "description": "Isolated client activation fixture", "supported_reasoning_levels": []any{}, "shell_type": "shell_command", "visibility": "list", "supported_in_api": true, "priority": 1, "support_verbosity": false, "truncation_policy": map[string]any{"mode": "tokens", "limit": 10000}, "experimental_supported_tools": []any{}, "input_modalities": []string{"text", "image"}, "supports_experimental_context": true, "context_window": 32768, "tool_mode": "direct"}
 		model["model_messages"] = map[string]string{"instructions_template": "Isolated capability probe. Follow the user request and use only declared synthetic tools."}
+		model["use_responses_lite"] = c.Profile == "lite_tools"
 		data, _ := json.Marshal(map[string]any{"models": []any{model}})
 		if os.WriteFile(path, data, 0600) != nil {
 			return r, ErrClient
@@ -288,8 +317,8 @@ use_history_notes_extension = %t
 			}
 		}
 	}()
-	d := dialogue{in: in, lines: lines}
-	defer func() { r.RPCErrorCode = d.rpcError }()
+	d := dialogue{in: in, lines: lines, tools: toolProfile}
+	defer func() { r.RPCErrorCode, r.ToolCalls = d.rpcError, d.toolCalls }()
 	r.Stage = "initialize"
 	if d.call(ctx, "initialize", map[string]any{"clientInfo": map[string]string{"name": "aihub-codex-probe", "version": "1"}, "capabilities": map[string]bool{"experimentalApi": true}}, nil) != nil {
 		return r, ErrClient
@@ -330,11 +359,19 @@ use_history_notes_extension = %t
 		} `json:"thread"`
 	}
 	r.Stage = "thread"
-	if d.call(ctx, "thread/start", map[string]any{"model": c.Model, "cwd": workspace, "approvalPolicy": "never", "sandbox": "read-only", "baseInstructions": "Isolated synthetic protocol probe. Use only the model-declared synthetic tools."}, &thread) != nil || thread.Thread.ID == "" {
+	threadParams := map[string]any{"model": c.Model, "cwd": workspace, "approvalPolicy": "never", "sandbox": "read-only", "baseInstructions": "Isolated synthetic protocol probe. Use only the model-declared synthetic tools."}
+	if toolProfile {
+		threadParams["dynamicTools"] = []any{map[string]any{"type": "function", "name": "synthetic_echo", "description": "Returns the synthetic probe result; no files, commands or network.", "inputSchema": json.RawMessage(syntheticArgumentsSchema)}}
+	}
+	if d.call(ctx, "thread/start", threadParams, &thread) != nil || thread.Thread.ID == "" {
 		return r, ErrClient
 	}
 	r.Stage = "turn_start"
-	if d.call(ctx, "turn/start", map[string]any{"threadId": thread.Thread.ID, "input": []any{map[string]string{"type": "text", "text": "Reply with exactly " + Marker + "."}}}, nil) != nil {
+	prompt := "Reply with exactly " + Marker + "."
+	if toolProfile {
+		prompt = `Call synthetic_echo exactly once with label="violet", meta={"ok":true}, items=[{"value":7}]. After receiving its result, reply with exactly the result text. No other tools.`
+	}
+	if d.call(ctx, "turn/start", map[string]any{"threadId": thread.Thread.ID, "input": []any{map[string]string{"type": "text", "text": prompt}}}, nil) != nil {
 		return r, ErrClient
 	}
 	r.Stage = "turn"

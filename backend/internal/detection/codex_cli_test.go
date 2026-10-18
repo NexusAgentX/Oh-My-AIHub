@@ -2,6 +2,7 @@ package detection
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,86 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexprobe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
+
+func codexToolStreamFixture(namespace string) string {
+	final := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-cli-call", Name: "synthetic_echo", Namespace: namespace}})
+	item := object(list(final["output"])[0])
+	initial := nativeObject{"id": "resp_fixture", "object": "response", "status": "in_progress", "output": []any{}}
+	added := cloneNative(item)
+	added["arguments"], added["status"] = "", "in_progress"
+	return typedEvent("response.created", nativeObject{"sequence_number": 0, "response": initial}) +
+		typedEvent("response.output_item.added", nativeObject{"sequence_number": 1, "output_index": 0, "item": added}) +
+		typedEvent("response.function_call_arguments.delta", nativeObject{"sequence_number": 2, "output_index": 0, "item_id": item["id"], "delta": item["arguments"]}) +
+		typedEvent("response.function_call_arguments.done", nativeObject{"sequence_number": 3, "output_index": 0, "item_id": item["id"], "arguments": item["arguments"]}) +
+		typedEvent("response.output_item.done", nativeObject{"sequence_number": 4, "output_index": 0, "item": item}) +
+		typedEvent("response.completed", nativeObject{"sequence_number": 5, "response": final})
+}
+
+func TestOfficialCodexStandardAndLiteExecuteActualToolCallbacks(t *testing.T) {
+	binary, probe := os.Getenv("AIHUB_TEST_CODEX_BINARY"), os.Getenv("AIHUB_TEST_CODEX_PROBE")
+	if binary == "" || probe == "" {
+		t.Skip("explicit pinned official CLI and probe artifacts required")
+	}
+	requests := 0
+	var mu sync.Mutex
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/backend-api/codex/models" {
+			_, _ = io.WriteString(w, `{"models":[{"slug":"synthetic-model"}]}`)
+			return
+		}
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Error("unexpected path", r.URL.Path)
+			w.WriteHeader(404)
+			return
+		}
+		mu.Lock()
+		requests++
+		mu.Unlock()
+		body, _ := io.ReadAll(r.Body)
+		root, err := decodeNative(body)
+		if err != nil {
+			t.Error("invalid native request", err)
+		}
+		closed, namespace := false, ""
+		for _, raw := range list(root["input"]) {
+			item := object(raw)
+			if str(item["type"]) == "additional_tools" {
+				for _, rawTool := range list(item["tools"]) {
+					tool := object(rawTool)
+					if str(tool["type"]) == "namespace" && syntheticToolDeclarations(list(tool["tools"])) > 0 {
+						namespace = str(tool["name"])
+					}
+				}
+			}
+			if str(item["type"]) == "function_call_output" && str(item["call_id"]) == "synthetic-cli-call" {
+				data, _ := json.Marshal(item["output"])
+				closed = strings.Contains(string(data), codexprobe.Marker)
+			}
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		if closed {
+			_, _ = io.WriteString(w, strings.ReplaceAll(responseStreamFixture(), "你好 🌍", codexprobe.Marker))
+		} else {
+			_, _ = io.WriteString(w, codexToolStreamFixture(namespace))
+		}
+	}))
+	defer up.Close()
+	r, s, service := codexTestSession(t, up.URL)
+	if err := r.RegisterCodexCLI(context.Background(), probe, binary); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"RL01", "RL02", "RL03"} {
+		result := service.run(context.Background(), s, codexLayerItem(t, r, s, "codex-special."+id, "official_cli"), nil)
+		if result.State != "pass" || result.Layer != "official_cli" {
+			t.Fatalf("official %s tool callback failed: %+v", id, result)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if requests != 4 || s.usage.Generate != 4 || s.usage.InputTokens != 40 || s.usage.OutputTokens != 16 {
+		t.Fatal("profile reuse duplicated actual calls or metering", requests, s.usage)
+	}
+}
 
 func TestMissingCodexArtifactsKeepOfficialLayerPending(t *testing.T) {
 	r, s, _ := codexTestSession(t, "https://fixture.example")

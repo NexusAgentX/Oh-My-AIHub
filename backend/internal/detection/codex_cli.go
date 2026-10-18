@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL13", "codex-special.RL15"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL13", "codex-special.RL15"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@official_cli", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "official_cli", CodeVersion: engineVersion + ":" + gateway.ProbeImplementationVersion() + ":" + probeDigest + ":" + binaryDigest, Run: func(ctx context.Context, s *Session) Result {
@@ -87,7 +87,73 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 	return nil
 }
 
+type codexCLIProof struct {
+	Client        codexprobe.Result
+	Wire          codexWireFacts
+	State, Reason string
+	Witnesses     []string
+	Observed      map[string]int
+}
+
 func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requirement, probePath, binaryPath string) Result {
+	n := nativeScene{s: s, protocol: "openai-responses", layer: "official_cli", requirement: req, checks: map[string]Assertion{}}
+	profiles := []string{"lite_tools"}
+	switch req.ID {
+	case "codex-special.RL03":
+		profiles = []string{"tools", "lite_tools"}
+	case "codex-special.RL13":
+		profiles = []string{"notes"}
+	case "codex-special.RL15":
+		profiles = []string{"catalog"}
+	}
+	for _, profile := range profiles {
+		proof := runCodexCLIProfile(ctx, s, profile, probePath, binaryPath)
+		n.witnesses = append(n.witnesses, proof.Witnesses...)
+		out := nativeOutcome{State: proof.State, Reason: proof.Reason}
+		if len(proof.Witnesses) > 0 {
+			out.Response.AttemptID = proof.Witnesses[len(proof.Witnesses)-1]
+		}
+		client, wire := proof.Client, proof.Wire
+		closed := client.Completed && client.MarkerMatched && client.ToolCalls == 1 && wire.ToolCalls == 1 && wire.ToolResults == 1 && wire.ToolDeclarations > 0 && wire.SSE >= 2
+		switch req.ID {
+		case "codex-special.RL01":
+			for _, label := range req.Assertions {
+				n.check(label, out, closed && wire.LiteRequests >= 2 && wire.StandardRequests == 0)
+			}
+		case "codex-special.RL02":
+			n.check("additional_tools_declaration", out, wire.LiteRequests > 0 && wire.ToolDeclarations > 0)
+			n.check("tool_call_association", out, client.ToolCalls == 1 && wire.ToolCalls == 1 && wire.ToolResults == 1)
+			n.check("tool_result_continuation", out, closed)
+		case "codex-special.RL03":
+			label := "standard_tools_roundtrip"
+			shape := wire.StandardRequests >= 2 && wire.LiteRequests == 0
+			if profile == "lite_tools" {
+				label, shape = "lite_tools_roundtrip", wire.LiteRequests >= 2 && wire.StandardRequests == 0
+			}
+			n.check(label, out, closed && shape)
+		case "codex-special.RL13":
+			auth, activation := out, out
+			if client.PlatformAuth && client.Protocol == codexprobe.Protocol {
+				auth.State, auth.Reason = "pass", "ok"
+			}
+			if proof.Observed["codex.notes.thread_hint"] > 0 && client.Protocol == codexprobe.Protocol {
+				activation.State, activation.Reason = "pass", "ok"
+			}
+			n.check("cli_auth_profile", auth, client.PlatformAuth)
+			n.check("features_activated", activation, proof.Observed["codex.notes.thread_hint"] > 0)
+		case "codex-special.RL15":
+			n.check("cli_catalog_consumed", out, client.CatalogModel && client.PlatformAuth && proof.Observed["codex.models"] > 0)
+		}
+	}
+	return n.finish()
+}
+
+func runCodexCLIProfile(ctx context.Context, s *Session, profile, probePath, binaryPath string) (proof codexCLIProof) {
+	key := "codex-cli-profile-v1:" + profile
+	if cached := s.Recall(key); len(cached) > 0 && json.Unmarshal(cached, &proof) == nil {
+		return proof
+	}
+	proof.State, proof.Reason = "inconclusive", "client_disabled"
 	s.allowed["codex.models"] = true
 	bootstrap := nativeScene{s: s, protocol: "openai-responses", checks: map[string]Assertion{}}
 	catalog, _ := bootstrap.codexCatalog(ctx)
@@ -102,27 +168,23 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 	}
 	b, err := newCodexBridge(s, model, bootstrap.witnesses)
 	if err != nil {
-		return Result{State: "invalid"}
+		return proof
 	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		b.close()
-		return Result{State: "invalid"}
+		return proof
 	}
 	tlsConfig, ca, err := codexprobe.LoopbackTLS()
 	if err != nil {
 		_ = listener.Close()
 		b.close()
-		return Result{State: "invalid"}
+		return proof
 	}
 	server := &http.Server{Handler: b, TLSConfig: tlsConfig, ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}
 	serveDone := make(chan struct{})
 	go func() { defer close(serveDone); _ = server.ServeTLS(listener, "", "") }()
 	defer func() { _ = server.Close(); <-serveDone; b.close() }()
-	profile := "notes"
-	if req.ID == "codex-special.RL15" {
-		profile = "catalog"
-	}
 	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: probePath, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binaryPath, "AIHUB_CODEX_BRIDGE_ORIGIN": "https://" + listener.Addr().String(), "AIHUB_CODEX_BRIDGE_TOKEN": b.token, "AIHUB_CODEX_MODEL": codexProbeModel, "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: min(s.limits.RequestTimeout, 110*time.Second)})
 	var client codexprobe.Result
 	parseErr := json.Unmarshal(output.Stdout, &client)
@@ -134,45 +196,33 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 	b.mu.Unlock()
 	b.wg.Wait()
 	s.usage.Add(b.usage)
-	n := nativeScene{s: s, protocol: "openai-responses", layer: "official_cli", requirement: req, checks: map[string]Assertion{}, witnesses: append(slices.Clone(bootstrap.witnesses), b.witnesses...)}
-	refs := n.witnesses
+	refs := append(slices.Clone(bootstrap.witnesses), b.witnesses...)
 	if len(refs) == 0 {
-		return Result{State: "invalid"}
+		return proof
 	}
-	out := nativeOutcome{State: "pass", Reason: "ok", Response: Response{AttemptID: refs[len(refs)-1]}}
+	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed}
 	if runErr != nil || parseErr != nil || client.Protocol != codexprobe.Protocol || client.Version != codexprobe.Version || client.Profile != profile {
 		stage := "unknown"
 		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "completed"}, client.Stage) {
 			stage = client.Stage
 		}
 		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "exit_code", output.ExitCode, "reason", output.Reason)
-		out.State, out.Reason = "inconclusive", "client_disabled"
+		proof.State, proof.Reason = "inconclusive", "client_disabled"
 		if ctx.Err() != nil {
-			out.Reason = "cancelled"
+			proof.Reason = "cancelled"
 		}
 	}
-	if req.ID == "codex-special.RL13" {
-		auth, activation := out, out
-		metadataValid := parseErr == nil && client.Protocol == codexprobe.Protocol && client.Version == codexprobe.Version && client.Profile == profile
-		if metadataValid && client.PlatformAuth {
-			auth.State, auth.Reason = "pass", "ok"
-		}
-		if metadataValid && b.observed["codex.notes.thread_hint"] > 0 {
-			activation.State, activation.Reason = "pass", "ok"
-		}
-		n.check("cli_auth_profile", auth, client.PlatformAuth)
-		n.check("features_activated", activation, b.observed["codex.notes.thread_hint"] > 0)
-	} else {
-		n.check("cli_catalog_consumed", out, client.CatalogModel && client.PlatformAuth && b.observed["codex.models"] > 0)
-	}
-	result := n.finish()
 	if b.limited {
-		result.State, result.Reason = "inconclusive", "platform_unavailable"
+		proof.State, proof.Reason = "inconclusive", "platform_unavailable"
 	}
 	// Artifacts are never copied into reports, including sanitized adapter
 	// diagnostics. These checks also guard accidental future driver changes.
 	if strings.Contains(string(output.Stdout), b.token) {
-		return Result{State: "invalid"}
+		return codexCLIProof{State: "inconclusive", Reason: "detector_error"}
 	}
-	return result
+	if proof.State == "pass" {
+		data, _ := json.Marshal(proof)
+		_ = s.Remember(key, data)
+	}
+	return proof
 }

@@ -107,3 +107,82 @@ func (n *nativeScene) codexCrossReplay(ctx context.Context, standardBody nativeO
 		n.linkedCheck("compatible_replay", transition.first, out, contentMatches(out, nativeToolResult) && nativeEndedNormally(out.Reply))
 	}
 }
+
+func (n *nativeScene) codexSequentialTools(ctx context.Context) {
+	body := codexToolBody(n.s.Target.Model, false)
+	body["parallel_tool_calls"] = false
+	body["input"] = []any{nativeObject{"role": "user", "content": `Invoke synthetic_echo exactly twice with label="violet", meta={"ok":true}, items=[{"value":7}]. Both invocations are required. After both results, reply with exactly their result text. Do not invent results.`}}
+	first := n.codexInfer(ctx, body, "")
+	n.check("parallel_parameter_accepted", first, first.Reply.Structure)
+	current := first
+	seen := map[string]bool{}
+	for turn := 0; turn < 3; turn++ {
+		if !validCalls(current, true) || len(current.Reply.Candidates[0].Calls) != 1 {
+			n.check("parallel_calls_disabled", current, false)
+			return
+		}
+		id := current.Reply.Candidates[0].Calls[0].ID
+		if seen[id] {
+			n.check("parallel_calls_disabled", current, false)
+			return
+		}
+		seen[id] = true
+		n.check("parallel_calls_disabled", current, true)
+		body = n.toolReplayBody(body, current.Reply)
+		if body == nil {
+			n.uncertain("parallel_calls_disabled", current)
+			return
+		}
+		// This scenario needs a second actual invocation; do not disable all
+		// tools after the first result as ordinary one-call probes do.
+		if len(seen) == 1 {
+			delete(body, "tool_choice")
+		}
+		out := n.codexInfer(ctx, body, "")
+		if len(seen) == 2 {
+			n.linkedCheck("parallel_calls_disabled", first, out, contentMatches(out, nativeToolResult) && nativeEndedNormally(out.Reply))
+			return
+		}
+		current = out
+	}
+}
+
+func (n *nativeScene) codexToolExtensions(ctx context.Context) {
+	for _, custom := range []bool{false, true} {
+		body := codexToolBody(n.s.Target.Model, false)
+		label := "namespace_tools_roundtrip"
+		if custom {
+			label = "custom_tools_roundtrip"
+			body["input"] = []any{nativeObject{"role": "user", "content": "Call synthetic_raw with exactly the plaintext input synthetic-input. After receiving its result, reply with exactly its text."}}
+			body["tools"] = []any{nativeObject{"type": "custom", "name": "synthetic_raw", "description": "Synthetic plaintext echo.", "format": nativeObject{"type": "text"}}}
+		} else {
+			body["tools"] = []any{nativeObject{"type": "namespace", "name": "synthetic", "description": "Synthetic tools.", "tools": []any{nativeTool(n.protocol, false)}}}
+		}
+		first := n.codexInfer(ctx, body, "")
+		valid := first.Reply.Structure && len(first.Reply.Candidates) == 1 && len(first.Reply.Candidates[0].Calls) == 1
+		if valid {
+			call := first.Reply.Candidates[0].Calls[0]
+			if custom {
+				valid = call.ID != "" && call.Name == "synthetic_raw" && call.Custom == "synthetic-input"
+			} else {
+				valid = validCalls(first, true) && call.Namespace == "synthetic"
+			}
+		}
+		n.check("argument_fragments", first, valid && first.Stream.Valid && first.Stream.ToolLifecycle)
+		if !valid {
+			n.check(label, first, false)
+			n.check("call_result_association", first, false)
+			continue
+		}
+		next := n.toolReplayBody(body, first.Reply)
+		if next == nil {
+			n.uncertain(label, first)
+			n.uncertain("call_result_association", first)
+			continue
+		}
+		out := n.codexInfer(ctx, next, "")
+		passed := contentMatches(out, nativeToolResult) && nativeEndedNormally(out.Reply)
+		n.linkedCheck(label, first, out, passed)
+		n.linkedCheck("call_result_association", first, out, passed)
+	}
+}

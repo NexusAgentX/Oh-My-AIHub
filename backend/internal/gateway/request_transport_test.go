@@ -46,7 +46,7 @@ func TestServeCompressedResponsesIsolatesContextAndKeepsOpaqueBytes(t *testing.T
 	defer upstream.Close()
 	run := newCredentialRun(t, 200)
 	store := &protocolErrorStore{candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-synthetic-upstream")}, fallbackCredential: run.seal("zz-fallback", "sk-synthetic-upstream")}
-	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/native_zstd_request": true}
+	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/public_zstd_request": true}
 	store.candidate.Advanced.HeaderRules.Set = []channel.HeaderSet{{Name: "Session-Id", Value: "foreign-session"}, {Name: "Thread-Id", Value: "foreign-thread"}, {Name: "Content-Encoding", Value: "gzip"}, {Name: "Digest", Value: "stale"}}
 	e := newServeFixture(t, 10, defaultRouting{}).engine
 	e.Store = store
@@ -70,7 +70,7 @@ func TestServeCompressedResponsesIsolatesContextAndKeepsOpaqueBytes(t *testing.T
 	}
 	// Removing support evidence must stop the compressed request locally,
 	// rather than trying an unknown supplier or inventing compatibility.
-	store.candidate.Evidence = nil
+	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/native_zstd_request": true}
 	r = httptest.NewRequest("POST", "/v1/responses", bytes.NewReader(wire))
 	r.Header.Set("Authorization", "Bearer "+apikey.Prefix+"synthetic")
 	r.Header.Set("Content-Encoding", "zstd")
@@ -119,14 +119,41 @@ func TestZstdRequirementMatchesManifestCapabilityLabel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, suite := range m.Suites {
-		for _, requirement := range suite.Requirements {
-			for _, label := range requirement.Assertions {
-				if requirement.ID+"/"+label == nativeZstdRequirement.ID {
-					return
+	for _, path := range []string{"/v1/responses", "/backend-api/codex/responses"} {
+		found := false
+		for _, suite := range m.Suites {
+			for _, requirement := range suite.Requirements {
+				for _, label := range requirement.Assertions {
+					if requirement.ID+"/"+label == nativeZstdRequirement(path).ID {
+						found = true
+					}
 				}
 			}
 		}
+		if !found {
+			t.Fatal("request gate does not match a projected manifest capability", path)
+		}
 	}
-	t.Fatal("request gate does not match a projected manifest capability")
+	if nativeZstdRequirement("/v1/messages") == nativeZstdRequirement("/v1/responses") {
+		t.Fatal("unmeasured endpoint borrowed Responses transport evidence")
+	}
+}
+
+func TestCodexPlainAndSpecialToolsRequireOnlyRequestedCapabilities(t *testing.T) {
+	for _, input := range []struct{ body, want, absent string }{
+		{`{"model":"m","input":"hello"}`, "RL14/uncompressed_request", "RL03/standard_tools_roundtrip"},
+		{`{"model":"m","tools":[{"type":"custom","name":"echo"}]}`, "RL07/custom_tools_roundtrip", "RL03/standard_tools_roundtrip"},
+		{`{"model":"m","tools":[{"type":"function","name":"echo"}]}`, "RL03/standard_tools_roundtrip", "RL07/custom_tools_roundtrip"},
+	} {
+		found := false
+		for _, required := range codexInferenceRequirements("/backend-api/codex/responses", []byte(input.body), "") {
+			found = found || strings.HasSuffix(required.ID, input.want)
+			if strings.HasSuffix(required.ID, input.absent) || strings.Contains(required.ID, "RL12/") {
+				t.Fatal("request requires an unrelated full tool replay", required)
+			}
+		}
+		if !found {
+			t.Fatal("requested native capability was omitted", input.want)
+		}
+	}
 }

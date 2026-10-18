@@ -1,7 +1,9 @@
 package detection
 
 import (
+	"bytes"
 	"context"
+	"net/http"
 	"slices"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -85,6 +87,24 @@ func runCodexGateway(ctx context.Context, s *Session, req gatewaycontract.Requir
 		acl = acl && out.Reply.Object["accounts"] == nil
 		n.check("model_acl_filter", out, acl)
 		n.check("evidence_metadata", out, evidence)
+		result = n.finish()
+	case "codex-special.RL25":
+		n.codexImages(ctx)
+		// Independently exercise the platform Key's image-model ACL. A local
+		// denial is a gateway fact tied to this job's actual upstream witnesses,
+		// never a synthetic supplier response or an additional paid request.
+		b.store.key.AllowedModels = []string{"different-model"}
+		before := b.requests
+		request, _ := http.NewRequestWithContext(ctx, "POST", "http://127.0.0.1/backend-api/codex/images/generations", bytes.NewBufferString(`{"model":"`+codexProbeModel+`","prompt":"Synthetic ACL probe."}`))
+		request.Header.Set("Authorization", "Bearer "+b.token)
+		request.Header.Set("Content-Type", "application/json")
+		writer := &codexProbeWriter{header: http.Header{}, limit: s.limits.ResponseBytes}
+		b.ServeHTTP(writer, request)
+		proof := nativeOutcome{State: "pass", Reason: "ok"}
+		if len(n.witnesses) > 0 {
+			proof.Response.AttemptID = n.witnesses[len(n.witnesses)-1]
+		}
+		n.check("image_model_permission", proof, writer.status == http.StatusForbidden && b.requests == before)
 		result = n.finish()
 	default:
 		result = n.runCodex(ctx)

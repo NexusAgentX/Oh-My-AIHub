@@ -55,7 +55,7 @@ func TestPrivateCodexGatewayProofUsesRealHandlerAndRealWitnesses(t *testing.T) {
 	}
 	item := codexLayerItem(t, r, s, "codex-special.RL14", "gateway_proxy")
 	result := service.run(context.Background(), s, item, nil)
-	if result.State != "pass" || result.Layer != "gateway_proxy" || result.Source != "synthetic" || len(result.Assertions) != 3 || result.Usage.HTTP != 3 || result.Usage.Generate != 2 || calls["/backend-api/codex/responses"] != 2 {
+	if result.State != "pass" || result.Layer != "gateway_proxy" || result.Source != "synthetic" || len(result.Assertions) != 5 || result.Usage.HTTP != 5 || result.Usage.Generate != 4 || calls["/backend-api/codex/responses"] != 2 || calls["/v1/responses"] != 2 {
 		t.Fatalf("private gateway evidence/counters invalid: %+v calls=%v", result, calls)
 	}
 	encoded, _ := json.Marshal(result)

@@ -12,7 +12,18 @@ import (
 
 var errContextNamespaceUnavailable = errors.New("context namespace unavailable")
 
-var nativeZstdRequirement = CapabilityRequirement{Layer: "upstream_protocol", ID: "codex-special.RL14/native_zstd_request"}
+func nativeZstdRequirement(path string) CapabilityRequirement {
+	id := "transport.zstd/" + path
+	switch path {
+	case "/backend-api/codex/responses":
+		id = "codex-special.RL14/native_zstd_request"
+	case "/v1/responses":
+		id = "codex-special.RL14/public_zstd_request"
+	}
+	// Other endpoints cannot borrow proof from either Responses entrance.
+	// A missing endpoint-specific proof follows normal unknown-capability rules.
+	return CapabilityRequirement{Layer: "upstream_protocol", ID: id}
+}
 
 type codexNamespaceApplied struct{}
 

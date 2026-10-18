@@ -17775,7 +17775,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.20",
+    "version": "2026-10-19.1",
     "stage": "discovery",
     "sources": [
       {
@@ -21054,7 +21054,8 @@ x-aihub-gateway-contract:
           {
             "id": "codex-special.RL14",
             "endpoints": [
-              "codex.responses"
+              "codex.responses",
+              "responses.create"
             ],
             "source_ids": [
               "RL14"
@@ -21063,14 +21064,27 @@ x-aihub-gateway-contract:
             "assertions": [
               "content_encoding_zstd",
               "native_zstd_request",
-              "uncompressed_request"
+              "uncompressed_request",
+              "public_zstd_request",
+              "public_uncompressed_request"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "assertion_layers": {
+              "codex-special.RL14/a4": [
+                "upstream_protocol",
+                "gateway_proxy"
+              ],
+              "codex-special.RL14/a5": [
+                "upstream_protocol",
+                "gateway_proxy"
+              ]
+            }
           },
           {
             "id": "codex-special.RL16",
             "endpoints": [
-              "codex.search"
+              "codex.search",
+              "codex.responses"
             ],
             "source_ids": [
               "RL16"
@@ -21388,7 +21402,13 @@ x-aihub-gateway-contract:
               "image_model_permission",
               "reliable_products"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "assertion_layers": {
+              "codex-special.RL25/a3": [
+                "gateway_proxy",
+                "official_cli"
+              ]
+            }
           }
         ]
       }
@@ -21550,6 +21570,7 @@ x-aihub-gateway-contract:
       "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"]",
       "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"]",
       "codex-rl25-operational-scope": "Operational assertions retain this original scope: [\"Codex 专用原生生图\", \"固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。\", \"F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源\", \"固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。\"]",
-      "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement."
+      "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement.",
+      "codex-rl14-endpoint-evidence": "RL14 separately tests the native Codex and public Responses entrances; neither endpoint supplies transport capability evidence for the other. Public assertions are upstream/gateway only; the pinned CLI compression profile uses its actual native endpoint."
     }
   }

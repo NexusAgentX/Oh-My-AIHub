@@ -86,17 +86,17 @@ func TestCodexCompressionUsesNativePathAndIndependentPlainRequest(t *testing.T) 
 		t.Run(map[bool]string{false: "supported", true: "unsupported"}[rejectCompressed], func(t *testing.T) {
 			seen := map[string]int{}
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/backend-api/codex/responses" {
-					t.Error("Codex proof borrowed public Responses path")
+				if r.URL.Path != "/backend-api/codex/responses" && r.URL.Path != "/v1/responses" {
+					t.Error("unknown compression test path")
 				}
 				encoding := r.Header.Get("Content-Encoding")
-				seen[encoding]++
+				seen[r.URL.Path+":"+encoding]++
 				wire, _ := io.ReadAll(r.Body)
 				plain, err := nativeencoding.Decode(r.Context(), encoding, wire)
 				if err != nil || !strings.Contains(string(plain), nativeMarker) {
 					t.Error("invalid actual compressed payload", err)
 				}
-				if encoding == "zstd" && rejectCompressed {
+				if encoding == "zstd" && rejectCompressed && r.URL.Path != "/v1/responses" {
 					w.WriteHeader(415)
 					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","code":"unsupported_parameter","message":"unsupported content encoding"}}`)
 					return
@@ -108,7 +108,7 @@ func TestCodexCompressionUsesNativePathAndIndependentPlainRequest(t *testing.T) 
 			s.resolved.Headers.Set = []market.HeaderSet{{Name: "Content-Encoding", Value: "gzip"}, {Name: "Content-Length", Value: "1"}}
 			item := nativeItem(t, r, s, "codex-special.RL14")
 			result := service.run(context.Background(), s, item, nil)
-			if len(result.Assertions) != 3 || result.Assertions[2].State != "pass" || seen[""] != 1 || seen["zstd"] != 1 {
+			if len(result.Assertions) != 5 || result.Assertions[2].State != "pass" || result.Assertions[3].State != "pass" || result.Assertions[4].State != "pass" || seen["/backend-api/codex/responses:"] != 1 || seen["/backend-api/codex/responses:zstd"] != 1 || seen["/v1/responses:zstd"] != 1 || seen["/v1/responses:"] != 1 {
 				t.Fatalf("compression/plain observations collapsed: %+v seen=%v", result, seen)
 			}
 			want := "pass"

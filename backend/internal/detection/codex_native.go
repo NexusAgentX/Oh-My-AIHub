@@ -21,7 +21,7 @@ func (r *Registry) RegisterCodexNative() error {
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL05", "codex-special.RL06", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL20", "codex-special.RL21", "codex-special.RL24"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL20", "codex-special.RL21", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: engineVersion, Run: func(ctx context.Context, s *Session) Result {
@@ -41,6 +41,10 @@ func (n *nativeScene) runCodex(ctx context.Context) Result {
 		n.codexTools(ctx)
 	case "codex-special.RL05":
 		n.codexReasoningContext(ctx)
+	case "codex-special.RL04":
+		n.codexSequentialTools(ctx)
+	case "codex-special.RL07":
+		n.codexToolExtensions(ctx)
 	case "codex-special.RL06":
 		n.codexInstructions(ctx)
 	case "codex-special.RL09":
@@ -51,6 +55,10 @@ func (n *nativeScene) runCodex(ctx context.Context) Result {
 	case "codex-special.RL15":
 		out, valid := n.codexCatalog(ctx)
 		n.check("native_catalog", out, valid)
+	case "codex-special.RL16":
+		n.codexSearch(ctx)
+	case "codex-special.RL25":
+		n.codexImages(ctx)
 	case "codex-special.RL14":
 		n.codexEncoding(ctx)
 	case "codex-special.RL24":
@@ -118,6 +126,23 @@ func (n *nativeScene) codexEncoding(ctx context.Context) {
 	n.check("native_zstd_request", compressed, codexMarker(compressed))
 	plain := n.codexInfer(ctx, body, "")
 	n.check("uncompressed_request", plain, codexMarker(plain))
+	if n.layer != "official_cli" {
+		for _, encoding := range []string{"zstd", ""} {
+			raw, _ := json.Marshal(body)
+			wire, err := nativeencoding.Encode(ctx, encoding, raw)
+			if err != nil {
+				continue
+			}
+			headers := http.Header{"Content-Type": {"application/json"}}
+			label := "public_uncompressed_request"
+			if encoding != "" {
+				headers.Set("Content-Encoding", encoding)
+				label = "public_zstd_request"
+			}
+			out := n.call(ctx, Request{EndpointID: "responses.create", Path: "/v1/responses", Headers: headers, Body: wire, Category: "generate"}, true)
+			n.check(label, out, codexMarker(out))
+		}
+	}
 }
 
 func (n *nativeScene) codexTiers(ctx context.Context) {

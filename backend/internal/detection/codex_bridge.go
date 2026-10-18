@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -21,12 +22,14 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexprobe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -60,6 +63,15 @@ type codexBridge struct {
 	slots     chan struct{}
 	handlers  chan struct{}
 	limited   bool
+	wire      codexWireFacts
+	callIDs   map[string]bool
+}
+
+// Only bounded semantic facts leave this private bridge. Call IDs and native
+// request/response bodies remain transient memory and never enter reports.
+type codexWireFacts struct {
+	LiteRequests, StandardRequests, ToolDeclarations int
+	ToolCalls, ToolResults, SSE, ReliableUsage       int
 }
 
 func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*codexBridge, error) {
@@ -84,7 +96,14 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	if err != nil {
 		return nil, err
 	}
-	book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "probe-group", GroupRevision: 1, ConnectionVersion: 1, Offers: map[string]quotepricing.Offer{codexProbeModel: {ModelID: codexProbeModel, Revision: 1, Quote: market.Quote{ID: "probe-zero-quote", GroupModelID: "probe-offering", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"}}}})
+	quote := market.Quote{ID: "probe-zero-quote", GroupModelID: "probe-offering", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"}
+	formats := []channel.Format{channel.FormatOpenAIResponses}
+	if s.Target.ModelType == "image" {
+		quote.BillingUnit = "per_successful_image"
+		quote.UnitPrices = []market.UnitPrice{{Unit: "successful_image", Price: money.FromNano(0)}}
+		formats = []channel.Format{channel.FormatOpenAIImages}
+	}
+	book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "probe-group", GroupRevision: 1, ConnectionVersion: 1, Offers: map[string]quotepricing.Offer{codexProbeModel: {ModelID: codexProbeModel, Revision: 1, Quote: quote}}})
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +137,17 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 		advanced.HeaderRules.Set = append(advanced.HeaderRules.Set, channel.HeaderSet{Name: set.Name, Value: set.Value})
 	}
 	c := gateway.Candidate{GroupID: "probe-group", GroupModelID: "probe-offering", ChannelID: "probe-channel", CredentialScope: "probe-scope", CredentialRevision: 1, OwnerID: "probe-provider", BaseURL: base.String(), UpstreamModel: upstreamModel, Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof, Advanced: advanced}
-	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}, finished: map[string]bool{}}
-	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
+	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
+	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
 	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
 	b.mux = http.NewServeMux()
 	for _, endpoint := range manifest.Endpoints {
 		if h := b.engine.CodexHandler(endpoint); h != nil {
 			b.mux.HandleFunc(endpoint.Method+" "+endpoint.Path, h)
+		} else if endpoint.ID == "responses.create" {
+			b.mux.HandleFunc(endpoint.Method+" "+endpoint.Path, func(w http.ResponseWriter, r *http.Request) {
+				b.engine.Serve(w, r, channel.FormatOpenAIResponses, "", false)
+			})
 		}
 	}
 	return b, nil
@@ -190,7 +213,7 @@ func (w *codexProbeWriter) Flush() { w.WriteHeader(http.StatusOK) }
 
 func (b *codexBridge) exchange(ctx context.Context, input Request) (Response, error) {
 	ep, ok := b.parent.endpoints[input.EndpointID]
-	if !ok || ep.Feature != "F8" || !matchPath(ep.Path, input.Path) || int64(len(input.Body)) > b.parent.limits.RequestBytes || input.Authentication != AuthenticationValid {
+	if !ok || (ep.Feature != "F8" && ep.ID != "responses.create") || !matchPath(ep.Path, input.Path) || int64(len(input.Body)) > b.parent.limits.RequestBytes || input.Authentication != AuthenticationValid {
 		return Response{}, ErrInvalid
 	}
 	u := &url.URL{Scheme: "http", Host: "127.0.0.1", Path: input.Path, RawQuery: input.Query.Encode()}
@@ -264,7 +287,7 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	var ep gatewaycontract.Endpoint
 	for _, e := range b.parent.endpoints {
-		if e.Feature == "F8" && e.Method == req.Method && req.URL.EscapedPath() == strings.TrimSuffix(b.base.EscapedPath(), "/")+e.Path {
+		if (e.Feature == "F8" || e.ID == "responses.create") && e.Method == req.Method && req.URL.EscapedPath() == strings.TrimSuffix(b.base.EscapedPath(), "/")+e.Path {
 			ep = e
 			break
 		}
@@ -289,21 +312,78 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	response, err := session.Do(req.Context(), Request{EndpointID: ep.ID, Path: ep.Path, Query: req.URL.Query(), Headers: req.Header, Body: body, Category: category, prepared: true})
 	var usage Usage
+	var reply nativeReply
+	wire := codexWireFacts{}
+	if ep.ID == "codex.responses" {
+		plain, decodeErr := nativeencoding.Decode(req.Context(), req.Header.Get("Content-Encoding"), body)
+		if decodeErr == nil {
+			if root, err := decodeNative(plain); err == nil {
+				lite := false
+				for _, raw := range list(root["input"]) {
+					item := object(raw)
+					if str(item["type"]) == "additional_tools" {
+						lite = true
+						wire.ToolDeclarations += syntheticToolDeclarations(list(item["tools"]))
+					}
+					if str(item["type"]) == "function_call_output" {
+						b.mu.Lock()
+						known := b.callIDs[str(item["call_id"])]
+						b.mu.Unlock()
+						output, _ := json.Marshal(item["output"])
+						if known && bytes.Contains(output, []byte(codexprobe.Marker)) {
+							wire.ToolResults++
+						}
+					}
+				}
+				if lite {
+					wire.LiteRequests++
+				} else {
+					wire.StandardRequests++
+					wire.ToolDeclarations += syntheticToolDeclarations(list(root["tools"]))
+				}
+			}
+		}
+	}
 	if err == nil && response.Status >= 200 && response.Status < 300 && category == "generate" {
-		var reply nativeReply
 		if strings.Contains(response.Headers.Get("Content-Type"), "text/event-stream") {
-			reply = parseNativeStream("openai-responses", response.Body, b.parent.limits.EventBytes).Reply
+			parsed := parseNativeStream("openai-responses", response.Body, b.parent.limits.EventBytes)
+			reply = parsed.Reply
+			if parsed.Valid && parsed.Terminal {
+				wire.SSE++
+			}
 		} else if root, decodeErr := decodeNative(response.Body); decodeErr == nil {
 			reply = parseNative("openai-responses", root)
 		}
 		if reply.Usage.Reliable && (responseTerminal(reply.Status) || str(reply.Object["object"]) == "response.compaction") {
 			usage.InputTokens, usage.OutputTokens = reply.Usage.Input, reply.Usage.Output
+			wire.ReliableUsage++
+		}
+		for _, candidate := range reply.Candidates {
+			for _, call := range candidate.Calls {
+				if call.Name == "synthetic_echo" && call.ID != "" && matchesNativeSchema(call.Arguments) {
+					wire.ToolCalls++
+				}
+			}
 		}
 	}
 	b.mu.Lock()
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	for _, candidate := range reply.Candidates {
+		for _, call := range candidate.Calls {
+			if len(b.callIDs) < 64 && call.ID != "" && call.Name == "synthetic_echo" && matchesNativeSchema(call.Arguments) {
+				b.callIDs[call.ID] = true
+			}
+		}
+	}
+	b.wire.LiteRequests += wire.LiteRequests
+	b.wire.StandardRequests += wire.StandardRequests
+	b.wire.ToolDeclarations += wire.ToolDeclarations
+	b.wire.ToolCalls += wire.ToolCalls
+	b.wire.ToolResults += wire.ToolResults
+	b.wire.SSE += wire.SSE
+	b.wire.ReliableUsage += wire.ReliableUsage
 	for _, id := range append(response.PriorAttempts, response.AttemptID) {
 		if id != "" && !slices.Contains(b.witnesses, id) {
 			b.witnesses = append(b.witnesses, id)
@@ -314,6 +394,19 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		return nil, err
 	}
 	return &http.Response{StatusCode: response.Status, Header: response.Headers, Body: io.NopCloser(bytes.NewReader(response.Body)), ContentLength: int64(len(response.Body)), Request: req}, nil
+}
+
+func syntheticToolDeclarations(tools []any) int {
+	count := 0
+	for _, raw := range tools {
+		tool := object(raw)
+		if str(tool["type"]) == "namespace" {
+			count += syntheticToolDeclarations(list(tool["tools"]))
+		} else if str(tool["type"]) == "function" && str(tool["name"]) == "synthetic_echo" {
+			count++
+		}
+	}
+	return count
 }
 
 type codexProbeStore struct {

@@ -136,6 +136,9 @@ func TestNegativeAuthenticationCannotReuseConfiguredCredentials(t *testing.T) {
 				if seen == 2 && got != "" {
 					t.Error("absent auth probe restored secret")
 				}
+				if r.Header.Get("X-Openai-Actor-Authorization") != "" {
+					t.Error("negative auth probe retained a working actor credential")
+				}
 				for _, name := range []string{"key", "api_key", "access_token", "token"} {
 					if r.URL.Query().Get(name) != "" {
 						t.Error("query credential survived")
@@ -150,7 +153,7 @@ func TestNegativeAuthenticationCannotReuseConfiguredCredentials(t *testing.T) {
 			_, s, _ := nativeTestSession(t, up.URL)
 			id, path, query := nativeEndpoint(protocol, "synthetic-model", false)
 			s.allowed = map[string]bool{id: true}
-			s.resolved.Headers.Set = []market.HeaderSet{{Name: "Authorization", Value: "Bearer synthetic-configured-secret"}, {Name: "x-api-key", Value: "synthetic-configured-secret"}, {Name: "x-goog-api-key", Value: "synthetic-configured-secret"}}
+			s.resolved.Headers.Set = []market.HeaderSet{{Name: "Authorization", Value: "Bearer synthetic-configured-secret"}, {Name: "x-api-key", Value: "synthetic-configured-secret"}, {Name: "x-goog-api-key", Value: "synthetic-configured-secret"}, {Name: "X-Openai-Actor-Authorization", Value: "synthetic-configured-actor"}}
 			if query == nil {
 				query = map[string][]string{}
 			}

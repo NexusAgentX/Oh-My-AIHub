@@ -7,7 +7,7 @@ import (
 
 // Only the registered Codex request surface uses these extension requirements.
 // Plain inference keeps its existing scan and capability rules.
-func codexInferenceRequirements(path string, body []byte) []CapabilityRequirement {
+func codexInferenceRequirements(path string, body []byte, encoding string) []CapabilityRequirement {
 	if !strings.HasPrefix(path, "/backend-api/codex/") {
 		return nil
 	}
@@ -35,6 +35,9 @@ func codexInferenceRequirements(path string, body []byte) []CapabilityRequiremen
 		add("RL16", "native_search")
 		return result
 	case "/backend-api/codex/responses":
+		if encoding == "" {
+			add("RL14", "uncompressed_request")
+		}
 	default:
 		return nil
 	}
@@ -56,25 +59,21 @@ func codexInferenceRequirements(path string, body []byte) []CapabilityRequiremen
 		defer func() { scratch.members = scratch.members[:mark] }()
 		o := scratch.objectOf(raw)
 		switch textValue(o.get("type")) {
+		case "function":
+			add("RL03", "standard_tools_roundtrip")
 		case "namespace":
 			add("RL07", "namespace_tools_roundtrip")
 		case "custom":
 			add("RL07", "custom_tools_roundtrip")
 		}
 	}
-	standardTools := false
-	eachElement(tools, func(raw []byte) { standardTools = true; tool(raw) })
-	if standardTools {
-		add("RL03", "standard_tools_roundtrip")
-	}
-	lite := false
+	eachElement(tools, tool)
 	eachElement(input, func(raw []byte) {
 		mark := len(scratch.members)
 		defer func() { scratch.members = scratch.members[:mark] }()
 		o := scratch.objectOf(raw)
 		switch textValue(o.get("type")) {
 		case "additional_tools":
-			lite = true
 			add("RL02", "additional_tools_declaration")
 			eachElement(o.get("tools"), tool)
 		case "compaction_trigger":
@@ -90,10 +89,5 @@ func codexInferenceRequirements(path string, body []byte) []CapabilityRequiremen
 			add("RL06", "developer_instruction")
 		}
 	})
-	if lite {
-		add("RL12", "lite_native_roundtrip")
-	} else {
-		add("RL12", "standard_native_roundtrip")
-	}
 	return result
 }

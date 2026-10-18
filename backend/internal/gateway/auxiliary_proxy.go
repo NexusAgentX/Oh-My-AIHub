@@ -282,7 +282,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
 	if encoding != "" {
-		selection.Required = append(selection.Required, nativeZstdRequirement)
+		selection.Required = append(selection.Required, nativeZstdRequirement(r.URL.Path))
 	}
 	if owned != nil {
 		selection.Reference = &ResourceScope{GroupID: owned.Binding.GroupID, ChannelID: owned.Binding.ChannelID, CredentialScope: owned.CredentialScope}

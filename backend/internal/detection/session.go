@@ -282,6 +282,9 @@ func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) 
 					req.Header.Set("Content-Encoding", encoding)
 				}
 				credential := string(s.secret)
+				if input.Authentication != AuthenticationValid {
+					req.Header.Del("X-Openai-Actor-Authorization")
+				}
 				if input.Authentication == AuthenticationInvalid {
 					credential = "aihub-invalid-" + id
 				}

@@ -161,3 +161,45 @@ func TestCodexCompactionV1AndV2PreserveDifferentNativeWindows(t *testing.T) {
 		})
 	}
 }
+
+func TestCodexParallelFalseRequiresTwoActualSequentialInvocations(t *testing.T) {
+	for _, parallelViolation := range []bool{false, true} {
+		t.Run(map[bool]string{false: "sequential", true: "parallel_violation"}[parallelViolation], func(t *testing.T) {
+			requests := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests++
+				raw, _ := io.ReadAll(r.Body)
+				body, _ := decodeNative(raw)
+				if body["parallel_tool_calls"] != false {
+					t.Error("actual request did not disable parallel calls")
+				}
+				var calls []nativeCall
+				text := nativeToolResult
+				if requests < 3 {
+					id := "first-call"
+					if requests == 2 {
+						id = "second-call"
+					}
+					calls = []nativeCall{{ID: id, Name: "synthetic_echo"}}
+					if parallelViolation && requests == 1 {
+						calls = append(calls, nativeCall{ID: "parallel-second", Name: "synthetic_echo"})
+					}
+				}
+				_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", text, calls))
+			}))
+			defer up.Close()
+			r, s, service := codexTestSession(t, up.URL)
+			result := service.run(context.Background(), s, nativeItem(t, r, s, "codex-special.RL04"), nil)
+			if result.Assertions[0].State != "pass" || len(result.Assertions) != 2 {
+				t.Fatal("parameter acceptance was lost", result)
+			}
+			if parallelViolation {
+				if result.Assertions[1].State == "pass" || requests != 1 {
+					t.Fatal("actual parallel execution was accepted or retried", result)
+				}
+			} else if result.State != "pass" || requests != 3 || len(result.Assertions[1].AttemptIDs) != 3 {
+				t.Fatal("two-step sequential behavior lacks complete witnesses", result)
+			}
+		})
+	}
+}
