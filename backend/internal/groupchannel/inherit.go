@@ -75,12 +75,13 @@ func ProbeBinding(r Record, g market.Group, m market.GroupModel) string {
 	// Prices, discounts, exclusions, address ordering and unrelated timeout/
 	// concurrency edits do not change a Key's basic protocol evidence.
 	payload := struct {
+		Version                   string
 		Channel, Group, Model     string
 		CredentialRevision, Epoch int64
 		GroupDigest, ModelDigest  string
 		UA                        *string
 		Headers                   *market.HeaderRules
-	}{r.ID, g.ID, m.ID, r.CredentialRevision, r.ProbeEpoch, g.CapabilityDigest, m.CapabilityDigest, effective.UserAgent, effective.HeaderRules}
+	}{"group-channel-basic.v1", r.ID, g.ID, m.ID, r.CredentialRevision, r.ProbeEpoch, g.CapabilityDigest, m.CapabilityDigest, effective.UserAgent, effective.HeaderRules}
 	b, _ := json.Marshal(payload)
 	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])

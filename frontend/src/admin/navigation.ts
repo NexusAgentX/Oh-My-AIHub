@@ -17,7 +17,7 @@ export const adminNavigation: AdminNavItem[] = [
   { label: '模型', to: '/admin/models', icon: 'layers' },
   { label: '供应商', to: '/admin/suppliers', icon: 'globe' },
   { label: '渠道', to: '/admin/channels', icon: 'shield' },
-  {label:'分组渠道',to:'/admin/group-channels',icon:'shield'},
+  {label:'分组渠道',to:'/admin/group-channels',icon:'server'},
   { label: '申诉', to: '/admin/disputes', icon: 'scale' },
   { label: '设置', to: '/admin/settings', icon: 'settings' },
  {label:'检测参数',to:'/admin/detection-search',icon:'flask'},

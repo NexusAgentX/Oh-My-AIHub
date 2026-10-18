@@ -27,6 +27,11 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 		t.Fatal(err)
 	}
 	change := marketBundle(t, "relay")
+	retainedID := marketID(t)
+	retained := change.Models[0].Value
+	retained.ID = retainedID
+	retained.ModelID = "zz-retained"
+	change.Models = append(change.Models, market.Change[market.GroupModel]{Value: retained})
 	qid := marketID(t)
 	change.Quotes = []market.Quote{{ID: qid, GroupModelID: change.Models[0].Value.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(t, "2")}}}
 	marketApply(t, s, admin.ID, change)
@@ -43,7 +48,7 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 	}
 	repo := groupchannelpg.NewStore(pool)
 	r := groupchannel.Record{ID: id, Owner: channel.Owner{ID: admin.ID}, OwnerActive: true, Name: "合成分组渠道", Status: channel.StatusListed, GroupID: g.ID, BaseURL: d.Addresses[0].BaseURL, Revision: 1, CredentialRevision: 1, ProbeEpoch: 1, AddressIDs: []string{d.GroupAddresses[0].ID}, Credential: sealed}
-	if err = repo.Create(ctx, r, []groupchannel.Choice{{GroupModelID: m.ID, DiscountNano: 0}}); err != nil {
+	if err = repo.Create(ctx, r, []groupchannel.Choice{{GroupModelID: m.ID, DiscountNano: 0}, {GroupModelID: retainedID, Excluded: true, DiscountNano: 1_000_000_000}}); err != nil {
 		t.Fatal(err)
 	}
 	r, err = repo.Get(ctx, id)
@@ -101,8 +106,13 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 		t.Fatal("unchanged probe binding should survive exclusion", err)
 	}
 	data, err = repo.Snapshot(ctx)
-	if err != nil || len(data.Choices) != 1 || !data.Choices[0].Excluded {
-		t.Fatal("late probe restored excluded model", err)
+	if err != nil || len(data.Choices) != 2 {
+		t.Fatal("owner edit erased an untouched model choice", err)
+	}
+	for _, c := range data.Choices {
+		if !c.Excluded {
+			t.Fatal("late probe or another model edit restored exclusion")
+		}
 	}
 	current, err := repo.Get(ctx, id)
 	if err != nil {

@@ -2,13 +2,14 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import { SharingNav } from '../sharing/components'
-import { Badge, Button, ButtonLink, Card, Checkbox, ConfirmDialog, EmptyState, FormSection, Icon, IconButton, InlineError, Notice, PageHeader, PasswordField, QueryBoundary, SelectField, TextareaField, TextField, Tabs } from '../ui'
+import { Badge, Button, ButtonLink, Card, Checkbox, ConfirmDialog, EmptyState, FormSection, Icon, IconButton, InlineError, Notice, PageHeader, PasswordField, QueryBoundary, SelectField, TextareaField, TextField, Tabs, SuccessMessage } from '../ui'
 import { useGroupAction, useGroupEvents, useGroupChannel, useGroupChannels, useGroupSources, useSaveGroupChannel, type Choice, type GroupChannel, type GroupSource, type Overrides } from './queries'
 import { ChannelStatsPanel, ChannelHealth } from '../channels/ChannelStatsPanel'
 import { ChannelCalls } from '../channels/ChannelCalls'
 import './group-channels.css'
 
 const formatNames: Record<string, string> = { openai_chat: 'Chat', openai_responses: 'Responses', anthropic: 'Messages', gemini: 'GenerateContent', openai_images: 'Images' }
+const probeReasons:Record<string,string>={upstream_rejected_probe:'上游拒绝请求',upstream_server_error:'上游服务错误',upstream_unreachable:'上游不可达',probe_cancelled_or_timed_out:'探针取消或超时',upstream_transport_error:'上游连接失败',outbound_validation_failed:'出站校验未通过',invalid_upstream_endpoint:'上游端点配置无效',invalid_probe_request:'探针请求配置无效',invalid_or_oversize_reply:'响应格式或大小无效',invalid_native_reply:'响应不符合原生协议'}
 const sourceNames: Record<string, string> = { channel: '渠道', group: '分组', platform: '平台', model_route_or_platform: '模型路由／平台' }
 export const emptyOverrides: Overrides = { user_agent: null, header_rules: null, concurrency_limit: null, rpm_limit: null, ttft_timeout_ms: null, request_timeout_ms: null, idle_timeout_ms: null, cooldown_failures: null, cooldown_seconds: null }
 
@@ -50,7 +51,7 @@ function Advanced({ value, defaults, onChange, sources }: { value: Overrides; de
   const mode = value.header_rules === null ? 'inherit' : !value.header_rules.set?.length && !value.header_rules.remove?.length ? 'empty' : 'custom'
   const [custom, setCustom] = useState(mode === 'custom')
   const rules = value.header_rules ?? {}
-  return <details className="group-channel-advanced"><summary>高级设置</summary>
+  return <details className="group-channel-advanced"><summary>高级设置</summary><div className="group-advanced-fields">
     <p className="muted-copy">留空跟随分组当前默认值。超时再依次使用模型路由、平台设置。</p>
     <TextField label="User-Agent" value={value.user_agent ?? ''} maxLength={512} placeholder={defaults.user_agent ?? '平台默认'} onChange={(e) => set({ user_agent: e.target.value || null })} />
     <div className="field-row">{numericFields.map(({ key, label, min, max }) => <TextField key={key} label={label} type="number" min={min} max={max} step={1} value={value[key] ?? ''} placeholder={defaults[key] === null ? '继承' : String(defaults[key])} hint={sources?.[key] ? `已保存来源：${sourceNames[sources[key]]}` : undefined} onChange={(e) => set({ [key]: e.target.value === '' ? null : Number(e.target.value) })} />)}</div>
@@ -60,7 +61,7 @@ function Advanced({ value, defaults, onChange, sources }: { value: Overrides; de
       {(rules.remove ?? []).map((name, index) => <div className="header-rule header-rule-remove" key={index}><TextField label="要删除的请求头" value={name} onChange={(e) => set({ header_rules: { ...rules, remove: rules.remove?.map((r, i) => i === index ? e.target.value : r) } })} /><IconButton type="button" label="移除删除规则" icon={<Icon name="x" />} onClick={() => set({ header_rules: { ...rules, remove: rules.remove?.filter((_, i) => i !== index) } })} /></div>)}
       <div className="group-channel-actions"><Button size="sm" type="button" variant="secondary" disabled={(rules.set?.length ?? 0) >= 32} onClick={() => set({ header_rules: { ...rules, set: [...(rules.set ?? []), { name: '', value: '' }] } })}>设置请求头</Button><Button size="sm" type="button" variant="secondary" disabled={(rules.remove?.length ?? 0) >= 32} onClick={() => set({ header_rules: { ...rules, remove: [...(rules.remove ?? []), ''] } })}>删除请求头</Button></div>
     </div>}
-  </details>
+  </div></details>
 }
 
 type Section = 'overview' | 'settings' | 'calls' | 'health'
@@ -106,7 +107,7 @@ function Editor({ sources, channel }: { sources: GroupSource[]; channel?: GroupC
       <Card title="渠道配置"><FormSection title="供应商分组">
         <SelectField label="生效分组" required value={groupID} onChange={(e) => { const g = sources.find((v) => v.id === e.target.value); setGroupID(e.target.value); setAddressIDs(g?.addresses[0] ? [g.addresses[0].id] : []); setChoices([]); setAPIKey('') }}><option value="" disabled>选择分组</option>{sources.map((g) => <option key={g.id} value={g.id}>{g.supplier_name} · {g.name}</option>)}</SelectField>
         {channel && channel.group_id !== groupID && <Notice tone="warning">更换分组需要填写该分组的 API Key。</Notice>}
-        <PasswordField label="API Key" autoComplete="new-password" value={apiKey} required={!channel || channel.group_id !== groupID} placeholder={channel ? '留空保留现有 Key' : '填写上游 API Key'} onChange={(e) => setAPIKey(e.target.value)} />
+        <PasswordField label="API Key" hint="自动探测会调用上游，费用按上游规则计算。" autoComplete="new-password" value={apiKey} required={!channel || channel.group_id !== groupID} placeholder={channel ? '留空保留现有 Key' : '填写上游 API Key'} onChange={(e) => setAPIKey(e.target.value)} />
         <TextField label="渠道名称" maxLength={64} placeholder={source?.name ?? '使用分组名称'} value={name} onChange={(e) => setName(e.target.value)} />
         <TextField label="一句话简介" maxLength={160} value={summary} onChange={(e) => setSummary(e.target.value)} />
         <TextareaField label="详细介绍" maxLength={8000} value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -123,11 +124,12 @@ function Editor({ sources, channel }: { sources: GroupSource[]; channel?: GroupC
         <p className="muted-copy">新模型自动探测。排除项会保留，折扣作用于该模型的整张分组价表。</p>
         {models.length === 0 ? <EmptyState title="当前分组没有模型" /> : <ul className="group-models">{models.map((model) => { const c = choices.find((choice) => choice.group_model_id === model.id); const tested = channel?.models.find((m) => m.group_model_id === model.id); return <li key={model.id}>
           <div className="group-model-main"><Checkbox checked={!c?.excluded} label={<strong className="mono">{model.model_id}</strong>} onChange={(e) => setChoice(model.id, { excluded: !e.target.checked })} />{tested && <ModelState model={tested} />}{model.display_name !== model.model_id && <span className="muted-copy">{model.display_name}</span>}</div>
-          <TextField label={`${model.model_id} 折扣`} inputMode="decimal" type="number" min={0} max={1000} step="0.000000001" value={c?.discount ?? '1'} onChange={(e) => setChoice(model.id, { discount: e.target.value })} />
-          {tested && <div className="group-probe-results">{Object.entries(tested.format_tests).map(([format, test]) => <span key={format} className={test.ok ? 'amount-positive' : 'muted'}>{formatNames[format] ?? format}：{test.ok ? '通过' : test.error || '未通过'}</span>)}</div>}
+          <TextField label="折扣" aria-label={`${model.model_id} 折扣`} inputMode="decimal" type="number" min={0} max={1000} step="0.000000001" value={c?.discount ?? '1'} onChange={(e) => setChoice(model.id, { discount: e.target.value })} />
+          {tested && <div className="group-probe-results">{Object.entries(tested.format_tests).map(([format, test]) => <span key={format} className={test.ok ? 'amount-positive' : 'muted'}>{formatNames[format] ?? format}：{test.ok ? '通过' : probeReasons[test.error??''] || test.error || '未通过'}</span>)}</div>}
         </li> })}</ul>}
       </Card>
       {channel?.suspended_reason && <Notice tone="danger">{channel.suspended_reason}</Notice>}
+      {save.isSuccess&&!dirty&&<SuccessMessage>配置已保存</SuccessMessage>}
       <InlineError>{localError || (save.isError ? errorMessage(save.error, '保存失败') : action.isError ? errorMessage(action.error, '操作失败') : '')}</InlineError>
       <div className="group-channel-actions"><Button loading={save.isPending} disabled={busy || !source || !addressIDs.length} type="submit">{channel ? '保存配置' : '创建渠道'}</Button>{channel && <Button type="button" variant="danger" disabled={busy} onClick={() => setDeleteOpen(true)}>删除渠道</Button>}</div>
     </form>
@@ -147,6 +149,6 @@ function Governance({ channel }: { channel: GroupChannel }) {
   const action = useGroupAction(channel.id)
   const [section,setSection]=useState<Section>('overview')
   const [reason, setReason] = useState('')
-  return <><DetailTabs section={section} onChange={setSection}><DetailSection channel={channel} section={section} onSection={setSection}/><div hidden={section!=='settings'}><Card title={channel.name}><p>{channel.supplier_name} · {channel.group_name} · {channel.owner.display_name}</p>{channel.suspended_reason && <Notice tone="danger">{channel.suspended_reason}</Notice>}<ul className="group-models">{channel.models.map((m) => <li key={m.group_model_id}><strong className="mono">{m.model_id}</strong><ModelState model={m} /><span>折扣 {m.discount}</span></li>)}</ul></Card><Card title="渠道治理"><form onSubmit={(e) => { e.preventDefault(); action.mutate({ action: 'moderate', revision: channel.revision, reason: channel.status === 'suspended' ? '' : reason }) }}>{channel.status !== 'suspended' && <TextareaField label="下架原因" value={reason} required maxLength={1000} onChange={(e) => setReason(e.target.value)} />}<InlineError>{action.isError ? errorMessage(action.error, '操作失败') : ''}</InlineError><Button type="submit" loading={action.isPending} variant={channel.status === 'suspended' ? 'primary' : 'danger'}>{channel.status === 'suspended' ? '恢复上架' : '下架渠道'}</Button></form></Card></div></DetailTabs></>
+  return <><DetailTabs section={section} onChange={setSection}><DetailSection channel={channel} section={section} onSection={setSection}/><div hidden={section!=='settings'}><Card title={channel.name}><p>{channel.supplier_name} · {channel.group_name} · {channel.owner.display_name}</p><details><summary>当前生效配置</summary><ol>{channel.selected_address_ids.map(id=>{const address=channel.addresses.find(a=>a.id===id);return address&&<li key={id}>{address.label} · <span className="mono">{address.url}</span></li>})}</ol><dl className="call-detail-grid"><div><dt>User-Agent</dt><dd>{channel.effective.user_agent??'平台默认'}</dd></div>{numericFields.map(({key,label})=><div key={key}><dt>{label}</dt><dd>{channel.effective[key]??sourceNames[channel.sources[key]]??'继承'}</dd></div>)}</dl></details>{channel.suspended_reason && <Notice tone="danger">{channel.suspended_reason}</Notice>}<ul className="group-models">{channel.models.map((m) => <li key={m.group_model_id}><strong className="mono">{m.model_id}</strong><ModelState model={m} /><span>折扣 {m.discount}</span></li>)}</ul></Card><Card title="渠道治理"><form onSubmit={(e) => { e.preventDefault(); action.mutate({ action: 'moderate', revision: channel.revision, reason: channel.status === 'suspended' ? '' : reason },{onSuccess:()=>setReason('')}) }}>{channel.status !== 'suspended' && <TextareaField label="下架原因" value={reason} required maxLength={1000} onChange={(e) => setReason(e.target.value)} />}<InlineError>{action.isError ? errorMessage(action.error, '操作失败') : ''}</InlineError><Button type="submit" loading={action.isPending} variant={channel.status === 'suspended' ? 'primary' : 'danger'}>{channel.status === 'suspended' ? '恢复上架' : '下架渠道'}</Button></form></Card></div></DetailTabs></>
 }
-export function AdminGroupChannelPage() { const { id = '' } = useParams(); const detail = useGroupChannel(id, true); return <><PageHeader title="分组渠道治理" back={{ to: '/admin/group-channels', label: '分组渠道' }} /><QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Governance key={`${channel.id}/${channel.status}`} channel={channel} />}</QueryBoundary></> }
+export function AdminGroupChannelPage() { const { id = '' } = useParams(); const detail = useGroupChannel(id, true); return <><PageHeader title="分组渠道治理" back={{ to: '/admin/group-channels', label: '分组渠道' }} /><QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Governance key={channel.id} channel={channel} />}</QueryBoundary></> }

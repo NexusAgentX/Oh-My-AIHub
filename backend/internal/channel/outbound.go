@@ -363,7 +363,7 @@ func BuildEndpoint(baseURL string, format Format, upstreamModelID string, stream
 	if err != nil {
 		return nil, ErrInvalidInput
 	}
-	var suffix string
+	var suffix, rawSuffix string
 	switch format {
 	case FormatOpenAIChat:
 		suffix = "/v1/chat/completions"
@@ -379,11 +379,16 @@ func BuildEndpoint(baseURL string, format Format, upstreamModelID string, stream
 			operation = ":streamGenerateContent"
 		}
 		suffix = "/v1beta/models/" + upstreamModelID + operation
+		rawSuffix = "/v1beta/models/" + url.PathEscape(upstreamModelID) + operation
 	default:
 		return nil, ErrInvalidInput
 	}
+	escapedBase := strings.TrimSuffix(base.EscapedPath(), "/")
 	base.Path = strings.TrimSuffix(base.Path, "/") + suffix
 	base.RawPath = ""
+	if rawSuffix != "" {
+		base.RawPath = escapedBase + rawSuffix
+	}
 	return base, nil
 }
 

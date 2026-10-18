@@ -391,7 +391,7 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 					}
 				}
 			}
-			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential, Evidence: evidence, VerifiedCapacity: capacity}})
+			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, ConfigRevision: r.Revision, CredentialRevision: r.CredentialRevision, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential, Evidence: evidence, VerifiedCapacity: capacity}})
 		}
 		sort.Slice(v.Models, func(i, j int) bool { return v.Models[i].ModelID < v.Models[j].ModelID })
 		if v.Available && !slices.ContainsFunc(v.Models, func(m ModelView) bool {

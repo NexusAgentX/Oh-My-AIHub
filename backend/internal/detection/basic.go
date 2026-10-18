@@ -75,5 +75,8 @@ func ValidateBasicReply(protocol string, body []byte) bool {
 		return true
 	}
 	r := parseNative(protocol, o)
-	return r.Structure && (r.Text != "" || r.Images > 0 || r.Reasoning && r.Usage.Reliable && r.Usage.Output > 0)
+	// A small probe may spend its output budget entirely on hidden reasoning.
+	// A valid native completion with reliable generated-token usage still
+	// proves Key callability; it does not prove any reasoning capability.
+	return r.Structure && (r.Text != "" || r.Images > 0 || r.Usage.Reliable && r.Usage.Output > 0)
 }

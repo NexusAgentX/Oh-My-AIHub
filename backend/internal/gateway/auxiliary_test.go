@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
@@ -12,7 +13,7 @@ import (
 func TestAuxiliaryUsesContextAllCapabilitiesAndExplicitFallback(t *testing.T) {
 	records := []CandidateRecord{}
 	for _, id := range []string{"b", "a"} {
-		records = append(records, CandidateRecord{ModelID: "model", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: Candidate{ChannelID: id, GroupID: "g", CredentialScope: "credential", Quotes: &quotepricing.Book{}, Evidence: map[string]bool{"upstream_protocol/history": true}}})
+		records = append(records, CandidateRecord{ModelID: "model", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: Candidate{ChannelID: id, GroupID: "g", GroupModelID: "offering", CredentialScope: "credential", Quotes: &quotepricing.Book{GroupID: "g", Offers: map[string]quotepricing.Offer{"model": {ModelID: "model", Quote: market.Quote{ID: "quote", GroupModelID: "offering"}}}}, Evidence: map[string]bool{"upstream_protocol/history": true}}})
 	}
 	in := AuxiliarySelection{Format: channel.FormatOpenAIResponses, Preference: routing.Default(""), Required: []CapabilityRequirement{{Layer: "upstream_protocol", ID: "history"}}}
 	out, err := SelectAuxiliary(records, in)

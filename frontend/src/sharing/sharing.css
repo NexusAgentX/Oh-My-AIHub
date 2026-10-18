@@ -64,3 +64,5 @@
 .quality-bar-track i { display: block; width: 100%; background: var(--mustard); }
 .quality-bars > span[data-active='true'] .quality-bar-track { outline: var(--stroke) solid var(--ink); outline-offset: calc(-1 * var(--stroke)); }
 .quality-bar-label { min-height: var(--space-4); font-size: var(--text-xs); white-space: nowrap; text-align: left; }
+
+@media (max-width: 767px) { .sharing-nav { flex-wrap: wrap; gap: var(--space-1); overflow: visible; } .sharing-nav a { padding-inline: var(--space-3); } }

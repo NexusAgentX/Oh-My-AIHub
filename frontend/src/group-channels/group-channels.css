@@ -15,3 +15,5 @@
 .group-probe-results { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); }
 .group-header-editor { padding-top: var(--space-3); }
 @media (max-width: 640px) { .group-models > li { grid-template-columns: minmax(0, 1fr); } .group-addresses > li { flex-wrap: wrap; } .group-address-order { margin-left: auto; } }
+
+.group-advanced-fields { display: grid; gap: var(--space-4); }

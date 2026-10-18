@@ -53,10 +53,12 @@ type KeyAuth struct {
 // Candidate is one channel offering the requested model in the requested
 // format.
 type Candidate struct {
-	GroupID         string
-	GroupModelID    string
-	CredentialScope string
-	Entrances       []Entrance
+	GroupID            string
+	GroupModelID       string
+	CredentialScope    string
+	ConfigRevision     int64
+	CredentialRevision int64
+	Entrances          []Entrance
 	// Evidence is compiled from current approved reports off the request path.
 	// Keys are proof-layer + "/" + independent capability ID.
 	Evidence         map[string]bool

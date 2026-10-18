@@ -74,7 +74,7 @@ type UpdateInput struct {
 	Status                     *channel.Status
 	AddressIDs                 *[]string
 	Overrides                  *market.Defaults
-	Models                     *[]Choice // nil preserves choices; [] restores defaults, not probe data
+	Models                     *[]Choice // nil preserves; nonempty upserts; [] resets choices, not probe data
 }
 type Mutation struct {
 	Record            Record

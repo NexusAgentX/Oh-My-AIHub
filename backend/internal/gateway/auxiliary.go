@@ -49,7 +49,7 @@ func SelectAuxiliary(records []CandidateRecord, in AuxiliarySelection) ([]Candid
 	seen := map[string]bool{}
 	for _, r := range records {
 		c := r.Candidate
-		if seen[c.ChannelID] || c.GroupID == "" || c.Quotes == nil || !slices.Contains(r.Formats, in.Format) || in.ModelID != "" && r.ModelID != in.ModelID || len(in.AllowedModels) > 0 && !slices.Contains(in.AllowedModels, r.ModelID) || slices.Contains(in.Preference.Excluded, c.ChannelID) {
+		if seen[c.ChannelID] || c.GroupID == "" || c.Quotes == nil || !c.ValidOffering(r.ModelID) || !slices.Contains(r.Formats, in.Format) || in.ModelID != "" && r.ModelID != in.ModelID || len(in.AllowedModels) > 0 && !slices.Contains(in.AllowedModels, r.ModelID) || slices.Contains(in.Preference.Excluded, c.ChannelID) {
 			continue
 		}
 		if in.Preference.Mode == routing.ModeManual && !slices.Contains(in.Preference.Order, c.ChannelID) {

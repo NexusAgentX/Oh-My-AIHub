@@ -5242,7 +5242,10 @@ export interface components {
             models?: components["schemas"]["GroupChannelChoice"][];
         };
         GroupChannelUpdate: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 更换分组时必须同时填写该分组 Key，清除原组模型选择；省略地址时预选新组当前首地址。
+             */
             group_id?: string;
             api_key?: string;
             name?: string;
@@ -5250,7 +5253,9 @@ export interface components {
             description?: string;
             /** @description 省略则选择当前第一个地址；顺序即回退顺序，新增地址不自动加入。 */
             address_ids?: string[];
+            /** @description 覆盖块整块替换，字段省略或 null 继承当前默认值；header_rules 为 null 时继承，为空对象时明确空规则。 */
             overrides?: components["schemas"]["GroupChannelOverrides"];
+            /** @description 省略保留选择；非空仅更新提交的模型；空数组明确重置所有选择。探针不改排除项。 */
             models?: components["schemas"]["GroupChannelChoice"][];
             revision: number;
             /** @enum {string} */

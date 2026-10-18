@@ -37,13 +37,15 @@ func TestEngineUsesOrderedEntrancesWithOneChannelSlotAndGlobalAttemptLimit(t *te
 		status    int
 		stream    bool
 		cooldownA bool
+		occupiedA bool
 	}{
-		{"address then channel", []int{500, 502, 200}, 3, []string{"a1", "a2", "b1"}, 200, false, true},
-		{"same engine recovers", []int{500, 200, 200}, 3, []string{"a1", "a2"}, 200, false, false},
-		{"global budget stops before B slot", []int{500, 502, 200}, 2, []string{"a1", "a2"}, 502, false, true},
-		{"request error is final", []int{400, 200, 200}, 3, []string{"a1"}, 400, false, false},
-		{"rate limit cools whole channel", []int{429, 200, 200}, 3, []string{"a1", "b1"}, 200, false, true},
-		{"output already delivered", []int{200, 200, 200}, 3, []string{"a1"}, 200, true, false},
+		{"address then channel", []int{500, 502, 200}, 3, []string{"a1", "a2", "b1"}, 200, false, true, false},
+		{"same engine recovers", []int{500, 200, 200}, 3, []string{"a1", "a2"}, 200, false, false, false},
+		{"global budget stops before B slot", []int{500, 502, 200}, 2, []string{"a1", "a2"}, 502, false, true, false},
+		{"request error is final", []int{400, 200, 200}, 3, []string{"a1"}, 400, false, false, false},
+		{"rate limit cools whole channel", []int{429, 200, 200}, 3, []string{"a1", "b1"}, 200, false, true, false},
+		{"output already delivered", []int{200, 200, 200}, 3, []string{"a1"}, 200, true, false, false},
+		{"occupied channel skips all its entrances", []int{200, 200, 200}, 1, []string{"b1"}, 200, false, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var mu sync.Mutex
@@ -94,6 +96,9 @@ func TestEngineUsesOrderedEntrancesWithOneChannelSlotAndGlobalAttemptLimit(t *te
 			one := int32(1)
 			store := &entranceStore{candidates: []Candidate{{ChannelID: "a", OwnerID: "provider", BaseURL: up.URL + "/ignored", UpstreamModel: "native", Credential: run.seal("a", "synthetic-a-key"), MultiplierNano: ledger.UnitRate, Advanced: channel.Advanced{ConcurrencyLimit: &one, RPMLimit: &one}, Entrances: []Entrance{{ID: "a1", BaseURL: up.URL + "/a1"}, {ID: "a2", BaseURL: up.URL + "/a2"}}}, {ChannelID: "b", OwnerID: "provider", BaseURL: up.URL + "/b1", UpstreamModel: "native", Credential: run.seal("b", "synthetic-b-key"), MultiplierNano: ledger.UnitRate, Advanced: channel.Advanced{ConcurrencyLimit: &one, RPMLimit: &one}, Entrances: []Entrance{{ID: "b1", BaseURL: up.URL + "/b1"}}}}}
 			engine.Store, engine.Keyring = store, run.keyring
+			if tc.occupiedA {
+				defer engine.Runtime.RestoreInflight("a")()
+			}
 			engine.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: int32(tc.budget), DefaultCooldownFailures: 1, DefaultCooldownSeconds: 60}, outbound: fakeOutbound{transport: http.DefaultTransport}})
 			body := `{"model":"gpt-test"}`
 			if tc.stream {
@@ -133,7 +138,11 @@ func TestEngineUsesOrderedEntrancesWithOneChannelSlotAndGlobalAttemptLimit(t *te
 			b := engine.Runtime.state("b")
 			aRPM, bRPM, inflight := len(a.requests), len(b.requests), a.inflight+b.inflight
 			engine.Runtime.mutex.Unlock()
-			if aRPM != 1 || inflight != 0 || bRPM != map[bool]int{true: 1, false: 0}[slices.Contains(tc.want, "b1")] {
+			wantARPM, wantInflight := 1, 0
+			if tc.occupiedA {
+				wantARPM, wantInflight = 0, 1
+			}
+			if aRPM != wantARPM || inflight != wantInflight || bRPM != map[bool]int{true: 1, false: 0}[slices.Contains(tc.want, "b1")] {
 				t.Fatalf("address count amplified admission: a=%d b=%d inflight=%d", aRPM, bRPM, inflight)
 			}
 			if cooling := !engine.Runtime.CooldownUntil("a", time.Now()).IsZero(); cooling != tc.cooldownA {
@@ -148,6 +157,87 @@ func TestEngineUsesOrderedEntrancesWithOneChannelSlotAndGlobalAttemptLimit(t *te
 			}
 			if tc.stream && !strings.Contains(w.Body.String(), "visible") {
 				t.Fatal("stream output lost")
+			}
+		})
+	}
+}
+
+func TestEntranceTimeoutAndCancellationUseOneCallDeadline(t *testing.T) {
+	for _, kind := range []string{"address_ttft", "call_deadline", "client_cancel"} {
+		t.Run(kind, func(t *testing.T) {
+			entered := make(chan struct{})
+			var mu sync.Mutex
+			seen := []string{}
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.Copy(io.Discard, r.Body)
+				name := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/"), "/v1/chat/completions")
+				mu.Lock()
+				seen = append(seen, name)
+				mu.Unlock()
+				if name == "a1" {
+					close(entered)
+					<-r.Context().Done()
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, entranceJSON)
+			}))
+			defer up.Close()
+			run := newCredentialRun(t, 200)
+			fixture := newServeFixture(t, 10, defaultRouting{})
+			e := fixture.engine
+			store := &entranceStore{candidates: []Candidate{{ChannelID: "a", OwnerID: "provider", Name: "A", Credential: run.seal("a", "synthetic-key"), MultiplierNano: ledger.UnitRate, Entrances: []Entrance{{ID: "a1", BaseURL: up.URL + "/a1"}, {ID: "a2", BaseURL: up.URL + "/a2"}}}}}
+			e.Store, e.Keyring = store, run.keyring
+			e.CallTimeLimit = time.Second
+			firstByte := int32(20)
+			if kind != "address_ttft" {
+				firstByte = 500
+			}
+			if kind == "call_deadline" {
+				e.CallTimeLimit = 40 * time.Millisecond
+			}
+			e.settingsSnap.Store(&settingsSnapshot{value: settings.Settings{DefaultMaxAttempts: 3, DefaultTTFTTimeoutMS: firstByte, DefaultCooldownFailures: 1, DefaultCooldownSeconds: 60}, outbound: fakeOutbound{transport: http.DefaultTransport}})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"gpt-test","stream":true}`)).WithContext(ctx)
+			r.Header.Set("Authorization", "Bearer "+apikey.Prefix+"synthetic")
+			w := httptest.NewRecorder()
+			done := make(chan struct{})
+			go func() { e.Serve(w, r, channel.FormatOpenAIChat, "", true); close(done) }()
+			select {
+			case <-entered:
+			case <-time.After(2 * time.Second):
+				t.Fatal("first entrance not reached")
+			}
+			if kind == "client_cancel" {
+				cancel()
+			}
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("call did not finish within its original budget")
+			}
+			mu.Lock()
+			actual := slices.Clone(seen)
+			mu.Unlock()
+			want := []string{"a1"}
+			if kind == "address_ttft" {
+				want = append(want, "a2")
+			}
+			if !slices.Equal(actual, want) {
+				t.Fatal("timeout/cancel changed entrance retry boundary", actual)
+			}
+			if len(store.finished) != 1 {
+				t.Fatal("call did not settle")
+			}
+			if kind == "address_ttft" && w.Code != 200 {
+				t.Fatal(w.Code, w.Body.String())
+			}
+			e.Runtime.mutex.Lock()
+			inflight := e.Runtime.state("a").inflight
+			e.Runtime.mutex.Unlock()
+			if inflight != 0 {
+				t.Fatal("channel slot leaked")
 			}
 		})
 	}
