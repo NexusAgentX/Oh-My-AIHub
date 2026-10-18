@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import type { ApiKeyDetail } from '../api/types'
-import { useModels } from '../models/queries'
+import { useMarketNames } from '../market/queries'
 import {
   Button,
   ConfirmDialog,
@@ -34,7 +34,7 @@ import { KeyRoutingSection } from './KeyRouting'
 function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form: KeyForm) => void }) {
   const [search, setSearch] = useState('')
   const [selectedOnly, setSelectedOnly] = useState(false)
-  const models = useModels()
+  const models = useMarketNames()
   const catalog = models.data?.items.map((model) => model.id) ?? []
   const modelSuggestions = catalog.map((model) => ({ value: model }))
   const set = (patch: Partial<KeyForm>) => onChange({ ...form, ...patch })

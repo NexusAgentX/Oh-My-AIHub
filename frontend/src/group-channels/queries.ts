@@ -20,7 +20,7 @@ export function useGroupSources() {
 }
 export function useSaveGroupChannel(id?: string) {
   const client = useQueryClient()
-  return useMutation({ mutationFn: (body: ChannelCreate | ChannelUpdate) => id ? apiSend<'updateGroupChannel'>('PATCH', `/api/group-channels/${id}`, body as ChannelUpdate) : apiSend<'createGroupChannel'>('POST', '/api/group-channels', body as ChannelCreate), onSuccess: async (data) => { client.setQueryData(['group-channels', 'detail', data.id, false], data); await client.invalidateQueries({ queryKey: ['group-channels'] }) } })
+  return useMutation({ mutationFn: (body: ChannelCreate | ChannelUpdate) => id ? apiSend<'updateGroupChannel'>('PATCH', `/api/group-channels/${id}`, body as ChannelUpdate) : apiSend<'createGroupChannel'>('POST', '/api/group-channels', body as ChannelCreate), onSuccess: async (data) => { client.setQueryData(['group-channels', 'detail', data.id, false], data); await Promise.all([client.invalidateQueries({ queryKey: ['group-channels'] }),client.invalidateQueries({queryKey:['market']})]) } })
 }
 export function useGroupAction(id: string) {
   const client = useQueryClient()
@@ -28,7 +28,7 @@ export function useGroupAction(id: string) {
     if (value.action === 'delete') return apiSend<'deleteGroupChannel'>('DELETE', `/api/group-channels/${id}`, { revision: value.revision })
     if (value.action === 'test') return apiSend<'retestGroupChannel'>('POST', `/api/group-channels/${id}/test`, { revision: value.revision })
     return apiSend<'moderateGroupChannel'>('POST', `/api/admin/group-channels/${id}/moderate`, { reason: value.reason ?? '' })
-  }, onSuccess: () => client.invalidateQueries({ queryKey: ['group-channels'] }) })
+  }, onSuccess: () => Promise.all([client.invalidateQueries({ queryKey: ['group-channels'] }),client.invalidateQueries({queryKey:['market']})]) })
 }
 
 export function useGroupEvents(id: string) {

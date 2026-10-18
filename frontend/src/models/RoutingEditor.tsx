@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelChannel, RoutingMode } from '../api/types'
+import type {components} from '../api/schema.gen'
 import { FormatTags, routingModeLabels } from '../calls'
 import { formatPoints } from '../money/format'
 import { RoutingMetrics } from './RoutingMetrics'
@@ -22,6 +23,7 @@ const modeOptions = (Object.keys(routingModeLabels) as RoutingMode[]).map((key) 
   key,
   label: routingModeLabels[key],
 }))
+type RoutingChannel=Pick<ModelChannel,'id'|'name'|'is_mine'|'formats'|'multiplier'|'state'|'cooldown_remaining_seconds'|'routing_metrics'>&Partial<Pick<ModelChannel,'owner'|'effective_multiplier'|'fx_discount'|'current_prices'>>&{typical_price?:components['schemas']['MarketBrowsePrice']|null}
 
 function parseOptionalInt(value: string) {
   if (value.trim() === '') return null
@@ -39,7 +41,7 @@ export function RoutingEditor({
   onChange,
   scopeHint,
 }: {
-  channels: ModelChannel[]
+  channels: RoutingChannel[]
   draft: RoutingDraft
   onChange: (draft: RoutingDraft) => void
   scopeHint?: string
@@ -52,7 +54,7 @@ export function RoutingEditor({
   const manual = draft.mode === 'manual'
   const rows = orderedChannels(channels, draft)
 
-  const onHandleKey = (event: KeyboardEvent, channel: ModelChannel) => {
+  const onHandleKey = (event: KeyboardEvent, channel: RoutingChannel) => {
     const delta = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
     if (!delta) return
     event.preventDefault()
@@ -65,7 +67,7 @@ export function RoutingEditor({
       document.querySelector<HTMLButtonElement>(`[data-handle="${channel.id}"]`)?.focus()
     })
   }
-  const onDrop = (event: DragEvent, target: ModelChannel) => {
+  const onDrop = (event: DragEvent, target: RoutingChannel) => {
     event.preventDefault()
     if (!dragging || dragging === target.id) return
     onChange({ ...draft, order: moveTo(draft.order, dragging, draft.order.indexOf(target.id)) })
@@ -125,7 +127,7 @@ export function RoutingEditor({
                 <div className="routing-name">
                   <Link draggable={false} to={`/channel-hall/${channel.id}`}>{channel.name}</Link>
                   <span className="routing-owner muted-copy">
-                    {channel.is_mine ? '由你提供' : `由 ${channel.owner.display_name} 提供`}
+                    {channel.is_mine ? '由你提供' : channel.owner ? `由 ${channel.owner.display_name} 提供` : '共享渠道'}
                   </span>
                   <span className="routing-badges">
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
@@ -135,7 +137,7 @@ export function RoutingEditor({
                 </div>
                 <dl className="routing-metrics">
                   <div>
-                    <dt>倍率</dt>
+                    <dt>{channel.typical_price === undefined ? '倍率' : '分组报价折扣'}</dt>
                     <dd>
                       <MultiplierText
                         effective={channel.effective_multiplier}
@@ -145,9 +147,9 @@ export function RoutingEditor({
                     </dd>
                   </div>
                   <div>
-                    <dt>现价 入/出</dt>
+                    <dt>{channel.current_prices ? '现价 入/出' : '典型费用'}</dt>
                     <dd>
-                      {formatPoints(channel.current_prices.input, { digits: 2 })} / {formatPoints(channel.current_prices.output, { digits: 2 })}
+                      {channel.current_prices ? `${formatPoints(channel.current_prices.input, { digits: 2 })} / ${formatPoints(channel.current_prices.output, { digits: 2 })}` : channel.typical_price?.self_net_zero ? '站内净支付 0' : channel.typical_price ? `${channel.typical_price.amount} 积分 / ${channel.typical_price.quantity} ${channel.typical_price.unit}` : '未知'}
                     </dd>
                   </div>
                 </dl>

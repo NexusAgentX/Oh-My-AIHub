@@ -52,7 +52,7 @@ export type MobileTab = {
 export const mobileTabs: MobileTab[] = [
   { label: '首页', to: '/home', icon: 'home' },
   { label: '模型', to: '/models', icon: 'store' },
-  { label: '渠道', to: '/channel-hall', icon: 'server', also: ['/channels', '/suppliers'] },
+  { label: '渠道', to: '/channel-hall', icon: 'server', also: ['/channels', '/suppliers', '/groups', '/reports'] },
   { label: '积分', to: '/points', icon: 'wallet' },
   { label: '我的', to: '/me', icon: 'account', also: ['/keys', '/usage', '/account', '/forum', '/detection','/contributions'] },
 ]

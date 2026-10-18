@@ -68,12 +68,23 @@ func (a *app) registerGatewayRoutes(r *router) {
 	})
 	r.implement("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
 	r.implement("B", "GET /v1beta/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, true) })
+	r.implement("499", "GET /v1/models/{model}", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) {
+		a.gateway.GetModel(w, req, req.PathValue("model"), false)
+	})
+	r.implement("499", "GET /v1beta/models/{model}", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) {
+		a.gateway.GetModel(w, req, req.PathValue("model"), true)
+	})
 	existing := map[string]bool{"chat.create": true, "responses.create": true, "responses.get": true, "responses.cancel": true, "messages.create": true, "gemini.generateContent": true, "gemini.streamGenerateContent": true, "gemini.countTokens": true}
+	a.gatewayEndpoints = map[string]bool{"models.openai.list": true, "models.openai.get": true, "models.anthropic.list": true, "models.anthropic.get": true, "models.gemini.list": true, "models.gemini.get": true, "models.gemini.v1.list": true}
+	for id := range existing {
+		a.gatewayEndpoints[id] = true
+	}
 	for _, endpoint := range manifest.Endpoints {
 		if endpoint.Feature == "F8" {
 			handler := a.gateway.CodexHandler(endpoint)
 			if handler != nil {
 				r.implement("497", endpoint.Method+" "+endpoint.Path, accessGatewayKey, handler)
+				a.gatewayEndpoints[endpoint.ID] = true
 			}
 			continue
 		}
@@ -88,6 +99,7 @@ func (a *app) registerGatewayRoutes(r *router) {
 			handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeAuxiliary(w, req, endpoint) }
 		}
 		r.implement("495", endpoint.Method+" "+path, accessGatewayKey, handler)
+		a.gatewayEndpoints[endpoint.ID] = true
 	}
 	r.mux.HandleFunc("/v1/", unsupportedEndpoint)
 	r.mux.HandleFunc("/v1beta/", unsupportedEndpoint)

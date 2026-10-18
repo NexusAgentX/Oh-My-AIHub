@@ -30,7 +30,7 @@ function SettingsEditor({ value }: { value: TypicalConfig }) {
   </form></Card>
 }
 export function EstimateCard({ item }: { item: TypicalEstimate }) {
-  const unit = item.unit === 'successful_images' ? '张成功图片' : 'tokens'
+  const unit = ({successful_images:'张成功图片',requests:'次请求',tokens:'tokens'})[item.unit] ?? item.unit
   const name = item.level === 'channel' ? item.channel_name : item.level === 'group' ? item.group_name : '站内整体'
   return <Card title={`${name || (item.level === 'channel' ? '渠道' : '分组')} · ${item.model_id}`}>
     {item.supplier_name && <p className="muted-copy">{item.supplier_name}</p>}

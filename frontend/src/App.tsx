@@ -1,4 +1,4 @@
-import { ChannelHallPage, HallChannelPage, SuppliersPage, SupplierDetailPage } from './sharing/Pages'
+import { MarketHallPage, MarketHallChannelPage } from './market/Hall'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import {
@@ -16,15 +16,11 @@ import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { AccountPage } from './account/AccountPage'
 import { MePage } from './account/MePage'
-import { ChannelEditorPage } from './channels/ChannelEditorPage'
-import { ChannelsPage } from './channels/ChannelsPage'
 import { HomePage } from './home/HomePage'
 import { UsagePage } from './usage/UsagePage'
 import { PointsPage } from './points/PointsPage'
 import { TradeDetailPage } from './points/TradeDetailPage'
 import { KeysPage } from './keys/KeysPage'
-import { ModelDetailPage } from './models/ModelDetailPage'
-import { ModelsPage } from './models/ModelsPage'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
 import { RouteErrorPage } from './layouts/RouteErrorPage'
@@ -92,24 +88,23 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireReadyAccount />}>
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
-          <Route element={<ModelsPage />} path="/models" />
-          <Route element={<ModelDetailPage />} path="/models/:model" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelsPage})} path="/models" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelDetailPage})} path="/models/:model" />
           <Route element={<KeysPage />} path="/keys" />
-          <Route element={<ChannelHallPage />} path="/channel-hall" />
-          <Route element={<HallChannelPage />} path="/channel-hall/:id" />
-          <Route element={<SuppliersPage />} path="/suppliers" />
-          <Route element={<SupplierDetailPage />} path="/suppliers/:id" />
-          <Route element={<ChannelsPage />} path="/channels" />
- <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/group-channels" />
- <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/group-channels/new" />
- <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/group-channels/:id" />
+          <Route element={<MarketHallPage />} path="/channel-hall" />
+          <Route element={<MarketHallChannelPage />} path="/channel-hall/:id" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSuppliersPage})} path="/suppliers" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSupplierDetailPage})} path="/suppliers/:id" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketGroupPage})} path="/groups/:id" />
+          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketReportPage})} path="/reports/:id" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/channels" />
  <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionsPage})} path="/contributions"/>
  <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionDetailPage})} path="/contributions/:draftID"/>
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/detection" />
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionDetailPage})} path="/detection/:taskID" />
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).SavedDetectionReportPage})} path="/detection/reports/:reportID" />
-          <Route element={<ChannelEditorPage />} path="/channels/new" />
-          <Route element={<ChannelEditorPage />} path="/channels/:id" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/new" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/:id" />
           <Route element={<PointsPage />} path="/points" />
           <Route element={<TradeDetailPage />} path="/points/trades/:id" />
           <Route element={<UsagePage />} path="/usage" />

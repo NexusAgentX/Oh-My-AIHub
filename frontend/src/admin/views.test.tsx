@@ -373,7 +373,7 @@ describe('overview indicators', () => {
 
 describe('admin shell', () => {
   it('uses one icon per item and four mobile tabs', () => {
-    expect(adminNavigation.map((item) => item.label)).toEqual(['概览', '调用', '积分', '用户', '模型', '供应商', '渠道', '分组渠道', '申诉', '设置', '典型费用', '检测参数', '贡献审核'])
+    expect(adminNavigation.map((item) => item.label)).toEqual(['概览', '调用', '积分', '用户', '模型 ID 治理', '供应商与分组', '渠道', '申诉', '设置', '典型费用', '检测参数', '贡献审核'])
     expect(new Set(adminNavigation.map((item) => item.icon)).size).toBe(adminNavigation.length)
     expect(adminTabCount).toBe(4)
   })
@@ -381,7 +381,7 @@ describe('admin shell', () => {
   it('matches nested admin routes to their navigation item', () => {
     expect(findAdminNavItem('/admin')?.label).toBe('概览')
     expect(findAdminNavItem('/admin/channels/abc')?.label).toBe('渠道')
-    expect(findAdminNavItem('/admin/group-channels/abc')?.label).toBe('分组渠道')
+    expect(findAdminNavItem('/admin/models')?.label).toBe('模型 ID 治理')
     expect(findAdminNavItem('/admin/disputes/abc')?.label).toBe('申诉')
   })
 

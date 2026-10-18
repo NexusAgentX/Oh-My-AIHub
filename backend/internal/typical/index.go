@@ -11,13 +11,21 @@ type costValue struct {
 	cost           money.Amount
 }
 type costIndex struct {
-	fx     int64
-	values map[costKey]costValue
+	fx      int64
+	version string
+	values  map[costKey]costValue
 }
 
 // PriceSnapshot is immutable and obtained once for a routing decision. All
 // candidates then use the same workload denominator and config generation.
 type PriceSnapshot = costIndex
+
+func (index *costIndex) Version() string {
+	if index == nil {
+		return "unknown"
+	}
+	return index.version
+}
 
 func (s *Service) Prices() *PriceSnapshot { return s.prices.Load() }
 
@@ -32,7 +40,7 @@ func (s *Service) install(snap *Snapshot, in Input) {
 	for _, ch := range in.Channels {
 		channels[costKey{ch.ID, ch.ModelID}] = ch
 	}
-	index := &costIndex{fx: in.USDCNYNano, values: map[costKey]costValue{}}
+	index := &costIndex{fx: in.USDCNYNano, version: snap.InputVersion + "/" + snap.UpdatedAt.String(), values: map[costKey]costValue{}}
 	for _, row := range snap.Items {
 		if row.Level != "channel" || row.State != "estimated" || row.Cost == nil {
 			continue

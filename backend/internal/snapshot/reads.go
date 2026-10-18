@@ -60,6 +60,14 @@ func (s gatewayStore) Candidates(ctx context.Context, modelID string, format cha
 	return candidates, nil
 }
 
+func (s gatewayStore) ModelListCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
+	fleet, err := s.c.fleet.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append([]gateway.CandidateRecord{}, fleet.modelLists[format]...), nil
+}
+
 func (s gatewayStore) AuxiliaryCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
 	fleet, err := s.c.fleet.get(ctx)
 	if err != nil {

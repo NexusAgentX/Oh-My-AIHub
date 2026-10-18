@@ -14,18 +14,16 @@ export const adminRoutes = (
     <Route lazy={async () => ({ Component: (await import('./AdminFrame')).AdminFrame })} path="/admin">
       <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"/>
  <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionDetailPage})} path="contributions/:draftID"/>
-      <Route lazy={async()=>({Component:(await import('../group-channels/Pages')).AdminGroupChannelsPage})} path="group-channels" />
- <Route lazy={async()=>({Component:(await import('../group-channels/Pages')).AdminGroupChannelPage})} path="group-channels/:id" />
  <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />
       <Route lazy={async () => ({ Component: (await import('./CallsPage')).CallsPage })} path="calls" />
       <Route lazy={async () => ({ Component: (await import('./PointsPage')).PointsPage })} path="points" />
       <Route lazy={async () => ({ Component: (await import('./UsersPage')).UsersPage })} path="users" />
-      <Route lazy={async () => ({ Component: (await import('./ModelsPage')).ModelsPage })} path="models" />
-      <Route lazy={async () => ({ Component: (await import('./SuppliersPage')).SuppliersPage })} path="suppliers" />
-      <Route lazy={async () => ({ Component: (await import('./ChannelsPage')).ChannelsPage })} path="channels" />
+      <Route path="models" lazy={async()=>({Component:(await import('../market/Admin')).ModelGovernancePage})} />
+      <Route path="suppliers" lazy={async()=>({Component:(await import('../market/Pages')).MarketSuppliersPage})} />
+      <Route lazy={async()=>({Component:(await import('../group-channels/Pages')).AdminGroupChannelsPage})} path="channels" />
       <Route
-        lazy={async () => ({ Component: (await import('./ChannelsPage')).ChannelDetailPage })}
-        path="channels/:channelID"
+        lazy={async () => ({ Component: (await import('../group-channels/Pages')).AdminGroupChannelPage })}
+        path="channels/:id"
       />
       <Route lazy={async () => ({ Component: (await import('./DisputesPage')).DisputesPage })} path="disputes" />
       <Route

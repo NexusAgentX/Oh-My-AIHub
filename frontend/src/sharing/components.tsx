@@ -11,7 +11,7 @@ export type CatalogModel = components['schemas']['CatalogModel']
 
 export function SharingNav() {
   return <nav className="sharing-nav" aria-label="共享栏目">
-    <NavLink to="/channel-hall">渠道大厅</NavLink><NavLink to="/suppliers">供应商</NavLink><NavLink to="/channels">我的渠道</NavLink><NavLink to="/group-channels">分组渠道</NavLink>
+    <NavLink to="/channel-hall">渠道大厅</NavLink><NavLink to="/suppliers">供应商</NavLink><NavLink to="/channels">我的渠道</NavLink>
   </nav>
 }
 export function SupplierIcon({ supplier }: { supplier?: Pick<Supplier, 'name' | 'icon_data'> | null }) {
