@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -278,7 +279,7 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 						output.Body = nil
 						err = ErrBusy
 						attempt.Reason = "body_limit"
-					} else if err == nil && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") && oversizedEvent(output.Body, s.limits.EventBytes) {
+					} else if err == nil && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") && oversizedEvent(output.Body, s.eventLimit(e.ID)) {
 						clear(output.Body)
 						output.Body = nil
 						err = ErrBusy
@@ -307,6 +308,15 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 		return Response{}, saveErr
 	}
 	return output, err
+}
+
+func (s *Session) eventLimit(endpoint string) int {
+	// Native image events carry a whole base64 product. Keep the same bounded
+	// total response limit, rather than applying the smaller text-event limit.
+	if slices.Contains([]string{"images.generations", "images.edits", "codex.images", "codex.images.edit"}, endpoint) {
+		return int(s.limits.ResponseBytes)
+	}
+	return s.limits.EventBytes
 }
 func containsCategory(category string) bool {
 	return category == "generate" || category == "count" || category == "query" || category == "cleanup"

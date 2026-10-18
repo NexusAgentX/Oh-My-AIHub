@@ -577,6 +577,13 @@ func (s *Service) run(ctx context.Context, session *Session, item Planned, compl
 			}
 		}
 	}
+	for _, image := range result.Images {
+		for _, id := range image.AttemptIDs {
+			if !slices.Contains(refs, id) {
+				refs = append(refs, id)
+			}
+		}
+	}
 	if len(refs) > 4096 {
 		return Result{State: "invalid"}
 	}

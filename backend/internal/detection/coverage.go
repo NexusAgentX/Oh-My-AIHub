@@ -59,6 +59,9 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 }
 
 func validObservations(result Result, witnesses map[string]Attempt) bool {
+	if !validImageEvidence(result.Images, witnesses) {
+		return false
+	}
 	if result.Fingerprint != nil && !fingerprint.ValidReport(*result.Fingerprint) {
 		return false
 	}

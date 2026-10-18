@@ -16,6 +16,14 @@ const fingerprint: NonNullable<Result['fingerprint']> = {
 }
 
 describe('detection metadata observations', () => {
+  it('keeps decoded image products separate from unconfirmed quality and missing token usage', () => {
+    const html = renderToStaticMarkup(<DetectionObservations result={{ images: [{ variant: { unit: 'successful_image', size: '256x256', quality: 'high', background: '', service_tier: '' }, transport: 'json', state: 'inconclusive', reason: 'not_observed', requested: 1, returned: 1, verified: 1, products: [{ width: 256, height: 256, format: 'png', transparent: false }], options_confirmed: false, mask_preserved: false, usage_reliable: false, unpriced_tokens: true, attempt_ids: ['synthetic-image-attempt'] }] }} />)
+    expect(html).toContain('按成功图片 · 256x256 · high')
+    expect(html).toContain('256×256 png')
+    expect(html).toContain('1 / 1')
+    expect(html).toContain('未确认')
+    expect(html).toContain('未知 · 不据此按 token 定价')
+  })
   it('keeps declaration, parameter acceptance, measured lower bound and unknown upper separate', () => {
     const html = renderToStaticMarkup(<DetectionObservations result={{ capacity: [capacity] }} />)
     expect(html).toContain('报价声明')

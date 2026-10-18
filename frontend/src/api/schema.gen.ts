@@ -2442,7 +2442,7 @@ export interface components {
         };
         DetectionImageVariant: {
             /** @enum {string} */
-            unit: "request" | "successful_image";
+            unit: "" | "request" | "successful_image";
             size: string;
             quality: string;
             background: string;
@@ -2451,6 +2451,32 @@ export interface components {
         DetectionTestProfile: {
             service_tiers: string[] | null;
             images: components["schemas"]["DetectionImageVariant"][] | null;
+        };
+        DetectionImageProperties: {
+            width: number;
+            height: number;
+            /** @enum {string} */
+            format: "png" | "jpeg";
+            transparent: boolean;
+        };
+        DetectionImageEvidence: {
+            variant: components["schemas"]["DetectionImageVariant"];
+            /** @enum {string} */
+            transport: "json" | "json_url" | "multipart" | "sse";
+            /** @enum {string} */
+            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive" | "unobserved";
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            /** @constant */
+            requested: 1;
+            returned: number;
+            verified: number;
+            products: components["schemas"]["DetectionImageProperties"][];
+            options_confirmed: boolean;
+            mask_preserved: boolean;
+            usage_reliable: boolean;
+            unpriced_tokens: boolean;
+            attempt_ids: string[];
         };
         DetectionCapacityProbe: {
             accepted: boolean;
@@ -2612,6 +2638,7 @@ export interface components {
             finished_at: string;
             capacity?: components["schemas"]["DetectionCapacityReport"][];
             fingerprint?: components["schemas"]["DetectionFingerprintReport"];
+            images?: components["schemas"]["DetectionImageEvidence"][];
         };
         DetectionPlanned: {
             credential_dependent: boolean;

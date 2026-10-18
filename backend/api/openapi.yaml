@@ -7004,6 +7004,7 @@ components:
           "unit": {
             "type": "string",
             "enum": [
+              "",
               "request",
               "successful_image"
             ]
@@ -7068,6 +7069,150 @@ components:
           "images"
         ],
         "additionalProperties": false
+      }
+    DetectionImageProperties:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg"
+            ]
+          },
+          "transparent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "format",
+          "transparent"
+        ]
+      }
+    DetectionImageEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "variant": {
+            "$ref": "#/components/schemas/DetectionImageVariant"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "json",
+              "json_url",
+              "multipart",
+              "sse"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive",
+              "unobserved"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "requested": {
+            "type": "integer",
+            "const": 1
+          },
+          "returned": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "verified": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32
+          },
+          "products": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/DetectionImageProperties"
+            }
+          },
+          "options_confirmed": {
+            "type": "boolean"
+          },
+          "mask_preserved": {
+            "type": "boolean"
+          },
+          "usage_reliable": {
+            "type": "boolean"
+          },
+          "unpriced_tokens": {
+            "type": "boolean"
+          },
+          "attempt_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "variant",
+          "transport",
+          "state",
+          "reason",
+          "requested",
+          "returned",
+          "verified",
+          "products",
+          "options_confirmed",
+          "mask_preserved",
+          "usage_reliable",
+          "unpriced_tokens",
+          "attempt_ids"
+        ]
       }
     DetectionCapacityProbe:
       {
@@ -7927,6 +8072,13 @@ components:
           },
           "fingerprint": {
             "$ref": "#/components/schemas/DetectionFingerprintReport"
+          },
+          "images": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/components/schemas/DetectionImageEvidence"
+            }
           }
         },
         "required": [
@@ -12411,7 +12563,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.9",
+    "version": "2026-10-18.10",
     "stage": "discovery",
     "sources": [
       {
@@ -12478,6 +12630,21 @@ x-aihub-gateway-contract:
         "id": "gemini-generate-content-audio",
         "url": "https://ai.google.dev/gemini-api/docs/generate-content/speech-generation",
         "version": "GenerateContent-v1beta-profile-2026-10-18"
+      },
+      {
+        "id": "openai-image-generation",
+        "url": "https://developers.openai.com/api/reference/resources/images/methods/generate",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-image-edit",
+        "url": "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "version": "official-docs-2026-10-18"
+      },
+      {
+        "id": "openai-image-variation",
+        "url": "https://developers.openai.com/api/reference/python/resources/images/methods/create_variation",
+        "version": "retired-native-compatibility-profile"
       }
     ],
     "endpoints": [
@@ -15246,7 +15413,8 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_sse_lifecycle"
             ],
             "credential_dependent": true
           },
@@ -15262,7 +15430,11 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_sse_lifecycle",
+              "native_multipart",
+              "inline_url_mask_multiple_images",
+              "masked_edit_preserves_unmasked_region"
             ],
             "credential_dependent": false
           },
@@ -15278,7 +15450,8 @@ x-aihub-gateway-contract:
               "native_json_or_multipart",
               "each_enabled_pricing_unit",
               "actual_product_count",
-              "reliable_usage_or_unpriced"
+              "reliable_usage_or_unpriced",
+              "native_multipart"
             ],
             "credential_dependent": false
           }
@@ -15888,6 +16061,7 @@ x-aihub-gateway-contract:
       "detection/group-negative-prerequisite": "分组基础负例先复用同一凭据/协议的有界模型目录，从实际返回的模型 ID 构造合法基础体，再分别执行无效/缺失鉴权、随机未知模型和无效 JSON。模型元数据仅作请求构造和元数据结构证据，不提升为容量支持；Gemini 多候选额外使用其原生流式端点。",
       "detection/native-multimodal-fixtures": "多模态探测仅使用固定提交和 SHA-256 校验的自有合成资源，URL 使用无答案提示的文件名。图片以左右色块及双图次序核验；PDF 以两页独立代码核验。Chat 官方协议不支持文件 URL，故其 M06 只测原生 file_data；不虚构 file_url 或转入 Files API。Messages PDF citations 启用后核验 document_index 与 1 起始、右端不含的页范围及真实引用；其他协议可选引用只在观测时验证，不补独立文件授权。",
       "openai-responses/M04": "保留原 M04 作为明确命名的供应商扩展 input_audio/data/format 探测，不伪称 OpenAI Responses 官方音频协议。官方文档当前将这种音频会话形态放在 Chat Completions，Responses 创建参考中也没有 input_audio/output_audio。按扩展实际返回/内容识别/用量如实报告，不用 Chat 成功代证 Responses，不新增独立 Audio、Realtime 或 WS 端点，不做协议转换。",
-      "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。"
+      "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
+      "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。"
     }
   }

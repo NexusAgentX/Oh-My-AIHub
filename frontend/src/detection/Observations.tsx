@@ -66,6 +66,23 @@ function FingerprintEvidence({ report }: { report: NonNullable<Result['fingerpri
   </section>
 }
 
-export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'> }) {
-  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}</>
+function ImageEvidence({ reports }: { reports: NonNullable<Result['images']> }) {
+  const [page, setPage] = useState(0)
+  const size = 20
+  return <section className="detection-observation">
+    <h3>图片产物与计价条件</h3>
+    <DataTable caption="图片检测证据" rows={reports.slice(page * size, (page + 1) * size)} rowKey={(row) => `${row.attempt_ids[0]}-${JSON.stringify(row.variant)}-${row.transport}`} empty={<p className="muted-copy">尚无图片产物证据</p>} columns={[
+      { key: 'variant', header: '计价条件', primary: true, cell: (row) => [row.variant.unit === 'request' ? '按请求' : row.variant.unit === 'successful_image' ? '按成功图片' : '默认条件', row.variant.size, row.variant.quality, row.variant.background, row.variant.service_tier].filter(Boolean).join(' · ') },
+      { key: 'transport', header: '请求方式', cell: (row) => ({ json: 'JSON · inline', json_url: 'JSON · URL', multipart: 'multipart', sse: 'SSE' })[row.transport] },
+      { key: 'count', header: '已核验 / 请求', numeric: true, cell: (row) => `${row.verified} / ${row.requested}` },
+      { key: 'products', header: '实际产物', cell: (row) => row.products.map((product) => `${product.width}×${product.height} ${product.format}${product.transparent ? ' · 含透明区域' : ''}`).join('，') || '未确认' },
+      { key: 'options', header: '计价条件核验', cell: (row) => row.options_confirmed && row.verified > 0 ? '已确认' : '未确认' },
+      { key: 'usage', header: 'Token 用量', cell: (row) => row.usage_reliable ? '可靠' : '未知 · 不据此按 token 定价' },
+    ]} />
+    {reports.length > size && <div className="form-actions"><Button variant="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</Button><span className="num">{page + 1}/{Math.ceil(reports.length / size)}</span><Button variant="quiet" disabled={(page + 1) * size >= reports.length} onClick={() => setPage(page + 1)}>下一页</Button></div>}
+  </section>
+}
+
+export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'|'images'> }) {
+  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}{result.images && result.images.length > 0 && <ImageEvidence reports={result.images} />}</>
 }

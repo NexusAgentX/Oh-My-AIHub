@@ -45,7 +45,7 @@ func (r *Registry) RegisterNative() error {
 		}
 		for _, req := range suite.Requirements {
 			family := req.ID[strings.LastIndex(req.ID, ".")+1:]
-			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video"}, family) {
+			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations"}, family) {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
@@ -83,6 +83,8 @@ func (r *Registry) RegisterNative() error {
 					scene.audio(ctx)
 				case "video":
 					scene.video(ctx)
+				case "generations", "edits", "variations":
+					scene.images(ctx)
 				}
 				return scene.finish()
 			}}); err != nil {
