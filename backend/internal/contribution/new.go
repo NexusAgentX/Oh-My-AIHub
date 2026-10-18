@@ -150,13 +150,16 @@ func (s *Service) New(ctx context.Context, actor Actor, input NewInput) (Draft, 
 	if input.TargetID == "" {
 		base = market.Changes{}
 	}
-	if input.Kind == "group_model" && input.TargetID != "" && input.Action != "delete" {
+	if input.Kind == "group_model" && input.TargetID != "" && input.Action == "edit" {
 		for i := range c.Quotes {
 			c.Quotes[i].ID, err = ids.NewUUID()
 			if err != nil {
 				return Draft{}, err
 			}
 		}
+	}
+	if input.Kind == "group_model" && input.Action != "edit" {
+		c.Quotes = nil
 	}
 	if input.Action == "delete" || input.Action == "disable" || input.Action == "restore" {
 		now := time.Now().UTC()
