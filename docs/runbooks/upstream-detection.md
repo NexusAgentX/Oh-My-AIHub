@@ -31,6 +31,8 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 
 SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。
 
+Linux 上 SDK 制品单独使用 2 GiB 虚拟地址空间上限，其他受控子进程默认仍为 1 GiB。实测 1 GiB 会使固定 SDK 在版本校验阶段偶发崩溃，2 GiB 对照消除了该复现；这给 Go 的虚拟地址预留留空间，不代表允许 2 GiB 的受管堆，SDK 仍用 128 MiB 的 Go 内存目标。并发槽位、单执行核、文件/输出/FD 和时间上限继续保留，调用方只能选择预定义的两个地址空间档，不能传入任意或无限限制；不靠自动重跑掩盖启动失败。虚拟地址空间的硬限制按 Linux 验证，macOS 本地执行不宣称具有相同的 OS 限额保证。
+
 用途根密钥通过现有上游凭据密钥环封装，无新增环境密钥。启动先验证全部已存根密钥；加载的根密钥可在保持明文字节不变的情况下重新封装到活动 Key。先保留旧包装 Key 完成验证与重新封装，再按既有密钥环检查处理历史秘密；删除旧 Key 后打不开任一根密钥必须阻止启动，不能生成新根密钥替代它。会话命名空间身份与包装 Key ID 无关，相关元数据应纳入备份，禁止通过降级迁移丢弃。
 
 远端 MCP 检测需要 `AIHUB_DETECTION_PUBLIC_ORIGIN=https://网关域名`，值只能为本应用的公网 HTTPS origin，不含路径、认证或查询。反向代理须允许上游访问 `POST /api/detection/mcp`；该固定回调凭检测器随机临时令牌认证，不使用站内 Cookie 或平台 Key，也不要求浏览器 Origin。没有配置时两项 MCP 套件保持 pending。回调只提供一个空参数、只读、无副作用的合成工具，结果为没有写入提示的随机标记；须同时收到真实授权回调和匹配的原生 MCP 工具结果才通过。每探针请求/工具调用与活动探针有界，任务完成/取消即撤销，不存请求/响应/令牌。它不是通用 MCP 托管、文件或工具资源服务。Responses 使用明确审批往返，Messages 固定既定 beta 与精确工具 allowlist，不访问宿主 MCP 配置。
