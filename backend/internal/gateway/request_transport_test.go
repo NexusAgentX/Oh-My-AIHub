@@ -109,7 +109,7 @@ func TestNativeOnlyKeyProbeDoesNotGrantPublicPrimaryEntrances(t *testing.T) {
 }
 
 func TestOrdinaryInferenceDoesNotAllocateForContextDetection(t *testing.T) {
-	body := []byte(`{"model":"fixture","input":"plain","client_metadata":null}`)
+	body := []byte(`{"model":"fixture","input":"plain","client_metadata":null,"prompt_cache_key":"ordinary-cache-hint"}`)
 	_, scan, err := ScanRequest(body)
 	if err != nil {
 		t.Fatal(err)

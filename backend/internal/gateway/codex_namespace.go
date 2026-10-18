@@ -109,6 +109,12 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 			kind := ""
 			switch position {
 			case "root":
+				// The pinned CLI uses this same value as its Responses session
+				// header. Leaving one copy public prevents context initialization
+				// and can defeat isolation under a shared upstream credential.
+				if name == "prompt_cache_key" {
+					kind = "id"
+				}
 				if name == "context" {
 					kind = "context"
 				}

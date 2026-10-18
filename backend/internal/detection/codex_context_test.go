@@ -138,6 +138,7 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 		for _, layer := range []string{"upstream_protocol", "gateway_proxy"} {
 			t.Run(layer+map[bool]string{false: "/isolated", true: "/shared"}[brokenIsolation], func(t *testing.T) {
 				notes := map[string]string{}
+				initialized := map[string]bool{}
 				seen := map[string]int{}
 				up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					seen[r.URL.Path]++
@@ -148,6 +149,15 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 					raw, _ := io.ReadAll(r.Body)
 					body, _ := decodeNative(raw)
 					if r.URL.Path == "/backend-api/codex/responses" {
+						metadata := object(body["client_metadata"])
+						if str(metadata["x-codex-turn-metadata"]) != "" {
+							id := str(metadata["session_id"])
+							if id != r.Header.Get("Session-Id") || body["prompt_cache_key"] != id {
+								t.Error("context initialization and cache/session identifiers disagree")
+							} else {
+								initialized[id] = true
+							}
+						}
 						if declarations := list(body["tools"]); len(declarations) > 0 {
 							tool := object(list(object(declarations[0])["tools"])[0])
 							operation := str(tool["name"])
@@ -198,6 +208,11 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 						t.Error("notes escaped its fixed context RPC or omitted truncation policy")
 					}
 					session := str(object(body["context"])["session_id"])
+					if !initialized[session] {
+						t.Error("notes accessed a context not initialized by its own actual model turn")
+						_, _ = io.WriteString(w, `{"error":"no stored context"}`)
+						return
+					}
 					if brokenIsolation {
 						session = "shared-incorrectly"
 					}
