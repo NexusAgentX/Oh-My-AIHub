@@ -13,6 +13,10 @@ import (
 // the original request; a long prompt or opaque ciphertext is never decoded
 // into a second message tree just to discover that it contains no remote ID.
 func nativeRequestReferences(protocol string, body []byte) ([]gatewaycontract.Reference, error) {
+	return nativeReferences(protocol, body, "input")
+}
+
+func nativeReferences(protocol string, body []byte, inputKey string) ([]gatewaycontract.Reference, error) {
 	var scratch Observer
 	refs := []gatewaycontract.Reference{}
 	var problem error
@@ -91,7 +95,7 @@ func nativeRequestReferences(protocol string, body []byte) ([]gatewaycontract.Re
 		})
 	}
 	root := scratch.objectOf(body)
-	unique(root, "previous_response_id", "conversation", "input", "messages", "contents", "cachedContent", "tools", "container", "images", "mask")
+	unique(root, "previous_response_id", "conversation", inputKey, "messages", "contents", "cachedContent", "tools", "container", "images", "mask")
 	switch protocol {
 	case "openai-responses", "codex-special":
 		add("response", root.get("previous_response_id"))
@@ -106,7 +110,7 @@ func nativeRequestReferences(protocol string, body []byte) ([]gatewaycontract.Re
 		} else {
 			add("conversation", v)
 		}
-		eachElement(root.get("input"), func(raw []byte) {
+		eachElement(root.get(inputKey), func(raw []byte) {
 			object(raw, func(item jsonObject) {
 				if smallText(item.get("type")) == "item_reference" {
 					unique(item, "id")
@@ -117,8 +121,8 @@ func nativeRequestReferences(protocol string, body []byte) ([]gatewaycontract.Re
 				}
 			})
 		})
-		content(root.get("input"))
-		messages(root.get("input"), "content")
+		content(root.get(inputKey))
+		messages(root.get(inputKey), "content")
 		eachElement(root.get("tools"), func(raw []byte) {
 			object(raw, func(tool jsonObject) {
 				switch smallText(tool.get("type")) {

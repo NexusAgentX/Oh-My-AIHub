@@ -17,6 +17,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
 
 // Local, explicit synthetic browser harness. It exercises real services and
@@ -102,6 +103,21 @@ func TestGroupChannelUIHarness(t *testing.T) {
 	p.channels.mu.Lock()
 	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Channel: channel.Channel{ID: v.ID, Owner: channel.Owner{ID: owner, Username: "qaadmin", DisplayName: "合成验收管理员"}, Name: v.Name, GroupID: &gid, Status: channel.StatusListed, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, credential: record.Credential})
 	p.channels.mu.Unlock()
+	if os.Getenv("AIHUB_IMAGE_UI_QA") == "1" {
+		p.observeFixtures(owner, v.ID, uuid())
+		p.observe.calls = p.observe.calls[:1]
+		row := &p.observe.calls[0]
+		model := "fixture/model-3:2026"
+		row.Format = "openai_images"
+		row.ModelID = &model
+		row.RequestedModel = model
+		row.Usage = observe.Usage{}
+		row.Cost = money.FromNano(1_000_000_000)
+		row.Fee = money.FromNano(1_000_000)
+		row.TokensPerSecond = nil
+		row.IntervalP50MS = nil
+		row.IntervalP95MS = nil
+	}
 	var mode atomic.Value
 	mode.Store("normal")
 	stopped := make(chan struct{})

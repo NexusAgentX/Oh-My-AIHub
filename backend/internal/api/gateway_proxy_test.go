@@ -128,8 +128,12 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 		}
 		t.Run(ep.ID, func(t *testing.T) {
 			seen := 0
+			var inferenceBody []byte
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				seen++
+				if ep.ID == "responses.create" {
+					inferenceBody, _ = io.ReadAll(r.Body)
+				}
 				if r.Header.Get("Authorization") != "Bearer upstream-synthetic" {
 					t.Error("platform key or missing native auth reached upstream")
 				}
@@ -332,6 +336,23 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 				if follow.Code != 200 || store.finished[len(store.finished)-1].ModelID != "platform/model:2026" {
 					t.Fatal("verified previous-response model context was not used", follow.Code, follow.Body.String())
 				}
+				// Self-contained state from the first channel must work through a
+				// different channel without a resource lookup or source binding.
+				store.candidate.ChannelID = "channel-second"
+				store.candidate.Credential, e = keyring.Encrypt("channel-second", 1, "upstream-synthetic")
+				if e != nil {
+					t.Fatal(e)
+				}
+				writes := records.writes
+				portable := `{"model":"platform/model:2026","store":false,"input":[{"type":"reasoning","id":"unregistered-internal","encrypted_content":"byte-exact-cipher"},{"type":"compaction","id":"opaque-compact","encrypted_content":"byte-exact-compact"}],"unknown":{"signature":"byte-exact-signature"}}`
+				request = httptest.NewRequest("POST", path, strings.NewReader(portable))
+				request.Header.Set("Authorization", "Bearer sk-aih-synthetic")
+				cross := httptest.NewRecorder()
+				handler.ServeHTTP(cross, request)
+				want := strings.Replace(portable, `"platform/model:2026"`, `"native/model:2026"`, 1)
+				if cross.Code != 200 || string(inferenceBody) != want || records.writes != writes || store.finished[len(store.finished)-1].ChannelID != "channel-second" {
+					t.Fatal("self-contained state became sticky or changed", cross.Code, string(inferenceBody), records.writes, writes)
+				}
 			}
 			if ep.Billing == "none" && len(store.finished) != 0 {
 				t.Fatal("metadata read/write created an inference charge")
@@ -339,14 +360,29 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 			// The same valid platform account using a different Key cannot read or
 			// mutate an existing resource, even with a known native identifier.
 			if len(body) == 0 && strings.Contains(ep.Path, "{") || ep.ID == "responses.cancel" {
-				store.key.KeyID = "other-key"
-				before := seen
-				denied := httptest.NewRecorder()
-				again := httptest.NewRequest(ep.Method, path, bytes.NewReader(body))
-				again.Header.Set("Authorization", "Bearer sk-aih-other")
-				handler.ServeHTTP(denied, again)
-				if denied.Code < 400 || seen != before {
-					t.Fatal("another Key reached owned resource", denied.Code, seen, before)
+				for _, change := range []string{"other-key", "other-account", "revoked-key", "rotated-credential", "different-group"} {
+					store.key = gateway.KeyAuth{OwnerID: "account-own", KeyID: "key-own", AccountActive: true, Enabled: true}
+					store.candidate = candidate
+					switch change {
+					case "other-key":
+						store.key.KeyID = "other-key"
+					case "other-account":
+						store.key.OwnerID = "other-account"
+					case "revoked-key":
+						store.key.Enabled = false
+					case "rotated-credential":
+						store.candidate.CredentialRevision = 2
+					case "different-group":
+						store.candidate.GroupID = "other-group"
+					}
+					before := seen
+					denied := httptest.NewRecorder()
+					again := httptest.NewRequest(ep.Method, path, bytes.NewReader(body))
+					again.Header.Set("Authorization", "Bearer sk-aih-other")
+					handler.ServeHTTP(denied, again)
+					if denied.Code < 400 || seen != before {
+						t.Fatal("unauthorized scope reached owned resource", change, denied.Code, seen, before)
+					}
 				}
 			}
 		})

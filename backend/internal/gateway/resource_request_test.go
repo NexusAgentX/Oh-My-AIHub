@@ -45,3 +45,18 @@ func BenchmarkNativeReferencesLongStatelessPrompt(b *testing.B) {
 		}
 	}
 }
+
+func TestConversationItemsScanRejectsDuplicateAndAuthorizesOriginalBytes(t *testing.T) {
+	for _, body := range []string{
+		`{"items":[],"items":[{"type":"item_reference","id":"foreign"}]}`,
+		`{"items":[],"it\u0065ms":[{"type":"item_reference","id":"foreign"}]}`,
+	} {
+		if _, err := nativeReferences("openai-responses", []byte(body), "items"); err == nil {
+			t.Fatal("duplicate items bypassed native authorization")
+		}
+	}
+	refs, err := nativeReferences("openai-responses", []byte(`{"items":[{"type":"item_reference","id":"owned"},{"type":"reasoning","id":"opaque","encrypted_content":"untouched"}]}`), "items")
+	if err != nil || len(refs) != 1 || refs[0].Kind != "item" || refs[0].ID != "owned" {
+		t.Fatal(refs, err)
+	}
+}

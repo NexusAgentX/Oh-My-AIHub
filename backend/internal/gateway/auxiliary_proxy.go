@@ -166,11 +166,11 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	pathRefs := append([]gatewaycontract.Reference(nil), refs...)
 	var explicitRefs []gatewaycontract.Reference
 	if len(body) > 0 {
-		extracted := body
+		inputKey := "input"
 		if ep.ID == "conversations.items.create" {
-			extracted, _ = json.Marshal(map[string]json.RawMessage{"input": object["items"]})
+			inputKey = "items"
 		}
-		more, e := nativeRequestReferences(ep.Protocol, extracted)
+		more, e := nativeReferences(ep.Protocol, body, inputKey)
 		if e != nil {
 			fail(400, "invalid_request", "请求包含无效资源引用")
 			return
@@ -252,23 +252,42 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	// filters and original credential revision are rechecked on every request.
 	cursorToken, cursorNative := "", ""
 	var cursorScope *gatewaycontract.CursorScope
+	var listBoundary *resourcestate.Record
 	if isResourceList(ep.ID) {
 		cursorToken = r.URL.Query().Get("after")
 		if ep.ID == "cache.list" {
 			cursorToken = r.URL.Query().Get("pageToken")
 		}
+		parentID := resourceListParent(ep, r, parent)
+		var before *resourcestate.Record
+		if boundary := r.URL.Query().Get("before"); boundary != "" {
+			if ep.ID == "cache.list" || len(boundary) > 2048 {
+				fail(400, "invalid_cursor", "分页边界无效")
+				return
+			}
+			before, err = resourcestate.Resolve(r.Context(), e.Resources, actor, []gatewaycontract.Reference{{Kind: resourceListKind(ep), ID: boundary, ParentID: parentID}})
+			if err != nil || before == nil || owned != nil && before.Binding != owned.Binding {
+				fail(400, "invalid_cursor", "分页边界不属于当前资源范围")
+				return
+			}
+			selection.Reference = &ResourceScope{GroupID: before.Binding.GroupID, ChannelID: before.Binding.ChannelID, CredentialScope: before.CredentialScope}
+			listBoundary = before
+		}
 		if cursorToken != "" {
-			scope, native, e := e.ResourceCursors.UnwrapPageCursor(actor, cursorToken)
-			if e != nil {
-				fail(400, "invalid_cursor", "分页游标无效或不属于当前 Key")
+			scope, native, decodeErr := e.ResourceCursors.UnwrapPageCursor(actor, cursorToken)
+			if decodeErr != nil && ep.ID != "cache.list" && len(cursorToken) <= 2048 && before == nil {
+				boundary, lookupErr := resourcestate.Resolve(r.Context(), e.Resources, actor, []gatewaycontract.Reference{{Kind: resourceListKind(ep), ID: cursorToken, ParentID: parentID}})
+				if lookupErr == nil && boundary != nil {
+					scope = gatewaycontract.CursorScope{AccountID: key.OwnerID, KeyID: key.KeyID, Kind: resourceListKind(ep), ParentID: parentID, Binding: boundary.Binding, QueryDigest: pageQueryDigest(r, ep, pref.ModelID)}
+					native, decodeErr = e.ResourceCursors.OwnedBoundary(actor, scope, boundary.Resource)
+				}
+			}
+			if decodeErr != nil || owned != nil && owned.Binding != scope.Binding || before != nil && before.Binding != scope.Binding {
+				fail(400, "invalid_cursor", "分页游标无效或不属于当前资源范围")
 				return
 			}
 			cursorScope = &scope
 			cursorNative = native
-			if owned != nil && owned.Binding != scope.Binding {
-				fail(400, "invalid_cursor", "分页资源范围不符")
-				return
-			}
 			selection.Reference = &ResourceScope{GroupID: scope.Binding.GroupID, ChannelID: scope.Binding.ChannelID}
 			for _, v := range records {
 				if candidateBinding(v.Candidate) == scope.Binding {
@@ -285,7 +304,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	candidates := make([]Candidate, 0, len(selected))
 	for _, v := range selected {
-		if !resourceMatch(v.Candidate, owned) {
+		if !resourceMatch(v.Candidate, owned) || !resourceMatch(v.Candidate, listBoundary) {
 			continue
 		}
 		state, _ := e.Runtime.Check(v.Candidate.ChannelID, EffectiveLimits(v.Candidate.Advanced, defaults), e.Now())

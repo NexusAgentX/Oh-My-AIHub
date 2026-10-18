@@ -90,23 +90,18 @@ func (e *Engine) observeAuxiliary(ctx context.Context, ep gatewaycontract.Endpoi
 	return nil
 }
 
-func pageQueryDigest(r *http.Request, ep gatewaycontract.Endpoint) string {
+func pageQueryDigest(r *http.Request, ep gatewaycontract.Endpoint, model string) string {
 	q := r.URL.Query()
 	for _, k := range []string{"key", "after", "pageToken"} {
 		q.Del(k)
 	}
-	sum := sha256.Sum256([]byte(ep.ID + "\n" + q.Encode()))
+	sum := sha256.Sum256([]byte(ep.ID + "\n" + q.Encode() + "\n" + model))
 	return hex.EncodeToString(sum[:])
 }
 func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gatewaycontract.Endpoint, c Candidate, key KeyAuth, location authLocation, policy channel.Outbound, defaults settings.Settings, pref routing.Pref, parent string, prior *gatewaycontract.CursorScope, token string, producer *resourcestate.Record, budget *int) ([]byte, *http.Response, error) {
 	kind := resourceListKind(ep)
-	if ep.ID == "responses.items" {
-		parent = r.PathValue("responseID")
-	}
-	if ep.ID == "chat.messages" {
-		parent = r.PathValue("completionID")
-	}
-	scope := gatewaycontract.CursorScope{AccountID: key.OwnerID, KeyID: key.KeyID, Kind: kind, ParentID: parent, Binding: candidateBinding(c), QueryDigest: pageQueryDigest(r, ep)}
+	parent = resourceListParent(ep, r, parent)
+	scope := gatewaycontract.CursorScope{AccountID: key.OwnerID, KeyID: key.KeyID, Kind: kind, ParentID: parent, Binding: candidateBinding(c), QueryDigest: pageQueryDigest(r, ep, pref.ModelID)}
 	if prior != nil && *prior != scope {
 		return nil, nil, gatewaycontract.ErrPage
 	}
@@ -131,13 +126,20 @@ func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gate
 			q := u.Query()
 			q.Del("after")
 			q.Del("pageToken")
+			before := r.URL.Query().Get("before")
+			q.Del("before")
 			q.Set(limitParam, strconv.Itoa(count))
 			if native != "" {
 				if ep.ID == "cache.list" {
 					q.Set("pageToken", native)
+				} else if before != "" {
+					q.Set("before", native)
 				} else {
 					q.Set("after", native)
 				}
+			}
+			if native == "" && before != "" {
+				q.Set("before", before)
 			}
 			u.RawQuery = q.Encode()
 			// The resource-page body limit is enforced while reading, before JSON
@@ -173,7 +175,7 @@ func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gate
 				return gatewaycontract.NativePage{}, gatewaycontract.ErrPage
 			}
 			page := gatewaycontract.NativePage{Items: []gatewaycontract.ListedResource{}}
-			var lastID string
+			var lastID, firstID string
 			for _, raw := range data {
 				var item struct {
 					ID   string `json:"id"`
@@ -190,6 +192,9 @@ func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gate
 					return gatewaycontract.NativePage{}, gatewaycontract.ErrPage
 				}
 				lastID = id
+				if firstID == "" {
+					firstID = id
+				}
 				page.Items = append(page.Items, gatewaycontract.ListedResource{Reference: gatewaycontract.Reference{Kind: kind, ID: id, ParentID: parent}, Raw: raw})
 			}
 			// Input/stored-chat messages receive their native IDs only when the
@@ -221,6 +226,9 @@ func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gate
 						return gatewaycontract.NativePage{}, gatewaycontract.ErrPage
 					}
 					page.Next = lastID
+					if before != "" {
+						page.Next = firstID
+					}
 				}
 			}
 			page.Stop = *budget <= 0
@@ -299,4 +307,14 @@ func (e *Engine) ownedResourcePage(ctx context.Context, r *http.Request, ep gate
 	last.Header = http.Header{"Content-Type": []string{"application/json"}}
 	last.StatusCode = http.StatusOK
 	return payload, last, nil
+}
+
+func resourceListParent(ep gatewaycontract.Endpoint, r *http.Request, fallback string) string {
+	if ep.ID == "responses.items" {
+		return r.PathValue("responseID")
+	}
+	if ep.ID == "chat.messages" {
+		return r.PathValue("completionID")
+	}
+	return fallback
 }

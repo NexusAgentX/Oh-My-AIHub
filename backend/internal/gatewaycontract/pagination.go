@@ -220,3 +220,13 @@ func (c *CursorCodec) UnwrapPageCursor(actor Principal, token string) (CursorSco
 	}
 	return page.Scope, page.Token, nil
 }
+
+// OwnedBoundary admits an SDK's own visible last_id as a boundary after the
+// handler has resolved its durable ownership. Shared-account raw cursors and
+// client ownership claims must never be passed as resource metadata.
+func (c *CursorCodec) OwnedBoundary(actor Principal, scope CursorScope, resource Resource) (string, error) {
+	if c == nil || scope.Authorize(actor, scope) != nil || resource.AccountID != actor.AccountID || resource.KeyID != actor.KeyID || resource.Kind != scope.Kind || resource.ParentID != scope.ParentID || resource.Binding != scope.Binding || resource.CredentialScope == "" || resource.CreationID == "" {
+		return "", ErrPage
+	}
+	return c.seal(scope, resource.ID)
+}
