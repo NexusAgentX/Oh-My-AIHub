@@ -77,8 +77,14 @@ func (a *app) registerGatewayRoutes(r *router) {
 				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeCodexIdentity(w, req, false) }
 			case endpoint.ID == "identity.accounts":
 				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeCodexIdentity(w, req, true) }
-			case endpoint.Scope == "context_acl_only":
+			case endpoint.Scope == "context_acl_only" || endpoint.ID == "codex.models":
 				handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeAuxiliary(w, req, endpoint) }
+			case endpoint.Replay == "inference":
+				format := channel.FormatOpenAIResponses
+				if strings.HasPrefix(endpoint.ID, "codex.images") {
+					format = channel.FormatOpenAIImages
+				}
+				handler = serve(format)
 			}
 			if handler != nil {
 				r.implement("497", endpoint.Method+" "+endpoint.Path, accessGatewayKey, handler)

@@ -28,6 +28,21 @@ func (s *codexRouteStore) AuxiliaryCandidates(context.Context, channel.Format) (
 	return s.rows, nil
 }
 
+func (s *codexRouteStore) Candidates(_ context.Context, model string, format channel.Format) ([]gateway.Candidate, error) {
+	out := []gateway.Candidate{}
+	for _, r := range s.rows {
+		if r.ModelID == model {
+			for _, f := range r.Formats {
+				if f == format {
+					out = append(out, r.Candidate)
+					break
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
 func newCodexContextFixture(t *testing.T, upstream *httptest.Server) (http.Handler, *codexRouteStore, *proxyRecords) {
 	t.Helper()
 	keyring, err := channel.ParseKeyring("test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "test")
@@ -62,7 +77,7 @@ func newCodexContextFixture(t *testing.T, upstream *httptest.Server) (http.Handl
 			}
 		}
 		candidate := gateway.Candidate{GroupID: group, GroupModelID: offering, ChannelID: "channel-" + id, CredentialRevision: 1, CredentialScope: "synthetic-scope-" + id, OwnerID: "provider", BaseURL: "https://synthetic.example", UpstreamModel: "native/model", Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof}
-		store.rows = append(store.rows, gateway.CandidateRecord{ModelID: "platform/model:2026", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: candidate})
+		store.rows = append(store.rows, gateway.CandidateRecord{ModelID: "platform/model:2026", Formats: []channel.Format{channel.FormatOpenAIResponses, channel.FormatOpenAIImages}, Candidate: candidate})
 	}
 	namespace, err := gatewaycontract.NewContextNamespace(bytes.Repeat([]byte{9}, 32))
 	if err != nil {
@@ -213,5 +228,92 @@ func TestCodexNotesCrossGroupsWithoutSourceStickinessAndIsolateKeys(t *testing.T
 	w = codexRequest(handler, "POST", read, body)
 	if w.Code != 403 || seen != 4 {
 		t.Fatal("revoked Key reached upstream")
+	}
+}
+
+func TestCodexModelDirectoryUsesCurrentKeyScopeAndMeasuredMetadata(t *testing.T) {
+	spec := loadOpenAPI(t)
+	seen := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen++
+		if r.Method != "GET" || r.URL.Path != "/backend-api/codex/models" || r.Header.Get("If-None-Match") != "" || r.Header.Get("Session-Id") == "client-session" {
+			t.Error("catalog path, ownership or revalidation incorrect")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("ETag", "shared-account-etag")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		_, _ = io.WriteString(w, `{"models":[{"slug":"native/model","display_name":"upstream display","input_modalities":["text","image"],"context_window":999999,"supports_experimental_context":true,"service_tiers":[{"id":"ultrafast","name":"Ultra","description":"declared only"}]},{"slug":"unoffered-model","display_name":"private"}],"accounts":["private-account"]}`)
+	}))
+	defer upstream.Close()
+	handler, store, _ := newCodexContextFixture(t, upstream)
+	store.key.AllowedModels = []string{"platform/model:2026"}
+	store.key.Aliases = map[string]string{"shortcut": "platform/model:2026"}
+	w := codexRequest(handler, "GET", "/backend-api/codex/models", "")
+	spec.assertResponse(t, "GET", "/backend-api/codex/models", w)
+	if w.Code != 200 || seen != 1 || !strings.Contains(w.Body.String(), "shortcut") || strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "unoffered") || strings.Contains(w.Body.String(), "999999") || strings.Contains(w.Body.String(), "ultrafast") || w.Header().Get("ETag") != "" || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("catalog bypassed current scope or advertised unproven values", w.Code, w.Body.String())
+	}
+	store.key.AllowedModels = []string{"another-model"}
+	w = codexRequest(handler, "GET", "/backend-api/codex/models", "")
+	if w.Code != 503 || seen != 1 {
+		t.Fatal("catalog bypassed Key model witness permissions", w.Code, w.Body.String())
+	}
+}
+
+func TestCodexInferenceAndImagePathsPreserveNativeBodiesAndSettleProducts(t *testing.T) {
+	spec := loadOpenAPI(t)
+	manifest, err := gatewaycontract.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ep := range manifest.Endpoints {
+		if ep.Feature != "F8" || ep.Replay != "inference" {
+			continue
+		}
+		t.Run(ep.ID, func(t *testing.T) {
+			seen := 0
+			var actual []byte
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				seen++
+				actual, _ = io.ReadAll(r.Body)
+				if r.URL.Path != ep.Path {
+					t.Error("Codex path converted to another protocol", r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if strings.HasPrefix(ep.ID, "codex.images") {
+					_, _ = io.WriteString(w, `{"created":1,"data":[{"b64_json":"c3ludGhldGlj"}]}`)
+				} else {
+					_, _ = io.WriteString(w, `{"object":"response","status":"completed","output":[],"usage":{"input_tokens":1,"output_tokens":1}}`)
+				}
+			}))
+			defer upstream.Close()
+			handler, store, _ := newCodexContextFixture(t, upstream)
+			if strings.HasPrefix(ep.ID, "codex.images") {
+				for i := range store.rows {
+					c := &store.rows[i].Candidate
+					book, err := quotepricing.Freeze(quotepricing.Book{GroupID: c.GroupID, GroupRevision: 1, ConnectionVersion: 1, Offers: map[string]quotepricing.Offer{"platform/model:2026": {ModelID: "platform/model:2026", Revision: 1, Quote: market.Quote{ID: "image-quote", GroupModelID: c.GroupModelID, Version: 1, Currency: "CNY", BillingUnit: "per_successful_image", UnitPrices: []market.UnitPrice{{Unit: "successful_image", Price: 1_000_000_000}}}}}})
+					if err != nil {
+						t.Fatal(err)
+					}
+					c.Quotes = book
+				}
+			}
+			body := `{"model":"platform/model:2026", "input":"synthetic", "prompt":"synthetic", "n":9, "store":false, "unknown":{"opaque":"retain"}}`
+			w := codexRequest(handler, "POST", ep.Path, body)
+			spec.assertResponse(t, "POST", ep.Path, w)
+			if w.Code != 200 || seen != 1 || string(actual) != strings.Replace(body, `"platform/model:2026"`, `"native/model"`, 1) || len(store.finished) != 1 {
+				t.Fatal("native body/entry/settlement failed", w.Code, w.Body.String(), string(actual))
+			}
+			if strings.HasPrefix(ep.ID, "codex.images") && store.finished[0].Cost.Nano() != 1_000_000_000 {
+				t.Fatal("image billed requested n instead of one real product", store.finished[0].Cost)
+			}
+			if strings.HasPrefix(ep.ID, "codex.images") {
+				store.key.AllowedModels = []string{"another-text-model"}
+				denied := codexRequest(handler, "POST", ep.Path, body)
+				if denied.Code != 403 || seen != 1 {
+					t.Fatal("independent image request borrowed another model permission", denied.Code, seen)
+				}
+			}
+		})
 	}
 }

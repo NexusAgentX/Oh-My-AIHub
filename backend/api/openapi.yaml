@@ -27,6 +27,259 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /backend-api/codex/responses:
+    {
+      "post": {
+        "operationId": "proxyCodexResponses",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.responses",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native inference result with reliable usage settlement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
+  /backend-api/codex/responses/compact:
+    {
+      "post": {
+        "operationId": "proxyCodexCompact",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.compact",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native inference result with reliable usage settlement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/search:
+    {
+      "post": {
+        "operationId": "proxyCodexSearch",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.search",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native inference result with reliable usage settlement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
+  /backend-api/codex/images/generations:
+    {
+      "post": {
+        "operationId": "proxyCodexImages",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.images",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native inference result with reliable usage settlement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
+  /backend-api/codex/images/edits:
+    {
+      "post": {
+        "operationId": "proxyCodexImagesEdit",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.images.edit",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native inference result with reliable usage settlement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
+  /backend-api/codex/models:
+    {
+      "get": {
+        "operationId": "proxyCodexModels",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.models",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native model metadata from the selected provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeCatalog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Native protocol error."
+          }
+        }
+      }
+    }
   /backend-api/codex/alpha/notes/v2/thread_hint:
     {
       "post": {
@@ -9052,6 +9305,35 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    CodexNativeCatalog:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "models"
+        ],
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "slug",
+                "display_name"
+              ],
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      }
     CodexNativeJSON:
       {}
     CodexPlatformIdentity:

@@ -499,6 +499,16 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
 		return
 	}
+	if required := codexInferenceRequirements(r.URL.Path, body); len(required) > 0 {
+		// Public-image/compact evidence is not proof for a distinct Codex path.
+		kept := call.resourceRequired[:0]
+		for _, requirement := range call.resourceRequired {
+			if !strings.HasPrefix(requirement.ID, "images.") && requirement.ID != "openai-responses.count_compact/native_compact_when_applicable" {
+				kept = append(kept, requirement)
+			}
+		}
+		call.resourceRequired = append(kept, required...)
+	}
 	if call.requestEncoding != "" {
 		call.resourceRequired = append(call.resourceRequired, nativeZstdRequirement)
 	}
