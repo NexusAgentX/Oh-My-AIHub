@@ -20,8 +20,10 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
@@ -29,6 +31,9 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
@@ -253,9 +258,52 @@ func main() {
 		}
 	}()
 
+	// Detector state/queries use two private connections; saturation cannot
+	// consume gateway/settlement pool slots. No protocol suites are registered
+	// until their implementations land, so current plans remain suite_pending.
+	detectorStartup, cancelDetectorStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
+	defer cancelDetectorStartup()
+	detectorPool, err := database.OpenLimited(detectorStartup, databaseURL, 2)
+	if err != nil {
+		fatal(logger, "opening detection database pool failed", err)
+	}
+	defer detectorPool.Close()
+	detectorMarket := marketpg.NewStore(detectorPool)
+	if err = detectorMarket.VerifyProtectedRoots(detectorStartup, credentialKeyring); err != nil {
+		fatal(logger, "protected market roots cannot be opened", err)
+	}
+	credentialRoot, err := detectorMarket.ProtectedRoot(detectorStartup, credentialKeyring, "credential-scope-root-v1")
+	cancelDetectorStartup()
+	if err != nil {
+		fatal(logger, "opening detection credential root failed", err)
+	}
+	manifest, err := gatewaycontract.Load()
+	if err != nil {
+		fatal(logger, "loading detection manifest failed", err)
+	}
+	registry, err := detection.NewRegistry(manifest)
+	if err != nil {
+		fatal(logger, "loading detection registry failed", err)
+	}
+	detectorStore := detectionpg.NewStore(detectorPool)
+	detectorSettings := settings.NewService(settingspg.NewStore(detectorPool))
+	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: detectionpg.DirectoryResolver{Market: detectorMarket}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
+		value, err := detectorSettings.Get(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return outboundPolicy.WithExtraBlockedHosts(value.ExtraBlockedHosts)
+	}, Limits: detection.DefaultLimits(), CredentialRoot: credentialRoot})
+	clear(credentialRoot)
+	if err != nil {
+		fatal(logger, "starting detection service failed", err)
+	}
+	defer detector.Close()
+
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
+			Detection: detector,
 			Suppliers: &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
 			Identity:  identityService,
 			Forum:     forumService,

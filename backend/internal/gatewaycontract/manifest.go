@@ -48,20 +48,26 @@ type Endpoint struct {
 }
 
 type Suite struct {
-	ID           string        `yaml:"id"`
-	Protocol     string        `yaml:"protocol"`
-	Target       string        `yaml:"target"`
-	Feature      string        `yaml:"feature"`
-	Requirements []Requirement `yaml:"requirements"`
+	ModelTypes     []string      `yaml:"model_types,omitempty"`
+	EvidenceLayers []string      `yaml:"evidence_layers"`
+	ID             string        `yaml:"id"`
+	Protocol       string        `yaml:"protocol"`
+	Target         string        `yaml:"target"`
+	Feature        string        `yaml:"feature"`
+	Requirements   []Requirement `yaml:"requirements"`
 }
 
 type Requirement struct {
-	ID          string   `yaml:"id"`
-	Endpoints   []string `yaml:"endpoints"`
-	SourceIDs   []string `yaml:"source_ids"`
-	Conditional []string `yaml:"conditional_source_ids"`
-	Assertions  []string `yaml:"assertions"`
-	AggregateOf []string `yaml:"aggregate_of,omitempty"`
+	ModelTypes            []string `yaml:"model_types,omitempty"`
+	CredentialDependent   bool     `yaml:"credential_dependent"`
+	ConditionalAssertions []string `yaml:"conditional_assertions,omitempty"`
+	EvidenceLayers        []string `yaml:"evidence_layers,omitempty"`
+	ID                    string   `yaml:"id"`
+	Endpoints             []string `yaml:"endpoints"`
+	SourceIDs             []string `yaml:"source_ids"`
+	Conditional           []string `yaml:"conditional_source_ids"`
+	Assertions            []string `yaml:"assertions"`
+	AggregateOf           []string `yaml:"aggregate_of,omitempty"`
 }
 
 type Exclusion struct {
@@ -157,10 +163,60 @@ func (m Manifest) Validate() error {
 		if s.ID == "" || seenSuites[s.ID] || s.Protocol == "" || (s.Target != "group" && s.Target != "group_model" && s.Target != "gateway") || (s.Feature != "F4" && s.Feature != "F8") {
 			return fmt.Errorf("invalid suite %q", s.ID)
 		}
+
+		layers := map[string]bool{}
+		for _, layer := range s.EvidenceLayers {
+			if layer != "upstream_protocol" && layer != "gateway_proxy" && layer != "official_cli" || layers[layer] {
+				return fmt.Errorf("invalid evidence layer for %s", s.ID)
+			}
+			layers[layer] = true
+		}
+		if len(layers) == 0 {
+			return fmt.Errorf("missing evidence layers for %s", s.ID)
+		}
+
+		types := map[string]bool{}
+		for _, kind := range s.ModelTypes {
+			if (kind != "text" && kind != "image") || types[kind] {
+				return fmt.Errorf("invalid model type for %s", s.ID)
+			}
+			types[kind] = true
+		}
+		if s.Target == "group_model" && len(types) == 0 {
+			return fmt.Errorf("missing model types for %s", s.ID)
+		}
 		seenSuites[s.ID] = true
 		for _, r := range s.Requirements {
 			if r.ID == "" || seenRequirements[r.ID] || len(r.Endpoints) == 0 || len(r.Assertions) == 0 {
 				return fmt.Errorf("invalid requirement %q", r.ID)
+			}
+
+			override := map[string]bool{}
+			for _, layer := range r.EvidenceLayers {
+				if !layers[layer] || override[layer] {
+					return fmt.Errorf("invalid requirement evidence layer %s", r.ID)
+				}
+				override[layer] = true
+			}
+
+			assertionIDs := map[string]bool{}
+			for i := range r.Assertions {
+				assertionIDs[fmt.Sprintf("%s/a%d", r.ID, i+1)] = true
+			}
+			conditionalIDs := map[string]bool{}
+			for _, id := range r.ConditionalAssertions {
+				if !assertionIDs[id] || conditionalIDs[id] {
+					return fmt.Errorf("invalid conditional assertion %s", id)
+				}
+				conditionalIDs[id] = true
+			}
+
+			modelTypes := map[string]bool{}
+			for _, kind := range r.ModelTypes {
+				if !types[kind] || modelTypes[kind] {
+					return fmt.Errorf("invalid requirement model type %s", r.ID)
+				}
+				modelTypes[kind] = true
 			}
 			seenRequirements[r.ID] = true
 			for _, endpoint := range r.Endpoints {

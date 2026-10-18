@@ -7,6 +7,7 @@ info:
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
+- {name: detection, description: 上游能力检测、报告与搜索设置}
 - {name: forum, description: 登录成员论坛与私密工单}
 - {name: instance, description: 实例与健康检查}
 - {name: auth, description: 认证与当前账户}
@@ -25,6 +26,817 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/detection/jobs/{taskID}/reports:
+    {
+      "get": {
+        "operationId": "listDetectionReports",
+        "tags": [
+          "detection"
+        ],
+        "summary": "读取不可变历史报告",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "只读历史报告，后续复测不改写此证据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionReportsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/reports/{reportID}:
+    {
+      "get": {
+        "operationId": "getDetectionReport",
+        "tags": [
+          "detection"
+        ],
+        "summary": "读取不可变历史报告",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reportID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "只读历史报告，后续复测不改写此证据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs:
+    {
+      "get": {
+        "operationId": "listDetectionJobs",
+        "tags": [
+          "detection"
+        ],
+        "summary": "查看自己的检测任务；管理员可治理全部任务",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查看自己的检测任务；管理员可治理全部任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "startDetectionJob",
+        "tags": [
+          "detection"
+        ],
+        "summary": "为已授权目标创建完整检测计划，缺套件明确待实现",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "为已授权目标创建完整检测计划，缺套件明确待实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}:
+    {
+      "get": {
+        "operationId": "getDetectionJob",
+        "tags": [
+          "detection"
+        ],
+        "summary": "查看任务、独立断言、版本与用量",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查看任务、独立断言、版本与用量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}/cancel:
+    {
+      "post": {
+        "operationId": "cancelDetectionJob",
+        "tags": [
+          "detection"
+        ],
+        "summary": "取消检测并保留已发生消耗与清理记录",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "取消检测并保留已发生消耗与清理记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}/resume:
+    {
+      "post": {
+        "operationId": "resumeDetectionJob",
+        "tags": [
+          "detection"
+        ],
+        "summary": "重填同范围凭据恢复中断任务",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionResume"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "重填同范围凭据恢复中断任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}/retest:
+    {
+      "post": {
+        "operationId": "retestDetectionJob",
+        "tags": [
+          "detection"
+        ],
+        "summary": "选择场景复测并保留独立有效证据",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionRetest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "选择场景复测并保留独立有效证据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionJobEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}/attempts:
+    {
+      "get": {
+        "operationId": "listDetectionAttempts",
+        "tags": [
+          "detection"
+        ],
+        "summary": "分页查看脱敏请求执行元数据",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "分页查看脱敏请求执行元数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionAttemptsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/detection/jobs/{taskID}/artifacts:
+    {
+      "get": {
+        "operationId": "listDetectionArtifacts",
+        "tags": [
+          "detection"
+        ],
+        "summary": "查看本任务尚待清理的资源归属元数据",
+        "x-access": "ready",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查看本任务尚待清理的资源归属元数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionArtifactsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/admin/detection/search:
+    {
+      "get": {
+        "operationId": "getDetectionParameters",
+        "tags": [
+          "detection"
+        ],
+        "summary": "查看上下文及最大输出搜索参数",
+        "x-access": "admin",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查看上下文及最大输出搜索参数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionParametersEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  /api/admin/detection/search/{target}:
+    {
+      "put": {
+        "operationId": "updateDetectionSearch",
+        "tags": [
+          "detection"
+        ],
+        "summary": "版本化修改搜索参数并记录审计",
+        "x-access": "admin",
+        "x-feature": "490",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "context",
+                "max_output"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionSearchSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "版本化修改搜索参数并记录审计",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionSearchEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
   /api/channel-hall/{channelID}/analysis:
     get:
       operationId: analyzeHallChannel
@@ -3677,6 +4489,967 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    DetectionReportsPage:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionReportSummary"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    DetectionReportSummary:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "task_id",
+          "state",
+          "complete",
+          "created_at"
+        ],
+        "additionalProperties": false
+      }
+    DetectionSearchSettings:
+      {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "ternary"
+            ]
+          },
+          "low": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "high": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hard_maximum": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "precision_mode": {
+            "type": "string",
+            "enum": [
+              "absolute",
+              "relative"
+            ]
+          },
+          "precision": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "rounds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "rechecks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          }
+        },
+        "required": [
+          "version",
+          "method",
+          "low",
+          "high",
+          "hard_maximum",
+          "precision_mode",
+          "precision",
+          "rounds",
+          "rechecks"
+        ],
+        "additionalProperties": false
+      }
+    DetectionParameters:
+      {
+        "type": "object",
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/DetectionSearchSettings"
+          },
+          "max_output": {
+            "$ref": "#/components/schemas/DetectionSearchSettings"
+          }
+        },
+        "required": [
+          "context",
+          "max_output"
+        ],
+        "additionalProperties": false
+      }
+    DetectionTarget:
+      {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/MarketEvidenceBinding"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "",
+              "text",
+              "image"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "service_tier": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "binding",
+          "model_type",
+          "model",
+          "service_tier"
+        ],
+        "additionalProperties": false
+      }
+    DetectionUsage:
+      {
+        "type": "object",
+        "properties": {
+          "http": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generate": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "query": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cleanup": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "images": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tools": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "http",
+          "generate",
+          "count",
+          "query",
+          "cleanup",
+          "input_tokens",
+          "output_tokens",
+          "images",
+          "tools"
+        ],
+        "additionalProperties": false
+      }
+    DetectionAttempt:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 599
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "generate",
+              "count",
+              "query",
+              "cleanup"
+            ]
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sent": {
+            "type": "boolean"
+          },
+          "response_received": {
+            "type": "boolean"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "endpoint_id",
+          "method",
+          "path",
+          "status",
+          "reason",
+          "category",
+          "duration_ms",
+          "sent",
+          "response_received",
+          "at"
+        ],
+        "additionalProperties": false
+      }
+    DetectionAssertion:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive",
+              "unobserved"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "attempt_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "reason",
+          "attempt_ids"
+        ],
+        "additionalProperties": false
+      }
+    DetectionResult:
+      {
+        "type": "object",
+        "properties": {"source_task_id":{"type": "string", "format": "uuid"},"source_report_id":{"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "unsupported",
+              "inconclusive"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unsupported",
+              "assertion_failed",
+              "prerequisite_failed",
+              "external_error",
+              "detector_error",
+              "not_observed",
+              "client_disabled",
+              "platform_unavailable",
+              "cancelled",
+              "interrupted",
+              "invalid_response",
+              "body_limit",
+              "timeout",
+              "network_error",
+              "invalid_request",
+              "key_unavailable",
+              "inputs_changed",
+              "suite_pending"
+            ]
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "upstream_protocol",
+              "gateway_proxy",
+              "official_cli"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "real_upstream",
+              "synthetic"
+            ]
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionAssertion"
+            }
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionAttempt"
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/DetectionUsage"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["source_task_id","source_report_id",
+          "id",
+          "scenario_id",
+          "state",
+          "reason",
+          "layer",
+          "source",
+          "assertions",
+          "attempts",
+          "usage",
+          "started_at",
+          "finished_at"
+        ],
+        "additionalProperties": false
+      }
+    DetectionPlanned:
+      {
+        "type": "object",
+        "properties": {"credential_dependent":{"type": "boolean"},
+ "assertion_labels":{"type":"object","additionalProperties":{"type":"string"}},
+          "id": {
+            "type": "string"
+          },
+          "suite_id": {
+            "type": "string"
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conditional": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aggregate": {
+            "type": "boolean"
+          },
+          "implemented": {
+            "type": "boolean"
+          },
+          "code_version": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "upstream_protocol",
+              "gateway_proxy",
+              "official_cli"
+            ]
+          },
+          "estimated_http": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["credential_dependent",
+ "assertion_labels",
+          "id",
+          "suite_id",
+          "requirements",
+          "assertions",
+          "conditional",
+          "dependencies",
+          "aggregate",
+          "implemented",
+          "code_version",
+          "layer",
+          "estimated_http"
+        ],
+        "additionalProperties": false
+      }
+    DetectionPlan:
+      {
+        "type": "object",
+        "properties": {
+          "engine_version": {
+            "type": "string"
+          },
+          "manifest_version": {
+            "type": "string"
+          },
+          "registry_version": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionPlanned"
+            }
+          }
+        },
+        "required": [
+          "engine_version",
+          "manifest_version",
+          "registry_version",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    DetectionJob:
+      {
+        "type": "object",
+        "properties": {"requested_by_id":{"type":"string","format":"uuid"},"continued_from_id":{"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+ "pending_cleanup":{"type":"array","items":{"$ref":"#/components/schemas/DetectionArtifact"}},
+ "report_id":{"anyOf":[{"type":"string","format":"uuid"},{"type":"null"}]},
+ "execution_active":{"type":"boolean"},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/DetectionTarget"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/DetectionParameters"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/DetectionPlan"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "finished",
+              "cancelled",
+              "interrupted",
+              "suite_pending",
+              "failed",
+              "outdated"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionResult"
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/DetectionUsage"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["requested_by_id","continued_from_id",
+ "pending_cleanup",
+ "report_id",
+ "execution_active",
+          "id",
+          "owner_id",
+          "target",
+          "parameters",
+          "plan",
+          "state",
+          "complete",
+          "results",
+          "usage",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    DetectionSummary:
+      {
+        "type": "object",
+        "properties": {
+ "execution_active":{"type":"boolean"},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/DetectionTarget"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "finished",
+              "cancelled",
+              "interrupted",
+              "suite_pending",
+              "failed",
+              "outdated"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "scenarios": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "finished_scenarios": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "usage": {
+            "$ref": "#/components/schemas/DetectionUsage"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+ "execution_active",
+          "id",
+          "owner_id",
+          "target",
+          "state",
+          "complete",
+          "scenarios",
+          "finished_scenarios",
+          "usage",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    DetectionArtifact:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "response",
+              "conversation",
+              "cache",
+              "stored_chat"
+            ]
+          },
+          "native_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "delete_endpoint": {
+            "type": "string"
+          },
+          "delete_path": {
+            "type": "string"
+          },
+          "producer_attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "removed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "external_error",
+              "invalid_response",
+              "key_unavailable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "native_id",
+          "delete_endpoint",
+          "delete_path",
+          "producer_attempt_id",
+          "removed",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    DetectionJobEnvelope:
+      {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/DetectionJob"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "additionalProperties": false
+      }
+    DetectionParametersEnvelope:
+      {
+        "type": "object",
+        "properties": {
+          "parameters": {
+            "$ref": "#/components/schemas/DetectionParameters"
+          }
+        },
+        "required": [
+          "parameters"
+        ],
+        "additionalProperties": false
+      }
+    DetectionSearchEnvelope:
+      {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/DetectionSearchSettings"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "additionalProperties": false
+      }
+    DetectionArtifactsEnvelope:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionArtifact"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    DetectionJobsPage:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionSummary"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    DetectionAttemptsPage:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionAttempt"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    DetectionCreate:
+      {
+        "type": "object",
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "group",
+              "group_model"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "target_kind",
+          "target_id",
+          "api_key"
+        ],
+        "additionalProperties": false
+      }
+    DetectionResume:
+      {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "additionalProperties": false
+      }
+    DetectionRetest:
+      {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "writeOnly": true
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 512
+          }
+        },
+        "required": [
+          "api_key",
+          "scenarios"
+        ],
+        "additionalProperties": false
+      }
     MarketPrice:
       {
         "type": "string",
@@ -7648,7 +9421,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.4",
+    "version": "2026-10-18.5",
     "stage": "discovery",
     "sources": [
       {
@@ -8743,7 +10516,8 @@ x-aihub-gateway-contract:
               "role_and_instruction_semantics",
               "unicode",
               "multi_turn"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "openai-chat-completions.json",
@@ -8761,7 +10535,8 @@ x-aihub-gateway-contract:
               "native_structure",
               "reliable_usage_independently",
               "normal_and_controlled_length_termination"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.stream",
@@ -8786,7 +10561,8 @@ x-aihub-gateway-contract:
               "reasoning_lifecycle_when_applicable",
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.tools",
@@ -8815,7 +10591,8 @@ x-aihub-gateway-contract:
               "strict_schema_when_native",
               "parallel_native_control",
               "custom_allowed_namespace_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.multi",
@@ -8831,7 +10608,8 @@ x-aihub-gateway-contract:
               "native_multiple_candidates",
               "independent_indexes_and_termination",
               "no_cross_candidate_usage_duplication"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.output",
@@ -8855,7 +10633,8 @@ x-aihub-gateway-contract:
               "nested_enum_required",
               "stop_or_length_control",
               "representative_current_sampling_effort_verbosity"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.vision",
@@ -8872,7 +10651,8 @@ x-aihub-gateway-contract:
               "url_or_uri_content_recognition",
               "inline_content_recognition",
               "multiple_images_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.audio",
@@ -8888,7 +10668,8 @@ x-aihub-gateway-contract:
               "native_inline_input_when_applicable",
               "native_output_when_applicable",
               "actual_content_and_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.document",
@@ -8904,7 +10685,8 @@ x-aihub-gateway-contract:
               "native_url_when_supported",
               "citations_when_native",
               "no_external_file_id_authorization"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.cache_tier",
@@ -8920,7 +10702,8 @@ x-aihub-gateway-contract:
               "immediate_real_write_read_usage",
               "each_enabled_service_tier_actual_return",
               "no_wait_for_expiration"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.stored",
@@ -8941,7 +10724,8 @@ x-aihub-gateway-contract:
               "owned_list_get_metadata_messages_delete",
               "bounded_pagination",
               "no_repeat_inference_fee"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.fingerprint",
@@ -8954,7 +10738,8 @@ x-aihub-gateway-contract:
               "pinned_lmfpd_and_reference_set",
               "ranking_confidence_not_identity",
               "no_output_body_persistence"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-chat-completions.length_search",
@@ -8969,8 +10754,15 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
-            ]
+            ],
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
+        ],
+        "model_types": [
+          "text"
         ]
       },
       {
@@ -9001,7 +10793,8 @@ x-aihub-gateway-contract:
               "invalid_request",
               "native_error_structure",
               "natural_service_errors_observed_only"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "openai-chat-completions.catalog",
@@ -9015,8 +10808,12 @@ x-aihub-gateway-contract:
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
-            ]
+            ],
+            "credential_dependent": true
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
         ]
       },
       {
@@ -9044,7 +10841,8 @@ x-aihub-gateway-contract:
               "role_and_instruction_semantics",
               "unicode",
               "multi_turn"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "openai-responses.output",
@@ -9067,7 +10865,8 @@ x-aihub-gateway-contract:
               "nested_enum_required",
               "stop_or_length_control",
               "representative_current_sampling_effort_verbosity"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.json",
@@ -9090,7 +10889,8 @@ x-aihub-gateway-contract:
               "native_structure",
               "reliable_usage_independently",
               "normal_and_controlled_length_termination"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.stream",
@@ -9120,7 +10920,8 @@ x-aihub-gateway-contract:
               "reasoning_lifecycle_when_applicable",
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.tools",
@@ -9150,7 +10951,8 @@ x-aihub-gateway-contract:
               "strict_schema_when_native",
               "parallel_native_control",
               "custom_allowed_namespace_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.state",
@@ -9187,7 +10989,8 @@ x-aihub-gateway-contract:
               "store_false_self_contained_replay",
               "unknown_reference_rejected",
               "conflicting_references_rejected"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.context",
@@ -9203,7 +11006,8 @@ x-aihub-gateway-contract:
               "configured_bisection_or_trisection",
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.reasoning",
@@ -9221,7 +11025,8 @@ x-aihub-gateway-contract:
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
               "no_source_stickiness"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.vision",
@@ -9237,7 +11042,8 @@ x-aihub-gateway-contract:
               "url_or_uri_content_recognition",
               "inline_content_recognition",
               "multiple_images_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.document",
@@ -9253,7 +11059,8 @@ x-aihub-gateway-contract:
               "native_url_when_supported",
               "citations_when_native",
               "no_external_file_id_authorization"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.audio",
@@ -9268,7 +11075,8 @@ x-aihub-gateway-contract:
               "native_inline_input_when_applicable",
               "native_output_when_applicable",
               "actual_content_and_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.search",
@@ -9282,7 +11090,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_server_search_request_execution_result",
               "reliable_usage_only"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.code",
@@ -9297,7 +11106,8 @@ x-aihub-gateway-contract:
               "native_in_call_execution_and_result",
               "reliable_receipt_only",
               "no_container_crud"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.image_tool",
@@ -9311,7 +11121,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_image_output",
               "actual_outputs_and_reliable_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.mcp",
@@ -9326,7 +11137,8 @@ x-aihub-gateway-contract:
               "fixed_remote_mcp_declaration",
               "authorization_and_tool_round_trip",
               "no_resource_management"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.background",
@@ -9362,7 +11174,8 @@ x-aihub-gateway-contract:
               "owned_retrieve_resume_cancel_delete_input_items",
               "terminal_usage_once",
               "cleanup_only_owned_resources"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.count_compact",
@@ -9378,7 +11191,8 @@ x-aihub-gateway-contract:
               "native_token_count",
               "native_compact_when_applicable",
               "complete_compacted_window_replay"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.fingerprint",
@@ -9391,7 +11205,8 @@ x-aihub-gateway-contract:
               "pinned_lmfpd_and_reference_set",
               "ranking_confidence_not_identity",
               "no_output_body_persistence"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "openai-responses.length_search",
@@ -9406,8 +11221,16 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
-            ]
+            ],
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
+        ],
+        "model_types": [
+          "text",
+          "image"
         ]
       },
       {
@@ -9439,7 +11262,8 @@ x-aihub-gateway-contract:
               "invalid_request",
               "native_error_structure",
               "natural_service_errors_observed_only"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "openai-responses.catalog",
@@ -9453,8 +11277,12 @@ x-aihub-gateway-contract:
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
-            ]
+            ],
+            "credential_dependent": true
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
         ]
       },
       {
@@ -9484,7 +11312,8 @@ x-aihub-gateway-contract:
               "role_and_instruction_semantics",
               "unicode",
               "multi_turn"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "native-messages.json",
@@ -9508,7 +11337,8 @@ x-aihub-gateway-contract:
               "native_structure",
               "reliable_usage_independently",
               "normal_and_controlled_length_termination"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.context",
@@ -9524,7 +11354,8 @@ x-aihub-gateway-contract:
               "configured_bisection_or_trisection",
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.stream",
@@ -9555,7 +11386,8 @@ x-aihub-gateway-contract:
               "reasoning_lifecycle_when_applicable",
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.tools",
@@ -9584,7 +11416,8 @@ x-aihub-gateway-contract:
               "strict_schema_when_native",
               "parallel_native_control",
               "custom_allowed_namespace_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.server_tools",
@@ -9599,7 +11432,8 @@ x-aihub-gateway-contract:
               "web_search_20250305",
               "code_execution_20250825",
               "actual_tool_use_result_and_reliable_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.reasoning",
@@ -9618,7 +11452,8 @@ x-aihub-gateway-contract:
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
               "no_source_stickiness"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.output",
@@ -9637,7 +11472,8 @@ x-aihub-gateway-contract:
               "nested_enum_required",
               "stop_or_length_control",
               "representative_current_sampling_effort_verbosity"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.vision",
@@ -9654,7 +11490,8 @@ x-aihub-gateway-contract:
               "url_or_uri_content_recognition",
               "inline_content_recognition",
               "multiple_images_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.document",
@@ -9670,7 +11507,8 @@ x-aihub-gateway-contract:
               "native_url_when_supported",
               "citations_when_native",
               "no_external_file_id_authorization"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.cache_tier",
@@ -9688,7 +11526,8 @@ x-aihub-gateway-contract:
               "immediate_real_write_read_usage",
               "each_enabled_service_tier_actual_return",
               "no_wait_for_expiration"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.count_compact",
@@ -9703,7 +11542,8 @@ x-aihub-gateway-contract:
               "native_token_count",
               "native_compact_when_applicable",
               "complete_compacted_window_replay"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.mcp",
@@ -9720,7 +11560,8 @@ x-aihub-gateway-contract:
               "mcp_toolset",
               "mcp_tool_use_and_mcp_tool_result",
               "no_files_or_container_crud"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.sdk",
@@ -9733,7 +11574,8 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "fixed_sdk_real_basic_request_not_mock"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.fingerprint",
@@ -9746,7 +11588,8 @@ x-aihub-gateway-contract:
               "pinned_lmfpd_and_reference_set",
               "ranking_confidence_not_identity",
               "no_output_body_persistence"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-messages.length_search",
@@ -9761,8 +11604,15 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
-            ]
+            ],
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
+        ],
+        "model_types": [
+          "text"
         ]
       },
       {
@@ -9793,7 +11643,8 @@ x-aihub-gateway-contract:
               "invalid_request",
               "native_error_structure",
               "natural_service_errors_observed_only"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "native-messages.catalog",
@@ -9807,8 +11658,12 @@ x-aihub-gateway-contract:
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
-            ]
+            ],
+            "credential_dependent": true
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
         ]
       },
       {
@@ -9837,7 +11692,8 @@ x-aihub-gateway-contract:
               "role_and_instruction_semantics",
               "unicode",
               "multi_turn"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "native-generate-content.json",
@@ -9861,7 +11717,8 @@ x-aihub-gateway-contract:
               "native_structure",
               "reliable_usage_independently",
               "normal_and_controlled_length_termination"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.multi",
@@ -9877,7 +11734,8 @@ x-aihub-gateway-contract:
               "native_multiple_candidates",
               "independent_indexes_and_termination",
               "no_cross_candidate_usage_duplication"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.stream",
@@ -9905,7 +11763,8 @@ x-aihub-gateway-contract:
               "reasoning_lifecycle_when_applicable",
               "indexes_utf8_and_terminal_usage",
               "no_induced_network_failure"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.tools",
@@ -9936,7 +11795,8 @@ x-aihub-gateway-contract:
               "strict_schema_when_native",
               "parallel_native_control",
               "custom_allowed_namespace_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.server_echo",
@@ -9951,7 +11811,8 @@ x-aihub-gateway-contract:
               "ToolCall_ToolResponse_GOOGLE_SEARCH_WEB",
               "ToolCall_ToolResponse_URL_CONTEXT",
               "matching_id_and_echo_native_parts"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.reasoning",
@@ -9971,7 +11832,8 @@ x-aihub-gateway-contract:
               "actual_reasoning_when_observable",
               "complete_opaque_signature_or_encrypted_replay",
               "no_source_stickiness"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.output",
@@ -9992,7 +11854,8 @@ x-aihub-gateway-contract:
               "nested_enum_required",
               "stop_or_length_control",
               "representative_current_sampling_effort_verbosity"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.vision",
@@ -10008,7 +11871,8 @@ x-aihub-gateway-contract:
               "url_or_uri_content_recognition",
               "inline_content_recognition",
               "multiple_images_when_native"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.audio",
@@ -10024,7 +11888,8 @@ x-aihub-gateway-contract:
               "native_inline_input_when_applicable",
               "native_output_when_applicable",
               "actual_content_and_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.video",
@@ -10038,7 +11903,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_inline_or_url_content_recognition",
               "no_files_upload"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.document",
@@ -10054,7 +11920,8 @@ x-aihub-gateway-contract:
               "native_url_when_supported",
               "citations_when_native",
               "no_external_file_id_authorization"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.image_tool",
@@ -10068,7 +11935,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_image_output",
               "actual_outputs_and_reliable_usage"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.search",
@@ -10082,7 +11950,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_server_search_request_execution_result",
               "reliable_usage_only"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.code",
@@ -10097,7 +11966,8 @@ x-aihub-gateway-contract:
               "native_in_call_execution_and_result",
               "reliable_receipt_only",
               "no_container_crud"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.url_context",
@@ -10110,7 +11980,8 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "native_url_context_and_result"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.safety",
@@ -10127,7 +11998,8 @@ x-aihub-gateway-contract:
             "assertions": [
               "native_safety_configuration",
               "feedback_only_if_observed"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.cache_tier",
@@ -10153,7 +12025,8 @@ x-aihub-gateway-contract:
               "immediate_real_write_read_usage",
               "each_enabled_service_tier_actual_return",
               "no_wait_for_expiration"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.sdk",
@@ -10166,7 +12039,8 @@ x-aihub-gateway-contract:
             "conditional_source_ids": [],
             "assertions": [
               "fixed_sdk_real_basic_request_not_mock"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.fingerprint",
@@ -10179,7 +12053,8 @@ x-aihub-gateway-contract:
               "pinned_lmfpd_and_reference_set",
               "ranking_confidence_not_identity",
               "no_output_body_persistence"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "native-generate-content.length_search",
@@ -10194,8 +12069,16 @@ x-aihub-gateway-contract:
               "measured_lower_and_proven_failure_upper",
               "external_error_not_length_upper",
               "maximum_output_actual_generation_separate_from_parameter_acceptance"
-            ]
+            ],
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
+        ],
+        "model_types": [
+          "text",
+          "image"
         ]
       },
       {
@@ -10229,7 +12112,8 @@ x-aihub-gateway-contract:
               "invalid_request",
               "native_error_structure",
               "natural_service_errors_observed_only"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "native-generate-content.catalog",
@@ -10243,8 +12127,12 @@ x-aihub-gateway-contract:
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
-            ]
+            ],
+            "credential_dependent": true
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
         ]
       },
       {
@@ -10266,7 +12154,8 @@ x-aihub-gateway-contract:
               "each_enabled_pricing_unit",
               "actual_product_count",
               "reliable_usage_or_unpriced"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "images.edits",
@@ -10281,7 +12170,8 @@ x-aihub-gateway-contract:
               "each_enabled_pricing_unit",
               "actual_product_count",
               "reliable_usage_or_unpriced"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "images.variations",
@@ -10296,8 +12186,15 @@ x-aihub-gateway-contract:
               "each_enabled_pricing_unit",
               "actual_product_count",
               "reliable_usage_or_unpriced"
-            ]
+            ],
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol"
+        ],
+        "model_types": [
+          "image"
         ]
       },
       {
@@ -10319,7 +12216,8 @@ x-aihub-gateway-contract:
               "Lite 协议标记 / 固定 CLI 的 Lite 路径",
               "核对实际 Header 名称、取值或其他协议识别方式，发真实请求并验证上游原生识别及平台保留。若该版本无独立 Lite Header，保留 ID 并按实际标记修正断言、记录源码/fixture 来源，不发明字段。",
               "与 CLI/provider/目录版本绑定；字段被接受不等于完整 Lite 支持"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL02",
@@ -10334,7 +12232,8 @@ x-aihub-gateway-contract:
               "additional_tools 输入结构",
               "发固定版本的原生 input 声明并触发工具；核验工具名/参数/call 关联与结果回填。",
               "Lite 工具声明能力；不能由普通文本成功推导"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL03",
@@ -10349,7 +12248,8 @@ x-aihub-gateway-contract:
               "顶层 tools 与 Lite 声明的原生支持",
               "分别用标准 tools 和 Lite 原生声明完成适用工具往返，各自保留原格式；上游只支持其一时分别报告。",
               "不进行声明互转；同次响应可支持多个子断言"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL04",
@@ -10364,7 +12264,8 @@ x-aihub-gateway-contract:
               "parallel_tool_calls:false",
               "发送明确禁止并行的工具场景，按固定版本约束验证实际行为及 call/result；不由开关接受推导限制已执行。",
               "独立参数/行为证据；不增加并发压测"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL05",
@@ -10379,7 +12280,8 @@ x-aihub-gateway-contract:
               "reasoning.context:all_turns",
               "使用有效的多轮合成上下文，分别记录参数接受和续聊行为，保留原生字段与 opaque 项。",
               "不从一次参数接受推导所有历史行为"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL06",
@@ -10394,7 +12296,8 @@ x-aihub-gateway-contract:
               "developer / 基础指令语义",
               "固定版本适用的指令与合成内容，核验层级/内容保留及可验证结果。",
               "与实际模型/协议绑定，不改写为另一种指令协议"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL07",
@@ -10409,7 +12312,8 @@ x-aihub-gateway-contract:
               "Namespace / custom 工具",
               "声明命名空间/工具，接收实际调用，按 namespace/name/call 标识回填并续聊，核验分片和关联。",
               "namespace/custom/普通 function 能力分别记录"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL08",
@@ -10424,7 +12328,8 @@ x-aihub-gateway-contract:
               "Lite SSE 生命周期",
               "实际 Lite 文本/工具流核验事件、索引、UTF-8、增量和终态/usage；可选事件及自然错误按实际出现记录。",
               "HTTP 200 或可显示文本不能替代完整 SSE；不主动诱发上游错误"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL09",
@@ -10439,7 +12344,8 @@ x-aihub-gateway-contract:
               "多轮加密推理原样续用",
               "生成后原样回传完整 encrypted reasoning 及相关项，验证后续推理；不因内部 ID 未登记拒绝。",
               "目标原生回放证据；跨渠道平台回归另见 RL23"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL10",
@@ -10460,7 +12366,8 @@ x-aihub-gateway-contract:
               "codex-special.RL20",
               "codex-special.RL21",
               "codex-special.RL22"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL12",
@@ -10475,7 +12382,8 @@ x-aihub-gateway-contract:
               "标准与 Lite 原生兼容（保留旧“双向兼容”追溯）",
               "对标准/Lite 各自适用的请求→工具→回填→续聊留证；跨形态回放仅按固定契约实际验证，不凭成功猜测。",
               "上游兼容性分别报告；平台不做双向转换"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL14",
@@ -10490,7 +12398,8 @@ x-aihub-gateway-contract:
               "zstd 请求编码",
               "发真实压缩请求，核验正常转发、模型替换后的有效编码/长度及无压缩回归；非法编码/解压上限负例在受控网关测试验证。",
               "传输编码能力与 CLI 是否实际发压缩请求分别记录；不扩大上游故障诱发范围"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL16",
@@ -10505,7 +12414,8 @@ x-aihub-gateway-contract:
               "独立 alpha/search",
               "按固定契约发搜索并核验实际结果结构/URL/opaque 输出及后续使用，记录可证实计量；CLI 证据须实际触发该 HTTP 路径。",
               "与 Responses 内置 web_search 分开；不代理任意返回 URL"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL20",
@@ -10521,7 +12431,8 @@ x-aihub-gateway-contract:
               "V1 standalone compact",
               "用固定原生 compact 路径提交完整输入，保留返回的整个有效窗口及顺序并续聊；可复用 F4/F7 同目标/同路径/同配置真实证据。",
               "原生 V1 能力；不能代替 V2 或后台执行"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL21",
@@ -10536,7 +12447,8 @@ x-aihub-gateway-contract:
               "V2 compaction_trigger",
               "普通 Responses 输入实际 trigger，收集 compaction 输出后完整回传续聊，核验固定版本实际状态/元数据。",
               "原生 V2 能力；store:false 与内部 ID 不引入来源绑定；不宣称所有摘要语义精确保留"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL22",
@@ -10551,7 +12463,8 @@ x-aihub-gateway-contract:
               "客户端后台 V2 正确性",
               "用确实生效的独立配置触发后台 V2，与前台请求存在实际重叠，核验结果使用/取消/关闭及无重复收费。",
               "同一 V2 的执行方式；不是 background=true、新接口或性能压测"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL24",
@@ -10566,25 +12479,17 @@ x-aihub-gateway-contract:
               "实际服务档位",
               "每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。",
               "降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6"
-            ]
-          },
-          {
-            "id": "codex-special.RL25",
-            "endpoints": [
-              "codex.images",
-              "codex.images.edit"
             ],
-            "source_ids": [
-              "RL25"
-            ],
-            "conditional_source_ids": [],
-            "assertions": [
-              "Codex 专用原生生图",
-              "固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。",
-              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源",
-              "固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。"
-            ]
+            "credential_dependent": false
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol",
+          "gateway_proxy",
+          "official_cli"
+        ],
+        "model_types": [
+          "text"
         ]
       },
       {
@@ -10609,7 +12514,8 @@ x-aihub-gateway-contract:
               "客户端接入前置",
               "固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。",
               "三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "codex-special.RL15",
@@ -10624,7 +12530,8 @@ x-aihub-gateway-contract:
               "Codex 能力目录",
               "固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。",
               "不暴露共享账号目录或存完整提示词；目录声明不自动证明能力"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "codex-special.RL17",
@@ -10639,7 +12546,8 @@ x-aihub-gateway-contract:
               "notes thread_hint",
               "新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。",
               "会话上下文辅助；不登记来源渠道粘性，不存提示正文"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "codex-special.RL18",
@@ -10658,7 +12566,8 @@ x-aihub-gateway-contract:
               "notes 写读/列表及固定范围内操作",
               "固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。",
               "F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文"
-            ]
+            ],
+            "credential_dependent": true
           },
           {
             "id": "codex-special.RL19",
@@ -10676,8 +12585,14 @@ x-aihub-gateway-contract:
               "history 窗口/条目及固定范围内操作",
               "list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。",
               "F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据"
-            ]
+            ],
+            "credential_dependent": true
           }
+        ],
+        "evidence_layers": [
+          "upstream_protocol",
+          "gateway_proxy",
+          "official_cli"
         ]
       },
       {
@@ -10701,7 +12616,8 @@ x-aihub-gateway-contract:
               "自包含状态/history-notes 跨渠道",
               "明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。",
               "平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性"
-            ]
+            ],
+            "credential_dependent": false
           },
           {
             "id": "codex-special.RL26",
@@ -10717,7 +12633,46 @@ x-aihub-gateway-contract:
               "专项权限与隔离",
               "两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。",
               "归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容"
-            ]
+            ],
+            "credential_dependent": false
+          }
+        ],
+        "evidence_layers": [
+          "gateway_proxy",
+          "official_cli"
+        ]
+      },
+      {
+        "id": "codex-special.image_model",
+        "protocol": "codex-special",
+        "target": "group_model",
+        "model_types": [
+          "image"
+        ],
+        "feature": "F8",
+        "evidence_layers": [
+          "upstream_protocol",
+          "gateway_proxy",
+          "official_cli"
+        ],
+        "requirements": [
+          {
+            "id": "codex-special.RL25",
+            "endpoints": [
+              "codex.images",
+              "codex.images.edit"
+            ],
+            "source_ids": [
+              "RL25"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "Codex 专用原生生图",
+              "固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。",
+              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源",
+              "固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。"
+            ],
+            "credential_dependent": true
           }
         ]
       }

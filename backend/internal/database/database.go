@@ -16,12 +16,23 @@ import (
 var migrationFiles embed.FS
 
 func Open(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
+	return openPool(ctx, databaseURL, 20)
+}
+
+// OpenLimited gives bounded background work its own connection slots.
+func OpenLimited(ctx context.Context, databaseURL string, maxConnections int32) (*pgxpool.Pool, error) {
+	if maxConnections < 1 || maxConnections > 20 {
+		return nil, fmt.Errorf("invalid background connection limit")
+	}
+	return openPool(ctx, databaseURL, maxConnections)
+}
+func openPool(ctx context.Context, databaseURL string, maxConnections int32) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse database configuration: %w", err)
 	}
-	config.MaxConns = 20
-	config.MinConns = 2
+	config.MaxConns = maxConnections
+	config.MinConns = min(2, maxConnections)
 	config.MaxConnLifetime = time.Hour
 	config.MaxConnIdleTime = 15 * time.Minute
 	config.HealthCheckPeriod = time.Minute

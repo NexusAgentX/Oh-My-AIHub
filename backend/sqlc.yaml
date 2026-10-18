@@ -219,3 +219,10 @@ sql:
         package: marketpg
         out: internal/postgres/marketpg
         emit_json_tags: true
+  - <<: *domain
+    queries: internal/postgres/detectionpg/queries.sql
+    gen:
+      go:
+        <<: *gen
+        package: detectionpg
+        out: internal/postgres/detectionpg
