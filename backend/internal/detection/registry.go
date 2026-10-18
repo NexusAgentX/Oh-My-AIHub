@@ -144,11 +144,18 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 					for _, member := range suite.Requirements {
 						if member.ID == required {
 							item.CredentialDependent = item.CredentialDependent || member.CredentialDependent
-							item.Conditional = append(item.Conditional, member.ConditionalAssertions...)
 							for i, label := range member.Assertions {
 								assertion := AssertionID(member.ID, i)
+								if !member.AssertionInLayer(assertion, layer) {
+									continue
+								}
 								item.Assertions = append(item.Assertions, assertion)
 								item.AssertionLabels[assertion] = label
+							}
+							for _, id := range member.ConditionalAssertions {
+								if member.AssertionInLayer(id, layer) {
+									item.Conditional = append(item.Conditional, id)
+								}
 							}
 						}
 					}

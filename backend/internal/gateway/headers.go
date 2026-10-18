@@ -129,7 +129,7 @@ func ClientResponseHeaders(upstream http.Header, decompressed bool) http.Header 
 	extra := connectionTokens(upstream)
 	for name, values := range upstream {
 		canonical := http.CanonicalHeaderKey(name)
-		if hopByHop[canonical] || extra[canonical] || canonical == "Set-Cookie" || canonical == "X-Aihub-Request-Id" {
+		if hopByHop[canonical] || extra[canonical] || canonical == "Set-Cookie" || canonical == "X-Aihub-Request-Id" || canonical == "Chatgpt-Account-Id" || canonical == "Chatgpt-User-Id" {
 			continue
 		}
 		if decompressed && (canonical == "Content-Length" || canonical == "Content-Encoding") {

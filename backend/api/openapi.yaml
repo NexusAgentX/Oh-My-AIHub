@@ -27,6 +27,1822 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /backend-api/codex/alpha/notes/v2/thread_hint:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesThread_Hint",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.thread_hint",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/notes/v2/write_file:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesWrite_File",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.write_file",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/notes/v2/read_file:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesRead_File",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.read_file",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/notes/v2/list_files_by_prefix:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesList_Files_By_Prefix",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.list_files_by_prefix",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/notes/v2/search_contents:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesSearch_Contents",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.search_contents",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/notes/v2/append_to_file:
+    {
+      "post": {
+        "operationId": "proxyCodexNotesAppend_To_File",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.notes.append_to_file",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/history/v2/list_windows:
+    {
+      "post": {
+        "operationId": "proxyCodexHistoryList_Windows",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.history.list_windows",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/history/v2/list_items:
+    {
+      "post": {
+        "operationId": "proxyCodexHistoryList_Items",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.history.list_items",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/history/v2/read_item:
+    {
+      "post": {
+        "operationId": "proxyCodexHistoryRead_Item",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.history.read_item",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /backend-api/codex/alpha/history/v2/search_contents:
+    {
+      "post": {
+        "operationId": "proxyCodexHistorySearch_Contents",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "codex.history.search_contents",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  /v1/user-auth-credential/whoami:
+    {
+      "get": {
+        "operationId": "proxyIdentityWhoami",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "identity.whoami",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexPlatformIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    }
+  /backend-api/wham/accounts/check:
+    {
+      "get": {
+        "operationId": "proxyIdentityAccounts",
+        "tags": [
+          "gateway"
+        ],
+        "summary": "identity.accounts",
+        "x-access": "gateway_key",
+        "x-feature": "497",
+        "security": [
+          {
+            "bearerKey": []
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Native JSON result and protocol error; context identifiers are isolated by platform account and Key."
+          },
+          "200": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexPlatformAccounts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Native JSON response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexNativeJSON"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    }
   /v1/chat/completions/{completionID}:
     {
       "get": {
@@ -7236,6 +9052,93 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    CodexNativeJSON:
+      {}
+    CodexPlatformIdentity:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "chatgpt_user_id",
+          "chatgpt_account_id",
+          "chatgpt_plan_type",
+          "chatgpt_account_is_fedramp"
+        ],
+        "properties": {
+          "email": {
+            "type": "null"
+          },
+          "chatgpt_user_id": {
+            "type": "string",
+            "pattern": "^aihub-user-"
+          },
+          "chatgpt_account_id": {
+            "type": "string",
+            "pattern": "^aihub-account-"
+          },
+          "chatgpt_plan_type": {
+            "const": "aihub"
+          },
+          "chatgpt_account_is_fedramp": {
+            "const": false
+          }
+        }
+      }
+    CodexPlatformAccounts:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accounts",
+          "account_ordering"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "plan_type",
+                "workspace_backend_origin",
+                "account_routing_override",
+                "structure"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^aihub-account-"
+                },
+                "plan_type": {
+                  "type": "null"
+                },
+                "workspace_backend_origin": {
+                  "const": "NO_CONSTRAINT"
+                },
+                "account_routing_override": {
+                  "const": "NO_CONSTRAINT"
+                },
+                "structure": {
+                  "const": "personal"
+                }
+              }
+            }
+          },
+          "account_ordering": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^aihub-account-"
+            }
+          }
+        }
+      }
     ContributionReuseAddress:
       {
         "type": "object",
@@ -15590,7 +17493,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.18",
+    "version": "2026-10-18.19",
     "stage": "discovery",
     "sources": [
       {
@@ -16264,7 +18167,7 @@ x-aihub-gateway-contract:
         "path": "/backend-api/codex/models",
         "source": "codex",
         "scope": "stateless",
-        "model": "explicit_or_context",
+        "model": "context_or_stable_fallback",
         "billing": "none",
         "replay": "read",
         "feature": "F8",
@@ -18697,9 +20600,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "Lite 协议标记 / 固定 CLI 的 Lite 路径",
-              "核对实际 Header 名称、取值或其他协议识别方式，发真实请求并验证上游原生识别及平台保留。若该版本无独立 Lite Header，保留 ID 并按实际标记修正断言、记录源码/fixture 来源，不发明字段。",
-              "与 CLI/provider/目录版本绑定；字段被接受不等于完整 Lite 支持"
+              "actual_protocol_marker",
+              "native_lite_request",
+              "marker_preserved"
             ],
             "credential_dependent": false
           },
@@ -18713,9 +20616,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "additional_tools 输入结构",
-              "发固定版本的原生 input 声明并触发工具；核验工具名/参数/call 关联与结果回填。",
-              "Lite 工具声明能力；不能由普通文本成功推导"
+              "additional_tools_declaration",
+              "tool_call_association",
+              "tool_result_continuation"
             ],
             "credential_dependent": false
           },
@@ -18729,9 +20632,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "顶层 tools 与 Lite 声明的原生支持",
-              "分别用标准 tools 和 Lite 原生声明完成适用工具往返，各自保留原格式；上游只支持其一时分别报告。",
-              "不进行声明互转；同次响应可支持多个子断言"
+              "standard_tools_roundtrip",
+              "lite_tools_roundtrip"
             ],
             "credential_dependent": false
           },
@@ -18745,9 +20647,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "parallel_tool_calls:false",
-              "发送明确禁止并行的工具场景，按固定版本约束验证实际行为及 call/result；不由开关接受推导限制已执行。",
-              "独立参数/行为证据；不增加并发压测"
+              "parallel_parameter_accepted",
+              "parallel_calls_disabled"
             ],
             "credential_dependent": false
           },
@@ -18761,9 +20662,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "reasoning.context:all_turns",
-              "使用有效的多轮合成上下文，分别记录参数接受和续聊行为，保留原生字段与 opaque 项。",
-              "不从一次参数接受推导所有历史行为"
+              "reasoning_context_parameter",
+              "multi_turn_continuation"
             ],
             "credential_dependent": false
           },
@@ -18777,9 +20677,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "developer / 基础指令语义",
-              "固定版本适用的指令与合成内容，核验层级/内容保留及可验证结果。",
-              "与实际模型/协议绑定，不改写为另一种指令协议"
+              "developer_instruction",
+              "instructions_preserved"
             ],
             "credential_dependent": false
           },
@@ -18793,9 +20692,10 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "Namespace / custom 工具",
-              "声明命名空间/工具，接收实际调用，按 namespace/name/call 标识回填并续聊，核验分片和关联。",
-              "namespace/custom/普通 function 能力分别记录"
+              "namespace_tools_roundtrip",
+              "custom_tools_roundtrip",
+              "argument_fragments",
+              "call_result_association"
             ],
             "credential_dependent": false
           },
@@ -18809,9 +20709,10 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "Lite SSE 生命周期",
-              "实际 Lite 文本/工具流核验事件、索引、UTF-8、增量和终态/usage；可选事件及自然错误按实际出现记录。",
-              "HTTP 200 或可显示文本不能替代完整 SSE；不主动诱发上游错误"
+              "sse_lifecycle",
+              "text_utf8_deltas",
+              "tool_argument_deltas",
+              "terminal_usage"
             ],
             "credential_dependent": false
           },
@@ -18825,9 +20726,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "多轮加密推理原样续用",
-              "生成后原样回传完整 encrypted reasoning 及相关项，验证后续推理；不因内部 ID 未登记拒绝。",
-              "目标原生回放证据；跨渠道平台回归另见 RL23"
+              "encrypted_reasoning_produced",
+              "encrypted_reasoning_continued"
             ],
             "credential_dependent": false
           },
@@ -18863,9 +20763,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "标准与 Lite 原生兼容（保留旧“双向兼容”追溯）",
-              "对标准/Lite 各自适用的请求→工具→回填→续聊留证；跨形态回放仅按固定契约实际验证，不凭成功猜测。",
-              "上游兼容性分别报告；平台不做双向转换"
+              "standard_native_roundtrip",
+              "lite_native_roundtrip",
+              "compatible_replay"
             ],
             "credential_dependent": false
           },
@@ -18879,9 +20779,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "zstd 请求编码",
-              "发真实压缩请求，核验正常转发、模型替换后的有效编码/长度及无压缩回归；非法编码/解压上限负例在受控网关测试验证。",
-              "传输编码能力与 CLI 是否实际发压缩请求分别记录；不扩大上游故障诱发范围"
+              "content_encoding_zstd",
+              "native_zstd_request",
+              "uncompressed_request"
             ],
             "credential_dependent": false
           },
@@ -18895,9 +20795,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "独立 alpha/search",
-              "按固定契约发搜索并核验实际结果结构/URL/opaque 输出及后续使用，记录可证实计量；CLI 证据须实际触发该 HTTP 路径。",
-              "与 Responses 内置 web_search 分开；不代理任意返回 URL"
+              "native_search",
+              "search_result_structure",
+              "search_result_continuation"
             ],
             "credential_dependent": false
           },
@@ -18912,9 +20812,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "V1 standalone compact",
-              "用固定原生 compact 路径提交完整输入，保留返回的整个有效窗口及顺序并续聊；可复用 F4/F7 同目标/同路径/同配置真实证据。",
-              "原生 V1 能力；不能代替 V2 或后台执行"
+              "native_compact",
+              "complete_output_window",
+              "compaction_continuation"
             ],
             "credential_dependent": false
           },
@@ -18928,9 +20828,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "V2 compaction_trigger",
-              "普通 Responses 输入实际 trigger，收集 compaction 输出后完整回传续聊，核验固定版本实际状态/元数据。",
-              "原生 V2 能力；store:false 与内部 ID 不引入来源绑定；不宣称所有摘要语义精确保留"
+              "compaction_trigger",
+              "compaction_output",
+              "compaction_continuation"
             ],
             "credential_dependent": false
           },
@@ -18944,9 +20844,11 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "客户端后台 V2 正确性",
-              "用确实生效的独立配置触发后台 V2，与前台请求存在实际重叠，核验结果使用/取消/关闭及无重复收费。",
-              "同一 V2 的执行方式；不是 background=true、新接口或性能压测"
+              "effective_background_profile",
+              "foreground_overlap",
+              "result_reuse",
+              "cancel_shutdown",
+              "single_settlement"
             ],
             "credential_dependent": false
           },
@@ -18960,9 +20862,9 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "实际服务档位",
-              "每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。",
-              "降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6"
+              "requested_service_tier",
+              "actual_service_tier",
+              "reliable_tier_usage"
             ],
             "credential_dependent": false
           }
@@ -18995,11 +20897,30 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "客户端接入前置",
-              "固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。",
-              "三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported"
+              "provider_api_auth",
+              "platform_identity",
+              "credential_separation",
+              "cli_auth_profile",
+              "features_activated"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "assertion_layers": {
+              "codex-special.RL13/a1": [
+                "upstream_protocol"
+              ],
+              "codex-special.RL13/a2": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL13/a3": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL13/a4": [
+                "official_cli"
+              ],
+              "codex-special.RL13/a5": [
+                "official_cli"
+              ]
+            }
           },
           {
             "id": "codex-special.RL15",
@@ -19011,11 +20932,26 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "Codex 能力目录",
-              "固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。",
-              "不暴露共享账号目录或存完整提示词；目录声明不自动证明能力"
+              "native_catalog",
+              "model_acl_filter",
+              "evidence_metadata",
+              "cli_catalog_consumed"
             ],
-            "credential_dependent": true
+            "credential_dependent": true,
+            "assertion_layers": {
+              "codex-special.RL15/a1": [
+                "upstream_protocol"
+              ],
+              "codex-special.RL15/a2": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL15/a3": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL15/a4": [
+                "official_cli"
+              ]
+            }
           },
           {
             "id": "codex-special.RL17",
@@ -19027,9 +20963,8 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "notes thread_hint",
-              "新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。",
-              "会话上下文辅助；不登记来源渠道粘性，不存提示正文"
+              "thread_hint",
+              "context_isolation"
             ],
             "credential_dependent": true
           },
@@ -19047,9 +20982,13 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "notes 写读/列表及固定范围内操作",
-              "固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。",
-              "F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文"
+              "write_file",
+              "read_file",
+              "list_files_by_prefix",
+              "search_contents",
+              "append_to_file",
+              "reopen_session",
+              "context_isolation"
             ],
             "credential_dependent": true
           },
@@ -19066,9 +21005,12 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "history 窗口/条目及固定范围内操作",
-              "list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。",
-              "F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据"
+              "list_windows",
+              "list_items",
+              "read_item",
+              "search_contents",
+              "remote_resume",
+              "context_isolation"
             ],
             "credential_dependent": true
           }
@@ -19097,9 +21039,12 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "自包含状态/history-notes 跨渠道",
-              "明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。",
-              "平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性"
+              "encrypted_reasoning_cross_channel",
+              "signature_cross_channel",
+              "compaction_cross_channel",
+              "notes_cross_channel",
+              "history_cross_channel",
+              "reference_scope_enforced"
             ],
             "credential_dependent": false
           },
@@ -19114,9 +21059,13 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "专项权限与隔离",
-              "两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。",
-              "归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容"
+              "account_key_isolation",
+              "context_collision",
+              "foreign_reference_denied",
+              "credential_rotation",
+              "key_revocation",
+              "fixed_egress",
+              "secret_redaction"
             ],
             "credential_dependent": false
           }
@@ -19151,10 +21100,10 @@ x-aihub-gateway-contract:
             ],
             "conditional_source_ids": [],
             "assertions": [
-              "Codex 专用原生生图",
-              "固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。",
-              "F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源",
-              "固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。"
+              "native_generation",
+              "native_edit",
+              "image_model_permission",
+              "reliable_products"
             ],
             "credential_dependent": true
           }
@@ -19292,6 +21241,32 @@ x-aihub-gateway-contract:
       "detection/builtins": "调用内工具固定为 Responses web_search/code_interpreter/image_generation，Messages web_search_20250305/code_execution_20250825，GenerateContent googleSearch/urlContext/codeExecution/IMAGE及GOOGLE_SEARCH_WEB、URL_CONTEXT原生ToolCall/ToolResponse整块回放。只有实际工具块、关联结果、可核验语义/产物支持能力；auto未调用为未知，缺代码执行计费回执不从container_id猜费用。不下载工具输出文件，不开放容器/工具资源CRUD。",
       "detection/mcp": "远端MCP仅使用本应用固定合成fixture v1（JSON Streamable HTTP 2025-06-18/2025-03-26）：每任务随机临时Bearer令牌，固定空参数只读工具返回未写入提示的随机marker，须同时有实际回调与上游原生结果。Responses测试always审批请求及明确批准后执行，Messages固定mcp-client-2025-11-20和mcp_toolset精确allowlist。AIHUB_DETECTION_PUBLIC_ORIGIN配置本应用公网HTTPS origin；缺配置保持MCP套件pending，不减全测分母。回调不接收平台Key/宿主认证/文件/任意URL，不持久化正文，单探针64请求/4工具调用、16活跃探针、请求16KiB均为局部资源保护。",
       "detection/version-quota": "GenerateContent分组分别验证v1与v1beta原生模型目录，独立子断言，不由一版本推导另一版本；G-C09元数据归目录场景。余额/配额原生适配范围为已固定六种OpenAI/Anthropic剩余量header；共享真实目录请求，字段缺失为条件未观测，数字错误独立失败，不等待重置、不诱发额度耗尽。固定原生推理Key契约没有统一金额余额入口：明确记录未暴露，不发送组织/管理员管理API、不猜余额、不试任意中转站私有路径；供应商私有金额余额适配需先固定真实接口/认证契约。数值只在所有者/管理员报告中，不投影到公开市场/路由画像。",
-      "detection/capability-projection": "Project只接受完整封存且目标/能力摘要/manifest/实现/参数/凭据范围匹配的真实报告，按独立断言与证明层级投影。partial/unknown/unobserved不能当支持；金额/地址/自然年龄不使证据失效。上下文只投影有精确实际计量步骤支撑的已验证下界，不用声明/参数接受/硬上界/指纹猜容量或身份。后台构建纯内存投影，热路径无新增I/O。"
+      "detection/capability-projection": "Project只接受完整封存且目标/能力摘要/manifest/实现/参数/凭据范围匹配的真实报告，按独立断言与证明层级投影。partial/unknown/unobserved不能当支持；金额/地址/自然年龄不使证据失效。上下文只投影有精确实际计量步骤支撑的已验证下界，不用声明/参数接受/硬上界/指纹猜容量或身份。后台构建纯内存投影，热路径无新增I/O。",
+      "codex-rl14-operational-assertions": "RL14 uses stable wire/semantic/identity-transport assertion labels. Scope remains unchanged; malformed and expansion-limit cases are controlled gateway regressions. Previous descriptions retained: [\"zstd 请求编码\", \"发真实压缩请求，核验正常转发、模型替换后的有效编码/长度及无压缩回归；非法编码/解压上限负例在受控网关测试验证。\", \"传输编码能力与 CLI 是否实际发压缩请求分别记录；不扩大上游故障诱发范围\"]",
+      "codex-rl01-operational-scope": "Operational assertions retain this original scope: [\"Lite 协议标记 / 固定 CLI 的 Lite 路径\", \"核对实际 Header 名称、取值或其他协议识别方式，发真实请求并验证上游原生识别及平台保留。若该版本无独立 Lite Header，保留 ID 并按实际标记修正断言、记录源码/fixture 来源，不发明字段。\", \"与 CLI/provider/目录版本绑定；字段被接受不等于完整 Lite 支持\"]",
+      "codex-rl02-operational-scope": "Operational assertions retain this original scope: [\"additional_tools 输入结构\", \"发固定版本的原生 input 声明并触发工具；核验工具名/参数/call 关联与结果回填。\", \"Lite 工具声明能力；不能由普通文本成功推导\"]",
+      "codex-rl03-operational-scope": "Operational assertions retain this original scope: [\"顶层 tools 与 Lite 声明的原生支持\", \"分别用标准 tools 和 Lite 原生声明完成适用工具往返，各自保留原格式；上游只支持其一时分别报告。\", \"不进行声明互转；同次响应可支持多个子断言\"]",
+      "codex-rl04-operational-scope": "Operational assertions retain this original scope: [\"parallel_tool_calls:false\", \"发送明确禁止并行的工具场景，按固定版本约束验证实际行为及 call/result；不由开关接受推导限制已执行。\", \"独立参数/行为证据；不增加并发压测\"]",
+      "codex-rl05-operational-scope": "Operational assertions retain this original scope: [\"reasoning.context:all_turns\", \"使用有效的多轮合成上下文，分别记录参数接受和续聊行为，保留原生字段与 opaque 项。\", \"不从一次参数接受推导所有历史行为\"]",
+      "codex-rl06-operational-scope": "Operational assertions retain this original scope: [\"developer / 基础指令语义\", \"固定版本适用的指令与合成内容，核验层级/内容保留及可验证结果。\", \"与实际模型/协议绑定，不改写为另一种指令协议\"]",
+      "codex-rl07-operational-scope": "Operational assertions retain this original scope: [\"Namespace / custom 工具\", \"声明命名空间/工具，接收实际调用，按 namespace/name/call 标识回填并续聊，核验分片和关联。\", \"namespace/custom/普通 function 能力分别记录\"]",
+      "codex-rl08-operational-scope": "Operational assertions retain this original scope: [\"Lite SSE 生命周期\", \"实际 Lite 文本/工具流核验事件、索引、UTF-8、增量和终态/usage；可选事件及自然错误按实际出现记录。\", \"HTTP 200 或可显示文本不能替代完整 SSE；不主动诱发上游错误\"]",
+      "codex-rl09-operational-scope": "Operational assertions retain this original scope: [\"多轮加密推理原样续用\", \"生成后原样回传完整 encrypted reasoning 及相关项，验证后续推理；不因内部 ID 未登记拒绝。\", \"目标原生回放证据；跨渠道平台回归另见 RL23\"]",
+      "codex-rl12-operational-scope": "Operational assertions retain this original scope: [\"标准与 Lite 原生兼容（保留旧“双向兼容”追溯）\", \"对标准/Lite 各自适用的请求→工具→回填→续聊留证；跨形态回放仅按固定契约实际验证，不凭成功猜测。\", \"上游兼容性分别报告；平台不做双向转换\"]",
+      "codex-rl14-operational-scope": "Operational assertions retain this original scope: [\"content_encoding_zstd\", \"native_zstd_request\", \"uncompressed_request\"]",
+      "codex-rl16-operational-scope": "Operational assertions retain this original scope: [\"独立 alpha/search\", \"按固定契约发搜索并核验实际结果结构/URL/opaque 输出及后续使用，记录可证实计量；CLI 证据须实际触发该 HTTP 路径。\", \"与 Responses 内置 web_search 分开；不代理任意返回 URL\"]",
+      "codex-rl20-operational-scope": "Operational assertions retain this original scope: [\"V1 standalone compact\", \"用固定原生 compact 路径提交完整输入，保留返回的整个有效窗口及顺序并续聊；可复用 F4/F7 同目标/同路径/同配置真实证据。\", \"原生 V1 能力；不能代替 V2 或后台执行\"]",
+      "codex-rl21-operational-scope": "Operational assertions retain this original scope: [\"V2 compaction_trigger\", \"普通 Responses 输入实际 trigger，收集 compaction 输出后完整回传续聊，核验固定版本实际状态/元数据。\", \"原生 V2 能力；store:false 与内部 ID 不引入来源绑定；不宣称所有摘要语义精确保留\"]",
+      "codex-rl22-operational-scope": "Operational assertions retain this original scope: [\"客户端后台 V2 正确性\", \"用确实生效的独立配置触发后台 V2，与前台请求存在实际重叠，核验结果使用/取消/关闭及无重复收费。\", \"同一 V2 的执行方式；不是 background=true、新接口或性能压测\"]",
+      "codex-rl24-operational-scope": "Operational assertions retain this original scope: [\"实际服务档位\", \"每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。\", \"降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6\"]",
+      "codex-rl13-operational-scope": "Operational assertions retain this original scope: [\"客户端接入前置\", \"固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。\", \"三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported\"]",
+      "codex-rl15-operational-scope": "Operational assertions retain this original scope: [\"Codex 能力目录\", \"固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。\", \"不暴露共享账号目录或存完整提示词；目录声明不自动证明能力\"]",
+      "codex-rl17-operational-scope": "Operational assertions retain this original scope: [\"notes thread_hint\", \"新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。\", \"会话上下文辅助；不登记来源渠道粘性，不存提示正文\"]",
+      "codex-rl18-operational-scope": "Operational assertions retain this original scope: [\"notes 写读/列表及固定范围内操作\", \"固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。\", \"F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文\"]",
+      "codex-rl19-operational-scope": "Operational assertions retain this original scope: [\"history 窗口/条目及固定范围内操作\", \"list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。\", \"F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据\"]",
+      "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"]",
+      "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"]",
+      "codex-rl25-operational-scope": "Operational assertions retain this original scope: [\"Codex 专用原生生图\", \"固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。\", \"F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源\", \"固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。\"]",
+      "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement."
     }
   }

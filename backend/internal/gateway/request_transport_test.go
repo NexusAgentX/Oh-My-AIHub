@@ -46,7 +46,7 @@ func TestServeCompressedResponsesIsolatesContextAndKeepsOpaqueBytes(t *testing.T
 	defer upstream.Close()
 	run := newCredentialRun(t, 200)
 	store := &protocolErrorStore{candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-synthetic-upstream")}, fallbackCredential: run.seal("zz-fallback", "sk-synthetic-upstream")}
-	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/a2": true}
+	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/native_zstd_request": true}
 	store.candidate.Advanced.HeaderRules.Set = []channel.HeaderSet{{Name: "Session-Id", Value: "foreign-session"}, {Name: "Thread-Id", Value: "foreign-thread"}, {Name: "Content-Encoding", Value: "gzip"}, {Name: "Digest", Value: "stale"}}
 	e := newServeFixture(t, 10, defaultRouting{}).engine
 	e.Store = store
@@ -112,4 +112,21 @@ func TestContextDetectionCannotBypassNamespaceWithMissingOriginator(t *testing.T
 			t.Fatal("unconfigured namespace did not fail closed", err)
 		}
 	}
+}
+
+func TestZstdRequirementMatchesManifestCapabilityLabel(t *testing.T) {
+	m, err := gatewaycontract.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, suite := range m.Suites {
+		for _, requirement := range suite.Requirements {
+			for _, label := range requirement.Assertions {
+				if requirement.ID+"/"+label == nativeZstdRequirement.ID {
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("request gate does not match a projected manifest capability")
 }

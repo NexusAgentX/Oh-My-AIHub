@@ -96,6 +96,9 @@ func RewriteCodexContext(body []byte, headers http.Header, actor gatewaycontract
 			if kind == "" {
 				return
 			}
+			if position == "root" && bytes.Equal(bytes.TrimSpace(input[start:end]), []byte("null")) {
+				return // Optional containers carry no identifier to protect.
+			}
 			if seen[name] {
 				fieldErr = errors.New("duplicate context identifier field")
 				return

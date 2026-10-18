@@ -12,7 +12,7 @@ import (
 
 var errContextNamespaceUnavailable = errors.New("context namespace unavailable")
 
-var nativeZstdRequirement = CapabilityRequirement{Layer: "upstream_protocol", ID: "codex-special.RL14/a2"}
+var nativeZstdRequirement = CapabilityRequirement{Layer: "upstream_protocol", ID: "codex-special.RL14/native_zstd_request"}
 
 type codexNamespaceApplied struct{}
 

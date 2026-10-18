@@ -37,6 +37,9 @@ func protocolFormat(protocol string) channel.Format {
 	return ""
 }
 func endpointRequirement(id string) []CapabilityRequirement {
+	if required := codexContextRequirements(id); len(required) > 0 {
+		return required
+	}
 	cap := ""
 	switch {
 	case strings.HasPrefix(id, "chat."):
@@ -177,6 +180,10 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(400, "invalid_request", "请求体不是合法 JSON 对象")
 		return
 	}
+	if ep.Scope == "context_acl_only" && !validCodexAuxiliaryContext(object) {
+		fail(400, "invalid_context", "请求需要有效的会话编号和代理名称")
+		return
+	}
 	refs, parent := endpointPathRef(ep, r)
 	pathRefs := append([]gatewaycontract.Reference(nil), refs...)
 	var explicitRefs []gatewaycontract.Reference
@@ -185,7 +192,11 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		if ep.ID == "conversations.items.create" {
 			inputKey = "items"
 		}
-		more, e := nativeReferences(ep.Protocol, body, inputKey)
+		protocol := ep.Protocol
+		if protocol == "codex-special" {
+			protocol = "openai-responses"
+		}
+		more, e := nativeReferences(protocol, body, inputKey)
 		if e != nil {
 			fail(400, "invalid_request", "请求包含无效资源引用")
 			return
@@ -383,7 +394,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 			payload, response, err = e.ownedResourcePage(ctx, r, ep, c, key, location, policy, defaults, pref, parent, cursorScope, cursorNative, target, &budget)
 		} else {
 			payload, response, err = e.auxiliaryExchange(ctx, r, ep, c, location, policy, defaults, pref, body, &budget)
-			if err == nil && response.StatusCode >= 200 && response.StatusCode < 300 {
+			if err == nil && response.StatusCode >= 200 && response.StatusCode < 300 && ep.Scope != "context_acl_only" {
 				err = e.observeAuxiliary(ctx, ep, c, key, model, operationID, parent, payload, target)
 			}
 		}
@@ -402,6 +413,9 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		}
 		for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 			w.Header()[name] = values
+		}
+		if ep.Scope == "context_acl_only" {
+			w.Header().Set("Cache-Control", "no-store")
 		}
 		w.Header().Del("Content-Length")
 		w.Header().Set("X-AIHub-Request-Id", operationID)
