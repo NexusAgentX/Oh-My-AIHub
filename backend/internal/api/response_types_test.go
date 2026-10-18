@@ -101,7 +101,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"suspended_reason": nil, "cooldown_until": nil, "models": emptyList,
 			"advanced": map[string]any{
 				"user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
-				"daily_revenue_cap": nil, "ttft_timeout_ms": nil, "request_timeout_ms": nil, "idle_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
+				"ttft_timeout_ms": nil, "request_timeout_ms": nil, "idle_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
 			},
 			"today": map[string]any{"revenue": "0", "calls": float64(0), "success_rate": nil},
 		}},
@@ -165,7 +165,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 			"success_rate": nil, "ttft_p50_ms": nil, "ttft_p95_ms": nil, "output_tokens_per_second_p50": nil, "output_tokens_per_second_p95": nil,
 			"last_24h": map[string]any{"calls": float64(0), "succeeded": float64(0), "success_rate": nil},
 			"hourly":   emptyList, "status_codes": emptyList, "recent_failures": emptyList, "by_model": emptyList, "daily": emptyList, "events": emptyList,
-			"today": map[string]any{"revenue": "0", "daily_cap": nil, "progress": nil},
+			"today": map[string]any{"revenue": "0"},
 		}},
 		{"administrator points of an empty ledger", newAdminPointsJSON(observe.AdminPointsReport{}), map[string]any{
 			"trend": emptyList, "risks": emptyList,

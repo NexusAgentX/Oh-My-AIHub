@@ -75,7 +75,7 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 			map[string]any{"model_id": "usd-model", "multiplier": "1.2", "fx_discount": true, "formats": []string{"openai_chat"}},
 		},
 		"advanced": map[string]any{
-			"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "daily_revenue_cap": "50", "ttft_timeout_ms": 5000,
+			"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "ttft_timeout_ms": 5000,
 			"request_timeout_ms": 20000, "idle_timeout_ms": 3000, "cooldown_failures": 4, "cooldown_seconds": 60,
 			"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-A", "value": "1"}}, "remove": []any{"X-B"}},
 		},

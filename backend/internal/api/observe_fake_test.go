@@ -140,7 +140,7 @@ func (s *fakeObserveStore) ChannelBrief(_ context.Context, id string) (observe.C
 	if err != nil {
 		return observe.ChannelBrief{}, observe.ErrNotFound
 	}
-	return observe.ChannelBrief{ID: item.ID, OwnerID: item.Owner.ID, Name: item.Name, DailyRevenueCap: item.Advanced.DailyRevenueCap}, nil
+	return observe.ChannelBrief{ID: item.ID, OwnerID: item.Owner.ID, Name: item.Name}, nil
 }
 
 func (s *fakeObserveStore) ChannelStats(_ context.Context, id string, _, _, now time.Time) (observe.ChannelStatsData, error) {

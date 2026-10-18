@@ -40,7 +40,6 @@ type channelAdvancedJSON struct {
 	HeaderRules      headerRulesJSON `json:"header_rules"`
 	ConcurrencyLimit *int32          `json:"concurrency_limit"`
 	RPMLimit         *int32          `json:"rpm_limit"`
-	DailyRevenueCap  *string         `json:"daily_revenue_cap"`
 	TTFTTimeoutMS    *int32          `json:"ttft_timeout_ms"`
 	RequestTimeoutMS *int32          `json:"request_timeout_ms"`
 	IdleTimeoutMS    *int32          `json:"idle_timeout_ms"`
@@ -213,7 +212,6 @@ func newChannelAdvancedJSON(advanced channel.Advanced) channelAdvancedJSON {
 		HeaderRules:      headerRulesJSON{Set: set, Remove: remove},
 		ConcurrencyLimit: advanced.ConcurrencyLimit,
 		RPMLimit:         advanced.RPMLimit,
-		DailyRevenueCap:  nullableAmount(advanced.DailyRevenueCap),
 		TTFTTimeoutMS:    advanced.TTFTTimeoutMS,
 		RequestTimeoutMS: advanced.RequestTimeoutMS, IdleTimeoutMS: advanced.IdleTimeoutMS,
 		CooldownFailures: advanced.CooldownFailures,
@@ -330,7 +328,6 @@ type advancedRequest struct {
 	HeaderRules      *headerRulesRequest `json:"header_rules"`
 	ConcurrencyLimit *int32              `json:"concurrency_limit"`
 	RPMLimit         *int32              `json:"rpm_limit"`
-	DailyRevenueCap  *string             `json:"daily_revenue_cap"`
 	TTFTTimeoutMS    *int32              `json:"ttft_timeout_ms"`
 	RequestTimeoutMS *int32              `json:"request_timeout_ms"`
 	IdleTimeoutMS    *int32              `json:"idle_timeout_ms"`
@@ -342,13 +339,6 @@ func (r advancedRequest) advanced() (channel.Advanced, error) {
 	advanced := channel.Advanced{
 		UserAgent: r.UserAgent, ConcurrencyLimit: r.ConcurrencyLimit, RPMLimit: r.RPMLimit, TTFTTimeoutMS: r.TTFTTimeoutMS,
 		RequestTimeoutMS: r.RequestTimeoutMS, IdleTimeoutMS: r.IdleTimeoutMS, CooldownFailures: r.CooldownFailures, CooldownSeconds: r.CooldownSeconds,
-	}
-	if r.DailyRevenueCap != nil {
-		cap, err := money.Parse(*r.DailyRevenueCap)
-		if err != nil {
-			return channel.Advanced{}, channel.ErrInvalidInput
-		}
-		advanced.DailyRevenueCap = &cap
 	}
 	if r.HeaderRules != nil {
 		for _, rule := range r.HeaderRules.Set {

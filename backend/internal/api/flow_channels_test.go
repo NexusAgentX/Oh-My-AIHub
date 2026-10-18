@@ -19,13 +19,12 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	alice, _ := p.member(t, "alice")
 	bob, _ := p.member(t, "bob")
 
-	dailyCap := "50"
 	body := map[string]any{
 		"name": "阿里中转", "base_url": "https://relay.example/v1", "api_key": "sk-upstream-test-key-0001",
 		"models": []map[string]any{{"model_id": "deepseek-chat", "upstream_model": "deepseek-chat-v2", "multiplier": "1.2", "formats": []string{"openai_chat", "anthropic"}}},
 		"advanced": map[string]any{
 			"user_agent": "relay-test/1.0", "header_rules": map[string]any{"set": []map[string]string{{"name": "X-Relay", "value": "1"}}, "remove": []string{"X-Old"}},
-			"concurrency_limit": 4, "rpm_limit": 60, "daily_revenue_cap": dailyCap, "ttft_timeout_ms": 20000, "request_timeout_ms": 300000, "idle_timeout_ms": 10000,
+			"concurrency_limit": 4, "rpm_limit": 60, "ttft_timeout_ms": 20000, "request_timeout_ms": 300000, "idle_timeout_ms": 10000,
 			"cooldown_failures": 3, "cooldown_seconds": 60,
 		},
 	}
@@ -36,7 +35,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 			t.Fatalf("channel %s = %v", field, got)
 		}
 	}
-	if created["status"] != "listed" || created["advanced"].(map[string]any)["daily_revenue_cap"] != "50" ||
+	if created["status"] != "listed" ||
 		created["models"].([]any)[0].(map[string]any)["multiplier"] != "1.2" || created["today"].(map[string]any)["success_rate"] != "0.500000" {
 		t.Fatalf("created channel = %v", created)
 	}
@@ -89,7 +88,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	if recorder := alice.call(t, http.MethodPatch, channelPath, map[string]any{}); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("empty channel update = %d", recorder.Code)
 	}
-	alice.expect(t, http.StatusOK, http.MethodPatch, channelPath, map[string]any{"status": "listed", "advanced": map[string]any{"rpm_limit": 30, "daily_revenue_cap": dailyCap}})
+	alice.expect(t, http.StatusOK, http.MethodPatch, channelPath, map[string]any{"status": "listed", "advanced": map[string]any{"rpm_limit": 30}})
 
 	// 格式测试写回结果。
 	tested := alice.expect(t, http.StatusOK, http.MethodPost, channelPath+"/test", map[string]any{"model_ids": []string{"deepseek-chat"}, "formats": []string{"openai_chat", "gemini"}, "apply": true})
@@ -114,8 +113,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	for viewer, wantMine := range map[*client]bool{alice: true, bob: false} {
 		page := viewer.expect(t, http.StatusOK, http.MethodGet, "/api/models/deepseek-chat", nil)
 		offered := page["channels"].([]any)
-		if len(offered) != 1 || offered[0].(map[string]any)["is_mine"] != wantMine || offered[0].(map[string]any)["success_rate_24h"] != "0.900000" ||
-			offered[0].(map[string]any)["daily_cap_remaining"] != "0.960000" {
+		if len(offered) != 1 || offered[0].(map[string]any)["is_mine"] != wantMine || offered[0].(map[string]any)["success_rate_24h"] != "0.900000" {
 			t.Fatalf("model page = %v", page)
 		}
 	}

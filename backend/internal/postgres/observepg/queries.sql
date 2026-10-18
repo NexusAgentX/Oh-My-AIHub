@@ -269,7 +269,7 @@ WHERE c.final_channel_id = sqlc.arg(channel_id)::uuid AND c.ledger_tx_id IS NOT 
   AND c.created_at >= sqlc.arg(since)::timestamptz;
 
 -- name: GetChannelBrief :one
-SELECT id, owner_id, name, daily_revenue_cap_nano FROM channels WHERE id = $1 AND deleted_at IS NULL;
+SELECT id, owner_id, name FROM channels WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: ListChannelEvents :many
 SELECT id, kind, reason, created_at FROM channel_events WHERE channel_id = $1 ORDER BY id DESC LIMIT 50;

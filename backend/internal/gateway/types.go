@@ -211,7 +211,6 @@ type Store interface {
 	TouchKey(ctx context.Context, keyID string, at time.Time) error
 	Points(ctx context.Context, accountID string) (ledger.Points, error)
 	KeySpend(ctx context.Context, keyID string, now time.Time) (Spend, error)
-	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 	Candidates(ctx context.Context, modelID string, format channel.Format) ([]Candidate, error)
 	// AttemptHistory reports the attempts of calls started at or after since,
 	// grouped as AttemptHistoryRow says, for the statistics window to start
@@ -326,6 +325,4 @@ type Browse interface {
 	OnlineChannels(ctx context.Context) ([]OnlineChannel, error)
 	Home(ctx context.Context, accountID string, dayStart time.Time) (HomeStats, error)
 	RecentCalls(ctx context.Context, accountID string, limit int) ([]CallSummary, error)
-	// ChannelRevenue is the revenue booked on a channel since the given time.
-	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 }

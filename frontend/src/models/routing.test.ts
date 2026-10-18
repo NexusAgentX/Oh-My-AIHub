@@ -25,7 +25,6 @@ const channel = (id: string): ModelChannel => ({
   success_rate_24h: null,
   ttft_p50_ms: null,
   state: 'available',
-  daily_cap_remaining: null,
   cooldown_remaining_seconds: null,
 })
 
@@ -81,13 +80,8 @@ describe('routing editor logic', () => {
 })
 
 describe('channel state label', () => {
-  it('shows the remaining daily cap for a limited channel', () => {
-    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: '0.125' }).label).toBe('今日额度剩 12%')
-    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: '0' }).label).toBe('今日额度剩 0%')
-  })
-
-  it('falls back to 已达上限 when the limit is not the daily cap', () => {
-    expect(channelStateLabel({ ...channel('a'), state: 'limited', daily_cap_remaining: null }).label).toBe('已达上限')
+  it('shows the concurrency or RPM limit', () => {
+    expect(channelStateLabel({ ...channel('a'), state: 'limited' }).label).toBe('已达上限')
   })
 
   it('shows cooldown minutes and online', () => {

@@ -79,7 +79,6 @@ export function AdvancedFields({ form, onChange }: { form: AdvancedForm; onChang
       <div className="field-row field-row-three">
         {int('并发上限', 'concurrency')}
         {int('每分钟请求数', 'rpm')}
-        <TextField inputMode="decimal" label="每日收入上限" onChange={(event) => set({ dailyCap: event.target.value.trim() })} placeholder="不限" value={form.dailyCap} />
       </div>
       <p className="muted-copy">超时留空时使用消费者的模型路由设置，未设置则使用平台默认。</p>
       <div className="field-row">

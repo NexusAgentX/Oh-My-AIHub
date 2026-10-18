@@ -243,7 +243,6 @@ function ChannelDetail({ channel, events }: { channel: AdminChannel; events: Cha
                   `设置 ${advanced.header_rules.set.length} 条 · 删除 ${advanced.header_rules.remove.length} 条`,
                 ],
                 ['并发 / 每分钟请求', `${orDefault(advanced.concurrency_limit)} / ${orDefault(advanced.rpm_limit)}`],
-                ['每日收入上限', advanced.daily_revenue_cap === null ? '不限' : formatPoints(advanced.daily_revenue_cap)],
                 ['首字超时', orDefault(advanced.ttft_timeout_ms, ' ms')],
                 ['空闲超时', orDefault(advanced.idle_timeout_ms, ' ms')],
                 ['请求超时', orDefault(advanced.request_timeout_ms, ' ms')],

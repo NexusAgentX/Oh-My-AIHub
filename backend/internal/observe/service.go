@@ -327,10 +327,8 @@ type ChannelReport struct {
 	Statuses  []StatusBucket
 	Failures  []Failure
 	Events    []ChannelEvent
-	// Today's revenue and the daily cap.
+	// Today's revenue.
 	TodayRevenue money.Amount
-	DailyCap     *money.Amount
-	Progress     *float64
 }
 
 // ChannelStats reports a channel to its owner or an administrator. The window
@@ -363,20 +361,10 @@ func (s *Service) ChannelStats(ctx context.Context, viewer Viewer, channelID str
 		From: start, To: end, Window: windowOf(data.Window), Last24h: windowOf(data.Last24h), Last7d: windowOf(data.Last7d),
 		TTFTP50MS: data.Window.TTFTP50MS, TTFTP95MS: data.Window.TTFTP95MS, SpeedP50: data.SpeedP50, SpeedP95: data.SpeedP95,
 		Revenue: data.Revenue, Models: data.Models, Statuses: data.StatusCodes, Failures: data.Failures, Events: data.Events,
-		TodayRevenue: data.TodayRevenue, DailyCap: brief.DailyRevenueCap,
+		TodayRevenue: data.TodayRevenue,
 	}
 	report.Hourly = fillHours(data.Hourly, now)
 	report.Daily = fillBuckets(data.Daily, start, end)
-	if brief.DailyRevenueCap != nil && *brief.DailyRevenueCap > 0 {
-		progress := float64(data.TodayRevenue.Nano()) / float64(brief.DailyRevenueCap.Nano())
-		if progress > 1 {
-			progress = 1
-		}
-		if progress < 0 {
-			progress = 0
-		}
-		report.Progress = &progress
-	}
 	return report, nil
 }
 

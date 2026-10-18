@@ -8,7 +8,7 @@ export const detail: ChannelDetail = {
     suspended_reason: null, cooldown_until: null, created_at: time, updated_at: time,
     today: { revenue: '14.8', calls: 1377, success_rate: '0.993' },
     advanced: { user_agent: null, header_rules: { set: [], remove: [] }, concurrency_limit: null, rpm_limit: null,
-      daily_revenue_cap: null, ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null, cooldown_failures: null, cooldown_seconds: null },
+      ttft_timeout_ms: null, idle_timeout_ms: null, request_timeout_ms: null, cooldown_failures: null, cooldown_seconds: null },
     models: Array.from({ length: 7 }, (_, i) => ({ model_id: `model-${i + 1}`, display_name: `model-${i + 1}`, upstream_model: `model-${i + 1}`,
       price_currency: 'USD', multiplier: '0.13', fx_discount: true, effective_multiplier: '0.02', formats: ['openai_chat', 'openai_responses', 'anthropic'],
       format_tests: { openai_chat: { ok: true, status_code: 200, error: null, duration_ms: 50, tested_at: time } },
@@ -20,7 +20,7 @@ const windowStats = { calls: 1867, succeeded: 1853, success_rate: '0.993', reven
 export const stats: ChannelStats = {
   from: time, to: time, ...windowStats, last_24h: windowStats, last_7d: windowStats,
   ttft_p50_ms: 3150, ttft_p95_ms: 9840, output_tokens_per_second_p50: 46.9, output_tokens_per_second_p95: 91.6,
-  today: { revenue: '14.8', daily_cap: null, progress: null },
+  today: { revenue: '14.8' },
   hourly: Array.from({ length: 24 }, (_, i) => ({ hour: `2026-10-12T${String(i).padStart(2, '0')}:00:00Z`, calls: i * 10, succeeded: i * 10 })),
   daily: Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${String(i + 6).padStart(2, '0')}`, calls: 100 + i * 120, succeeded: 99 + i * 119, revenue: '2' })),
   by_model: detail.channel.models.map((m, i) => ({ model_id: m.model_id, calls: 30 + i * 25, succeeded: 30 + i * 24, revenue: String(1 + i) })),

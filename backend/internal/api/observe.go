@@ -401,9 +401,7 @@ type channelStatsStatusJSON struct {
 
 // channelStatsTodayJSON is the today object of the OpenAPI ChannelStats schema.
 type channelStatsTodayJSON struct {
-	Revenue  string  `json:"revenue"`
-	DailyCap *string `json:"daily_cap"`
-	Progress *string `json:"progress"`
+	Revenue string `json:"revenue"`
 }
 
 // channelStatsModelJSON is one by_model element of the OpenAPI ChannelStats schema.
@@ -687,7 +685,7 @@ func newChannelStatsJSON(report observe.ChannelReport) channelStatsJSON {
 		StatusCodes:              statuses,
 		RecentFailures:           failures,
 		Today: channelStatsTodayJSON{
-			Revenue: report.TodayRevenue.String(), DailyCap: nullableAmount(report.DailyCap), Progress: optionalRatio(report.Progress),
+			Revenue: report.TodayRevenue.String(),
 		},
 		ByModel: models,
 		Daily:   daily,

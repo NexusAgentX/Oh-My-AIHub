@@ -96,8 +96,7 @@ func TestCallObservationReports(t *testing.T) {
 	carol, _ := p.member(t, "carol")
 	channelID := bob.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
 		"name": "阿里中转", "base_url": "https://relay.example", "api_key": "sk-upstream-test-key-0001",
-		"models":   []map[string]any{{"model_id": "deepseek-chat", "formats": []string{"openai_chat"}}},
-		"advanced": map[string]any{"daily_revenue_cap": "10"},
+		"models": []map[string]any{{"model_id": "deepseek-chat", "formats": []string{"openai_chat"}}},
 	})["channel"].(map[string]any)["id"].(string)
 	keyID := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{"name": "默认 Key"})["key"].(map[string]any)["id"].(string)
 	ids := p.observeFixtures(aliceID, channelID, keyID)
@@ -157,7 +156,7 @@ func TestCallObservationReports(t *testing.T) {
 
 	// 渠道统计与渠道调用只对所有者与管理员开放。
 	stats := bob.expect(t, http.StatusOK, http.MethodGet, "/api/channels/"+channelID+"/stats", nil)
-	if stats["calls"] != float64(10) || stats["today"].(map[string]any)["daily_cap"] != "10" || len(stats["hourly"].([]any)) != 24 {
+	if stats["calls"] != float64(10) || len(stats["hourly"].([]any)) != 24 {
 		t.Fatalf("channel stats = %v", stats)
 	}
 	admin.expect(t, http.StatusOK, http.MethodGet, "/api/channels/"+channelID+"/stats", nil)

@@ -7,7 +7,6 @@ import type {
   DiscoveredModel,
   Format,
 } from '../api/types'
-import { isPositiveAmount } from '../money/format'
 
 /** 选模型表格的一行。key 为本地稳定标识。 */
 export type ModelRow = {
@@ -58,7 +57,6 @@ export type AdvancedForm = {
   headerRemove: string[]
   concurrency: string
   rpm: string
-  dailyCap: string
   ttftTimeout: string
   requestTimeout: string
   idleTimeout: string
@@ -72,7 +70,6 @@ export const emptyAdvanced: AdvancedForm = {
   headerRemove: [],
   concurrency: '',
   rpm: '',
-  dailyCap: '',
   ttftTimeout: '',
   requestTimeout: '',
   idleTimeout: '',
@@ -201,7 +198,6 @@ export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
     headerRemove: advanced.header_rules.remove.slice(),
     concurrency: numberOrEmpty(advanced.concurrency_limit),
     rpm: numberOrEmpty(advanced.rpm_limit),
-    dailyCap: advanced.daily_revenue_cap ?? '',
     ttftTimeout: numberOrEmpty(advanced.ttft_timeout_ms),
     requestTimeout: numberOrEmpty(advanced.request_timeout_ms),
     idleTimeout: numberOrEmpty(advanced.idle_timeout_ms),
@@ -210,14 +206,13 @@ export function advancedFromChannel(advanced: ChannelAdvanced): AdvancedForm {
   }
 }
 
-/** 已改项数：UA、请求头规则、并发、RPM、每日收入上限、超时、失败冷却（各算一项）。 */
+/** 已改项数：UA、请求头规则、并发、RPM、超时、失败冷却（各算一项）。 */
 export function advancedChangedCount(form: AdvancedForm) {
   return [
     form.userAgent.trim(),
     form.headerSet.some((row) => row.name.trim()) || form.headerRemove.some((name) => name.trim()),
     form.concurrency,
     form.rpm,
-    form.dailyCap,
     form.ttftTimeout || form.idleTimeout || form.requestTimeout,
     form.cooldownFailures || form.cooldownMinutes,
   ].filter(Boolean).length
@@ -242,7 +237,6 @@ export function validateAdvanced(form: AdvancedForm) {
   for (const [label, value] of ints) {
     if (value.trim() && intOrNull(value) === null) return `${label}须为正整数`
   }
-  if (form.dailyCap && !isPositiveAmount(form.dailyCap)) return '每日收入上限须为正数'
   if (form.headerSet.some((row) => !row.name.trim() && row.value.trim())) return '请求头规则缺少名称'
   return ''
 }
@@ -256,7 +250,6 @@ export function advancedInput(form: AdvancedForm): ChannelAdvancedInput {
     },
     concurrency_limit: intOrNull(form.concurrency),
     rpm_limit: intOrNull(form.rpm),
-    daily_revenue_cap: form.dailyCap.trim() || null,
     ttft_timeout_ms: intOrNull(form.ttftTimeout),
     request_timeout_ms: intOrNull(form.requestTimeout),
     idle_timeout_ms: intOrNull(form.idleTimeout),

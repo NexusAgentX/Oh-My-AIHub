@@ -248,9 +248,6 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 	if advanced.RPMLimit != nil {
 		limits.RPM = int(*advanced.RPMLimit)
 	}
-	if advanced.DailyRevenueCap != nil {
-		limits.DailyRevenueCap = *advanced.DailyRevenueCap
-	}
 	if advanced.CooldownFailures != nil {
 		limits.CooldownAfter = int(*advanced.CooldownFailures)
 	}
@@ -600,16 +597,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
 		if candidates[index].Quotes != nil {
 			candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
-		}
-	}
-	for _, candidate := range candidates {
-		if limits := EffectiveLimits(candidate.Advanced, defaults); limits.DailyRevenueCap > 0 && e.Runtime.NeedsRevenue(candidate.ChannelID, started) {
-			revenue, err := e.Store.ChannelRevenue(ctx, candidate.ChannelID, started)
-			if err != nil {
-				e.Logger.Warn("gateway: channel revenue lookup failed", "error", err)
-				continue
-			}
-			e.Runtime.SetRevenue(candidate.ChannelID, revenue, started)
 		}
 	}
 	sticky := ""
@@ -1574,13 +1561,7 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 			closed, finished = true, retryResult.Finished
 		}
 	} else if outcome.Finished && finish.Bill != nil {
-		now := e.Now()
 		e.spend.Add(call.key.KeyID, finish.Cost+finish.Fee, call.started)
-		var revenueCap money.Amount
-		if candidate.Advanced.DailyRevenueCap != nil {
-			revenueCap = *candidate.Advanced.DailyRevenueCap
-		}
-		e.Runtime.AddRevenueAt(candidate.ChannelID, finish.Cost, call.started, now, revenueCap)
 	}
 	if closed {
 		call.completed = true

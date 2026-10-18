@@ -1242,25 +1242,19 @@ func (q *Queries) GetCall(ctx context.Context, id string) (GetCallRow, error) {
 }
 
 const getChannelBrief = `-- name: GetChannelBrief :one
-SELECT id, owner_id, name, daily_revenue_cap_nano FROM channels WHERE id = $1 AND deleted_at IS NULL
+SELECT id, owner_id, name FROM channels WHERE id = $1 AND deleted_at IS NULL
 `
 
 type GetChannelBriefRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	DailyRevenueCapNano *money.Amount
+	ID      string
+	OwnerID string
+	Name    string
 }
 
 func (q *Queries) GetChannelBrief(ctx context.Context, id string) (GetChannelBriefRow, error) {
 	row := q.db.QueryRow(ctx, getChannelBrief, id)
 	var i GetChannelBriefRow
-	err := row.Scan(
-		&i.ID,
-		&i.OwnerID,
-		&i.Name,
-		&i.DailyRevenueCapNano,
-	)
+	err := row.Scan(&i.ID, &i.OwnerID, &i.Name)
 	return i, err
 }
 

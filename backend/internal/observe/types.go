@@ -239,7 +239,6 @@ type UsageRow struct {
 
 type ChannelBrief struct {
 	ID, OwnerID, Name string
-	DailyRevenueCap   *money.Amount
 }
 
 type AttemptWindow struct {

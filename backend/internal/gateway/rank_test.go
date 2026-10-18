@@ -140,19 +140,7 @@ func TestRuntimeLimitsCooldownAndRevenueCap(t *testing.T) {
 	}
 	rt.Success("c")
 
-	cap := Limits{DailyRevenueCap: money.FromNano(100)}
-	rt.SetRevenue("r", 90, now)
-	if state, _ := rt.Check("r", cap, now); state != StateAvailable {
-		t.Fatalf("below cap = %s", state)
-	}
-	rt.AddRevenue("r", 10, now, cap.DailyRevenueCap)
-	if state, reason := rt.Check("r", cap, now); state != StateLimited || reason != "daily_revenue" {
-		t.Fatalf("at cap = %s %q", state, reason)
-	}
-	if state, _ := rt.Check("r", cap, now.Add(24*time.Hour)); state != StateAvailable {
-		t.Fatalf("next day = %s", state)
-	}
-	want := []string{"c:" + channel.EventLimitReached, "c:" + channel.EventCooldownStarted, "c:" + channel.EventCooldownEnded, "r:" + channel.EventLimitReached}
+	want := []string{"c:" + channel.EventLimitReached, "c:" + channel.EventCooldownStarted, "c:" + channel.EventCooldownEnded}
 	for _, expected := range want {
 		found := false
 		for _, event := range events {
@@ -226,11 +214,5 @@ func TestLateSettlementUsesCallStartBudgetWindow(t *testing.T) {
 	got, _ := cache.Get("key", now, load)
 	if got != (Spend{Today: 5, Month: 50, Total: 507}) {
 		t.Fatalf("late charge leaked into current window: %+v", got)
-	}
-	runtime := NewRuntime(nil)
-	runtime.SetRevenue("channel", 10, now)
-	runtime.AddRevenueAt("channel", 7, previous, now, 11)
-	if state, _ := runtime.Check("channel", Limits{DailyRevenueCap: 11}, now); state != StateAvailable {
-		t.Fatalf("previous-day revenue exhausted current day: %s", state)
 	}
 }

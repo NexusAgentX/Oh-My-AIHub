@@ -3733,7 +3733,7 @@ paths:
       operationId: getChannelStats
       tags: [channels]
       summary: 渠道统计
-      description: 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日收入与每日上限进度。渠道所有者或管理员可见。
+      description: 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日已结算收入。渠道所有者或管理员可见。
       x-access: ready
       x-feature: G
       security:
@@ -9586,33 +9586,90 @@ components:
       required: [items]
       additionalProperties: false
     ModelChannel:
-      type: object
-      properties:
-        id: {type: string, format: uuid}
-        name: {type: string}
-        owner: {$ref: '#/components/schemas/Party'}
-        is_mine: {type: boolean}
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-        multiplier: {$ref: '#/components/schemas/Multiplier'}
-        fx_discount: {type: boolean, description: 美元模型开启了汇率优惠。}
-        effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
-        current_prices: {$ref: '#/components/schemas/EffectivePrices'}
-        success_rate_24h:
-          anyOf:
-          - {$ref: '#/components/schemas/Ratio'}
-          - {type: 'null'}
-        ttft_p50_ms: {type: [integer, 'null']}
-        state: {type: string, enum: [available, cooldown, limited], description: available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM/每日收入上限。}
-        cooldown_remaining_seconds: {type: [integer, 'null']}
-        daily_cap_remaining:
-          anyOf:
-          - {$ref: '#/components/schemas/Ratio'}
-          - {type: 'null'}
-          description: 渠道设置了每日收入上限时，今日剩余比例（0～1）；未设置上限为 null。state 为 limited 时可据此显示剩余额度。
-      required: [id, name, owner, is_mine, formats, multiplier, fx_discount, effective_multiplier, current_prices, success_rate_24h, ttft_p50_ms, state, cooldown_remaining_seconds, daily_cap_remaining]
-      additionalProperties: false
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/Party"
+          },
+          "is_mine": {
+            "type": "boolean"
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Format"
+            }
+          },
+          "multiplier": {
+            "$ref": "#/components/schemas/Multiplier"
+          },
+          "fx_discount": {
+            "type": "boolean",
+            "description": "美元模型开启了汇率优惠。"
+          },
+          "effective_multiplier": {
+            "$ref": "#/components/schemas/EffectiveMultiplier"
+          },
+          "current_prices": {
+            "$ref": "#/components/schemas/EffectivePrices"
+          },
+          "success_rate_24h": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ttft_p50_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "cooldown",
+              "limited"
+            ],
+            "description": "available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM限制。"
+          },
+          "cooldown_remaining_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "owner",
+          "is_mine",
+          "formats",
+          "multiplier",
+          "fx_discount",
+          "effective_multiplier",
+          "current_prices",
+          "success_rate_24h",
+          "ttft_p50_ms",
+          "state",
+          "cooldown_remaining_seconds"
+        ],
+        "additionalProperties": false
+      }
     RoutingPreference:
       type: object
       properties:
@@ -9799,36 +9856,158 @@ components:
       required: [set, remove]
       additionalProperties: false
     ChannelAdvanced:
-      type: object
-      description: 高级设置；null 表示使用平台默认。
-      properties:
-        user_agent: {type: [string, 'null']}
-        header_rules: {$ref: '#/components/schemas/HeaderRules'}
-        concurrency_limit: {type: [integer, 'null'], minimum: 1}
-        rpm_limit: {type: [integer, 'null'], minimum: 1}
-        daily_revenue_cap: {$ref: '#/components/schemas/NullableAmount'}
-        ttft_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 600000}
-        idle_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 3600000}
-        request_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 3600000}
-        cooldown_failures: {type: [integer, 'null'], minimum: 1, maximum: 100}
-        cooldown_seconds: {type: [integer, 'null'], minimum: 10, maximum: 86400}
-      required: [user_agent, header_rules, concurrency_limit, rpm_limit, daily_revenue_cap, ttft_timeout_ms, idle_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds]
-      additionalProperties: false
+      {
+        "type": "object",
+        "description": "高级设置；null 表示使用平台默认。",
+        "properties": {
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "header_rules": {
+            "$ref": "#/components/schemas/HeaderRules"
+          },
+          "concurrency_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "rpm_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "ttft_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 600000
+          },
+          "idle_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 3600000
+          },
+          "request_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 3600000
+          },
+          "cooldown_failures": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cooldown_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 10,
+            "maximum": 86400
+          }
+        },
+        "required": [
+          "user_agent",
+          "header_rules",
+          "concurrency_limit",
+          "rpm_limit",
+          "ttft_timeout_ms",
+          "idle_timeout_ms",
+          "request_timeout_ms",
+          "cooldown_failures",
+          "cooldown_seconds"
+        ],
+        "additionalProperties": false
+      }
     ChannelAdvancedInput:
-      type: object
-      properties:
-        user_agent: {type: [string, 'null']}
-        header_rules: {$ref: '#/components/schemas/HeaderRules'}
-        concurrency_limit: {type: [integer, 'null'], minimum: 1}
-        rpm_limit: {type: [integer, 'null'], minimum: 1}
-        daily_revenue_cap: {$ref: '#/components/schemas/NullableAmount'}
-        ttft_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 600000}
-        idle_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 3600000}
-        request_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 3600000}
-        cooldown_failures: {type: [integer, 'null'], minimum: 1, maximum: 100}
-        cooldown_seconds: {type: [integer, 'null'], minimum: 10, maximum: 86400}
-      required: []
-      additionalProperties: false
+      {
+        "type": "object",
+        "properties": {
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "header_rules": {
+            "$ref": "#/components/schemas/HeaderRules"
+          },
+          "concurrency_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "rpm_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "ttft_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 600000
+          },
+          "idle_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 3600000
+          },
+          "request_timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1000,
+            "maximum": 3600000
+          },
+          "cooldown_failures": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cooldown_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 10,
+            "maximum": 86400
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
     FormatTest:
       type: object
       properties:
@@ -10549,89 +10728,216 @@ components:
       required: [call_id, created_at, model_id, status_code, error_code, error_message, end_reason]
       additionalProperties: false
     ChannelStats:
-      type: object
-      description: 渠道统计。calls 与 succeeded 为到达该渠道的尝试次数与成功次数（不含客户端自己取消的尝试）；窗口默认最近 7 天，daily 按 Asia/Shanghai 自然日。
-      properties:
-        from: {$ref: '#/components/schemas/Timestamp'}
-        to: {$ref: '#/components/schemas/Timestamp'}
-        calls: {type: integer}
-        succeeded: {type: integer}
-        success_rate:
-          anyOf:
-          - {$ref: '#/components/schemas/Ratio'}
-          - {type: 'null'}
-        revenue: {$ref: '#/components/schemas/Amount'}
-        ttft_p50_ms: {type: [integer, 'null']}
-        ttft_p95_ms: {type: [integer, 'null']}
-        output_tokens_per_second_p50: {type: [number, 'null']}
-        output_tokens_per_second_p95: {type: [number, 'null']}
-        last_24h: {$ref: '#/components/schemas/ChannelWindow'}
-        last_7d: {$ref: '#/components/schemas/ChannelWindow'}
-        hourly:
-          type: array
-          description: 最近 24 小时按小时的尝试量与成功量（含没有调用的小时）。
-          items:
-            type: object
-            properties:
-              hour: {$ref: '#/components/schemas/Timestamp'}
-              calls: {type: integer}
-              succeeded: {type: integer}
-            required: [hour, calls, succeeded]
-            additionalProperties: false
-        status_codes:
-          type: array
-          description: 失败尝试按上游状态码的分布（status_code 为 null 表示没有拿到响应，例如连接失败或超时），按次数降序。
-          items:
-            type: object
-            properties:
-              status_code: {type: [integer, 'null']}
-              count: {type: integer}
-            required: [status_code, count]
-            additionalProperties: false
-        recent_failures:
-          type: array
-          description: 最近 20 次失败尝试，含上游原始错误（30 天后清理）。
-          items: {$ref: '#/components/schemas/ChannelFailure'}
-        today:
-          type: object
-          description: 今日收入与每日收入上限进度。
-          properties:
-            revenue: {$ref: '#/components/schemas/Amount'}
-            daily_cap: {$ref: '#/components/schemas/NullableAmount'}
-            progress:
-              anyOf:
-              - {$ref: '#/components/schemas/Ratio'}
-              - {type: 'null'}
-              description: 今日收入占上限的比例（封顶为 1）；未设置上限为 null。
-          required: [revenue, daily_cap, progress]
-          additionalProperties: false
-        by_model:
-          type: array
-          items:
-            type: object
-            properties:
-              model_id: {type: string}
-              calls: {type: integer}
-              succeeded: {type: integer}
-              revenue: {$ref: '#/components/schemas/Amount'}
-            required: [model_id, calls, succeeded, revenue]
-            additionalProperties: false
-        daily:
-          type: array
-          items:
-            type: object
-            properties:
-              date: {$ref: '#/components/schemas/Date'}
-              calls: {type: integer}
-              succeeded: {type: integer}
-              revenue: {$ref: '#/components/schemas/Amount'}
-            required: [date, calls, succeeded, revenue]
-            additionalProperties: false
-        events:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelEvent'}
-      required: [from, to, calls, succeeded, success_rate, revenue, ttft_p50_ms, ttft_p95_ms, output_tokens_per_second_p50, output_tokens_per_second_p95, last_24h, last_7d, hourly, status_codes, recent_failures, today, by_model, daily, events]
-      additionalProperties: false
+      {
+        "type": "object",
+        "description": "渠道统计。calls 与 succeeded 为到达该渠道的尝试次数与成功次数（不含客户端自己取消的尝试）；窗口默认最近 7 天，daily 按 Asia/Shanghai 自然日。",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "calls": {
+            "type": "integer"
+          },
+          "succeeded": {
+            "type": "integer"
+          },
+          "success_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revenue": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "ttft_p50_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ttft_p95_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "output_tokens_per_second_p50": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "output_tokens_per_second_p95": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "last_24h": {
+            "$ref": "#/components/schemas/ChannelWindow"
+          },
+          "last_7d": {
+            "$ref": "#/components/schemas/ChannelWindow"
+          },
+          "hourly": {
+            "type": "array",
+            "description": "最近 24 小时按小时的尝试量与成功量（含没有调用的小时）。",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hour": {
+                  "$ref": "#/components/schemas/Timestamp"
+                },
+                "calls": {
+                  "type": "integer"
+                },
+                "succeeded": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "hour",
+                "calls",
+                "succeeded"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status_codes": {
+            "type": "array",
+            "description": "失败尝试按上游状态码的分布（status_code 为 null 表示没有拿到响应，例如连接失败或超时），按次数降序。",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status_code": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "status_code",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recent_failures": {
+            "type": "array",
+            "description": "最近 20 次失败尝试，含上游原始错误（30 天后清理）。",
+            "items": {
+              "$ref": "#/components/schemas/ChannelFailure"
+            }
+          },
+          "today": {
+            "type": "object",
+            "description": "今日已结算收入。",
+            "properties": {
+              "revenue": {
+                "$ref": "#/components/schemas/Amount"
+              }
+            },
+            "required": [
+              "revenue"
+            ],
+            "additionalProperties": false
+          },
+          "by_model": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model_id": {
+                  "type": "string"
+                },
+                "calls": {
+                  "type": "integer"
+                },
+                "succeeded": {
+                  "type": "integer"
+                },
+                "revenue": {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              },
+              "required": [
+                "model_id",
+                "calls",
+                "succeeded",
+                "revenue"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "$ref": "#/components/schemas/Date"
+                },
+                "calls": {
+                  "type": "integer"
+                },
+                "succeeded": {
+                  "type": "integer"
+                },
+                "revenue": {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              },
+              "required": [
+                "date",
+                "calls",
+                "succeeded",
+                "revenue"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelEvent"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "calls",
+          "succeeded",
+          "success_rate",
+          "revenue",
+          "ttft_p50_ms",
+          "ttft_p95_ms",
+          "output_tokens_per_second_p50",
+          "output_tokens_per_second_p95",
+          "last_24h",
+          "last_7d",
+          "hourly",
+          "status_codes",
+          "recent_failures",
+          "today",
+          "by_model",
+          "daily",
+          "events"
+        ],
+        "additionalProperties": false
+      }
     ChannelCall:
       type: object
       description: 渠道所有者视角的调用，不含调用者身份。error 为该渠道上最近一次失败尝试（没有失败为 null）。

@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -81,7 +80,6 @@ type modelChannelJSON struct {
 	TTFTP50MS                *int64              `json:"ttft_p50_ms"`
 	State                    string              `json:"state"`
 	CooldownRemainingSeconds *int64              `json:"cooldown_remaining_seconds"`
-	DailyCapRemaining        *string             `json:"daily_cap_remaining"`
 }
 
 // modelDetailJSON is the OpenAPI ModelDetail schema.
@@ -344,7 +342,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	channels := make([]modelChannelJSON, 0, len(mine))
 	for _, entry := range mine {
 		state, remaining := a.gateway.State().Describe(entry.ChannelID, gateway.EffectiveLimits(entry.Advanced, defaults), now)
-		var successRate, capRemaining *string
+		var successRate *string
 		var ttft, cooldown *int64
 		if health, ok := stats[entry.ChannelID]; ok && health.Attempts > 0 {
 			rate := ratio(health.SuccessRate())
@@ -357,16 +355,6 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		if state == gateway.StateCooldown {
 			seconds := int64(remaining.Seconds()) + 1
 			cooldown = &seconds
-		}
-		if cap := entry.Advanced.DailyRevenueCap; cap != nil && *cap > 0 {
-			revenue, err := a.browse.ChannelRevenue(ctx, entry.ChannelID, localtime.DayStart(now))
-			if err != nil {
-				writeDomainError(w, err)
-				return
-			}
-			remaining := 1 - float64(revenue.Nano())/float64(cap.Nano())
-			left := ratio(math.Min(1, math.Max(0, remaining)))
-			capRemaining = &left
 		}
 		priced := entryModel(model, entry)
 		prices, _ := currentPrices(priced, now)
@@ -385,7 +373,6 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 			TTFTP50MS:                ttft,
 			State:                    string(state),
 			CooldownRemainingSeconds: cooldown,
-			DailyCapRemaining:        capRemaining,
 		})
 	}
 	tiers := make([]priceTierJSON, 0, len(model.PriceTiers))

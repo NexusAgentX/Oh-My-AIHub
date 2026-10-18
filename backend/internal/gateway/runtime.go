@@ -20,11 +20,10 @@ const (
 
 // Limits are the effective per-channel limits (zero means unlimited).
 type Limits struct {
-	Concurrency     int
-	RPM             int
-	DailyRevenueCap money.Amount
-	CooldownAfter   int
-	CooldownFor     time.Duration
+	Concurrency   int
+	RPM           int
+	CooldownAfter int
+	CooldownFor   time.Duration
 }
 
 type channelRuntime struct {
@@ -32,15 +31,12 @@ type channelRuntime struct {
 	requests      []time.Time // starts within the last minute
 	failures      int
 	cooldownUntil time.Time
-	revenueDay    time.Time
-	revenue       money.Amount
-	revenueLoaded bool
 	limitNoticed  bool
 }
 
 // Runtime keeps the in-process, single-instance state of channels:
-// concurrency, requests per minute, consecutive failures and cooldowns, and the
-// cached revenue of the current day. Nothing here survives a restart.
+// concurrency, requests per minute, consecutive failures and cooldowns.
+// Nothing here survives a restart.
 type Runtime struct {
 	mutex    sync.Mutex
 	channels map[string]*channelRuntime
@@ -79,14 +75,6 @@ func (s *channelRuntime) prune(now time.Time) {
 	s.requests = s.requests[index:]
 }
 
-// rollRevenue resets the cached revenue when the accounting day changes.
-func (s *channelRuntime) rollRevenue(now time.Time) {
-	day := localtime.DayStart(now)
-	if !s.revenueDay.Equal(day) {
-		s.revenueDay, s.revenue, s.revenueLoaded = day, 0, false
-	}
-}
-
 // Check reports whether the channel can take a request now without changing
 // anything except expiring a finished cooldown.
 func (r *Runtime) Check(id string, limits Limits, now time.Time) (ChannelState, string) {
@@ -115,51 +103,7 @@ func (r *Runtime) check(state *channelRuntime, limits Limits, now time.Time) (Ch
 	if limits.RPM > 0 && len(state.requests) >= limits.RPM {
 		return StateLimited, "rpm"
 	}
-	state.rollRevenue(now)
-	if limits.DailyRevenueCap > 0 && state.revenueLoaded && state.revenue >= limits.DailyRevenueCap {
-		return StateLimited, "daily_revenue"
-	}
 	return StateAvailable, ""
-}
-
-// NeedsRevenue reports whether the day's revenue must be loaded before the
-// daily cap can be judged.
-func (r *Runtime) NeedsRevenue(id string, now time.Time) bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	state := r.state(id)
-	state.rollRevenue(now)
-	return !state.revenueLoaded
-}
-
-// SetRevenue seeds the cached revenue of the current day from the database.
-func (r *Runtime) SetRevenue(id string, revenue money.Amount, now time.Time) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	state := r.state(id)
-	state.rollRevenue(now)
-	if !state.revenueLoaded {
-		state.revenue, state.revenueLoaded = revenue, true
-	}
-}
-
-// AddRevenue accounts a billed call to the channel's day.
-func (r *Runtime) AddRevenue(id string, amount money.Amount, now time.Time, cap money.Amount) {
-	r.mutex.Lock()
-	state := r.state(id)
-	state.rollRevenue(now)
-	crossed := false
-	if state.revenueLoaded {
-		state.revenue += amount
-		crossed = cap > 0 && state.revenue >= cap && !state.limitNoticed
-		if crossed {
-			state.limitNoticed = true
-		}
-	}
-	r.mutex.Unlock()
-	if crossed {
-		r.notify(id, channel.EventLimitReached, "daily_revenue")
-	}
 }
 
 // Begin reserves a slot for one attempt. The returned release function must
@@ -170,7 +114,7 @@ func (r *Runtime) Begin(id string, limits Limits, now time.Time) (release func()
 	result, why := r.check(state, limits, now)
 	if result != StateAvailable {
 		r.mutex.Unlock()
-		if result == StateLimited && why != "daily_revenue" {
+		if result == StateLimited {
 			r.noticeLimit(id, why)
 		}
 		return nil, false, why
@@ -350,11 +294,4 @@ func (r *Runtime) RestoreInflight(id string) func() {
 	r.mutex.Unlock()
 	var once sync.Once
 	return func() { once.Do(func() { r.mutex.Lock(); r.state(id).inflight--; r.mutex.Unlock() }) }
-}
-
-// AddRevenueAt uses the same call-start day as the persisted revenue query.
-func (r *Runtime) AddRevenueAt(id string, amount money.Amount, started, now time.Time, cap money.Amount) {
-	if localtime.DayStart(started).Equal(localtime.DayStart(now)) {
-		r.AddRevenue(id, amount, now, cap)
-	}
 }

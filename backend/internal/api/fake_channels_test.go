@@ -285,7 +285,6 @@ type fakeBrowse struct {
 	channels *fakeChannelStore
 	home     gateway.HomeStats
 	recent   []gateway.CallSummary
-	revenue  money.Amount
 }
 
 func (b *fakeBrowse) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
@@ -318,10 +317,6 @@ func (b *fakeBrowse) RecentCalls(_ context.Context, _ string, limit int) ([]gate
 		return b.recent[:limit], nil
 	}
 	return b.recent, nil
-}
-
-func (b *fakeBrowse) ChannelRevenue(context.Context, string, time.Time) (money.Amount, error) {
-	return b.revenue, nil
 }
 
 // seedChannelHealth gives a channel the statistics the model pages report:

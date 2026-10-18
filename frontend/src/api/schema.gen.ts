@@ -1202,7 +1202,7 @@ export interface paths {
         };
         /**
          * 渠道统计
-         * @description 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日收入与每日上限进度。渠道所有者或管理员可见。
+         * @description 24h 与 7d 成功率与调用量、首字与输出速度 p50/p95、错误按状态码分布、最近 20 次失败（含上游原始错误）、健康事件、今日已结算收入。渠道所有者或管理员可见。
          */
         get: operations["getChannelStats"];
         put?: never;
@@ -3343,13 +3343,11 @@ export interface components {
             success_rate_24h: components["schemas"]["Ratio"] | null;
             ttft_p50_ms: number | null;
             /**
-             * @description available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM/每日收入上限。
+             * @description available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM限制。
              * @enum {string}
              */
             state: "available" | "cooldown" | "limited";
             cooldown_remaining_seconds: number | null;
-            /** @description 渠道设置了每日收入上限时，今日剩余比例（0～1）；未设置上限为 null。state 为 limited 时可据此显示剩余额度。 */
-            daily_cap_remaining: components["schemas"]["Ratio"] | null;
         };
         RoutingPreference: {
             model_id: string;
@@ -3477,7 +3475,6 @@ export interface components {
             header_rules: components["schemas"]["HeaderRules"];
             concurrency_limit: number | null;
             rpm_limit: number | null;
-            daily_revenue_cap: components["schemas"]["NullableAmount"];
             ttft_timeout_ms: number | null;
             idle_timeout_ms: number | null;
             request_timeout_ms: number | null;
@@ -3489,7 +3486,6 @@ export interface components {
             header_rules?: components["schemas"]["HeaderRules"];
             concurrency_limit?: number | null;
             rpm_limit?: number | null;
-            daily_revenue_cap?: components["schemas"]["NullableAmount"];
             ttft_timeout_ms?: number | null;
             idle_timeout_ms?: number | null;
             request_timeout_ms?: number | null;
@@ -4074,12 +4070,9 @@ export interface components {
             }[];
             /** @description 最近 20 次失败尝试，含上游原始错误（30 天后清理）。 */
             recent_failures: components["schemas"]["ChannelFailure"][];
-            /** @description 今日收入与每日收入上限进度。 */
+            /** @description 今日已结算收入。 */
             today: {
                 revenue: components["schemas"]["Amount"];
-                daily_cap: components["schemas"]["NullableAmount"];
-                /** @description 今日收入占上限的比例（封顶为 1）；未设置上限为 null。 */
-                progress: components["schemas"]["Ratio"] | null;
             };
             by_model: {
                 model_id: string;

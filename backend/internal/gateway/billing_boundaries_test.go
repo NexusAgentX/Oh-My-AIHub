@@ -209,10 +209,4 @@ func TestLateSettlementCrossesDayButNotMonth(t *testing.T) {
 	if got != (Spend{Today: 5, Month: 57, Total: 507}) {
 		t.Fatalf("late settlement budget=%+v", got)
 	}
-	runtime := NewRuntime(nil)
-	runtime.SetRevenue("channel", 10, now)
-	runtime.AddRevenueAt("channel", 7, previous, now, 11)
-	if state, _ := runtime.Check("channel", Limits{DailyRevenueCap: 11}, now); state != StateAvailable {
-		t.Fatal("previous-day revenue exhausted today's cap")
-	}
 }

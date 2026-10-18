@@ -98,8 +98,6 @@ sql:
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
           - column: "channel_models.custom_cache_read_price_nano_per_million"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
-          - column: "channels.daily_revenue_cap_nano"
-            go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
           - column: "api_keys.budget_daily_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
           - column: "api_keys.budget_monthly_nano"

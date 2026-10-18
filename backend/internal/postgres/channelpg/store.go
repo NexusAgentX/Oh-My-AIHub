@@ -69,8 +69,7 @@ func toChannel(row GetChannelRow) channel.Channel {
 		Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, Status: channel.Status(row.Status), SuspendedReason: row.SuspendedReason,
 		Advanced: channel.Advanced{
 			UserAgent: row.UserAgent, HeaderRules: decodeRules(row.HeaderRules),
-			ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
-			TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
+			ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
 			CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
 		},
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
@@ -240,8 +239,7 @@ func (s *Store) Create(ctx context.Context, in channel.NewChannel) (channel.Chan
 			ID: in.ID, OwnerID: in.OwnerID, Name: in.Name, Summary: in.Summary, Description: in.Description, BaseUrl: in.BaseURL,
 			ApiKeyCiphertext: in.Credential.Ciphertext, ApiKeyNonce: in.Credential.Nonce, ApiKeyKeyID: in.Credential.KeyID,
 			Status: string(in.Status), UserAgent: in.Advanced.UserAgent, HeaderRules: rules,
-			ConcurrencyLimit: in.Advanced.ConcurrencyLimit, RpmLimit: in.Advanced.RPMLimit, DailyRevenueCapNano: in.Advanced.DailyRevenueCap,
-			TtftTimeoutMs: in.Advanced.TTFTTimeoutMS, RequestTimeoutMs: in.Advanced.RequestTimeoutMS, IdleTimeoutMs: in.Advanced.IdleTimeoutMS,
+			ConcurrencyLimit: in.Advanced.ConcurrencyLimit, RpmLimit: in.Advanced.RPMLimit, TtftTimeoutMs: in.Advanced.TTFTTimeoutMS, RequestTimeoutMs: in.Advanced.RequestTimeoutMS, IdleTimeoutMs: in.Advanced.IdleTimeoutMS,
 			CooldownFailures: in.Advanced.CooldownFailures, CooldownSeconds: in.Advanced.CooldownSeconds,
 		}); err != nil {
 			return err
@@ -346,7 +344,7 @@ func (s *Store) Update(ctx context.Context, id string, update channel.Update) (c
 			}
 			if err := q.UpdateChannelAdvanced(ctx, UpdateChannelAdvancedParams{
 				ID: id, UserAgent: advanced.UserAgent, HeaderRules: rules, ConcurrencyLimit: advanced.ConcurrencyLimit,
-				RpmLimit: advanced.RPMLimit, DailyRevenueCapNano: advanced.DailyRevenueCap, TtftTimeoutMs: advanced.TTFTTimeoutMS,
+				RpmLimit: advanced.RPMLimit, TtftTimeoutMs: advanced.TTFTTimeoutMS,
 				RequestTimeoutMs: advanced.RequestTimeoutMS, IdleTimeoutMs: advanced.IdleTimeoutMS, CooldownFailures: advanced.CooldownFailures, CooldownSeconds: advanced.CooldownSeconds,
 			}); err != nil {
 				return err

@@ -303,7 +303,7 @@ func (s *Store) ChannelBrief(ctx context.Context, id string) (observe.ChannelBri
 	if err != nil {
 		return observe.ChannelBrief{}, err
 	}
-	return observe.ChannelBrief{ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, DailyRevenueCap: row.DailyRevenueCapNano}, nil
+	return observe.ChannelBrief{ID: row.ID, OwnerID: row.OwnerID, Name: row.Name}, nil
 }
 
 func (s *Store) attemptWindow(ctx context.Context, id string, from, to time.Time) (observe.AttemptWindow, error) {

@@ -96,22 +96,6 @@ func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) 
 	return items, nil
 }
 
-const channelRevenue = `-- name: ChannelRevenue :one
-SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $1 AND created_at >= $2
-`
-
-type ChannelRevenueParams struct {
-	FinalChannelID *string
-	CreatedAt      time.Time
-}
-
-func (q *Queries) ChannelRevenue(ctx context.Context, arg ChannelRevenueParams) (int64, error) {
-	row := q.db.QueryRow(ctx, channelRevenue, arg.FinalChannelID, arg.CreatedAt)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const claimBackground = `-- name: ClaimBackground :many
 WITH due AS (
  SELECT call_id FROM gateway_background_jobs
@@ -419,8 +403,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 const listAllCandidates = `-- name: ListAllCandidates :many
 SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -446,7 +429,6 @@ type ListAllCandidatesRow struct {
 	HeaderRules                         []byte
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
 	RequestTimeoutMs                    *int32
 	IdleTimeoutMs                       *int32
@@ -490,7 +472,6 @@ func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -578,8 +559,7 @@ func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
 
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -608,7 +588,6 @@ type ListCandidatesRow struct {
 	HeaderRules                         []byte
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
 	RequestTimeoutMs                    *int32
 	IdleTimeoutMs                       *int32
@@ -645,7 +624,6 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -672,8 +650,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.cooldown_failures, c.cooldown_seconds,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
@@ -694,7 +671,6 @@ type ListOnlineChannelModelsRow struct {
 	FxDiscount                          bool
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
 	IsCustom                            bool
@@ -724,7 +700,6 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 			&i.FxDiscount,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
 			&i.IsCustom,

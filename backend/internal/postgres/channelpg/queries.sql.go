@@ -82,7 +82,7 @@ func (q *Queries) DeleteChannelModels(ctx context.Context, channelID string) err
 
 const getChannel = `-- name: GetChannel :one
 SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
@@ -91,28 +91,27 @@ WHERE c.id = $1 AND c.deleted_at IS NULL
 `
 
 type GetChannelRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	Summary             string
-	Description         string
-	BaseUrl             string
-	Status              string
-	SuspendedReason     *string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	RequestTimeoutMs    *int32
-	IdleTimeoutMs       *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	OwnerUsername       string
-	OwnerDisplayName    string
+	ID               string
+	OwnerID          string
+	Name             string
+	Summary          string
+	Description      string
+	BaseUrl          string
+	Status           string
+	SuspendedReason  *string
+	UserAgent        *string
+	HeaderRules      []byte
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	TtftTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	IdleTimeoutMs    *int32
+	CooldownFailures *int32
+	CooldownSeconds  *int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	OwnerUsername    string
+	OwnerDisplayName string
 }
 
 func (q *Queries) GetChannel(ctx context.Context, id string) (GetChannelRow, error) {
@@ -131,7 +130,6 @@ func (q *Queries) GetChannel(ctx context.Context, id string) (GetChannelRow, err
 		&i.HeaderRules,
 		&i.ConcurrencyLimit,
 		&i.RpmLimit,
-		&i.DailyRevenueCapNano,
 		&i.TtftTimeoutMs,
 		&i.RequestTimeoutMs,
 		&i.IdleTimeoutMs,
@@ -176,32 +174,31 @@ func (q *Queries) GetChannelForUpdate(ctx context.Context, id string) (string, e
 const insertChannel = `-- name: InsertChannel :exec
 INSERT INTO channels (
     id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id, status,
-    user_agent, header_rules, concurrency_limit, rpm_limit, daily_revenue_cap_nano,
+    user_agent, header_rules, concurrency_limit, rpm_limit,
     ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms, summary, description
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 `
 
 type InsertChannelParams struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	BaseUrl             string
-	ApiKeyCiphertext    []byte
-	ApiKeyNonce         []byte
-	ApiKeyKeyID         string
-	Status              string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	RequestTimeoutMs    *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	IdleTimeoutMs       *int32
-	Summary             string
-	Description         string
+	ID               string
+	OwnerID          string
+	Name             string
+	BaseUrl          string
+	ApiKeyCiphertext []byte
+	ApiKeyNonce      []byte
+	ApiKeyKeyID      string
+	Status           string
+	UserAgent        *string
+	HeaderRules      []byte
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	TtftTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	CooldownFailures *int32
+	CooldownSeconds  *int32
+	IdleTimeoutMs    *int32
+	Summary          string
+	Description      string
 }
 
 func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) error {
@@ -218,7 +215,6 @@ func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) er
 		arg.HeaderRules,
 		arg.ConcurrencyLimit,
 		arg.RpmLimit,
-		arg.DailyRevenueCapNano,
 		arg.TtftTimeoutMs,
 		arg.RequestTimeoutMs,
 		arg.CooldownFailures,
@@ -292,7 +288,7 @@ func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModel
 
 const listAdminChannels = `-- name: ListAdminChannels :many
 SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
@@ -318,28 +314,27 @@ type ListAdminChannelsParams struct {
 }
 
 type ListAdminChannelsRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	Summary             string
-	Description         string
-	BaseUrl             string
-	Status              string
-	SuspendedReason     *string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	RequestTimeoutMs    *int32
-	IdleTimeoutMs       *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	OwnerUsername       string
-	OwnerDisplayName    string
+	ID               string
+	OwnerID          string
+	Name             string
+	Summary          string
+	Description      string
+	BaseUrl          string
+	Status           string
+	SuspendedReason  *string
+	UserAgent        *string
+	HeaderRules      []byte
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	TtftTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	IdleTimeoutMs    *int32
+	CooldownFailures *int32
+	CooldownSeconds  *int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	OwnerUsername    string
+	OwnerDisplayName string
 }
 
 func (q *Queries) ListAdminChannels(ctx context.Context, arg ListAdminChannelsParams) ([]ListAdminChannelsRow, error) {
@@ -371,7 +366,6 @@ func (q *Queries) ListAdminChannels(ctx context.Context, arg ListAdminChannelsPa
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -555,7 +549,7 @@ func (q *Queries) ListModelsOfChannels(ctx context.Context, channelIds []string)
 
 const listOwnerChannels = `-- name: ListOwnerChannels :many
 SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
@@ -565,28 +559,27 @@ ORDER BY c.created_at DESC, c.id DESC
 `
 
 type ListOwnerChannelsRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	Summary             string
-	Description         string
-	BaseUrl             string
-	Status              string
-	SuspendedReason     *string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	RequestTimeoutMs    *int32
-	IdleTimeoutMs       *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	OwnerUsername       string
-	OwnerDisplayName    string
+	ID               string
+	OwnerID          string
+	Name             string
+	Summary          string
+	Description      string
+	BaseUrl          string
+	Status           string
+	SuspendedReason  *string
+	UserAgent        *string
+	HeaderRules      []byte
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	TtftTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	IdleTimeoutMs    *int32
+	CooldownFailures *int32
+	CooldownSeconds  *int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	OwnerUsername    string
+	OwnerDisplayName string
 }
 
 func (q *Queries) ListOwnerChannels(ctx context.Context, ownerID string) ([]ListOwnerChannelsRow, error) {
@@ -611,7 +604,6 @@ func (q *Queries) ListOwnerChannels(ctx context.Context, ownerID string) ([]List
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -714,23 +706,22 @@ func (q *Queries) UnsuspendChannel(ctx context.Context, id string) error {
 
 const updateChannelAdvanced = `-- name: UpdateChannelAdvanced :exec
 UPDATE channels SET
-    user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5, daily_revenue_cap_nano = $6,
-    ttft_timeout_ms = $7, request_timeout_ms = $8, idle_timeout_ms = $11, cooldown_failures = $9, cooldown_seconds = $10, updated_at = now()
+    user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5,
+    ttft_timeout_ms = $6, request_timeout_ms = $7, idle_timeout_ms = $10, cooldown_failures = $8, cooldown_seconds = $9, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL
 `
 
 type UpdateChannelAdvancedParams struct {
-	ID                  string
-	UserAgent           *string
-	HeaderRules         []byte
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	TtftTimeoutMs       *int32
-	RequestTimeoutMs    *int32
-	CooldownFailures    *int32
-	CooldownSeconds     *int32
-	IdleTimeoutMs       *int32
+	ID               string
+	UserAgent        *string
+	HeaderRules      []byte
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	TtftTimeoutMs    *int32
+	RequestTimeoutMs *int32
+	CooldownFailures *int32
+	CooldownSeconds  *int32
+	IdleTimeoutMs    *int32
 }
 
 func (q *Queries) UpdateChannelAdvanced(ctx context.Context, arg UpdateChannelAdvancedParams) error {
@@ -740,7 +731,6 @@ func (q *Queries) UpdateChannelAdvanced(ctx context.Context, arg UpdateChannelAd
 		arg.HeaderRules,
 		arg.ConcurrencyLimit,
 		arg.RpmLimit,
-		arg.DailyRevenueCapNano,
 		arg.TtftTimeoutMs,
 		arg.RequestTimeoutMs,
 		arg.CooldownFailures,
