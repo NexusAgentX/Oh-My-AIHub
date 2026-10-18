@@ -242,10 +242,8 @@ func (b *codexBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// The official-client harness can observe cancellation even though the
 	// production engine deliberately drains disconnected calls for settlement.
-	observation := make(chan struct{})
-	stop := context.AfterFunc(r.Context(), func() { close(observation) })
-	defer stop()
-	r = r.WithContext(context.WithValue(r.Context(), codexClientCancellationKey{}, (<-chan struct{})(observation)))
+	clientContext := r.Context()
+	r = r.WithContext(context.WithValue(clientContext, codexClientCancellationKey{}, clientContext))
 	b.mux.ServeHTTP(w, r)
 }
 
@@ -417,15 +415,22 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	finished := time.Now().UnixNano()
 	if ep.ID == "codex.responses" {
 		cancelled := false
+		if compact {
+			b.receivedActivity()
+		}
 		if compact && cancelCase {
 			// Gate only delivery of an already-observed genuine result. This
 			// tests client shutdown and gateway draining without inducing an
 			// upstream fault or asserting that the upstream itself cancelled.
-			if client, ok := req.Context().Value(codexClientCancellationKey{}).(<-chan struct{}); ok {
+			if client, ok := req.Context().Value(codexClientCancellationKey{}).(context.Context); ok {
 				select {
-				case <-client:
+				case <-client.Done():
 					cancelled = true
 				case <-req.Context().Done():
+					// Both contexts can be done during handler shutdown. Read
+					// the original request directly rather than racing a second
+					// AfterFunc notification against the draining context.
+					cancelled = client.Err() != nil
 				}
 			}
 		}

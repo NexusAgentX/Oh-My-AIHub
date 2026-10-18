@@ -25,19 +25,56 @@ type codexRouteStore struct {
 	rows []gateway.CandidateRecord
 }
 
+// Per-request synthetic snapshots let regressions change eligible channels
+// without racing a shared slice or introducing a production bypass.
+type codexTestSnapshotKey struct{}
+type codexTestSnapshot struct {
+	ChannelID string
+	Key       *gateway.KeyAuth
+	Rotated   *channel.EncryptedCredential
+}
+
+func (s *codexRouteStore) LookupKey(ctx context.Context, _ []byte) (gateway.KeyAuth, error) {
+	if selected, ok := ctx.Value(codexTestSnapshotKey{}).(codexTestSnapshot); ok && selected.Key != nil {
+		return *selected.Key, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.key, nil
+}
+
+func (s *codexRouteStore) snapshot(ctx context.Context) []gateway.CandidateRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	selected, _ := ctx.Value(codexTestSnapshotKey{}).(codexTestSnapshot)
+	out := []gateway.CandidateRecord{}
+	for _, row := range s.rows {
+		if selected.ChannelID != "" && row.Candidate.ChannelID != selected.ChannelID {
+			continue
+		}
+		if selected.Rotated != nil {
+			row.Candidate.Credential = *selected.Rotated
+			row.Candidate.CredentialRevision++
+			row.Candidate.CredentialScope = "rotated-synthetic-scope"
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 type codexFixtureModels struct{ proxyModels }
 
 func (codexFixtureModels) Get(_ context.Context, id string) (catalog.Model, error) {
 	return catalog.Model{ID: id, Enabled: true, PriceCurrency: "CNY"}, nil
 }
 
-func (s *codexRouteStore) AuxiliaryCandidates(context.Context, channel.Format) ([]gateway.CandidateRecord, error) {
-	return s.rows, nil
+func (s *codexRouteStore) AuxiliaryCandidates(ctx context.Context, _ channel.Format) ([]gateway.CandidateRecord, error) {
+	return s.snapshot(ctx), nil
 }
 
-func (s *codexRouteStore) Candidates(_ context.Context, model string, format channel.Format) ([]gateway.Candidate, error) {
+func (s *codexRouteStore) Candidates(ctx context.Context, model string, format channel.Format) ([]gateway.Candidate, error) {
 	out := []gateway.Candidate{}
-	for _, r := range s.rows {
+	for _, r := range s.snapshot(ctx) {
 		if r.ModelID == model {
 			for _, f := range r.Formats {
 				if f == format {

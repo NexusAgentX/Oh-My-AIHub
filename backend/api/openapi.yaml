@@ -17776,7 +17776,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-19.5",
+    "version": "2026-10-19.6",
     "stage": "discovery",
     "sources": [
       {
@@ -21376,7 +21376,15 @@ x-aihub-gateway-contract:
               "history_cross_channel",
               "reference_scope_enforced"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "assertion_layers": {
+              "codex-special.RL23/a2": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL23/a6": [
+                "gateway_proxy"
+              ]
+            }
           },
           {
             "id": "codex-special.RL26",
@@ -21397,7 +21405,21 @@ x-aihub-gateway-contract:
               "fixed_egress",
               "secret_redaction"
             ],
-            "credential_dependent": false
+            "credential_dependent": false,
+            "assertion_layers": {
+              "codex-special.RL26/a2": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL26/a3": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL26/a6": [
+                "gateway_proxy"
+              ],
+              "codex-special.RL26/a7": [
+                "gateway_proxy"
+              ]
+            }
           }
         ],
         "evidence_layers": [
@@ -21607,6 +21629,7 @@ x-aihub-gateway-contract:
       "codex-rl14-endpoint-evidence": "RL14 separately tests the native Codex and public Responses entrances; neither endpoint supplies transport capability evidence for the other. Public assertions are upstream/gateway only; the pinned CLI compression profile uses its actual native endpoint.",
       "codex-notes-model-prerequisites": "RL18 uses the actual native catalog for an explicit group model prerequisite and actual native model-produced encrypted arguments/output consumption. No invented ciphertext, notes body persistence, resource management API, timed consistency wait or source-channel binding.",
       "codex-history-seed-scope": "RL19 seeds only a synthetic session and known window using pinned CLI history_ingest_requested metadata. It reads only item IDs recovered from that window and matching the unpredictable seeded content, performs immediate observations without waiting, and records missing IDs as failed prerequisites rather than guessing resources or binding source channels.",
-      "codex_compaction_proof": "固定官方 CLI 0.163.0 / 83086188 的 RemoteCompactionSupport 仅 Unsupported/V2；V1 standalone 保留直接上游与平台代理完整窗口检测，不编造不存在的 CLI V1 配置。RL22 使用 V2 协议；配置启用属客户端，重叠/取消/续用分层核验，单次结算属平台代理。原 ID 与全部功能断言保留。"
+      "codex_compaction_proof": "固定官方 CLI 0.163.0 / 83086188 的 RemoteCompactionSupport 仅 Unsupported/V2；V1 standalone 保留直接上游与平台代理完整窗口检测，不编造不存在的 CLI V1 配置。RL22 使用 V2 协议；配置启用属客户端，重叠/取消/续用分层核验，单次结算属平台代理。原 ID 与全部功能断言保留。",
+      "codex-platform-proof": "RL23/26 are CI-controlled synthetic platform regressions, separate from supplier creation. Fixed CLI HTTP ResponsesApiRequest has no previous_response_id (the similarly named field is WebSocket-only), and does not emit Messages thinking signatures; these remain gateway HTTP proofs. Forged/colliding identifiers, arbitrary egress and secret-bearing error injection are adversarial HTTP proofs. CLI proofs cover actual cross-channel reasoning/compaction/notes/history, account/Key isolation of its actual contexts, credential rotation and revocation. Every original functional assertion remains mandatory in its applicable layer; no synthetic result projects supplier support."
     }
   }

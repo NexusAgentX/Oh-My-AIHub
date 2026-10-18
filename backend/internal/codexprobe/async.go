@@ -20,8 +20,12 @@ func asyncSeed(id string) string {
 // Waiting for an observed request/event is bounded synchronization, not a TTL
 // or elapsed-time capability test. The private observer never calls upstream.
 func asyncState(ctx context.Context, c Config, after int, finished bool) (int, error) {
-	var state struct{ Started, Finished int }
-	if probeControl(ctx, c, "/probe/async-state?after="+strconv.Itoa(after)+"&finished="+strconv.FormatBool(finished), &state) != nil || state.Started <= after || state.Started > 8 || finished && state.Finished <= after {
+	return asyncObservedState(ctx, c, after, finished, false)
+}
+
+func asyncObservedState(ctx context.Context, c Config, after int, finished, received bool) (int, error) {
+	var state struct{ Started, Received, Finished int }
+	if probeControl(ctx, c, "/probe/async-state?after="+strconv.Itoa(after)+"&finished="+strconv.FormatBool(finished)+"&received="+strconv.FormatBool(received), &state) != nil || state.Started <= after || state.Started > 8 || finished && state.Finished <= after || received && state.Received <= after {
 		return 0, ErrClient
 	}
 	return state.Started, nil
@@ -92,7 +96,10 @@ func runAsyncCompaction(ctx context.Context, c Config, d *dialogue, first string
 	if d.runTurn(ctx, thread.Thread.ID, asyncSeed(thread.Thread.ID)+" Controlled client cancellation case AIHUB-ASYNC-CANCEL-"+thread.Thread.ID) != nil || !d.matched {
 		return ErrClient
 	}
-	if _, err = asyncState(ctx, c, count, false); err != nil {
+	// Shutdown only after the real upstream operation has returned and the
+	// private bridge is gating delivery. Observing request start alone races
+	// cancellation against response headers and cannot prove draining usage.
+	if _, err = asyncObservedState(ctx, c, count, false, true); err != nil {
 		return err
 	}
 	if d.call(ctx, "thread/archive", map[string]any{"threadId": thread.Thread.ID}, nil) != nil {

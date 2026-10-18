@@ -10,8 +10,8 @@ import (
 // Private worker synchronization only. This path is never registered on the
 // platform router and supplies no supplier assertion or response body.
 type codexProbeActivity struct {
-	started, finished, compact, foreground int
-	changed                                chan struct{}
+	started, received, finished, compact, foreground int
+	changed                                          chan struct{}
 }
 
 type codexClientCancellationKey struct{}
@@ -56,6 +56,13 @@ func (b *codexBridge) finishActivity(compact, cancelled bool) {
 	a.notify()
 }
 
+func (b *codexBridge) receivedActivity() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.activity.received++
+	b.activity.notify()
+}
+
 func (b *codexBridge) serveAsyncState(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" || subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+b.token)) != 1 {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -67,6 +74,7 @@ func (b *codexBridge) serveAsyncState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	finished := r.URL.Query().Get("finished") == "true"
+	received := r.URL.Query().Get("received") == "true"
 	for {
 		b.mu.Lock()
 		a, closed := b.activity, b.closed
@@ -75,8 +83,8 @@ func (b *codexBridge) serveAsyncState(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		if a.started > after && (!finished || a.finished > after) {
-			_ = json.NewEncoder(w).Encode(map[string]int{"started": a.started, "finished": a.finished})
+		if a.started > after && (!received || a.received > after) && (!finished || a.finished > after) {
+			_ = json.NewEncoder(w).Encode(map[string]int{"started": a.started, "received": a.received, "finished": a.finished})
 			return
 		}
 		select {

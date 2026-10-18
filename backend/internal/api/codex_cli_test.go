@@ -54,6 +54,35 @@ func codexCLITLSBridge(t *testing.T, handler http.Handler) (*httptest.Server, []
 	return server, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
 }
 
+func runProductionCodexProbe(t *testing.T, handler http.Handler, profile string) codexprobe.Result {
+	return runProductionCodexProbeOutcome(t, handler, profile, true)
+}
+
+func runProductionCodexProbeOutcome(t *testing.T, handler http.Handler, profile string, success bool) codexprobe.Result {
+	t.Helper()
+	binary, adapter := os.Getenv("AIHUB_TEST_CODEX_BINARY"), os.Getenv("AIHUB_TEST_CODEX_PROBE")
+	if binary == "" || adapter == "" {
+		t.Skip("explicit pinned official CLI and probe artifacts required")
+	}
+	bridge, ca := codexCLITLSBridge(t, handler)
+	defer bridge.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	output, err := detection.RunControlledProcess(ctx, detection.ProcessSpec{Executable: adapter, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binary, "AIHUB_CODEX_BRIDGE_ORIGIN": bridge.URL, "AIHUB_CODEX_BRIDGE_TOKEN": "sk-aih-synthetic", "AIHUB_CODEX_MODEL": "gpt-6.1-sol", "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: 110 * time.Second})
+	var result codexprobe.Result
+	parseErr := json.Unmarshal(output.Stdout, &result)
+	if success && (err != nil || parseErr != nil || !result.Completed || !result.MarkerMatched || !result.PlatformAuth) {
+		t.Fatalf("official CLI did not complete production-handler profile %s: reason=%s exit=%d metadata=%+v", profile, output.Reason, output.ExitCode, result)
+	}
+	if !success && (err == nil || parseErr != nil || result.Protocol != codexprobe.Protocol || result.Version != codexprobe.Version || result.Completed || result.PlatformAuth) {
+		t.Fatalf("revoked platform Key enabled the official client: reason=%s exit=%d metadata=%+v", output.Reason, output.ExitCode, result)
+	}
+	if strings.Contains(string(output.Stdout), "sk-aih-synthetic") || strings.Contains(string(output.Stdout), codexprobe.Marker) {
+		t.Fatal("probe emitted a credential or body")
+	}
+	return result
+}
+
 // Real fixed official CLI -> real platform HTTP handlers -> synthetic upstream.
 // This proves the implemented bridge, never supplier compatibility.
 func TestOfficialCodexCLIUsesProductionHandlers(t *testing.T) {
@@ -133,7 +162,7 @@ func TestOfficialCodexCLIUsesProductionHandlers(t *testing.T) {
 			defer bridge.Close()
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
-			output, err := detection.RunControlledProcess(ctx, detection.ProcessSpec{Executable: adapter, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binary, "AIHUB_CODEX_BRIDGE_ORIGIN": bridge.URL, "AIHUB_CODEX_BRIDGE_TOKEN": "sk-aih-synthetic", "AIHUB_CODEX_MODEL": "gpt-6.1-sol", "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, Timeout: 110 * time.Second})
+			output, err := detection.RunControlledProcess(ctx, detection.ProcessSpec{Executable: adapter, Args: []string{"--probe"}, Files: map[string][]byte{"bridge-ca.pem": ca}, Env: map[string]string{"AIHUB_CODEX_BINARY": binary, "AIHUB_CODEX_BRIDGE_ORIGIN": bridge.URL, "AIHUB_CODEX_BRIDGE_TOKEN": "sk-aih-synthetic", "AIHUB_CODEX_MODEL": "gpt-6.1-sol", "AIHUB_CODEX_PROFILE": profile, "AIHUB_CODEX_CA": "bridge-ca.pem", "GOMEMLIMIT": "128MiB", "GOMAXPROCS": "1"}, VirtualMemoryMiB: 2048, Timeout: 110 * time.Second})
 			var result codexprobe.Result
 			parseErr := json.Unmarshal(output.Stdout, &result)
 			if err != nil || parseErr != nil || !result.Completed || !result.MarkerMatched || !result.PlatformAuth {

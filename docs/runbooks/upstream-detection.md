@@ -1,6 +1,6 @@
 # 上游能力检测
 
-任务和报告只存必要执行元数据；不保存请求、响应、密文或 history/notes 正文，也不产生平台积分过账。真实检测须使用明确提供的测试 Key，维护者自行在上游控制限额。原生 F4 已实现套件会执行；缺 SDK/MCP 配置或未注册的 F8 套件显示 `suite_pending`，不能以此批准真实创建或宣称供应商通过。
+任务和报告只存必要执行元数据；不保存请求、响应、密文或 history/notes 正文，也不产生平台积分过账。真实检测须使用明确提供的测试 Key，维护者自行在上游控制限额。创建执行当前范围内的适用套件；缺 SDK/MCP 配置或固定 Codex 制品时相应项目显示 `suite_pending`，不能以此批准真实创建或宣称供应商通过。
 
 Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具往返、RL05 多轮 reasoning context、RL06 指令、RL09 加密推理续用、RL13 上游认证、RL15 原生目录、RL14 zstd/未压缩推理、RL20/21 完整压缩窗口续用和 RL24 各启用服务档位。相同真实请求复用，不把目录中的上下文、工具或套餐声明当成实测能力；独立操作、协议形态、压缩前后及跨形态回放各保留实际证据。均访问对应 Codex 原生路径，不借用公共 `/v1/responses` 的成功。请求档位、实际返档与可靠用量分别记录，降档不证明请求档位通过。
 
@@ -9,6 +9,25 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 官方 CLI 已注册 21 个适用业务场景（RL01–09、12–19、21/22/24/25）；固定客户端不支持的 V1 压缩只要求上游与平台代理两层，RL10 仍汇总全部适用压缩证据。RL23/26 属于平台跨渠道与隔离回归，不参与贡献对象的上游全测，不把合成平台结果算作供应商通过。临时 HTTPS 回环桥使用一次性 CA；消费者身份由正式处理器返回，实际测试 Key 不交给 CLI。`notes`/`image` profile 使用固定本地模型描述激活客户端场景；其中的 32768 是客户端测试配置，不是容量检测结论，不进入模型目录或路由快照。`catalog` profile 只使用实际目录，核验 `model/list` 返回目标别名，不调用推理；不会用本地目录冒充原生目录通过。启动检查制品版本/摘要，缺制品保持 pending。运行时可指定绝对路径 `AIHUB_DETECTION_CODEX_PROBE`、`AIHUB_CODEX_BINARY`，默认查找 server 同目录。
 
 渠道 Key 的最小可调用性探针与能力报告分开。只有当前有效的原生报告证明 Codex 入口支持、公共主入口缺少支持证据时，才以固定 Codex responses 或 images 入口探测；报告未知/失效不猜入口，也不额外补一次付费探测。`endpoint_id` 保留实际入口供所有者诊断，原生成功不能充当公共 `/v1/responses` 或 `/v1/images/generations` 支持。渠道所选地址仍按顺序回退，完整 SSE 终止或真实图片产物才证明可调用。
+
+## 固定 Codex 客户端接入
+
+以下仅对应本轮固定的 0.163.0；消费者填写本平台 Key，模型使用有权限且已有相应有效证据的实际模型 ID。使用独立的 `CODEX_HOME`，其 `auth.json` 为 `{"personal_access_token":"<PLATFORM_API_KEY>"}`；不要填写渠道 Key 或复制个人 ChatGPT 登录。
+
+`config.toml`：
+
+```toml
+model = "<MODEL_ID>"
+model_provider = "openai"
+openai_base_url = "https://gateway.example/backend-api/codex"
+chatgpt_base_url = "https://gateway.example/backend-api/"
+
+[features.token_budget]
+enabled = true
+use_history_notes_extension = true
+```
+
+以 `CODEX_AUTHAPI_BASE_URL=https://gateway.example` 启动这个隔离客户端。身份入口返回本平台账号和未知套餐 `aihub`；固定 CLI 将此 PAT 分支标为 ChatGPT，这不表示官方订阅或任何 Pro 权益。模型目录只来自当前 Key 可见的站内候选及实际能力证据。后台 V2 验证使用另一个客户端配置，关闭 TokenBudget 后启用 `[features.async_compaction] enabled = true`，不与上述 history/notes 配置混用；本地检测中的 1% 阈值和合成模型目录用于触发测试，不是消费者配置或供应商容量声明。
 
 ## 操作与故障恢复
 
@@ -31,7 +50,7 @@ Codex 原生适配器现执行 RL01/02/03/08/12 的标准/Lite 声明与工具�
 
 固定版本的 [RemoteCompactionSupport](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/model-provider-info/src/capabilities.rs) 只有 Unsupported/V2；V1 standalone 仍执行上游与平台代理的整个返回窗口续用，不编造 CLI V1 配置。V2 客户端仅安装返回的 compaction 项，保留消息由原请求按客户端规则筛选，不能用合成的 V1 多消息返回窗口冒充其实际安装规则。三层适用断言及汇总依赖由 OpenAPI manifest 声明，不跨层借用结果。
 
-`async_compact` 使用独立配置：TokenBudget 关闭，AsyncCompaction 开启，阈值 1%，固定合成上下文；验证真实前后台请求重叠、结果采用及后来消息保留。后台完成后要在后续前台检查点采用，不能等采用事件后才启动该轮。取消用例在私有桥暂缓交付已取得的上游结果，官方 CLI 关闭独立合成线程后释放；这是 CLI/网关功能检测，不是上游故障诱发，也不声称上游撤销了请求。网关仍按断开后继续读取的既有规则收尾，按每个调用的可靠结果核验单次结算。私有同步入口仅在该执行的回环桥上注册，校验临时平台 Key，不增加生产接口；等待真实事件有执行期限，不做 TTL 或到期测试。
+`async_compact` 使用独立配置：TokenBudget 关闭，AsyncCompaction 开启，阈值 1%，固定合成上下文；验证真实前后台请求重叠、结果采用及后来消息保留。后台完成后要在后续前台检查点采用，不能等采用事件后才启动该轮。关闭阶段先等待实际 HTTP 操作返回、桥进入交付暂缓状态，再关闭客户端线程；仅观察请求开始会让客户端取消抢在响应头之前，不能验证可靠结果的读取与结算。取消用例在私有桥暂缓交付已取得的上游结果，官方 CLI 关闭独立合成线程后释放；这是 CLI/网关功能检测，不是上游故障诱发，也不声称上游撤销了请求。网关仍按断开后继续读取的既有规则收尾，按每个调用的可靠结果核验单次结算。私有同步入口仅在该执行的回环桥上注册，校验临时平台 Key，不增加生产接口；等待真实事件有执行期限，不做 TTL 或到期测试。
 
 `encrypted` 配置实际进行两轮推理并核验上游密文原样回放；`search` 显式启用 StandaloneWebSearch，核验实际独立 alpha/search、有效结果 URL 结构和固定 CLI 带回的 input_text 输出。固定版本即使同时收到 encrypted_output 也使用 SearchResponse.output；协议直接检测与客户端实际行为分别记录。所有中间内容仍只留在私有执行内存中。
 
@@ -60,3 +79,7 @@ Linux 上 SDK 与 Codex 的 Go 检测驱动使用 2 GiB 虚拟地址空间上限
 ## 开发验证
 
 机制单测：`go -C backend test ./internal/detection ./internal/api`。PostgreSQL、迁移升级与 `-race` 交 CI。可显式启用 `uiqa` 构建标签的合成浏览器 HTTP harness；它不使用数据库、宿主登录、付费 Key 或真实上游，不构成供应商验收。开发不运行端到端性能 A/B，相关影响路径随版本交接至发版前集中验证。
+
+RL23/26 是平台回归矩阵，不是对任意供应商两两组合的创建检测，也不开放 `gateway` 贡献目标。CI 使用合成批准对象和固定 CLI，覆盖两渠道的实际加密推理/V2 压缩续用、notes A 写/B 读、history 读取恢复及凭据轮换；同组/跨组、thinking 签名、真正远端引用、碰撞/伪造/其他账号与 Key、撤销、固定出站与错误抹除走正式 HTTP 处理器。非法标识攻击是 HTTP 权限证据，不声称固定 CLI 自身提供制造这些请求的功能。测试只保留断言、计数和版本；合成上游正文只留测试内存，不写供应商报告。贡献对象的全部适用三层项目由 `TestAllApplicableCodexBusinessSuitesRegisterWithFixedArtifacts` 守住，缺制品仍保持待就绪。
+
+平台矩阵按固定客户端的实际请求模型分层：HTTP `ResponsesApiRequest` 不含 `previous_response_id`（同文件中的该字段属于已排除的 WS 请求）；Messages thinking 签名、伪造/碰撞 ID、任意出站与秘密错误注入在正式 HTTP 层验证。CLI 层验证其实际生成的推理/压缩/上下文及正常跨渠道流程、实际会话的账号/Key 隔离、凭据轮换与撤销。原功能断言均保留，分层由 manifest 版本固定；`TestCodexPlatformManifestHasConcreteRegressionOwners` 防止新增断言失去具体回归归属。CLI 可能在本地 PAT 配置下继续尝试推理，撤销的正确边界是每个正式入口拒绝该 Key、没有上游调用，不依赖 CLI 的本地认证标签。
