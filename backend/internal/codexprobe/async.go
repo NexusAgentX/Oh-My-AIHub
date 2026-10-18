@@ -20,32 +20,39 @@ func asyncSeed(id string) string {
 // Waiting for an observed request/event is bounded synchronization, not a TTL
 // or elapsed-time capability test. The private observer never calls upstream.
 func asyncState(ctx context.Context, c Config, after int, finished bool) (int, error) {
+	var state struct{ Started, Finished int }
+	if probeControl(ctx, c, "/probe/async-state?after="+strconv.Itoa(after)+"&finished="+strconv.FormatBool(finished), &state) != nil || state.Started <= after || state.Started > 8 || finished && state.Finished <= after {
+		return 0, ErrClient
+	}
+	return state.Started, nil
+}
+
+func probeControl(ctx context.Context, c Config, path string, target any) error {
 	ca, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), c.CA))
 	if err != nil {
-		return 0, ErrClient
+		return ErrClient
 	}
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(ca) {
-		return 0, ErrClient
+		return ErrClient
 	}
 	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}, MaxConnsPerHost: 1, MaxIdleConns: 1}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	req, err := http.NewRequestWithContext(ctx, "GET", c.Origin+"/probe/async-state?after="+strconv.Itoa(after)+"&finished="+strconv.FormatBool(finished), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.Origin+path, nil)
 	if err != nil {
-		return 0, ErrClient
+		return ErrClient
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, ErrClient
+		return ErrClient
 	}
 	defer resp.Body.Close()
-	var state struct{ Started, Finished int }
-	if resp.StatusCode != 200 || json.NewDecoder(io.LimitReader(resp.Body, 1024)).Decode(&state) != nil || state.Started <= after || state.Started > 8 || finished && state.Finished <= after {
-		return 0, ErrClient
+	if resp.StatusCode != 200 || json.NewDecoder(io.LimitReader(resp.Body, 1024)).Decode(target) != nil {
+		return ErrClient
 	}
-	return state.Started, nil
+	return nil
 }
 
 func runAsyncCompaction(ctx context.Context, c Config, d *dialogue, first string, params map[string]any, r *Result) error {

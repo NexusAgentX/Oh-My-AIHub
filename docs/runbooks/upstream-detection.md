@@ -39,6 +39,10 @@ RL17 复用 notes 生命周期的实际 CLI 请求。固定客户端会缓存初
 
 RL07 分别运行真实 Namespace 动态回调与内置 freeform apply_patch 的空补丁闭环；后者校验实际无操作诊断、参数分片和 call/result，不宣称文件写入能力。私有桥只交付规范空补丁，任何改变文件的内容或其他客户端工具在执行前拒绝。RL12 先复用标准/Lite 独立工具证据，再在同一个隔离官方客户端中用两个本地协议配置别名指向同一实际上游模型，分别把工具历史续用到另一格式。CLI 自身生成对应原生声明，网关不转换；两个方向均须识别到同一实际 call/result 的格式切换，不以两次独立工具成功代替兼容回放。
 
+RL19 使用 TokenBudget/history-notes 配置进行实际 history ingest，随后由 CLI 完成 list_windows/list_items/read_item/search_contents、另开会话的隔离及恢复后的新读取；只跟随本次写入元数据中的逻辑窗口或 context-window 标识，实际选择的 opaque ID 原样用于后续操作。固定客户端的 [传输窗口生成](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/mod.rs) 与 [上下文窗口展示](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/context/token_budget_context.rs) 使用不同标识，不能强行把所有窗口当 UUID。查不到刚写入条目时不猜 item ID、不等索引延迟，记录未观测；外国上下文的真实 403/404 拒绝与空结果分别观测，拒绝不能被算成对应操作的支持证据。
+
+官方 CLI 的 notes/history 验证以实际上下文中的合成待办任务完成情况核验恢复，不要求客户端引用或复述其内置工具规则要求保密的正文。上游工具输出仍须有真实 HTTP 回执、结果哈希及后续推理中的对应回填，不能仅靠最终文本成功。请求/响应、私有笔记/历史和密文不进入报告。
+
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。
 
 SDK 子进程只获得合成提示、模型 ID、临时回环地址/令牌和占位 Key，实际测试 Key 由父进程的固定出站持有。桥仅允许当前模型的一个基础请求；SDK 重试和自动续用关闭，短答响应不超过 256 KiB，子进程用 `GOMEMLIMIT=128MiB`、单 Go 执行核及既有进程保护。原始 stdout/stderr 不入报告。SDK 类型中包含的 Files/容器/WS 等资源不构成代理范围。机制回归：先 `mise run build-detection-sdk`，再以构建制品的绝对路径设置 `AIHUB_TEST_SDK_BINARY` 运行 `go -C backend test ./internal/detection -run 'TestOfficialSDKBridge|TestMissingSDKArtifact'`；它只使用合成上游。真实供应商验收仍需要明确测试 Key。

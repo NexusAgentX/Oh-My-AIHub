@@ -226,7 +226,15 @@ func codexReturnedContextText(body nativeObject) string {
 			if value["missing"] == true {
 				return codexMissingNote
 			}
-			return str(value["content"])
+			text := str(value["content"])
+			if strings.HasPrefix(text, "Pending user task: answer with exactly ") {
+				answer := codexNoteMarker.FindString(text)
+				appendAnswer := regexp.MustCompile(`APPEND-[0-9a-f-]{36}`).FindString(text)
+				if answer != "" && appendAnswer != "" {
+					return answer + " " + appendAnswer
+				}
+			}
+			return text
 		}
 	}
 	return ""

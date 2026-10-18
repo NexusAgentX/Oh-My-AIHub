@@ -17775,7 +17775,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-19.4",
+    "version": "2026-10-19.5",
     "stage": "discovery",
     "sources": [
       {
@@ -21556,7 +21556,7 @@ x-aihub-gateway-contract:
       "gateway/item-reference": "原生item_reference可能仅含id：按可信索引的账号/Key与原始父级元数据解析，唯一才绑定；有显式父级时严格校验。跨父级/来源同ID无法消歧时拒绝，不以空父级错误拒绝所有已登记项。",
       "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
       "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。",
-      "codex-special/context-wire-mapping": "只处理固定CLI的context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。不递归改input/opaque item id、window/item引用、notes路径、正文或密文，不改current_agent_name。只在Codex上下文协议启用，未知扩展原样保留；重复标识/头拒绝，空值可选metadata保留。解压/映射/模型替换后由F8正确重建编码与长度。",
+      "codex-special/context-wire-mapping": "只处理固定CLI的context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。固定CLI的传输窗口元数据window_id、client_metadata.x-codex-window-id与HTTP x-codex-window-id，只有明确的thread-UUID:无符号计数格式时，将UUID前缀用同一会话映射，保留计数；不把它与context_window_id或history接口的opaque窗口ID混同。未知格式原样保留；不递归改input/opaque item id、history窗口/item引用、notes路径、正文、密文或current_agent_name。只在Codex上下文协议启用；重复标识/头拒绝，可选metadata空值保留。解压/映射/模型替换后重建编码与长度；单请求映射缓存至多16项，不引入来源路由绑定或SQL。",
       "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。",
       "detection/native-evidence": "F4 按原生协议逐项验证结构、语义与可靠用量；真实长度与参数接受独立，搜索额外计数请求纳入实际消耗。SSE 使用原生流式端点，计数/压缩场景允许调用对应原生生成端点验证完整窗口续用。指纹固定 lmfpd 0.0.1792242250521 / 50a364bc686279094265f34f18f5501eac1d73f4，三条完整样本、离线 Go 等价评分，只保存库内相对排名，不证明身份。",
       "detection/native-applicability": "保留每个原始 ID 的场景归属，将通用模板断言细化为实际原生字段。Messages 不虚构 json_object/custom/namespace；Gemini 使用 allowedFunctionNames、VALIDATED、parametersJsonSchema 和 responseJsonSchema，不加入旧 responseSchema 专项；Chat SSE 不虚构原生推理事件。OpenAI custom、allowed_tools 及 Responses namespace 分别验证，temperature/top_p/effort/verbosity 分开投影。缺少偶发多调用或可选 thinking/签名事件只按明确条件断言记录未观测，不代替主动适用检测。",

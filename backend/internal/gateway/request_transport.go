@@ -41,7 +41,7 @@ func needsCodexNamespace(r *http.Request, body []byte, scan objectScan, format c
 	if format != channel.FormatOpenAIResponses {
 		return false
 	}
-	for _, name := range []string{"Session-Id", "Thread-Id", "X-Client-Request-Id", "X-Codex-Parent-Thread-Id", "X-Codex-Turn-Metadata"} {
+	for _, name := range []string{"Session-Id", "Thread-Id", "X-Client-Request-Id", "X-Codex-Parent-Thread-Id", "X-Codex-Turn-Metadata", "X-Codex-Window-Id"} {
 		if len(r.Header.Values(name)) > 0 {
 			return true
 		}
@@ -57,7 +57,7 @@ func needsCodexNamespace(r *http.Request, body []byte, scan objectScan, format c
 				found = found || name == "session_id"
 			} else {
 				switch name {
-				case "session_id", "thread_id", "parent_thread_id", "forked_from_thread_id", "x-codex-parent-thread-id", "x-codex-turn-metadata":
+				case "session_id", "thread_id", "parent_thread_id", "forked_from_thread_id", "x-codex-parent-thread-id", "x-codex-turn-metadata", "x-codex-window-id":
 					found = true
 				}
 			}
@@ -129,7 +129,7 @@ func requestWireHeaders(h http.Header, encoding string) {
 // Approved channel header rules cannot replace an authenticated caller's
 // protected context with a shared or foreign session. Absence stays absent.
 func contextWireHeaders(out, mapped http.Header) {
-	for _, name := range []string{"Session-Id", "Thread-Id", "X-Client-Request-Id", "X-Codex-Parent-Thread-Id", "X-Codex-Turn-Metadata"} {
+	for _, name := range []string{"Session-Id", "Thread-Id", "X-Client-Request-Id", "X-Codex-Parent-Thread-Id", "X-Codex-Turn-Metadata", "X-Codex-Window-Id"} {
 		out.Del(name)
 		if values := mapped.Values(name); len(values) > 0 {
 			out[name] = append([]string(nil), values...)

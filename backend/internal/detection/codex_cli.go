@@ -68,7 +68,7 @@ func (r *Registry) RegisterCodexCLI(ctx context.Context, probePath, binaryPath s
 			continue
 		}
 		for _, req := range suite.Requirements {
-			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
+			if !slices.Contains([]string{"codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL04", "codex-special.RL05", "codex-special.RL06", "codex-special.RL07", "codex-special.RL08", "codex-special.RL09", "codex-special.RL12", "codex-special.RL13", "codex-special.RL14", "codex-special.RL15", "codex-special.RL16", "codex-special.RL17", "codex-special.RL18", "codex-special.RL19", "codex-special.RL21", "codex-special.RL22", "codex-special.RL24", "codex-special.RL25"}, req.ID) {
 				continue
 			}
 			layers := []string{"official_cli"}
@@ -101,6 +101,7 @@ type codexCLIProof struct {
 	Observed         map[string]int
 	ContextContinued map[string]bool
 	ContextPhases    map[string]map[string]int
+	ContextDenied    map[string]map[string]int
 	Hints            map[string]codexHintFacts
 }
 
@@ -135,6 +136,8 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 		profiles = []string{"search"}
 	case "codex-special.RL17", "codex-special.RL18":
 		profiles = []string{"notes_lifecycle"}
+	case "codex-special.RL19":
+		profiles = []string{"history_lifecycle"}
 	case "codex-special.RL21":
 		profiles = []string{"compact"}
 	case "codex-special.RL22":
@@ -254,7 +257,22 @@ func runCodexCLI(ctx context.Context, s *Session, req gatewaycontract.Requiremen
 				n.check(operation, out, client.ContextVerified && proof.ContextPhases["notes_primary"][endpoint] > 0 && proof.ContextContinued[endpoint])
 			}
 			n.check("reopen_session", out, client.ContextVerified && client.ReopenVerified && proof.ContextPhases["notes_reopen"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
-			n.check("context_isolation", out, client.ContextVerified && client.IsolationVerified && proof.ContextPhases["notes_isolation"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
+			n.check("context_isolation", out, client.ContextVerified && client.IsolationVerified && proof.ContextPhases["notes_isolation"]["codex.notes.read_file"]+proof.ContextDenied["notes_isolation"]["codex.notes.read_file"] > 0 && proof.ContextContinued["codex.notes.read_file"])
+		case "codex-special.RL19":
+			for _, operation := range []string{"list_windows", "list_items", "read_item", "search_contents"} {
+				endpoint := "codex.history." + operation
+				step := out
+				if operation == "read_item" && client.HistoryUnobserved && step.State == "pass" {
+					step.State, step.Reason = "inconclusive", "not_observed"
+				}
+				n.check(operation, step, proof.ContextPhases["history_primary"][endpoint] > 0 && proof.ContextContinued[endpoint])
+			}
+			resumed := out
+			if client.HistoryUnobserved && resumed.State == "pass" {
+				resumed.State, resumed.Reason = "inconclusive", "not_observed"
+			}
+			n.check("remote_resume", resumed, client.ContextVerified && client.ReopenVerified && proof.ContextPhases["history_reopen"]["codex.history.read_item"] > 0 && proof.ContextContinued["codex.history.read_item"])
+			n.check("context_isolation", resumed, client.ContextVerified && client.IsolationVerified && proof.ContextPhases["history_isolation"]["codex.history.list_items"]+proof.ContextDenied["history_isolation"]["codex.history.list_items"] > 0)
 		case "codex-special.RL21":
 			n.check("compaction_trigger", out, wire.CompactionV2 > 0 && wire.CompactionV1 == 0)
 			n.check("compaction_output", out, wire.CompactionReturned > 0)
@@ -362,7 +380,7 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	proof = codexCLIProof{Client: client, Wire: b.wire, State: "pass", Reason: "ok", Witnesses: refs, Observed: b.observed, ContextContinued: b.contextContinued}
 	if runErr != nil || parseErr != nil || client.Protocol != codexprobe.Protocol || client.Version != codexprobe.Version || client.Profile != profile {
 		stage := "unknown"
-		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "compact", "async_overlap", "async_reuse", "async_shutdown", "completed"}, client.Stage) {
+		if slices.Contains([]string{"setup", "initialize", "account", "catalog", "thread", "turn_start", "turn", "compact", "async_overlap", "async_reuse", "async_shutdown", "history_metadata", "history_metadata_id", "history_primary", "history_isolation", "history_reopen", "completed"}, client.Stage) {
 			stage = client.Stage
 		}
 		proof.State, proof.Reason = "inconclusive", "client_disabled"
@@ -376,10 +394,18 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 			proof.Reason = "cancelled"
 		}
 		slog.Warn("controlled Codex probe did not complete", "profile", profile, "stage", stage, "rpc_error_code", client.RPCErrorCode, "exit_code", output.ExitCode, "state", proof.State, "reason", proof.Reason)
+		if profile == "history_lifecycle" {
+			slog.Warn("history observer metadata", "observed", b.historyWindow != "", "length", len(b.historyWindow))
+		}
 	}
-	if profile == "notes_lifecycle" && proof.State == "pass" {
-		counts, valid := codexObservedPhases(client.Phases, b.contextExecutions, executionStarted, executionFinished)
+	if (profile == "notes_lifecycle" || profile == "history_lifecycle") && proof.State == "pass" {
+		kinds := []string{"notes_primary", "notes_isolation", "notes_reopen"}
+		if profile == "history_lifecycle" {
+			kinds = []string{"history_primary", "history_isolation", "history_reopen"}
+		}
+		counts, valid := codexObservedPhasesFor(client.Phases, b.contextExecutions, executionStarted, executionFinished, kinds)
 		proof.ContextPhases = counts
+		proof.ContextDenied = codexDeniedPhases(client.Phases, b.contextExecutions)
 		proof.Hints = codexHintPhases(client.Phases, b.contextExecutions)
 		if !valid {
 			proof.State, proof.Reason = "inconclusive", "detector_error"
@@ -401,8 +427,11 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 }
 
 func codexObservedPhases(phases []codexprobe.Phase, executions []codexContextExecution, start, end int64) (map[string]map[string]int, bool) {
+	return codexObservedPhasesFor(phases, executions, start, end, []string{"notes_primary", "notes_isolation", "notes_reopen"})
+}
+
+func codexObservedPhasesFor(phases []codexprobe.Phase, executions []codexContextExecution, start, end int64, kinds []string) (map[string]map[string]int, bool) {
 	counts := map[string]map[string]int{}
-	kinds := []string{"notes_primary", "notes_isolation", "notes_reopen"}
 	if len(phases) != len(kinds) || start <= 0 || end < start {
 		return counts, false
 	}
@@ -414,7 +443,7 @@ func codexObservedPhases(phases []codexprobe.Phase, executions []codexContextExe
 		previous = phase.End
 		counts[phase.Kind] = map[string]int{}
 		for _, execution := range executions {
-			if execution.Start >= phase.Start && execution.End >= execution.Start && execution.End <= phase.End {
+			if !execution.Denied && execution.Start >= phase.Start && execution.End >= execution.Start && execution.End <= phase.End {
 				counts[phase.Kind][execution.Endpoint]++
 			}
 		}

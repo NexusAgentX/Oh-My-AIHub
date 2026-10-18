@@ -64,6 +64,7 @@ type Result struct {
 	ReopenVerified    bool    `json:"reopen_verified"`
 	ShutdownVerified  bool    `json:"shutdown_verified"`
 	ImageCalls        int     `json:"image_calls"`
+	HistoryUnobserved bool    `json:"history_unobserved"`
 	Phases            []Phase `json:"phases,omitempty"`
 }
 
@@ -125,7 +126,7 @@ func (c Config) validate() error {
 
 func validProfile(profile string) bool {
 	switch profile {
-	case "standard", "catalog", "notes", "image", "tools", "lite_tools", "compressed", "plain", "notes_lifecycle", "sequential_tools", "instructions", "tier", "compact", "encrypted", "search", "async_compact", "image_lifecycle", "namespace_tools", "custom_tool", "cross_tools":
+	case "standard", "catalog", "notes", "image", "tools", "lite_tools", "compressed", "plain", "notes_lifecycle", "sequential_tools", "instructions", "tier", "compact", "encrypted", "search", "async_compact", "image_lifecycle", "namespace_tools", "custom_tool", "cross_tools", "history_lifecycle":
 		return true
 	}
 	return false
@@ -140,21 +141,22 @@ type rpcMessage struct {
 }
 
 type dialogue struct {
-	in            io.Writer
-	lines         <-chan []byte
-	next          int
-	completed     bool
-	matched       bool
-	rpcError      int
-	tools         bool
-	toolCalls     int
-	expected      string
-	thread        string
-	turn          string
-	compacted     bool
-	background    bool
-	imageCalls    int
-	toolNamespace string
+	in             io.Writer
+	lines          <-chan []byte
+	next           int
+	completed      bool
+	matched        bool
+	rpcError       int
+	tools          bool
+	toolCalls      int
+	expected       string
+	thread         string
+	turn           string
+	compacted      bool
+	background     bool
+	imageCalls     int
+	toolNamespace  string
+	missingHistory bool
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -238,6 +240,9 @@ func (d *dialogue) notification(msg rpcMessage) error {
 		if p.Item.Type == "agentMessage" && strings.TrimSpace(p.Item.Text) == expected {
 			d.matched = true
 		}
+		if p.Item.Type == "agentMessage" && strings.TrimSpace(p.Item.Text) == historyMissing {
+			d.missingHistory = true
+		}
 		if p.Item.Type == "contextCompaction" {
 			d.compacted = true
 		}
@@ -266,6 +271,7 @@ func (d *dialogue) runTurn(ctx context.Context, thread, prompt string) error {
 func (d *dialogue) runTurnModel(ctx context.Context, thread, prompt, model string) error {
 	d.thread, d.turn = thread, "pending"
 	d.completed, d.matched = false, false
+	d.missingHistory = false
 	var started struct {
 		Turn struct {
 			ID string `json:"id"`
@@ -343,7 +349,7 @@ func Run(ctx context.Context, c Config) (r Result, runErr error) {
 	root := os.Getenv("CODEX_HOME")
 	probeCatalog := ""
 	toolProfile := c.Profile == "tools" || c.Profile == "lite_tools" || c.Profile == "sequential_tools" || c.Profile == "namespace_tools" || c.Profile == "cross_tools"
-	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle" || c.Profile == "image_lifecycle"
+	notesProfile := c.Profile == "notes" || c.Profile == "image" || c.Profile == "notes_lifecycle" || c.Profile == "image_lifecycle" || c.Profile == "history_lifecycle"
 	if c.Profile != "standard" && c.Profile != "catalog" {
 		// Activate the fixed client scenario independently of a provider's
 		// catalog declarations. This is controlled client configuration, never
@@ -561,17 +567,28 @@ use_history_notes_extension = %t
 	if c.Profile == "image_lifecycle" {
 		prompt = "Use image_gen.imagegen to generate exactly one simple blue circle on white, with no text. After receiving the actual image, reply with exactly " + Marker + ". No local commands or file reads."
 	}
+	if c.Profile == "history_lifecycle" {
+		d.expected = "OK"
+		prompt = "The pending user task after this acknowledgment is to answer with exactly AIHUB-HISTORY-" + thread.Thread.ID + ". For now reply only OK."
+	}
 	if c.Profile == "notes_lifecycle" {
-		note := "AIHUB-NOTE-" + thread.Thread.ID
+		answer := "AIHUB-NOTE-" + thread.Thread.ID
 		appended := "APPEND-" + thread.Thread.ID
-		d.expected = note + "\n" + appended
-		prompt = fmt.Sprintf("Use the declared notes tools only on the synthetic virtual path aihub-probe-notes.txt: write exactly %q, read it, append exactly %q, read it again, list this exact path prefix, and search within this exact path for AIHUB-NOTE-. Check every actual result. Finally return only the full text actually read from the appended note, without labels or formatting. Do not invent successful results.", note, "\n"+appended)
+		note := "Pending user task: answer with exactly " + answer + "."
+		update := "\nTask update: append exactly " + appended + " to the answer, separated by one space."
+		d.expected = answer + " " + appended
+		prompt = fmt.Sprintf("Use the declared notes tools only on the synthetic virtual path aihub-probe-notes.txt: write exactly %q, read it, append exactly %q, read it again, list this exact path prefix, and search within this exact path for AIHUB-NOTE-. Check every actual result. Finally complete the pending user task defined by the actual appended note and return only its answer. Do not quote or describe the private note, disclose tool details, or invent successful results.", note, update)
 	}
 	primaryStarted := time.Now().UnixNano()
 	if d.runTurn(ctx, thread.Thread.ID, prompt) != nil {
 		return r, ErrClient
 	}
 	r.Stage = "turn"
+	if c.Profile == "history_lifecycle" {
+		if !d.matched || runHistoryLifecycle(ctx, c, &d, thread.Thread.ID, threadParams, &r) != nil {
+			return r, ErrClient
+		}
+	}
 	if c.Profile == "cross_tools" {
 		if !d.matched || d.toolCalls != 1 || d.runTurnModel(ctx, thread.Thread.ID, "Repeat only the actual synthetic tool result from the previous turn. Do not call any tool.", c.Model+"-lite") != nil || !d.matched {
 			return r, ErrClient
@@ -642,7 +659,7 @@ use_history_notes_extension = %t
 		d.thread, d.expected = thread.Thread.ID, "AIHUB-SYNTHETIC-NOTE-MISSING"
 		r.Stage = "turn_start"
 		isolationStarted := time.Now().UnixNano()
-		if d.runTurn(ctx, thread.Thread.ID, "Read the exact synthetic virtual notes path aihub-probe-notes.txt using notes.read_file. Return only its full actual text if present, or exactly AIHUB-SYNTHETIC-NOTE-MISSING if absent. Do not write, copy or invent any note.") != nil {
+		if d.runTurn(ctx, thread.Thread.ID, "Use notes.read_file on the exact synthetic virtual path aihub-probe-notes.txt. Complete the pending user task in the actual note, returning only its answer; if absent, reply exactly AIHUB-SYNTHETIC-NOTE-MISSING. Do not quote the note, write, copy, disclose tool details or invent any result.") != nil {
 			return r, ErrClient
 		}
 		r.Stage = "turn"
@@ -655,7 +672,7 @@ use_history_notes_extension = %t
 		}
 		r.Stage = "turn_start"
 		reopenStarted := time.Now().UnixNano()
-		if d.runTurn(ctx, firstID, "Read aihub-probe-notes.txt again using notes.read_file. Return only the full actual note text without labels. Do not copy a previous answer or invent a result.") != nil {
+		if d.runTurn(ctx, firstID, "Read aihub-probe-notes.txt again using notes.read_file and complete the pending user task in the actual note. Return only the task answer. Do not quote the private note, disclose tool details, copy a previous answer or invent a result.") != nil {
 			return r, ErrClient
 		}
 		r.ReopenVerified = d.completed && d.matched

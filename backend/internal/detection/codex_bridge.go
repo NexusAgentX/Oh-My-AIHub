@@ -79,12 +79,16 @@ type codexBridge struct {
 	hintMarker        string
 	hintSeedStarted   bool
 	replayShapes      map[string]uint8
+	historyWindow     string
+	historyAlternate  string
+	historyChosen     string
 }
 
 type codexContextExecution struct {
 	Endpoint                          string
 	Start, End                        int64
 	HintShape, HintKnown, HintMatched bool
+	Denied                            bool
 }
 
 type codexUpstreamFailure struct {
@@ -232,6 +236,10 @@ func (b *codexBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		b.serveAsyncState(w, r)
 		return
 	}
+	if r.URL.Path == "/probe/history-window" {
+		b.serveHistoryWindow(w, r)
+		return
+	}
 	// The official-client harness can observe cancellation even though the
 	// production engine deliberately drains disconnected calls for settlement.
 	observation := make(chan struct{})
@@ -377,6 +385,26 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 		if e == nil {
 			cancelCase = b.profile == "async_compact" && bytes.Contains(plain, []byte("AIHUB-ASYNC-CANCEL-"))
 			root, _ := decodeNative(plain)
+			if b.profile == "history_lifecycle" {
+				metadata := object(root["client_metadata"])
+				window := str(metadata["x-codex-window-id"])
+				if window == "" {
+					turn, _ := decodeNative([]byte(str(metadata["x-codex-turn-metadata"])))
+					window = str(turn["window_id"])
+				}
+				if window == "" {
+					window = req.Header.Get("X-Codex-Window-Id")
+				}
+				b.mu.Lock()
+				if b.historyWindow == "" && len(window) <= 128 && gatewaycontract.ValidModelID(window) {
+					b.historyWindow = window
+					turn, _ := decodeNative([]byte(str(metadata["x-codex-turn-metadata"])))
+					if alternate := str(turn["context_window_id"]); len(alternate) <= 128 && gatewaycontract.ValidModelID(alternate) && alternate != window {
+						b.historyAlternate = alternate
+					}
+				}
+				b.mu.Unlock()
+			}
 			for _, raw := range list(root["input"]) {
 				compact = compact || str(object(raw)["type"]) == "compaction_trigger"
 			}
@@ -593,6 +621,13 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	unsafeClient := false
 	if ep.ID == "codex.responses" && err == nil && response.Status >= 200 && response.Status < 300 {
 		unsafeClient = b.profile == "image_lifecycle" && (!validStream || !safeCLIImageOutput(reply.Object)) || b.profile == "custom_tool" && (!validStream || !safeCLINoopOutput(reply.Object))
+		if b.profile == "history_lifecycle" {
+			b.mu.Lock()
+			window := b.historyWindow
+			alternate := b.historyAlternate
+			b.mu.Unlock()
+			unsafeClient = !validStream || !safeCLIHistoryOutput(reply.Object, window, alternate)
+		}
 	}
 	if unsafeClient {
 		failure = &codexUpstreamFailure{State: "fail", Reason: "assertion_failed"}
@@ -601,6 +636,23 @@ func (p codexProbeOutbound) RoundTrip(req *http.Request) (*http.Response, error)
 	b.parent.usage.Add(session.usage)
 	b.usage.Add(usage)
 	b.observed[ep.ID]++
+	if b.profile == "history_lifecycle" && strings.HasPrefix(ep.ID, "codex.history.") && err == nil && response.Status >= 200 && response.Status < 300 {
+		root, _ := decodeNative(body)
+		window := str(root["window_id"])
+		if b.historyChosen == "" && window != "" && (window == b.historyWindow || window == b.historyAlternate) {
+			b.historyChosen = window
+		}
+	}
+	if err == nil && (response.Status == http.StatusForbidden || response.Status == http.StatusNotFound) && (strings.HasPrefix(ep.ID, "codex.notes.") || strings.HasPrefix(ep.ID, "codex.history.")) {
+		root, e := decodeNative(response.Body)
+		if e == nil && nativeError("openai-responses", root) {
+			if len(b.contextExecutions) >= 256 {
+				b.limited = true
+			} else {
+				b.contextExecutions = append(b.contextExecutions, codexContextExecution{Endpoint: ep.ID, Start: started, End: finished, Denied: true})
+			}
+		}
+	}
 	if ep.ID == "codex.notes.thread_hint" && err == nil && response.Status >= 200 && response.Status < 300 {
 		root, e := decodeNative(response.Body)
 		text, shape := root["text"].(string)
