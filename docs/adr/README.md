@@ -47,6 +47,8 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 
 - [ADR-0043：持久跟踪后台 Responses，按可靠推理分量结算](0043-track-background-responses-and-component-billing.md)
 
+- [ADR-0044：分组市场采用稳定对象、不可变报价与能力证据绑定](0044-group-market-contract.md)
+
 ## 归档
 
 探索期（v0.7.0 原地重写之前）及已失效的记录，只供追溯，不构成当前约束。探索期记录的文件内状态保持原样；被新 ADR 整体取代的记录，文件内状态改为“已取代”。

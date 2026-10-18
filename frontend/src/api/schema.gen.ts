@@ -1730,6 +1730,181 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description 非负价格，最多100000，9位小数；0为明确免费。 */
+        MarketPrice: string;
+        MarketHeaderSet: {
+            name: string;
+            value: string;
+        };
+        MarketHeaderRules: {
+            set?: components["schemas"]["MarketHeaderSet"][];
+            remove?: string[];
+        };
+        /** @description null动态继承；header_rules为明确空对象块时清除整个继承规则，不与null合并。 */
+        MarketDefaults: {
+            user_agent: string | null;
+            header_rules: components["schemas"]["MarketHeaderRules"] | null;
+            concurrency_limit: number | null;
+            rpm_limit: number | null;
+            ttft_timeout_ms: number | null;
+            request_timeout_ms: number | null;
+            idle_timeout_ms: number | null;
+            cooldown_failures: number | null;
+            cooldown_seconds: number | null;
+        };
+        MarketSupplier: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            readonly contributor_id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official_api" | "official_subscription" | "relay";
+            website_url: string;
+            icon_data: string;
+            icon_source: string;
+            summary: string;
+            description: string;
+            docs_url: string;
+            enabled: boolean;
+            readonly revision: number;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        MarketGroup: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            name: string;
+            description: string;
+            status_url: string;
+            defaults: components["schemas"]["MarketDefaults"];
+            enabled: boolean;
+            readonly revision: number;
+            readonly connection_version: number;
+            readonly capability_digest: string;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        MarketAddress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            base_url: string;
+            label: string;
+            readonly revision: number;
+            deleted_at?: string | null;
+        };
+        MarketGroupAddress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_id: string;
+            /** Format: uuid */
+            address_id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            position: number;
+            deleted_at?: string | null;
+        };
+        /** @description 分组内的模型报价身份，model_id精确区分大小写；不创建全局模型目录实体。model_id/上游名采用F0的原生命名空间校验。 */
+        MarketGroupModel: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_id: string;
+            model_id: string;
+            display_name: string;
+            upstream_model: string;
+            /** @enum {string} */
+            model_type: "text" | "image";
+            context_window: number | null;
+            max_output_tokens: number | null;
+            notes: string;
+            enabled: boolean;
+            is_reference: boolean;
+            readonly quote_id: string | null;
+            readonly revision: number;
+            readonly capability_digest: string;
+            deleted_at?: string | null;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        MarketTokenPrices: {
+            input: components["schemas"]["MarketPrice"];
+            output: components["schemas"]["MarketPrice"];
+            cache_write: components["schemas"]["MarketPrice"];
+            cache_read: components["schemas"]["MarketPrice"];
+            details: {
+                [key: string]: components["schemas"]["MarketPrice"];
+            };
+        };
+        MarketPriceConditions: {
+            service_tier: string;
+            min_prompt_tokens: number | null;
+            max_prompt_tokens: number | null;
+            timezone: string;
+            weekdays: number[];
+            start_minute: number | null;
+            end_minute: number | null;
+        };
+        MarketPriceTier: {
+            name: string;
+            conditions: components["schemas"]["MarketPriceConditions"];
+            prices: components["schemas"]["MarketTokenPrices"];
+        };
+        MarketUnitPrice: {
+            /** @enum {string} */
+            unit: "request" | "successful_image" | "tool_call" | "tool_session" | "tool_second" | "tool_query";
+            tool: string;
+            image_size: string;
+            image_quality: string;
+            image_background: string;
+            service_tier: string;
+            price: components["schemas"]["MarketPrice"];
+        };
+        /** @description 追加且不可变的候选报价版本。CNY为积分，USD在调用开始固定汇率；折扣作用于整张表，手续费独立。 */
+        MarketQuote: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            group_model_id: string;
+            readonly version: number;
+            /** @enum {string} */
+            currency: "CNY" | "USD";
+            /** @enum {string} */
+            billing_unit: "per_million_tokens" | "per_request" | "per_successful_image";
+            prices: components["schemas"]["MarketTokenPrices"];
+            tiers: components["schemas"]["MarketPriceTier"][];
+            unit_prices: components["schemas"]["MarketUnitPrice"][];
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        MarketCapability: {
+            id: string;
+            /** @enum {string} */
+            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
+            /** @enum {string} */
+            state: "supported" | "unsupported" | "unknown" | "unobserved" | "invalidated";
+            reason: string;
+            /** Format: uuid */
+            report_id: string;
+        };
+        MarketEvidenceBinding: {
+            /** @enum {string} */
+            target_kind: "group" | "group_model";
+            /** Format: uuid */
+            target_id: string;
+            target_revision: number;
+            capability_digest: string;
+            manifest_version: string;
+            code_version: string;
+            parameter_version: string;
+        };
         /** @description F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。 */
         GatewayCapacitySearch: {
             readonly version: string;

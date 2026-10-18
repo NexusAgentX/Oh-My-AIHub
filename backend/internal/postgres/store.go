@@ -5,6 +5,7 @@ package postgres
 
 import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/forumpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/supplierpg"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -21,6 +22,7 @@ import (
 )
 
 type Store struct {
+	Market    *marketpg.Store
 	Suppliers *supplierpg.Store
 	// Books is where the stores that book (ledger, gateway, C2C, observe)
 	// report what their ledger transactions did; Cached subscribes the
@@ -44,6 +46,7 @@ type Store struct {
 func New(pool *pgxpool.Pool) *Store {
 	books := ledgerpg.NewBooks()
 	return &Store{
+		Market:    marketpg.NewStore(pool),
 		Books:     books,
 		Suppliers: supplierpg.NewStore(pool),
 		Forum:     forumpg.NewStore(pool),

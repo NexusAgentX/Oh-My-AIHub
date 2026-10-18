@@ -3677,6 +3677,922 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
   schemas:
+    MarketPrice:
+      {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]{0,5})(\\.[0-9]{1,9})?$",
+        "description": "非负价格，最多100000，9位小数；0为明确免费。"
+      }
+    MarketHeaderSet:
+      {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "additionalProperties": false
+      }
+    MarketHeaderRules:
+      {
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketHeaderSet"
+            },
+            "maxItems": 32
+          },
+          "remove": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "maxItems": 32
+          }
+        },
+        "additionalProperties": false
+      }
+    MarketDefaults:
+      {
+        "type": "object",
+        "properties": {
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "header_rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketHeaderRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "concurrency_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1073741824
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rpm_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1073741824
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ttft_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 3600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "idle_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 3600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cooldown_failures": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cooldown_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 86400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user_agent",
+          "header_rules",
+          "concurrency_limit",
+          "rpm_limit",
+          "ttft_timeout_ms",
+          "request_timeout_ms",
+          "idle_timeout_ms",
+          "cooldown_failures",
+          "cooldown_seconds"
+        ],
+        "additionalProperties": false,
+        "description": "null动态继承；header_rules为明确空对象块时清除整个继承规则，不与null合并。"
+      }
+    MarketSupplier:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contributor_id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "official_api",
+              "official_subscription",
+              "relay"
+            ]
+          },
+          "website_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "icon_data": {
+            "type": "string",
+            "maxLength": 350000
+          },
+          "icon_source": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "docs_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "contributor_id",
+          "name",
+          "kind",
+          "website_url",
+          "icon_data",
+          "icon_source",
+          "summary",
+          "description",
+          "docs_url",
+          "enabled",
+          "revision",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    MarketGroup:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "status_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/MarketDefaults"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "connection_version": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "capability_digest": {
+            "type": "string",
+            "maxLength": 64,
+            "readOnly": true
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "supplier_id",
+          "name",
+          "description",
+          "status_url",
+          "defaults",
+          "enabled",
+          "revision",
+          "connection_version",
+          "capability_digest",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    MarketAddress:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "base_url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "supplier_id",
+          "base_url",
+          "label",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    MarketGroupAddress:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "address_id",
+          "supplier_id",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    MarketGroupModel:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_id": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "upstream_model": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "is_reference": {
+            "type": "boolean"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "capability_digest": {
+            "type": "string",
+            "maxLength": 64,
+            "readOnly": true
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "model_id",
+          "display_name",
+          "upstream_model",
+          "model_type",
+          "context_window",
+          "max_output_tokens",
+          "notes",
+          "enabled",
+          "is_reference",
+          "quote_id",
+          "revision",
+          "capability_digest",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "分组内的模型报价身份，model_id精确区分大小写；不创建全局模型目录实体。model_id/上游名采用F0的原生命名空间校验。"
+      }
+    MarketTokenPrices:
+      {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/MarketPrice"
+          },
+          "output": {
+            "$ref": "#/components/schemas/MarketPrice"
+          },
+          "cache_write": {
+            "$ref": "#/components/schemas/MarketPrice"
+          },
+          "cache_read": {
+            "$ref": "#/components/schemas/MarketPrice"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MarketPrice"
+            },
+            "maxProperties": 16,
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "input_text",
+                "input_image",
+                "input_audio",
+                "input_video",
+                "output_text",
+                "output_image",
+                "output_audio",
+                "output_video",
+                "cache_read_text",
+                "cache_read_image",
+                "cache_read_audio",
+                "cache_read_video",
+                "cache_write_5m",
+                "cache_write_1h"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input",
+          "output",
+          "cache_write",
+          "cache_read",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    MarketPriceConditions:
+      {
+        "type": "object",
+        "properties": {
+          "service_tier": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "min_prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "maxItems": 7
+          },
+          "start_minute": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1439
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_minute": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service_tier",
+          "min_prompt_tokens",
+          "max_prompt_tokens",
+          "timezone",
+          "weekdays",
+          "start_minute",
+          "end_minute"
+        ],
+        "additionalProperties": false
+      }
+    MarketPriceTier:
+      {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/MarketPriceConditions"
+          },
+          "prices": {
+            "$ref": "#/components/schemas/MarketTokenPrices"
+          }
+        },
+        "required": [
+          "name",
+          "conditions",
+          "prices"
+        ],
+        "additionalProperties": false
+      }
+    MarketUnitPrice:
+      {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "enum": [
+              "request",
+              "successful_image",
+              "tool_call",
+              "tool_session",
+              "tool_second",
+              "tool_query"
+            ]
+          },
+          "tool": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "image_size": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "image_quality": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "image_background": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "service_tier": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "price": {
+            "$ref": "#/components/schemas/MarketPrice"
+          }
+        },
+        "required": [
+          "unit",
+          "tool",
+          "image_size",
+          "image_quality",
+          "image_background",
+          "service_tier",
+          "price"
+        ],
+        "additionalProperties": false
+      }
+    MarketQuote:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_model_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "CNY",
+              "USD"
+            ]
+          },
+          "billing_unit": {
+            "type": "string",
+            "enum": [
+              "per_million_tokens",
+              "per_request",
+              "per_successful_image"
+            ]
+          },
+          "prices": {
+            "$ref": "#/components/schemas/MarketTokenPrices"
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketPriceTier"
+            },
+            "maxItems": 16
+          },
+          "unit_prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketUnitPrice"
+            },
+            "maxItems": 128
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "group_model_id",
+          "version",
+          "currency",
+          "billing_unit",
+          "prices",
+          "tiers",
+          "unit_prices",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "description": "追加且不可变的候选报价版本。CNY为积分，USD在调用开始固定汇率；折扣作用于整张表，手续费独立。"
+      }
+    MarketCapability:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "upstream_protocol",
+              "gateway_proxy",
+              "official_cli"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "unsupported",
+              "unknown",
+              "unobserved",
+              "invalidated"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "layer",
+          "state",
+          "reason",
+          "report_id"
+        ],
+        "additionalProperties": false
+      }
+    MarketEvidenceBinding:
+      {
+        "type": "object",
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "group",
+              "group_model"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_digest": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "manifest_version": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "code_version": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "parameter_version": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "target_kind",
+          "target_id",
+          "target_revision",
+          "capability_digest",
+          "manifest_version",
+          "code_version",
+          "parameter_version"
+        ],
+        "additionalProperties": false
+      }
     GatewayCapacitySearch:
       type: object
       description: F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。
