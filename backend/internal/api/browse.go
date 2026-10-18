@@ -67,19 +67,20 @@ type catalogModelListJSON struct {
 
 // modelChannelJSON is the OpenAPI ModelChannel schema.
 type modelChannelJSON struct {
-	ID                       string              `json:"id"`
-	Name                     string              `json:"name"`
-	Owner                    partyJSON           `json:"owner"`
-	IsMine                   bool                `json:"is_mine"`
-	Formats                  []channel.Format    `json:"formats"`
-	Multiplier               string              `json:"multiplier"`
-	FXDiscount               bool                `json:"fx_discount"`
-	EffectiveMultiplier      string              `json:"effective_multiplier"`
-	CurrentPrices            effectivePricesJSON `json:"current_prices"`
-	SuccessRate24h           *string             `json:"success_rate_24h"`
-	TTFTP50MS                *int64              `json:"ttft_p50_ms"`
-	State                    string              `json:"state"`
-	CooldownRemainingSeconds *int64              `json:"cooldown_remaining_seconds"`
+	RoutingMetrics           []gateway.ModelMetricView `json:"routing_metrics"`
+	ID                       string                    `json:"id"`
+	Name                     string                    `json:"name"`
+	Owner                    partyJSON                 `json:"owner"`
+	IsMine                   bool                      `json:"is_mine"`
+	Formats                  []channel.Format          `json:"formats"`
+	Multiplier               string                    `json:"multiplier"`
+	FXDiscount               bool                      `json:"fx_discount"`
+	EffectiveMultiplier      string                    `json:"effective_multiplier"`
+	CurrentPrices            effectivePricesJSON       `json:"current_prices"`
+	SuccessRate24h           *string                   `json:"success_rate_24h"`
+	TTFTP50MS                *int64                    `json:"ttft_p50_ms"`
+	State                    string                    `json:"state"`
+	CooldownRemainingSeconds *int64                    `json:"cooldown_remaining_seconds"`
 }
 
 // modelDetailJSON is the OpenAPI ModelDetail schema.
@@ -331,7 +332,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	accountID := accountFromContext(ctx).ID
-	stats := a.gateway.Stats()
+	stats := a.gateway.ModelMetrics(model.ID)
 
 	var mine []gateway.OnlineChannel
 	for _, entry := range online {
@@ -344,13 +345,14 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		state, remaining := a.gateway.State().Describe(entry.ChannelID, gateway.EffectiveLimits(entry.Advanced, defaults), now)
 		var successRate *string
 		var ttft, cooldown *int64
-		if health, ok := stats[entry.ChannelID]; ok && health.Attempts > 0 {
-			rate := ratio(health.SuccessRate())
+		var attempts, successes int64
+		for _, health := range stats[entry.ChannelID] {
+			attempts += health.Attempts
+			successes += health.Successes
+		}
+		if attempts > 0 {
+			rate := ratio(float64(successes) / float64(attempts))
 			successRate = &rate
-			if health.TTFTP50MS != nil {
-				value := int64(*health.TTFTP50MS)
-				ttft = &value
-			}
 		}
 		if state == gateway.StateCooldown {
 			seconds := int64(remaining.Seconds()) + 1
@@ -360,6 +362,7 @@ func (a *app) getModel(w http.ResponseWriter, r *http.Request) {
 		prices, _ := currentPrices(priced, now)
 		pricing := newChannelPricing(priced, entry.MultiplierNano, entry.FXDiscount, defaults.USDCNYRateNano)
 		channels = append(channels, modelChannelJSON{
+			RoutingMetrics:           append([]gateway.ModelMetricView{}, stats[entry.ChannelID]...),
 			ID:                       entry.ChannelID,
 			Name:                     entry.ChannelName,
 			Owner:                    partyJSON{ID: entry.OwnerID, DisplayName: entry.OwnerName},

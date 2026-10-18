@@ -28,9 +28,10 @@ type StageTiming struct {
 	DurationMS float64  `json:"duration_ms"`
 }
 type RouteDecision struct {
-	Channel AttemptChannel `json:"channel"`
-	Reason  string         `json:"reason"`
-	Rank    int            `json:"rank"`
+	MissingCapability string         `json:"missing_capability,omitempty"`
+	Channel           AttemptChannel `json:"channel"`
+	Reason            string         `json:"reason"`
+	Rank              int            `json:"rank"`
 }
 type AttemptTimeouts struct {
 	FirstByteMS int64 `json:"first_byte_ms"`

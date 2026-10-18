@@ -5,6 +5,9 @@ import (
 	"embed"
 	"encoding/hex"
 	"strings"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
 
 //go:embed *.go
@@ -22,6 +25,8 @@ var probeImplementationVersion = func() string {
 		h.Write([]byte{0})
 		h.Write(body)
 	}
+	h.Write([]byte(gatewaycontract.ImplementationVersion()))
+	h.Write([]byte(nativeencoding.ImplementationVersion()))
 	return hex.EncodeToString(h.Sum(nil))
 }()
 

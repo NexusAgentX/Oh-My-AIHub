@@ -113,7 +113,7 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 	for viewer, wantMine := range map[*client]bool{alice: true, bob: false} {
 		page := viewer.expect(t, http.StatusOK, http.MethodGet, "/api/models/deepseek-chat", nil)
 		offered := page["channels"].([]any)
-		if len(offered) != 1 || offered[0].(map[string]any)["is_mine"] != wantMine || offered[0].(map[string]any)["success_rate_24h"] != "0.900000" {
+		if len(offered) != 1 || offered[0].(map[string]any)["is_mine"] != wantMine || offered[0].(map[string]any)["success_rate_24h"] != nil {
 			t.Fatalf("model page = %v", page)
 		}
 	}

@@ -170,6 +170,7 @@ func (r *Registry) Plan(t Target) (Plan, error) {
 					item.Dependencies = slices.Clone(req.AggregateOf)
 					item.CodeVersion = "aggregate.v2"
 				}
+				item.ScopeVersion = r.scopeVersion(suite, item)
 				p.Items = append(p.Items, item)
 			}
 		}

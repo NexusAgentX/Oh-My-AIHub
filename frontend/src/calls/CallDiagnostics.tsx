@@ -34,9 +34,11 @@ const labels: Record<string, string> = {
   sticky: '沿用上次渠道',
   cheapest: '价格优先',
   reliable: '稳定优先',
-  fastest: '速度优先',
+  fastest: '延迟优先',
+  speed: '速率优先',
   manual: '手动顺序',
   eligible: '可用',
+  required_capability_evidence_missing: '所需能力或版本证据不足',
 }
 export function diagnosticLabel(value: string) {
   return labels[value] ?? value
@@ -116,6 +118,7 @@ export function CallDiagnostics({ data }: { data: components['schemas']['CallDia
               <span>
                 {d.rank > 0 ? `候选 #${d.rank} · ` : ''}
                 {diagnosticLabel(d.reason)}
+                {d.missing_capability && <small> · {d.missing_capability}</small>}
               </span>
             </li>
           ))}

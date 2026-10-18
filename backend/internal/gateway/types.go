@@ -66,6 +66,12 @@ type Candidate struct {
 	// The minimal Key probe's chosen primary entrance is distinct from wire
 	// format. A native-only Codex probe cannot prove the public primary API.
 	KeyProbeEndpoints map[channel.Format]string
+	TypicalCost       money.Amount
+	TypicalCostKnown  bool
+	TypicalUnit       string
+	TypicalQuantity   int64
+	PricingVersion    string
+	ModelType         string
 	// Quotes is immutable. A missing group offer never uses a global price.
 	Quotes         *quotepricing.Book
 	ChannelID      string
@@ -132,9 +138,14 @@ func (c Candidate) ValidOffering(modelID string) bool {
 // first-token median is read off a histogram (see StatsBook) and is within 4.6%
 // of the exact median.
 type ChannelStats struct {
-	Attempts  int64
-	Successes int64
-	TTFTP50MS *float64
+	Attempts           int64
+	Successes          int64
+	TTFTP50MS          *float64
+	FirstOutputP50MS   *float64
+	FirstOutputSamples int64
+	OutputTPSP50       *float64
+	OutputSpeedSamples int64
+	ExcludedSamples    int64
 }
 
 func (s ChannelStats) SuccessRate() float64 {
@@ -160,6 +171,15 @@ type CallInsert struct {
 
 // Attempt is one try on one channel (calls.attempts).
 type Attempt struct {
+	MetricProtocol     string           `json:"metric_protocol,omitempty"`
+	MetricsVersion     int              `json:"metrics_version,omitempty"`
+	MetricTier         string           `json:"metric_tier,omitempty"`
+	ActualServiceTier  string           `json:"actual_service_tier,omitempty"`
+	FirstOutputMS      *int             `json:"first_output_ms,omitempty"`
+	SelectionOutputMS  *int             `json:"selection_output_ms,omitempty"`
+	OutputKind         string           `json:"output_kind,omitempty"`
+	GenerationMS       *int             `json:"generation_ms,omitempty"`
+	OutputTPS          *float64         `json:"output_tps,omitempty"`
 	AddressID          string           `json:"address_id,omitempty"`
 	FallbackLevel      string           `json:"fallback_level,omitempty"`
 	SelectionFinal     *bool            `json:"selection_final,omitempty"`

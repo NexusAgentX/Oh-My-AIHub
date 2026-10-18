@@ -32,11 +32,11 @@ func TestResponseOutputSpeed(t *testing.T) {
 		duration, ttft, attemptStart int
 		want                         float64
 	}{
-		{"nonstream sample", false, 2380, 2377, 0, 6.0 / 2.38},
-		{"nonstream longer output", false, 2380, 100, 0, 6.0 / 2.38},
-		{"nonstream includes earlier attempts", false, 2380, 1377, 1000, 6.0 / 2.38},
+		{"nonstream has no generation interval", false, 2380, 2377, 0, 0},
+		{"nonstream early first byte is insufficient", false, 2380, 100, 0, 0},
+		{"earlier attempts cannot create a generation interval", false, 2380, 1377, 1000, 0},
 		{"nonstream zero duration", false, 0, 0, 0, 0},
-		{"stream unchanged", true, 2380, 2377, 0, 2000},
+		{"terminal-only short stream has no output interval", true, 2380, 2377, 0, 0},
 		{"stream zero output duration", true, 2380, 2380, 0, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

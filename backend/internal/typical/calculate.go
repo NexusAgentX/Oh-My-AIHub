@@ -546,3 +546,18 @@ func PricingVersion(book *quotepricing.Book) string {
 		References map[string]quotepricing.Reference
 	}{book.GroupID, refs})
 }
+
+// PricingVersions uses the same active quote references as the estimator.
+// Billing books may also retain excluded/disabled companion quotes, so callers
+// must not hash those broader books into a comparison estimate's version.
+func PricingVersions(directory market.Directory) (map[string]string, error) {
+	rows, _, err := offerings(Input{Directory: directory})
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, row := range rows {
+		out[row.model.GroupID] = row.digest
+	}
+	return out, nil
+}

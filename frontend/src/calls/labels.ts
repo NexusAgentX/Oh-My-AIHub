@@ -12,9 +12,10 @@ export const formatLabels: Record<Format, string> = {
 }
 
 export const routingModeLabels: Record<RoutingMode, string> = {
-  cheapest: '便宜优先',
+  cheapest: '价格优先',
   reliable: '稳定优先',
-  fastest: '快速优先',
+  fastest: '延迟优先',
+  speed: '速率优先',
   manual: '手动',
 }
 

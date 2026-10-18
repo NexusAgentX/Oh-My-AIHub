@@ -29,11 +29,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function CallResponseMetrics({ call }: { call: CallDetail }) {
+  const measured = call.attempts?.some(attempt => attempt.metrics_version === 2)
   return (
     <>
       {' '}
-      <Row label={call.stream ? '输出速度' : '端到端平均速度'}>
-        {call.output_tokens_per_second == null ? '—' : `${call.output_tokens_per_second.toFixed(1)} tokens/s`}
+      <Row label={measured || call.output_tokens_per_second == null ? '有效输出速率' : call.stream ? '输出速度（历史口径）' : '端到端平均速度（历史口径）'}>
+        {call.output_tokens_per_second == null ? '未知' : `${call.output_tokens_per_second.toFixed(1)} tokens/s`}
       </Row>
       {call.stream && call.inter_token_p50_ms !== null && (
         <Row label="数据帧间隔 p50 / p95">

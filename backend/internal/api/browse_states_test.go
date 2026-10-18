@@ -88,8 +88,8 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	}
 	want := map[string]row{
 		"无统计":   {state: "available"},
-		"无首字延迟": {state: "available", successRate: "0.750000"},
-		"有首字延迟": {state: "available", successRate: "0.900000", ttft: float64(412)}, // 420 ms falls into the 395–430 ms bin, reported as its middle, 412.5
+		"无首字延迟": {state: "available"}, // Legacy aggregate cannot populate the new model scope.
+		"有首字延迟": {state: "available"},
 		"冷却中":   {state: "cooldown"},
 		"并发已满":  {state: "limited"},
 	}

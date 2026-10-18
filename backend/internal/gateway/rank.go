@@ -52,12 +52,49 @@ func price(candidate Candidate, consumerID string) float64 {
 	return float64(candidate.MultiplierNano) * float64(rate)
 }
 
+func compareCandidatePrice(a, b Candidate, consumer string, comparable bool) int {
+	if a.GroupID == "" && b.GroupID == "" {
+		left, right := price(a, consumer), price(b, consumer)
+		if left < right {
+			return -1
+		}
+		if left > right {
+			return 1
+		}
+		return 0
+	}
+	left, right := a.TypicalCost, b.TypicalCost
+	knownLeft, knownRight := a.TypicalCostKnown && comparable, b.TypicalCostKnown && comparable
+	if consumer != "" && a.OwnerID == consumer {
+		left, knownLeft = 0, true
+	}
+	if consumer != "" && b.OwnerID == consumer {
+		right, knownRight = 0, true
+	}
+	if knownLeft != knownRight {
+		if knownLeft {
+			return -1
+		}
+		return 1
+	}
+	if !knownLeft {
+		return 0
+	}
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
+}
+
 func medianOf(values []float64) (float64, bool) {
 	if len(values) == 0 {
 		return 0, false
 	}
 	sort.Float64s(values)
-	return values[len(values)/2], true
+	return (values[(len(values)-1)/2] + values[len(values)/2]) / 2, true
 }
 
 // Rank filters and orders the candidates of a request.
@@ -66,12 +103,21 @@ func Rank(in RankInput) []Candidate {
 	for _, id := range in.Excluded {
 		excluded[id] = true
 	}
+	var positions map[string]int
+	if in.Mode == routing.ModeManual {
+		positions = make(map[string]int, len(in.Order))
+		for index, id := range in.Order {
+			if _, exists := positions[id]; !exists {
+				positions[id] = index
+			}
+		}
+	}
 	var pool []Candidate
 	for _, candidate := range in.Candidates {
 		if excluded[candidate.ChannelID] {
 			continue
 		}
-		if in.Mode == routing.ModeManual && !slices.Contains(in.Order, candidate.ChannelID) {
+		if _, selected := positions[candidate.ChannelID]; in.Mode == routing.ModeManual && !selected {
 			// A channel missing from the manual list counts as unticked.
 			continue
 		}
@@ -81,20 +127,18 @@ func Rank(in RankInput) []Candidate {
 		pool = append(pool, candidate)
 	}
 
-	var rates, latencies []float64
-	for _, stats := range in.Stats {
+	pricesComparable := comparableCandidatePrices(pool)
+	var rates []float64
+	for _, candidate := range pool {
+		stats := in.Stats[candidate.ChannelID]
 		if stats.Attempts >= minSamples {
 			rates = append(rates, stats.SuccessRate())
-		}
-		if stats.TTFTP50MS != nil {
-			latencies = append(latencies, *stats.TTFTP50MS)
 		}
 	}
 	medianRate, ok := medianOf(rates)
 	if !ok {
 		medianRate = 1
 	}
-	medianLatency, haveLatency := medianOf(latencies)
 	rate := func(candidate Candidate) float64 {
 		stats := in.Stats[candidate.ChannelID]
 		if stats.Attempts < minSamples {
@@ -103,16 +147,20 @@ func Rank(in RankInput) []Candidate {
 		return stats.SuccessRate()
 	}
 	latency := func(candidate Candidate) float64 {
-		if stats, found := in.Stats[candidate.ChannelID]; found && stats.TTFTP50MS != nil {
-			return *stats.TTFTP50MS
-		}
-		if haveLatency {
-			return medianLatency
+		if stats, found := in.Stats[candidate.ChannelID]; found && stats.FirstOutputP50MS != nil && stats.FirstOutputSamples >= minSamples {
+			return *stats.FirstOutputP50MS
 		}
 		return math.Inf(1)
 	}
+	speed := func(candidate Candidate) float64 {
+		stats := in.Stats[candidate.ChannelID]
+		if stats.OutputTPSP50 != nil && stats.OutputSpeedSamples >= minSamples {
+			return *stats.OutputTPSP50
+		}
+		return math.Inf(-1)
+	}
 
-	position := func(candidate Candidate) int { return slices.Index(in.Order, candidate.ChannelID) }
+	position := func(candidate Candidate) int { return positions[candidate.ChannelID] }
 	sort.SliceStable(pool, func(i, j int) bool {
 		a, b := pool[i], pool[j]
 		switch in.Mode {
@@ -126,17 +174,21 @@ func Rank(in RankInput) []Candidate {
 			if latency(a) != latency(b) {
 				return latency(a) < latency(b)
 			}
+		case routing.ModeSpeed:
+			if speed(a) != speed(b) {
+				return speed(a) > speed(b)
+			}
 		default:
-			if price(a, in.ConsumerID) != price(b, in.ConsumerID) {
-				return price(a, in.ConsumerID) < price(b, in.ConsumerID)
+			if order := compareCandidatePrice(a, b, in.ConsumerID, pricesComparable); order != 0 {
+				return order < 0
 			}
 			if rate(a) != rate(b) {
 				return rate(a) > rate(b)
 			}
 			return a.ChannelID < b.ChannelID
 		}
-		if price(a, in.ConsumerID) != price(b, in.ConsumerID) {
-			return price(a, in.ConsumerID) < price(b, in.ConsumerID)
+		if order := compareCandidatePrice(a, b, in.ConsumerID, pricesComparable); order != 0 {
+			return order < 0
 		}
 		return a.ChannelID < b.ChannelID
 	})

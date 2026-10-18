@@ -34,7 +34,7 @@ func (noRoutingPreferences) Get(context.Context, string, string, string) (routin
 // attempts recorded after the page was first served show up once the engine
 // republishes them (RunRefresh does it every few seconds), and serving the page
 // never waits on a refresh.
-func TestModelPageReadsStatsCountedInMemory(t *testing.T) {
+func TestModelPageReadsOnlyVersionedModelStatistics(t *testing.T) {
 	spec := loadOpenAPI(t)
 	store := newFakeStore()
 	policy, err := channel.NewOutboundPolicy(nil, nil)
@@ -70,17 +70,37 @@ func TestModelPageReadsStatsCountedInMemory(t *testing.T) {
 		book.Record(browseTestChannelID, "deepseek-chat", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
 	}
 	book.Record(browseTestChannelID, "deepseek-chat", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
+	if got := successRate(); got != nil {
+		t.Fatalf("legacy history invented model statistics: %v", got)
+	}
+	engine.Store = browseMetricHistory{rows: []gateway.ModelAttemptHistoryRow{{ChannelID: browseTestChannelID, ModelID: "deepseek-chat", Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Bucket: now.Unix() / 300, Counted: 4, Successes: 3, LatencyBin: -1, SpeedBin: -1}}}
+	if err := engine.LoadStats(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if got := successRate(); got != "0.750000" {
 		t.Fatalf("success rate = %v, want 0.750000", got)
 	}
 
-	// Another failure is counted at once but published with the next refresh.
+	// Legacy channel-only observations cannot contaminate a model scope,
+	// including after the next snapshot refresh.
 	book.Record(browseTestChannelID, "deepseek-chat", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
 	if got := successRate(); got != "0.750000" {
 		t.Fatalf("success rate = %v before the refresh, want the published 0.750000", got)
 	}
 	engine.RefreshStats()
-	if got := successRate(); got != "0.600000" {
-		t.Fatalf("success rate = %v after the refresh, want 0.600000", got)
+	if got := successRate(); got != "0.750000" {
+		t.Fatalf("success rate = %v after the refresh, want model-only 0.750000", got)
 	}
+}
+
+type browseMetricHistory struct {
+	gateway.Store
+	rows []gateway.ModelAttemptHistoryRow
+}
+
+func (s browseMetricHistory) AttemptHistory(context.Context, time.Time) ([]gateway.AttemptHistoryRow, error) {
+	return nil, nil
+}
+func (s browseMetricHistory) ModelAttemptHistory(context.Context, time.Time, int32) ([]gateway.ModelAttemptHistoryRow, error) {
+	return s.rows, nil
 }

@@ -86,7 +86,7 @@ func (r *Registry) RegisterSDK(ctx context.Context, path string) error {
 			if protocol == "native-generate-content" {
 				provider, module = "gemini", "google.golang.org/genai"
 			}
-			code := sha256.Sum256([]byte(engineVersion + digest))
+			code := sha256.Sum256([]byte(nativeEngineVersion + digest))
 			if err = r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: fmt.Sprintf("%s@%s:%s", provider, sdkVersions[module], hex.EncodeToString(code[:])), Run: func(ctx context.Context, s *Session) Result {
 				n := nativeScene{s: s, protocol: protocol, requirement: requirement, checks: map[string]Assertion{}}
 				if current, e := sdkDigest(path); e != nil || current != digest {

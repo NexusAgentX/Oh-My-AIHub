@@ -3,7 +3,8 @@ import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
-import { formatMs, formatPoints, formatRatio } from '../money/format'
+import { formatPoints } from '../money/format'
+import { RoutingMetrics } from './RoutingMetrics'
 import { MultiplierText } from '../money/MultiplierText'
 import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
@@ -149,15 +150,8 @@ export function RoutingEditor({
                       {formatPoints(channel.current_prices.input, { digits: 2 })} / {formatPoints(channel.current_prices.output, { digits: 2 })}
                     </dd>
                   </div>
-                  <div>
-                    <dt>24h 成功率</dt>
-                    <dd>{formatRatio(channel.success_rate_24h)}</dd>
-                  </div>
-                  <div>
-                    <dt>首字</dt>
-                    <dd>{formatMs(channel.ttft_p50_ms)}</dd>
-                  </div>
                 </dl>
+                <RoutingMetrics rows={channel.routing_metrics} />
               </li>
             )
           })}

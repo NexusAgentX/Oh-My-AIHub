@@ -23,7 +23,7 @@ func (r *Registry) RegisterMCP(fixture *MCPFixture) error {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
-			code := sha256.Sum256([]byte(engineVersion + fixture.origin + "mcp-json-2025-06-18-v1"))
+			code := sha256.Sum256([]byte(nativeEngineVersion + fixture.origin + "mcp-json-2025-06-18-v1"))
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: hex.EncodeToString(code[:]), Run: func(ctx context.Context, s *Session) Result {
 				n := &nativeScene{s: s, protocol: protocol, requirement: requirement, checks: map[string]Assertion{}}
 				return n.mcp(ctx, fixture)

@@ -414,17 +414,20 @@ func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
 			}
 			_, secret := e.defaultKey(consumer)
 
-			// One streaming call through each channel, chosen by hand.
+			// Reach the new minimum with real model-scoped streaming observations;
+			// one legacy first-byte sample must no longer decide latency ranking.
 			for _, id := range []string{slowID, fastID} {
 				setRouting(e, consumer, map[string]any{"mode": "manual", "order": []string{id}})
-				if code := streamTo(e, secret, "gpt-test"); code != http.StatusOK {
-					t.Fatalf("seeding call = %d", code)
+				for range 20 {
+					if code := streamTo(e, secret, "gpt-test"); code != http.StatusOK {
+						t.Fatalf("seeding call = %d", code)
+					}
 				}
 			}
 			setRouting(e, consumer, map[string]any{"mode": "fastest"})
 			e.engine.RefreshStats()
-			stats := e.engine.Stats()
-			if stats[fastID].TTFTP50MS == nil || stats[slowID].TTFTP50MS == nil || *stats[fastID].TTFTP50MS >= *stats[slowID].TTFTP50MS {
+			stats := e.engine.ModelStats("gpt-test", channel.FormatOpenAIChat, "", true)
+			if stats[fastID].FirstOutputSamples != 20 || stats[slowID].FirstOutputSamples != 20 || stats[fastID].FirstOutputP50MS == nil || stats[slowID].FirstOutputP50MS == nil || *stats[fastID].FirstOutputP50MS >= *stats[slowID].FirstOutputP50MS {
 				t.Fatalf("first-token medians: fast %+v slow %+v", stats[fastID], stats[slowID])
 			}
 
@@ -462,20 +465,23 @@ func TestReliableModeFollowsTheSuccessRatesCountedInMemory(t *testing.T) {
 	_, secret := e.defaultKey(consumer)
 	setRouting(e, consumer, map[string]any{"mode": "reliable"})
 
-	// Yesterday's record, as the gateway would have counted it.
-	now := time.Now()
+	// Seed versioned synthetic history through the real startup aggregate;
+	// old whole-channel counters cannot populate the new ranking scope.
 	for _, entry := range []struct {
 		id         string
 		ok, failed int
 	}{{steadyID, 28, 2}, {wobblyID, 20, 10}} {
-		for range entry.ok {
-			book.Record(entry.id, "gpt-test", false, gateway.Attempt{EndReason: gateway.EndCompleted}, now)
-		}
-		for range entry.failed {
-			book.Record(entry.id, "gpt-test", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
+		_, err := e.pool.Exec(context.Background(), `INSERT INTO calls(account_id,model_id,requested_model,format,stream,outcome,attempts,created_at,completed_at)
+SELECT $1,'gpt-test','gpt-test','openai_chat',false,CASE WHEN n<=$3 THEN 'succeeded' ELSE 'upstream_failed' END,
+jsonb_build_array(jsonb_build_object('metrics_version',2,'metric_protocol','openai-chat-completions','channel',jsonb_build_object('id',$2::text,'name','synthetic'),'end_reason',CASE WHEN n<=$3 THEN 'completed' ELSE 'upstream_error' END)),
+now()-interval '2 minutes',now()-interval '2 minutes' FROM generate_series(1,$4::int) AS n`, consumer.id, entry.id, entry.ok, entry.ok+entry.failed)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
-	e.engine.RefreshStats()
+	if err := e.engine.LoadStats(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	hits := func() [2]int { return [2]int{len(steady.inference()), len(wobbly.inference())} }
 	send := func() {

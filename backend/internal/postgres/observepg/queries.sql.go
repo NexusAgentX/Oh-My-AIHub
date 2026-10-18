@@ -15,7 +15,7 @@ import (
 const analyzeCalls = `-- name: AnalyzeCalls :many
 WITH samples AS MATERIALIZED (
  SELECT c.created_at, c.outcome, c.stream, c.duration_ms, c.ttft_ms,
- c.output_tokens_per_second, c.inter_token_p95_ms,
+ CASE WHEN c.attempts->-1->>'metrics_version'='2' AND c.attempts->-1->>'end_reason'='completed' THEN c.output_tokens_per_second END AS output_tokens_per_second, c.inter_token_p95_ms,
  c.input_tokens, c.output_tokens, c.cache_read_tokens, c.cache_write_tokens, c.fee_nano,
  c.ledger_tx_id IS NOT NULL AS billed,
  c.diagnostics->>'delivery' AS delivery, c.diagnostics->>'usage_status' AS usage_status,
@@ -418,7 +418,7 @@ WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
  (att->>'duration_ms')::double precision AS duration,
  CASE WHEN c.stream AND att->>'end_reason'='completed' THEN (att->>'ttft_ms')::double precision END AS ttft,
  -- Call-level speed/gap belongs only to its last, successful streaming attempt.
- CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN c.output_tokens_per_second END AS speed,
+ CASE WHEN c.stream AND att->>'metrics_version'='2' AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN c.output_tokens_per_second END AS speed,
  CASE WHEN c.stream AND att->>'end_reason'='completed' AND n=jsonb_array_length(c.attempts) AND ch.id=c.final_channel_id THEN (c.diagnostics->>'max_frame_gap_ms')::double precision END AS gap,
  -- Cache quality uses measured input of final successful attempts, across both
  -- streaming and non-streaming. Missing usage and zero input are not misses.
@@ -1099,6 +1099,7 @@ SELECT coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.output_tokens_per_
        coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY c.output_tokens_per_second), -1)::double precision AS p95
 FROM calls c
 WHERE c.final_channel_id = $1::uuid AND c.output_tokens_per_second IS NOT NULL
+  AND c.stream AND c.attempts->-1->>'metrics_version'='2' AND c.attempts->-1->>'end_reason'='completed'
   AND c.created_at >= $2::timestamptz AND c.created_at < $3::timestamptz
 `
 

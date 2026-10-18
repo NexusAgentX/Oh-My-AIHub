@@ -55,7 +55,7 @@ export const metricGroups: Record<string, Metric[]> = {
   ],
   streaming: [
     number('streamed', '流式请求'),
-    ...[10, 50, 95].map((p) => number(`speed_p${p}` as keyof Values, `输出速度 p${p}`, 'tokens/s')),
+    ...[10, 50, 95].map((p) => number(`speed_p${p}` as keyof Values, `有效输出速率 p${p}`, 'tokens/s')),
     ...[50, 95, 99].map((p) => number(`gap_p${p}` as keyof Values, `单次帧间隔 p95 的 p${p}`, 'ms')),
     number('max_gap_p95', '最大停顿 p95', 'ms'),
     {

@@ -33,6 +33,12 @@ function AttemptRow({
         <span className="attempt-duration num">{formatMs(attempt.duration_ms)}</span>
       </div>
       <dl className="attempt-metrics">
+        {attempt.metrics_version === 2 && <>
+          <dt>首有效输出</dt><dd>{attempt.first_output_ms == null ? '未知' : formatMs(attempt.first_output_ms)}</dd>
+          <dt>有效输出速率</dt><dd>{attempt.output_tps == null ? '未知' : `${attempt.output_tps.toFixed(1)} tokens/s`}</dd>
+          {attempt.generation_ms != null && <><dt>输出观测区间</dt><dd>{formatMs(attempt.generation_ms)}</dd></>}
+          {attempt.actual_service_tier && <><dt>实际服务档位</dt><dd>{attempt.actual_service_tier === 'unknown' ? '未知' : attempt.actual_service_tier}</dd></>}
+        </>}
         {attempt.address_id && <><dt>地址 ID</dt><dd className="mono">{attempt.address_id}<CopyButton iconOnly label="复制尝试地址 ID" value={attempt.address_id}/></dd></>}
         {attempt.fallback_level && <><dt>回退层级</dt><dd>{attempt.fallback_level==='address'?'同渠道地址':'跨渠道'}</dd></>}
         {attempt.upstream_model && (
