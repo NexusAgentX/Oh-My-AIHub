@@ -9,15 +9,15 @@ import (
 // cost, request-count or duration budget. F3 owns admin persistence; F4 owns real
 // upstream probes and the distinction between accepted and achieved lengths.
 type SearchSettings struct {
-	Version       string
-	Method        string
-	Low           int64
-	High          int64
-	HardMaximum   int64
-	Precision     float64
-	PrecisionMode string
-	Rounds        int
-	Rechecks      int
+	Version       string  `json:"version"`
+	Method        string  `json:"method"`
+	Low           int64   `json:"low"`
+	High          int64   `json:"high"`
+	HardMaximum   int64   `json:"hard_maximum"`
+	Precision     float64 `json:"precision"`
+	PrecisionMode string  `json:"precision_mode"`
+	Rounds        int     `json:"rounds"`
+	Rechecks      int     `json:"rechecks"`
 }
 
 func (s SearchSettings) Validate() error {
