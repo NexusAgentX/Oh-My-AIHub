@@ -27,17 +27,21 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
@@ -124,7 +128,19 @@ func main() {
 	// The gateway reads keys, the catalog, channels and routing preferences from
 	// memory (ADR-0040). Every service that writes them is built on the cached
 	// stores, so each change rebuilds the affected snapshot before it returns.
-	cached := store.Cached(logger)
+	groupStartup, cancelGroupStartup := context.WithTimeout(context.Background(), 15*time.Second)
+	groupPool, err := database.OpenLimited(groupStartup, databaseURL, 2)
+	cancelGroupStartup()
+	if err != nil {
+		fatal(logger, "opening group channel database pool failed", err)
+	}
+	defer groupPool.Close()
+	groupStore := groupchannelpg.NewStore(groupPool)
+	groupRuntime := &groupchannel.Runtime{Repository: groupStore, Removed: credentialKeyring.ForgetCredential}
+	cached := store.Cached(logger, func(config *snapshot.Config) { config.Loader = groupRuntime.Wrap(config.Loader) })
+	groupRuntime.Rebuild = func(ctx context.Context) error {
+		return cached.Cache.InvalidateChecked(ctx, snapshot.DomainFleet|snapshot.DomainModels)
+	}
 	loadContext, cancelLoad := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	err = cached.Cache.Load(loadContext)
 	cancelLoad()
@@ -139,7 +155,7 @@ func main() {
 	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
 	modelIDs := func(ctx context.Context) ([]string, error) {
-		models, err := catalogService.List(ctx, true)
+		models, err := cached.Models.List(ctx, true)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +215,7 @@ func main() {
 
 	engine := gateway.NewEngine(gateway.Dependencies{
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
-		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Ready: groupRuntime.Check, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
 	backgroundCheckCtx, cancelBackgroundCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
@@ -214,6 +230,7 @@ func main() {
 	// 4xx anomaly rule counted against it before, and a channel ranked last for
 	// those answers is ranked on its merits again before the edit returns.
 	cached.Cache.OnChannelEdited(engine.ChannelEdited)
+	groupRuntime.Edited = engine.ChannelEdited
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
 	if geo != nil {
@@ -329,7 +346,18 @@ func main() {
 	if err = reviewStore.SyncPublications(reviewStartup); err != nil {
 		fatal(logger, "waiting for market publication recovery fence failed", err)
 	}
-	marketRuntime := contribution.NewRuntime(reviewMarket, nil)
+	groupCredentialRoot := append([]byte{}, credentialRoot...)
+	defer clear(groupCredentialRoot)
+	groupRuntime.CredentialScope = func(r groupchannel.Record) (string, error) {
+		secret, err := credentialKeyring.OpenCredential(r.ID, r.Credential)
+		if err != nil {
+			return "", err
+		}
+		return market.CredentialScope(groupCredentialRoot, r.GroupID, []byte(secret))
+	}
+	groupRuntime.Planner = registry
+	marketRuntime := contribution.NewRuntime(reviewMarket, groupRuntime.Install)
+	groupRuntime.Ready = func() error { _, err := marketRuntime.Current(); return err }
 	if err = marketRuntime.Refresh(reviewStartup); err != nil {
 		fatal(logger, "loading approved market failed", err)
 	}
@@ -352,11 +380,21 @@ func main() {
 		fatal(logger, "starting detection service failed", err)
 	}
 	defer detector.Close()
+	groupService := &groupchannel.Service{Repository: groupStore, Runtime: groupRuntime, Keyring: credentialKeyring}
+	groupProber := groupchannel.NewProber(backgroundContext, groupchannel.ProbeConfig{Runtime: groupRuntime, Repository: groupStore, Keyring: credentialKeyring, Logger: logger, Edited: engine.ChannelEdited, Outbound: func(ctx context.Context) (channel.Outbound, error) {
+		value, err := settingsService.Get(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return outboundPolicy.WithExtraBlockedHosts(value.ExtraBlockedHosts)
+	}})
+	defer groupProber.Close()
+	groupProber.Notify()
 
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			DetectionMCP:  mcpFixture,
+			GroupChannels: groupService, DetectionMCP: mcpFixture,
 			Contributions: contributions,
 			Detection:     detector,
 			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},

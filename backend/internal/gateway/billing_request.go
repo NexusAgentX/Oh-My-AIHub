@@ -6,6 +6,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 )
 
 type billingHints struct {
@@ -54,11 +55,11 @@ func (scan objectScan) billingHints(body []byte, format channel.Format) billingH
 					}
 				}
 			case "image_generation":
-				if catalog.ValidModelID(tool.Model) {
+				if gatewaycontract.ValidModelID(tool.Model) {
 					hints.ImageModel = tool.Model
 				}
 			case "advisor_20260301":
-				if catalog.ValidModelID(tool.Model) {
+				if gatewaycontract.ValidModelID(tool.Model) {
 					hints.Submodels = append(hints.Submodels, tool.Model)
 				}
 			}

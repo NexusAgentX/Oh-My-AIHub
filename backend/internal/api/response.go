@@ -94,6 +94,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, apikey.ErrLimitReached):
 		writeError(w, http.StatusConflict, "key_limit_reached", "API Key 数量已达上限")
+	case errors.Is(err, channel.ErrGroupManaged):
+		writeError(w, http.StatusConflict, "group_managed_channel", "请通过分组渠道配置修改该渠道")
 	case errors.Is(err, channel.ErrSuspended):
 		writeError(w, http.StatusConflict, "channel_suspended", "渠道已被管理员下架，不能自行上架")
 	case errors.Is(err, channel.ErrConflict):

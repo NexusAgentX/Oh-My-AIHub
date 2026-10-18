@@ -7,12 +7,16 @@ import (
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
 func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Candidate, usage ledger.Usage, defaults settings.Settings, feeRate int64) (ledger.PriceResult, []byte, error) {
+	if !candidate.ValidOffering(model.ID) {
+		return ledger.PriceResult{}, nil, quotepricing.ErrQuote
+	}
 	if candidate.Quotes != nil {
 		if usage.Detail != nil {
 			detail := *usage.Detail
@@ -138,7 +142,7 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 }
 
 func boundedModelName(value string) string {
-	if !catalog.ValidModelID(value) {
+	if !gatewaycontract.ValidModelID(value) {
 		return "unknown"
 	}
 	return value

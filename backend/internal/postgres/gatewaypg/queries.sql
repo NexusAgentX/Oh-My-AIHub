@@ -46,7 +46,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id;
 
 -- Every row ListCandidates can return, for any model and format, for the
@@ -65,7 +65,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
 -- The attempts of calls started in the window the engine keeps channel statistics
@@ -90,7 +90,7 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
        coalesce(c.model_id, '')::text AS model_id,
        floor(extract(epoch FROM c.created_at) / 300)::bigint AS bucket,
        coalesce(CASE WHEN c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL
-                THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
+                THEN width_bucket(round(coalesce(att->>'selection_latency_ms',att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
        count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
        count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors,
@@ -102,6 +102,7 @@ LEFT JOIN channels ch ON ch.id = (att->'channel'->>'id')::uuid
 WHERE c.created_at >= sqlc.arg(since)::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
   AND att->>'end_reason' <> 'client_disconnected'
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
 GROUP BY 1, 2, 3, 4;
 
 -- name: ResponseChannel :one
@@ -156,7 +157,7 @@ FROM channel_models cm
 CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 GROUP BY cm.model_id
 ORDER BY cm.model_id;
 
@@ -167,7 +168,7 @@ SELECT EXISTS (
     JOIN channels c ON c.id = cm.channel_id
     JOIN accounts a ON a.id = c.owner_id
     WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
-      AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+      AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 );
 
 -- name: ListOnlineChannelModels :many
@@ -178,7 +179,7 @@ SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.di
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
 -- name: HomeToday :one

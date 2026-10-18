@@ -248,14 +248,14 @@ func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) 
 				if req.Header == nil {
 					req.Header = make(http.Header)
 				}
-				if s.resolved.UserAgent != "" {
-					req.Header.Set("User-Agent", s.resolved.UserAgent)
-				}
 				for _, name := range s.resolved.Headers.Remove {
 					req.Header.Del(name)
 				}
 				for _, v := range s.resolved.Headers.Set {
 					req.Header.Set(v.Name, v.Value)
+				}
+				if s.resolved.UserAgent != "" {
+					req.Header.Set("User-Agent", s.resolved.UserAgent)
 				}
 				// Credentials/transport fields cannot be supplied through a scene/header
 				// override. Never use a query-string key or log the resulting request.

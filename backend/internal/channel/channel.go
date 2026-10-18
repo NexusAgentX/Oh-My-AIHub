@@ -18,7 +18,8 @@ var (
 	ErrNotFound = errors.New("channel not found")
 	ErrConflict = errors.New("channel state conflict")
 	// ErrSuspended rejects owner changes of a channel an administrator took down.
-	ErrSuspended = errors.New("channel is suspended")
+	ErrSuspended    = errors.New("channel is suspended")
+	ErrGroupManaged = errors.New("channel is managed through a supplier group")
 	// ErrModelNameTaken rejects a custom model whose name is in the catalog.
 	ErrModelNameTaken = errors.New("custom model name is a catalog model")
 )
@@ -134,6 +135,7 @@ type Today struct {
 }
 
 type Channel struct {
+	GroupID         *string
 	ID              string
 	Owner           Owner
 	Name            string

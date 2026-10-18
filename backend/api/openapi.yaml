@@ -27,6 +27,704 @@ tags:
 - {name: admin-observe, description: 管理员：观测}
 - {name: gateway, description: 外部模型 API 入口}
 paths:
+  /api/group-channels/{channelID}/events:
+    {
+      "get": {
+        "operationId": "groupChannelEvents",
+        "tags": [
+          "channels"
+        ],
+        "summary": "渠道最近健康事件，所有者或管理员",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannelEvents"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/group-channels/sources:
+    {
+      "get": {
+        "operationId": "groupChannelSources",
+        "tags": [
+          "channels"
+        ],
+        "summary": "可选的已批准分组与地址",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannelSources"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  /api/group-channels:
+    {
+      "get": {
+        "operationId": "listGroupChannels",
+        "tags": [
+          "channels"
+        ],
+        "summary": "我的分组渠道",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "用分组和 Key 创建渠道并自动探测",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannel"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChannelCreate"
+              }
+            }
+          }
+        }
+      }
+    }
+  /api/group-channels/{channelID}:
+    {
+      "get": {
+        "operationId": "getGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "分组渠道配置与有效继承值",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannel"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "更新渠道选择、折扣和覆盖值",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannel"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChannelUpdate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "业务删除渠道，保留历史账本",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChannelRevision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/group-channels/{channelID}/test:
+    {
+      "post": {
+        "operationId": "retestGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "重新执行 Key 最小可调用性探针",
+        "x-access": "ready",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannel"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChannelRevision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/admin/group-channels:
+    {
+      "get": {
+        "operationId": "listAdminGroupChannels",
+        "tags": [
+          "channels"
+        ],
+        "summary": "管理员查看分组渠道",
+        "x-access": "admin",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  /api/admin/group-channels/{channelID}:
+    {
+      "get": {
+        "operationId": "getAdminGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "管理员查看分组渠道配置与探针",
+        "x-access": "admin",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupChannel"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  /api/admin/group-channels/{channelID}/moderate:
+    {
+      "post": {
+        "operationId": "moderateGroupChannel",
+        "tags": [
+          "channels"
+        ],
+        "summary": "下架或恢复分组渠道",
+        "x-access": "admin",
+        "x-feature": "494",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "快照尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChannelModeration"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channelID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
   /api/contributions/{draftID}/addresses:
     {
       "post": {
@@ -11378,6 +12076,10 @@ components:
     CallAttempt:
       type: object
       properties:
+        address_id: {type: string, format: uuid, description: 本次实际尝试的分组地址关系 ID，仅为诊断元数据。}
+        fallback_level: {type: string, enum: [address, channel], description: 本次回退发生在同渠道地址之间或渠道之间。}
+        selection_final: {type: boolean, description: 同渠道选取的最后一次实际尝试；健康统计每次选取只计一次。}
+        selection_latency_ms: {type: integer, minimum: 0, description: 本次渠道选取开始至收到首字节的总时间。}
         upstream_model: {type: string}
         timeouts: {anyOf: [{$ref: '#/components/schemas/AttemptTimeouts'}, {type: 'null'}]}
         offset_ms: {type: [integer, 'null']}
@@ -13073,6 +13775,671 @@ components:
       additionalProperties: false
 
 # Discovery metadata only: these entries do not register live HTTP routes.
+    GroupChannelFormat:
+      {
+        "type": "string",
+        "enum": [
+          "openai_chat",
+          "openai_responses",
+          "anthropic",
+          "gemini",
+          "openai_images"
+        ]
+      }
+    GroupChannelAddress:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelChoice:
+      {
+        "type": "object",
+        "properties": {
+          "group_model_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "discount": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,3})(?:\\.[0-9]{1,9})?$",
+            "description": "整张模型价表的折扣，0 至 1000，默认 1。"
+          }
+        },
+        "required": [
+          "group_model_id",
+          "excluded",
+          "discount"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelModel:
+      {
+        "type": "object",
+        "properties": {
+          "group_model_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "discount": {
+            "type": "string"
+          },
+          "probe_state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "available",
+              "unavailable"
+            ]
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelFormat"
+            }
+          },
+          "format_tests": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FormatTest"
+            }
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "group_model_id",
+          "model_id",
+          "display_name",
+          "model_type",
+          "excluded",
+          "discount",
+          "probe_state",
+          "formats",
+          "format_tests",
+          "quote_id",
+          "enabled"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannel:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "display_name"
+            ],
+            "additionalProperties": false
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "listed",
+              "unlisted",
+              "suspended"
+            ]
+          },
+          "suspended_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_name": {
+            "type": "string"
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "group_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelAddress"
+            },
+            "maxItems": 32
+          },
+          "selected_address_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 32
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/MarketDefaults"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/MarketDefaults"
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "channel",
+                "group",
+                "model_route_or_platform",
+                "platform"
+              ]
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelModel"
+            },
+            "maxItems": 4096
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "name",
+          "summary",
+          "description",
+          "status",
+          "suspended_reason",
+          "group_id",
+          "group_name",
+          "supplier_name",
+          "revision",
+          "group_revision",
+          "addresses",
+          "selected_address_ids",
+          "overrides",
+          "effective",
+          "sources",
+          "models",
+          "available",
+          "reason",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelRevision:
+      {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelOverrides:
+      {
+        "type": "object",
+        "properties": {
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "header_rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketHeaderRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "concurrency_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1073741824
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rpm_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1073741824
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ttft_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 3600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "idle_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 3600000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cooldown_failures": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cooldown_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 86400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "null动态继承；header_rules为明确空对象块时清除整个继承规则，不与null合并。"
+      }
+    GroupChannelCreate:
+      {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "writeOnly": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "address_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "省略则选择当前第一个地址；顺序即回退顺序，新增地址不自动加入。"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/GroupChannelOverrides"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelChoice"
+            },
+            "maxItems": 4096
+          }
+        },
+        "required": [
+          "group_id",
+          "api_key"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelUpdate:
+      {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "writeOnly": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "address_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "省略则选择当前第一个地址；顺序即回退顺序，新增地址不自动加入。"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/GroupChannelOverrides"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelChoice"
+            },
+            "maxItems": 4096
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "listed",
+              "unlisted"
+            ]
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelList:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannel"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelSource:
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/MarketDefaults"
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelAddress"
+            },
+            "maxItems": 32
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "model_id": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "model_type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "image"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "model_id",
+                "display_name",
+                "model_type"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 4096
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "supplier_name",
+          "revision",
+          "defaults",
+          "addresses",
+          "models"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelSources:
+      {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupChannelSource"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    GroupChannelModeration:
+      {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "非空下架原因；空字符串恢复上架。"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+
+    GroupChannelEvents:
+      type: object
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: {$ref: "#/components/schemas/ChannelEvent"}
+      required: [items]
+      additionalProperties: false
+
 x-aihub-gateway-contract:
   {
     "version": "2026-10-18.18",

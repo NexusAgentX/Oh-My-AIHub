@@ -20,7 +20,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
@@ -115,7 +114,7 @@ func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 	t.Cleanup(cancel)
 	go feed.Run(ctx)
 	<-bus.ready
-	browse := &fakeBrowse{channels: channelStore, revenue: money.FromNano(2_000_000_000)}
+	browse := &fakeBrowse{channels: channelStore}
 
 	c2cStore := newFakeC2CStore(store)
 	rates := &fakeRateSource{rateNano: 7_100_000_000}

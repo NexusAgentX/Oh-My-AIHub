@@ -4,6 +4,145 @@
  */
 
 export interface paths {
+    "/api/group-channels/{channelID}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 渠道最近健康事件，所有者或管理员 */
+        get: operations["groupChannelEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-channels/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 可选的已批准分组与地址 */
+        get: operations["groupChannelSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 我的分组渠道 */
+        get: operations["listGroupChannels"];
+        put?: never;
+        /** 用分组和 Key 创建渠道并自动探测 */
+        post: operations["createGroupChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-channels/{channelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分组渠道配置与有效继承值 */
+        get: operations["getGroupChannel"];
+        put?: never;
+        post?: never;
+        /** 业务删除渠道，保留历史账本 */
+        delete: operations["deleteGroupChannel"];
+        options?: never;
+        head?: never;
+        /** 更新渠道选择、折扣和覆盖值 */
+        patch: operations["updateGroupChannel"];
+        trace?: never;
+    };
+    "/api/group-channels/{channelID}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重新执行 Key 最小可调用性探针 */
+        post: operations["retestGroupChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/group-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员查看分组渠道 */
+        get: operations["listAdminGroupChannels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/group-channels/{channelID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员查看分组渠道配置与探针 */
+        get: operations["getAdminGroupChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/group-channels/{channelID}/moderate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 下架或恢复分组渠道 */
+        post: operations["moderateGroupChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contributions/{draftID}/addresses": {
         parameters: {
             query?: never;
@@ -3957,6 +4096,20 @@ export interface components {
             trend: components["schemas"]["AnalysisRow"][];
         };
         CallAttempt: {
+            /**
+             * Format: uuid
+             * @description 本次实际尝试的分组地址关系 ID，仅为诊断元数据。
+             */
+            address_id?: string;
+            /**
+             * @description 本次回退发生在同渠道地址之间或渠道之间。
+             * @enum {string}
+             */
+            fallback_level?: "address" | "channel";
+            /** @description 同渠道选取的最后一次实际尝试；健康统计每次选取只计一次。 */
+            selection_final?: boolean;
+            /** @description 本次渠道选取开始至收到首字节的总时间。 */
+            selection_latency_ms?: number;
             upstream_model: string;
             timeouts: components["schemas"]["AttemptTimeouts"] | null;
             offset_ms: number | null;
@@ -4993,6 +5146,146 @@ export interface components {
         SupplierImpact: {
             linked_channels: number;
         };
+        /** @enum {string} */
+        GroupChannelFormat: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
+        GroupChannelAddress: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: uri */
+            url: string;
+        };
+        GroupChannelChoice: {
+            /** Format: uuid */
+            group_model_id: string;
+            excluded: boolean;
+            /** @description 整张模型价表的折扣，0 至 1000，默认 1。 */
+            discount: string;
+        };
+        GroupChannelModel: {
+            /** Format: uuid */
+            group_model_id: string;
+            model_id: string;
+            display_name: string;
+            /** @enum {string} */
+            model_type: "text" | "image";
+            excluded: boolean;
+            discount: string;
+            /** @enum {string} */
+            probe_state: "pending" | "available" | "unavailable";
+            formats: components["schemas"]["GroupChannelFormat"][];
+            format_tests: {
+                [key: string]: components["schemas"]["FormatTest"];
+            };
+            quote_id: string | null;
+            enabled: boolean;
+        };
+        GroupChannel: {
+            /** Format: uuid */
+            id: string;
+            owner: {
+                /** Format: uuid */
+                id: string;
+                username: string;
+                display_name: string;
+            };
+            name: string;
+            summary: string;
+            description: string;
+            /** @enum {string} */
+            status: "listed" | "unlisted" | "suspended";
+            suspended_reason: string | null;
+            /** Format: uuid */
+            group_id: string;
+            group_name: string;
+            supplier_name: string;
+            revision: number;
+            group_revision: number;
+            addresses: components["schemas"]["GroupChannelAddress"][];
+            selected_address_ids: string[];
+            overrides: components["schemas"]["MarketDefaults"];
+            effective: components["schemas"]["MarketDefaults"];
+            sources: {
+                [key: string]: "channel" | "group" | "model_route_or_platform" | "platform";
+            };
+            models: components["schemas"]["GroupChannelModel"][];
+            available: boolean;
+            reason: string;
+            created_at: components["schemas"]["Timestamp"];
+            updated_at: components["schemas"]["Timestamp"];
+        };
+        GroupChannelRevision: {
+            revision: number;
+        };
+        /** @description null动态继承；header_rules为明确空对象块时清除整个继承规则，不与null合并。 */
+        GroupChannelOverrides: {
+            user_agent?: string | null;
+            header_rules?: components["schemas"]["MarketHeaderRules"] | null;
+            concurrency_limit?: number | null;
+            rpm_limit?: number | null;
+            ttft_timeout_ms?: number | null;
+            request_timeout_ms?: number | null;
+            idle_timeout_ms?: number | null;
+            cooldown_failures?: number | null;
+            cooldown_seconds?: number | null;
+        };
+        GroupChannelCreate: {
+            /** Format: uuid */
+            group_id: string;
+            api_key: string;
+            name?: string;
+            summary?: string;
+            description?: string;
+            /** @description 省略则选择当前第一个地址；顺序即回退顺序，新增地址不自动加入。 */
+            address_ids?: string[];
+            overrides?: components["schemas"]["GroupChannelOverrides"];
+            models?: components["schemas"]["GroupChannelChoice"][];
+        };
+        GroupChannelUpdate: {
+            /** Format: uuid */
+            group_id?: string;
+            api_key?: string;
+            name?: string;
+            summary?: string;
+            description?: string;
+            /** @description 省略则选择当前第一个地址；顺序即回退顺序，新增地址不自动加入。 */
+            address_ids?: string[];
+            overrides?: components["schemas"]["GroupChannelOverrides"];
+            models?: components["schemas"]["GroupChannelChoice"][];
+            revision: number;
+            /** @enum {string} */
+            status?: "listed" | "unlisted";
+        };
+        GroupChannelList: {
+            items: components["schemas"]["GroupChannel"][];
+        };
+        GroupChannelSource: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            supplier_name: string;
+            revision: number;
+            defaults: components["schemas"]["MarketDefaults"];
+            addresses: components["schemas"]["GroupChannelAddress"][];
+            models: {
+                /** Format: uuid */
+                id: string;
+                model_id: string;
+                display_name: string;
+                /** @enum {string} */
+                model_type: "text" | "image";
+            }[];
+        };
+        GroupChannelSources: {
+            items: components["schemas"]["GroupChannelSource"][];
+        };
+        GroupChannelModeration: {
+            /** @description 非空下架原因；空字符串恢复上架。 */
+            reason: string;
+        };
+        GroupChannelEvents: {
+            items: components["schemas"]["ChannelEvent"][];
+        };
     };
     responses: {
         /** @description 请求格式无效或参数非法（invalid_json、invalid_request、invalid_cursor）。 */
@@ -5204,6 +5497,410 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    groupChannelEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannelEvents"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    groupChannelSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannelSources"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listGroupChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannelList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupChannelCreate"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannel"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannel"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupChannelRevision"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupChannelUpdate"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannel"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retestGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupChannelRevision"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannel"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listAdminGroupChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannelList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAdminGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupChannel"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    moderateGroupChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupChannelModeration"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            /** @description 快照尚未就绪 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     reuseContributionAddress: {
         parameters: {
             query?: never;

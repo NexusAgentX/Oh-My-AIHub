@@ -65,7 +65,7 @@ func decodeRules(raw []byte) channel.HeaderRules {
 
 func toChannel(row GetChannelRow) channel.Channel {
 	return channel.Channel{
-		ID: row.ID, Owner: channel.Owner{ID: row.OwnerID, Username: row.OwnerUsername, DisplayName: row.OwnerDisplayName},
+		ID: row.ID, GroupID: row.MarketGroupID, Owner: channel.Owner{ID: row.OwnerID, Username: row.OwnerUsername, DisplayName: row.OwnerDisplayName},
 		Name: row.Name, Summary: row.Summary, Description: row.Description, BaseURL: row.BaseUrl, Status: channel.Status(row.Status), SuspendedReason: row.SuspendedReason,
 		Advanced: channel.Advanced{
 			UserAgent: row.UserAgent, HeaderRules: decodeRules(row.HeaderRules),

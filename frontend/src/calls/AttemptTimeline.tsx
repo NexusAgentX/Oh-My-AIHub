@@ -33,6 +33,8 @@ function AttemptRow({
         <span className="attempt-duration num">{formatMs(attempt.duration_ms)}</span>
       </div>
       <dl className="attempt-metrics">
+        {attempt.address_id && <><dt>地址 ID</dt><dd className="mono">{attempt.address_id}<CopyButton iconOnly label="复制尝试地址 ID" value={attempt.address_id}/></dd></>}
+        {attempt.fallback_level && <><dt>回退层级</dt><dd>{attempt.fallback_level==='address'?'同渠道地址':'跨渠道'}</dd></>}
         {attempt.upstream_model && (
           <>
             <dt>上游模型</dt>

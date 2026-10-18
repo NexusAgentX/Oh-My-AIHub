@@ -100,6 +100,9 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<SuppliersPage />} path="/suppliers" />
           <Route element={<SupplierDetailPage />} path="/suppliers/:id" />
           <Route element={<ChannelsPage />} path="/channels" />
+ <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/group-channels" />
+ <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/group-channels/new" />
+ <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/group-channels/:id" />
  <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionsPage})} path="/contributions"/>
  <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionDetailPage})} path="/contributions/:draftID"/>
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/detection" />

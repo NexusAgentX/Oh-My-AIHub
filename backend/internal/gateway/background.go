@@ -288,25 +288,62 @@ func (e *Engine) backgroundExchange(ctx context.Context, m backgroundMetadata, i
 	if err != nil {
 		return nil, "", err
 	}
-	client, err := policy.GatewayClient(ctx, m.Candidate.BaseURL)
-	if err != nil {
-		return nil, "", err
+	// A saved resource stays on its original channel, credential and immutable
+	// entrance list. Selected addresses are alternate entrances to that engine.
+	entries := m.Candidate.Entrances
+	if len(entries) == 0 {
+		entries = []Entrance{{BaseURL: m.Candidate.BaseURL}}
+	}
+	maxAttempts := int(m.Settings.DefaultMaxAttempts)
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+	if len(entries) > maxAttempts {
+		entries = entries[:maxAttempts]
 	}
 	path := "/v1/responses/" + id
 	if operation != "" {
 		path += "/" + operation
 	}
-	target, err := UpstreamURL(m.Candidate.BaseURL, path, query, channel.FormatOpenAIResponses, m.Candidate.UpstreamModel, m.Location, secret)
-	if err != nil {
-		return nil, "", err
+	var lastErr error
+	for index, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, secret, err
+		}
+		client, err := policy.GatewayClient(ctx, entry.BaseURL)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		target, err := UpstreamURL(entry.BaseURL, path, query, channel.FormatOpenAIResponses, m.Candidate.UpstreamModel, m.Location, secret)
+		if err != nil {
+			return nil, secret, err
+		}
+		request, err := http.NewRequestWithContext(ctx, method, target, body)
+		if err != nil {
+			return nil, secret, err
+		}
+		request.Header = UpstreamHeaders(m.Headers, m.Location, secret, m.Candidate.Advanced)
+		response, err := client.Do(request)
+		// A caller-supplied body is single-use: never replay it after partial send.
+		if body != nil {
+			return response, secret, err
+		}
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if response.StatusCode < 500 || index == len(entries)-1 {
+			return response, secret, nil
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxFailureBody))
+		response.Body.Close()
+		lastErr = errors.New("background entrance unavailable")
 	}
-	request, err := http.NewRequestWithContext(ctx, method, target, body)
-	if err != nil {
-		return nil, "", err
+	if lastErr == nil {
+		lastErr = errors.New("background entrance unavailable")
 	}
-	request.Header = UpstreamHeaders(m.Headers, m.Location, secret, m.Candidate.Advanced)
-	response, err := client.Do(request)
-	return response, secret, err
+	return nil, secret, lastErr
 }
 
 // ServeResponse authenticates every follow-up, binds it to the creating Key,

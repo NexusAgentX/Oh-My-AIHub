@@ -81,7 +81,7 @@ func (q *Queries) DeleteChannelModels(ctx context.Context, channelID string) err
 }
 
 const getChannel = `-- name: GetChannel :one
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -92,6 +92,7 @@ WHERE c.id = $1 AND c.deleted_at IS NULL
 
 type GetChannelRow struct {
 	ID               string
+	MarketGroupID    *string
 	OwnerID          string
 	Name             string
 	Summary          string
@@ -119,6 +120,7 @@ func (q *Queries) GetChannel(ctx context.Context, id string) (GetChannelRow, err
 	var i GetChannelRow
 	err := row.Scan(
 		&i.ID,
+		&i.MarketGroupID,
 		&i.OwnerID,
 		&i.Name,
 		&i.Summary,
@@ -287,13 +289,13 @@ func (q *Queries) InsertChannelModel(ctx context.Context, arg InsertChannelModel
 }
 
 const listAdminChannels = `-- name: ListAdminChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.deleted_at IS NULL
+WHERE c.deleted_at IS NULL AND c.market_group_id IS NULL
   AND ($1::text = '' OR c.status = $1)
   AND ($2::text = '' OR c.owner_id::text = $2)
   AND ($3::text = '' OR c.name ILIKE '%' || $3 || '%'
@@ -315,6 +317,7 @@ type ListAdminChannelsParams struct {
 
 type ListAdminChannelsRow struct {
 	ID               string
+	MarketGroupID    *string
 	OwnerID          string
 	Name             string
 	Summary          string
@@ -355,6 +358,7 @@ func (q *Queries) ListAdminChannels(ctx context.Context, arg ListAdminChannelsPa
 		var i ListAdminChannelsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.MarketGroupID,
 			&i.OwnerID,
 			&i.Name,
 			&i.Summary,
@@ -548,18 +552,19 @@ func (q *Queries) ListModelsOfChannels(ctx context.Context, channelIds []string)
 }
 
 const listOwnerChannels = `-- name: ListOwnerChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.owner_id = $1 AND c.deleted_at IS NULL
+WHERE c.owner_id = $1 AND c.deleted_at IS NULL AND c.market_group_id IS NULL
 ORDER BY c.created_at DESC, c.id DESC
 `
 
 type ListOwnerChannelsRow struct {
 	ID               string
+	MarketGroupID    *string
 	OwnerID          string
 	Name             string
 	Summary          string
@@ -593,6 +598,7 @@ func (q *Queries) ListOwnerChannels(ctx context.Context, ownerID string) ([]List
 		var i ListOwnerChannelsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.MarketGroupID,
 			&i.OwnerID,
 			&i.Name,
 			&i.Summary,

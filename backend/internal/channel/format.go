@@ -8,8 +8,7 @@ import (
 	"unicode"
 )
 
-// Format is one of the four native API formats the gateway forwards without
-// conversion.
+// Format identifies a native forwarding API family.
 type Format string
 
 const (
@@ -17,6 +16,7 @@ const (
 	FormatOpenAIResponses Format = "openai_responses"
 	FormatAnthropic       Format = "anthropic"
 	FormatGemini          Format = "gemini"
+	FormatOpenAIImages    Format = "openai_images"
 )
 
 var ErrInvalidInput = errors.New("invalid channel input")

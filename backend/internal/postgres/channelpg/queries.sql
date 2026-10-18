@@ -24,7 +24,7 @@ SELECT EXISTS (SELECT 1 FROM models WHERE id = $1);
 DELETE FROM channel_models WHERE channel_id = $1;
 
 -- name: GetChannel :one
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
@@ -36,23 +36,23 @@ WHERE c.id = $1 AND c.deleted_at IS NULL;
 SELECT status FROM channels WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
 -- name: ListOwnerChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.owner_id = $1 AND c.deleted_at IS NULL
+WHERE c.owner_id = $1 AND c.deleted_at IS NULL AND c.market_group_id IS NULL
 ORDER BY c.created_at DESC, c.id DESC;
 
 -- name: ListAdminChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
        c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.deleted_at IS NULL
+WHERE c.deleted_at IS NULL AND c.market_group_id IS NULL
   AND (sqlc.arg(status)::text = '' OR c.status = sqlc.arg(status))
   AND (sqlc.arg(owner_id)::text = '' OR c.owner_id::text = sqlc.arg(owner_id))
   AND (sqlc.arg(query)::text = '' OR c.name ILIKE '%' || sqlc.arg(query) || '%'

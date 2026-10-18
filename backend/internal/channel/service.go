@@ -162,6 +162,9 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, in UpdateInput
 	if err != nil {
 		return Channel{}, err
 	}
+	if current.GroupID != nil {
+		return Channel{}, ErrGroupManaged
+	}
 	update := Update{Summary: in.Summary, Description: in.Description}
 	if (in.Summary != nil && utf8.RuneCountInString(*in.Summary) > 160) || (in.Description != nil && utf8.RuneCountInString(*in.Description) > 8000) {
 		return Channel{}, ErrInvalidInput
@@ -235,8 +238,12 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, in UpdateInput
 }
 
 func (s *Service) Delete(ctx context.Context, ownerID, id string) error {
-	if _, err := s.owned(ctx, ownerID, id); err != nil {
+	current, err := s.owned(ctx, ownerID, id)
+	if err != nil {
 		return err
+	}
+	if current.GroupID != nil {
+		return ErrGroupManaged
 	}
 	if err := s.Store.SoftDelete(ctx, id); err != nil {
 		return err

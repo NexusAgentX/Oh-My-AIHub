@@ -66,6 +66,7 @@ var (
 
 // Dependencies wires the gateway.
 type Dependencies struct {
+	Ready             func() error
 	TrustedProxyCIDRs []netip.Prefix
 	Geo               *geolocation.Service
 	GatewayLocation   *geolocation.Location
@@ -358,6 +359,12 @@ func (e *Engine) touchKey(ctx context.Context, keyID string) {
 // Serve handles one inference request of the given format. pathModel is the
 // model named in a Gemini path.
 func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Format, pathModel string, pathStream bool) {
+	if e.Ready != nil {
+		if err := e.Ready(); err != nil {
+			WriteError(w, DialectOf(r), http.StatusServiceUnavailable, "market_unavailable", "供应商配置正在同步，请稍后重试", "")
+			return
+		}
+	}
 	ctx := r.Context()
 	started := e.Now()
 	// One limit for the whole call, every attempt included (ADR-0035 rule 5).
@@ -609,6 +616,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	for _, candidate := range candidates {
 		reason := "eligible"
 		switch {
+		case !candidate.ValidOffering(call.modelID):
+			reason = "missing_group_quote"
 		case containsString(pref.Excluded, candidate.ChannelID):
 			reason = "excluded"
 		case pref.Mode == routing.ModeManual && !containsString(pref.Order, candidate.ChannelID):
@@ -627,6 +636,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats.channels,
 		Demoted: stats.anomalies[call.modelID], ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
+			if !c.ValidOffering(call.modelID) {
+				return false
+			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
 			return state == StateAvailable
 		},
@@ -656,44 +668,81 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	// taken since ranking is skipped and the next one fills in.
 	for slot := range e.reservations(ordered, maxAttempts, defaults) {
 		candidate, limits, release := slot.candidate, slot.limits, slot.release
-		tried++
-		call.lastChannelID = candidate.ChannelID
-		result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, timeouts)
-		if len(call.attempts) > 0 {
-			result.record.FallbackReason = call.attempts[len(call.attempts)-1].EndReason
+		selectionStarted := e.Now()
+		entrances := len(candidate.Entrances)
+		if entrances == 0 {
+			entrances = 1
 		}
-		call.attempts = append(call.attempts, result.record)
-		e.publishAttempt(call, candidate, result.record)
-		if result.response == nil {
-			// An attempt with an answer to stream back is counted when
-			// streamBack has settled how it ended.
-			e.recordAttempt(call, candidate, result.record)
-		}
-		switch {
-		case result.clientGone:
-			release()
-			e.finishAbandoned(call, "")
-			return
-		case result.expired:
-			release()
-			e.finishExpired(w, call)
-			return
-		case result.passthrough != nil:
-			e.Runtime.Success(candidate.ChannelID) // an answering upstream is healthy
-			e.forwardPassthrough(w, call, result.passthrough)
-			release()
-			return
-		case result.response != nil:
-			call.releaseChannel = release
-			e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
-			if !call.pending {
-				release()
+		channelFault, finalReason := false, ""
+		for entry := 0; entry < entrances && tried < maxAttempts; entry++ {
+			if len(candidate.Entrances) > 0 {
+				candidate.BaseURL = candidate.Entrances[entry].BaseURL
 			}
-			return
+			tried++
+			call.lastChannelID = candidate.ChannelID
+			result := e.attempt(callCtx, r, call, candidate, limits, defaults, policy, body, scan, location, timeouts)
+			if len(candidate.Entrances) > 0 {
+				result.record.AddressID = candidate.Entrances[entry].ID
+			}
+			advance := result.response == nil && result.passthrough == nil && !result.clientGone && !result.expired && !result.rateLimited && entry+1 < entrances && tried < maxAttempts
+			if result.record.ErrorCode != nil && *result.record.ErrorCode == "credential_error" {
+				advance = false
+			}
+			selectionFinal := !advance
+			result.record.SelectionFinal = &selectionFinal
+			if result.response != nil {
+				result.record.SelectionLatencyMS = millis(e.Now().Sub(selectionStarted))
+			}
+			if len(call.attempts) > 0 {
+				result.record.FallbackReason = call.attempts[len(call.attempts)-1].EndReason
+				result.record.FallbackLevel = "channel"
+				if previous := call.attempts[len(call.attempts)-1].Channel; previous != nil && previous.ID == candidate.ChannelID {
+					result.record.FallbackLevel = "address"
+				}
+			}
+			call.attempts = append(call.attempts, result.record)
+			e.publishAttempt(call, candidate, result.record)
+			if result.response == nil {
+				// An attempt with an answer to stream back is counted when
+				// streamBack has settled how it ended.
+				e.recordAttempt(call, candidate, result.record)
+			}
+			switch {
+			case result.clientGone:
+				release()
+				e.finishAbandoned(call, "")
+				return
+			case result.expired:
+				release()
+				e.finishExpired(w, call)
+				return
+			case result.passthrough != nil:
+				e.Runtime.Success(candidate.ChannelID) // an answering upstream is healthy
+				e.forwardPassthrough(w, call, result.passthrough)
+				release()
+				return
+			case result.response != nil:
+				call.releaseChannel = release
+				e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
+				if !call.pending {
+					release()
+				}
+				return
+			}
+			if result.failure != nil {
+				last = result.failure
+			}
+			channelFault, finalReason = result.channelFault, result.record.EndReason
+			if !advance {
+				break
+			}
+		}
+		if channelFault {
+			e.Runtime.Failure(candidate.ChannelID, limits, e.Now(), finalReason)
 		}
 		release()
-		if result.failure != nil {
-			last = result.failure
+		if tried >= maxAttempts {
+			break
 		}
 	}
 
@@ -891,10 +940,12 @@ func newUpstreamFailure(response *http.Response, payload []byte, secret string) 
 // a failure to fall back from, a passthrough (an upstream 4xx that is the
 // request's own fault and ends the call unchanged), or a departed client.
 type attemptResult struct {
-	record   Attempt
-	response *http.Response
-	first    []byte
-	firstErr error
+	channelFault bool
+	rateLimited  bool
+	record       Attempt
+	response     *http.Response
+	first        []byte
+	firstErr     error
 	// chunk is the pooled buffer first lies in. streamBack takes it over: it
 	// keeps reading into it once first has been delivered, and gives it back.
 	chunk *[]byte
@@ -983,7 +1034,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	}
 	fail := func(endReason, code, message string, status *int) attemptResult {
 		closeFailed(endReason, code, message, status)
-		e.Runtime.Failure(candidate.ChannelID, limits, e.Now(), endReason)
+		result.channelFault = true
 		return result
 	}
 	// expired ends the attempt because the call ran out of time. The channel is
@@ -1186,6 +1237,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		// The upstream said when to come back: rest the channel for that long
 		// right away rather than counting towards the failure threshold.
 		closeFailed(EndUpstreamError, code, string(payload), &status)
+		result.rateLimited = true
 		e.Runtime.CooldownFor(candidate.ChannelID, pause, e.Now(), CooldownRateLimited)
 		return result
 	}

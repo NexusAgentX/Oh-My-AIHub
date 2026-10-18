@@ -51,20 +51,24 @@ func (u Usage) Total() int64 {
 
 // Attempt mirrors one element of calls.attempts as the gateway writes it.
 type Attempt struct {
-	UpstreamModel    string                   `json:"upstream_model"`
-	Timeouts         *gateway.AttemptTimeouts `json:"timeouts"`
-	OffsetMS         *int                     `json:"offset_ms"`
-	ReusedConnection *bool                    `json:"reused_connection"`
-	FallbackReason   string                   `json:"fallback_reason"`
-	Channel          *ChannelRef              `json:"channel"`
-	StatusCode       *int                     `json:"status_code"`
-	ErrorCode        *string                  `json:"error_code"`
-	ErrorMessage     *string                  `json:"error_message"`
-	ConnectMS        *int                     `json:"connect_ms"`
-	TTFTMS           *int                     `json:"ttft_ms"`
-	DurationMS       *int                     `json:"duration_ms"`
-	ResponseByte     *int64                   `json:"response_bytes"`
-	EndReason        string                   `json:"end_reason"`
+	AddressID          string                   `json:"address_id,omitempty"`
+	FallbackLevel      string                   `json:"fallback_level,omitempty"`
+	SelectionFinal     *bool                    `json:"selection_final,omitempty"`
+	SelectionLatencyMS *int                     `json:"selection_latency_ms,omitempty"`
+	UpstreamModel      string                   `json:"upstream_model"`
+	Timeouts           *gateway.AttemptTimeouts `json:"timeouts"`
+	OffsetMS           *int                     `json:"offset_ms"`
+	ReusedConnection   *bool                    `json:"reused_connection"`
+	FallbackReason     string                   `json:"fallback_reason"`
+	Channel            *ChannelRef              `json:"channel"`
+	StatusCode         *int                     `json:"status_code"`
+	ErrorCode          *string                  `json:"error_code"`
+	ErrorMessage       *string                  `json:"error_message"`
+	ConnectMS          *int                     `json:"connect_ms"`
+	TTFTMS             *int                     `json:"ttft_ms"`
+	DurationMS         *int                     `json:"duration_ms"`
+	ResponseByte       *int64                   `json:"response_bytes"`
+	EndReason          string                   `json:"end_reason"`
 }
 
 // Succeeded reports whether the attempt delivered the response.

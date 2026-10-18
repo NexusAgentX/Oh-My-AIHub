@@ -275,6 +275,9 @@ func NewStatsBook() *StatsBook {
 // only for a completed attempt of a streaming call: a non-streaming call's
 // first byte is the whole answer.
 func (b *StatsBook) Record(channelID, modelID string, stream bool, attempt Attempt, at time.Time) {
+	if attempt.SelectionFinal != nil && !*attempt.SelectionFinal {
+		return
+	}
 	epoch := statsEpoch(at)
 	if epoch <= 0 || attempt.EndReason == EndClientDisconnected {
 		return
@@ -283,7 +286,11 @@ func (b *StatsBook) Record(channelID, modelID string, stream bool, attempt Attem
 	success := attempt.EndReason == EndCompleted
 	ttftBin := -1
 	if success && stream && attempt.TTFTMS != nil {
-		ttftBin = ttftBinOf(*attempt.TTFTMS)
+		latency := attempt.TTFTMS
+		if attempt.SelectionLatencyMS != nil {
+			latency = attempt.SelectionLatencyMS
+		}
+		ttftBin = ttftBinOf(*latency)
 	}
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

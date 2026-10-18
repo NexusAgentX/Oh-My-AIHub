@@ -185,3 +185,23 @@ func TestUnitPriorityUsesActualFastTierAlias(t *testing.T) {
 		t.Fatal("actual tier alias lost or requested tier substituted", err)
 	}
 }
+
+func TestEachOfferUsesItsOwnChannelDiscountIncludingZero(t *testing.T) {
+	mainDiscount, childDiscount := int64(500_000_000), int64(0)
+	mainQuote := market.Quote{ID: "main-quote", GroupModelID: "main-offer", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: 1_000_000_000}}
+	childQuote := mainQuote
+	childQuote.ID = "child-quote"
+	childQuote.GroupModelID = "child-offer"
+	book, err := Freeze(Book{GroupID: "group", GroupRevision: 1, Offers: map[string]Offer{"main": {ModelID: "main", Revision: 1, Quote: mainQuote, DiscountNano: &mainDiscount}, "child": {ModelID: "child", Revision: 1, Quote: childQuote, DiscountNano: &childDiscount}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts := Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{Iterations: []ledger.UsageIteration{{Model: "child", Usage: ledger.Usage{InputTokens: 1_000_000}}}}}}
+	got, err := Calculate(book, "main", facts, time.Now(), 900_000_000, ledger.UnitRate, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Lines) != 2 || got.Lines[0].DiscountNano != mainDiscount || got.Lines[1].DiscountNano != 0 || got.Lines[1].Cost != 0 || got.Cost != 500_000_000 {
+		t.Fatalf("independent model discounts lost: %+v", got)
+	}
+}
