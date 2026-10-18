@@ -98,6 +98,34 @@ func compileNativeRequirements(format channel.Format, body []byte, stream bool, 
 		}
 		out.capabilities = append(out.capabilities, CapabilityRequirement{Layer: "upstream_protocol", ID: id})
 	}
+	// A supplied sampling/stop parameter is an explicit contract requirement,
+	// including zero. Missing and JSON null carry no such requirement. Use the
+	// independent report assertion rather than a generic output-scenario pass.
+	present := func(raw []byte) bool { return len(raw) > 0 && !bytes.Equal(bytes.TrimSpace(raw), []byte("null")) }
+	if format == channel.FormatOpenAIChat {
+		for _, field := range []string{"temperature", "top_p", "stop"} {
+			if present(root.get(field)) {
+				add("output", field)
+			}
+		}
+	}
+	if format == channel.FormatAnthropic {
+		if present(root.get("stop_sequences")) {
+			add("output", "stop_sequences")
+		}
+		if present(root.get("system")) {
+			add("base", "role_and_instruction_semantics")
+		}
+	}
+	if format == channel.FormatOpenAIResponses {
+		text := scratch.objectOf(root.get("text"))
+		if present(text.get("verbosity")) {
+			add("output", "text.verbosity")
+		}
+		if present(root.get("instructions")) {
+			add("base", "role_and_instruction_semantics")
+		}
+	}
 	if format == channel.FormatOpenAIImages {
 		endpoint := imageCapabilityEndpoint(path)
 		out.capabilities = append(out.capabilities, CapabilityRequirement{Layer: "upstream_protocol", ID: endpoint + "/actual_image_model"})
@@ -268,6 +296,14 @@ func compileNativeRequirements(format channel.Format, body []byte, stream bool, 
 	}
 	if format == channel.FormatGemini {
 		config := scratch.objectOf(root.get("generationConfig"))
+		for _, field := range []string{"temperature", "topP", "topK", "stopSequences"} {
+			if present(config.get(field)) {
+				add("output", field)
+			}
+		}
+		if present(root.get("systemInstruction")) {
+			add("base", "role_and_instruction_semantics")
+		}
 		if n, ok := count(config.get("maxOutputTokens")); ok {
 			out.maxOutput = n
 		}
@@ -317,6 +353,10 @@ func compileNativeRequirements(format channel.Format, body []byte, stream bool, 
 		defer func() { scratch.members = scratch.members[:mark] }()
 		p := scratch.objectOf(raw)
 		kind := requestTag(p.get("type"))
+		role := requestTag(p.get("role"))
+		if (format == channel.FormatOpenAIChat || format == channel.FormatOpenAIResponses) && (role == "system" || role == "developer") {
+			add("base", "role_and_instruction_semantics")
+		}
 		media := func(family string, remote bool) {
 			label := "native_inline_content_recognition"
 			if family == "vision" {
@@ -378,7 +418,7 @@ func compileNativeRequirements(format channel.Format, body []byte, stream bool, 
 		if p.has("functionCall") || p.has("functionResponse") {
 			add("tools", "call_result_association")
 		}
-		if p.has("tool_calls") || requestTag(p.get("role")) == "tool" {
+		if p.has("tool_calls") || role == "tool" {
 			add("tools", "call_result_association")
 		}
 		if p.has("cache_control") {
