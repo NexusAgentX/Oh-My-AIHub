@@ -199,6 +199,11 @@ func (o *Observer) observeResponseItem(raw []byte) {
 	case "image_generation_call":
 		o.unit("image_generation", o.detail.Units["image_generation"]/ledger.FixedPointScale+1)
 		o.note("图像工具仅作观察，暂不收取图像子模型费用")
+		status := textValue(item.get("status"))
+		if status == "failed" || status == "cancelled" {
+			o.note("图像工具终态失败，子费用未计价")
+			return
+		}
 		model := textValue(item.get("model"))
 		if model == "" {
 			model = o.imageModel
@@ -209,6 +214,13 @@ func (o *Observer) observeResponseItem(raw []byte) {
 		if model == "" {
 			o.note("图像工具模型缺失，子模型费用未计价")
 			return
+		}
+		if result := item.get("result"); status == "completed" && len(result) > 2 && result[0] == '"' {
+			if len(o.billableUnits) <= maxBillingItems-2 {
+				o.billableUnits = append(o.billableUnits, quotepricing.Unit{Unit: "request", ModelID: model, QuantityNano: ledger.UnitRate}, quotepricing.Unit{Unit: "successful_image", ModelID: model, QuantityNano: ledger.UnitRate})
+			} else {
+				o.note("图像产物超过有界计量上限，部分子费用未计价")
+			}
 		}
 		usage := item.get("usage")
 		child := NewObserver(channel.FormatOpenAIResponses, false, "application/json")

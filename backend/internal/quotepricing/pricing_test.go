@@ -159,3 +159,29 @@ func TestRuntimeQuantityNeedsReliableBillingPeriodAndPreservesFraction(t *testin
 		t.Fatal("fractional reliable runtime priced incorrectly", err)
 	}
 }
+
+func TestChildAliasAmbiguityNeverSelectsAnotherOfferPrice(t *testing.T) {
+	main := offer(t, "main", "CNY", "2")
+	child := offer(t, "child", "CNY", "3")
+	child.UpstreamModel = "native-image"
+	facts := Facts{MainReliable: true, Usage: ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{Iterations: []ledger.UsageIteration{{Type: "image_generation_call", Model: "native-image", Usage: ledger.Usage{InputTokens: 1_000_000}}}}}}
+	s, err := Calculate(book(t, main, child), "main", facts, time.Now(), ledger.UnitRate, ledger.UnitRate, 0)
+	if err != nil || s.Cost != amount(t, "5") {
+		t.Fatal("unique same-group native mapping not priced", err)
+	}
+	ambiguous := offer(t, "native-image", "CNY", "999")
+	ambiguous.UpstreamModel = "different-engine-model"
+	s, err = Calculate(book(t, main, child, ambiguous), "main", facts, time.Now(), ledger.UnitRate, ledger.UnitRate, 0)
+	if err != nil || s.Cost != amount(t, "2") || s.Lines[1].State != "unpriced" {
+		t.Fatal("ambiguous child borrowed a price", err)
+	}
+}
+
+func TestUnitPriorityUsesActualFastTierAlias(t *testing.T) {
+	o := offer(t, "main", "CNY", "0")
+	o.Quote.UnitPrices = []market.UnitPrice{{Unit: "tool_call", Tool: "search", ServiceTier: "openai:fast", Price: amount(t, "2")}, {Unit: "tool_call", Tool: "search", Price: amount(t, "1")}}
+	s, err := Calculate(book(t, o), "main", Facts{MainReliable: true, Units: []Unit{{Unit: "tool_call", Tool: "search", ServiceTier: "openai:priority", QuantityNano: ledger.UnitRate}}}, time.Now(), ledger.UnitRate, ledger.UnitRate, 0)
+	if err != nil || s.Cost != amount(t, "2") || s.Lines[1].Unit.ServiceTier != "openai:priority" {
+		t.Fatal("actual tier alias lost or requested tier substituted", err)
+	}
+}

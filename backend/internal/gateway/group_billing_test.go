@@ -126,3 +126,22 @@ func TestGroupPriceProtocolFailureTransportInterruptionAndSelfUse(t *testing.T) 
 		})
 	}
 }
+
+func TestImageToolUnitsExcludeFailedSubcallsAndOldNoChargeNotes(t *testing.T) {
+	raw := `{"usage":{"input_tokens":1000000,"output_tokens":0},"output":[{"id":"good-image","type":"image_generation_call","status":"completed","model":"image","result":"private-image"},{"id":"bad-image","type":"image_generation_call","status":"failed","model":"image","usage":{"input_tokens":1000000,"output_tokens":0}}]}`
+	observed := observe(channel.FormatOpenAIResponses, false, "application/json", raw, 7)
+	if len(observed.Units) != 2 || observed.Units[1].QuantityNano != ledger.UnitRate || len(observed.Usage.Detail.Iterations) != 0 {
+		t.Fatalf("image failure or request n became billed products: %+v", observed)
+	}
+	main := market.Quote{ID: "main-quote", GroupModelID: "gm-main", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: money.FromNano(2_000_000_000)}}
+	image := market.Quote{ID: "image-quote", GroupModelID: "gm-image", Version: 1, Currency: "CNY", BillingUnit: "per_successful_image", UnitPrices: []market.UnitPrice{{Unit: "successful_image", Price: money.FromNano(3_000_000_000)}}}
+	book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "group", GroupRevision: 1, Offers: map[string]quotepricing.Offer{"main": {ModelID: "main", Revision: 1, Quote: main}, "image": {ModelID: "image", Revision: 1, Quote: image}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := &callState{started: time.Now(), billingFacts: quotepricing.Facts{MainReliable: true, Units: observed.Units}}
+	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate}, observed.Usage, settings.Settings{}, 0)
+	if err != nil || priced.Cost.String() != "5" || strings.Contains(string(snapshot), "暂不收取") || strings.Contains(string(snapshot), "private-image") {
+		t.Fatalf("price=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
+	}
+}

@@ -14,6 +14,16 @@ import (
 
 func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Candidate, usage ledger.Usage, defaults settings.Settings, feeRate int64) (ledger.PriceResult, []byte, error) {
 	if candidate.Quotes != nil {
+		if usage.Detail != nil {
+			detail := *usage.Detail
+			detail.Notes = []string{}
+			for _, note := range usage.Detail.Notes {
+				if note != "图像工具仅作观察，暂不收取图像子模型费用" && note != "工具用量仅作观察，暂不收取工具附加费" {
+					detail.Notes = append(detail.Notes, note)
+				}
+			}
+			usage.Detail = &detail
+		}
 		facts := call.billingFacts
 		facts.Usage = usage
 		if offer, ok := candidate.Quotes.Offers[model.ID]; ok && offer.Quote.BillingUnit == "per_request" && facts.MainReliable && !facts.IndependentImage {

@@ -116,12 +116,9 @@ func reference(offer Offer) Reference {
 }
 
 func (b *Book) childOffer(model string) (Offer, bool) {
-	if offer, ok := b.Offers[model]; ok {
-		return offer, true
-	}
 	var match Offer
 	for _, offer := range b.Offers {
-		if offer.UpstreamModel == model && model != "" {
+		if (offer.ModelID == model || offer.UpstreamModel == model) && model != "" {
 			if match.ModelID != "" {
 				return Offer{}, false
 			}
@@ -260,6 +257,9 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 			model = mainModel
 		}
 		offer, ok := book.childOffer(model)
+		if unit.ModelID == "" {
+			offer, ok = main, true
+		}
 		if !ok {
 			missing(model, unit.Unit, "missing_group_quote")
 			statement.Lines[len(statement.Lines)-1].Unit = &unit
@@ -338,12 +338,16 @@ func (s Statement) ReceiptKeys() []string {
 	return slices.Compact(keys)
 }
 func selectUnitPrice(prices []market.UnitPrice, unit Unit) (money.Amount, bool) {
+	actualTier := unit.ServiceTier
+	if actualTier == "openai:priority" {
+		actualTier = "openai:fast"
+	}
 	for _, candidate := range prices {
 		if candidate.Unit != unit.Unit || candidate.Tool != unit.Tool {
 			continue
 		}
 		matches := true
-		for _, pair := range [][2]string{{candidate.ImageSize, unit.ImageSize}, {candidate.ImageQuality, unit.ImageQuality}, {candidate.ImageBackground, unit.ImageBackground}, {candidate.ServiceTier, unit.ServiceTier}} {
+		for _, pair := range [][2]string{{candidate.ImageSize, unit.ImageSize}, {candidate.ImageQuality, unit.ImageQuality}, {candidate.ImageBackground, unit.ImageBackground}, {candidate.ServiceTier, actualTier}} {
 			if pair[0] != "" {
 				matches = matches && pair[0] == pair[1]
 			}
