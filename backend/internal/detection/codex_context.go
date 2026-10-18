@@ -52,7 +52,9 @@ func (n *nativeScene) codexContextArgumentsFor(ctx context.Context, model, sessi
 	}
 	slices.SortFunc(required, func(a, b any) int { return strings.Compare(str(a), str(b)) })
 	body := codexBase(model)
-	body["client_metadata"] = nativeObject{"session_id": session}
+	if _, err := n.codexContextInitialize(body, model, session); err != nil {
+		return nil, nativeOutcome{State: "inconclusive", Reason: "detector_error"}
+	}
 	body["input"] = []any{nativeObject{"role": "user", "content": "Call only " + namespace + "." + operation + " on this isolated synthetic context, using these exact values. Preserve the required encrypted argument representation. Do not invent a result: " + string(mustNativeJSON(desired))}}
 	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "description": "Isolated synthetic context tools.", "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "parameters": nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}}}}}
 	body["tool_choice"] = "required"
@@ -220,6 +222,11 @@ func (n *nativeScene) codexNotes(ctx context.Context) {
 	reopened := n.codexContextCall(ctx, session, "notes", "read_file", readArgs)
 	reopenText := n.codexContextText(ctx, model, session, "notes", "read_file", "Return only the full actual note text, without labels or formatting.", readArgs, reopened)
 	n.linkedCheck("reopen_session", reopened, reopenText, valid && contentMatches(reopenText, marker+"\n"+appended) && nativeEndedNormally(reopenText.Reply))
+	initialized := n.codexFreshContext(ctx, model, other)
+	if initialized.State != "pass" || !nativeEndedNormally(initialized.Reply) {
+		n.check("context_isolation", initialized, false)
+		return
+	}
 	foreign := n.codexContextCall(ctx, other, "notes", "read_file", readArgs)
 	foreignText := n.codexContextText(ctx, model, other, "notes", "read_file", "Return only the full actual note text, without labels or formatting.", readArgs, foreign)
 	denied := foreign.Response.Status == http.StatusNotFound && nativeError(n.protocol, foreign.Reply.Object)

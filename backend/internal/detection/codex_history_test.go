@@ -38,6 +38,10 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 						}
 						input := list(body["input"])
 						if len(input) == 1 {
+							if owner != "" {
+								_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
+								return
+							}
 							marker = str(object(input[0])["content"])
 							metadata := object(body["client_metadata"])
 							owner, window = str(metadata["session_id"]), str(metadata["x-codex-window-id"])
@@ -45,6 +49,10 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 							if body["store"] != false || turn["history_ingest_requested"] != true || str(turn["session_id"]) != owner || str(turn["thread_id"]) != owner || str(turn["window_id"]) != window {
 								t.Error("actual history ingest metadata was missing or lost namespace consistency")
 							}
+							if window != owner+":0" || str(turn["context_window_id"]) == "" || str(turn["context_window_id"]) == window {
+								t.Error("logical and stored context window identifiers were conflated")
+							}
+							window = str(turn["context_window_id"])
 							_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
 							return
 						}

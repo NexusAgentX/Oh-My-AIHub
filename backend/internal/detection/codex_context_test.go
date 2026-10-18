@@ -16,9 +16,23 @@ import (
 func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
 	for _, namespace := range []string{"notes", "history"} {
 		t.Run(namespace, func(t *testing.T) {
+			requests := 0
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests++
 				raw, _ := io.ReadAll(r.Body)
 				body, _ := decodeNative(raw)
+				metadata := object(body["client_metadata"])
+				if r.Header.Get("Session-Id") != "synthetic-session" || r.Header.Get("Thread-Id") != "synthetic-session" || r.Header.Get("Originator") != "aihub-codex-probe" || r.Header.Get("Version") != "0.163.0" || r.Header.Get("X-Codex-Beta-Features") != "remote_compaction_v2" {
+					t.Error("context initialization omitted the pinned client headers")
+				}
+				if requests == 1 {
+					turn, err := decodeNative([]byte(str(metadata["x-codex-turn-metadata"])))
+					if err != nil || turn["history_initialization"] != "new" || turn["history_ingest_requested"] != true || turn["request_kind"] != "turn" || turn["model"] != "synthetic-model" || turn["agent_name"] != "/root" || str(turn["installation_id"]) == "" || str(turn["turn_id"]) == "" || turn["turn_id"] != turn["root_turn_id"] || str(turn["context_window_id"]) == "" || str(turn["window_id"]) != "synthetic-session:0" || metadata["x-codex-window-id"] != turn["window_id"] || str(metadata["x-codex-turn-metadata"]) != r.Header.Get("X-Codex-Turn-Metadata") || r.Header.Get("X-Codex-Window-Id") != "synthetic-session:0" {
+						t.Error("synthetic context used incomplete turn initialization")
+					}
+				} else if metadata["x-codex-turn-metadata"] != nil || r.Header.Get("X-Codex-Turn-Metadata") != "" {
+					t.Error("a later tool request overwrote the known seeded history")
+				}
 				tools := list(body["tools"])
 				if len(tools) != 1 || str(object(tools[0])["description"]) == "" {
 					w.WriteHeader(http.StatusBadRequest)
@@ -33,9 +47,11 @@ func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
 			_, s, _ := codexTestSession(t, up.URL)
 			s.allowed = map[string]bool{"codex.responses": true}
 			n := nativeScene{s: s, protocol: "openai-responses"}
-			args, out := n.codexContextArgumentsFor(context.Background(), "synthetic-model", "synthetic-session", namespace, "search_contents", nativeObject{"query": "synthetic-query"})
-			if out.State != "pass" || str(args["query"]) != "sealed:synthetic-query" {
-				t.Fatal("malformed namespace declaration prevented the real context probe", out.State, out.Reason)
+			for range 2 {
+				args, out := n.codexContextArgumentsFor(context.Background(), "synthetic-model", "synthetic-session", namespace, "search_contents", nativeObject{"query": "synthetic-query"})
+				if out.State != "pass" || str(args["query"]) != "sealed:synthetic-query" {
+					t.Fatal("malformed namespace declaration prevented the real context probe", out.State, out.Reason)
+				}
 			}
 		})
 	}
@@ -154,6 +170,10 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 							return
 						}
 						input := list(body["input"])
+						if len(input) == 1 {
+							_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
+							return
+						}
 						output := object(input[len(input)-1])["output"]
 						var value any
 						if str(output) != "" {

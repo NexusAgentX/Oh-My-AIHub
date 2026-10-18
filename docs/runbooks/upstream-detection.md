@@ -64,6 +64,8 @@ RL07 分别运行真实 Namespace 动态回调与内置 freeform apply_patch 的
 
 RL19 使用 TokenBudget/history-notes 配置进行实际 history ingest，随后由 CLI 完成 list_windows/list_items/read_item/search_contents、另开会话的隔离及恢复后的新读取；只跟随本次写入元数据中的逻辑窗口或 context-window 标识，实际选择的 opaque ID 原样用于后续操作。固定客户端的 [传输窗口生成](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/mod.rs) 与 [上下文窗口展示](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/context/token_budget_context.rs) 使用不同标识，不能强行把所有窗口当 UUID。查不到刚写入条目时不猜 item ID、不等索引延迟，记录未观测；外国上下文的真实 403/404 拒绝与空结果分别观测，拒绝不能被算成对应操作的支持证据。
 
+原生 notes/history 准备请求同样使用固定客户端的完整 turn 初始化与对应请求头；只有自报 session ID 时，上游可能尚未建立上下文，不能据此判断读写不支持。逻辑窗口为线程 ID 加序号，历史读取使用本任务生成的独立 context-window ID。后续加密参数生成和结果解释不重新 ingest 辅助提示，避免替换已知历史；隔离验证先初始化另一合成会话，再尝试读取本人的已验证记录。初始化元数据仅留有界 worker 内存，不建立来源渠道映射。
+
 官方 CLI 的 notes/history 验证以实际上下文中的合成待办任务完成情况核验恢复，不要求客户端引用或复述其内置工具规则要求保密的正文。上游工具输出仍须有真实 HTTP 回执、结果哈希及后续推理中的对应回填，不能仅靠最终文本成功。请求/响应、私有笔记/历史和密文不进入报告。
 
 官方 SDK 检测使用独立的 `aihub-detection-sdk` 制品，版本固定在 manifest 来源与 `RegisterSDK` 中。容器构建同时生成并安装它；本地 `mise run dev-backend` 自动先构建，单独运行 server 时可用 `AIHUB_DETECTION_SDK_BINARY` 指定绝对路径，默认查找 server 同目录的制品。缺少制品时对应套件保持待实现，不降低创建全测要求；制品版本或 SHA 改变会改变套件版本。不要指向个人 CLI、宿主登录脚本或任意下载的可执行文件。

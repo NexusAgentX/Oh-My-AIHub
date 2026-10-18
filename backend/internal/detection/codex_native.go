@@ -115,6 +115,16 @@ func (n *nativeScene) codexInfer(ctx context.Context, body nativeObject, encodin
 		return nativeOutcome{State: "inconclusive", Reason: "detector_error"}
 	}
 	headers := http.Header{"Content-Type": {"application/json"}}
+	if metadata := object(body["client_metadata"]); metadata != nil {
+		headers.Set("Originator", "aihub-codex-probe")
+		headers.Set("Version", "0.163.0")
+		headers.Set("X-Codex-Beta-Features", "remote_compaction_v2")
+		for field, header := range map[string]string{"session_id": "Session-Id", "thread_id": "Thread-Id", "x-codex-turn-metadata": "X-Codex-Turn-Metadata", "x-codex-window-id": "X-Codex-Window-Id"} {
+			if value := str(metadata[field]); value != "" {
+				headers.Set(header, value)
+			}
+		}
+	}
 	if encoding != "" {
 		headers.Set("Content-Encoding", encoding)
 	}

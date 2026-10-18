@@ -15,8 +15,7 @@ func (n *nativeScene) codexHistory(ctx context.Context) {
 	}
 	session, a := ids.NewUUID()
 	other, b := ids.NewUUID()
-	window, c := ids.NewUUID()
-	if a != nil || b != nil || c != nil {
+	if a != nil || b != nil {
 		n.codexContextDetectorError()
 		return
 	}
@@ -24,10 +23,11 @@ func (n *nativeScene) codexHistory(ctx context.Context) {
 	seedBody := codexBase(model)
 	seedBody["instructions"] = "Reply with exactly OK."
 	seedBody["input"] = []any{nativeObject{"role": "user", "content": marker}}
-	// These are the pinned CLI's real ingest fields, not a bare previous-ID
-	// reference. The seeded window belongs to this synthetic session only.
-	turn := nativeObject{"session_id": session, "thread_id": session, "agent_name": "/root", "window_id": window, "context_window_id": window, "window_number": 0, "request_kind": "turn", "history_ingest_requested": true}
-	seedBody["client_metadata"] = nativeObject{"session_id": session, "thread_id": session, "x-codex-window-id": window, "x-codex-turn-metadata": string(mustNativeJSON(turn))}
+	window, err := n.codexContextInitialize(seedBody, model, session)
+	if err != nil {
+		n.codexContextDetectorError()
+		return
+	}
 	seed := n.codexInfer(ctx, seedBody, "")
 	if seed.State != "pass" || !nativeEndedNormally(seed.Reply) {
 		return
@@ -67,6 +67,11 @@ func (n *nativeScene) codexHistory(ctx context.Context) {
 	valid := contentMatches(text, marker) && nativeEndedNormally(text.Reply)
 	n.linkedCheck("read_item", read, text, valid)
 	n.linkedCheck("remote_resume", read, text, valid)
+	initialized := n.codexFreshContext(ctx, model, other)
+	if initialized.State != "pass" || !nativeEndedNormally(initialized.Reply) {
+		n.check("context_isolation", initialized, false)
+		return
+	}
 	foreign := n.codexContextCall(ctx, other, "history", "read_item", readArgs)
 	foreignText := n.codexContextText(ctx, model, other, "history", "read_item", "Return only the full actual original user-message text without metadata or ID markers.", readArgs, foreign)
 	denied := foreign.Response.Status == http.StatusNotFound && nativeError(n.protocol, foreign.Reply.Object)
