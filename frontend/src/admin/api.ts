@@ -54,15 +54,6 @@ export const adminApi = {
       'Idempotency-Key': idempotencyKey,
     }),
 
-  models: () => request<ResponseBody<'listAdminModels'>>('/api/admin/models'),
-  createModel: (body: RequestBody<'createAdminModel'>) =>
-    post<'createAdminModel'>('/api/admin/models', body),
-  updateModel: (modelID: string, body: RequestBody<'updateAdminModel'>) =>
-    patch<'updateAdminModel'>(`/api/admin/models/${id(modelID)}`, body),
-
-  deleteModel: (modelID: string) =>
-    request<void>(`/api/admin/models/${id(modelID)}`, { method: 'DELETE' }),
-
   settings: () => request<ResponseBody<'getAdminSettings'>>('/api/admin/settings'),
   updateSettings: (body: RequestBody<'updateAdminSettings'>) =>
     request<ResponseBody<'updateAdminSettings'>>('/api/admin/settings', {
@@ -73,15 +64,6 @@ export const adminApi = {
     request<ResponseBody<'syncAdminExchangeRate'>>('/api/admin/settings/exchange-rate/sync', { method: 'POST' }),
   audit: (query: QueryOf<'listAdminAudit'>) =>
     request<ResponseBody<'listAdminAudit'>>(withQuery('/api/admin/audit', query)),
-
-  channels: (query: QueryOf<'listAdminChannels'>) =>
-    request<ResponseBody<'listAdminChannels'>>(withQuery('/api/admin/channels', query)),
-  channel: (channelID: string) =>
-    request<ResponseBody<'getAdminChannel'>>(`/api/admin/channels/${id(channelID)}`),
-  suspendChannel: (channelID: string, reason: string) =>
-    post<'suspendAdminChannel'>(`/api/admin/channels/${id(channelID)}/suspend`, { reason }),
-  unsuspendChannel: (channelID: string, reason: string) =>
-    post<'unsuspendAdminChannel'>(`/api/admin/channels/${id(channelID)}/unsuspend`, { reason }),
 
   disputes: (query: QueryOf<'listAdminDisputes'>) =>
     request<ResponseBody<'listAdminDisputes'>>(withQuery('/api/admin/disputes', query)),

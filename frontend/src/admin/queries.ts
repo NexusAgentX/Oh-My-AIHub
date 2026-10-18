@@ -14,11 +14,8 @@ export const adminKeys = {
   overview: ['admin', 'overview'] as const,
   points: (days: number) => ['admin', 'points', days] as const,
   accounts: (query: object) => ['admin', 'accounts', query] as const,
-  models: ['admin', 'models'] as const,
   settings: ['admin', 'settings'] as const,
   audit: (query: object) => ['admin', 'audit', query] as const,
-  channels: (query: object) => ['admin', 'channels', query] as const,
-  channel: (channelID: string) => ['admin', 'channel', channelID] as const,
   disputes: (query: object) => ['admin', 'disputes', query] as const,
   trade: (tradeID: string) => ['admin', 'trade', tradeID] as const,
   calls: (query: object) => ['admin', 'calls', query] as const,
@@ -67,9 +64,6 @@ export function useAdminAccounts(query: Omit<AdminQuery<'listAdminAccounts'>, 'c
   )
 }
 
-export function useAdminModels() {
-  return useQuery({ queryKey: adminKeys.models, queryFn: adminApi.models })
-}
 
 export function useAdminSettings() {
   return useQuery({ queryKey: adminKeys.settings, queryFn: adminApi.settings })
@@ -83,18 +77,7 @@ export function useAdminAudit(query: Omit<AdminQuery<'listAdminAudit'>, 'cursor'
   )
 }
 
-export function useAdminChannels(query: Omit<AdminQuery<'listAdminChannels'>, 'cursor'>) {
-  return usePagedQuery(adminKeys.channels(query), (cursor) =>
-    adminApi.channels({ ...query, cursor, limit: 50 }),
-  )
-}
 
-export function useAdminChannel(channelID: string) {
-  return useQuery({
-    queryKey: adminKeys.channel(channelID),
-    queryFn: () => adminApi.channel(channelID),
-  })
-}
 
 export function useAdminDisputes(query: Omit<AdminQuery<'listAdminDisputes'>, 'cursor'>) {
   return usePagedQuery(adminKeys.disputes(query), (cursor) =>
@@ -171,26 +154,7 @@ export function useWriteOffAccount() {
   )
 }
 
-export function useDeleteModel() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: adminApi.deleteModel,
-    onSuccess: () => client.invalidateQueries(),
-  })
-}
 
-export function useSaveModel() {
-  return useAdminMutation(
-    (
-      input:
-        | { mode: 'create'; body: RequestBody<'createAdminModel'> }
-        | { mode: 'update'; id: string; body: RequestBody<'updateAdminModel'> },
-    ) =>
-      input.mode === 'create'
-        ? adminApi.createModel(input.body)
-        : adminApi.updateModel(input.id, input.body),
-  )
-}
 
 export function useUpdateSettings() {
   const client = useQueryClient()
@@ -205,13 +169,6 @@ export function useSyncExchangeRate() {
   return useAdminMutation(() => adminApi.syncExchangeRate())
 }
 
-export function useChannelSuspension() {
-  return useAdminMutation((input: { id: string; suspend: boolean; reason: string }) =>
-    input.suspend
-      ? adminApi.suspendChannel(input.id, input.reason)
-      : adminApi.unsuspendChannel(input.id, input.reason),
-  )
-}
 
 export function useResolveTrade() {
   return useAdminMutation((input: { id: string; body: RequestBody<'resolveAdminC2CTrade'> }) =>

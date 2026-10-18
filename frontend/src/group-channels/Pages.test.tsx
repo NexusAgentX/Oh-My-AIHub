@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GroupChannelEditorPage } from './Pages'
 import type { GroupChannel, GroupSource } from './queries'
-import { stats } from '../channels/detail.testdata'
+import { stats } from '../channels/stats.testdata'
 
 const defaults = { user_agent: null, header_rules: null, concurrency_limit: null, rpm_limit: null, ttft_timeout_ms: null, request_timeout_ms: null, idle_timeout_ms: null, cooldown_failures: null, cooldown_seconds: null }
 const source: GroupSource = { id: 'group', name: '标准分组', supplier_name: '合成供应商', revision: 1, defaults, addresses: [{ id: 'one', label: '直连', url: 'https://one.example' }, { id: 'two', label: 'CF', url: 'https://two.example' }, { id: 'three', label: 'CDN', url: 'https://three.example' }], models: [{ id: 'offering', model_id: 'vendor/model:1', display_name: '模型', model_type: 'text' }] }
