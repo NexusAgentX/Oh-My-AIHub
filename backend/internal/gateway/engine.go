@@ -126,7 +126,7 @@ type Engine struct {
 	modelMetrics *modelMetricsBook
 	// anomalyNotified is when each channel on each model last had its
 	// anomalous_client_errors event; guarded by statsBuild.
-	anomalyNotified map[pairKey]time.Time
+	anomalyNotified map[modelMetricKey]time.Time
 
 	mutex   sync.Mutex // guards touched
 	touched map[string]time.Time
@@ -161,7 +161,7 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.StatsBook == nil {
 		dependencies.StatsBook = NewStatsBook()
 	}
-	return &Engine{Dependencies: dependencies, modelMetrics: newModelMetricsBook(), spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[pairKey]time.Time{}}
+	return &Engine{Dependencies: dependencies, modelMetrics: newModelMetricsBook(), spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[modelMetricKey]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -272,6 +272,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 
 // callState is everything known about one call while it runs.
 type callState struct {
+	nativeRequired       nativeRequirements
 	requestEncoding      string
 	codexContext         bool
 	resourceReferences   []gatewaycontract.Reference
@@ -505,6 +506,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
 		return
 	}
+	call.nativeRequired = compileNativeRequirements(format, body, call.stream, r.URL.Path)
+	if call.imageMultipart != nil && !strings.HasPrefix(r.URL.Path, "/backend-api/codex/") {
+		addMultipartImageRequirements(&call.nativeRequired, call.imageMultipart, r.URL.Path)
+	}
 	if required := codexInferenceRequirements(r.URL.Path, body, call.requestEncoding); len(required) > 0 {
 		// Public-image/compact evidence is not proof for a distinct Codex path.
 		kept := call.resourceRequired[:0]
@@ -681,8 +686,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	stats := e.statsView()
 	modelStats, demoted := stats.forModel(call.modelID, format, call.requestedServiceTier, call.stream)
+	capabilityBlocked := false
 	for _, candidate := range candidates {
 		reason := "eligible"
+		missingCapability := missingRequestCapability(candidate, call.nativeRequired, r.Header)
 		switch {
 		case !candidate.ValidOffering(call.modelID):
 			reason = "missing_group_quote"
@@ -691,6 +698,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		case !keyProbeMatchesEndpoint(candidate, format, r.URL.Path):
 			reason = "channel_probe_endpoint_mismatch"
 		case !supportsAll(candidate, call.resourceRequired):
+			reason = "required_capability_evidence_missing"
+		case missingCapability != "":
 			reason = "required_capability_evidence_missing"
 		case containsString(pref.Excluded, candidate.ChannelID):
 			reason = "excluded"
@@ -704,13 +713,26 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 				reason = "demoted"
 			}
 		}
-		call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: reason})
+		if reason == "required_capability_evidence_missing" {
+			capabilityBlocked = true
+			if missingCapability == "" {
+				for _, required := range call.resourceRequired {
+					if !required.supportedBy(candidate.Evidence) {
+						missingCapability = required.ID
+						break
+					}
+				}
+			}
+		} else {
+			missingCapability = ""
+		}
+		call.diagnostics.Routing = append(call.diagnostics.Routing, RouteDecision{Channel: AttemptChannel{ID: candidate.ChannelID, Name: candidate.Name}, Reason: reason, MissingCapability: missingCapability})
 	}
 	ordered := Rank(RankInput{
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: modelStats,
 		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || call.resourceObserver != nil && c.GroupID == "" {
+			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || missingRequestCapability(c, call.nativeRequired, r.Header) != "" || call.resourceObserver != nil && c.GroupID == "" {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
@@ -732,6 +754,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	call.stage("routing", routingAt, e.Now())
 	if len(ordered) == 0 {
+		if capabilityBlocked {
+			e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "required_capability_evidence_missing", "没有满足请求所需有效能力证据及版本前提的可用渠道")
+			return
+		}
 		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "no_channel_available", "当前没有可用的渠道")
 		return
 	}

@@ -127,35 +127,44 @@ func (e *Engine) buildStats(force, quiet bool) *statsSnapshot {
 	snapshot := &statsSnapshot{channels: view.channels, anomalies: detectAnomalies(view.models)}
 	snapshot.models, snapshot.dropped = e.modelStatsView(now)
 	previous := e.statsSnap.Load()
-	var announce []Anomaly
-	for model, channels := range snapshot.anomalies {
-		for id, anomaly := range channels {
+	type scopedAnomaly struct {
+		scope metricScope
+		value Anomaly
+	}
+	var announce []scopedAnomaly
+	for scope, view := range snapshot.models {
+		for id, anomaly := range view.anomalies {
 			if previous != nil {
-				if _, already := previous.anomalies[model][id]; already {
+				if _, already := previous.models[scope].anomalies[id]; already {
 					continue
 				}
 			}
-			key := pairKey{model, id}
+			key := modelMetricKey{channel: id, model: scope.model, format: scope.format, tier: scope.tier, stream: scope.stream}
 			if last, announced := e.anomalyNotified[key]; announced && now.Sub(last) < anomalyRenotifyAfter {
 				continue
 			}
 			e.anomalyNotified[key] = now
 			if !quiet {
-				announce = append(announce, anomaly)
+				announce = append(announce, scopedAnomaly{scope, anomaly})
 			}
 		}
 	}
 	for key, at := range e.anomalyNotified {
-		if _, flagged := snapshot.anomalies[key.model][key.channel]; !flagged && now.Sub(at) >= anomalyRenotifyAfter {
+		scope := metricScope{key.model, key.format, key.tier, key.stream}
+		if _, flagged := snapshot.models[scope].anomalies[key.channel]; !flagged && now.Sub(at) >= anomalyRenotifyAfter {
 			delete(e.anomalyNotified, key)
 		}
+	}
+	if snapshot.dropped > 0 && (previous == nil || snapshot.dropped > previous.dropped) {
+		e.Logger.Warn("gateway: model metric observations dropped at bounded capacity", "dropped", snapshot.dropped)
 	}
 	e.statsSnap.Store(snapshot)
 	e.statsBuild.Unlock()
 
-	for _, anomaly := range announce {
+	for _, item := range announce {
+		anomaly := item.value
 		e.Logger.Warn("gateway: a channel answers a model with 4xx almost every time", "channel_id", anomaly.Channel, "model", anomaly.Model,
-			"client_errors", anomaly.Client, "attempts", anomaly.Total)
+			"client_errors", anomaly.Client, "attempts", anomaly.Total, "format", item.scope.format, "tier", item.scope.tier, "stream", item.scope.stream)
 		e.Runtime.Announce(anomaly.Channel, channel.EventAnomalousClientErrors, anomaly.Reason())
 	}
 	return snapshot

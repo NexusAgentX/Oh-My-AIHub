@@ -121,3 +121,17 @@ func TestEngineRankingUsesOnlyMatchingModelProtocolStreamAndTier(t *testing.T) {
 		t.Fatal("whole channel history was spread to an unmeasured model")
 	}
 }
+
+func BenchmarkFinishedOutputTPS(b *testing.B) {
+	base := time.Unix(1000, 0)
+	call := &callState{stream: true, format: channel.FormatOpenAIResponses}
+	o := Observation{Found: true, FirstVisibleOutputAt: base, OutputEndAt: base.Add(time.Second), Usage: ledger.Usage{OutputTokens: 100}}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		ms, tps := observedOutputTPS(call, o)
+		if ms == nil || tps == nil {
+			b.Fatal("missing measured interval")
+		}
+	}
+}

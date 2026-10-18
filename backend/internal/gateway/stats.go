@@ -467,50 +467,53 @@ func (a Anomaly) Reason() string {
 func detectAnomalies(models map[string][]pairSums) map[string]map[string]Anomaly {
 	var found map[string]map[string]Anomaly
 	for model, channels := range models {
-		for _, subject := range channels {
-			if subject.total < anomalyMinSamples {
-				continue
-			}
-			ratio := float64(subject.client) / float64(subject.total)
-			if ratio < anomalyMinRatio {
-				continue
-			}
-			var others []float64
-			for _, other := range channels {
-				if other.channel != subject.channel && other.total >= anomalyMinSamples {
-					others = append(others, float64(other.client)/float64(other.total))
-				}
-			}
-			if !clearlyAbove(ratio, others) {
-				continue
-			}
+		if rows := detectScopeAnomalies(model, channels); len(rows) > 0 {
 			if found == nil {
 				found = map[string]map[string]Anomaly{}
 			}
-			if found[model] == nil {
-				found[model] = map[string]Anomaly{}
-			}
-			found[model][subject.channel] = Anomaly{Model: model, Channel: subject.channel, Total: subject.total, Client: subject.client}
+			found[model] = rows
 		}
 	}
 	return found
 }
 
-// clearlyAbove reports whether ratio stands out from the 4xx shares of the other
-// channels: they are all below anomalyOthersBelow (which includes there being
-// none), or it is at least anomalyFactor times their median.
-func clearlyAbove(ratio float64, others []float64) bool {
-	if len(others) == 0 {
-		return true
+// Sort peers once; removing the subject changes only median indexes. Even a
+// saturated 4096-channel scope cannot allocate a peer slice for every subject.
+func detectScopeAnomalies(model string, channels []pairSums) map[string]Anomaly {
+	mature := make([]pairSums, 0, len(channels))
+	for _, row := range channels {
+		if row.total >= anomalyMinSamples {
+			mature = append(mature, row)
+		}
 	}
-	highest := slices.Max(others)
-	if highest < anomalyOthersBelow {
-		return true
+	sort.Slice(mature, func(i, j int) bool {
+		return float64(mature[i].client)/float64(mature[i].total) < float64(mature[j].client)/float64(mature[j].total)
+	})
+	ratioAt := func(i int) float64 { return float64(mature[i].client) / float64(mature[i].total) }
+	var out map[string]Anomaly
+	for i, subject := range mature {
+		ratio := ratioAt(i)
+		if ratio < anomalyMinRatio {
+			continue
+		}
+		n := len(mature) - 1
+		above := n == 0
+		if n > 0 {
+			peer := func(rank int) float64 {
+				if rank >= i {
+					rank++
+				}
+				return ratioAt(rank)
+			}
+			median := (peer((n-1)/2) + peer(n/2)) / 2
+			above = peer(n-1) < anomalyOthersBelow || ratio+1e-9 >= anomalyFactor*median
+		}
+		if above {
+			if out == nil {
+				out = map[string]Anomaly{}
+			}
+			out[subject.channel] = Anomaly{Model: model, Channel: subject.channel, Total: subject.total, Client: subject.client}
+		}
 	}
-	sort.Float64s(others)
-	median := others[len(others)/2]
-	if len(others)%2 == 0 {
-		median = (others[len(others)/2-1] + others[len(others)/2]) / 2
-	}
-	return ratio+1e-9 >= anomalyFactor*median
+	return out
 }

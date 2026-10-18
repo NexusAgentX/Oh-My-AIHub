@@ -68,7 +68,7 @@ describe('attempt timeline segments', () => {
     expect(render(call)).toContain('2.5 tokens/s')
     for (const duration of [0, null]) {
       const markup = render({ ...call, duration_ms: duration, output_tokens_per_second: null })
-      expect(markup).toContain('速度</dt><dd>—</dd>')
+      expect(markup).toContain('有效输出速率</dt><dd>未知</dd>')
       expect(markup).not.toMatch(/Infinity|NaN/)
     }
   })

@@ -14486,10 +14486,28 @@ components:
           items: {$ref: '#/components/schemas/CatalogModel'}
       required: [items]
       additionalProperties: false
+    ModelRoutingMetric:
+      type: object
+      properties:
+        format: {$ref: '#/components/schemas/Format'}
+        tier: {type: string, description: 请求档位；空值代表默认/auto 调用上下文。}
+        stream: {type: boolean}
+        attempts: {type: integer, minimum: 0}
+        successes: {type: integer, minimum: 0}
+        excluded: {type: integer, minimum: 0, description: 客户端错误/主动断开，排除于可用率。}
+        success_rate: {type: [number, 'null'], minimum: 0, maximum: 1}
+        first_output_p50_ms: {type: [number, 'null'], minimum: 0}
+        first_output_samples: {type: integer, minimum: 0}
+        output_tps_p50: {type: [number, 'null'], exclusiveMinimum: 0}
+        output_samples: {type: integer, minimum: 0}
+        min_samples: {type: integer, minimum: 1, description: 对应统计至少达到此样本数才用于自身指标排序。}
+      required: [format, tier, stream, attempts, successes, excluded, success_rate, first_output_p50_ms, first_output_samples, output_tps_p50, output_samples, min_samples]
+      additionalProperties: false
     ModelChannel:
       {
         "type": "object",
         "properties": {
+          "routing_metrics": {"type":"array","items":{"$ref":"#/components/schemas/ModelRoutingMetric"},"description":"该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。"},
           "id": {
             "type": "string",
             "format": "uuid"
@@ -15204,6 +15222,7 @@ components:
     RouteDecision:
       type: object
       properties:
+        missing_capability: {type: string, description: 固定能力 ID 或版本/已验证容量缺失原因，不含请求内容或上游配置。}
         channel: {$ref: '#/components/schemas/ChannelRef'}
         reason: {type: string}
         rank: {type: integer}
@@ -15549,7 +15568,7 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/PriceSnapshot'}
           - {type: 'null'}
-        output_tokens_per_second: {type: [number, 'null']}
+        output_tokens_per_second: {type: [number, 'null'], description: metrics_version=2 的尝试使用可靠可见输出量和实际输出区间；其他历史记录保留原平均速度，不能进入新速率排名或可靠速率聚合。}
         inter_token_p50_ms: {type: [integer, 'null']}
         inter_token_p95_ms: {type: [integer, 'null']}
         response_bytes: {type: [integer, 'null']}

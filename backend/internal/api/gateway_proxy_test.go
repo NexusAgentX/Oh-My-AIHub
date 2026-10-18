@@ -300,6 +300,9 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 			req := httptest.NewRequest(ep.Method, path, bytes.NewReader(body))
 			req.Header.Set("Authorization", "Bearer sk-aih-synthetic")
 			req.Header.Set("Content-Type", contentType)
+			if ep.Protocol == "native-messages" {
+				req.Header.Set("Anthropic-Version", "2023-06-01")
+			}
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, req)
 			if recorder.Code < 200 || recorder.Code >= 300 || seen != 1 {

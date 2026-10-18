@@ -258,7 +258,7 @@ func (b *modelMetricsBook) load(rows []ModelAttemptHistoryRow, now time.Time) {
 		if row.Bucket < floor || row.Bucket > ceiling || row.ModelID == "" || row.ChannelID == "" || row.Tier != requestedMetricTier(row.Format, row.Tier) {
 			continue
 		}
-		if row.Counted < 0 || row.Successes < 0 || row.Successes > row.Counted || row.Excluded < 0 || row.ClientErrors < 0 || row.ClientErrors > row.Excluded || row.Counted+row.Excluded == 0 || row.BeforeEditAttempts < 0 || row.BeforeEditAttempts > row.Counted+row.ClientErrors || row.BeforeEditClientErrors < 0 || row.BeforeEditClientErrors > row.ClientErrors {
+		if row.Counted < 0 || row.Counted > math.MaxUint32 || row.Successes < 0 || row.Successes > row.Counted || row.Excluded < 0 || row.Excluded > math.MaxUint32 || row.ClientErrors < 0 || row.ClientErrors > row.Excluded || row.Counted+row.Excluded == 0 || row.BeforeEditAttempts < 0 || row.BeforeEditAttempts > row.Counted+row.ClientErrors || row.BeforeEditClientErrors < 0 || row.BeforeEditClientErrors > row.ClientErrors {
 			b.dropped++
 			continue
 		}

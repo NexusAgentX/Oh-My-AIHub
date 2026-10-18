@@ -197,6 +197,10 @@ func (o *Observer) responseOutput(root jsonObject) string {
 		if nonemptyOutputString(root.get("delta")) {
 			return o.markOutput("audio")
 		}
+	case outputTagIs(tag, "response.image_generation_call.partial_image"):
+		if nonemptyOutputString(root.get("partial_image_b64")) {
+			return o.markOutput("image")
+		}
 	case outputTagIs(tag, "response.output_item.added") || outputTagIs(tag, "response.output_item.done"):
 		return o.outputPart(root.get("item"))
 	case outputTagIs(tag, "response.content_part.added") || outputTagIs(tag, "response.content_part.done"):
@@ -328,7 +332,7 @@ func (o *Observer) trackEffectiveOutput(raw []byte, at time.Time) {
 				kind = "image"
 			}
 		})
-		if nonemptyOutputString(root.get("b64_json")) {
+		if nonemptyOutputString(root.get("b64_json")) || nonemptyOutputString(root.get("partial_image_b64")) {
 			kind = "image"
 		}
 	}

@@ -94,7 +94,7 @@ func medianOf(values []float64) (float64, bool) {
 		return 0, false
 	}
 	sort.Float64s(values)
-	return values[len(values)/2], true
+	return (values[(len(values)-1)/2] + values[len(values)/2]) / 2, true
 }
 
 // Rank filters and orders the candidates of a request.
@@ -103,12 +103,21 @@ func Rank(in RankInput) []Candidate {
 	for _, id := range in.Excluded {
 		excluded[id] = true
 	}
+	var positions map[string]int
+	if in.Mode == routing.ModeManual {
+		positions = make(map[string]int, len(in.Order))
+		for index, id := range in.Order {
+			if _, exists := positions[id]; !exists {
+				positions[id] = index
+			}
+		}
+	}
 	var pool []Candidate
 	for _, candidate := range in.Candidates {
 		if excluded[candidate.ChannelID] {
 			continue
 		}
-		if in.Mode == routing.ModeManual && !slices.Contains(in.Order, candidate.ChannelID) {
+		if _, selected := positions[candidate.ChannelID]; in.Mode == routing.ModeManual && !selected {
 			// A channel missing from the manual list counts as unticked.
 			continue
 		}
@@ -151,7 +160,7 @@ func Rank(in RankInput) []Candidate {
 		return math.Inf(-1)
 	}
 
-	position := func(candidate Candidate) int { return slices.Index(in.Order, candidate.ChannelID) }
+	position := func(candidate Candidate) int { return positions[candidate.ChannelID] }
 	sort.SliceStable(pool, func(i, j int) bool {
 		a, b := pool[i], pool[j]
 		switch in.Mode {

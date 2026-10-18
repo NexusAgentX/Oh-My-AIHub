@@ -11,7 +11,11 @@ import (
 	"net/textproto"
 )
 
-type imageMultipart struct{ models []entry }
+type imageMultipart struct {
+	models      []entry
+	mask        bool
+	inputImages int
+}
 
 // scanImageMultipart validates a bounded in-memory multipart body without
 // writing temporary files. Only model-field bytes are spliced on forwarding;
@@ -93,6 +97,14 @@ func scanImageMultipart(body []byte, contentType string) (RequestFacts, objectSc
 			return RequestFacts{}, objectScan{}, nil, err
 		}
 		name := disp["name"]
+		if next > valueStart {
+			switch name {
+			case "mask":
+				plan.mask = true
+			case "image", "image[]", "images", "images[]":
+				plan.inputImages++
+			}
+		}
 		if disp["filename"] == "" {
 			switch name {
 			case "model", "size", "quality", "background", "stream":

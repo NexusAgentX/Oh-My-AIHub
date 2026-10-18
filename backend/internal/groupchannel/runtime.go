@@ -395,7 +395,7 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 						capacity[c.ScenarioID+"/"+c.Kind] = c.VerifiedLower
 					}
 					for _, setting := range p.Settings {
-						if capability := setting.RoutingCapability(); capability != "" {
+						if capability := scopedSettingCapability(setting); capability != "" {
 							evidence["upstream_protocol/"+capability] = true
 						}
 					}

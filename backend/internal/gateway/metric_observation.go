@@ -26,8 +26,11 @@ func actualMetricTier(format channel.Format, value string) string {
 		prefix = "gemini:"
 	}
 	value = strings.TrimPrefix(value, prefix)
+	if prefix == "openai:" && value == "priority" {
+		value = "fast"
+	}
 	switch value {
-	case "default", "standard", "priority", "flex", "fast", "batch", "scale":
+	case "default", "standard", "priority", "flex", "fast", "ultrafast", "batch", "scale":
 		return prefix + value
 	default:
 		return "unknown"

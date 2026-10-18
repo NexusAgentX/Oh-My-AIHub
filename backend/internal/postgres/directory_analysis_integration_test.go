@@ -39,6 +39,7 @@ func TestDirectoryQualityAggregationAndVisibility(t *testing.T) {
 	add(o.goodID, "client_error", 5, 10)
 	add(o.goodID, "client_disconnected", 5, 20)
 	add(o.goodID, "completed", 300, 3000)
+	attempts[len(attempts)-1]["metrics_version"] = 2
 	raw, _ := json.Marshal(attempts)
 	exec("UPDATE calls SET attempts=$2,stream=true,created_at=$3,output_tokens_per_second=25,diagnostics='{\"max_frame_gap_ms\":80}' WHERE id=$1", o.fellBack, raw, now.Add(-time.Hour))
 	// A previous-period non-streaming success must not enter TTFT/speed, even if old data has fields.

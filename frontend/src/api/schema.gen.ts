@@ -4379,7 +4379,26 @@ export interface components {
         CatalogModelList: {
             items: components["schemas"]["CatalogModel"][];
         };
+        ModelRoutingMetric: {
+            format: components["schemas"]["Format"];
+            /** @description 请求档位；空值代表默认/auto 调用上下文。 */
+            tier: string;
+            stream: boolean;
+            attempts: number;
+            successes: number;
+            /** @description 客户端错误/主动断开，排除于可用率。 */
+            excluded: number;
+            success_rate: number | null;
+            first_output_p50_ms: number | null;
+            first_output_samples: number;
+            output_tps_p50: number | null;
+            output_samples: number;
+            /** @description 对应统计至少达到此样本数才用于自身指标排序。 */
+            min_samples: number;
+        };
         ModelChannel: {
+            /** @description 该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。 */
+            routing_metrics?: components["schemas"]["ModelRoutingMetric"][];
             /** Format: uuid */
             id: string;
             name: string;
@@ -4733,6 +4752,8 @@ export interface components {
             duration_ms: number;
         };
         RouteDecision: {
+            /** @description 固定能力 ID 或版本/已验证容量缺失原因，不含请求内容或上游配置。 */
+            missing_capability?: string;
             channel: components["schemas"]["ChannelRef"];
             reason: string;
             rank: number;
@@ -5060,6 +5081,7 @@ export interface components {
             client_user_agent: string | null;
             attempts: components["schemas"]["CallAttempt"][];
             price_snapshot: components["schemas"]["PriceSnapshot"] | null;
+            /** @description metrics_version=2 的尝试使用可靠可见输出量和实际输出区间；其他历史记录保留原平均速度，不能进入新速率排名或可靠速率聚合。 */
             output_tokens_per_second: number | null;
             inter_token_p50_ms: number | null;
             inter_token_p95_ms: number | null;

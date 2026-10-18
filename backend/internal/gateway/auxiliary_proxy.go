@@ -280,6 +280,16 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(503, "candidate_source_unavailable", "候选读取失败")
 		return
 	}
+	// Count/list/context operations require their own endpoint capability,
+	// not execution of every inference feature described in their input.
+	requestedCapabilities := nativeRequirements{protocol: ep.Protocol, capabilities: endpointRequirement(ep.ID)}
+	filtered := make([]CandidateRecord, 0, len(records))
+	for _, record := range records {
+		if missingRequestCapability(record.Candidate, requestedCapabilities, r.Header) == "" {
+			filtered = append(filtered, record)
+		}
+	}
+	records = filtered
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
 	if encoding != "" {
 		selection.Required = append(selection.Required, nativeZstdRequirement(r.URL.Path))
@@ -338,7 +348,11 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	selected, err := SelectAuxiliary(records, selection)
 	if err != nil {
-		fail(503, "required_capability_evidence_missing", "没有符合权限及所需有效能力证据的渠道")
+		if errors.Is(err, ErrManualOrderRequired) {
+			fail(400, "manual_order_required", "没有适用的已保存手动渠道顺序")
+			return
+		}
+		fail(503, "required_capability_evidence_missing", "没有符合权限、协议版本及有效能力证据的渠道："+ep.ID)
 		return
 	}
 	candidates := make([]Candidate, 0, len(selected))

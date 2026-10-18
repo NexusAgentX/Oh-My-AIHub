@@ -93,3 +93,23 @@ func BenchmarkModelMetricRecordExistingSeries(b *testing.B) {
 		book.record(key, sample, now)
 	}
 }
+
+func BenchmarkModelMetricSnapshotSaturated(b *testing.B) {
+	now := time.Now()
+	e := NewEngine(Dependencies{Now: func() time.Time { return now }})
+	latency, tps := 100, 80.0
+	for i := range maxMetricSeries {
+		key := modelMetricKey{channel: fmt.Sprint(i), model: "approved-model", format: channel.FormatOpenAIResponses, stream: true}
+		for _, at := range []time.Time{now.Add(-5 * time.Minute), now} {
+			e.modelMetrics.record(key, modelMetricSample{end: EndCompleted, firstOutputMS: &latency, outputTPS: &tps}, at)
+		}
+	}
+	e.RefreshStats()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		e.RefreshStats()
+	}
+	b.ReportMetric(maxMetricSeries, "series")
+	b.ReportMetric(maxMetricBuckets, "buckets")
+}

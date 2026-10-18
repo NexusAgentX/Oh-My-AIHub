@@ -51,6 +51,8 @@ func TestEffectiveOutputRecognizesNonTextWithoutInventingVisibleTokens(t *testin
 		{channel.FormatGemini, `{"candidates":[{"content":{"parts":[{"functionCall":{"name":"synthetic","args":{}}}]}}]}`, "tool"},
 		{channel.FormatGemini, `{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"audio/pcm","data":"YQ=="}}]}}]}`, "audio"},
 		{channel.FormatOpenAIImages, `{"data":[{"b64_json":"YQ=="}]}`, "image"},
+		{channel.FormatOpenAIImages, `{"type":"image_generation.partial_image","partial_image_b64":"YQ=="}`, "image"},
+		{channel.FormatOpenAIResponses, `{"type":"response.image_generation_call.partial_image","partial_image_b64":"YQ=="}`, "image"},
 	} {
 		t.Run(string(test.format)+test.kind, func(t *testing.T) {
 			o := NewObserver(test.format, true, "text/event-stream")
