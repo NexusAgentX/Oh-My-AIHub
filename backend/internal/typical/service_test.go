@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -241,5 +242,66 @@ func TestUnavailableWarmupStartsUnknownAndRecoversWithoutAffectingSettlement(t *
 	}
 	if snap, _ = service.Snapshot(); snap == nil {
 		t.Fatal("statistics failed to recover")
+	}
+}
+
+type countedRepo struct {
+	*memoryRepo
+	scans atomic.Int64
+}
+
+func (r *countedRepo) Calls(ctx context.Context, scan Scan, limit int) ([]RawCall, error) {
+	r.scans.Add(1)
+	return r.memoryRepo.Calls(ctx, scan, limit)
+}
+func TestAutomaticNotificationsCoalesceWithoutRepeatedScansAndManualStillRefreshes(t *testing.T) {
+	in, c, samples, at := fixture(t)
+	repo := &countedRepo{memoryRepo: memory(c)}
+	repo.raw = []RawCall{rawSample(samples[0])}
+	service, err := New(t.Context(), repo, sourceFunc(func(context.Context) (Input, error) { return in, nil }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.now = func() time.Time { return at }
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { defer close(done); service.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	wait := func(ready func() bool) {
+		t.Helper()
+		deadline := time.NewTimer(3 * time.Second)
+		defer deadline.Stop()
+		tick := time.NewTicker(time.Millisecond)
+		defer tick.Stop()
+		for !ready() {
+			select {
+			case <-tick.C:
+			case <-deadline.C:
+				t.Fatal("worker did not reach expected boundary")
+			}
+		}
+	}
+	wait(func() bool {
+		snap, status := service.Snapshot()
+		return snap != nil && !status.Running && !status.Pending
+	})
+	before := repo.scans.Load()
+	previous, _ := service.Snapshot()
+	for range 10 {
+		service.Notify()
+	}
+	wait(func() bool { _, status := service.Snapshot(); return !status.Running && !status.Pending })
+	if repo.scans.Load() != before {
+		t.Fatal("unchanged probe notifications repeatedly scanned calls")
+	}
+	if err = service.Trigger(); err != nil {
+		t.Fatal(err)
+	}
+	wait(func() bool {
+		snap, status := service.Snapshot()
+		return snap != previous && !status.Running && !status.Pending
+	})
+	if repo.scans.Load() <= before {
+		t.Fatal("explicit refresh did not ingest new calls")
 	}
 }

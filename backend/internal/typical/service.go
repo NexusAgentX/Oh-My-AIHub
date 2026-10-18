@@ -21,6 +21,7 @@ type Service struct {
 	prices  atomic.Pointer[costIndex]
 	mu      sync.Mutex
 	status  Status
+	force   bool
 	now     func() time.Time
 }
 
@@ -64,20 +65,21 @@ func (s *Service) Update(ctx context.Context, actor string, c Config) (Config, e
 	return next, err
 }
 func (s *Service) Notify() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status.Pending = true
 	select {
 	case s.request <- struct{}{}:
 	default:
 	}
-	s.mu.Lock()
-	s.status.Pending = true
-	s.mu.Unlock()
 }
 func (s *Service) Trigger() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	select {
 	case s.request <- struct{}{}:
-		s.mu.Lock()
+		s.force = true
 		s.status.Pending = true
-		s.mu.Unlock()
 		return nil
 	default:
 		return ErrBusy
@@ -97,10 +99,14 @@ func (s *Service) Run(ctx context.Context) {
 	defer tick.Stop()
 	last := time.Time{}
 	for {
+		force := false
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.request:
+			s.mu.Lock()
+			force, s.force = s.force, false
+			s.mu.Unlock()
 		case <-tick.C:
 			c, err := s.repo.Config(ctx)
 			if err != nil {
@@ -111,10 +117,33 @@ func (s *Service) Run(ctx context.Context) {
 			}
 		}
 		run, cancel := context.WithTimeout(ctx, 30*time.Second)
+		if !force && s.unchanged(run, last) {
+			cancel()
+			s.mu.Lock()
+			s.status.Pending = len(s.request) != 0
+			s.mu.Unlock()
+			continue
+		}
 		_ = s.Step(run)
 		cancel()
 		last = s.now()
 	}
+}
+
+// Probe completions rebuild the fleet too. Repeated notifications with the
+// same pricing inputs do not repeatedly scan business history inside a period.
+// Explicit manual refreshes still ingest new calls immediately.
+func (s *Service) unchanged(ctx context.Context, last time.Time) bool {
+	current := s.current.Load()
+	if current == nil || last.IsZero() {
+		return false
+	}
+	c, err := s.repo.Config(ctx)
+	if err != nil || s.now().Sub(last) >= time.Duration(c.IntervalSeconds)*time.Second {
+		return false
+	}
+	in, err := s.source.Current(ctx)
+	return err == nil && current.InputVersion == InputVersion(in, c)
 }
 func (s *Service) Step(ctx context.Context) (err error) {
 	if !s.running.CompareAndSwap(false, true) {
@@ -122,7 +151,7 @@ func (s *Service) Step(ctx context.Context) (err error) {
 	}
 	s.mu.Lock()
 	s.status.LastAttempt = s.now()
-	s.status.Pending = false
+	s.status.Pending = len(s.request) != 0
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
