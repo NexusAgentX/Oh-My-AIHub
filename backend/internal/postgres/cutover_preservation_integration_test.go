@@ -104,6 +104,15 @@ func TestCutoverReadOnlyEvidenceProtectsIndividualBalancesAndLegacyCiphertext(t 
 	if _, err = pool.Exec(ctx, `ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_immutable`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = pool.Exec(ctx, `ALTER TABLE calls DROP CONSTRAINT calls_ledger_tx_fk`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = reader.Inspect(ctx, &before); !errors.Is(err, cutover.ErrIncomplete) {
+		t.Fatal("missing historical ledger FK accepted with unchanged rows", err)
+	}
+	if _, err = pool.Exec(ctx, `ALTER TABLE calls ADD CONSTRAINT calls_ledger_tx_fk FOREIGN KEY(ledger_tx_id) REFERENCES ledger_transactions(id)`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = pool.Exec(ctx, `INSERT INTO calls(account_id,format,stream,outcome)VALUES($1,'openai_chat',false,'in_progress')`, members[0].ID); err != nil {
 		t.Fatal(err)
 	}

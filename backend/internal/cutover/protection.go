@@ -54,12 +54,47 @@ func (p Pending) Check() error {
 }
 
 type Manifest struct {
-	Format           string   `json:"format"`
-	MigrationVersion int64    `json:"migration_version"`
-	Pending          Pending  `json:"pending"`
-	Tables           []Digest `json:"tables"`
-	Guards           []Guard  `json:"guards"`
-	Checks           []Check  `json:"checks"`
+	Format           string       `json:"format"`
+	MigrationVersion int64        `json:"migration_version"`
+	Pending          Pending      `json:"pending"`
+	Tables           []Digest     `json:"tables"`
+	Guards           []Guard      `json:"guards"`
+	Checks           []Check      `json:"checks"`
+	Constraints      []Constraint `json:"constraints"`
+}
+
+type Constraint struct {
+	Table  string `json:"table"`
+	Name   string `json:"name"`
+	Kind   string `json:"kind"`
+	SHA256 string `json:"sha256"`
+}
+
+// These are retained history/ledger links, not the intentionally retired
+// calls-to-global-model link. Every other existing protected PK/FK/unique
+// constraint is captured too; this minimum prevents an incomplete baseline.
+var requiredConstraints = []string{"accounts/accounts_pkey", "api_keys/api_keys_pkey", "channels/channels_pkey", "calls/calls_pkey", "ledger_accounts/ledger_accounts_pkey", "ledger_transactions/ledger_transactions_pkey", "ledger_entries/ledger_entries_pkey", "c2c_orders/c2c_orders_pkey", "c2c_trades/c2c_trades_pkey", "calls/calls_ledger_tx_fk", "calls/calls_final_channel_id_fkey", "ledger_entries/ledger_entries_transaction_id_fkey", "ledger_entries/ledger_entries_ledger_account_id_fkey", "c2c_trades/c2c_trades_ledger_tx_id_fkey"}
+
+func validateConstraints(m Manifest) error {
+	seen := map[string]bool{}
+	for _, c := range m.Constraints {
+		key := c.Table + "/" + c.Name
+		if !validIdentifier(c.Table) || !validIdentifier(c.Name) || seen[key] || LegacyConfiguration(c.Table) || c.Table == "goose_db_version" || !slices.Contains([]string{"p", "f", "u"}, c.Kind) || len(c.SHA256) != 64 {
+			return ErrInvalid
+		}
+		if _, err := hex.DecodeString(c.SHA256); err != nil {
+			return ErrInvalid
+		}
+		seen[key] = true
+	}
+	if m.MigrationVersion != 0 || len(m.Tables) != 0 {
+		for _, key := range requiredConstraints {
+			if !seen[key] {
+				return ErrIncomplete
+			}
+		}
+	}
+	return nil
 }
 
 type Guard struct {
@@ -242,6 +277,9 @@ func (m Manifest) Validate() error {
 	if err := validateIntegrity(m); err != nil {
 		return err
 	}
+	if err := validateConstraints(m); err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	tables := map[string]bool{}
 	for _, d := range m.Tables {
@@ -318,6 +356,15 @@ func Compare(before, after Manifest) ([]Difference, error) {
 		current[d.Rule.Table+"/"+d.Rule.Scope] = d
 	}
 	changes := []Difference{}
+	constraints := map[string]Constraint{}
+	for _, c := range after.Constraints {
+		constraints[c.Table+"/"+c.Name] = c
+	}
+	for _, c := range before.Constraints {
+		if constraints[c.Table+"/"+c.Name] != c {
+			changes = append(changes, Difference{c.Table, c.Name, "constraint_changed"})
+		}
+	}
 	guards := map[string]Guard{}
 	for _, g := range after.Guards {
 		guards[g.Name] = g

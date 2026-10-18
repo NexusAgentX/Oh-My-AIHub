@@ -57,6 +57,14 @@ func manifest(t *testing.T, version int64, ledger Digest) Manifest {
 	for _, name := range CheckNames {
 		m.Checks = append(m.Checks, Check{Name: name})
 	}
+	for _, key := range requiredConstraints {
+		table, name, _ := strings.Cut(key, "/")
+		kind := "f"
+		if strings.HasSuffix(name, "_pkey") {
+			kind = "p"
+		}
+		m.Constraints = append(m.Constraints, Constraint{Table: table, Name: name, Kind: kind, SHA256: strings.Repeat("c", 64)})
+	}
 	return m
 }
 func TestProtectionPlanKeepsAllFinancialAndHistoricalTablesAndCiphertext(t *testing.T) {

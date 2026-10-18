@@ -103,6 +103,10 @@ func (s Store) Inspect(ctx context.Context, before *cutover.Manifest) (cutover.M
 			return out, err
 		}
 	}
+	out.Constraints, err = constraints(ctx, tx)
+	if err != nil {
+		return out, err
+	}
 	var rules []cutover.Rule
 	if before == nil {
 		rules, err = cutover.Plan(tables)

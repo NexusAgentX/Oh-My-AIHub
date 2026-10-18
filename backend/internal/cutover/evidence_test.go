@@ -53,3 +53,17 @@ func TestLedgerGuardChangesCannotHideBehindIdenticalRows(t *testing.T) {
 		t.Fatal("missing ledger guard accepted")
 	}
 }
+
+func TestHistoryConstraintChangesAreDetectedWithIdenticalRows(t *testing.T) {
+	before := manifest(t, 14, digest(t, "synthetic"))
+	after := manifest(t, 26, digest(t, "synthetic"))
+	after.Constraints[0].SHA256 = strings.Repeat("d", 64)
+	differences, err := Compare(before, after)
+	if err != nil || len(differences) != 1 || differences[0].Reason != "constraint_changed" {
+		t.Fatal("schema protection silently lost", differences, err)
+	}
+	after.Constraints = after.Constraints[1:]
+	if !errors.Is(after.Validate(), ErrIncomplete) {
+		t.Fatal("required identity/ledger constraint missing")
+	}
+}
