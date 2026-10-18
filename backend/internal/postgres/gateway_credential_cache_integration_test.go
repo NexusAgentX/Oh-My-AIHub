@@ -9,7 +9,7 @@ import (
 // memory (ADR-0036, decision 8) until the channel gets another key or is
 // deleted: what reaches the upstream always follows the database.
 func TestGatewayOpensAChannelKeyOnceUntilTheKeyChangesOrTheChannelIsDeleted(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -38,7 +38,7 @@ func TestGatewayOpensAChannelKeyOnceUntilTheKeyChangesOrTheChannelIsDeleted(t *t
 	}
 
 	// Another key in the database means another key upstream, at once.
-	e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"api_key": "sk-second-0002"})
+	e.replaceGroupedChannelKey(sharer, channelID, "sk-second-0002")
 	callOK()
 	callOK()
 	keys := sent()
@@ -55,7 +55,7 @@ func TestGatewayOpensAChannelKeyOnceUntilTheKeyChangesOrTheChannelIsDeleted(t *t
 	}
 
 	// A deleted channel is not routed to any more, and nothing is decrypted for it.
-	if recorder := e.api(sharer, http.MethodDelete, "/api/channels/"+channelID, nil); recorder.Code != http.StatusNoContent {
+	if recorder := e.deleteGroupedChannel(sharer, channelID); recorder.Code != http.StatusNoContent {
 		t.Fatalf("delete channel = %d", recorder.Code)
 	}
 	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", request, nil).Code; code != http.StatusServiceUnavailable {

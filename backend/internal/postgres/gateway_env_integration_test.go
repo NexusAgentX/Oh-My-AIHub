@@ -315,6 +315,7 @@ func newEnvOnMode(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, config
 	e := &env{t: t, pool: pool, store: store, cached: cached, catalog: catalogService, logs: logs, service: service, people: map[string]person{}, keyring: keyring}
 	e.groups, e.groupStore = groups, repo
 	if grouped {
+		groups.Removed = keyring.ForgetCredential
 		groups.CredentialScope = func(r groupchannel.Record) (string, error) {
 			value, err := keyring.OpenCredential(r.ID, r.Credential)
 			if err != nil {

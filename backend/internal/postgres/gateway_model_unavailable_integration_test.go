@@ -70,7 +70,7 @@ func TestGatewayFallsBackWhenTheUpstreamSaysTheModelDoesNotExist(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := newEnv(t)
+			e := newGroupEnv(t)
 			consumer := e.member("consumer", "100")
 			sharer := e.member("sharer", "0")
 			wrong := replyWith(t, tc.status, tc.body)
@@ -114,7 +114,7 @@ func TestGatewayFallsBackWhenTheUpstreamSaysTheModelDoesNotExist(t *testing.T) {
 // When every channel lacks the model the client still gets an upstream answer:
 // the last one, as with any other failure on every channel.
 func TestGatewayAnswersWithTheLastUpstreamErrorWhenEveryChannelLacksTheModel(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	const lastBody = `{"error":{"message":"The model ` + "`gpt-b`" + ` does not exist","type":"invalid_request_error","code":"model_not_found"}}`
@@ -171,7 +171,7 @@ func TestGatewayHandsBackRequestErrorsByteForByteAndDoesNotCountThem(t *testing.
 			"{\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"Invalid JSON payload received. Unknown name \\\"foo\\\" at 'generation_config': Cannot find field.\",\n" +
 				"    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n"},
 	}
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	var current atomic.Pointer[requestError]

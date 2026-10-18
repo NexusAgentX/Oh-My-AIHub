@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
 
@@ -56,7 +60,7 @@ func (p probe) expect(t *testing.T, step string, status int, reached bool) *http
 }
 
 func TestSecurityChangesTakeEffectBeforeTheAdminCallReturns(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -103,21 +107,25 @@ func TestSecurityChangesTakeEffectBeforeTheAdminCallReturns(t *testing.T) {
 	})
 
 	t.Run("the owner unlists the channel", func(t *testing.T) {
-		e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"status": "unlisted"})
+		e.patchGroupedChannel(sharer, channelID, map[string]any{"status": "unlisted"})
 		p.expect(t, "unlisted channel", http.StatusServiceUnavailable, false)
-		e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"status": "listed"})
+		e.patchGroupedChannel(sharer, channelID, map[string]any{"status": "listed"})
 		p.expect(t, "listed again", http.StatusOK, true)
 	})
 
 	t.Run("an administrator takes the channel down", func(t *testing.T) {
-		e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+channelID+"/suspend", map[string]any{"reason": "abuse report"})
+		if reply := e.api(e.admin, http.MethodPost, "/api/admin/group-channels/"+channelID+"/moderate", map[string]any{"reason": "abuse report"}); reply.Code != http.StatusNoContent {
+			t.Fatal(reply.Code, reply.Body.String())
+		}
 		p.expect(t, "suspended channel", http.StatusServiceUnavailable, false)
-		e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+channelID+"/unsuspend", map[string]any{"reason": "cleared"})
+		if reply := e.api(e.admin, http.MethodPost, "/api/admin/group-channels/"+channelID+"/moderate", map[string]any{"reason": ""}); reply.Code != http.StatusNoContent {
+			t.Fatal(reply.Code, reply.Body.String())
+		}
 		p.expect(t, "restored channel", http.StatusOK, true)
 	})
 
 	t.Run("the owner deletes the channel", func(t *testing.T) {
-		if recorder := e.api(sharer, http.MethodDelete, "/api/channels/"+channelID, nil); recorder.Code != http.StatusNoContent {
+		if recorder := e.deleteGroupedChannel(sharer, channelID); recorder.Code != http.StatusNoContent {
 			t.Fatalf("delete channel = %d %s", recorder.Code, recorder.Body.String())
 		}
 		p.expect(t, "deleted channel", http.StatusServiceUnavailable, false)
@@ -126,7 +134,7 @@ func TestSecurityChangesTakeEffectBeforeTheAdminCallReturns(t *testing.T) {
 }
 
 func TestNewKeysWorkAtOnce(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -147,104 +155,172 @@ func TestNewKeysWorkAtOnce(t *testing.T) {
 	}
 }
 
-// Every other kind of change an administrator, a channel owner or a user can
-// make is seen by the very next request too.
 func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
-	relay := okUpstream(t)
-	other := okUpstream(t)
+	relay, other := okUpstream(t), okUpstream(t)
 	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
 	keyID, secret := e.defaultKey(consumer)
 	p := probe{e: e, secret: secret, upstrms: []*upstream{relay, other}}
-	cost := func(step string, recorder *httptest.ResponseRecorder) int64 {
+	cost := func(step string, reply *httptest.ResponseRecorder) int64 {
 		t.Helper()
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("%s: %d %s", step, recorder.Code, recorder.Body.String())
+		if reply.Code != 200 {
+			t.Fatalf("%s: %d %s", step, reply.Code, reply.Body.String())
 		}
-		return e.callRow(recorder.Header().Get("X-AIHub-Request-Id")).CostNano
+		return e.callRow(reply.Header().Get("X-AIHub-Request-Id")).CostNano
 	}
-	patchChannel := func(body map[string]any) {
+	currentModel := func(modelID string) market.GroupModel {
 		t.Helper()
-		e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, body)
-	}
-	models := func(multiplier string, formats []string, extra map[string]any) []any {
-		model := map[string]any{"model_id": "gpt-test", "multiplier": multiplier, "formats": formats}
-		for name, value := range extra {
-			model[name] = value
+		row, err := e.groupStore.Get(context.Background(), channelID)
+		if err != nil {
+			t.Fatal(err)
 		}
-		return []any{model}
+		for _, m := range marketSnapshot(t, e.store).Models {
+			if m.GroupID == row.GroupID && m.ModelID == modelID {
+				return m
+			}
+		}
+		t.Fatal("missing group offering", modelID)
+		return market.GroupModel{}
+	}
+	installProbe := func(modelID string, formats []string) {
+		t.Helper()
+		row, err := e.groupStore.Get(context.Background(), channelID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		model := currentModel(modelID)
+		var group market.Group
+		for _, g := range marketSnapshot(t, e.store).Groups {
+			if g.ID == row.GroupID {
+				group = g
+			}
+		}
+		tests := map[channel.Format]channel.FormatTest{}
+		for _, f := range formats {
+			tests[channel.Format(f)] = channel.FormatTest{OK: true, TestedAt: time.Now()}
+		}
+		saved, err := e.groupStore.SaveProbe(context.Background(), row, group, model, groupchannel.Probe{ChannelID: row.ID, GroupModelID: model.ID, Binding: groupchannel.ProbeBinding(row, group, model), Tests: tests, TestedAt: time.Now()})
+		if err != nil || !saved {
+			t.Fatal("synthetic key probe", err)
+		}
+		if err = e.groups.Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
 	}
 	allFormats := []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
-
-	base := cost("baseline", p.expect(t, "baseline", http.StatusOK, true)) // (1000 x 10 + 500 x 20) / 1e6 points
+	baselineReply := p.expect(t, "baseline", 200, true)
+	base := cost("baseline", baselineReply)
 	if base != 20_000_000 {
-		t.Fatalf("baseline cost = %d", base)
+		t.Fatalf("baseline cost=%d", base)
 	}
-
-	// Model: price, enabled, deleted.
-	input, output := mustAmount(t, "20"), mustAmount(t, "40")
-	e.patchModelFixture("gpt-test", catalog.ModelPatch{InputPrice: &input, OutputPrice: &output})
-	if got := cost("after a price change", p.expect(t, "after a price change", http.StatusOK, true)); got != 2*base {
-		t.Fatalf("cost after doubling the price = %d, want %d", got, 2*base)
-	}
-	disabled := false
-	e.patchModelFixture("gpt-test", catalog.ModelPatch{Enabled: &disabled})
-	p.expect(t, "disabled model", http.StatusNotFound, false)
-	enabled := true
-	e.patchModelFixture("gpt-test", catalog.ModelPatch{Enabled: &enabled})
-	p.expect(t, "enabled model", http.StatusOK, true)
-	e.addModelFixture(catalog.Model{ID: "late-model", DisplayName: "Late", Enabled: true, InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "1")})
-	late := func() *httptest.ResponseRecorder {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"late-model"}`), nil)
-	}
-	if got := late().Code; got != http.StatusServiceUnavailable {
-		t.Fatalf("new model without a channel = %d", got)
-	}
-	patchChannel(map[string]any{"models": append(models("1", allFormats, nil), map[string]any{"model_id": "late-model", "multiplier": "1", "formats": []string{"openai_chat"}})})
-	if got := late().Code; got != http.StatusOK {
-		t.Fatalf("new model once a channel offers it = %d", got)
-	}
-	patchChannel(map[string]any{"models": models("1", allFormats, nil)})
-	if got := late().Code; got != http.StatusServiceUnavailable {
-		t.Fatalf("model the channel stopped offering = %d", got)
-	}
-	if err := e.catalog.Delete(context.Background(), e.admin.id, "late-model"); err != nil {
+	baselineID := baselineReply.Header().Get("X-AIHub-Request-Id")
+	var frozenPrice string
+	if err := e.pool.QueryRow(context.Background(), `SELECT price_snapshot::text FROM calls WHERE id=$1`, baselineID).Scan(&frozenPrice); err != nil {
 		t.Fatal(err)
 	}
-	if got := late().Code; got != http.StatusNotFound {
-		t.Fatalf("deleted model = %d", got)
+	model := currentModel("gpt-test")
+	e.publishGroupFixture(market.Changes{Quotes: []market.Quote{{ID: marketID(t), GroupModelID: model.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(t, "20"), Output: mustAmount(t, "40"), CacheWrite: mustAmount(t, "12.5"), CacheRead: mustAmount(t, "1")}}}})
+	if got := cost("new quote", p.expect(t, "new quote", 200, true)); got != 2*base {
+		t.Fatalf("quote cost=%d", got)
 	}
-
-	// Channel: multiplier, formats, upstream name, address and credential, advanced settings.
-	patchChannel(map[string]any{"models": models("2", allFormats, nil)})
-	if got := cost("after a multiplier change", p.expect(t, "after a multiplier change", http.StatusOK, true)); got != 4*base {
-		t.Fatalf("cost with multiplier 2 and doubled prices = %d, want %d", got, 4*base)
+	var afterPrice string
+	if err := e.pool.QueryRow(context.Background(), `SELECT price_snapshot::text FROM calls WHERE id=$1`, baselineID).Scan(&afterPrice); err != nil || afterPrice != frozenPrice {
+		t.Fatal("quote update rewrote history", err)
 	}
-	patchChannel(map[string]any{"models": models("1", []string{"anthropic"}, nil)})
-	p.expect(t, "a format the channel no longer serves", http.StatusServiceUnavailable, false)
-	patchChannel(map[string]any{"models": models("1", allFormats, nil)})
-	p.expect(t, "the format is served again", http.StatusOK, true)
-
-	patchChannel(map[string]any{"models": models("1", allFormats, map[string]any{"upstream_model": "renamed-upstream"})})
-	p.expect(t, "upstream rename", http.StatusOK, true)
+	e.publishGroupFixture(market.Changes{Governance: []market.Change[market.ModelRule]{{Value: market.ModelRule{ModelID: "gpt-test", Disabled: true, Reason: "synthetic governance"}}}})
+	p.expect(t, "governed model", 404, false)
+	rule := marketSnapshot(t, e.store).Governance[0]
+	rule.Disabled = false
+	e.publishGroupFixture(market.Changes{Governance: []market.Change[market.ModelRule]{{Value: rule, BaseRevision: rule.Revision}}})
+	p.expect(t, "restored model", 200, true)
+	model = currentModel("gpt-test")
+	lateModel := market.GroupModel{ID: marketID(t), GroupID: model.GroupID, ModelID: "late-model", ModelType: "text", Enabled: true}
+	e.publishGroupFixture(market.Changes{Models: []market.Change[market.GroupModel]{{Value: lateModel}}, Quotes: []market.Quote{{ID: marketID(t), GroupModelID: lateModel.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(t, "1"), Output: mustAmount(t, "1")}}}})
+	late := func() *httptest.ResponseRecorder {
+		return e.call(secret, "POST", "/v1/chat/completions", []byte(`{"model":"late-model"}`), nil)
+	}
+	if got := late().Code; got != 503 {
+		t.Fatalf("new offering without key probe=%d", got)
+	}
+	installProbe("late-model", []string{"openai_chat"})
+	if got := late().Code; got != 200 {
+		t.Fatalf("new offering after probe=%d", got)
+	}
+	e.patchGroupedChannel(sharer, channelID, map[string]any{"models": []any{map[string]any{"group_model_id": lateModel.ID, "excluded": true, "discount": "1"}}})
+	if got := late().Code; got != 503 {
+		t.Fatalf("excluded offering=%d", got)
+	}
+	lateModel = currentModel("late-model")
+	now := time.Now().UTC()
+	lateModel.DeletedAt = &now
+	e.publishGroupFixture(market.Changes{Models: []market.Change[market.GroupModel]{{Value: lateModel, BaseRevision: lateModel.Revision}}})
+	if got := late().Code; got != 404 {
+		t.Fatalf("deleted offering=%d", got)
+	}
+	model = currentModel("gpt-test")
+	e.patchGroupedChannel(sharer, channelID, map[string]any{"models": []any{map[string]any{"group_model_id": model.ID, "discount": "2"}}})
+	if got := cost("discount", p.expect(t, "discount", 200, true)); got != 4*base {
+		t.Fatalf("discount cost=%d", got)
+	}
+	installProbe("gpt-test", []string{"anthropic"})
+	p.expect(t, "removed chat callability", 503, false)
+	installProbe("gpt-test", allFormats)
+	p.expect(t, "restored chat callability", 200, true)
+	model = currentModel("gpt-test")
+	model.UpstreamModel = "renamed-upstream"
+	e.publishGroupFixture(market.Changes{Models: []market.Change[market.GroupModel]{{Value: model, BaseRevision: model.Revision}}})
+	p.expect(t, "changed engine before new key probe", 503, false)
+	installProbe("gpt-test", allFormats)
+	p.expect(t, "upstream rename", 200, true)
 	if last := relay.inference(); !strings.Contains(string(last[len(last)-1].Body), `"renamed-upstream"`) {
-		t.Fatalf("the upstream received %s, want the renamed model", last[len(last)-1].Body)
+		t.Fatal("upstream rename not applied")
 	}
-	patchChannel(map[string]any{"api_key": "rotated-upstream-key", "advanced": map[string]any{"user_agent": "relay-agent/2"}})
-	p.expect(t, "credential and user agent change", http.StatusOK, true)
-	last := relay.inference()
-	if seen := last[len(last)-1].Header; seen.Get("Authorization") != "Bearer rotated-upstream-key" || seen.Get("User-Agent") != "relay-agent/2" {
-		t.Fatalf("upstream saw Authorization %q and User-Agent %q", seen.Get("Authorization"), seen.Get("User-Agent"))
+	e.replaceGroupedChannelKey(sharer, channelID, "rotated-upstream-key")
+	e.patchGroupedChannel(sharer, channelID, map[string]any{"overrides": map[string]any{"user_agent": "relay-agent/2"}})
+	// The controlled engine accepts this synthetic UA too; no real report is asserted.
+	installProbe("gpt-test", allFormats)
+	p.expect(t, "key and UA", 200, true)
+	if last := relay.inference(); last[len(last)-1].Header.Get("Authorization") != "Bearer rotated-upstream-key" || last[len(last)-1].Header.Get("User-Agent") != "relay-agent/2" {
+		t.Fatal("key/UA change not applied")
 	}
-	patchChannel(map[string]any{"base_url": other.server.URL})
-	before := len(other.inference())
-	p.expect(t, "address change", http.StatusOK, true)
-	if len(other.inference()) != before+1 {
-		t.Fatal("the request did not go to the new address")
+	row, err := e.groupStore.Get(context.Background(), channelID)
+	if err != nil {
+		t.Fatal(err)
 	}
-	patchChannel(map[string]any{"base_url": relay.server.URL})
+	var address market.Address
+	directory := marketSnapshot(t, e.store)
+	for _, link := range directory.GroupAddresses {
+		if link.GroupID == row.GroupID {
+			for _, a := range directory.Addresses {
+				if a.ID == link.AddressID {
+					address = a
+				}
+			}
+		}
+	}
+	originalURL := address.BaseURL
+	otherURL, err := url.Parse(other.server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.installGroupLoopback(otherURL.Port())
+	otherURL.Host = net.JoinHostPort("example.com", otherURL.Port())
+	address.BaseURL = otherURL.String()
+	e.publishGroupFixture(market.Changes{Addresses: []market.Change[market.Address]{{Value: address, BaseRevision: address.Revision}}})
+	beforeOtherAddress := len(other.inference())
+	p.expect(t, "address change without new engine report", 200, true)
+	if len(other.inference()) != beforeOtherAddress+1 {
+		t.Fatal("address update did not take effect")
+	}
+	for _, a := range marketSnapshot(t, e.store).Addresses {
+		if a.ID == address.ID {
+			address = a
+		}
+	}
+	address.BaseURL = originalURL
+	e.publishGroupFixture(market.Changes{Addresses: []market.Change[market.Address]{{Value: address, BaseRevision: address.Revision}}})
 
 	// Key: allowed models, aliases, expiry, budget.
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"allowed_models": []string{"claude-test"}})
@@ -303,12 +379,12 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 		t.Fatalf("models = %v", ids)
 	}
 	for _, id := range []string{channelID, second} {
-		e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+id, map[string]any{"status": "unlisted"})
+		e.patchGroupedChannel(sharer, id, map[string]any{"status": "unlisted"})
 	}
 	if ids := listed(); len(ids) != 0 {
 		t.Fatalf("models with every channel unlisted = %v", ids)
 	}
-	e.apiJSON(sharer, http.StatusOK, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"status": "listed"})
+	e.patchGroupedChannel(sharer, channelID, map[string]any{"status": "listed"})
 	if ids := listed(); len(ids) != 1 {
 		t.Fatalf("models with a channel listed again = %v", ids)
 	}
@@ -319,7 +395,7 @@ func TestEveryKindOfChangeReachesTheNextRequest(t *testing.T) {
 // after every call that returned, the next request of that key sees the new
 // state, and the traffic of the others is never disturbed.
 func TestKeyStateChangesAreSeenAtOnceUnderLoad(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -365,10 +441,10 @@ func TestKeyStateChangesAreSeenAtOnceUnderLoad(t *testing.T) {
 // up by the periodic rebuild, and until then it is not seen: the snapshots are
 // really what the requests read.
 func TestPeriodicRebuildPicksUpChangesMadeBehindTheServer(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	keyID, secret := e.defaultKey(consumer)
-	fast := e.store.Cached(slog.New(slog.NewTextHandler(io.Discard, nil)), func(c *snapshot.Config) { c.Interval = 50 * time.Millisecond })
+	fast := e.store.Cached(slog.New(slog.NewTextHandler(io.Discard, nil)), func(c *snapshot.Config) { c.Interval = 50 * time.Millisecond; c.Loader = e.groups.Wrap(c.Loader) })
 	ctx := context.Background()
 	if err := fast.Cache.Load(ctx); err != nil {
 		t.Fatal(err)

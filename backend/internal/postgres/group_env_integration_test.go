@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -194,6 +195,65 @@ func (e *env) installGroupLoopback(port string) {
 	e.engine.Outbound = testOutbound{client: &client}
 	e.engineDeps.Outbound = e.engine.Outbound
 	e.t.Cleanup(copy.CloseIdleConnections)
+}
+
+// The patch contains the actual group API fields. The helper supplies its
+// optimistic revision by reading through the same owner-scoped handler.
+func (e *env) patchGroupedChannel(owner person, id string, fields map[string]any) map[string]any {
+	e.t.Helper()
+	current := e.apiJSON(owner, 200, "GET", "/api/group-channels/"+id, nil)
+	body := map[string]any{"revision": current["revision"]}
+	for k, v := range fields {
+		body[k] = v
+	}
+	return e.apiJSON(owner, 200, "PATCH", "/api/group-channels/"+id, body)
+}
+
+func (e *env) deleteGroupedChannel(owner person, id string) *httptest.ResponseRecorder {
+	e.t.Helper()
+	current := e.apiJSON(owner, 200, "GET", "/api/group-channels/"+id, nil)
+	return e.api(owner, "DELETE", "/api/group-channels/"+id, map[string]any{"revision": current["revision"]})
+}
+
+// These credential-cache tests declare that their controlled engine continues
+// to accept the same formats after rotating its synthetic key. Rebind only the
+// fixture's prior minimal callability facts; never create a capability report.
+func (e *env) replaceGroupedChannelKey(owner person, id, key string) {
+	e.t.Helper()
+	ctx := context.Background()
+	before, err := e.groupStore.Snapshot(ctx)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.patchGroupedChannel(owner, id, map[string]any{"api_key": key})
+	r, err := e.groupStore.Get(ctx, id)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	d := marketSnapshot(e.t, e.store)
+	var group market.Group
+	models := map[string]market.GroupModel{}
+	for _, g := range d.Groups {
+		if g.ID == r.GroupID {
+			group = g
+		}
+	}
+	for _, m := range d.Models {
+		models[m.ID] = m
+	}
+	for _, p := range before.Probes {
+		if p.ChannelID != id {
+			continue
+		}
+		p.Binding = groupchannel.ProbeBinding(r, group, models[p.GroupModelID])
+		p.TestedAt = time.Now()
+		if saved, err := e.groupStore.SaveProbe(ctx, r, group, models[p.GroupModelID], p); err != nil || !saved {
+			e.t.Fatal("rotated callability fixture rejected", err)
+		}
+	}
+	if err := e.groups.Refresh(ctx); err != nil {
+		e.t.Fatal(err)
+	}
 }
 
 func TestGroupedFixtureStartsEmptyAndUsesApprovedQuotes(t *testing.T) {
