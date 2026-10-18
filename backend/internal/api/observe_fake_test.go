@@ -51,6 +51,7 @@ func (s *fakeObserveStore) matching(filter observe.CallFilter) []observe.CallRec
 	for _, record := range s.calls {
 		if (filter.AccountID != "" && record.Account.ID != filter.AccountID) ||
 			(filter.ScopeChannelID != "" && !touches(record, filter.ScopeChannelID)) ||
+			(filter.Format != "" && record.Format != filter.Format) ||
 			(filter.Outcome != "" && record.Outcome != filter.Outcome) {
 			continue
 		}

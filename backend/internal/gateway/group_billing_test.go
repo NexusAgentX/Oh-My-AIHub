@@ -30,9 +30,22 @@ func groupBook(t *testing.T, currency string, price int64) *quotepricing.Book {
 func TestGroupCandidateNeverBorrowsCatalogPriceOrFXDiscount(t *testing.T) {
 	model := catalog.Model{ID: "main", InputPrice: 999_000_000_000, PriceCurrency: "CNY"}
 	candidate := Candidate{Quotes: groupBook(t, "USD", 2_000_000_000), MultiplierNano: ledger.UnitRate / 2, RateNano: 7 * ledger.UnitRate, FXDiscount: true}
-	call := &callState{started: time.Now(), billingFacts: quotepricing.Facts{MainReliable: true}}
+	// A timestamp can contain the catalog's decimal digits; only inspect the
+	// pricing fields when asserting that catalog pricing was not borrowed.
+	call := &callState{started: time.Date(2026, 10, 18, 0, 0, 0, 999361686, time.UTC), billingFacts: quotepricing.Facts{MainReliable: true}}
 	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, model, candidate, ledger.Usage{InputTokens: 1_000_000}, settings.Settings{USDCNYRateNano: 7 * ledger.UnitRate}, 0)
-	if err != nil || priced.Cost.String() != "7" || !strings.Contains(string(snapshot), "quote-v1") || strings.Contains(string(snapshot), "999") {
+	var saved struct {
+		BasePrices map[string]string `json:"base_prices"`
+		FXDiscount bool              `json:"fx_discount"`
+		Currency   string            `json:"currency"`
+		GroupQuote struct {
+			Components []struct {
+				QuoteID string `json:"quote_id"`
+			} `json:"components"`
+		} `json:"group_quote"`
+	}
+	decodeErr := json.Unmarshal(snapshot, &saved)
+	if err != nil || decodeErr != nil || priced.Cost.String() != "7" || saved.BasePrices["input"] != "2" || saved.Currency != "USD" || saved.FXDiscount || len(saved.GroupQuote.Components) != 1 || saved.GroupQuote.Components[0].QuoteID != "quote-v1" {
 		t.Fatalf("cost=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
 	}
 	model.ID = "unknown"

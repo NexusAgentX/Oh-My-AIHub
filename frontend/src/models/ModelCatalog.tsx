@@ -60,7 +60,7 @@ function ModelCard({ model, priceLabel = '最低参考价', renderDetails }: { m
 
 const formatOptions = [
   { key: 'all' as const, label: '全部' },
-  ...formats.map((key) => ({ key, label: formatLabels[key] })),
+  ...formats.filter((key) => key !== 'openai_images').map((key) => ({ key, label: formatLabels[key] })),
 ]
 
 export function ModelCatalog({ models, priceLabel, renderDetails }: { models: CatalogModel[] } & CatalogOptions) {

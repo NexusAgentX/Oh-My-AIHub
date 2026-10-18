@@ -43,10 +43,11 @@ type Observation struct {
 // Observer scans a response as it streams past, without ever altering it and
 // without validating its shape: anything it cannot parse is ignored.
 type Observer struct {
-	billableUnits []quotepricing.Unit
-	format        channel.Format
-	stream        bool
-	sse           bool
+	imageCompleted bool
+	billableUnits  []quotepricing.Unit
+	format         channel.Format
+	stream         bool
+	sse            bool
 
 	eventData    []byte
 	eventSkip    bool
@@ -132,6 +133,10 @@ func (o *Observer) frame(at time.Time) {
 }
 
 func (o *Observer) writeSSE(chunk []byte, at time.Time) {
+	lineLimit := maxLineBuffer
+	if o.format == channel.FormatOpenAIImages {
+		lineLimit = maxRequestBytes
+	}
 	for len(chunk) > 0 {
 		if o.pendingCR {
 			o.pendingCR = false
@@ -152,7 +157,7 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 		}
 		if newline < 0 {
 			if !o.skipLine {
-				if len(o.line)+len(chunk) > maxLineBuffer {
+				if len(o.line)+len(chunk) > lineLimit {
 					o.skipLine, o.line, o.parseLimited, o.eventSkip = true, nil, true, true
 				} else {
 					o.line = append(o.line, chunk...)
@@ -161,7 +166,7 @@ func (o *Observer) writeSSE(chunk []byte, at time.Time) {
 			return
 		}
 		if !o.skipLine {
-			if len(o.line)+newline <= maxLineBuffer {
+			if len(o.line)+newline <= lineLimit {
 				o.line = append(o.line, chunk[:newline]...)
 				o.handleLine(o.line, at)
 			} else {
@@ -185,7 +190,11 @@ func (o *Observer) handleLine(line []byte, at time.Time) {
 		return
 	}
 	payload = bytes.TrimPrefix(payload, []byte(" "))
-	if len(o.eventData)+len(payload)+1 > maxLineBuffer {
+	lineLimit := maxLineBuffer
+	if o.format == channel.FormatOpenAIImages {
+		lineLimit = maxRequestBytes
+	}
+	if len(o.eventData)+len(payload)+1 > lineLimit {
 		o.eventSkip, o.parseLimited = true, true
 		o.eventData = o.eventData[:0]
 		return
@@ -296,6 +305,21 @@ func (o *Observer) absorb(raw []byte) {
 		o.observeStop(raw)
 	}
 	switch o.format {
+	case channel.FormatOpenAIImages:
+		if o.imageCompleted {
+			break
+		}
+		result, facts := ObserveNativeImage(raw)
+		if result.Found {
+			o.usage, o.found = result.Usage, true
+		}
+		if len(facts.Units) > 0 {
+			o.billableUnits = facts.Units
+			o.imageCompleted = true
+		}
+		if result.ProtocolError {
+			o.protocolError = true
+		}
 	case channel.FormatOpenAIChat:
 		if keys&keyUsage != 0 {
 			o.absorbChat(raw)

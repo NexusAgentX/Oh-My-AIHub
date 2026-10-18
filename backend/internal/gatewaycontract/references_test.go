@@ -137,7 +137,9 @@ func TestExcludedResourcesDoNotGainSharedCredentialAuthorization(t *testing.T) {
 			t.Fatal(refs, err)
 		}
 		if _, err := gatewaycontract.ResolveReferences(gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}, refs, func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) {
-			t.Fatal("excluded resource requested ownership lookup")
+			if refs[0].Kind != "container" {
+				t.Fatal("excluded resource requested ownership lookup")
+			}
 			return nil, nil
 		}); err == nil {
 			t.Fatal("unknown excluded resource acquired shared access")

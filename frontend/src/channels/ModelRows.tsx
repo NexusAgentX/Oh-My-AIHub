@@ -42,7 +42,7 @@ function CustomPrices({ row, onChange }: { row: ModelRow; onChange: (prices: Cus
 function FormatToggles({ row, onChange }: { row: ModelRow; onChange: (formats: Format[]) => void }) {
   return (
     <span aria-label="支持的格式" className="format-toggles" role="group">
-      {formats.map((format) => {
+      {formats.filter((format) => format !== 'openai_images').map((format) => {
         const on = row.formats.includes(format)
         const passed = row.passed[format]
         return (
