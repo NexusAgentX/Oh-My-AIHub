@@ -90,7 +90,7 @@ function endReasonLabel(reason: string) {
   return reason ? `结束原因：${reason}` : '无原始错误'
 }
 
-/** 渠道统计：24h/7d 成功率、收入与今日上限进度、首响应与速度 p50/p95、调用趋势、按模型收入、失败分布与最近失败。 */
+/** 渠道统计：24h/7d 成功率、收入、首响应与速度 p50/p95、调用趋势、按模型收入、失败分布与最近失败。 */
 export function ChannelStatsPanel({ channelId, onViewFailures }: { channelId: string; onViewFailures?: () => void }) {
   const [range, setRange] = useState<'24h' | '7d'>('7d')
   const stats = useChannelStats(channelId)
@@ -175,9 +175,7 @@ function ChannelMetricValues({ data }: { data: ChannelStats }) {
         value={formatRatio(data.last_24h.success_rate)}
       />
       <Metric
-        hint={data.today.daily_cap ? `上限 ${formatPoints(data.today.daily_cap)}` : '未设上限'}
         label="今日收入"
-        progress={data.today.progress === null ? undefined : Number(data.today.progress) * 100}
         value={formatPoints(data.today.revenue)}
       />
       <Metric hint={`p95 ${formatMs(data.ttft_p95_ms)}`} label="首响应 p50" value={formatMs(data.ttft_p50_ms)} />

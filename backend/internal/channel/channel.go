@@ -18,7 +18,8 @@ var (
 	ErrNotFound = errors.New("channel not found")
 	ErrConflict = errors.New("channel state conflict")
 	// ErrSuspended rejects owner changes of a channel an administrator took down.
-	ErrSuspended = errors.New("channel is suspended")
+	ErrSuspended    = errors.New("channel is suspended")
+	ErrGroupManaged = errors.New("channel is managed through a supplier group")
 	// ErrModelNameTaken rejects a custom model whose name is in the catalog.
 	ErrModelNameTaken = errors.New("custom model name is a catalog model")
 )
@@ -58,7 +59,6 @@ type Advanced struct {
 	HeaderRules      HeaderRules
 	ConcurrencyLimit *int32
 	RPMLimit         *int32
-	DailyRevenueCap  *money.Amount
 	TTFTTimeoutMS    *int32
 	RequestTimeoutMS *int32
 	IdleTimeoutMS    *int32
@@ -135,6 +135,7 @@ type Today struct {
 }
 
 type Channel struct {
+	GroupID         *string
 	ID              string
 	Owner           Owner
 	Name            string
@@ -287,9 +288,6 @@ func ValidateAdvanced(advanced Advanced) error {
 	if !inRange(advanced.ConcurrencyLimit, 1, 1<<30) || !inRange(advanced.RPMLimit, 1, 1<<30) ||
 		!inRange(advanced.TTFTTimeoutMS, 1000, 600000) || !inRange(advanced.RequestTimeoutMS, 1000, 3600000) || !inRange(advanced.IdleTimeoutMS, 1000, 3600000) ||
 		!inRange(advanced.CooldownFailures, 1, 100) || !inRange(advanced.CooldownSeconds, 10, 86400) {
-		return ErrInvalidInput
-	}
-	if advanced.DailyRevenueCap != nil && *advanced.DailyRevenueCap <= 0 {
 		return ErrInvalidInput
 	}
 	return nil

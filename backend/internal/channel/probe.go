@@ -273,6 +273,9 @@ func (s *Service) Test(ctx context.Context, ownerID, id string, request TestRequ
 	if err != nil {
 		return nil, Channel{}, err
 	}
+	if channel.GroupID != nil {
+		return nil, Channel{}, ErrGroupManaged
+	}
 	formats := request.Formats
 	if len(formats) == 0 {
 		formats = Formats

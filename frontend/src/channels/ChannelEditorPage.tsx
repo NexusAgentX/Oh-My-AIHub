@@ -2,9 +2,9 @@ import { SupplierRecognition } from '../sharing/SupplierRecognition'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
-import type { Channel, ChannelDetail, ChannelCall } from '../api/types'
-import { CallExplorer, FormatTags, channelCallColumns, outcomeLabels, outcomeOptions } from '../calls'
-import { rangeFrom, type RangePreset } from '../money/time'
+import type { Channel, ChannelDetail } from '../api/types'
+import { FormatTags } from '../calls'
+import { ChannelCalls } from './ChannelCalls'
 import {
   Badge,
   Button,
@@ -16,7 +16,6 @@ import {
   PageHeader,
   PasswordField,
   QueryBoundary,
-  Segmented,
   SuccessMessage,
   Switch,
   Tabs,
@@ -328,50 +327,6 @@ function ChannelWizard() {
   )
 }
 
-function ChannelCalls({ channelId }: { channelId: string }) {
-  const [range, setRange] = useState<RangePreset>('today')
-  const [outcome, setOutcome] = useState('')
-  const params = { from: rangeFrom(range), outcome: outcome || undefined }
-  return (
-    <Card title="调用">
-      <CallExplorer<ChannelCall>
-        key={JSON.stringify(params)}
-        pageSize={20}
-        caption="渠道调用"
-        chargedLabel="收入"
-        columns={channelCallColumns()}
-        listPath={`/api/channels/${channelId}/calls`}
-        params={params}
-        streamPath={`/api/channels/${channelId}/calls/stream`}
-        toolbar={
-          <div className="call-filters">
-            <Segmented
-              label="时间范围"
-              onChange={setRange}
-              options={[
-                { key: 'today', label: '今天' },
-                { key: '7d', label: '7 天' },
-                { key: '30d', label: '30 天' },
-              ]}
-              value={range}
-            />
-            <label className="filter-select">
-              <span className="visually-hidden">结果</span>
-              <select aria-label="结果" className="input select-input" onChange={(event) => setOutcome(event.target.value)} value={outcome}>
-                <option value="">结果：全部</option>
-                {outcomeOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {outcomeLabels[item]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        }
-      />
-    </Card>
-  )
-}
 
 /** 配置草稿留在父组件，切换分区时不丢失未保存的值。 */
 function ChannelEditForm({ detail }: { detail: ChannelDetail }) {

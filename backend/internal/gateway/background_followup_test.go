@@ -18,6 +18,8 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -385,5 +387,84 @@ func TestRegisteredBackgroundSurvivesRevocationWithOriginalCredentialAndQuote(t 
 	e.pollBackgroundJob(t.Context(), job)
 	if len(store.finished) != 1 {
 		t.Fatal("duplicate terminal observation charged twice")
+	}
+}
+
+func TestGroupBackgroundRetainsOriginalEntranceOrderKeyAndQuote(t *testing.T) {
+	for _, budget := range []int32{1, 2} {
+		t.Run(fmt.Sprint(budget), func(t *testing.T) {
+			var mu sync.Mutex
+			seen := []string{}
+			var engine *Engine
+			e, store, job := followupFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				seen = append(seen, r.URL.Path)
+				mu.Unlock()
+				if r.Header.Get("Authorization") != "Bearer synthetic-upstream-key" {
+					t.Error("saved background request changed upstream credential")
+				}
+				if _, why := engine.Runtime.Check("channel", Limits{Concurrency: 1}, time.Now()); why != "concurrency" {
+					t.Error("background address fallback released its original slot")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if strings.HasPrefix(r.URL.Path, "/one/") {
+					w.WriteHeader(503)
+					return
+				}
+				_, _ = io.WriteString(w, `{"id":"resp_followup","status":"completed","usage":{"input_tokens":100,"output_tokens":20}}`)
+			})
+			engine = e
+			var metadata backgroundMetadata
+			if err := json.Unmarshal(job.Metadata, &metadata); err != nil {
+				t.Fatal(err)
+			}
+			base := metadata.Candidate.BaseURL
+			metadata.Candidate.GroupID = "saved-group"
+			metadata.Candidate.GroupModelID = "saved-offer"
+			metadata.Candidate.CredentialScope = "saved-credential-scope"
+			metadata.Candidate.Entrances = []Entrance{{ID: "one", BaseURL: base + "/one"}, {ID: "two", BaseURL: base + "/two"}}
+			metadata.Candidate.BaseURL = base + "/removed-live-address"
+			metadata.Settings.DefaultMaxAttempts = budget
+			quote := market.Quote{ID: "saved-quote", GroupModelID: "saved-offer", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: 1_000_000_000, Output: 5_000_000_000}}
+			frozen, err := quotepricing.Freeze(quotepricing.Book{GroupID: "saved-group", GroupRevision: 1, Offers: map[string]quotepricing.Offer{"main": {ModelID: "main", Revision: 1, Quote: quote}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			metadata.Candidate.Quotes = frozen
+			job.Metadata, err = json.Marshal(metadata)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store.jobs[job.CallID] = job
+			// Live routing is unavailable/revoked; polling uses only the registered
+			// execution snapshot. Changing a mutable source quote cannot reprice it.
+			store.key.Enabled = false
+			quote.Prices.Input = 999_000_000_000
+			if err = e.RestoreBackground(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			e.pollBackgroundJob(t.Context(), job)
+			mu.Lock()
+			actual := append([]string{}, seen...)
+			mu.Unlock()
+			want := []string{"/one/v1/responses/resp_followup"}
+			if budget == 2 {
+				want = append(want, "/two/v1/responses/resp_followup")
+			}
+			if strings.Join(actual, ",") != strings.Join(want, ",") {
+				t.Fatal("saved entrance sequence/budget lost", actual)
+			}
+			if budget == 2 {
+				got := store.finished[job.CallID]
+				if got.Cost.String() != "0.0002" || got.Bill == nil || !store.jobs[job.CallID].Settled || e.inflight.Count("consumer") != 0 {
+					t.Fatal("background lost original group billing or release", got.Cost.String())
+				}
+			} else {
+				if len(store.finished) != 0 || store.jobs[job.CallID].Settled {
+					t.Fatal("failed poll pretended to settle")
+				}
+				e.releaseBackground(job.CallID)
+			}
+		})
 	}
 }

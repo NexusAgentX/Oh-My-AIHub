@@ -7,8 +7,6 @@ package supplierpg
 
 import (
 	"context"
-
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
 const deleteEndpoints = `-- name: DeleteEndpoints :exec
@@ -73,24 +71,23 @@ func (q *Queries) InsertSupplier(ctx context.Context, arg InsertSupplierParams) 
 
 const listChannelListings = `-- name: ListChannelListings :many
 SELECT c.id,c.name,c.summary,c.description,c.base_url,c.owner_id,a.display_name AS owner_name,
- c.concurrency_limit,c.rpm_limit,c.daily_revenue_cap_nano,c.cooldown_seconds
+ c.concurrency_limit,c.rpm_limit,c.cooldown_seconds
 FROM channels c JOIN accounts a ON a.id=c.owner_id
 WHERE c.deleted_at IS NULL AND c.status='listed' AND a.status='active'
 ORDER BY c.id
 `
 
 type ListChannelListingsRow struct {
-	ID                  string
-	Name                string
-	Summary             string
-	Description         string
-	BaseUrl             string
-	OwnerID             string
-	OwnerName           string
-	ConcurrencyLimit    *int32
-	RpmLimit            *int32
-	DailyRevenueCapNano *money.Amount
-	CooldownSeconds     *int32
+	ID               string
+	Name             string
+	Summary          string
+	Description      string
+	BaseUrl          string
+	OwnerID          string
+	OwnerName        string
+	ConcurrencyLimit *int32
+	RpmLimit         *int32
+	CooldownSeconds  *int32
 }
 
 func (q *Queries) ListChannelListings(ctx context.Context) ([]ListChannelListingsRow, error) {
@@ -112,7 +109,6 @@ func (q *Queries) ListChannelListings(ctx context.Context) ([]ListChannelListing
 			&i.OwnerName,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.CooldownSeconds,
 		); err != nil {
 			return nil, err

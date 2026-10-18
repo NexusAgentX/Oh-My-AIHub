@@ -53,6 +53,16 @@ type KeyAuth struct {
 // Candidate is one channel offering the requested model in the requested
 // format.
 type Candidate struct {
+	GroupID            string
+	GroupModelID       string
+	CredentialScope    string
+	ConfigRevision     int64
+	CredentialRevision int64
+	Entrances          []Entrance
+	// Evidence is compiled from current approved reports off the request path.
+	// Keys are proof-layer + "/" + independent capability ID.
+	Evidence         map[string]bool
+	VerifiedCapacity map[string]int64
 	// Quotes is immutable. A missing group offer never uses a global price.
 	Quotes         *quotepricing.Book
 	ChannelID      string
@@ -73,9 +83,19 @@ type Candidate struct {
 	Custom *channel.CustomPrices
 }
 
+// Entrance is a selected stable group-address relationship. The sequence is
+// frozen with the candidate; it is not a capability or ownership dimension.
+type Entrance struct {
+	ID      string
+	BaseURL string
+}
+
 // PricingModel is the model a candidate bills: the catalog model itself, or
 // for a custom model the channel's own point prices without tiers.
 func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
+	if c.GroupID != "" && !c.ValidOffering(model.ID) {
+		return catalog.Model{ID: model.ID}
+	}
 	if c.Quotes != nil {
 		offer, ok := c.Quotes.Offers[model.ID]
 		if !ok {
@@ -92,6 +112,17 @@ func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
 		return model
 	}
 	return c.Custom.Model(model.ID)
+}
+
+func (c Candidate) ValidOffering(modelID string) bool {
+	if c.GroupID == "" {
+		return true
+	}
+	if c.Quotes == nil || c.Quotes.GroupID != c.GroupID {
+		return false
+	}
+	offer, ok := c.Quotes.Offers[modelID]
+	return ok && offer.Quote.ID != "" && offer.Quote.GroupModelID == c.GroupModelID
 }
 
 // ChannelStats is the 24h health of a channel computed from call attempts. The
@@ -126,20 +157,24 @@ type CallInsert struct {
 
 // Attempt is one try on one channel (calls.attempts).
 type Attempt struct {
-	UpstreamModel    string           `json:"upstream_model"`
-	Timeouts         *AttemptTimeouts `json:"timeouts"`
-	OffsetMS         *int             `json:"offset_ms"`
-	ReusedConnection *bool            `json:"reused_connection"`
-	FallbackReason   string           `json:"fallback_reason"`
-	Channel          *AttemptChannel  `json:"channel"`
-	StatusCode       *int             `json:"status_code"`
-	ErrorCode        *string          `json:"error_code"`
-	ErrorMessage     *string          `json:"error_message"`
-	ConnectMS        *int             `json:"connect_ms"`
-	TTFTMS           *int             `json:"ttft_ms"`
-	DurationMS       *int             `json:"duration_ms"`
-	ResponseByte     *int64           `json:"response_bytes"`
-	EndReason        string           `json:"end_reason"`
+	AddressID          string           `json:"address_id,omitempty"`
+	FallbackLevel      string           `json:"fallback_level,omitempty"`
+	SelectionFinal     *bool            `json:"selection_final,omitempty"`
+	SelectionLatencyMS *int             `json:"selection_latency_ms,omitempty"`
+	UpstreamModel      string           `json:"upstream_model"`
+	Timeouts           *AttemptTimeouts `json:"timeouts"`
+	OffsetMS           *int             `json:"offset_ms"`
+	ReusedConnection   *bool            `json:"reused_connection"`
+	FallbackReason     string           `json:"fallback_reason"`
+	Channel            *AttemptChannel  `json:"channel"`
+	StatusCode         *int             `json:"status_code"`
+	ErrorCode          *string          `json:"error_code"`
+	ErrorMessage       *string          `json:"error_message"`
+	ConnectMS          *int             `json:"connect_ms"`
+	TTFTMS             *int             `json:"ttft_ms"`
+	DurationMS         *int             `json:"duration_ms"`
+	ResponseByte       *int64           `json:"response_bytes"`
+	EndReason          string           `json:"end_reason"`
 }
 
 type AttemptChannel struct {
@@ -211,7 +246,6 @@ type Store interface {
 	TouchKey(ctx context.Context, keyID string, at time.Time) error
 	Points(ctx context.Context, accountID string) (ledger.Points, error)
 	KeySpend(ctx context.Context, keyID string, now time.Time) (Spend, error)
-	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 	Candidates(ctx context.Context, modelID string, format channel.Format) ([]Candidate, error)
 	// AttemptHistory reports the attempts of calls started at or after since,
 	// grouped as AttemptHistoryRow says, for the statistics window to start
@@ -326,6 +360,4 @@ type Browse interface {
 	OnlineChannels(ctx context.Context) ([]OnlineChannel, error)
 	Home(ctx context.Context, accountID string, dayStart time.Time) (HomeStats, error)
 	RecentCalls(ctx context.Context, accountID string, limit int) ([]CallSummary, error)
-	// ChannelRevenue is the revenue booked on a channel since the given time.
-	ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error)
 }

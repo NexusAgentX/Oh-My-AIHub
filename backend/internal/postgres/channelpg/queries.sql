@@ -1,9 +1,9 @@
 -- name: InsertChannel :exec
 INSERT INTO channels (
     id, owner_id, name, base_url, api_key_ciphertext, api_key_nonce, api_key_key_id, status,
-    user_agent, header_rules, concurrency_limit, rpm_limit, daily_revenue_cap_nano,
+    user_agent, header_rules, concurrency_limit, rpm_limit,
     ttft_timeout_ms, request_timeout_ms, cooldown_failures, cooldown_seconds, idle_timeout_ms, summary, description
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, sqlc.narg(idle_timeout_ms), sqlc.arg(summary), sqlc.arg(description));
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, sqlc.narg(idle_timeout_ms), sqlc.arg(summary), sqlc.arg(description));
 
 -- name: InsertChannelModel :exec
 INSERT INTO channel_models (
@@ -24,8 +24,8 @@ SELECT EXISTS (SELECT 1 FROM models WHERE id = $1);
 DELETE FROM channel_models WHERE channel_id = $1;
 
 -- name: GetChannel :one
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
@@ -36,23 +36,23 @@ WHERE c.id = $1 AND c.deleted_at IS NULL;
 SELECT status FROM channels WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
 -- name: ListOwnerChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.owner_id = $1 AND c.deleted_at IS NULL
+WHERE c.owner_id = $1 AND c.deleted_at IS NULL AND c.market_group_id IS NULL
 ORDER BY c.created_at DESC, c.id DESC;
 
 -- name: ListAdminChannels :many
-SELECT c.id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
-       c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
+SELECT c.id, c.market_group_id, c.owner_id, c.name, c.summary, c.description, c.base_url, c.status, c.suspended_reason, c.user_agent, c.header_rules,
+       c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms,
        c.cooldown_failures, c.cooldown_seconds, c.created_at, c.updated_at,
        a.username AS owner_username, a.display_name AS owner_display_name
 FROM channels c
 JOIN accounts a ON a.id = c.owner_id
-WHERE c.deleted_at IS NULL
+WHERE c.deleted_at IS NULL AND c.market_group_id IS NULL
   AND (sqlc.arg(status)::text = '' OR c.status = sqlc.arg(status))
   AND (sqlc.arg(owner_id)::text = '' OR c.owner_id::text = sqlc.arg(owner_id))
   AND (sqlc.arg(query)::text = '' OR c.name ILIKE '%' || sqlc.arg(query) || '%'
@@ -87,8 +87,8 @@ WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: UpdateChannelAdvanced :exec
 UPDATE channels SET
-    user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5, daily_revenue_cap_nano = $6,
-    ttft_timeout_ms = $7, request_timeout_ms = $8, idle_timeout_ms = sqlc.narg(idle_timeout_ms), cooldown_failures = $9, cooldown_seconds = $10, updated_at = now()
+    user_agent = $2, header_rules = $3, concurrency_limit = $4, rpm_limit = $5,
+    ttft_timeout_ms = $6, request_timeout_ms = $7, idle_timeout_ms = sqlc.narg(idle_timeout_ms), cooldown_failures = $8, cooldown_seconds = $9, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: SoftDeleteChannel :execrows

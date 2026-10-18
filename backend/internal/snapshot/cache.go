@@ -205,6 +205,12 @@ func (c *Cache) Invalidate(ctx context.Context, domains Domain) {
 	}
 }
 
+// InvalidateChecked gives publication/configuration services an acknowledged
+// barrier: a committed edit is not reported as usable before its rebuild.
+func (c *Cache) InvalidateChecked(ctx context.Context, domains Domain) error {
+	return c.run(ctx, domains, false)
+}
+
 // step is one snapshot as the cache drives it.
 type step struct {
 	name       string

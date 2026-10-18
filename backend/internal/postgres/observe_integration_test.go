@@ -243,7 +243,7 @@ func TestObserveChannelCallsAndStats(t *testing.T) {
 	if hourly := asList(t, stats["hourly"]); len(hourly) != 24 {
 		t.Fatalf("hourly = %d buckets", len(hourly))
 	}
-	if today := asMap(t, stats["today"]); today["revenue"] != "0.08" || today["daily_cap"] != nil || today["progress"] != nil {
+	if today := asMap(t, stats["today"]); today["revenue"] != "0.08" {
 		t.Fatalf("today = %v", today)
 	}
 	if models := asList(t, stats["by_model"]); len(models) != 1 || asMap(t, models[0])["model_id"] != "gpt-test" || asMap(t, models[0])["revenue"] != "0.08" {
@@ -1012,26 +1012,6 @@ func TestObserveAdminAccountsShowLastActivity(t *testing.T) {
 	}
 	if active["consumer"] == nil || active["founder"] == nil {
 		t.Fatalf("last_active_at = %v", active)
-	}
-}
-
-func TestObserveModelDetailShowsDailyCapRemaining(t *testing.T) {
-	e := newEnv(t)
-	consumer := e.member("consumer", "100")
-	sharer := e.member("sharer", "0")
-	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "capped", upstream: relay, multiplier: "1", advanced: map[string]any{"daily_revenue_cap": "0.1"}})
-	e.createChannel(sharer, channelSpec{name: "open", upstream: relay, multiplier: "3"})
-	_, secret := e.defaultKey(consumer)
-	e.chat(secret, nil) // 0.02 of the 0.1 cap
-	detail := e.get(consumer, "/api/models/gpt-test")
-	remaining := map[string]any{}
-	for _, item := range asList(t, detail["channels"]) {
-		channel := asMap(t, item)
-		remaining[channel["name"].(string)] = channel["daily_cap_remaining"]
-	}
-	if remaining["capped"] != "0.800000" || remaining["open"] != nil {
-		t.Fatalf("daily_cap_remaining = %v", remaining)
 	}
 }
 

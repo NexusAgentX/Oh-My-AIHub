@@ -52,6 +52,14 @@ func (s gatewayStore) Candidates(ctx context.Context, modelID string, format cha
 	return candidates, nil
 }
 
+func (s gatewayStore) AuxiliaryCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
+	fleet, err := s.c.fleet.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append([]gateway.CandidateRecord{}, fleet.auxiliary[format]...), nil
+}
+
 // Points is the balance and credit limit for the check before a request is let
 // through. It comes from the balance cache (balances.go), which the ledger's
 // bookings keep current; the engine never learns the difference.
@@ -108,7 +116,7 @@ func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish)
 var (
 	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "CustomModelOnline", "ResponseChannel", "Points"}
 	gatewayStoreOthers   = []string{
-		"TouchKey", "KeySpend", "ChannelRevenue", "AttemptHistory", "InsertCall", "FinishCall",
+		"TouchKey", "KeySpend", "AttemptHistory", "InsertCall", "FinishCall",
 		"SweepStaleCalls", "RecordChannelEvent",
 	}
 )

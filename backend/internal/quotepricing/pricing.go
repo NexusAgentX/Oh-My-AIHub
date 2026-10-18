@@ -25,6 +25,7 @@ type Book struct {
 	Offers            map[string]Offer `json:"offers"`
 }
 type Offer struct {
+	DiscountNano  *int64       `json:"discount_nano,omitempty"`
 	ModelID       string       `json:"model_id"`
 	UpstreamModel string       `json:"upstream_model"`
 	Revision      int64        `json:"revision"`
@@ -37,7 +38,7 @@ func Freeze(book Book) (*Book, error) {
 		return nil, ErrQuote
 	}
 	for id, offer := range book.Offers {
-		if id != offer.ModelID || !gatewaycontract.ValidModelID(id) || (offer.UpstreamModel != "" && !gatewaycontract.ValidModelID(offer.UpstreamModel)) || offer.Revision < 1 || offer.Quote.ID == "" || offer.Quote.Version < 1 || market.ValidateQuote(offer.Quote) != nil {
+		if (offer.DiscountNano != nil && (*offer.DiscountNano < 0 || *offer.DiscountNano > 1000*ledger.UnitRate)) || id != offer.ModelID || !gatewaycontract.ValidModelID(id) || (offer.UpstreamModel != "" && !gatewaycontract.ValidModelID(offer.UpstreamModel)) || offer.Revision < 1 || offer.Quote.ID == "" || offer.Quote.Version < 1 || market.ValidateQuote(offer.Quote) != nil {
 			return nil, ErrQuote
 		}
 	}
@@ -174,6 +175,10 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		}
 	}
 	addTokens := func(offer Offer, usage ledger.Usage, kind string) error {
+		discountNano := discountNano
+		if offer.DiscountNano != nil {
+			discountNano = *offer.DiscountNano
+		}
 		if offer.Quote.Currency == "USD" && usdRateNano <= 0 {
 			return ErrQuote
 		}
@@ -276,6 +281,10 @@ func Calculate(book *Book, mainModel string, facts Facts, at time.Time, discount
 		}
 		if unit.ReceiptKey != "" && seen[unit.ReceiptKey] {
 			continue
+		}
+		discountNano := discountNano
+		if offer.DiscountNano != nil {
+			discountNano = *offer.DiscountNano
 		}
 		price, ok := selectUnitPrice(offer.Quote.UnitPrices, unit)
 		if !ok {

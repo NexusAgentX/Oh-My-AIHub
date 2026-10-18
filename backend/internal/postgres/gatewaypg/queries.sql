@@ -25,8 +25,6 @@ SELECT coalesce(sum(cost_nano + fee_nano) FILTER (WHERE created_at >= sqlc.arg(d
 FROM calls
 WHERE api_key_id = sqlc.arg(key_id);
 
--- name: ChannelRevenue :one
-SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $1 AND created_at >= $2;
 
 -- Every key the gateway can recognise, for the key snapshot (ADR-0040): the
 -- same row as LookupKey for each undeleted key, with the hash it is found by.
@@ -40,8 +38,7 @@ WHERE k.deleted_at IS NULL;
 
 -- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -49,7 +46,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND sqlc.arg(format)::text = ANY(cm.formats)
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id;
 
 -- Every row ListCandidates can return, for any model and format, for the
@@ -60,8 +57,7 @@ ORDER BY c.id;
 -- name: ListAllCandidates :many
 SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -69,7 +65,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
 -- The attempts of calls started in the window the engine keeps channel statistics
@@ -94,7 +90,7 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
        coalesce(c.model_id, '')::text AS model_id,
        floor(extract(epoch FROM c.created_at) / 300)::bigint AS bucket,
        coalesce(CASE WHEN c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL
-                THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
+                THEN width_bucket(round(coalesce(att->>'selection_latency_ms',att->>'ttft_ms')::numeric)::int, sqlc.arg(edges)::int[]) - 1 END, -1)::int AS ttft_bin,
        count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
        count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors,
@@ -106,6 +102,7 @@ LEFT JOIN channels ch ON ch.id = (att->'channel'->>'id')::uuid
 WHERE c.created_at >= sqlc.arg(since)::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
   AND att->>'end_reason' <> 'client_disconnected'
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
 GROUP BY 1, 2, 3, 4;
 
 -- name: ResponseChannel :one
@@ -160,7 +157,7 @@ FROM channel_models cm
 CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 GROUP BY cm.model_id
 ORDER BY cm.model_id;
 
@@ -171,19 +168,18 @@ SELECT EXISTS (
     JOIN channels c ON c.id = cm.channel_id
     JOIN accounts a ON a.id = c.owner_id
     WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
-      AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+      AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 );
 
 -- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.cooldown_failures, c.cooldown_seconds,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id;
 
 -- name: HomeToday :one

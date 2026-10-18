@@ -114,11 +114,6 @@ func (s *Store) KeySpend(ctx context.Context, keyID string, now time.Time) (gate
 	return gateway.Spend{Today: money.FromNano(row.TodayNano), Month: money.FromNano(row.MonthNano), Total: money.FromNano(row.TotalNano)}, nil
 }
 
-func (s *Store) ChannelRevenue(ctx context.Context, channelID string, since time.Time) (money.Amount, error) {
-	nano, err := s.q.ChannelRevenue(ctx, ChannelRevenueParams{FinalChannelID: &channelID, CreatedAt: localtime.DayStart(since)})
-	return money.FromNano(nano), err
-}
-
 func (s *Store) Candidates(ctx context.Context, modelID string, format channel.Format) ([]gateway.Candidate, error) {
 	rows, err := s.q.ListCandidates(ctx, ListCandidatesParams{ModelID: modelID, Format: string(format)})
 	if err != nil {
@@ -141,7 +136,6 @@ type candidateColumns struct {
 	UserAgent                                      *string
 	HeaderRules                                    []byte
 	ConcurrencyLimit, RpmLimit                     *int32
-	DailyRevenueCapNano                            *money.Amount
 	TtftTimeoutMs, RequestTimeoutMs, IdleTimeoutMs *int32
 	CooldownFailures, CooldownSeconds              *int32
 	UpstreamModel                                  string
@@ -164,7 +158,7 @@ func candidate(row candidateColumns) gateway.Candidate {
 	_ = json.Unmarshal(row.HeaderRules, &rules)
 	advanced := channel.Advanced{
 		UserAgent: row.UserAgent, ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit,
-		DailyRevenueCap: row.DailyRevenueCapNano, TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
+		TTFTTimeoutMS: row.TtftTimeoutMs, RequestTimeoutMS: row.RequestTimeoutMs, IdleTimeoutMS: row.IdleTimeoutMs,
 		CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
 		HeaderRules: channel.HeaderRules{Remove: rules.Remove},
 	}
@@ -197,8 +191,7 @@ func (s *Store) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, 
 		records = append(records, gateway.CandidateRecord{ModelID: row.ModelID, Formats: formats, Candidate: candidate(candidateColumns{
 			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, BaseUrl: row.BaseUrl, ApiKeyCiphertext: row.ApiKeyCiphertext,
 			ApiKeyNonce: row.ApiKeyNonce, ApiKeyKeyID: row.ApiKeyKeyID, UserAgent: row.UserAgent, HeaderRules: row.HeaderRules,
-			ConcurrencyLimit: row.ConcurrencyLimit, RpmLimit: row.RpmLimit, DailyRevenueCapNano: row.DailyRevenueCapNano,
-			TtftTimeoutMs: row.TtftTimeoutMs, RequestTimeoutMs: row.RequestTimeoutMs, IdleTimeoutMs: row.IdleTimeoutMs, CooldownFailures: row.CooldownFailures,
+			ConcurrencyLimit: row.ConcurrencyLimit, RpmLimit: row.RpmLimit, TtftTimeoutMs: row.TtftTimeoutMs, RequestTimeoutMs: row.RequestTimeoutMs, IdleTimeoutMs: row.IdleTimeoutMs, CooldownFailures: row.CooldownFailures,
 			CooldownSeconds: row.CooldownSeconds, UpstreamModel: row.UpstreamModel, MultiplierNano: row.MultiplierNano,
 			FxDiscount: row.FxDiscount, IsCustom: row.IsCustom,
 			CustomInputPriceNanoPerMillion: row.CustomInputPriceNanoPerMillion, CustomOutputPriceNanoPerMillion: row.CustomOutputPriceNanoPerMillion,
@@ -421,8 +414,7 @@ func (s *Store) OnlineChannels(ctx context.Context) ([]gateway.OnlineChannel, er
 			ModelID: row.ModelID, ChannelID: row.ChannelID, ChannelName: row.ChannelName, OwnerID: row.OwnerID, OwnerName: row.OwnerName,
 			MultiplierNano: row.MultiplierNano, FXDiscount: row.FxDiscount,
 			Advanced: channel.Advanced{
-				ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, DailyRevenueCap: row.DailyRevenueCapNano,
-				CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
+				ConcurrencyLimit: row.ConcurrencyLimit, RPMLimit: row.RpmLimit, CooldownFailures: row.CooldownFailures, CooldownSeconds: row.CooldownSeconds,
 			},
 			Custom: customPrices(row.IsCustom, row.CustomInputPriceNanoPerMillion, row.CustomOutputPriceNanoPerMillion,
 				row.CustomCacheWritePriceNanoPerMillion, row.CustomCacheReadPriceNanoPerMillion),

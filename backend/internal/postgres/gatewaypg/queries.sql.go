@@ -17,7 +17,7 @@ SELECT (att->'channel'->>'id')::uuid AS channel_id,
        coalesce(c.model_id, '')::text AS model_id,
        floor(extract(epoch FROM c.created_at) / 300)::bigint AS bucket,
        coalesce(CASE WHEN c.stream AND att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL
-                THEN width_bucket(round((att->>'ttft_ms')::numeric)::int, $1::int[]) - 1 END, -1)::int AS ttft_bin,
+                THEN width_bucket(round(coalesce(att->>'selection_latency_ms',att->>'ttft_ms')::numeric)::int, $1::int[]) - 1 END, -1)::int AS ttft_bin,
        count(*) FILTER (WHERE att->>'end_reason' <> 'client_error')::bigint AS counted,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
        count(*) FILTER (WHERE att->>'end_reason' = 'client_error')::bigint AS client_errors,
@@ -29,6 +29,7 @@ LEFT JOIN channels ch ON ch.id = (att->'channel'->>'id')::uuid
 WHERE c.created_at >= $2::timestamptz
   AND att->'channel' IS NOT NULL AND jsonb_typeof(att->'channel') = 'object'
   AND att->>'end_reason' <> 'client_disconnected'
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
 GROUP BY 1, 2, 3, 4
 `
 
@@ -96,22 +97,6 @@ func (q *Queries) AttemptHistory(ctx context.Context, arg AttemptHistoryParams) 
 	return items, nil
 }
 
-const channelRevenue = `-- name: ChannelRevenue :one
-SELECT coalesce(sum(cost_nano), 0)::bigint FROM calls WHERE final_channel_id = $1 AND created_at >= $2
-`
-
-type ChannelRevenueParams struct {
-	FinalChannelID *string
-	CreatedAt      time.Time
-}
-
-func (q *Queries) ChannelRevenue(ctx context.Context, arg ChannelRevenueParams) (int64, error) {
-	row := q.db.QueryRow(ctx, channelRevenue, arg.FinalChannelID, arg.CreatedAt)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const claimBackground = `-- name: ClaimBackground :many
 WITH due AS (
  SELECT call_id FROM gateway_background_jobs
@@ -177,7 +162,7 @@ SELECT EXISTS (
     JOIN channels c ON c.id = cm.channel_id
     JOIN accounts a ON a.id = c.owner_id
     WHERE cm.model_id = $1 AND cm.is_custom AND cm.enabled
-      AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+      AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 )
 `
 
@@ -419,8 +404,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 const listAllCandidates = `-- name: ListAllCandidates :many
 SELECT cm.model_id, cm.formats,
        c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -428,7 +412,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.enabled AND NOT cm.pending_multiplier
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id
 `
 
@@ -446,7 +430,6 @@ type ListAllCandidatesRow struct {
 	HeaderRules                         []byte
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
 	RequestTimeoutMs                    *int32
 	IdleTimeoutMs                       *int32
@@ -490,7 +473,6 @@ func (q *Queries) ListAllCandidates(ctx context.Context) ([]ListAllCandidatesRow
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -578,8 +560,7 @@ func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
 
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.owner_id, c.name, c.base_url, c.api_key_ciphertext, c.api_key_nonce, c.api_key_key_id,
-       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
+       c.user_agent, c.header_rules, c.concurrency_limit, c.rpm_limit, c.ttft_timeout_ms, c.request_timeout_ms, c.idle_timeout_ms, c.cooldown_failures, c.cooldown_seconds,
        cm.upstream_model, cm.multiplier_nano, cm.fx_discount,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
@@ -587,7 +568,7 @@ FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
 WHERE cm.model_id = $1 AND cm.enabled AND NOT cm.pending_multiplier AND $2::text = ANY(cm.formats)
-  AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+  AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY c.id
 `
 
@@ -608,7 +589,6 @@ type ListCandidatesRow struct {
 	HeaderRules                         []byte
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	TtftTimeoutMs                       *int32
 	RequestTimeoutMs                    *int32
 	IdleTimeoutMs                       *int32
@@ -645,7 +625,6 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.HeaderRules,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.TtftTimeoutMs,
 			&i.RequestTimeoutMs,
 			&i.IdleTimeoutMs,
@@ -672,14 +651,13 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 
 const listOnlineChannelModels = `-- name: ListOnlineChannelModels :many
 SELECT cm.model_id, c.id AS channel_id, c.name AS channel_name, c.owner_id, a.display_name AS owner_name,
-       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.daily_revenue_cap_nano,
-       c.cooldown_failures, c.cooldown_seconds,
+       cm.formats, cm.multiplier_nano, cm.fx_discount, c.concurrency_limit, c.rpm_limit, c.cooldown_failures, c.cooldown_seconds,
        cm.is_custom, cm.custom_input_price_nano_per_million, cm.custom_output_price_nano_per_million,
        cm.custom_cache_write_price_nano_per_million, cm.custom_cache_read_price_nano_per_million
 FROM channel_models cm
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 ORDER BY cm.model_id, c.id
 `
 
@@ -694,7 +672,6 @@ type ListOnlineChannelModelsRow struct {
 	FxDiscount                          bool
 	ConcurrencyLimit                    *int32
 	RpmLimit                            *int32
-	DailyRevenueCapNano                 *money.Amount
 	CooldownFailures                    *int32
 	CooldownSeconds                     *int32
 	IsCustom                            bool
@@ -724,7 +701,6 @@ func (q *Queries) ListOnlineChannelModels(ctx context.Context) ([]ListOnlineChan
 			&i.FxDiscount,
 			&i.ConcurrencyLimit,
 			&i.RpmLimit,
-			&i.DailyRevenueCapNano,
 			&i.CooldownFailures,
 			&i.CooldownSeconds,
 			&i.IsCustom,
@@ -749,7 +725,7 @@ FROM channel_models cm
 CROSS JOIN LATERAL unnest(cm.formats) AS f
 JOIN channels c ON c.id = cm.channel_id
 JOIN accounts a ON a.id = c.owner_id
-WHERE cm.enabled AND NOT cm.pending_multiplier AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
+WHERE cm.enabled AND NOT cm.pending_multiplier AND c.market_group_id IS NULL AND c.status = 'listed' AND c.deleted_at IS NULL AND a.status = 'active'
 GROUP BY cm.model_id
 ORDER BY cm.model_id
 `

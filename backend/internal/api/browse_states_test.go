@@ -13,25 +13,19 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
 type onlineChannelsFixture struct {
 	gateway.Browse
-	online  []gateway.OnlineChannel
-	revenue money.Amount
+	online []gateway.OnlineChannel
 }
 
 func (b onlineChannelsFixture) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
 	return b.online, nil
 }
 
-func (b onlineChannelsFixture) ChannelRevenue(context.Context, string, time.Time) (money.Amount, error) {
-	return b.revenue, nil
-}
-
-// 模型页的渠道行把成功率、首字延迟、冷却剩余和每日上限剩余写成 null 或字符串；
+// 模型页的渠道行把成功率、首字延迟、冷却剩余写成 null 或字符串；
 // 这些分支由处理器内联拼装，门禁只校验形状，这里钉住各状态下的取值。
 func TestModelPageReportsEachChannelsState(t *testing.T) {
 	const idPrefix = "00000000-0000-4000-8000-00000000"
@@ -55,20 +49,18 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 		t.Fatal(err)
 	}
 	one := int32(1)
-	capped := money.FromNano(10 * money.Scale)
 	line := func(suffix, name string, advanced channel.Advanced) gateway.OnlineChannel {
 		return gateway.OnlineChannel{
 			ModelID: "m1", ChannelID: idPrefix + suffix, ChannelName: name, OwnerID: idPrefix + "00ff", OwnerName: "车主",
 			Formats: []channel.Format{channel.FormatAnthropic, channel.FormatOpenAIChat}, MultiplierNano: 1_250_000_000, Advanced: advanced,
 		}
 	}
-	browse := onlineChannelsFixture{revenue: money.FromNano(7_500_000_000), online: []gateway.OnlineChannel{
+	browse := onlineChannelsFixture{online: []gateway.OnlineChannel{
 		line("a001", "无统计", channel.Advanced{}),
 		line("a002", "无首字延迟", channel.Advanced{}),
 		line("a003", "有首字延迟", channel.Advanced{}),
 		line("a004", "冷却中", channel.Advanced{CooldownFailures: &one}),
 		line("a005", "并发已满", channel.Advanced{ConcurrencyLimit: &one}),
-		line("a006", "有上限", channel.Advanced{DailyRevenueCap: &capped}),
 	}}
 	handler := NewHandler(Dependencies{
 		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
@@ -93,7 +85,6 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	type row struct {
 		state, successRate string
 		ttft, cooldown     any
-		capRemaining       any
 	}
 	want := map[string]row{
 		"无统计":   {state: "available"},
@@ -101,7 +92,6 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 		"有首字延迟": {state: "available", successRate: "0.900000", ttft: float64(412)}, // 420 ms falls into the 395–430 ms bin, reported as its middle, 412.5
 		"冷却中":   {state: "cooldown"},
 		"并发已满":  {state: "limited"},
-		"有上限":   {state: "available", capRemaining: "0.250000"},
 	}
 	got := map[string]row{}
 	for _, entry := range page["channels"].([]any) {
@@ -109,7 +99,7 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 		successRate, _ := channelRow["success_rate_24h"].(string)
 		got[channelRow["name"].(string)] = row{
 			state: channelRow["state"].(string), successRate: successRate, ttft: channelRow["ttft_p50_ms"],
-			cooldown: channelRow["cooldown_remaining_seconds"], capRemaining: channelRow["daily_cap_remaining"],
+			cooldown: channelRow["cooldown_remaining_seconds"],
 		}
 	}
 	// The cooldown row also reports the seconds left, which depends on the clock.

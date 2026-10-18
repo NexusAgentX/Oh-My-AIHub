@@ -255,20 +255,24 @@ type adminCallJSON struct {
 
 // callAttemptJSON is the OpenAPI CallAttempt schema.
 type callAttemptJSON struct {
-	UpstreamModel    string               `json:"upstream_model"`
-	Timeouts         *attemptTimeoutsJSON `json:"timeouts"`
-	OffsetMS         *int                 `json:"offset_ms"`
-	ReusedConnection *bool                `json:"reused_connection"`
-	FallbackReason   string               `json:"fallback_reason"`
-	Channel          *channelRefJSON      `json:"channel"`
-	StatusCode       *int                 `json:"status_code"`
-	ErrorCode        *string              `json:"error_code"`
-	ErrorMessage     *string              `json:"error_message"`
-	ConnectMS        *int                 `json:"connect_ms"`
-	TTFTMS           *int                 `json:"ttft_ms"`
-	DurationMS       *int                 `json:"duration_ms"`
-	ResponseBytes    *int64               `json:"response_bytes"`
-	EndReason        string               `json:"end_reason"`
+	AddressID          string               `json:"address_id,omitempty"`
+	FallbackLevel      string               `json:"fallback_level,omitempty"`
+	SelectionFinal     *bool                `json:"selection_final,omitempty"`
+	SelectionLatencyMS *int                 `json:"selection_latency_ms,omitempty"`
+	UpstreamModel      string               `json:"upstream_model"`
+	Timeouts           *attemptTimeoutsJSON `json:"timeouts"`
+	OffsetMS           *int                 `json:"offset_ms"`
+	ReusedConnection   *bool                `json:"reused_connection"`
+	FallbackReason     string               `json:"fallback_reason"`
+	Channel            *channelRefJSON      `json:"channel"`
+	StatusCode         *int                 `json:"status_code"`
+	ErrorCode          *string              `json:"error_code"`
+	ErrorMessage       *string              `json:"error_message"`
+	ConnectMS          *int                 `json:"connect_ms"`
+	TTFTMS             *int                 `json:"ttft_ms"`
+	DurationMS         *int                 `json:"duration_ms"`
+	ResponseBytes      *int64               `json:"response_bytes"`
+	EndReason          string               `json:"end_reason"`
 }
 
 // callDetailJSON is the OpenAPI CallDetail schema: a CallSummary plus routing, attempts and speed.
@@ -401,9 +405,7 @@ type channelStatsStatusJSON struct {
 
 // channelStatsTodayJSON is the today object of the OpenAPI ChannelStats schema.
 type channelStatsTodayJSON struct {
-	Revenue  string  `json:"revenue"`
-	DailyCap *string `json:"daily_cap"`
-	Progress *string `json:"progress"`
+	Revenue string `json:"revenue"`
 }
 
 // channelStatsModelJSON is one by_model element of the OpenAPI ChannelStats schema.
@@ -556,6 +558,7 @@ func newCallStatsJSON(stats observe.CallStats) callStatsJSON {
 
 func newCallAttemptJSON(attempt observe.Attempt) callAttemptJSON {
 	return callAttemptJSON{
+		AddressID: attempt.AddressID, FallbackLevel: attempt.FallbackLevel, SelectionFinal: attempt.SelectionFinal, SelectionLatencyMS: attempt.SelectionLatencyMS,
 		UpstreamModel: attempt.UpstreamModel, Timeouts: newAttemptTimeoutsJSON(attempt.Timeouts), OffsetMS: attempt.OffsetMS, ReusedConnection: attempt.ReusedConnection, FallbackReason: attempt.FallbackReason,
 		Channel:       newChannelRefJSON(attempt.Channel),
 		StatusCode:    attempt.StatusCode,
@@ -687,7 +690,7 @@ func newChannelStatsJSON(report observe.ChannelReport) channelStatsJSON {
 		StatusCodes:              statuses,
 		RecentFailures:           failures,
 		Today: channelStatsTodayJSON{
-			Revenue: report.TodayRevenue.String(), DailyCap: nullableAmount(report.DailyCap), Progress: optionalRatio(report.Progress),
+			Revenue: report.TodayRevenue.String(),
 		},
 		ByModel: models,
 		Daily:   daily,

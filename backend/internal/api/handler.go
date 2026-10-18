@@ -15,6 +15,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
@@ -29,6 +30,7 @@ const (
 )
 
 type Dependencies struct {
+	GroupChannels *groupchannel.Service
 	DetectionMCP  *detection.MCPFixture
 	Contributions *contribution.Service
 	Detection     *detection.Service
@@ -55,6 +57,7 @@ type Dependencies struct {
 }
 
 type app struct {
+	groupChannels     *groupchannel.Service
 	detectionMCP      *detection.MCPFixture
 	contributions     *contribution.Service
 	detection         *detection.Service
@@ -90,6 +93,7 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
+		groupChannels:     dependencies.GroupChannels,
 		detectionMCP:      dependencies.DetectionMCP,
 		contributions:     dependencies.Contributions,
 		detection:         dependencies.Detection,
@@ -133,6 +137,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerForumRoutes(routes)
 	application.registerDetectionRoutes(routes)
 	application.registerContributionRoutes(routes)
+	application.registerGroupChannelRoutes(routes)
 
 	return chain(routes.mux, responseWriteDeadline, securityHeaders, application.requireSameOrigin), routes.table
 }

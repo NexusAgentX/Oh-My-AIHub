@@ -733,15 +733,16 @@ func (q *Queries) CallStats(ctx context.Context, arg CallStatsParams) (CallStats
 const channelAttemptStats = `-- name: ChannelAttemptStats :one
 SELECT count(*)::bigint AS attempts,
        count(*) FILTER (WHERE att->>'end_reason' = 'completed')::bigint AS successes,
-       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
+       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY coalesce(att->>'selection_latency_ms',att->>'ttft_ms')::double precision)
          FILTER (WHERE att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p50_ms,
-       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY (att->>'ttft_ms')::double precision)
+       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY coalesce(att->>'selection_latency_ms',att->>'ttft_ms')::double precision)
          FILTER (WHERE att->>'end_reason' = 'completed' AND att->>'ttft_ms' IS NOT NULL), -1)::double precision AS ttft_p95_ms
 FROM calls c
 CROSS JOIN LATERAL jsonb_array_elements(c.attempts) att
 WHERE c.created_at >= $1::timestamptz AND c.created_at < $2::timestamptz
   AND c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', $3::text)))
   AND att->'channel'->>'id' = $3::text
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
   AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
 `
 
@@ -758,7 +759,8 @@ type ChannelAttemptStatsRow struct {
 	TtftP95Ms float64
 }
 
-// 渠道统计以“到达该渠道的尝试”为单位：客户端自己取消或因请求本身有问题的尝试不计。
+// 渠道健康按一次渠道选取计数，组内中间地址只进入诊断；旧历史缺字段仍计一次。
+// 客户端取消与请求自身错误不计健康。
 func (q *Queries) ChannelAttemptStats(ctx context.Context, arg ChannelAttemptStatsParams) (ChannelAttemptStatsRow, error) {
 	row := q.db.QueryRow(ctx, channelAttemptStats, arg.FromTime, arg.ToTime, arg.ChannelText)
 	var i ChannelAttemptStatsRow
@@ -780,6 +782,7 @@ CROSS JOIN LATERAL jsonb_array_elements(c.attempts) att
 WHERE c.created_at >= $1::timestamptz AND c.created_at < $2::timestamptz
   AND c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', $3::text)))
   AND att->'channel'->>'id' = $3::text
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
   AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
 GROUP BY 1
 ORDER BY 1
@@ -826,6 +829,7 @@ CROSS JOIN LATERAL jsonb_array_elements(c.attempts) att
 WHERE c.created_at >= $1::timestamptz AND c.created_at < $2::timestamptz
   AND c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', $3::text)))
   AND att->'channel'->>'id' = $3::text
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
   AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
 GROUP BY 1
 ORDER BY 1
@@ -872,6 +876,7 @@ CROSS JOIN LATERAL jsonb_array_elements(c.attempts) att
 WHERE c.created_at >= $1::timestamptz AND c.created_at < $2::timestamptz
   AND c.attempts @> jsonb_build_array(jsonb_build_object('channel', jsonb_build_object('id', $3::text)))
   AND att->'channel'->>'id' = $3::text
+  AND att->>'selection_final' IS DISTINCT FROM 'false'
   AND att->>'end_reason' NOT IN ('client_disconnected', 'client_error')
 GROUP BY 1
 ORDER BY 1
@@ -1242,25 +1247,19 @@ func (q *Queries) GetCall(ctx context.Context, id string) (GetCallRow, error) {
 }
 
 const getChannelBrief = `-- name: GetChannelBrief :one
-SELECT id, owner_id, name, daily_revenue_cap_nano FROM channels WHERE id = $1 AND deleted_at IS NULL
+SELECT id, owner_id, name FROM channels WHERE id = $1 AND deleted_at IS NULL
 `
 
 type GetChannelBriefRow struct {
-	ID                  string
-	OwnerID             string
-	Name                string
-	DailyRevenueCapNano *money.Amount
+	ID      string
+	OwnerID string
+	Name    string
 }
 
 func (q *Queries) GetChannelBrief(ctx context.Context, id string) (GetChannelBriefRow, error) {
 	row := q.db.QueryRow(ctx, getChannelBrief, id)
 	var i GetChannelBriefRow
-	err := row.Scan(
-		&i.ID,
-		&i.OwnerID,
-		&i.Name,
-		&i.DailyRevenueCapNano,
-	)
+	err := row.Scan(&i.ID, &i.OwnerID, &i.Name)
 	return i, err
 }
 

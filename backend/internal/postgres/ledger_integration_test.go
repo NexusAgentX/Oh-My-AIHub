@@ -30,7 +30,7 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedTables := []string{"accounts", "api_keys", "audit_log", "c2c_orders", "c2c_trades", "call_execution_receipts", "calls", "channel_events", "channel_models", "channels", "detection_artifacts", "detection_attempts", "detection_reports", "detection_results", "detection_tasks", "forum_attachments", "forum_boards", "forum_replies", "forum_topics", "gateway_background_jobs", "geoip_cache", "geoip_daily_usage", "ledger_accounts", "ledger_entries", "ledger_transactions", "market_addresses", "market_capability_evidence", "market_contributions", "market_group_addresses", "market_group_models", "market_groups", "market_model_governance", "market_object_versions", "market_protected_keys", "market_quote_tier_token_prices", "market_quote_tiers", "market_quote_token_prices", "market_quote_unit_prices", "market_quotes", "market_report_bindings", "market_search_settings", "market_suppliers", "model_price_tiers", "models", "route_pref_channels", "route_prefs", "sessions", "settings", "supplier_endpoints", "suppliers"}
+	expectedTables := []string{"accounts", "api_keys", "audit_log", "c2c_orders", "c2c_trades", "call_execution_receipts", "calls", "channel_events", "channel_models", "channels", "detection_artifacts", "detection_attempts", "detection_reports", "detection_results", "detection_tasks", "forum_attachments", "forum_boards", "forum_replies", "forum_topics", "gateway_background_jobs", "geoip_cache", "geoip_daily_usage", "ledger_accounts", "ledger_entries", "ledger_transactions", "market_addresses", "market_capability_evidence", "market_channel_model_choices", "market_channel_model_probes", "market_channels", "market_contributions", "market_group_addresses", "market_group_models", "market_groups", "market_model_governance", "market_object_versions", "market_protected_keys", "market_quote_tier_token_prices", "market_quote_tiers", "market_quote_token_prices", "market_quote_unit_prices", "market_quotes", "market_report_bindings", "market_search_settings", "market_suppliers", "model_price_tiers", "models", "route_pref_channels", "route_prefs", "sessions", "settings", "supplier_endpoints", "suppliers"}
 	if !slices.Equal(tables, expectedTables) {
 		t.Fatalf("schema tables = %v, want %v", tables, expectedTables)
 	}
@@ -51,14 +51,20 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	if systemAccounts != 3 || settingsRows != 1 || feeRate != 1_000_000 {
 		t.Fatalf("seed = %d system accounts, %d settings rows, fee %d", systemAccounts, settingsRows, feeRate)
 	}
-	var constraintTriggers int
-	if err := pool.QueryRow(ctx, `
-		SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-		WHERE c.relnamespace = current_schema()::regnamespace AND t.tgconstraint <> 0 AND t.tgname NOT LIKE 'RI_%'`).Scan(&constraintTriggers); err != nil {
+	triggerRows, err := pool.Query(ctx, `
+		SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+		WHERE c.relnamespace = current_schema()::regnamespace AND t.tgconstraint <> 0 AND t.tgname NOT LIKE 'RI_%'
+		ORDER BY t.tgname`)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if constraintTriggers != 1 {
-		t.Fatalf("constraint triggers = %d, want exactly the zero-sum trigger", constraintTriggers)
+	triggers, err := pgx.CollectRows(triggerRows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTriggers := []string{"ledger_transaction_balance", "market_channel_choice_links", "market_channel_config_links", "market_channel_owner_links"}
+	if !slices.Equal(triggers, wantTriggers) {
+		t.Fatalf("constraint triggers = %v, want %v", triggers, wantTriggers)
 	}
 }
 

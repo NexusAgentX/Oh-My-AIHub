@@ -216,7 +216,7 @@ func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
 	}
 }
 
-func TestGatewayEnforcesRPMDailyRevenueAndConcurrencyLimits(t *testing.T) {
+func TestGatewayEnforcesRPMAndConcurrencyLimits(t *testing.T) {
 	e := newEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
@@ -233,22 +233,6 @@ func TestGatewayEnforcesRPMDailyRevenueAndConcurrencyLimits(t *testing.T) {
 	if refused := call(); refused.Code != http.StatusServiceUnavailable || !strings.Contains(refused.Body.String(), `"no_channel_available"`) {
 		t.Fatalf("second request within the minute = %d %s", refused.Code, refused.Body.String())
 	}
-
-	capped := e.member("capped", "0")
-	capUpstream := okUpstream(t)
-	capChannel := e.createChannel(capped, channelSpec{name: "capped", upstream: capUpstream, model: "claude-test", advanced: map[string]any{"daily_revenue_cap": "0.05"}})
-	callClaude := func() *httptest.ResponseRecorder {
-		return e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"claude-test"}`), nil)
-	}
-	for index := range 2 { // 0.04 then 0.08: the cap of 0.05 is only reached after the second call
-		if code := callClaude().Code; code != http.StatusOK {
-			t.Fatalf("call %d under the cap = %d", index, code)
-		}
-	}
-	if refused := callClaude(); refused.Code != http.StatusServiceUnavailable {
-		t.Fatalf("call over the cap = %d %s", refused.Code, refused.Body.String())
-	}
-	_ = capChannel
 
 	// Concurrency: the second request arrives while the first is still streaming.
 	release := make(chan struct{})
