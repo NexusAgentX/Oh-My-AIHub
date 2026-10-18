@@ -29,7 +29,7 @@ func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/v1/responses" {
-			io.WriteString(w, `{"id":"resp_durable","background":true,"status":"queued"}`)
+			io.WriteString(w, `{"id":"resp_durable","object":"response","background":true,"status":"queued"}`)
 		} else if strings.HasSuffix(r.URL.Path, "/cancel") {
 			io.WriteString(w, `{"id":"resp_durable","status":"cancelled"}`)
 		} else {

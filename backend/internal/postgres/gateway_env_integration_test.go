@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -659,6 +660,7 @@ const (
 
 // okUpstream answers every inference request with the body fitting its path.
 func okUpstream(t *testing.T) *upstream {
+	var responseSerial atomic.Uint64
 	return newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -670,7 +672,7 @@ func okUpstream(t *testing.T) *upstream {
 			}
 			_, _ = io.WriteString(w, chatBody)
 		case strings.HasSuffix(r.URL.Path, "/responses"):
-			_, _ = io.WriteString(w, responsesBody)
+			_, _ = io.WriteString(w, strings.Replace(responsesBody, "resp_1", fmt.Sprintf("resp_%d", responseSerial.Add(1)), 1))
 		case strings.HasSuffix(r.URL.Path, "/messages"):
 			_, _ = io.WriteString(w, anthropicBody)
 		default:

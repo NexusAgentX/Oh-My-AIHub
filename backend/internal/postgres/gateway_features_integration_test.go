@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -57,8 +58,13 @@ func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
 	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
+	var priceyResponses atomic.Uint64
 	pricey := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
-		_, _ = io.WriteString(w, `{"id":"resp_pricey","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
+		id := "resp_pricey"
+		if sequence := priceyResponses.Add(1); sequence > 1 {
+			id += fmt.Sprintf("_%d", sequence)
+		}
+		_, _ = io.WriteString(w, `{"id":"`+id+`","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
 	})
 	cheap := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		_, _ = io.WriteString(w, `{"id":"resp_cheap","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)

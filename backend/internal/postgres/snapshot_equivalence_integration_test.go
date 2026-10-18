@@ -139,7 +139,7 @@ func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cach
 	nonEmpty := 0
 	for _, model := range modelNames {
 		for _, format := range formats {
-			var want []gateway.Candidate
+			want := []gateway.Candidate{}
 			for _, row := range rows {
 				if row.ModelID == model && slices.Contains(row.Formats, format) {
 					want = append(want, row.Candidate)

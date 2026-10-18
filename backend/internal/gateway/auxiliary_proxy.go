@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -225,6 +226,30 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		target, err = resourcestate.Resolve(r.Context(), e.Resources, actor, pathRefs)
 		if err != nil {
 			fail(404, "resource_unavailable", "资源不存在或归属冲突")
+			return
+		}
+	}
+	// A durable background call already owns its admission and original sealed
+	// snapshot. It cannot switch to a replacement credential for a follow-up.
+	if target != nil && e.Jobs != nil && (ep.ID == "responses.get" || ep.ID == "responses.cancel") {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		job, err := e.Jobs.LookupBackground(ctx, key.OwnerID, key.KeyID, r.PathValue("responseID"))
+		cancel()
+		if err == nil {
+			// readNativeRequest consumed the caller's body. Restore its native
+			// bytes before the frozen follow-up path forwards cancellation.
+			wire, encodeErr := nativeencoding.Encode(r.Context(), encoding, body)
+			if encodeErr != nil {
+				fail(400, "invalid_request", "请求编码无效")
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(wire))
+			r.ContentLength = int64(len(wire))
+			e.serveResponseJob(w, r, key, r.PathValue("responseID"), ep.ID == "responses.cancel", job, target)
+			return
+		}
+		if !errors.Is(err, ErrBackgroundNotFound) {
+			fail(503, "response_service_unavailable", "响应状态读取失败")
 			return
 		}
 	}

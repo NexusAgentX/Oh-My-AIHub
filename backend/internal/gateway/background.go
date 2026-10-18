@@ -386,10 +386,28 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		WriteError(w, DialectOf(r), 500, "internal_error", "读取响应失败", "")
 		return
 	}
+	e.serveResponseJob(w, r, key, id, cancel, job, nil)
+}
+
+func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key KeyAuth, id string, cancel bool, job BackgroundJob, owned *resourcestate.Record) {
 	var metadata backgroundMetadata
 	if json.Unmarshal(job.Metadata, &metadata) != nil {
 		WriteError(w, DialectOf(r), 500, "internal_error", "读取响应失败", "")
 		return
+	}
+	if owned != nil {
+		if job.CallID != owned.CreationID || job.ResponseID != id || job.ChannelID != metadata.Candidate.ChannelID || metadata.Key.OwnerID != key.OwnerID || metadata.Key.KeyID != key.KeyID || metadata.ModelID != owned.ModelID || !resourceMatch(metadata.Candidate, owned) || !metadata.Candidate.ValidOffering(metadata.ModelID) {
+			WriteError(w, DialectOf(r), 404, "resource_unavailable", "资源不存在、归属冲突或已不可用", "")
+			return
+		}
+		endpoint := "responses.get"
+		if cancel {
+			endpoint = "responses.cancel"
+		}
+		if !supportsAll(metadata.Candidate, endpointRequirement(endpoint)) {
+			WriteError(w, DialectOf(r), 503, "required_capability_evidence_missing", "原任务缺少所需操作的支持证据", "")
+			return
+		}
 	}
 	if len(key.AllowedModels) > 0 && !containsString(key.AllowedModels, metadata.ModelID) {
 		WriteError(w, DialectOf(r), 403, "model_not_allowed", "该 API Key 不允许使用此模型", "")
@@ -447,6 +465,26 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 		newUpstreamFailure(response, payload, secret).write(w, job.CallID)
+		return
+	}
+	if owned != nil {
+		if timer != nil {
+			timer.Stop()
+		}
+		if timeouts.idle > 0 && isResourceSSE(response.Header.Get("Content-Type")) {
+			timer = time.AfterFunc(timeouts.idle, stop)
+			defer timer.Stop()
+		} else {
+			timer = nil
+		}
+		err := e.forwardBackgroundResource(w, r, response, key, metadata, job, owned, cancel, func() {
+			if timer != nil {
+				timer.Reset(timeouts.idle)
+			}
+		})
+		if err != nil {
+			WriteError(w, DialectOf(r), 502, "upstream_failed", "读取上游响应失败", job.CallID)
+		}
 		return
 	}
 	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {

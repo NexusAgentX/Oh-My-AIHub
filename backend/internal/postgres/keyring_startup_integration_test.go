@@ -81,7 +81,7 @@ func (f *secretFixture) channel(keyring *channel.Keyring, name string, status ch
 	f.t.Helper()
 	ctx := context.Background()
 	if f.groupID == "" {
-		supplier := market.Supplier{ID: marketID(f.t), Name: "Synthetic keyring supplier", Kind: "relay", Enabled: true}
+		supplier := market.Supplier{ID: marketID(f.t), Name: "Synthetic keyring supplier", Kind: "relay", WebsiteURL: "https://synthetic.example", Enabled: true}
 		group := market.Group{ID: marketID(f.t), SupplierID: supplier.ID, Name: "Synthetic keyring group", Enabled: true}
 		marketApply(f.t, f.store, f.admin.ID, market.Changes{Suppliers: []market.Change[market.Supplier]{{Value: supplier}}, Groups: []market.Change[market.Group]{{Value: group}}})
 		f.groupID = group.ID

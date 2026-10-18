@@ -34,6 +34,9 @@ DELETE FROM route_pref_channels r USING channels c
 UPDATE channels SET deleted_at=coalesce(deleted_at,transaction_timestamp()),
  status='unlisted',suspended_reason=NULL,updated_at=transaction_timestamp()
  WHERE market_group_id IS NULL;
+-- Flush this existing deferred relationship trigger before changing columns.
+-- Deleted historical rows carry no live group configuration to validate.
+SET CONSTRAINTS market_channel_owner_links IMMEDIATE;
 
 DROP TABLE channel_models;
 DROP TABLE model_price_tiers;
