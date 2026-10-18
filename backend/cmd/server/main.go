@@ -292,6 +292,16 @@ func main() {
 	if err = registry.RegisterNative(); err != nil {
 		fatal(logger, "registering native detection suites failed", err)
 	}
+	var mcpFixture *detection.MCPFixture
+	if origin := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_PUBLIC_ORIGIN")); origin != "" {
+		mcpFixture, err = detection.NewMCPFixture(origin)
+		if err != nil {
+			fatal(logger, "invalid detection callback origin", err)
+		}
+	}
+	if err = registry.RegisterMCP(mcpFixture); err != nil {
+		fatal(logger, "registering MCP detection failed", err)
+	}
 	sdkBinary := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_SDK_BINARY"))
 	if sdkBinary == "" {
 		executable, executableErr := os.Executable()
@@ -346,6 +356,7 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
+			DetectionMCP:  mcpFixture,
 			Contributions: contributions,
 			Detection:     detector,
 			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},

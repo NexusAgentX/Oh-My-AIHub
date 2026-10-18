@@ -269,12 +269,12 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 			t.Errorf("%s: 非外部入口必须位于 /api/ 下", key)
 		}
 		switch operation.body["x-feature"] {
-		case "A", "B", "C", "G", "239", "407", "490", "492":
+		case "A", "B", "C", "G", "239", "407", "490", "492", "493":
 		default:
-			t.Errorf("%s: x-feature 须为 A/B/C/G/239/407/490/492", key)
+			t.Errorf("%s: x-feature 须为已实现 Feature", key)
 		}
 		responses := operation.body["responses"].(map[string]any)
-		if access != "gateway_key" && operation.method != "GET" && responses["403"] == nil {
+		if access != "gateway_key" && operation.method != "GET" && operation.path != "/api/detection/mcp" && responses["403"] == nil {
 			t.Errorf("%s: 写操作须登记同源校验的 403", key)
 		}
 		if access == "admin" || access == "ready" || access == "session" {

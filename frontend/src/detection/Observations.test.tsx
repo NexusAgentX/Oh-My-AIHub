@@ -16,6 +16,13 @@ const fingerprint: NonNullable<Result['fingerprint']> = {
 }
 
 describe('detection metadata observations', () => {
+	 it('keeps credential quota observations separate from monetary balance', () => {
+	   const html=renderToStaticMarkup(<DetectionObservations result={{quotas:[{header:'x-ratelimit-remaining-tokens',remaining:123,attempt_id:'synthetic-quota-attempt'}]}} />)
+	   expect(html).toContain('上游剩余配额')
+	   expect(html).toContain('x-ratelimit-remaining-tokens')
+	   expect(html).toContain('123')
+	   expect(html).toContain('不能据此换算金额余额')
+	 })
   it('shows an accepted priority request and its actual standard downgrade separately', () => {
     const html = renderToStaticMarkup(<DetectionObservations result={{ settings: [{ kind: 'service_tier', configured: 'anthropic:priority', wire: 'auto', actual: 'anthropic:standard', accepted: true, usage_reliable: true, state: 'inconclusive', reason: 'not_observed', cache_write_tokens: 0, cache_read_tokens: 0, attempt_ids: ['synthetic-tier-attempt'] }] }} />)
     expect(html).toContain('anthropic:priority')

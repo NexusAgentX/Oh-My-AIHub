@@ -16,11 +16,12 @@ import (
 )
 
 type nativeOutcome struct {
-	Response Response
-	Reply    nativeReply
-	Stream   nativeStream
-	State    string
-	Reason   string
+	ProofAttempts []string
+	Response      Response
+	Reply         nativeReply
+	Stream        nativeStream
+	State         string
+	Reason        string
 }
 type nativeScene struct {
 	s           *Session
@@ -45,7 +46,7 @@ func (r *Registry) RegisterNative() error {
 		}
 		for _, req := range suite.Requirements {
 			family := req.ID[strings.LastIndex(req.ID, ".")+1:]
-			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations", "reasoning", "count_compact", "stored", "state", "background", "cache_tier", "continuation"}, family) {
+			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations", "reasoning", "count_compact", "stored", "state", "background", "cache_tier", "continuation", "search", "code", "image_tool", "url_context", "server_echo", "safety", "server_tools", "quota", "versions"}, family) {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
@@ -53,6 +54,10 @@ func (r *Registry) RegisterNative() error {
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, CodeVersion: hex.EncodeToString(code[:]), Layer: "upstream_protocol", Run: func(ctx context.Context, s *Session) Result {
 				scene := &nativeScene{s: s, protocol: protocol, requirement: requirement, checks: map[string]Assertion{}}
 				switch family {
+				case "quota":
+					scene.quota(ctx)
+				case "versions":
+					scene.versions(ctx)
 				case "base":
 					scene.base(ctx)
 				case "json":
@@ -99,6 +104,20 @@ func (r *Registry) RegisterNative() error {
 					scene.cacheTier(ctx)
 				case "continuation":
 					scene.continuation(ctx)
+				case "search":
+					scene.search(ctx)
+				case "code":
+					scene.code(ctx)
+				case "image_tool":
+					scene.imageTool(ctx)
+				case "url_context":
+					scene.urlContext(ctx)
+				case "server_echo":
+					scene.serverEcho(ctx)
+				case "safety":
+					scene.safety(ctx)
+				case "server_tools":
+					scene.messageServerTools(ctx)
 				}
 				return scene.finish()
 			}}); err != nil {

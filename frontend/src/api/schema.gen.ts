@@ -2103,6 +2103,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/detection/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 检测任务专用合成 MCP 回调
+         * @description 只接受活跃检测任务的随机临时 Bearer 令牌；提供固定只读合成工具及 Streamable HTTP JSON-RPC 初始化/列表/调用。不接受平台 Key、会话 Cookie、资源 URL、文件或任意工具；未配置或无有效令牌返回404。无正文持久化。
+         */
+        post: operations["detectionMCPFixture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2634,6 +2654,14 @@ export interface components {
             reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
             attempt_ids: string[];
         };
+        DetectionQuotaEvidence: {
+            /** @enum {string} */
+            header: "x-ratelimit-remaining-requests" | "x-ratelimit-remaining-tokens" | "anthropic-ratelimit-requests-remaining" | "anthropic-ratelimit-input-tokens-remaining" | "anthropic-ratelimit-output-tokens-remaining" | "anthropic-ratelimit-tokens-remaining";
+            /** Format: int64 */
+            remaining: number;
+            /** Format: uuid */
+            attempt_id: string;
+        };
         DetectionResult: {
             /** Format: uuid */
             source_task_id: string;
@@ -2660,6 +2688,8 @@ export interface components {
             fingerprint?: components["schemas"]["DetectionFingerprintReport"];
             images?: components["schemas"]["DetectionImageEvidence"][];
             settings?: components["schemas"]["DetectionSettingEvidence"][];
+            /** @description 仅凭据所有者/管理员诊断；不是公开分组能力或模型价格，不据此推断金额余额。 */
+            quotas?: components["schemas"]["DetectionQuotaEvidence"][];
         };
         DetectionPlanned: {
             credential_dependent: boolean;
@@ -9502,6 +9532,69 @@ export interface operations {
         responses: {
             /** @description 原生响应（含流式）与原生错误。 */
             default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    detectionMCPFixture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description JSON-RPC 合成响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description 初始化通知已接收 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 不属于固定合成协议 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 无活跃探针或令牌无效 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 请求超过16KiB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 单探针回调请求保护 */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

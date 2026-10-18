@@ -3,7 +3,7 @@ openapi: 3.1.0
 info:
   title: Oh-My-AIHub API
   version: 0.7.0-dev
-  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；论坛列表使用页码分页（page / limit → items / total / page / limit）；其余列表使用游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
+  description: "Oh-My-AIHub 前后端契约的唯一来源（ADR-0021）。覆盖全部 /api/** JSON 接口；/v1/**、/v1beta/** 外部模型 API 入口只登记路径与认证。\n\n约定：积分金额为十进制字符串（最多 9 位小数）；人民币为整数分（*_fen）；费率为整数纳比率（*_rate_nano，1e9 = 100%）；时间为 RFC 3339；字段统一 snake_case；错误统一为 {\"error\": \"<code>\", \"message\": \"<中文>\", \"request_id\"?: \"...\"}；论坛列表使用页码分页（page / limit → items / total / page / limit）；其余列表使用游标分页（cursor / limit → items / next_cursor）；除 GET/HEAD/OPTIONS 外的 /api 请求须携带与 Host 同源的 Origin；任务临时令牌认证的固定 /api/detection/mcp 回调除外。\n\n扩展字段：x-access 声明路由门禁（public 无需会话；session 需会话，允许首次改密前访问；ready 需会话且已完成首次改密；admin 在 ready 基础上需管理员；gateway_key 凭平台 API Key）；x-feature 标明负责实现的 Feature（Epic #170），尚未实现的接口返回 501 not_implemented。契约测试逐项对照路由表、门禁与实现状态。"
 servers:
 - {url: /, description: 同源部署：开发环境由 Vite 代理，Compose 环境由 Nginx 代理。}
 tags:
@@ -5030,6 +5030,61 @@ paths:
       - {geminiQueryKey: []}
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
+  /api/detection/mcp:
+    {
+      "post": {
+        "operationId": "detectionMCPFixture",
+        "summary": "检测任务专用合成 MCP 回调",
+        "description": "只接受活跃检测任务的随机临时 Bearer 令牌；提供固定只读合成工具及 Streamable HTTP JSON-RPC 初始化/列表/调用。不接受平台 Key、会话 Cookie、资源 URL、文件或任意工具；未配置或无有效令牌返回404。无正文持久化。",
+        "tags": [
+          "Detection"
+        ],
+        "security": [],
+        "x-access": "public",
+        "x-feature": "493",
+        "x-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC 合成响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "初始化通知已接收"
+          },
+          "400": {
+            "description": "不属于固定合成协议"
+          },
+          "404": {
+            "description": "无活跃探针或令牌无效"
+          },
+          "413": {
+            "description": "请求超过16KiB"
+          },
+          "429": {
+            "description": "单探针回调请求保护"
+          }
+        }
+      }
+    }
+
 components:
   securitySchemes:
     sessionCookie: {type: apiKey, in: cookie, name: oma_session, description: 登录后由服务端设置的 HttpOnly 会话 Cookie。}
@@ -8068,6 +8123,39 @@ components:
         ],
         "additionalProperties": false
       }
+    DetectionQuotaEvidence:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "header",
+          "remaining",
+          "attempt_id"
+        ],
+        "properties": {
+          "header": {
+            "type": "string",
+            "enum": [
+              "x-ratelimit-remaining-requests",
+              "x-ratelimit-remaining-tokens",
+              "anthropic-ratelimit-requests-remaining",
+              "anthropic-ratelimit-input-tokens-remaining",
+              "anthropic-ratelimit-output-tokens-remaining",
+              "anthropic-ratelimit-tokens-remaining"
+            ]
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+
     DetectionResult:
       {
         "type": "object",
@@ -8189,6 +8277,14 @@ components:
             "items": {
               "$ref": "#/components/schemas/DetectionSettingEvidence"
             }
+          },
+          "quotas": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/components/schemas/DetectionQuotaEvidence"
+            },
+            "description": "仅凭据所有者/管理员诊断；不是公开分组能力或模型价格，不据此推断金额余额。"
           }
         },
         "required": [
@@ -12673,7 +12769,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.16",
+    "version": "2026-10-18.18",
     "stage": "discovery",
     "sources": [
       {
@@ -12790,6 +12886,21 @@ x-aihub-gateway-contract:
         "id": "google-genai-go-sdk",
         "url": "https://github.com/googleapis/go-genai/tree/v1.75.0",
         "version": "v1.75.0"
+      },
+      {
+        "id": "openai-mcp-profile",
+        "url": "https://developers.openai.com/api/docs/guides/tools-connectors-mcp",
+        "version": "2026-10-18-native-approval-profile"
+      },
+      {
+        "id": "anthropic-mcp-profile",
+        "url": "https://platform.claude.com/docs/en/agents-and-tools/mcp-connector",
+        "version": "mcp-client-2025-11-20"
+      },
+      {
+        "id": "mcp-streamable-profile",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports",
+        "version": "2025-06-18-json"
       }
     ],
     "endpoints": [
@@ -13817,6 +13928,19 @@ x-aihub-gateway-contract:
         "replay": "read",
         "feature": "F8",
         "auth": "platform_key"
+      },
+      {
+        "id": "models.gemini.v1.list",
+        "protocol": "native-generate-content",
+        "method": "GET",
+        "path": "/v1/models",
+        "source": "gemini",
+        "scope": "stateless",
+        "model": "catalog_filter",
+        "billing": "none",
+        "replay": "read",
+        "feature": "F11",
+        "auth": "platform_key"
       }
     ],
     "suites": [
@@ -14148,6 +14272,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "openai-chat-completions.quota",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "openai-chat-completions.quota/a1",
+              "openai-chat-completions.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -14663,6 +14805,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "openai-responses.quota",
+            "endpoints": [
+              "models.openai.list",
+              "models.openai.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "openai-responses.quota/a1",
+              "openai-responses.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -15058,6 +15218,24 @@ x-aihub-gateway-contract:
               "metadata_not_capacity_proof"
             ],
             "credential_dependent": true
+          },
+          {
+            "id": "native-messages.quota",
+            "endpoints": [
+              "models.anthropic.list",
+              "models.anthropic.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "native-messages.quota/a1",
+              "native-messages.quota/a2"
+            ]
           }
         ],
         "evidence_layers": [
@@ -15535,9 +15713,7 @@ x-aihub-gateway-contract:
               "models.gemini.list"
             ],
             "source_ids": [
-              "G-B08",
               "G-B09",
-              "G-C09",
               "G-E01",
               "G-E02",
               "G-E03",
@@ -15566,12 +15742,48 @@ x-aihub-gateway-contract:
               "models.gemini.list",
               "models.gemini.get"
             ],
-            "source_ids": [],
+            "source_ids": [
+              "G-C09"
+            ],
             "conditional_source_ids": [],
             "assertions": [
               "fixed_protocol_auth_and_version",
               "bounded_directory_pagination",
               "metadata_not_capacity_proof"
+            ],
+            "credential_dependent": true
+          },
+          {
+            "id": "native-generate-content.quota",
+            "endpoints": [
+              "models.gemini.list",
+              "models.gemini.get"
+            ],
+            "source_ids": [],
+            "conditional_source_ids": [],
+            "credential_dependent": true,
+            "assertions": [
+              "remaining_quota_headers_when_observed",
+              "account_balance_not_exposed_by_native_profile"
+            ],
+            "conditional_assertions": [
+              "native-generate-content.quota/a1",
+              "native-generate-content.quota/a2"
+            ]
+          },
+          {
+            "id": "native-generate-content.versions",
+            "endpoints": [
+              "models.gemini.list",
+              "models.gemini.v1.list"
+            ],
+            "source_ids": [
+              "G-B08"
+            ],
+            "conditional_source_ids": [],
+            "assertions": [
+              "v1beta_native_directory",
+              "v1_native_directory"
             ],
             "credential_dependent": true
           }
@@ -16255,6 +16467,10 @@ x-aihub-gateway-contract:
       "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
       "detection/cache-tier-facts": "缓存接受、即时写/读计数与服务档位独立保存。OpenAI in_memory/24h、Messages 5m/1h 分别真实写读，不等待到期；短期未命中只记未确认，不虚构不支持或保持时长。Gemini 显式缓存只操作当前创建资源，真实生成/流式/计数后删除。每个启用档位各发有意义请求，不与所有功能全排列；Anthropic priority 用原生 auto 请求，standard 用 standard_only，实际 usage 可降到 standard，不能把 auto 接受冒充 priority。Gemini 从原生 usageMetadata.serviceTier/合法实际返档头核验；相互矛盾或缺失留未知。只保留固定/配置选择器、白名单实际档位及数值，不保存任意上游字符串或缓存正文。G-C08 continuationToken 续用另需独立实现，不能由缓存通过代证。",
       "gemini/G-C08": "continuationToken 独立场景，不能由显式缓存通过代证。复用真实 JSON 控制长度请求，在原生候选返回 MAX_TOKENS/CONTINUATION 与 token 时保持原 contents 不变、完整携带 opaque token 并单调增加总输出上限，验证一次真实后续 hop/逐次 usage；不追加先前输出，不把 SDK 自动累计再相加。未出现 token 记无法确认，不假造 token、不换成文档示例模型，也不为触发每 hop 32K/64K 阈值另开耐久/吞吐长跑。只保存断言/数值及真实尝试元数据，不保存 token 或正文。",
-      "detection/fixed-sdk": "Messages/GenerateContent 各使用一个固定官方 Go SDK 版本真实构造、发送并解析基础请求；SDK本身不放入网关server进程。单独应用制品 aihub-detection-sdk 在 fresh HOME/显式环境的受控子进程中运行，避免 Google SDK 无条件读取宿主环境/ADC。子进程只持一次性回环桥令牌与占位Key，真实测试Key始终留在 Session.Do 固定出站中。桥限制为当前模型/已登记单个原生端点及一次请求，关闭SDK重试/自动续用，短答响应限256KiB，正文/SDK原始错误不入报告。启动核验SDK实际构建版本和制品SHA，版本加入计划CodeVersion；缺制品不注册相应套件，保留待实现而非冒充检测完成。两SDK直接依赖仅由独立worker使用：Anthropic MIT、Google Apache-2.0；SDK的资源/WS类型不表示网关开放这些范围外接口。"
+      "detection/fixed-sdk": "Messages/GenerateContent 各使用一个固定官方 Go SDK 版本真实构造、发送并解析基础请求；SDK本身不放入网关server进程。单独应用制品 aihub-detection-sdk 在 fresh HOME/显式环境的受控子进程中运行，避免 Google SDK 无条件读取宿主环境/ADC。子进程只持一次性回环桥令牌与占位Key，真实测试Key始终留在 Session.Do 固定出站中。桥限制为当前模型/已登记单个原生端点及一次请求，关闭SDK重试/自动续用，短答响应限256KiB，正文/SDK原始错误不入报告。启动核验SDK实际构建版本和制品SHA，版本加入计划CodeVersion；缺制品不注册相应套件，保留待实现而非冒充检测完成。两SDK直接依赖仅由独立worker使用：Anthropic MIT、Google Apache-2.0；SDK的资源/WS类型不表示网关开放这些范围外接口。",
+      "detection/builtins": "调用内工具固定为 Responses web_search/code_interpreter/image_generation，Messages web_search_20250305/code_execution_20250825，GenerateContent googleSearch/urlContext/codeExecution/IMAGE及GOOGLE_SEARCH_WEB、URL_CONTEXT原生ToolCall/ToolResponse整块回放。只有实际工具块、关联结果、可核验语义/产物支持能力；auto未调用为未知，缺代码执行计费回执不从container_id猜费用。不下载工具输出文件，不开放容器/工具资源CRUD。",
+      "detection/mcp": "远端MCP仅使用本应用固定合成fixture v1（JSON Streamable HTTP 2025-06-18/2025-03-26）：每任务随机临时Bearer令牌，固定空参数只读工具返回未写入提示的随机marker，须同时有实际回调与上游原生结果。Responses测试always审批请求及明确批准后执行，Messages固定mcp-client-2025-11-20和mcp_toolset精确allowlist。AIHUB_DETECTION_PUBLIC_ORIGIN配置本应用公网HTTPS origin；缺配置保持MCP套件pending，不减全测分母。回调不接收平台Key/宿主认证/文件/任意URL，不持久化正文，单探针64请求/4工具调用、16活跃探针、请求16KiB均为局部资源保护。",
+      "detection/version-quota": "GenerateContent分组分别验证v1与v1beta原生模型目录，独立子断言，不由一版本推导另一版本；G-C09元数据归目录场景。余额/配额原生适配范围为已固定六种OpenAI/Anthropic剩余量header；共享真实目录请求，字段缺失为条件未观测，数字错误独立失败，不等待重置、不诱发额度耗尽。固定原生推理Key契约没有统一金额余额入口：明确记录未暴露，不发送组织/管理员管理API、不猜余额、不试任意中转站私有路径；供应商私有金额余额适配需先固定真实接口/认证契约。数值只在所有者/管理员报告中，不投影到公开市场/路由画像。",
+      "detection/capability-projection": "Project只接受完整封存且目标/能力摘要/manifest/实现/参数/凭据范围匹配的真实报告，按独立断言与证明层级投影。partial/unknown/unobserved不能当支持；金额/地址/自然年龄不使证据失效。上下文只投影有精确实际计量步骤支撑的已验证下界，不用声明/参数接受/硬上界/指纹猜容量或身份。后台构建纯内存投影，热路径无新增I/O。"
     }
   }

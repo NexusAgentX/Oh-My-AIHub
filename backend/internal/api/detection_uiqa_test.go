@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/fingerprint"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
@@ -67,6 +69,7 @@ func TestDetectionUIHarness(t *testing.T) {
 		for _, a := range item.Assertions {
 			result.Assertions = append(result.Assertions, detection.Assertion{ID: a, State: state, Reason: reason, AttemptIDs: []string{}})
 		}
+		uiDetectionMetadata(t, &result, i, job.Parameters)
 		job.Results = append(job.Results, result)
 	}
 	job.UpdatedAt = job.CreatedAt.Add(time.Second)
@@ -127,4 +130,32 @@ func TestDetectionUIHarness(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = server.Shutdown(ctx)
+}
+
+func uiDetectionMetadata(t *testing.T, r *detection.Result, index int, params detection.Parameters) {
+	t.Helper()
+	switch index {
+	case 0:
+		declared, accepted, actual := int64(32768), int64(16384), int64(120)
+		r.Capacity = []detection.CapacityReport{{Kind: "context", Unit: "tokens", Declared: &declared, Settings: params.Context, ParameterAcceptedLower: &accepted, VerifiedLower: &actual, Completed: true, Stop: "unconfirmed", Steps: []detection.CapacityStep{{Requested: 4096, Round: 1, CapacityProbe: detection.CapacityProbe{Accepted: true, Semantic: true, Actual: &actual, RequestedApproximate: true, Reason: "ok", AttemptIDs: []string{}}}}}}
+	case 1:
+		samples := []fingerprint.Sample{}
+		for i := range 3 {
+			var b strings.Builder
+			for j := range 300 {
+				fmt.Fprintf(&b, "%d ", (i*7+j*13)%100+1)
+			}
+			samples = append(samples, fingerprint.Sample{Text: b.String(), ExpectedCount: 300})
+		}
+		fp, err := fingerprint.Analyze(samples)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Fingerprint = &fp
+	case 2:
+		r.Images = []detection.ImageEvidence{{Variant: detection.ImageVariant{Unit: "successful_image", Size: "256x256", Quality: "high"}, Transport: "json", State: "inconclusive", Reason: "not_observed", Requested: 1, Returned: 1, Verified: 1, Products: []detection.ImageProperties{{Width: 256, Height: 256, Format: "png"}}, UnpricedTokens: true, AttemptIDs: []string{}}}
+	case 3:
+		r.Settings = []detection.SettingEvidence{{Kind: "service_tier", Configured: "anthropic:priority", Wire: "auto", Actual: "anthropic:standard", State: "inconclusive", Reason: "not_observed", Accepted: true, UsageReliable: true, AttemptIDs: []string{}}, {Kind: "cache", Configured: "5m", Wire: "5m", State: "pass", Reason: "ok", Accepted: true, UsageReliable: true, CacheWriteTokens: 2048, CacheReadTokens: 2048, AttemptIDs: []string{}}}
+		r.Quotas = []detection.QuotaEvidence{{Header: "x-ratelimit-remaining-tokens", Remaining: 10000, AttemptID: "10000000-0000-4000-8000-000000000099"}}
+	}
 }

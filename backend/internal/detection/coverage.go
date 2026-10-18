@@ -59,6 +59,9 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 }
 
 func validObservations(result Result, witnesses map[string]Attempt) bool {
+	if !validQuotaEvidence(result.Quotas, witnesses) {
+		return false
+	}
 	if !validSettingEvidence(result.Settings, witnesses) {
 		return false
 	}

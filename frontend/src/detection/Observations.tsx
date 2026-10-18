@@ -101,6 +101,6 @@ function SettingEvidence({ reports }: { reports: NonNullable<Result['settings']>
   </section>
 }
 
-export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'|'images'|'settings'> }) {
-  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}{result.images && result.images.length > 0 && <ImageEvidence reports={result.images} />}{result.settings && result.settings.length > 0 && <SettingEvidence reports={result.settings} />}</>
+export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'|'images'|'settings'|'quotas'> }) {
+  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}{result.images && result.images.length > 0 && <ImageEvidence reports={result.images} />}{result.settings && result.settings.length > 0 && <SettingEvidence reports={result.settings} />}{result.quotas && result.quotas.length > 0 && <section className="detection-observation"><h3>上游剩余配额</h3><p className="muted-copy">本次凭据的响应观测值，不能据此换算金额余额。</p><dl className="detection-versions">{result.quotas.map(row=><div key={row.header}><dt className="detection-code">{row.header}</dt><dd className="num">{tokens(row.remaining)}</dd></div>)}</dl></section>}</>
 }
