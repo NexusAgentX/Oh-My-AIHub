@@ -4,6 +4,312 @@
  */
 
 export interface paths {
+    "/backend-api/codex/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.responses */
+        post: operations["proxyCodexResponses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/responses/compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.compact */
+        post: operations["proxyCodexCompact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.search */
+        post: operations["proxyCodexSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/images/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.images */
+        post: operations["proxyCodexImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/images/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.images.edit */
+        post: operations["proxyCodexImagesEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** codex.models */
+        get: operations["proxyCodexModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/thread_hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.thread_hint */
+        post: operations["proxyCodexNotesThread_Hint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/write_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.write_file */
+        post: operations["proxyCodexNotesWrite_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/read_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.read_file */
+        post: operations["proxyCodexNotesRead_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/list_files_by_prefix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.list_files_by_prefix */
+        post: operations["proxyCodexNotesList_Files_By_Prefix"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/search_contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.search_contents */
+        post: operations["proxyCodexNotesSearch_Contents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/append_to_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.append_to_file */
+        post: operations["proxyCodexNotesAppend_To_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/list_windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.list_windows */
+        post: operations["proxyCodexHistoryList_Windows"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/list_items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.list_items */
+        post: operations["proxyCodexHistoryList_Items"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/read_item": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.read_item */
+        post: operations["proxyCodexHistoryRead_Item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/search_contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.search_contents */
+        post: operations["proxyCodexHistorySearch_Contents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/user-auth-credential/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** identity.whoami */
+        get: operations["proxyIdentityWhoami"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/wham/accounts/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** identity.accounts */
+        get: operations["proxyIdentityAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/chat/completions/{completionID}": {
         parameters: {
             query?: never;
@@ -2662,6 +2968,37 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CodexNativeCatalog: {
+            models: ({
+                slug: string;
+                display_name: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+        };
+        CodexNativeJSON: unknown;
+        CodexPlatformIdentity: {
+            email: null;
+            chatgpt_user_id: string;
+            chatgpt_account_id: string;
+            /** @constant */
+            chatgpt_plan_type: "aihub";
+            /** @constant */
+            chatgpt_account_is_fedramp: false;
+        };
+        CodexPlatformAccounts: {
+            accounts: {
+                id: string;
+                plan_type: null;
+                /** @constant */
+                workspace_backend_origin: "NO_CONSTRAINT";
+                /** @constant */
+                account_routing_override: "NO_CONSTRAINT";
+                /** @constant */
+                structure: "personal";
+            }[];
+            account_ordering: string[];
+        };
         ContributionReuseAddress: {
             revision: number;
             /** Format: uuid */
@@ -4207,6 +4544,8 @@ export interface components {
             cooldown_seconds?: number | null;
         };
         FormatTest: {
+            /** @description 最小可调用性实际使用的固定入口标识；省略时为原公共格式入口。 */
+            endpoint_id?: string;
             ok: boolean;
             status_code: number | null;
             error: string | null;
@@ -5989,6 +6328,1741 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    proxyCodexResponses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexCompact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexImagesEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized native model metadata from the selected provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeCatalog"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesThread_Hint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesWrite_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesRead_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesList_Files_By_Prefix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesSearch_Contents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesAppend_To_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryList_Windows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryList_Items: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryRead_Item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistorySearch_Contents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyIdentityWhoami: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexPlatformIdentity"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyIdentityAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexPlatformAccounts"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     proxyChatGet: {
         parameters: {
             query?: never;

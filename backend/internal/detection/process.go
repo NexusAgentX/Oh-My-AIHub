@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +24,9 @@ type ProcessSpec struct {
 	Env        map[string]string
 	Files      map[string][]byte
 	Timeout    time.Duration
+	// Fixed internal profiles only. Go's address reservations can exceed the
+	// default even with a small managed heap; callers cannot request infinity.
+	VirtualMemoryMiB int
 }
 type ProcessOutput struct {
 	Stdout   []byte `json:"-"`
@@ -57,6 +62,13 @@ func RunControlledProcess(ctx context.Context, spec ProcessSpec) (ProcessOutput,
 		return out, ctx.Err()
 	}
 	if !processSupported() || !filepath.IsAbs(spec.Executable) || spec.Timeout < time.Second || spec.Timeout > 5*time.Minute || len(spec.Args) > 64 || len(spec.Env) > 32 || len(spec.Files) > 16 {
+		return out, ErrInvalid
+	}
+	memoryMiB := spec.VirtualMemoryMiB
+	if memoryMiB == 0 {
+		memoryMiB = 1024
+	}
+	if memoryMiB != 1024 && memoryMiB != 2048 {
 		return out, ErrInvalid
 	}
 	argumentBytes := 0
@@ -108,7 +120,13 @@ func RunControlledProcess(ctx context.Context, spec ProcessSpec) (ProcessOutput,
 	stdout, stderr := &boundedOutput{cancel: cancel}, &boundedOutput{cancel: cancel}
 	// Shell text is constant. Executable and arguments remain separate argv
 	// entries, so neither prompts nor filenames are interpreted as shell code.
-	args := append([]string{"-c", `ulimit -v 1048576; ulimit -f 16384; ulimit -n 64; exec "$@"`, "aihub-client", spec.Executable}, spec.Args...)
+	program := `ulimit -v "$1" && shift && ulimit -f 16384 && ulimit -n 64 && exec "$@"`
+	if runtime.GOOS == "darwin" {
+		// Darwin rejects RLIMIT_AS. Keep its existing process/file/output guards
+		// without silently ignoring errors in Linux's enforced address limit.
+		program = `shift && ulimit -f 16384 && ulimit -n 64 && exec "$@"`
+	}
+	args := append([]string{"-c", program, "aihub-client", strconv.Itoa(memoryMiB * 1024), spec.Executable}, spec.Args...)
 	cmd := exec.Command("/bin/sh", args...)
 	cmd.Dir = dir
 	cmd.Stdout = stdout

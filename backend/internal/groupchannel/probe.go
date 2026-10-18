@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -171,6 +173,14 @@ func (p *Prober) run(id string) {
 	effective, _ := ResolveDefaults(r.Overrides, g.Defaults)
 	entries := selected(state.Directory, r)
 	changed := false
+	facts := map[string]detection.Projection{}
+	if CompatibleHeaders(r.Overrides, g.Defaults) {
+		for _, report := range state.Data.Reports {
+			if report.Target.Binding.TargetKind == "group_model" {
+				facts[report.Target.Binding.TargetID] = projection(state.Directory, report, p.Runtime.Planner)
+			}
+		}
+	}
 	for _, m := range models {
 		if p.ctx.Err() != nil {
 			break
@@ -184,7 +194,8 @@ func (p *Prober) run(id string) {
 			if p.ctx.Err() != nil {
 				break
 			}
-			result.Tests[format] = basicProbe(p.ctx, policy, entries, effective, m, format, secret)
+			endpoint := basicProbeEndpoint(m, format, facts[m.ID])
+			result.Tests[format] = basicProbeAt(p.ctx, policy, entries, effective, m, format, secret, endpoint)
 		}
 		if p.ctx.Err() != nil {
 			break
@@ -233,8 +244,32 @@ func probeBody(f channel.Format, model string) ([]byte, string) {
 	return b, protocol
 }
 func basicProbe(ctx context.Context, policy channel.Outbound, entries []gateway.Entrance, d market.Defaults, m market.GroupModel, f channel.Format, secret string) (out channel.FormatTest) {
+	return basicProbeAt(ctx, policy, entries, d, m, f, secret, "")
+}
+
+func basicProbeEndpoint(m market.GroupModel, f channel.Format, proof detection.Projection) string {
+	if !proof.Valid {
+		return ""
+	}
+	passed := map[string]bool{}
+	for _, cap := range proof.Capabilities {
+		if cap.Layer == "upstream_protocol" && cap.State == "pass" {
+			passed[cap.ID] = true
+		}
+	}
+	if m.ModelType != "image" && f == channel.FormatOpenAIResponses && !passed["openai-responses.base/accepted_native_message_shapes"] && passed["codex-special.RL14/uncompressed_request"] {
+		return "codex.responses"
+	}
+	if m.ModelType == "image" && f == channel.FormatOpenAIImages && !passed["images.generations/native_json_or_multipart"] && passed["codex-special.RL25/native_generation"] {
+		return "codex.images"
+	}
+	return ""
+}
+
+func basicProbeAt(ctx context.Context, policy channel.Outbound, entries []gateway.Entrance, d market.Defaults, m market.GroupModel, f channel.Format, secret, endpoint string) (out channel.FormatTest) {
 	started := time.Now()
 	out.TestedAt = started
+	out.EndpointID = endpoint
 	defer func() { ms := int(time.Since(started).Milliseconds()); out.DurationMS = &ms }()
 	limit := 30 * time.Second
 	if m.ModelType == "image" {
@@ -243,6 +278,9 @@ func basicProbe(ctx context.Context, policy channel.Outbound, entries []gateway.
 	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 	payload, protocol := probeBody(f, m.UpstreamModel)
+	if endpoint == "codex.responses" {
+		payload, _ = json.Marshal(map[string]any{"model": m.UpstreamModel, "instructions": "Follow the user's request exactly.", "input": []any{map[string]string{"role": "user", "content": "Reply OK."}}, "store": false, "stream": true})
+	}
 	if m.ModelType == "image" && f != channel.FormatOpenAIImages {
 		payload = detection.BasicImageRequest(protocol, m.UpstreamModel)
 	}
@@ -258,6 +296,17 @@ func basicProbe(ctx context.Context, policy channel.Outbound, entries []gateway.
 			continue
 		}
 		target, err := channel.BuildEndpoint(entry.BaseURL, f, m.UpstreamModel, false)
+		if endpoint == "codex.responses" || endpoint == "codex.images" {
+			target, err = url.Parse(entry.BaseURL)
+			if err == nil {
+				suffix := "/backend-api/codex/responses"
+				if endpoint == "codex.images" {
+					suffix = "/backend-api/codex/images/generations"
+				}
+				target.Path = strings.TrimSuffix(target.Path, "/") + suffix
+				target.RawPath = ""
+			}
+		}
 		if err != nil {
 			reason = "invalid_upstream_endpoint"
 			break
@@ -269,6 +318,9 @@ func basicProbe(ctx context.Context, policy channel.Outbound, entries []gateway.
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		if endpoint == "codex.responses" {
+			req.Header.Set("Accept", "text/event-stream")
+		}
 		req.Header.Set("Accept-Encoding", "identity")
 		if d.HeaderRules != nil {
 			for _, name := range d.HeaderRules.Remove {
@@ -307,6 +359,9 @@ func basicProbe(ctx context.Context, policy channel.Outbound, entries []gateway.
 			break
 		}
 		out.OK = detection.ValidateBasicReply(protocol, body)
+		if endpoint == "codex.responses" && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+			out.OK = detection.ValidateBasicStreamReply(protocol, body)
+		}
 		if m.ModelType == "image" {
 			out.OK = detection.ValidateBasicImageReply(protocol, body)
 		}

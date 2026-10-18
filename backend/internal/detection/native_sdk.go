@@ -60,7 +60,7 @@ func (r *Registry) RegisterSDK(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	version, err := RunControlledProcess(ctx, ProcessSpec{Executable: path, Args: []string{"--version"}, Env: sdkEnvironment(), Timeout: 10 * time.Second})
+	version, err := RunControlledProcess(ctx, ProcessSpec{Executable: path, Args: []string{"--version"}, Env: sdkEnvironment(), Timeout: 10 * time.Second, VirtualMemoryMiB: 2048})
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (n *nativeScene) sdk(ctx context.Context, path string) Result {
 	env := sdkEnvironment()
 	env["AIHUB_SDK_PROVIDER"], env["AIHUB_SDK_BASE_URL"], env["AIHUB_SDK_BRIDGE_TOKEN"] = provider, "http://"+listener.Addr().String(), token
 	env["AIHUB_SDK_MODEL"], env["AIHUB_SDK_PROMPT"], env["AIHUB_SDK_EXPECTED"] = n.s.Target.Model, nativeBasicPrompt, nativeMarker
-	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: path, Args: []string{"--probe"}, Env: env, Timeout: min(n.s.limits.RequestTimeout, 3*time.Minute)})
+	output, runErr := RunControlledProcess(ctx, ProcessSpec{Executable: path, Args: []string{"--probe"}, Env: env, Timeout: min(n.s.limits.RequestTimeout, 3*time.Minute), VirtualMemoryMiB: 2048})
 	if runErr != nil {
 		return Result{State: "invalid"}
 	}

@@ -178,6 +178,14 @@ func imageUsage(o nativeObject) nativeUsage {
 }
 
 func (n *nativeScene) imageRequest(ctx context.Context, endpoint, transport string, variant ImageVariant) (nativeOutcome, ImageEvidence) {
+	endpointID := endpoint
+	codex := endpoint == "codex.images" || endpoint == "codex.images.edit"
+	if codex {
+		endpoint = "images.generations"
+		if endpointID == "codex.images.edit" {
+			endpoint = "images.edits"
+		}
+	}
 	request := nativeObject{"model": n.s.Target.Model, "n": 1}
 	if endpoint != "images.variations" {
 		request["prompt"] = "Create a simple blue circle centered on a plain white background. Do not add text."
@@ -205,6 +213,15 @@ func (n *nativeScene) imageRequest(ctx context.Context, endpoint, transport stri
 	if transport == "sse" {
 		request["stream"] = true
 		request["partial_images"] = 1
+	}
+	if codex {
+		// The pinned native image API is JSON-only. It has inline images for
+		// edits, with no standalone Files dependency and no mask parameter.
+		delete(request, "output_format")
+		delete(request, "mask")
+		if endpoint == "images.edits" {
+			request["prompt"] = "Replace the left half of the first image with green. Use the second image as a green color reference."
+		}
 	}
 	var encoded []byte
 	header := http.Header{"Content-Type": {"application/json"}}
@@ -238,7 +255,10 @@ func (n *nativeScene) imageRequest(ctx context.Context, endpoint, transport stri
 		encoded, _ = json.Marshal(request)
 	}
 	path := "/v1/images/" + strings.TrimPrefix(endpoint, "images.")
-	out := n.call(ctx, Request{EndpointID: endpoint, Path: path, Headers: header, Body: encoded, Category: "generate"}, false)
+	if codex {
+		path = "/backend-api/codex/images/" + strings.TrimPrefix(endpoint, "images.")
+	}
+	out := n.call(ctx, Request{EndpointID: endpointID, Path: path, Headers: header, Body: encoded, Category: "generate"}, false)
 	e := ImageEvidence{Variant: variant, Transport: transport, State: out.State, Reason: out.Reason, Requested: 1, Products: []ImageProperties{}, UnpricedTokens: true, AttemptIDs: []string{out.Response.AttemptID}}
 	if out.Response.Status < 200 || out.Response.Status >= 300 || out.Response.AttemptID == "" || (out.State == "inconclusive" && out.Reason != "invalid_response") {
 		return out, e
@@ -374,7 +394,8 @@ func validImageEvidence(evidence []ImageEvidence, witnesses map[string]Attempt) 
 			return false
 		}
 		attempt, ok := witnesses[e.AttemptIDs[0]]
-		if !ok || !strings.HasPrefix(attempt.EndpointID, "images.") || (e.State == "pass" && (!attempt.ResponseReceived || attempt.Status < 200 || attempt.Status >= 300 || e.Verified != e.Requested || e.Returned != e.Requested || !e.OptionsConfirmed)) {
+		imageEndpoint := strings.HasPrefix(attempt.EndpointID, "images.") || attempt.EndpointID == "codex.images" || attempt.EndpointID == "codex.images.edit"
+		if !ok || !imageEndpoint || (e.State == "pass" && (!attempt.ResponseReceived || attempt.Status < 200 || attempt.Status >= 300 || e.Verified != e.Requested || e.Returned != e.Requested || !e.OptionsConfirmed)) {
 			return false
 		}
 		for _, p := range e.Products {

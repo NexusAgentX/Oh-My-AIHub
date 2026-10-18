@@ -38,6 +38,20 @@ func fieldInt(o nativeObject, k string) (int64, bool) { return integer(o[k]) }
 // permissive map decoder could otherwise hide invalid counts or replaced tool
 // IDs. Unknown fields remain available for native extension observations.
 func decodeNative(body []byte) (nativeObject, error) {
+	v, err := decodeNativeValue(body)
+	if err != nil {
+		return nil, err
+	}
+	o := object(v)
+	if o == nil {
+		return nil, ErrInvalid
+	}
+	return o, nil
+}
+
+// Context RPCs may return any JSON value. They use the same strict bounded
+// decoder as inference; accepting arrays must not allow duplicate keys or tails.
+func decodeNativeValue(body []byte) (any, error) {
 	if !utf8.Valid(body) {
 		return nil, errors.New("invalid native utf8")
 	}
@@ -112,11 +126,7 @@ func decodeNative(body []byte) (nativeObject, error) {
 	if _, err = d.Token(); err != io.EOF {
 		return nil, errors.New("native trailing data")
 	}
-	o := object(v)
-	if o == nil {
-		return nil, ErrInvalid
-	}
-	return o, nil
+	return v, nil
 }
 
 type nativeUsage struct {

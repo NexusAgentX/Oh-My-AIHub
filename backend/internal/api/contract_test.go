@@ -256,8 +256,8 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 				t.Errorf("%s: %s 路由须声明 sessionCookie", key, access)
 			}
 		case "gateway_key":
-			if len(security) == 0 || !strings.HasPrefix(operation.path, "/v1") {
-				t.Errorf("%s: 外部 API 入口须位于 /v1、/v1beta 下并声明 Key 认证", key)
+			if len(security) == 0 || (!strings.HasPrefix(operation.path, "/v1") && !strings.HasPrefix(operation.path, "/backend-api/")) {
+				t.Errorf("%s: 外部 API 入口须位于已声明的模型协议前缀下并声明 Key 认证", key)
 			}
 			if _, hasBody := operation.body["requestBody"]; hasBody != (operation.method == "POST" || operation.method == "PATCH") {
 				t.Errorf("%s: 外部 API 的 POST/PATCH 登记原生请求体", key)
@@ -269,7 +269,7 @@ func TestOpenAPIOperationsAreWellFormed(t *testing.T) {
 			t.Errorf("%s: 非外部入口必须位于 /api/ 下", key)
 		}
 		switch operation.body["x-feature"] {
-		case "A", "B", "C", "G", "239", "407", "490", "492", "493", "494", "495", "496":
+		case "A", "B", "C", "G", "239", "407", "490", "492", "493", "494", "495", "496", "497":
 		default:
 			t.Errorf("%s: x-feature 须为已实现 Feature", key)
 		}
