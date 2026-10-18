@@ -78,6 +78,7 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 	if detail["model"].(map[string]any)["id"] != "same/model:v1" {
 		t.Fatal(detail)
 	}
+	member.expect(t, 200, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
 	for _, path := range []string{"/api/market/models", "/api/market/suppliers", "/api/market/groups/group", "/api/market/models/same%2Fmodel:v1", "/api/market/channels", "/api/market/channels/channel"} {
 		encoded, _ := json.Marshal(member.expect(t, 200, "GET", path, nil))
 		if strings.Contains(string(encoded), "PRIVATE-") {
@@ -89,8 +90,10 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 		t.Fatal(err)
 	}
 	member.expect(t, 404, "GET", "/api/market/models/same%2Fmodel:v1", nil)
+	member.expect(t, 404, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
 	member.expect(t, 409, "GET", "/api/market/models?limit=1&cursor="+first["next_cursor"].(string), nil)
 	runtime.Ready = func() error { return errors.New("PRIVATE-publication-detail") }
+	member.expect(t, 503, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
 	for _, path := range []string{"/api/market/models", "/api/market/suppliers", "/api/market/groups/group", "/api/market/reports/unpublished"} {
 		member.expect(t, 503, "GET", path, nil)
 	}

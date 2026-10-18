@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { components } from '../api/schema.gen'
-import { MarketModelsPage, MarketReportPage, PriceText } from './Pages'
+import { MarketModelsPage, MarketReportPage, PriceText,ModelRoutingCard } from './Pages'
 
 type Schemas=components['schemas']
 describe('approved group market presentation',()=>{
@@ -36,6 +36,19 @@ describe('approved group market presentation',()=>{
     expect(html).toContain('不支持');expect(html).toContain('未观测')
     expect(html).toContain('当前证据失效');expect(html).toContain('0.163.0')
     expect(html).not.toContain('277/277')
+    client.clear()
+  })
+  it('edits the complete model route even when a detail page is filtered to one group',()=>{
+    const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}})
+    const model:Schemas['MarketBrowseModel']={id:'model',model_types:['text'],formats:['openai_responses'],protocols:['openai-responses'],online_channels:2,price:null,offers:[]}
+    const preference:Schemas['RoutingPreference']={model_id:'model',source:'account',mode:'manual',order:['hidden-channel','visible-channel'],excluded:['hidden-channel'],updated_at:null,max_attempts:null,ttft_timeout_ms:null,idle_timeout_ms:null,request_timeout_ms:null}
+    const channels:Schemas['MarketBrowseRoutingChannel'][]=['hidden-channel','visible-channel'].map(id=>({id,name:id,formats:['openai_responses'],multiplier:'1',is_mine:false,state:'available',cooldown_remaining_seconds:null,routing_metrics:[],typical_price:null}))
+    client.setQueryData(['market','model','model',''],{model,routing:preference,routing_channels:channels,offers:[],channels:[],suppliers:[],groups:[]}satisfies Schemas['MarketBrowseDetail'])
+    client.setQueryData(['settings','form-defaults'],{default_max_attempts:2,default_ttft_timeout_ms:30000,default_request_timeout_ms:120000,default_idle_timeout_ms:60000})
+    const html=renderToStaticMarkup(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/models/model?group_id=filtered-group']}><ModelRoutingCard id="model"/></MemoryRouter></QueryClientProvider>)
+    expect(html).toContain('hidden-channel');expect(html).toContain('visible-channel')
+    expect(html).toContain('该模型的全部渠道')
+    expect(html.indexOf('使用 hidden-channel')).toBeLessThan(html.indexOf('使用 visible-channel'))
     client.clear()
   })
 })

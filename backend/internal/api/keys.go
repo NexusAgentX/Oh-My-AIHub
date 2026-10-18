@@ -8,6 +8,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
@@ -349,7 +350,11 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 		return
 	}
 	if err := a.routable(r.Context(), modelID); err != nil {
-		writeDomainError(w, err)
+		if errors.Is(err, groupchannel.ErrUnavailable) {
+			writeGroupChannelError(w, err)
+		} else {
+			writeDomainError(w, err)
+		}
 		return
 	}
 	pref, err := routing.Validate(routing.Pref{
@@ -371,6 +376,18 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 // routable accepts a catalog model or a custom model a listed channel offers
 // (ADR-0034).
 func (a *app) routable(ctx context.Context, modelID string) error {
+	if a.groupChannels != nil && a.groupChannels.Runtime != nil {
+		state, err := a.groupChannels.Runtime.Current()
+		if err != nil {
+			return err
+		}
+		if known, enabled := state.ModelState(modelID); known {
+			if enabled {
+				return nil
+			}
+			return catalog.ErrNotFound
+		}
+	}
 	_, err := a.catalog.Get(ctx, modelID)
 	if !errors.Is(err, catalog.ErrNotFound) {
 		return err

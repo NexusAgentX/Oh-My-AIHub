@@ -93,8 +93,12 @@ function RoutingCard({ detail }: { detail: Detail }) {
   const dirty = !sameDraft(draft, saved)
   return <Card title="调用方式" actions={<Button size="sm" disabled={!dirty} loading={mutation.isPending} onClick={() => { setMessage(''); mutation.mutate(toRoutingInput(draft), { onSuccess: () => setMessage('已保存') }) }}>保存</Button>}>
     <SuccessMessage>{dirty ? '' : message}</SuccessMessage><InlineError>{mutation.isError ? errorMessage(mutation.error, '保存失败') : ''}</InlineError>
-    <RoutingEditor channels={detail.routing_channels} draft={draft} onChange={setDraft} scopeHint="对你所有 Key 生效，单把 Key 可以另设" />
+    <RoutingEditor channels={detail.routing_channels} draft={draft} onChange={setDraft} scopeHint="该模型的全部渠道，对你所有 Key 生效，单把 Key 可以另设" />
   </Card>
+}
+export function ModelRoutingCard({id}:{id:string}){
+  const query=useMarketModel(id,new URLSearchParams())
+  return <QueryBoundary query={query} errorFallback="模型调用设置加载失败">{detail=><RoutingCard detail={detail}/>}</QueryBoundary>
 }
 function TypicalModelCosts({ detail }: { detail: Detail }) {
   const query = useTypicalCosts('', detail.model.id)
@@ -110,7 +114,7 @@ export function MarketModelDetailPage() {
   return <QueryBoundary query={query} errorFallback="模型不存在或没有符合条件的报价">{detail => <>
     <PageHeader title={detail.model.id} back={{ to: `/models?${params}`, label: '模型' }} />
     <p className="muted-copy">{detail.model.online_channels} 个在线渠道 · 典型费用 <PriceText value={detail.model.price} /></p>
-    <RoutingCard detail={detail} />
+    <ModelRoutingCard id={detail.model.id} />
     {detail.offers.map(offer => {
       const group = detail.groups.find(g => g.id === offer.group_id), supplier = detail.suppliers.find(s => s.id === group?.supplier_id)
       const channels = detail.channels.filter(c => c.group_model_id === offer.id)

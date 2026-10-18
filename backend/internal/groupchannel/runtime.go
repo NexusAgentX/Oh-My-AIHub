@@ -31,6 +31,34 @@ type State struct {
 	Reports    map[string]detection.Projection
 	Version    string
 }
+
+// ModelState authorizes management of an approved ID before it has any online
+// channels. A disabled exact-ID rule also prevents a legacy-catalog fallback.
+func (s *State) ModelState(id string) (known, enabled bool) {
+	for _, v := range s.Directory.Governance {
+		if v.ModelID == id && v.Disabled {
+			return true, false
+		}
+	}
+	groups := map[string]market.Group{}
+	suppliers := map[string]bool{}
+	for _, v := range s.Directory.Groups {
+		groups[v.ID] = v
+	}
+	for _, v := range s.Directory.Suppliers {
+		suppliers[v.ID] = v.Enabled && v.DeletedAt == nil
+	}
+	for _, v := range s.Directory.Models {
+		if v.ModelID != id {
+			continue
+		}
+		known = true
+		g := groups[v.GroupID]
+		enabled = enabled || (v.Enabled && v.DeletedAt == nil && g.ID != "" && g.Enabled && g.DeletedAt == nil && suppliers[g.SupplierID])
+	}
+	return known, enabled
+}
+
 type Runtime struct {
 	Repository      Repository
 	Planner         Planner
