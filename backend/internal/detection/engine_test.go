@@ -147,9 +147,10 @@ func (f fixtureOutbound) FreshClient(context.Context, string) (*http.Client, err
 func (f fixtureOutbound) WithExtraBlockedHosts([]string) (channel.Outbound, error) { return f, nil }
 
 type fixtureResolver struct {
-	base   string
-	mu     sync.Mutex
-	digest string
+	profile TestProfile
+	base    string
+	mu      sync.Mutex
+	digest  string
 }
 
 func (f *fixtureResolver) Resolve(_ context.Context, actor Actor, input Target) (Resolved, error) {
@@ -158,7 +159,7 @@ func (f *fixtureResolver) Resolve(_ context.Context, actor Actor, input Target) 
 	if actor.ID != "owner" && !actor.Admin {
 		return Resolved{}, ErrNotFound
 	}
-	return Resolved{Target: Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: input.Binding.TargetID, TargetRevision: 1, CapabilityDigest: f.digest}, ModelType: "text", Model: "native/model:v1"}, Addresses: []string{f.base}}, nil
+	return Resolved{Target: Target{Profile: f.profile, Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: input.Binding.TargetID, TargetRevision: 1, CapabilityDigest: f.digest}, ModelType: "text", Model: "native/model:v1"}, Addresses: []string{f.base}}, nil
 }
 func fixtureManifest(requirements ...string) gatewaycontract.Manifest {
 	reqs := []gatewaycontract.Requirement{}

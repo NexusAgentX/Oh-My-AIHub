@@ -45,7 +45,7 @@ func (r *Registry) RegisterNative() error {
 		}
 		for _, req := range suite.Requirements {
 			family := req.ID[strings.LastIndex(req.ID, ".")+1:]
-			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations", "reasoning", "count_compact", "stored", "state", "background", "cache_tier"}, family) {
+			if !slices.Contains([]string{"base", "json", "fingerprint", "context", "length_search", "output", "tools", "stream", "multi", "catalog", "errors", "vision", "document", "audio", "video", "generations", "edits", "variations", "reasoning", "count_compact", "stored", "state", "background", "cache_tier", "continuation"}, family) {
 				continue
 			}
 			protocol, requirement := suite.Protocol, req
@@ -97,6 +97,8 @@ func (r *Registry) RegisterNative() error {
 					scene.background(ctx)
 				case "cache_tier":
 					scene.cacheTier(ctx)
+				case "continuation":
+					scene.continuation(ctx)
 				}
 				return scene.finish()
 			}}); err != nil {
@@ -366,6 +368,7 @@ func (n *nativeScene) finish() Result {
 
 const nativeMarker = "蓝鲸🌍_47"
 const nativeBasicPrompt = "Reply with exactly this text and no explanation: " + nativeMarker
+const nativeLengthPrompt = "Write the integers from 1 to 10000, separated by spaces. Continue until your output token limit. No tools and no explanation."
 
 func (n *nativeScene) basic(ctx context.Context) nativeOutcome {
 	return n.infer(ctx, baseNative(n.protocol, n.s.Target.Model, nativeBasicPrompt), false, true)
@@ -434,7 +437,7 @@ func (n *nativeScene) json(ctx context.Context) {
 	n.check("native_structure", basic, basic.Reply.Structure)
 	n.check("reliable_usage_independently", basic, basic.Reply.Usage.Reliable)
 	n.check("normal_and_controlled_length_termination", basic, nativeEndedNormally(basic.Reply))
-	body := baseNative(n.protocol, n.s.Target.Model, "Write the integers from 1 to 10000, separated by spaces. Continue until your output token limit. No tools and no explanation.")
+	body := baseNative(n.protocol, n.s.Target.Model, nativeLengthPrompt)
 	outputLimit(n.protocol, body, 16)
 	out := n.infer(ctx, body, false, true)
 	n.check("normal_and_controlled_length_termination", out, nativeEndedForLength(out.Reply))

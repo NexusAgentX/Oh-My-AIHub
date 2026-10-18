@@ -12673,7 +12673,7 @@ components:
 # Discovery metadata only: these entries do not register live HTTP routes.
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-18.14",
+    "version": "2026-10-18.15",
     "stage": "discovery",
     "sources": [
       {
@@ -12774,6 +12774,11 @@ x-aihub-gateway-contract:
       {
         "id": "gemini-caching",
         "url": "https://ai.google.dev/api/caching",
+        "version": "GenerateContent-v1beta-2026-10-18"
+      },
+      {
+        "id": "gemini-continuation",
+        "url": "https://ai.google.dev/gemini-api/docs/generate-content/long-decode",
         "version": "GenerateContent-v1beta-2026-10-18"
       }
     ],
@@ -16238,6 +16243,7 @@ x-aihub-gateway-contract:
       "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
       "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
       "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
-      "detection/cache-tier-facts": "缓存接受、即时写/读计数与服务档位独立保存。OpenAI in_memory/24h、Messages 5m/1h 分别真实写读，不等待到期；短期未命中只记未确认，不虚构不支持或保持时长。Gemini 显式缓存只操作当前创建资源，真实生成/流式/计数后删除。每个启用档位各发有意义请求，不与所有功能全排列；Anthropic priority 用原生 auto 请求，standard 用 standard_only，实际 usage 可降到 standard，不能把 auto 接受冒充 priority。Gemini 从原生 usageMetadata.serviceTier/合法实际返档头核验；相互矛盾或缺失留未知。只保留固定/配置选择器、白名单实际档位及数值，不保存任意上游字符串或缓存正文。G-C08 continuationToken 续用另需独立实现，不能由缓存通过代证。"
+      "detection/cache-tier-facts": "缓存接受、即时写/读计数与服务档位独立保存。OpenAI in_memory/24h、Messages 5m/1h 分别真实写读，不等待到期；短期未命中只记未确认，不虚构不支持或保持时长。Gemini 显式缓存只操作当前创建资源，真实生成/流式/计数后删除。每个启用档位各发有意义请求，不与所有功能全排列；Anthropic priority 用原生 auto 请求，standard 用 standard_only，实际 usage 可降到 standard，不能把 auto 接受冒充 priority。Gemini 从原生 usageMetadata.serviceTier/合法实际返档头核验；相互矛盾或缺失留未知。只保留固定/配置选择器、白名单实际档位及数值，不保存任意上游字符串或缓存正文。G-C08 continuationToken 续用另需独立实现，不能由缓存通过代证。",
+      "gemini/G-C08": "continuationToken 独立场景，不能由显式缓存通过代证。复用真实 JSON 控制长度请求，在原生候选返回 MAX_TOKENS/CONTINUATION 与 token 时保持原 contents 不变、完整携带 opaque token 并单调增加总输出上限，验证一次真实后续 hop/逐次 usage；不追加先前输出，不把 SDK 自动累计再相加。未出现 token 记无法确认，不假造 token、不换成文档示例模型，也不为触发每 hop 32K/64K 阈值另开耐久/吞吐长跑。只保存断言/数值及真实尝试元数据，不保存 token 或正文。"
     }
   }
