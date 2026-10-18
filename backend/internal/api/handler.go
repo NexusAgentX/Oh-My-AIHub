@@ -21,7 +21,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
@@ -36,7 +35,6 @@ type Dependencies struct {
 	DetectionMCP  *detection.MCPFixture
 	Contributions *contribution.Service
 	Detection     *detection.Service
-	Suppliers     *supplier.Service
 	Forum         *forum.Service
 	Identity      *identity.Service
 	Catalog       *catalog.Service
@@ -64,7 +62,6 @@ type app struct {
 	detectionMCP      *detection.MCPFixture
 	contributions     *contribution.Service
 	detection         *detection.Service
-	suppliers         *supplier.Service
 	forum             *forum.Service
 	identity          *identity.Service
 	catalog           *catalog.Service
@@ -102,7 +99,6 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 		detectionMCP:      dependencies.DetectionMCP,
 		contributions:     dependencies.Contributions,
 		detection:         dependencies.Detection,
-		suppliers:         dependencies.Suppliers,
 		forum:             dependencies.Forum,
 		identity:          dependencies.Identity,
 		catalog:           dependencies.Catalog,
@@ -133,7 +129,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerAdminSettingsRoutes(routes)
 	application.registerKeyRoutes(routes)
 	application.registerBrowseRoutes(routes)
-	application.registerSupplierRoutes(routes)
+	application.registerDirectoryAnalysisRoutes(routes)
 	application.registerChannelRoutes(routes)
 	application.registerGatewayRoutes(routes)
 	application.registerC2CRoutes(routes)

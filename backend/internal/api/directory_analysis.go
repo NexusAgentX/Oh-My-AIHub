@@ -80,3 +80,8 @@ func (a *app) analyzeDirectory(w http.ResponseWriter, r *http.Request, supplier 
 	}
 	writeJSON(w, 200, report)
 }
+
+func (a *app) registerDirectoryAnalysisRoutes(r *router) {
+	r.implement("407", "GET /api/channel-hall/{channelID}/analysis", accessReady, a.analyzeHallChannel)
+	r.implement("407", "GET /api/suppliers/{supplierID}/analysis", accessReady, a.analyzeSupplier)
+}

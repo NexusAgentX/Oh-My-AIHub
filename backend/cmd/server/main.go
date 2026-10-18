@@ -44,7 +44,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/typicalpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
@@ -468,7 +467,6 @@ func main() {
 			Typical: typicalCosts, GroupChannels: groupService, DetectionMCP: mcpFixture,
 			Contributions: contributions,
 			Detection:     detector,
-			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
 			Identity:      identityService,
 			Forum:         forumService,
 			Catalog:       catalogService,
