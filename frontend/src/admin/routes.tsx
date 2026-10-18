@@ -34,6 +34,7 @@ export const adminRoutes = (
       />
       <Route lazy={async () => ({ Component: (await import('./SettingsPage')).SettingsPage })} path="settings" />
  <Route lazy={async()=>({Component:(await import('../detection/SearchPage')).DetectionSearchPage})} path="detection-search" />
+ <Route lazy={async()=>({Component:(await import("../typical/Page")).TypicalCostsPage})} path="typical-costs" />
     </Route>
   </Route>
 )

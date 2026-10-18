@@ -40,9 +40,11 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/typicalpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
 // keyringCheckTimeout bounds the startup decryption of every stored secret.
@@ -390,11 +392,33 @@ func main() {
 	}})
 	defer groupProber.Close()
 	groupProber.Notify()
+	// Derived estimates have two private connections and one bounded worker;
+	// inference/settlement never waits for them.
+	typicalStartup, cancelTypicalStartup := context.WithTimeout(context.Background(), 15*time.Second)
+	typicalPool, err := database.OpenLimited(typicalStartup, databaseURL, 2)
+	if err != nil {
+		fatal(logger, "opening typical cost pool failed", err)
+	}
+	defer typicalPool.Close()
+	typicalRates := settings.NewService(settingspg.NewStore(typicalPool))
+	typicalCosts, err := typical.New(typicalStartup, typicalpg.NewStore(typicalPool), typicalSource{runtime: groupRuntime, values: func(ctx context.Context) (int64, int64, error) {
+		v, e := typicalRates.Get(ctx)
+		return v.USDCNYRateNano, v.FeeRateNano, e
+	}})
+	cancelTypicalStartup()
+	if err != nil {
+		fatal(logger, "starting typical cost estimates failed", err)
+	}
+	groupRuntime.Notify = func() { groupProber.Notify(); typicalCosts.Notify() }
+	typicalContext, stopTypical := context.WithCancel(backgroundContext)
+	typicalDone := make(chan struct{})
+	go func() { defer close(typicalDone); typicalCosts.Run(typicalContext) }()
+	defer func() { stopTypical(); <-typicalDone }()
 
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			GroupChannels: groupService, DetectionMCP: mcpFixture,
+			Typical: typicalCosts, GroupChannels: groupService, DetectionMCP: mcpFixture,
 			Contributions: contributions,
 			Detection:     detector,
 			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
