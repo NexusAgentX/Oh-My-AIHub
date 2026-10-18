@@ -104,22 +104,6 @@ func TestChannelsModelPagesAndHome(t *testing.T) {
 		t.Fatalf("test of unknown model = %d", recorder.Code)
 	}
 
-	// 模型浏览与首页。
-	list := bob.expect(t, http.StatusOK, http.MethodGet, "/api/models", nil)["items"].([]any)
-	if len(list) != 1 || list[0].(map[string]any)["online_channels"] != float64(1) || list[0].(map[string]any)["lowest_prices"] == nil {
-		t.Fatalf("models = %v", list)
-	}
-	seedChannelHealth(p.stats, channelID, "deepseek-chat")
-	for viewer, wantMine := range map[*client]bool{alice: true, bob: false} {
-		page := viewer.expect(t, http.StatusOK, http.MethodGet, "/api/models/deepseek-chat", nil)
-		offered := page["channels"].([]any)
-		if len(offered) != 1 || offered[0].(map[string]any)["is_mine"] != wantMine || offered[0].(map[string]any)["success_rate_24h"] != nil {
-			t.Fatalf("model page = %v", page)
-		}
-	}
-	if recorder := bob.call(t, http.MethodGet, "/api/models/missing", nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("unknown model page = %d", recorder.Code)
-	}
 	keyName, keyID := "默认 Key", "30000000-0000-4000-8000-0000000000b1"
 	finished, duration := time.Date(2026, 10, 8, 9, 0, 1, 0, time.UTC), int32(1200)
 	p.browse.home = gateway.HomeStats{TodaySpend: money.FromNano(3_000_000_000), TodayCalls: 4, TodaySucceeded: 3, RevenueToday: money.FromNano(1_000_000_000), ChannelsOnline: 1, ChannelsTotal: 2, PendingTrades: 1}

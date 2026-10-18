@@ -86,7 +86,7 @@ func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
 }
 
 func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	a, b, c := okUpstream(t), okUpstream(t), okUpstream(t)
@@ -133,8 +133,8 @@ func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
 	if hits() != [3]int{1, 2, 2} {
 		t.Fatalf("restored routing hits = %v", hits())
 	}
-	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/models/gpt-test", nil)
-	if model["routing"].(map[string]any)["mode"] != "manual" || len(model["channels"].([]any)) != 3 {
+	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/market/models/gpt-test", nil)
+	if model["routing"].(map[string]any)["mode"] != "manual" || len(model["routing_channels"].([]any)) != 3 {
 		t.Fatalf("model detail = %v", model)
 	}
 	if e.apiJSON(consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "fastest"})["mode"] != "fastest" {
@@ -615,7 +615,7 @@ func TestKeyManagementDefaultKeyLimitSecretAuditAndDeletion(t *testing.T) {
 }
 
 func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -623,60 +623,67 @@ func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
 		"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-Tenant", "value": "private-tenant-value"}}, "remove": []any{}},
 	}})
 	_, secret := e.defaultKey(consumer)
-
-	// What other users see must not reveal the Base URL, the key or header rules.
-	for _, path := range []string{"/api/models", "/api/models/gpt-test", "/api/home"} {
-		body := e.api(consumer, http.MethodGet, path, nil).Body.String()
-		for _, forbidden := range []string{relay.server.URL, "upstream-secret-key", "private-tenant-value", "X-Tenant", "api_key_ciphertext"} {
-			if strings.Contains(body, forbidden) {
-				t.Fatalf("%s leaks %q: %s", path, forbidden, body)
+	for _, path := range []string{"/api/market/models", "/api/market/models/gpt-test", "/api/market/channels/" + id, "/api/home"} {
+		reply := e.api(consumer, http.MethodGet, path, nil)
+		if reply.Code != http.StatusOK {
+			t.Fatalf("public %s: %d %s", path, reply.Code, reply.Body.String())
+		}
+		for _, forbidden := range []string{relay.server.URL, strings.Replace(relay.server.URL, "127.0.0.1", "example.com", 1), "upstream-secret-key", "private-tenant-value", "X-Tenant", "api_key_ciphertext"} {
+			if strings.Contains(reply.Body.String(), forbidden) {
+				t.Fatalf("%s leaks %q", path, forbidden)
 			}
 		}
 	}
-	for _, mine := range []string{e.api(sharer, http.MethodGet, "/api/channels", nil).Body.String(), e.api(sharer, http.MethodGet, "/api/channels/"+id, nil).Body.String(),
-		e.api(e.admin, http.MethodGet, "/api/admin/channels", nil).Body.String(), e.api(e.admin, http.MethodGet, "/api/admin/channels/"+id, nil).Body.String()} {
-		if strings.Contains(mine, "upstream-secret-key") {
-			t.Fatalf("a channel read echoes the upstream key: %s", mine)
+	for _, view := range []struct {
+		actor person
+		path  string
+	}{
+		{sharer, "/api/group-channels"}, {sharer, "/api/group-channels/" + id}, {e.admin, "/api/admin/group-channels"}, {e.admin, "/api/admin/group-channels/" + id},
+	} {
+		reply := e.api(view.actor, http.MethodGet, view.path, nil)
+		if reply.Code != http.StatusOK || strings.Contains(reply.Body.String(), "upstream-secret-key") || strings.Contains(reply.Body.String(), "api_key_ciphertext") {
+			t.Fatalf("private metadata read: %d %s", reply.Code, reply.Body.String())
 		}
 	}
-	if recorder := e.api(consumer, http.MethodGet, "/api/channels/"+id, nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("someone else's channel = %d", recorder.Code)
+	if got := e.api(consumer, http.MethodGet, "/api/group-channels/"+id, nil).Code; got != http.StatusNotFound {
+		t.Fatalf("another owner's channel: %d", got)
 	}
-	if recorder := e.api(consumer, http.MethodGet, "/api/admin/channels", nil); recorder.Code != http.StatusForbidden {
-		t.Fatalf("admin list as member = %d", recorder.Code)
+	if got := e.api(consumer, http.MethodGet, "/api/admin/group-channels", nil).Code; got != http.StatusForbidden {
+		t.Fatalf("admin list as member: %d", got)
 	}
-
-	if recorder := e.api(e.admin, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": ""}); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("suspend without a reason = %d", recorder.Code)
+	moderate := "/api/admin/group-channels/" + id + "/moderate"
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": strings.Repeat("x", 1001)}).Code; got != http.StatusUnprocessableEntity {
+		t.Fatalf("overlong moderation reason: %d", got)
 	}
-	suspended := e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": "abuse report"})
-	if suspended["channel"].(map[string]any)["status"] != "suspended" || suspended["channel"].(map[string]any)["owner"].(map[string]any)["username"] != "sharer" {
-		t.Fatalf("suspended = %v", suspended)
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": "abuse report"}).Code; got != http.StatusNoContent {
+		t.Fatalf("moderation: %d", got)
 	}
-	if recorder := e.api(e.admin, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": "again"}); recorder.Code != http.StatusConflict {
-		t.Fatalf("second suspend = %d", recorder.Code)
+	suspended := e.apiJSON(e.admin, 200, "GET", "/api/admin/group-channels/"+id, nil)
+	if suspended["status"] != "suspended" || suspended["owner"].(map[string]any)["username"] != "sharer" {
+		t.Fatal(suspended)
 	}
-	if recorder := e.api(sharer, http.MethodPatch, "/api/channels/"+id, map[string]any{"status": "listed"}); recorder.Code != http.StatusConflict {
-		t.Fatalf("owner relisting a suspended channel = %d %s", recorder.Code, recorder.Body.String())
+	if got := e.api(sharer, http.MethodPatch, "/api/group-channels/"+id, map[string]any{"revision": suspended["revision"], "status": "listed"}).Code; got != http.StatusConflict {
+		t.Fatalf("owner relisted suspended channel: %d", got)
 	}
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusServiceUnavailable {
-		t.Fatalf("call to a suspended channel = %d", code)
+	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; got != http.StatusServiceUnavailable {
+		t.Fatalf("suspended channel routed: %d", got)
 	}
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+id+"/unsuspend", map[string]any{"reason": "reviewed"})
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","messages":[{"role":"user","content":"SECRET-PROMPT-TEXT"}]}`), nil).Code; code != http.StatusOK {
-		t.Fatalf("call after unsuspend = %d", code)
+	// The fixed group API uses an explicit empty reason to restore a channel.
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": ""}).Code; got != http.StatusNoContent {
+		t.Fatalf("restore: %d", got)
 	}
+	reply := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","messages":[{"role":"user","content":"SECRET-PROMPT-TEXT"}]}`), nil)
+	if reply.Code != http.StatusOK {
+		t.Fatalf("restored call: %d %s", reply.Code, reply.Body.String())
+	}
+	callID := reply.Header().Get("X-AIHub-Request-Id")
 	var audits int
-	_ = e.pool.QueryRow(context.Background(), `SELECT count(*) FROM audit_log WHERE action IN ('channel.suspended', 'channel.unsuspended') AND target_id = $1`, id).Scan(&audits)
-	if audits != 2 {
-		t.Fatalf("audit rows = %d", audits)
+	if err := e.pool.QueryRow(context.Background(), `SELECT count(*) FROM audit_log WHERE action='group_channel.moderated' AND target_id=$1`, id).Scan(&audits); err != nil || audits != 2 {
+		t.Fatal("moderation audit", audits, err)
 	}
-	events := e.channelEvents(id)
-	if fmt.Sprint(events) != "[listed suspended unsuspended]" {
-		t.Fatalf("channel events = %v", events)
+	if events := e.channelEvents(id); fmt.Sprint(events) != "[listed suspended unsuspended]" {
+		t.Fatalf("events: %v", events)
 	}
-
-	// The structured log lines carry identifiers only: no key, no body.
 	logs := e.logs.String()
 	for _, forbidden := range []string{secret, "upstream-secret-key", "SECRET-PROMPT-TEXT", "private-tenant-value"} {
 		if strings.Contains(logs, forbidden) {
@@ -684,20 +691,24 @@ func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
 		}
 	}
 	if !strings.Contains(logs, `"msg":"gateway request"`) || !strings.Contains(logs, `"key_prefix":"sk-aih-`) {
-		t.Fatalf("expected gateway log lines, got %s", logs)
+		t.Fatal("missing gateway log identifiers")
 	}
-
-	// Deleting hides the channel everywhere.
-	if recorder := e.api(sharer, http.MethodDelete, "/api/channels/"+id, nil); recorder.Code != http.StatusNoContent {
-		t.Fatalf("delete channel = %d", recorder.Code)
+	current := e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+id, nil)
+	if got := e.api(sharer, http.MethodDelete, "/api/group-channels/"+id, map[string]any{"revision": current["revision"]}).Code; got != http.StatusNoContent {
+		t.Fatalf("delete: %d", got)
 	}
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusServiceUnavailable {
-		t.Fatalf("call to a deleted channel = %d", code)
+	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; got != http.StatusServiceUnavailable {
+		t.Fatalf("deleted channel routed: %d", got)
 	}
+	historical := e.callRow(callID)
+	if historical.FinalChannel != id || !historical.HasLedgerTx {
+		t.Fatalf("business delete removed historical settlement: %+v", historical)
+	}
+	e.assertZeroSum()
 }
 
 func TestHomeAndModelListShowTodayNumbers(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -720,15 +731,32 @@ func TestHomeAndModelListShowTodayNumbers(t *testing.T) {
 	if channels["today_revenue"] != expectedCost || channels["online"] != float64(1) || channels["total"] != float64(1) {
 		t.Fatalf("sharer home = %v", sharerHome)
 	}
-	models := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/models", nil)["items"].([]any)
+	models := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/market/models", nil)["items"].([]any)
 	var found map[string]any
 	for _, item := range models {
 		if item.(map[string]any)["id"] == "gpt-test" {
 			found = item.(map[string]any)
 		}
 	}
-	if found["online_channels"] != float64(1) || fmt.Sprint(found["formats"]) != "[openai_chat openai_responses anthropic gemini]" ||
-		found["lowest_prices"].(map[string]any)["input"] != "20" {
+	if found["online_channels"] != float64(1) || len(found["formats"].([]any)) != 4 {
 		t.Fatalf("model list entry = %v", found)
+	}
+	detail := e.apiJSON(consumer, 200, "GET", "/api/market/models/gpt-test", nil)
+	if rows := detail["routing_channels"].([]any); len(rows) != 1 || rows[0].(map[string]any)["multiplier"] != "2" {
+		t.Fatal(detail)
+	}
+	var quoted bool
+	for _, raw := range detail["offers"].([]any) {
+		offer := raw.(map[string]any)
+		if offer["quote"] != nil {
+			q := offer["quote"].(map[string]any)
+			if q["currency"] != "CNY" || q["prices"].(map[string]any)["input"] != "10" {
+				t.Fatal("independent quote changed", q)
+			}
+			quoted = true
+		}
+	}
+	if !quoted {
+		t.Fatal("missing approved quote", detail)
 	}
 }

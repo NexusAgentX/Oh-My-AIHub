@@ -24,7 +24,7 @@ const (
 )
 
 func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -117,7 +117,7 @@ func TestGatewayForwardsAllFourFormatsByteForByteAndBooksEachCall(t *testing.T) 
 }
 
 func TestGatewayResponseIsUnchangedWhenUsageCannotBeRead(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
@@ -141,7 +141,7 @@ func TestGatewayResponseIsUnchangedWhenUsageCannotBeRead(t *testing.T) {
 }
 
 func TestGatewayFallsBackBeforeAnyByteIsWritten(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	broken := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
@@ -167,7 +167,7 @@ func TestGatewayFallsBackBeforeAnyByteIsWritten(t *testing.T) {
 }
 
 func TestGatewayReturnsClientErrorsUnchangedWithoutFallbackOrCharge(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	rejecting := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
@@ -193,7 +193,7 @@ func TestGatewayReturnsClientErrorsUnchangedWithoutFallbackOrCharge(t *testing.T
 }
 
 func TestGatewayAnswersWithTheLastUpstreamFailureWhenEveryChannelFails(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	status := func(code int, body string) *upstream {
@@ -217,7 +217,7 @@ func TestGatewayAnswersWithTheLastUpstreamFailureWhenEveryChannelFails(t *testin
 }
 
 func TestGatewayCooldownTakesAChannelOutAfterConsecutiveFailures(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	failing := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) { w.WriteHeader(http.StatusBadGateway) })
@@ -246,15 +246,15 @@ func TestGatewayCooldownTakesAChannelOutAfterConsecutiveFailures(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/models/gpt-test", nil)
-	listed := model["channels"].([]any)[0].(map[string]any)
+	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/market/models/gpt-test", nil)
+	listed := model["routing_channels"].([]any)[0].(map[string]any)
 	if listed["state"] != "cooldown" || listed["cooldown_remaining_seconds"] == nil {
 		t.Fatalf("channel state = %v", listed)
 	}
 }
 
 func TestGatewayRateLimitWithRetryAfterRestsTheChannelForThatLong(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	var limited atomic.Bool
@@ -325,7 +325,7 @@ func TestGatewayRateLimitWithRetryAfterRestsTheChannelForThatLong(t *testing.T) 
 }
 
 func TestGatewayRateLimitWithoutRetryAfterIsOnlyCounted(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	var limited atomic.Bool
@@ -354,7 +354,7 @@ func TestGatewayRateLimitWithoutRetryAfterIsOnlyCounted(t *testing.T) {
 }
 
 func TestGatewayChecksBalanceAndKeyBudgetWithoutReserving(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	sharer := e.member("sharer", "0")
 	consumer := e.member("consumer", "0.05") // credit limit: one call overdraws, the next is refused
 	relay := okUpstream(t)
@@ -403,7 +403,7 @@ func TestGatewayChecksBalanceAndKeyBudgetWithoutReserving(t *testing.T) {
 }
 
 func TestGatewayOwnChannelNetsToZeroWithoutFee(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	owner := e.member("owner", "10")
 	relay := okUpstream(t)
 	e.createChannel(owner, channelSpec{name: "mine", upstream: relay})
@@ -423,7 +423,7 @@ func TestGatewayOwnChannelNetsToZeroWithoutFee(t *testing.T) {
 }
 
 func TestFinishingACallTwiceBooksItOnce(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	id, err := e.store.Gateway.InsertCall(context.Background(), gateway.CallInsert{
@@ -453,7 +453,7 @@ func TestFinishingACallTwiceBooksItOnce(t *testing.T) {
 }
 
 func TestStaleCallsAreInterruptedWithoutCharge(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	id, err := e.store.Gateway.InsertCall(context.Background(), gateway.CallInsert{
 		AccountID: consumer.id, RequestedModel: "gpt-test", Format: channel.FormatOpenAIChat, Outcome: gateway.OutcomeInProgress,

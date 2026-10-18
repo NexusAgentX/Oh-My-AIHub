@@ -1644,40 +1644,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 可用模型列表 */
-        get: operations["listModels"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/{modelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 模型详情、渠道与我的路由 */
-        get: operations["getModel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/routing/{modelID}": {
         parameters: {
             query?: never;
@@ -4255,17 +4221,6 @@ export interface components {
             seq: number;
             name: string;
         };
-        /** @description 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。 */
-        ModelPrices: {
-            input: components["schemas"]["Price"];
-            output: components["schemas"]["Price"];
-            /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
-            token_prices?: {
-                [key: string]: components["schemas"]["Price"];
-            };
-            cache_write: components["schemas"]["Price"];
-            cache_read: components["schemas"]["Price"];
-        };
         /** @description 乘以渠道倍率后的四个现价，积分/百万 token。 */
         EffectivePrices: {
             input: components["schemas"]["Amount"];
@@ -4387,135 +4342,6 @@ export interface components {
             pending_c2c_trades: number;
             recent_calls: components["schemas"]["CallSummary"][];
         };
-        /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
-        PriceTier: {
-            seq: number;
-            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
-            service_tier?: string;
-            name: string;
-            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
-            min_prompt_tokens: number | null;
-            /** @description 输入侧 token 上限，不含。 */
-            max_prompt_tokens: number | null;
-            /** @description IANA 时区，默认 UTC。 */
-            timezone: string;
-            /** @description ISO 星期（1=周一）；null 表示每天。 */
-            weekdays: number[] | null;
-            start_minute_of_day: number | null;
-            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
-            end_minute_of_day: number | null;
-            prices: components["schemas"]["ModelPrices"];
-        };
-        PriceTierInput: {
-            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
-            service_tier?: string;
-            name?: string;
-            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
-            min_prompt_tokens?: number | null;
-            /** @description 输入侧 token 上限，不含。 */
-            max_prompt_tokens?: number | null;
-            /** @description IANA 时区，默认 UTC。 */
-            timezone?: string;
-            /** @description ISO 星期（1=周一）；null 表示每天。 */
-            weekdays?: number[] | null;
-            start_minute_of_day?: number | null;
-            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
-            end_minute_of_day?: number | null;
-            prices: components["schemas"]["ModelPrices"];
-        };
-        AdminModel: {
-            id: string;
-            display_name: string;
-            price_currency: components["schemas"]["PriceCurrency"];
-            base_prices: components["schemas"]["ModelPrices"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            enabled: boolean;
-            sort_order: number;
-            provider: string;
-            context_window: number | null;
-            max_output_tokens: number | null;
-            input_modalities: string[];
-            output_modalities: string[];
-            supports_tools: boolean;
-            supports_structured_output: boolean;
-            supports_vision: boolean;
-            parameter_info: string;
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-        };
-        AdminModelList: {
-            items: components["schemas"]["AdminModel"][];
-        };
-        AdminModelEnvelope: {
-            model: components["schemas"]["AdminModel"];
-        };
-        ModelCreateRequest: {
-            /** @description 模型名，即客户端请求中的 model；不含 / 与 :。 */
-            id: string;
-            display_name: string;
-            /** @description 默认 CNY。基准价、细分价与条件价格档都按此币种填写。 */
-            price_currency?: components["schemas"]["PriceCurrency"];
-            base_prices: components["schemas"]["ModelPrices"];
-            price_tiers?: components["schemas"]["PriceTierInput"][];
-            enabled?: boolean;
-            sort_order?: number;
-            provider?: string;
-            context_window?: number | null;
-            max_output_tokens?: number | null;
-            input_modalities?: string[];
-            output_modalities?: string[];
-            supports_tools?: boolean;
-            supports_structured_output?: boolean;
-            supports_vision?: boolean;
-            parameter_info?: string;
-        };
-        ModelUpdateRequest: {
-            display_name?: string;
-            /** @description 改变币种时，提供该模型的全部渠道的汇率优惠随之重设：改为 USD 时开启（数值不变的模型保持原价），改为 CNY 时关闭。 */
-            price_currency?: components["schemas"]["PriceCurrency"];
-            base_prices?: components["schemas"]["ModelPrices"];
-            /** @description 提供时整组替换价格档；空数组表示删除全部档位。 */
-            price_tiers?: components["schemas"]["PriceTierInput"][];
-            enabled?: boolean;
-            sort_order?: number;
-            provider?: string;
-            context_window?: number | null;
-            max_output_tokens?: number | null;
-            input_modalities?: string[];
-            output_modalities?: string[];
-            supports_tools?: boolean;
-            supports_structured_output?: boolean;
-            supports_vision?: boolean;
-            parameter_info?: string;
-        };
-        /** @description 启用模型的列表项。 */
-        CatalogModel: {
-            id: string;
-            display_name: string;
-            provider: string;
-            context_window: number | null;
-            max_output_tokens: number | null;
-            input_modalities: string[];
-            output_modalities: string[];
-            supports_tools: boolean;
-            supports_structured_output: boolean;
-            supports_vision: boolean;
-            parameter_info: string;
-            price_currency: components["schemas"]["PriceCurrency"];
-            /** @description 美元模型换算用的当前汇率；人民币模型为 null。 */
-            usd_cny_rate: components["schemas"]["ExchangeRate"] | null;
-            /** @description 积分价；美元模型已按当前汇率换算。 */
-            base_prices: components["schemas"]["ModelPrices"];
-            current_tier: components["schemas"]["TierRef"] | null;
-            lowest_prices: components["schemas"]["EffectivePrices"] | null;
-            formats: components["schemas"]["Format"][];
-            online_channels: number;
-            /** @description 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。 */
-            custom: boolean;
-        };
-        CatalogModelList: {
-            items: components["schemas"]["CatalogModel"][];
-        };
         ModelRoutingMetric: {
             /**
              * @description 实际入口协议；Codex 原生与公共 Responses/Images 分开计量。
@@ -4537,29 +4363,6 @@ export interface components {
             output_samples: number;
             /** @description 对应统计至少达到此样本数才用于自身指标排序。 */
             min_samples: number;
-        };
-        ModelChannel: {
-            /** @description 该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。 */
-            routing_metrics?: components["schemas"]["ModelRoutingMetric"][];
-            /** Format: uuid */
-            id: string;
-            name: string;
-            owner: components["schemas"]["Party"];
-            is_mine: boolean;
-            formats: components["schemas"]["Format"][];
-            multiplier: components["schemas"]["Multiplier"];
-            /** @description 美元模型开启了汇率优惠。 */
-            fx_discount: boolean;
-            effective_multiplier: components["schemas"]["EffectiveMultiplier"];
-            current_prices: components["schemas"]["EffectivePrices"];
-            success_rate_24h: components["schemas"]["Ratio"] | null;
-            ttft_p50_ms: number | null;
-            /**
-             * @description available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM限制。
-             * @enum {string}
-             */
-            state: "available" | "cooldown" | "limited";
-            cooldown_remaining_seconds: number | null;
         };
         RoutingPreference: {
             model_id: string;
@@ -4588,12 +4391,6 @@ export interface components {
             ttft_timeout_ms?: number | null;
             idle_timeout_ms?: number | null;
             request_timeout_ms?: number | null;
-        };
-        ModelDetail: {
-            model: components["schemas"]["CatalogModel"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            channels: components["schemas"]["ModelChannel"][];
-            routing: components["schemas"]["RoutingPreference"];
         };
         ApiKeySpend: {
             today: components["schemas"]["Amount"];
@@ -5908,85 +5705,12 @@ export interface components {
             /** Format: uuid */
             transaction_id: string | null;
         };
-        Supplier: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        SupplierEndpoint: {
-            base_url: string;
-            label: string;
-        };
-        AdminSupplier: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            /** Format: date-time */
-            updated_at: string;
-            visible: boolean;
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-            linked_channels: number;
-        };
-        SupplierInput: {
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            visible: boolean;
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-        };
-        SupplierList: {
-            items: components["schemas"]["Supplier"][];
-            next_cursor: string | null;
-        };
-        AdminSupplierList: {
-            items: components["schemas"]["AdminSupplier"][];
-            next_cursor: string | null;
-        };
-        SupplierRecognition: {
-            supplier: components["schemas"]["Supplier"] | null;
-        };
-        SupplierRecognitionInput: {
-            base_url: string;
-        };
         SupplierIcon: {
             icon_data: string;
             icon_source: string;
         };
         SupplierIconInput: {
             website_url: string;
-        };
-        HallOffer: {
-            model: components["schemas"]["CatalogModel"];
-            multiplier: string;
-            effective_multiplier: string;
-            fx_discount: boolean;
         };
         DirectoryValues: {
             cache_samples: number;
@@ -6035,38 +5759,6 @@ export interface components {
             previous: components["schemas"]["DirectoryValues"];
             groups: components["schemas"]["DirectoryRow"][];
             trend: components["schemas"]["DirectoryRow"][];
-        };
-        HallChannel: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            summary: string;
-            description: string;
-            owner: components["schemas"]["Party"];
-            is_mine: boolean;
-            supplier: components["schemas"]["Supplier"] | null;
-            models: components["schemas"]["HallOffer"][];
-            formats: components["schemas"]["Format"][];
-            /** @enum {string} */
-            state: "available" | "cooldown" | "limited";
-            cooldown_remaining_seconds: number | null;
-            success_rate_24h: string | null;
-            ttft_p50_ms: number | null;
-        };
-        HallList: {
-            items: components["schemas"]["HallChannel"][];
-            next_cursor: string | null;
-        };
-        SupplierDetail: {
-            supplier: components["schemas"]["Supplier"];
-            channels: components["schemas"]["HallChannel"][];
-            models: components["schemas"]["CatalogModel"][];
-        };
-        SupplierImpactInput: {
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-        };
-        SupplierImpact: {
-            linked_channels: number;
         };
         /** @enum {string} */
         GroupChannelFormat: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
@@ -11389,54 +11081,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-        };
-    };
-    listModels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogModelList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 模型名。 */
-                modelID: components["parameters"]["modelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelDetail"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     setRouting: {

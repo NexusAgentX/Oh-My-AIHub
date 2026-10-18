@@ -11,6 +11,10 @@ func TestGlobalModelAdministrationRoutesAreRemoved(t *testing.T) {
 	assertRetiredRoutes(t, []struct{ method, path string }{{"GET", "/api/admin/models"}, {"POST", "/api/admin/models"}, {"PATCH", "/api/admin/models/retired"}, {"DELETE", "/api/admin/models/retired"}})
 }
 
+func TestGlobalModelBrowseRoutesAreRemoved(t *testing.T) {
+	assertRetiredRoutes(t, []struct{ method, path string }{{"GET", "/api/models"}, {"GET", "/api/models/retired"}})
+}
+
 func TestLegacySupplierAndHallRoutesAreRemoved(t *testing.T) {
 	assertRetiredRoutes(t, []struct{ method, path string }{
 		{"POST", "/api/admin/suppliers/preview"},

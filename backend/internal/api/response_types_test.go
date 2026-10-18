@@ -90,9 +90,7 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"points summary of calls without a key", newPointsEntrySummaryJSON(observe.EntrySummary{ByKey: []observe.KeySpend{{Spend: money.FromNano(money.Scale), Entries: 2}}}), map[string]any{
 			"by_key": []any{map[string]any{"api_key": nil, "spend": "1", "entries": float64(2)}},
 		}},
-		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0), 0), map[string]any{
-			"context_window": nil, "max_output_tokens": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0), "usd_cny_rate": nil,
-		}},
+
 		{"call that has not finished", newGatewayCallSummaryJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
 			"cost": "0.000000003", "charged": "0",

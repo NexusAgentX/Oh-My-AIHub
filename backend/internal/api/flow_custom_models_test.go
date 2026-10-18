@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCustomModelsListPriceAndRoute(t *testing.T) {
+func TestLegacyChannelCustomPriceValidation(t *testing.T) {
 	t.Parallel()
 	p := newPlatform(t)
 	admin := p.admin(t)
@@ -49,18 +49,6 @@ func TestCustomModelsListPriceAndRoute(t *testing.T) {
 	if recorder := alice.call(t, http.MethodPost, "/api/channels", channelBody("非法", bad)); recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid custom name = %d", recorder.Code)
 	}
-
-	list := alice.expect(t, http.StatusOK, http.MethodGet, "/api/models", nil)["items"].([]any)
-	last := list[len(list)-1].(map[string]any)
-	if len(list) != 2 || last["id"] != "foo-1" || last["custom"] != true || last["online_channels"] != float64(2) ||
-		last["lowest_prices"].(map[string]any)["output"] != "9" || list[0].(map[string]any)["custom"] != false {
-		t.Fatalf("models = %v", list)
-	}
-	detail := alice.expect(t, http.StatusOK, http.MethodGet, "/api/models/foo-1", nil)
-	if detail["model"].(map[string]any)["custom"] != true || len(detail["channels"].([]any)) != 2 || len(detail["price_tiers"].([]any)) != 0 {
-		t.Fatalf("custom model detail = %v", detail)
-	}
-	alice.expect(t, http.StatusNotFound, http.MethodGet, "/api/models/missing", nil)
 
 	alice.expect(t, http.StatusOK, http.MethodPut, "/api/routing/foo-1", map[string]any{"mode": "reliable"})
 	alice.expect(t, http.StatusNotFound, http.MethodPut, "/api/routing/missing", map[string]any{"mode": "reliable"})
