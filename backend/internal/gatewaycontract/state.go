@@ -92,7 +92,7 @@ func ResolveReferences(actor Principal, refs []Reference, lookup Lookup) (*Bindi
 		var match *Resource
 		for i := range rows {
 			r := &rows[i]
-			if r.AccountID != actor.AccountID || r.KeyID != actor.KeyID || r.Kind != ref.Kind || r.ID != ref.ID || r.ParentID != ref.ParentID {
+			if r.AccountID != actor.AccountID || r.KeyID != actor.KeyID || r.Kind != ref.Kind || r.ID != ref.ID || (ref.ParentID != "" && r.ParentID != ref.ParentID) {
 				continue
 			}
 			if match != nil {

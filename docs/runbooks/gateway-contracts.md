@@ -35,16 +35,19 @@ rm -rf "$AIHUB_CLI_LAB"
 
 脚本拒绝其他客户端版本。它为每组配置创建独立的子进程配置目录与合成工作区，使用临时 CA 和非 CA 叶证书建立回环 HTTPS 后端；TLS 校验保持开启。子进程仅获得必要环境，Git 的宿主配置/凭据辅助读取关闭，插件、应用和 shell 工具关闭，外部代理指向本地 fixture；不加载宿主登录。运行结束或取消时清理进程组和临时目录。输出仅包含版本、认证类别、方法/路径、布尔断言与输入类型，不保存完整 HTTP、认证内容、stdout/stderr、推理或笔记正文。
 
-两个配置仅在本地合成凭据形式上不同：
+凭据对照及原生图片工具闭环：
 
 | 配置 | 合成 auth.json 字段 | 预期机制结果 |
 | --- | --- | --- |
 | 普通 API Key | `OPENAI_API_KEY` | 推理完成，notes 扩展未启用 |
 | 平台身份兼容原型 | `personal_access_token` | 本地 whoami/accounts 返回合成平台身份及未知套餐 `aihub`，CLI 分类为 ChatGPT；调用 notes thread_hint 后推理完成 |
+| 平台身份兼容＋生图工具 | `personal_access_token` | 合成 SSE 下发 image_gen.imagegen，CLI 实际调用原生 images/generations，以图像模型请求并把工具结果回填推理 |
+
+可以在命令末尾附加 `api-key`、`synthetic-platform-pat` 或 `synthetic-platform-imagegen`，只复现一个配置。生图用本地固定 PNG，不访问真实图片服务；它证明固定客户端与原生入口的闭环，不证明供应商生图支持。Codex JSON edits 字段与通用 multipart edits 是两个原生契约，分别验证，不相互转换。
 
 共同设置是内置 `openai` provider、指向本地 HTTPS 的 `openai_base_url`（`/backend-api/codex`）/`chatgpt_base_url`（`/backend-api/`）、本地 `CODEX_AUTHAPI_BASE_URL`，并启用 token budget 与 history/notes。具体开关以可执行脚本为准。身份辅助接口按维护者决定由平台本地回答，正式实现不能将共享供应商 whoami/accounts 直接转给消费者。
 
-这一步证明固定客户端的启用条件，不证明真实 notes 写读/历史恢复、跨供应商兼容、正式平台端点、模型目录、zstd 或生图已通过。fixture 会拒绝未实现路径，目录失败后使用客户端内置目录；它没有伪造一份已通过的供应商目录。客户端可能先尝试 WebSocket 再回退到 HTTP/SSE，不能把回退记录为 WebSocket 支持。`responses_websockets` 系列在该版本已经移除，不将这些无效开关作为禁用 WS 的证据。
+这一步证明固定客户端的启用和合成生图工具闭环，不证明真实 notes 写读/历史恢复、跨供应商兼容、正式平台端点、模型目录、zstd 或真实上游生图已通过。fixture 会拒绝未实现路径，目录失败后使用客户端内置目录；它没有伪造一份已通过的供应商目录。客户端可能先尝试 WebSocket 再回退到 HTTP/SSE，不能把回退记录为 WebSocket 支持。`responses_websockets` 系列在该版本已经移除，不将这些无效开关作为禁用 WS 的证据。
 
 合成后端返回空 thread_hint 只证明调用发生。它没有标准的“创建会话并证明所有者”语义，不能据此把客户端提交的未知 session 先登记给第一个调用者。正式 F8 必须证明实际原生协议下的首次归属；未证明时按既定安全边界失败关闭并标记平台前置未就绪，不写供应商 unsupported，不增加来源粘性。
 

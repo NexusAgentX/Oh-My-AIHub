@@ -22,6 +22,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
 });
 
 async function experiment(mode) {
+  const imageMode = mode === 'synthetic-platform-imagegen';
   const root = await mkdtemp(path.join(tmpdir(), 'aihub-codex-bootstrap-'));
   const configDir = path.join(root, 'config');
   const workspace = path.join(root, 'workspace');
@@ -39,6 +40,7 @@ async function experiment(mode) {
     '-days', '1', '-extfile', 'server.ext', '-out', 'server.pem']);
   const observations = [];
   const key = 'aihub-synthetic-platform-key';
+  let responseRequests = 0;
   const server = https.createServer({ key: await readFile(path.join(root, 'server.key')),
     cert: await readFile(path.join(root, 'server.pem')) }, async (req, res) => {
     const chunks = [];
@@ -72,16 +74,28 @@ async function experiment(mode) {
         structure: 'personal' }], account_ordering: ['aihub-account-fixture'] });
     } else if (req.url.endsWith('/alpha/notes/v2/thread_hint')) {
       send(200, { text: '' });
+    } else if (req.url.endsWith('/images/generations')) {
+      assert.equal(req.method, 'POST');
+      assert.equal(body?.model, 'gpt-image-2');
+      assert.equal(typeof body?.prompt, 'string');
+      assert.equal(body?.background, 'opaque');
+      send(200, { created: 1, data: [{ b64_json: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', generation_id: 'fixture-generation' }] });
     } else if (req.url.endsWith('/responses')) {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const item = { id: 'msg_fixture', type: 'message', role: 'assistant', status: 'completed',
-        content: [{ type: 'output_text', text: 'fixture-ok', annotations: [] }] };
+      if (req.method === 'POST') responseRequests++;
+      const toolTurn = imageMode && responseRequests === 1;
+      const item = toolTurn ? { id: 'fc_fixture', type: 'function_call', call_id: 'call_fixture',
+        namespace: 'image_gen', name: 'imagegen', arguments: JSON.stringify({ prompt: 'Synthetic fixture blue square' }) }
+        : { id: 'msg_fixture', type: 'message', role: 'assistant', status: 'completed',
+          content: [{ type: 'output_text', text: 'fixture-ok', annotations: [] }] };
       const response = { id: 'resp_fixture', object: 'response', created_at: 1,
         status: 'completed', output: [item], usage: { input_tokens: 8, output_tokens: 3, total_tokens: 11 } };
       for (const event of [
         { type: 'response.created', response: { ...response, status: 'in_progress', output: [] } },
-        { type: 'response.output_item.added', output_index: 0, item: { ...item, status: 'in_progress', content: [] } },
-        { type: 'response.output_text.delta', item_id: item.id, output_index: 0, content_index: 0, delta: 'fixture-ok' },
+        ...(!toolTurn ? [
+          { type: 'response.output_item.added', output_index: 0, item: { ...item, status: 'in_progress', content: [] } },
+          { type: 'response.output_text.delta', item_id: item.id, output_index: 0, content_index: 0, delta: 'fixture-ok' },
+        ] : []),
         { type: 'response.output_item.done', output_index: 0, item },
         { type: 'response.completed', response },
       ]) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
@@ -175,11 +189,14 @@ use_history_notes_extension = true
     assert.equal(status, 'completed', 'synthetic inference did not complete');
     assert(observations.some(x => x.path.endsWith('/responses') && x.authenticated));
     const notesEnabled = observations.some(x => x.path.endsWith('/alpha/notes/v2/thread_hint'));
-    assert.equal(notesEnabled, mode === 'synthetic-platform-pat', 'notes activation differs from the fixed-version contract');
+    assert.equal(notesEnabled, mode !== 'api-key', 'notes activation differs from the fixed-version contract');
+    const imageEnabled = observations.some(x => x.path.endsWith('/images/generations'));
+    assert.equal(imageEnabled, imageMode, 'native image-generation tool was not executed');
+    if (imageMode) assert(observations.some(x => x.path.endsWith('/responses') && x.inputTypes.includes('function_call_output')), 'image result was not fed back');
     assert.notEqual(account.account?.planType, 'pro', 'fixture must not claim Pro');
     return { evidence: 'official_cli_with_synthetic_backend', version: version.stdout.trim(), mode,
       accountType: account.account?.type ?? null, completed: true,
-      planType: account.account?.planType ?? null, notesEnabled,
+      planType: account.account?.planType ?? null, notesEnabled, imageEnabled,
       observations };
   } finally {
     clearTimeout(deadline);
@@ -194,7 +211,10 @@ use_history_notes_extension = true
   }
 }
 
-for (const mode of ['api-key', 'synthetic-platform-pat']) {
+const modes = ['api-key', 'synthetic-platform-pat', 'synthetic-platform-imagegen'];
+const selected = process.argv[3] ? [process.argv[3]] : modes;
+for (const mode of selected) {
+  assert(modes.includes(mode), 'unknown experiment mode');
   if (cancelled) break;
   const result = await experiment(mode);
   console.log(JSON.stringify(result));

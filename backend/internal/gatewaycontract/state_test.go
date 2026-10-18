@@ -21,6 +21,9 @@ func TestOwnershipAndIndependentReferenceConflicts(t *testing.T) {
 	if err != nil || got == nil || *got != a {
 		t.Fatalf("wrong collision owner: %v %v", got, err)
 	}
+	if got, err := ResolveReferences(actor, []Reference{{Kind: "item", ID: "item-a"}}, lookup); err != nil || got == nil || *got != a {
+		t.Fatal("bare owned item_reference lost its recorded parent", got, err)
+	}
 	for _, tc := range []struct {
 		name  string
 		actor Principal
