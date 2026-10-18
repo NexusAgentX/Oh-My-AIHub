@@ -63,7 +63,23 @@ type Request struct {
 	Headers    http.Header
 	Body       []byte
 	Category   string
+	// Internal-only negative authentication probes. Callers cannot supply an
+	// arbitrary replacement credential; configured protected headers are still
+	// stripped before either invalid or absent authentication is selected.
+	Authentication Authentication
+	// A generator may prove its synthetic request would exceed RequestBytes
+	// before allocating it. This records a local protection attempt, not an
+	// upstream response or a length-capability failure.
+	Oversized bool
 }
+type Authentication string
+
+const (
+	AuthenticationValid   Authentication = ""
+	AuthenticationInvalid Authentication = "invalid"
+	AuthenticationAbsent  Authentication = "absent"
+)
+
 type Response struct {
 	AttemptID string
 	Status    int
@@ -135,7 +151,7 @@ func matchPath(template, path string) bool {
 }
 func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	e, ok := s.endpoints[input.EndpointID]
-	if !ok || !s.allowed[e.ID] || !matchPath(e.Path, input.Path) || int64(len(input.Body)) > s.limits.RequestBytes || !containsCategory(input.Category) || len(s.resolved.Addresses) == 0 {
+	if !ok || !s.allowed[e.ID] || !matchPath(e.Path, input.Path) || !containsCategory(input.Category) || len(s.resolved.Addresses) == 0 || (input.Authentication != AuthenticationValid && input.Authentication != AuthenticationInvalid && input.Authentication != AuthenticationAbsent) {
 		return Response{}, ErrInvalid
 	}
 	id, err := ids.NewUUID()
@@ -161,7 +177,11 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 	callCtx, cancel := context.WithTimeout(ctx, s.limits.RequestTimeout)
 	defer cancel()
 	policy := s.outbound
-	if s.prepareEgress != nil {
+	if input.Oversized || int64(len(input.Body)) > s.limits.RequestBytes {
+		err = ErrBusy
+		attempt.Reason = "body_limit"
+	}
+	if err == nil && s.prepareEgress != nil {
 		policy, err = s.prepareEgress(callCtx)
 	}
 	var client *http.Client
@@ -221,16 +241,26 @@ func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
 						}
 					}
 				}
+				credential := string(s.secret)
+				if input.Authentication == AuthenticationInvalid {
+					credential = "aihub-invalid-" + id
+				}
 				switch e.Protocol {
 				case "native-messages":
-					req.Header.Set("x-api-key", string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("x-api-key", credential)
+					}
 					if req.Header.Get("anthropic-version") == "" {
 						req.Header.Set("anthropic-version", "2023-06-01")
 					}
 				case "native-generate-content":
-					req.Header.Set("x-goog-api-key", string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("x-goog-api-key", credential)
+					}
 				default:
-					req.Header.Set("Authorization", "Bearer "+string(s.secret))
+					if input.Authentication != AuthenticationAbsent {
+						req.Header.Set("Authorization", "Bearer "+credential)
+					}
 				}
 				var resp *http.Response
 				resp, err = client.Do(req)

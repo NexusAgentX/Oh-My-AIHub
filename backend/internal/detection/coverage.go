@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/fingerprint"
 	"slices"
 	"strings"
 )
@@ -21,6 +22,9 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 		return ErrInvalid
 	}
 	seen := map[string]bool{}
+	if !validObservations(result, witnesses) {
+		return ErrInvalid
+	}
 	for _, a := range result.Assertions {
 		if seen[a.ID] || !slices.Contains(item.Assertions, a.ID) || !reasonValid(a.Reason) || len(a.AttemptIDs) == 0 || len(a.AttemptIDs) > 16 {
 			return ErrInvalid
@@ -34,7 +38,7 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 		}
 		for _, id := range a.AttemptIDs {
 			attempt, ok := witnesses[id]
-			if !ok || (!attempt.Sent && a.Reason != "external_error" && a.Reason != "network_error" && a.Reason != "timeout" && a.Reason != "prerequisite_failed") {
+			if !ok || (!attempt.Sent && a.Reason != "external_error" && a.Reason != "network_error" && a.Reason != "timeout" && a.Reason != "prerequisite_failed" && a.Reason != "body_limit") {
 				return ErrInvalid
 			}
 		}
@@ -54,6 +58,46 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 	return nil
 }
 
+func validObservations(result Result, witnesses map[string]Attempt) bool {
+	if result.Fingerprint != nil && !fingerprint.ValidReport(*result.Fingerprint) {
+		return false
+	}
+	if len(result.Capacity) > 2 {
+		return false
+	}
+	kinds := map[string]bool{}
+	for _, r := range result.Capacity {
+		if kinds[r.Kind] || (r.Kind != "context" && r.Kind != "max_output") || r.Unit != "tokens" || r.Settings.Validate() != nil || r.Settings.Rounds > 128 || r.Settings.Rechecks > 8 || len(r.Steps) > 2*r.Settings.Rounds*(r.Settings.Rechecks+1) || !slices.Contains([]string{"rounds", "precision", "cancelled", "non_monotonic", "configured_bound", "unconfirmed"}, r.Stop) {
+			return false
+		}
+		kinds[r.Kind] = true
+		for _, v := range []*int64{r.Declared, r.ParameterAcceptedLower, r.ParameterRejectedUpper, r.VerifiedLower, r.ProvenFailureUpper} {
+			if v != nil && *v < 0 {
+				return false
+			}
+		}
+		for _, step := range r.Steps {
+			if step.Requested < r.Settings.Low || step.Requested > r.Settings.High || step.Round < 1 || step.Round > r.Settings.Rounds || step.Recheck < 0 || step.Recheck > r.Settings.Rechecks || !reasonValid(step.Reason) || len(step.AttemptIDs) == 0 || len(step.AttemptIDs) > 16 {
+				return false
+			}
+			for _, v := range []*int64{step.Actual, step.InputOverhead, step.FailureUpper} {
+				if v != nil && *v < 0 {
+					return false
+				}
+			}
+			if step.FailureUpper != nil && !step.LengthError {
+				return false
+			}
+			for _, id := range step.AttemptIDs {
+				if _, ok := witnesses[id]; !ok {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
 // Complete is intentionally stricter than job terminality or a green summary.
 // Negative but fully executed reports qualify; absent suites, fixture results,
 // mismatched versions or unfinished items never qualify for object creation.
@@ -63,6 +107,11 @@ func Complete(job Job) bool {
 	}
 	results := map[string]Result{}
 	for _, result := range job.Results {
+		for _, capacity := range result.Capacity {
+			if !capacity.Completed {
+				return false
+			}
+		}
 		if _, ok := results[result.ScenarioID]; ok {
 			return false
 		}

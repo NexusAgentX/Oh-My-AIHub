@@ -110,7 +110,7 @@ func attemptValue(a DetectionAttempt) detection.Attempt {
 	return detection.Attempt{ID: a.ID, EndpointID: a.EndpointID, Method: a.Method, Path: a.PathTemplate, Status: int(a.Status), Reason: a.Reason, Category: a.Category, DurationMS: a.DurationMs, Sent: a.Sent, ResponseReceived: a.ResponseReceived, At: a.CreatedAt}
 }
 func (s *Store) Attempts(ctx context.Context, jobID string, ids []string) ([]detection.Attempt, error) {
-	if len(ids) > 1024 {
+	if len(ids) > 4096 {
 		return nil, detection.ErrInvalid
 	}
 	rows, err := New(s.pool).FindAttempts(ctx, FindAttemptsParams{TaskID: jobID, Column2: ids})

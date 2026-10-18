@@ -1,0 +1,71 @@
+import { useState } from 'react'
+import { Button, DataTable, Notice } from '../ui'
+import type { Job } from './queries'
+
+type Result = Job['results'][number]
+type Capacity = NonNullable<Result['capacity']>[number]
+const tokens = (value: number | null | undefined) => value == null ? '未知' : value.toLocaleString('zh-CN')
+const stops: Record<Capacity['stop'], string> = {
+  rounds: '已完成配置轮数', precision: '已达到探测目标精度', configured_bound: '已探到配置上界',
+  non_monotonic: '边界不单调，保留已验证结果', unconfirmed: '无法继续确认边界', cancelled: '已取消',
+}
+
+function CapacityEvidence({ report }: { report: Capacity }) {
+  const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(0)
+  const size = 50
+  const steps = report.steps.slice(page * size, (page + 1) * size)
+  return <section className="detection-observation">
+    <h3>{report.kind === 'context' ? '上下文实测' : '最大输出实测'}</h3>
+    <dl className="detection-versions">
+      <dt>报价声明</dt><dd className="num">{tokens(report.declared)} token</dd>
+      <dt>参数接受的探测点</dt><dd className="num">{tokens(report.parameter_accepted_lower)}</dd>
+      <dt>长度限制探测点</dt><dd className="num">{tokens(report.parameter_rejected_upper)}</dd>
+      <dt>实测成功下界</dt><dd className="num">{tokens(report.verified_lower)} token</dd>
+      <dt>已证实失败上界</dt><dd className="num">{tokens(report.proven_failure_upper)} token</dd>
+      <dt>结束状态</dt><dd>{stops[report.stop]}{!report.completed && ' · 未完成'}</dd>
+    </dl>
+    <p className="muted-copy">参数接受与实际达到分别记录；探到配置上界后，真实最大值仍可能更高。</p>
+    {report.steps.some((step) => step.requested_approximate) && <p className="muted-copy">上下文请求目标为近似 token 数，实测下界取可靠用量；计数估算保留在逐轮证据中。</p>}
+    <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary>逐轮证据 · {report.steps.length} 次探测</summary>
+      {expanded && <>
+        <DataTable caption="长度探测证据" rows={steps} empty={<p className="muted-copy">尚无探测记录</p>} rowKey={(step) => `${step.round}-${step.recheck}-${step.requested}`} columns={[
+          { key: 'round', header: '轮次', primary: true, cell: (step) => `${step.round}${step.recheck ? ` · 复核 ${step.recheck}` : ''}` },
+          { key: 'requested', header: '请求目标', numeric: true, cell: (step) => `${step.requested_approximate ? '≈ ' : ''}${tokens(step.requested)}` },
+          { key: 'accepted', header: '参数接受', cell: (step) => step.accepted ? '已接受' : step.length_error ? '长度限制' : '未确认' },
+          { key: 'actual', header: '实际 token', numeric: true, cell: (step) => `${step.approximate && step.actual !== null ? '≈ ' : ''}${tokens(step.actual)}` },
+          { key: 'semantic', header: '内容核验', cell: (step) => step.semantic ? '已核验' : '未确认' },
+        ]} />
+        {report.steps.length > size && <div className="form-actions"><Button variant="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</Button><span className="num">{page + 1}/{Math.ceil(report.steps.length / size)}</span><Button variant="quiet" disabled={(page + 1) * size >= report.steps.length} onClick={() => setPage(page + 1)}>下一页</Button></div>}
+      </>}
+    </details>
+  </section>
+}
+
+function FingerprintEvidence({ report }: { report: NonNullable<Result['fingerprint']> }) {
+  const [all, setAll] = useState(false)
+  return <section className="detection-observation">
+    <h3>模型指纹参考</h3>
+    <Notice tone="info">结果表示参考库内的相似程度，无法据此确定模型身份或识别库外模型。</Notice>
+    <p>有效样本 <span className="num">{report.used_outputs}/3</span> · {report.version}</p>
+    {report.decision === 'unscorable' ? <p>有效样本不足，无法评分。</p> : <>
+      <DataTable caption="模型指纹参考排名" rows={all ? report.results : report.results.slice(0, 5)} rowKey={(row) => row.model} columns={[
+        { key: 'model', header: '参考模型 ID', primary: true, cell: (row) => <span className="detection-code">{row.model}</span> },
+        { key: 'score', header: '排名分数', numeric: true, cell: (row) => row.score.toFixed(3) },
+        { key: 'probability', header: '参考库内概率', numeric: true, cell: (row) => row.probability == null ? '未知' : row.probability.toLocaleString('zh-CN', { style: 'percent', maximumFractionDigits: 2 }) },
+      ]} />
+      {report.results.length > 5 && <Button variant="quiet" onClick={() => setAll(!all)}>{all ? '只看前五项' : `查看全部 ${report.results.length} 项`}</Button>}
+    </>}
+    <details><summary>固定参考库</summary><dl className="detection-versions">
+      <dt>参考库时间</dt><dd>{report.reference_built_at}</dd>
+      <dt>算法提交</dt><dd className="detection-code">{report.commit}</dd>
+      <dt>检测器 SHA-256</dt><dd className="detection-code">{report.detector_sha256}</dd>
+      <dt>参考库 SHA-256</dt><dd className="detection-code">{report.reference_sha256}</dd>
+    </dl></details>
+  </section>
+}
+
+export function DetectionObservations({ result }: { result: Pick<Result,'capacity'|'fingerprint'> }) {
+  return <>{result.capacity?.map((report) => <CapacityEvidence key={report.kind} report={report} />)}{result.fingerprint && <FingerprintEvidence report={result.fingerprint} />}</>
+}

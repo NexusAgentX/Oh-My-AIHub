@@ -5,6 +5,7 @@ import { errorMessage } from '../api/query'
 import { Badge, Button, ButtonLink, Card, EmptyState, InlineError, Metric, MetricGrid, Notice, PageHeader, PasswordField, QueryBoundary } from '../ui'
 import { useDetectionAction, useDetectionArtifacts, useDetectionJob, useDetectionJobs, useSavedDetectionReport,useDetectionReports, type Job } from './queries'
 import './detection.css'
+import { DetectionObservations } from './Observations'
 
 const states: Record<string, string> = { queued: '排队中', running: '检测中', finished: '已结束', cancelled: '已取消', interrupted: '已中断', suite_pending: '检测套件待实现', failed: '检测器异常', outdated: '配置已变化', pass: '通过', partial: '部分支持', fail: '未通过', unsupported: '不支持', inconclusive: '无法确认', unobserved: '未观测', untested: '未执行' }
 const reasons: Record<string, string> = { ok: '已核验', unsupported: '上游不支持', assertion_failed: '断言未通过', prerequisite_failed: '前置未通过，无法继续核验', external_error: '上游或网络异常', detector_error: '检测器异常', not_observed: '条件未出现', client_disabled: '客户端未启用', platform_unavailable: '平台代理暂不可用', body_limit: '超出单次大小保护上限', timeout: '单次请求超时', network_error: '网络错误', invalid_response: '响应不符合约定', cancelled: '已取消', interrupted: '进程中断' }
@@ -69,6 +70,7 @@ function Report({ job,readOnly=false }: { job: Job;readOnly?:boolean }) {
       <div className="stack-form">{rerunnable && <label className="check-label"><input type="checkbox" checked={selected.includes(item.id)} onChange={(e) => setSelected((old) => e.target.checked ? [...old, item.id] : old.filter((id) => id !== item.id))} />选择此场景复测</label>}
         <p>{result?.source_task_id && result.source_task_id!==job.id && '复用历史证据 · '}{layers[item.layer]}{result && ` · ${result.source === 'synthetic' ? '合成机制证据' : '真实上游执行'} · ${reasons[result.reason] ?? result.reason}`}</p>
         {item.assertions.map((id) => { const assertion = result?.assertions.find((a) => a.id === id); return <div className="detection-assertion" key={id}><span className="detection-code">{item.assertion_labels[id] || id}</span><State state={assertion?.state ?? 'untested'} />{assertion && <span>{reasons[assertion.reason] ?? assertion.reason}</span>}</div> })}
+        {result && <DetectionObservations result={result} />}
         {result?.attempts.map((attempt) => <p className="muted-copy detection-code" key={attempt.id}>{attempt.method} {attempt.path} · HTTP {attempt.status || '未收到响应'} · {attempt.duration_ms} ms · {reasons[attempt.reason] ?? attempt.reason}</p>)}
       </div></details> })}</div></Card>
     <Card title="待清理资源">{readOnly ? <p className="muted-copy">此轮结束时待清理 {job.pending_cleanup.length} 项</p> : <QueryBoundary query={artifacts}>{(data) => data.items.length === 0 ? <p className="muted-copy">无待清理资源</p> : <div className="detection-list">{data.items.map((item) => <p key={item.id} className="detection-code">{item.kind} · {item.native_id} · {reasons[item.reason] ?? item.reason}</p>)}</div>}</QueryBoundary>}</Card>

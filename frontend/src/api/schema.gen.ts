@@ -2440,6 +2440,98 @@ export interface components {
             context: components["schemas"]["DetectionSearchSettings"];
             max_output: components["schemas"]["DetectionSearchSettings"];
         };
+        DetectionImageVariant: {
+            /** @enum {string} */
+            unit: "request" | "successful_image";
+            size: string;
+            quality: string;
+            background: string;
+            service_tier: string;
+        };
+        DetectionTestProfile: {
+            service_tiers: string[] | null;
+            images: components["schemas"]["DetectionImageVariant"][] | null;
+        };
+        DetectionCapacityProbe: {
+            accepted: boolean;
+            semantic: boolean;
+            actual: number | null;
+            input_overhead: number | null;
+            length_error: boolean;
+            failure_upper: number | null;
+            approximate: boolean;
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            attempt_ids: string[];
+            requested_approximate: boolean;
+        };
+        DetectionCapacityStep: {
+            /** Format: int64 */
+            requested: number;
+            round: number;
+            recheck: number;
+            accepted: boolean;
+            semantic: boolean;
+            actual: number | null;
+            input_overhead: number | null;
+            length_error: boolean;
+            failure_upper: number | null;
+            approximate: boolean;
+            /** @enum {string} */
+            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
+            attempt_ids: string[];
+            requested_approximate: boolean;
+        };
+        DetectionCapacityReport: {
+            /** @enum {string} */
+            kind: "context" | "max_output";
+            /** @enum {string} */
+            unit: "tokens";
+            declared: number | null;
+            settings: components["schemas"]["DetectionSearchSettings"];
+            parameter_accepted_lower: number | null;
+            parameter_rejected_upper: number | null;
+            verified_lower: number | null;
+            proven_failure_upper: number | null;
+            completed: boolean;
+            /** @enum {string} */
+            stop: "rounds" | "precision" | "cancelled" | "non_monotonic" | "configured_bound" | "unconfirmed";
+            steps: components["schemas"]["DetectionCapacityStep"][];
+        };
+        DetectionFingerprintDiagnostic: {
+            index: number;
+            /** Format: int64 */
+            parsed_numbers: number;
+            /** Format: int64 */
+            minimum_numbers: number;
+            accepted: boolean;
+            /** Format: int64 */
+            raw_out_of_range_count: number;
+        };
+        DetectionFingerprintRanking: {
+            model: string;
+            display_name: string;
+            family: string;
+            family_name: string;
+            score: number;
+            probability: number | null;
+        };
+        DetectionFingerprintReport: {
+            version: string;
+            commit: string;
+            detector_sha256: string;
+            reference_sha256: string;
+            base_sha256: string;
+            reference_built_at: string;
+            calibration_sha256: string;
+            /** @enum {string} */
+            decision: "unscorable" | "ranked";
+            used_outputs: number;
+            diagnostics: components["schemas"]["DetectionFingerprintDiagnostic"][];
+            /** @enum {string} */
+            probability_scope: "unavailable" | "reference-closed-set";
+            results: components["schemas"]["DetectionFingerprintRanking"][];
+        };
         DetectionTarget: {
             /** Format: uuid */
             group_id: string;
@@ -2453,6 +2545,11 @@ export interface components {
              * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
              */
             draft_id?: string;
+            /** Format: int64 */
+            context_window?: number;
+            /** Format: int64 */
+            max_output_tokens?: number;
+            profile: components["schemas"]["DetectionTestProfile"];
         };
         DetectionUsage: {
             http: number;
@@ -2513,6 +2610,8 @@ export interface components {
             started_at: string;
             /** Format: date-time */
             finished_at: string;
+            capacity?: components["schemas"]["DetectionCapacityReport"][];
+            fingerprint?: components["schemas"]["DetectionFingerprintReport"];
         };
         DetectionPlanned: {
             credential_dependent: boolean;

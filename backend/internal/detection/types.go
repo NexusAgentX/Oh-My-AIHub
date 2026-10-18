@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/fingerprint"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
@@ -24,12 +25,15 @@ type Actor struct {
 	Admin bool
 }
 type Target struct {
-	DraftID     string                 `json:"draft_id,omitempty"`
-	GroupID     string                 `json:"group_id"`
-	Binding     market.EvidenceBinding `json:"binding"`
-	ModelType   string                 `json:"model_type"`
-	Model       string                 `json:"model"`
-	ServiceTier string                 `json:"service_tier"`
+	ContextWindow   *int64                 `json:"context_window,omitempty"`
+	MaxOutputTokens *int64                 `json:"max_output_tokens,omitempty"`
+	Profile         TestProfile            `json:"profile"`
+	DraftID         string                 `json:"draft_id,omitempty"`
+	GroupID         string                 `json:"group_id"`
+	Binding         market.EvidenceBinding `json:"binding"`
+	ModelType       string                 `json:"model_type"`
+	Model           string                 `json:"model"`
+	ServiceTier     string                 `json:"service_tier"`
 }
 type Parameters struct {
 	Context   gatewaycontract.SearchSettings `json:"context"`
@@ -92,19 +96,21 @@ type Assertion struct {
 	AttemptIDs []string `json:"attempt_ids"`
 }
 type Result struct {
-	SourceTaskID   string      `json:"source_task_id"`
-	SourceReportID *string     `json:"source_report_id"`
-	ID             string      `json:"id"`
-	ScenarioID     string      `json:"scenario_id"`
-	State          string      `json:"state"`
-	Reason         string      `json:"reason"`
-	Layer          string      `json:"layer"`
-	Source         string      `json:"source"` // real_upstream or synthetic; fixtures never authorize creation
-	Assertions     []Assertion `json:"assertions"`
-	Attempts       []Attempt   `json:"attempts"`
-	Usage          Usage       `json:"usage"`
-	StartedAt      time.Time   `json:"started_at"`
-	FinishedAt     time.Time   `json:"finished_at"`
+	Capacity       []CapacityReport    `json:"capacity,omitempty"`
+	Fingerprint    *fingerprint.Report `json:"fingerprint,omitempty"`
+	SourceTaskID   string              `json:"source_task_id"`
+	SourceReportID *string             `json:"source_report_id"`
+	ID             string              `json:"id"`
+	ScenarioID     string              `json:"scenario_id"`
+	State          string              `json:"state"`
+	Reason         string              `json:"reason"`
+	Layer          string              `json:"layer"`
+	Source         string              `json:"source"` // real_upstream or synthetic; fixtures never authorize creation
+	Assertions     []Assertion         `json:"assertions"`
+	Attempts       []Attempt           `json:"attempts"`
+	Usage          Usage               `json:"usage"`
+	StartedAt      time.Time           `json:"started_at"`
+	FinishedAt     time.Time           `json:"finished_at"`
 }
 type Planned struct {
 	CredentialDependent bool              `json:"credential_dependent"`
