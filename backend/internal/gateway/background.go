@@ -54,7 +54,6 @@ type backgroundMetadata struct {
 	Key                  KeyAuth
 	Candidate            Candidate
 	Model                catalog.Model
-	Submodels            []catalog.Model
 	Settings             settings.Settings
 	Requested            string
 	ModelID              string
@@ -134,7 +133,7 @@ func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate 
 	if e.Jobs == nil || !responseIDPattern.MatchString(id) {
 		return errors.New("invalid background response metadata")
 	}
-	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
 	defer func() {
 		if saveErr == nil {
 			return
@@ -224,7 +223,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		e.Logger.Error("gateway: invalid task metadata", "request_id", job.CallID)
 		return
 	}
-	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, polling: true, pending: true}
 	if e.Resources != nil && metadata.Candidate.GroupID != "" {
 		// The durable background registration is a trusted producer chain and
 		// can finish a failed initial ownership write without replaying creation.

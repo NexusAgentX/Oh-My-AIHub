@@ -52,7 +52,8 @@ func TestResponseOutputSpeed(t *testing.T) {
 			response := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(""))}
 			call := &callState{started: start, stream: tt.stream, format: channel.FormatOpenAIResponses, attempts: []Attempt{{}}}
 			recorder := httptest.NewRecorder()
-			engine.streamBack(recorder, call, catalog.Model{}, Candidate{}, attemptResult{
+			model := catalog.Model{ID: "main"}
+			engine.streamBack(recorder, call, model, quotedCandidate(t, Candidate{}, model), attemptResult{
 				response: response, first: []byte(body), firstErr: io.EOF, cancel: func(error) {}, upstream: context.Background(),
 				watch: watchClient(context.Background(), func(error) {}, drainWindow), started: start.Add(time.Duration(tt.attemptStart) * time.Millisecond), ttft: time.Duration(tt.ttft) * time.Millisecond,
 			}, settings.Settings{})

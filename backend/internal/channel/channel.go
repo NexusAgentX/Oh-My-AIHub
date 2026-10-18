@@ -8,9 +8,6 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
 var ErrNotFound = errors.New("channel not found")
@@ -61,33 +58,6 @@ type FormatTest struct {
 	Error      *string   `json:"error"`
 	DurationMS *int      `json:"duration_ms"`
 	TestedAt   time.Time `json:"tested_at"`
-}
-
-// CustomPrices are the four per-million-token point prices of a custom model
-// (ADR-0034); they are charged as is, without multiplier, exchange rate or
-// tiers.
-type CustomPrices struct {
-	Input      money.Amount
-	Output     money.Amount
-	CacheWrite money.Amount
-	CacheRead  money.Amount
-}
-
-// Blended is the 3:1 input/output blend that orders channels of a custom
-// model by price (cheapest first and the lowest reference price, ADR-0034);
-// cache prices do not count.
-func (p CustomPrices) Blended() float64 {
-	return (3*float64(p.Input.Nano()) + float64(p.Output.Nano())) / 4
-}
-
-// Model is the catalog-shaped model a channel bills for a custom model: the
-// four prices in points without tiers or fine-grained prices.
-func (p CustomPrices) Model(id string) catalog.Model {
-	return catalog.Model{
-		ID: id, DisplayName: id, PriceCurrency: "CNY", Enabled: true,
-		InputModalities: []string{"text"}, OutputModalities: []string{"text"},
-		InputPrice: p.Input, OutputPrice: p.Output, CacheWritePrice: p.CacheWrite, CacheReadPrice: p.CacheRead,
-	}
 }
 
 type Owner struct {

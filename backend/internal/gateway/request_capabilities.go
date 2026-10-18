@@ -467,10 +467,6 @@ func effectiveCapabilityHeader(client http.Header, advanced channel.Advanced, na
 }
 
 func missingRequestCapability(c Candidate, req nativeRequirements, headers http.Header) string {
-	// Legacy configuration is removed by F12; it has no capability report.
-	if c.GroupID == "" {
-		return ""
-	}
 	for _, cap := range req.capabilities {
 		if !cap.supportedBy(c.Evidence) {
 			return cap.ID

@@ -307,7 +307,6 @@ type callState struct {
 	// upstream then adds is not for the client (see usageFrameFilter).
 	usageInjected   bool
 	hints           billingHints
-	submodels       []catalog.Model
 	pricedStatement *quotepricing.Statement
 	billingFacts    quotepricing.Facts
 	pending         bool
@@ -583,11 +582,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.internalError(w, call, err)
 		return
 	}
-
-	call.submodels, err = e.captureSubmodels(ctx, call.hints)
-	if err != nil {
-		e.Logger.Warn("gateway: submodel prices unavailable; forwarding without submodel charges", "request_id", call.id)
-	}
 	// Balance and budgets are checked, never reserved (Epic #170 decision 6).
 	points, err := e.Store.Points(ctx, key.OwnerID)
 	if err != nil {
@@ -665,10 +659,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	for index := range candidates {
 		pricing := candidates[index].PricingModel(model)
-		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
-		if candidates[index].Quotes != nil {
-			candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
-		}
+		candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
 	}
 	e.applyTypicalPrices(candidates, call.modelID, defaults.USDCNYRateNano)
 	sticky := ""
@@ -1762,10 +1753,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
-	if candidate.Quotes == nil && !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.Iterations) > 0 {
-		observation.Usage.Detail.Notes = appendNote(observation.Usage.Detail.Notes, "主模型用量缺失，未计费")
-		finish.PriceSnapshot = priceSnapshot(model, ledger.PriceResult{}, candidate, defaults.USDCNYRateNano, 0, observation.Usage, call.started)
-	}
 	call.stage("pricing", pricingAt, e.Now())
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
@@ -1838,10 +1825,10 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,
-		"fx_discount":          model.PriceCurrency == ledger.CurrencyUSD && candidate.FXDiscount,
-		"effective_multiplier": money.FromNano(ledger.EffectiveMultiplier(multiplierNano, candidate.RateNano, model.Rate(usdRateNano))).String(),
+		"fx_discount":          false,
+		"effective_multiplier": money.FromNano(multiplierNano).String(),
 		"fee_rate_nano":        feeRateNano,
-		"custom":               candidate.Custom != nil,
+		"custom":               false,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),

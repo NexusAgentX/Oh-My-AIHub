@@ -17,6 +17,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -62,16 +63,17 @@ func TestBillingAdvisorAndPerIterationThreshold(t *testing.T) {
 	model := catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000, CacheReadPrice: 100_000_000}
 	child := catalog.Model{ID: "advisor", InputPrice: 5_000_000_000, OutputPrice: 25_000_000_000}
 	engine := NewEngine(Dependencies{})
-	call := &callState{format: channel.FormatAnthropic, submodels: []catalog.Model{child}}
-	candidate := Candidate{UpstreamModel: "main-up", MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}
+	call := &callState{format: channel.FormatAnthropic, billingFacts: quotepricing.Facts{MainReliable: true, IterationsReplace: true}}
+	candidate := quotedCandidate(t, Candidate{UpstreamModel: "main-up", MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, model, child)
 	raw := `{"usage":{"input_tokens":1760,"cache_read_input_tokens":412,"output_tokens":531,"iterations":[{"type":"message","input_tokens":412,"output_tokens":89},{"type":"advisor_message","model":"advisor","input_tokens":823,"output_tokens":1612},{"type":"message","input_tokens":1348,"cache_read_input_tokens":412,"output_tokens":442}]}}`
 	got := observe(channel.FormatAnthropic, false, "application/json", raw, 7)
 	priced, snapshot, err := engine.priceUsage(call, model, candidate, got.Usage, settings.Settings{}, 0)
-	if err != nil || priced.Cost.String() != "0.0488712" || !strings.Contains(string(snapshot), `"model":"advisor"`) {
+	if err != nil || priced.Cost.String() != "0.0488712" || !strings.Contains(string(snapshot), `"model_id":"advisor"`) {
 		t.Fatalf("cost=%+v err=%v snapshot=%s", priced, err, snapshot)
 	}
 	threshold := int64(100001)
 	model.PriceTiers = []ledger.PriceTier{{MinPromptTokens: &threshold, InputPrice: 2_000_000_000, OutputPrice: 7_500_000_000}}
+	candidate = quotedCandidate(t, candidate, model, child)
 	got = observe(channel.FormatAnthropic, false, "application/json", `{"usage":{"iterations":[{"type":"compaction","input_tokens":80000,"output_tokens":3500},{"type":"message","input_tokens":23000,"output_tokens":1000}]}}`, 7)
 	priced, _, err = engine.priceUsage(call, model, candidate, got.Usage, settings.Settings{}, 0)
 	if err != nil || priced.Cost.String() != "0.1255" {
@@ -183,6 +185,7 @@ func TestBackgroundAckPersistsBeforeDeliveryAndBindsFollowups(t *testing.T) {
 	call.releaseAccount = release
 	candidate := Candidate{ChannelID: "channel", OwnerID: "seller", BaseURL: upstream.URL, Credential: sealed, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}
 	model := catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000}
+	candidate = quotedCandidate(t, candidate, model)
 	ack := `{"id":"resp_job","object":"response","background":true,"status":"queued","usage":null}`
 	response := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(""))}
 	recorder := httptest.NewRecorder()
@@ -275,6 +278,7 @@ func TestBackgroundDeadlineSettlesCancellationUsage(t *testing.T) {
 		Candidate: Candidate{ChannelID: "channel", OwnerID: "seller", BaseURL: upstream.URL, Credential: credential, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate},
 		Model:     catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000}, ModelID: "main", Attempts: []Attempt{{}},
 	}
+	metadata.Candidate = quotedCandidate(t, metadata.Candidate, metadata.Model)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		t.Fatal(err)

@@ -861,6 +861,9 @@ func (s *codexProbeStore) Candidates(_ context.Context, model string, format cha
 func (s *codexProbeStore) AuxiliaryCandidates(context.Context, channel.Format) ([]gateway.CandidateRecord, error) {
 	return append([]gateway.CandidateRecord{s.row}, s.extraRows...), nil
 }
+func (s *codexProbeStore) ModelListCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
+	return s.AuxiliaryCandidates(ctx, format)
+}
 func (*codexProbeStore) AttemptHistory(context.Context, time.Time) ([]gateway.AttemptHistoryRow, error) {
 	return nil, nil
 }

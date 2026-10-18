@@ -1,9 +1,6 @@
 package channel
 
-import (
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
-	"testing"
-)
+import "testing"
 
 func TestValidateAdvancedRejectsForbiddenHeadersAndBadRanges(t *testing.T) {
 	ua := "agent/1"
@@ -25,11 +22,5 @@ func TestValidateAdvancedRejectsForbiddenHeadersAndBadRanges(t *testing.T) {
 	good := Advanced{UserAgent: &ua, HeaderRules: HeaderRules{Set: []HeaderSet{{Name: "X-Tenant", Value: "acme"}}, Remove: []string{"X-Debug"}}}
 	if err := ValidateAdvanced(good); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestCustomPricesBlended(t *testing.T) {
-	if got := (CustomPrices{Input: money.FromNano(1e9), Output: money.FromNano(5e9), CacheRead: money.FromNano(9e9)}).Blended(); got != 2e9 {
-		t.Fatalf("blended = %v", got)
 	}
 }

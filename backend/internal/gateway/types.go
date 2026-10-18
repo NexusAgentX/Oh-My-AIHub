@@ -80,16 +80,10 @@ type Candidate struct {
 	BaseURL        string
 	UpstreamModel  string
 	MultiplierNano int64
-	FXDiscount     bool
-	// RateNano converts the model's prices into points for this channel
-	// (ledger.ChannelRate); the engine sets it from the settings snapshot
-	// before ranking so ranking and billing use the same rate.
+	// RateNano converts the frozen group quote currency into platform points.
 	RateNano   int64
 	Advanced   channel.Advanced
 	Credential channel.EncryptedCredential
-	// Custom is set for a custom model (ADR-0034): the channel's own point
-	// prices, charged without multiplier, exchange rate or tiers.
-	Custom *channel.CustomPrices
 }
 
 // Entrance is a selected stable group-address relationship. The sequence is
@@ -99,35 +93,22 @@ type Entrance struct {
 	BaseURL string
 }
 
-// PricingModel is the model a candidate bills: the catalog model itself, or
-// for a custom model the channel's own point prices without tiers.
+// PricingModel projects the candidate's frozen group quote for historical
+// snapshots. Missing or mismatched offers never borrow directory prices.
 func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
-	if c.GroupID != "" && !c.ValidOffering(model.ID) {
+	if !c.ValidOffering(model.ID) {
 		return catalog.Model{ID: model.ID}
 	}
-	if c.Quotes != nil {
-		offer, ok := c.Quotes.Offers[model.ID]
-		if !ok {
-			return catalog.Model{ID: model.ID}
-		}
-		quote := offer.Quote
-		result := catalog.Model{ID: model.ID, DisplayName: model.ID, Enabled: true, PriceCurrency: quote.Currency, InputPrice: quote.Prices.Input, OutputPrice: quote.Prices.Output, CacheWritePrice: quote.Prices.CacheWrite, CacheReadPrice: quote.Prices.CacheRead, TokenPrices: quote.Prices.Details}
-		for _, tier := range quote.Tiers {
-			result.PriceTiers = append(result.PriceTiers, tier.Ledger())
-		}
-		return result
+	quote := c.Quotes.Offers[model.ID].Quote
+	result := catalog.Model{ID: model.ID, DisplayName: model.ID, Enabled: true, PriceCurrency: quote.Currency, InputPrice: quote.Prices.Input, OutputPrice: quote.Prices.Output, CacheWritePrice: quote.Prices.CacheWrite, CacheReadPrice: quote.Prices.CacheRead, TokenPrices: quote.Prices.Details}
+	for _, tier := range quote.Tiers {
+		result.PriceTiers = append(result.PriceTiers, tier.Ledger())
 	}
-	if c.Custom == nil {
-		return model
-	}
-	return c.Custom.Model(model.ID)
+	return result
 }
 
 func (c Candidate) ValidOffering(modelID string) bool {
-	if c.GroupID == "" {
-		return true
-	}
-	if c.Quotes == nil || c.Quotes.GroupID != c.GroupID {
+	if c.GroupID == "" || c.GroupModelID == "" || c.Quotes == nil || c.Quotes.GroupID != c.GroupID {
 		return false
 	}
 	offer, ok := c.Quotes.Offers[modelID]

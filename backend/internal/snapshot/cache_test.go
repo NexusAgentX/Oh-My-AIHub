@@ -102,11 +102,10 @@ func newTestCache(loader *fakeLoader) *Cache {
 }
 
 func TestBuildFleetIndexesByModelAndFormatInChannelOrder(t *testing.T) {
-	custom := &channel.CustomPrices{}
 	records := []gateway.CandidateRecord{
 		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat, channel.FormatAnthropic}, Candidate: gateway.Candidate{ChannelID: "c1"}},
 		{ModelID: "a", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: gateway.Candidate{ChannelID: "c2"}},
-		{ModelID: "b", Formats: []channel.Format{channel.FormatGemini}, Candidate: gateway.Candidate{ChannelID: "c1", Custom: custom}},
+		{ModelID: "b", Formats: []channel.Format{channel.FormatGemini}, Candidate: gateway.Candidate{ChannelID: "c1"}},
 	}
 	fleet := buildFleet(records)
 

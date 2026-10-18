@@ -83,8 +83,8 @@ func TestProtocolErrorKeepsUsageAndDeliveryIndependent(t *testing.T) {
 						t.Fatal("protocol failure was billed")
 					}
 					if order == "no_usage" {
-						if finish.Diagnostics.UsageStatus != "missing" || len(finish.PriceSnapshot) != 0 {
-							t.Fatal("fabricated usage/snapshot")
+						if finish.Diagnostics.UsageStatus != "missing" || finish.Usage.InputTokens != 0 || finish.Usage.OutputTokens != 0 || !strings.Contains(string(finish.PriceSnapshot), "missing_main_usage") {
+							t.Fatal("missing usage was not retained as unpriced")
 						}
 					} else if finish.Usage.InputTokens != 7 || finish.Usage.OutputTokens != 3 || finish.Diagnostics.UsageStatus != "reported" || len(finish.PriceSnapshot) == 0 {
 						t.Fatalf("usage or snapshot lost: %+v", finish)
@@ -202,7 +202,8 @@ func TestHTTP200JSONProtocolErrorIsNotBilled(t *testing.T) {
 			store := &speedStore{}
 			engine := NewEngine(Dependencies{Store: store})
 			call := &callState{started: time.Now(), format: tc.format, attempts: []Attempt{{}}, key: KeyAuth{OwnerID: "consumer"}}
-			engine.streamBack(httptest.NewRecorder(), call, catalog.Model{InputPrice: money.FromNano(money.Scale)}, Candidate{OwnerID: "provider", MultiplierNano: ledger.UnitRate, RateNano: ledger.UnitRate}, attemptResult{
+			model := catalog.Model{ID: "main", InputPrice: money.FromNano(money.Scale)}
+			engine.streamBack(httptest.NewRecorder(), call, model, quotedCandidate(t, Candidate{OwnerID: "provider", MultiplierNano: ledger.UnitRate, RateNano: ledger.UnitRate}, model), attemptResult{
 				response: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(""))},
 				first:    []byte(tc.body), firstErr: io.EOF, upstream: context.Background(), cancel: func(error) {}, watch: watchClient(context.Background(), func(error) {}, drainWindow), started: call.started,
 			}, settings.Settings{})

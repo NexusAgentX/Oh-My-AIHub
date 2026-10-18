@@ -51,7 +51,7 @@ func TestBackgroundImageOnlyUsagePersistsAsUnbilled(t *testing.T) {
 			store.mu.Lock()
 			defer store.mu.Unlock()
 			finish, ok := store.finished[job.CallID]
-			if !ok || finish.Outcome != OutcomeUnbilled || finish.Bill != nil || finish.Cost != 0 || finish.Fee != 0 || !strings.Contains(string(finish.PriceSnapshot), "主模型用量缺失，未计费") {
+			if !ok || finish.Outcome != OutcomeUnbilled || finish.Bill != nil || finish.Cost != 0 || finish.Fee != 0 || !strings.Contains(string(finish.PriceSnapshot), "missing_main_usage") {
 				t.Fatalf("finish=%+v", finish)
 			}
 			var snapshot struct {

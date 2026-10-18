@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 )
@@ -94,27 +92,4 @@ func geminiBillableTools(raw []byte) bool {
 		}
 	}
 	return true
-}
-
-func (e *Engine) captureSubmodels(ctx context.Context, hints billingHints) ([]catalog.Model, error) {
-	if len(hints.Submodels) == 0 {
-		return nil, nil
-	}
-	models, err := e.Catalog.List(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	result := []catalog.Model{}
-	for _, model := range models {
-		match := false
-		for _, name := range hints.Submodels {
-			if model.ID == name {
-				match = true
-			}
-		}
-		if match && len(result) < maxBillingItems {
-			result = append(result, model)
-		}
-	}
-	return result, nil
 }
