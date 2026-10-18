@@ -1825,10 +1825,8 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,
-		"fx_discount":          false,
 		"effective_multiplier": money.FromNano(multiplierNano).String(),
 		"fee_rate_nano":        feeRateNano,
-		"custom":               false,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),

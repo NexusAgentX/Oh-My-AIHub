@@ -45,6 +45,9 @@ func TestGroupCandidateNeverBorrowsDirectoryPrice(t *testing.T) {
 		} `json:"group_quote"`
 	}
 	decodeErr := json.Unmarshal(snapshot, &saved)
+	if strings.Contains(string(snapshot), `"fx_discount"`) || strings.Contains(string(snapshot), `"custom"`) {
+		t.Fatal("new group quote emitted retired pricing configuration")
+	}
 	if err != nil || decodeErr != nil || priced.Cost.String() != "7" || saved.BasePrices["input"] != "2" || saved.Currency != "USD" || saved.FXDiscount || len(saved.GroupQuote.Components) != 1 || saved.GroupQuote.Components[0].QuoteID != "quote-v1" {
 		t.Fatalf("cost=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
 	}

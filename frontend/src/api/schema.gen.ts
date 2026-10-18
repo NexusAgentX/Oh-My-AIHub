@@ -4667,8 +4667,9 @@ export interface components {
             currency?: components["schemas"]["PriceCurrency"];
             /** @description 美元模型计费时使用的汇率；人民币模型为 null。 */
             usd_cny_rate?: components["schemas"]["ExchangeRate"] | null;
+            /** @description 仅用于解码历史快照中的 FX 特惠；新分组报价不产生此字段。 */
             fx_discount?: boolean;
-            /** @description 渠道自定义模型按渠道自定价格计费；旧快照无此字段。 */
+            /** @description 仅用于解码历史渠道自定义点价快照；新分组报价不产生此字段。 */
             custom?: boolean;
             effective_multiplier?: components["schemas"]["EffectiveMultiplier"];
             fee_rate_nano: number;
