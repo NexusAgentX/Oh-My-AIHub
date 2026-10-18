@@ -55,7 +55,7 @@ func profileScenarios(plan Plan) []string {
 	var ids []string
 	for _, item := range plan.Items {
 		for _, req := range item.Requirements {
-			if strings.HasSuffix(req, ".cache_tier") || strings.HasPrefix(req, "images.") || strings.HasSuffix(req, ".image_tool") || req == "codex-special.RL25" {
+			if strings.HasSuffix(req, ".cache_tier") || strings.HasPrefix(req, "images.") || strings.HasSuffix(req, ".image_tool") || req == "codex-special.RL24" || req == "codex-special.RL25" {
 				ids = append(ids, item.ID)
 				break
 			}

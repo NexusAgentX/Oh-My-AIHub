@@ -21,7 +21,7 @@ func codexTierProof(c Candidate, wire string) bool {
 	}
 	switch wire {
 	case "default", "fast", "flex", "ultrafast", "scale":
-		return c.Evidence["upstream_protocol/service_tier/openai:"+wire]
+		return c.Evidence["upstream_protocol/codex-special.RL24/service_tier/openai:"+wire]
 	}
 	return false
 }
@@ -49,7 +49,7 @@ func filterCodexCatalog(payload []byte, records []CandidateRecord, selected Cand
 	}
 	// ModelInfo, rust-v0.163.0. Entitlement and model-policy overrides are not
 	// platform privileges; the client keeps its own configured policies.
-	fields := strings.Fields("slug display_name description default_reasoning_level supported_reasoning_levels shell_type visibility supported_in_api priority additional_speed_tiers service_tiers default_service_tier model_messages include_skills_usage_instructions include_plugin_usage_instructions include_apps_usage_instructions supports_reasoning_summary_parameter default_reasoning_summary support_verbosity default_verbosity apply_patch_tool_type web_search_tool_type truncation_policy supports_image_detail_original context_window max_context_window auto_compact_token_limit comp_hash effective_context_window_percent experimental_supported_tools input_modalities supports_search_tool supports_experimental_context use_responses_lite supports_reasoning_effort_updates node_repl_auto_review_required node_repl_disabled model_specialty tool_mode multi_agent_version multi_agent_reasoning_effort")
+	fields := strings.Fields("slug display_name description default_reasoning_level supported_reasoning_levels shell_type visibility supported_in_api priority additional_speed_tiers service_tiers default_service_tier model_messages base_instructions include_skills_usage_instructions include_plugin_usage_instructions include_apps_usage_instructions supports_reasoning_summary_parameter default_reasoning_summary support_verbosity default_verbosity apply_patch_tool_type web_search_tool_type truncation_policy supports_image_detail_original context_window max_context_window auto_compact_token_limit comp_hash effective_context_window_percent experimental_supported_tools input_modalities supports_search_tool supports_experimental_context use_responses_lite supports_reasoning_effort_updates node_repl_auto_review_required node_repl_disabled model_specialty tool_mode multi_agent_version multi_agent_reasoning_effort")
 	models := map[string]map[string]json.RawMessage{}
 	remaining := (4 << 20) - 128
 	for _, raw := range envelope.Models {

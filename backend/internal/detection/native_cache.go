@@ -13,6 +13,8 @@ import (
 // Configured and Wire are fixed test options or validated quote selectors.
 // Actual is a whitelisted canonical tier, never an arbitrary response string.
 type SettingEvidence struct {
+	ScenarioID       string   `json:"-"` // assigned by sealed-report projection only
+	Layer            string   `json:"-"`
 	Kind             string   `json:"kind"`
 	Configured       string   `json:"configured"`
 	Wire             string   `json:"wire"`
@@ -24,6 +26,26 @@ type SettingEvidence struct {
 	CacheWriteTokens int64    `json:"cache_write_tokens"`
 	CacheReadTokens  int64    `json:"cache_read_tokens"`
 	AttemptIDs       []string `json:"attempt_ids"`
+}
+
+// RoutingCapability preserves the actual surface and proof layer. Public
+// Responses/Chat evidence and gateway fixtures cannot advertise a native
+// Codex service tier on a supplier candidate.
+func (e SettingEvidence) RoutingCapability() string {
+	configured := e.Configured
+	if configured == "openai:priority" {
+		configured = "openai:fast"
+	}
+	if e.Layer != "upstream_protocol" || e.Kind != "service_tier" || e.State != "pass" || !e.Accepted || !e.UsageReliable || e.Actual == "" || e.Actual != configured {
+		return ""
+	}
+	if strings.HasPrefix(e.ScenarioID, "codex-special.") {
+		if e.ScenarioID != "codex-special.RL24@upstream_protocol" {
+			return ""
+		}
+		return "codex-special.RL24/service_tier/" + e.Actual
+	}
+	return "service_tier/" + e.Actual
 }
 
 func tierNamespace(protocol string) string {

@@ -41,6 +41,7 @@ func (l Limits) Validate() error {
 }
 
 type Session struct {
+	exchange      func(context.Context, Request) (Response, error)
 	entry         int
 	Target        Target
 	Parameters    Parameters
@@ -59,6 +60,7 @@ type Session struct {
 	retainedBytes int64
 }
 type Request struct {
+	prepared   bool // private gateway bridge already applied the configured header rules
 	EndpointID string
 	Path       string
 	Query      url.Values
@@ -154,6 +156,9 @@ func matchPath(template, path string) bool {
 	return true
 }
 func (s *Session) Do(ctx context.Context, input Request) (Response, error) {
+	if s.exchange != nil {
+		return s.exchange(ctx, input)
+	}
 	if s.entry < 0 || s.entry >= len(s.resolved.Addresses) {
 		return Response{}, ErrInvalid
 	}
@@ -248,14 +253,16 @@ func (s *Session) doEntry(ctx context.Context, input Request) (Response, error) 
 				if req.Header == nil {
 					req.Header = make(http.Header)
 				}
-				for _, name := range s.resolved.Headers.Remove {
-					req.Header.Del(name)
-				}
-				for _, v := range s.resolved.Headers.Set {
-					req.Header.Set(v.Name, v.Value)
-				}
-				if s.resolved.UserAgent != "" {
-					req.Header.Set("User-Agent", s.resolved.UserAgent)
+				if !input.prepared {
+					for _, name := range s.resolved.Headers.Remove {
+						req.Header.Del(name)
+					}
+					for _, v := range s.resolved.Headers.Set {
+						req.Header.Set(v.Name, v.Value)
+					}
+					if s.resolved.UserAgent != "" {
+						req.Header.Set("User-Agent", s.resolved.UserAgent)
+					}
 				}
 				// Credentials/transport fields cannot be supplied through a scene/header
 				// override. Never use a query-string key or log the resulting request.

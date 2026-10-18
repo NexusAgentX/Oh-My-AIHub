@@ -73,6 +73,7 @@ func Project(job Job, current market.EvidenceBinding) Projection {
 			}
 		}
 		for _, setting := range result.Settings {
+			setting.ScenarioID, setting.Layer = result.ScenarioID, result.Layer
 			setting.AttemptIDs = slices.Clone(setting.AttemptIDs)
 			p.Settings = append(p.Settings, setting)
 		}

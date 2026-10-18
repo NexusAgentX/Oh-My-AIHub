@@ -342,6 +342,9 @@ func main() {
 	if err = registry.RegisterCodexNative(); err != nil {
 		fatal(logger, "registering Codex native detection suites failed", err)
 	}
+	if err = registry.RegisterCodexGateway(); err != nil {
+		fatal(logger, "registering Codex gateway detection suites failed", err)
+	}
 	var mcpFixture *detection.MCPFixture
 	if origin := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_PUBLIC_ORIGIN")); origin != "" {
 		mcpFixture, err = detection.NewMCPFixture(origin)
@@ -365,6 +368,26 @@ func main() {
 	cancelSDKStartup()
 	if err != nil {
 		fatal(logger, "validating SDK detection artifact failed", err)
+	}
+	probePath := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_CODEX_PROBE"))
+	codexPath := strings.TrimSpace(os.Getenv("AIHUB_CODEX_BINARY"))
+	if probePath == "" || codexPath == "" {
+		executable, executableErr := os.Executable()
+		if executableErr != nil {
+			fatal(logger, "locating Codex detection artifacts failed", executableErr)
+		}
+		if probePath == "" {
+			probePath = filepath.Join(filepath.Dir(executable), "aihub-detection-codex")
+		}
+		if codexPath == "" {
+			codexPath = filepath.Join(filepath.Dir(executable), "codex")
+		}
+	}
+	codexStartup, cancelCodexStartup := context.WithTimeout(context.Background(), 25*time.Second)
+	err = registry.RegisterCodexCLI(codexStartup, probePath, codexPath)
+	cancelCodexStartup()
+	if err != nil {
+		fatal(logger, "validating Codex detection artifacts failed", err)
 	}
 	// Review transactions and directory rebuilds use two separate connections;
 	// no long review transaction holds a gateway or detector pool slot.

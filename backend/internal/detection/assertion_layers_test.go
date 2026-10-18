@@ -90,3 +90,22 @@ func TestProjectionPreservesNonconsecutiveLayerAssertionID(t *testing.T) {
 		t.Fatalf("nonconsecutive proof ID was lost or changed layer: %+v", p)
 	}
 }
+
+func TestClientAndPlatformExecutionFailuresCannotCompleteCreationReport(t *testing.T) {
+	for _, reason := range []string{"detector_error", "client_disabled", "platform_unavailable", "suite_pending", "cancelled", "interrupted", "invalid_request"} {
+		for _, assertionOnly := range []bool{false, true} {
+			j := projectionFixture()
+			if !Complete(j) {
+				t.Fatal("invalid base fixture")
+			}
+			if assertionOnly {
+				j.Results[0].Assertions[0].State, j.Results[0].Assertions[0].Reason = "inconclusive", reason
+			} else {
+				j.Results[0].State, j.Results[0].Reason = "inconclusive", reason
+			}
+			if Complete(j) || Project(j, j.Target.Binding).Valid {
+				t.Fatal("unexecuted client/platform became complete supplier evidence", reason, assertionOnly)
+			}
+		}
+	}
+}

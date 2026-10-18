@@ -26,37 +26,41 @@ func (r *Registry) RegisterCodexNative() error {
 			}
 			if err := r.Register(Definition{ID: req.ID + "@upstream_protocol", SuiteID: suite.ID, Requirements: []string{req.ID}, Layer: "upstream_protocol", CodeVersion: engineVersion, Run: func(ctx context.Context, s *Session) Result {
 				n := nativeScene{s: s, protocol: "openai-responses", layer: "upstream_protocol", requirement: req, checks: map[string]Assertion{}}
-				switch req.ID {
-				case "codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL12":
-					n.codexTools(ctx)
-				case "codex-special.RL05":
-					n.codexReasoningContext(ctx)
-				case "codex-special.RL06":
-					n.codexInstructions(ctx)
-				case "codex-special.RL09":
-					n.codexReasoningReplay(ctx)
-				case "codex-special.RL13":
-					out, valid := n.codexCatalog(ctx)
-					n.check("provider_api_auth", out, valid)
-				case "codex-special.RL15":
-					out, valid := n.codexCatalog(ctx)
-					n.check("native_catalog", out, valid)
-				case "codex-special.RL14":
-					n.codexEncoding(ctx)
-				case "codex-special.RL24":
-					n.codexTiers(ctx)
-				case "codex-special.RL20":
-					n.codexCompact(ctx, false)
-				case "codex-special.RL21":
-					n.codexCompact(ctx, true)
-				}
-				return n.finish()
+				return n.runCodex(ctx)
 			}}); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (n *nativeScene) runCodex(ctx context.Context) Result {
+	switch n.requirement.ID {
+	case "codex-special.RL01", "codex-special.RL02", "codex-special.RL03", "codex-special.RL08", "codex-special.RL12":
+		n.codexTools(ctx)
+	case "codex-special.RL05":
+		n.codexReasoningContext(ctx)
+	case "codex-special.RL06":
+		n.codexInstructions(ctx)
+	case "codex-special.RL09":
+		n.codexReasoningReplay(ctx)
+	case "codex-special.RL13":
+		out, valid := n.codexCatalog(ctx)
+		n.check("provider_api_auth", out, valid)
+	case "codex-special.RL15":
+		out, valid := n.codexCatalog(ctx)
+		n.check("native_catalog", out, valid)
+	case "codex-special.RL14":
+		n.codexEncoding(ctx)
+	case "codex-special.RL24":
+		n.codexTiers(ctx)
+	case "codex-special.RL20":
+		n.codexCompact(ctx, false)
+	case "codex-special.RL21":
+		n.codexCompact(ctx, true)
+	}
+	return n.finish()
 }
 
 func (n *nativeScene) codexCatalog(ctx context.Context) (nativeOutcome, bool) {

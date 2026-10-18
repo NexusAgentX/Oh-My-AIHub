@@ -128,18 +128,24 @@ func Complete(job Job) bool {
 	}
 	for _, item := range job.Plan.Items {
 		result, ok := results[item.ID]
-		if !ok || !item.Implemented || !terminal(result.State) || result.Source != "real_upstream" || result.Layer != item.Layer || len(result.Assertions) != len(item.Assertions) {
+		if !ok || !item.Implemented || !terminal(result.State) || executionIncomplete(result.Reason) || result.Source != "real_upstream" || result.Layer != item.Layer || len(result.Assertions) != len(item.Assertions) {
 			return false
 		}
 		seen := map[string]bool{}
 		for _, a := range result.Assertions {
-			if seen[a.ID] || !slices.Contains(item.Assertions, a.ID) || len(a.AttemptIDs) == 0 || (!terminal(a.State) && !(a.State == "unobserved" && slices.Contains(item.Conditional, a.ID))) {
+			if seen[a.ID] || !slices.Contains(item.Assertions, a.ID) || executionIncomplete(a.Reason) || len(a.AttemptIDs) == 0 || (!terminal(a.State) && !(a.State == "unobserved" && slices.Contains(item.Conditional, a.ID))) {
 				return false
 			}
 			seen[a.ID] = true
 		}
 	}
 	return len(results) == len(job.Plan.Items)
+}
+
+func executionIncomplete(reason string) bool {
+	// These describe a detector/client/platform prerequisite that did not run
+	// successfully, not a negative observation about an actual supplier call.
+	return slices.Contains([]string{"detector_error", "client_disabled", "platform_unavailable", "suite_pending", "cancelled", "interrupted", "invalid_request"}, reason)
 }
 func HasPending(plan Plan) bool {
 	for _, item := range plan.Items {

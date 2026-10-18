@@ -53,7 +53,9 @@ type Result struct {
 	Completed     bool   `json:"completed"`
 	MarkerMatched bool   `json:"marker_matched"`
 	PlatformAuth  bool   `json:"platform_auth"`
+	CatalogModel  bool   `json:"catalog_model"`
 	Stage         string `json:"stage"`
+	RPCErrorCode  int    `json:"rpc_error_code,omitempty"`
 }
 
 func CheckVersion(ctx context.Context, binary string) error {
@@ -77,7 +79,7 @@ func (c Config) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || len(c.Token) < 16 || len(c.Token) > 256 || strings.ContainsAny(c.Token, "\r\n\x00") || !gatewaycontract.ValidModelID(c.Model) {
 		return ErrClient
 	}
-	if c.Profile != "standard" && c.Profile != "notes" && c.Profile != "image" {
+	if c.Profile != "standard" && c.Profile != "catalog" && c.Profile != "notes" && c.Profile != "image" {
 		return ErrClient
 	}
 	// The caller must be RunControlledProcess, which makes these private roots.
@@ -106,6 +108,7 @@ type dialogue struct {
 	next      int
 	completed bool
 	matched   bool
+	rpcError  int
 }
 
 func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
@@ -125,7 +128,7 @@ func (d *dialogue) receive(ctx context.Context) (rpcMessage, error) {
 }
 
 func (d *dialogue) notification(msg rpcMessage) error {
-	if len(msg.ID) > 0 && msg.Method != "" {
+	if len(msg.ID) > 0 && string(msg.ID) != "null" && msg.Method != "" {
 		// No approvals or arbitrary client RPCs are part of this fixed probe.
 		return ErrClient
 	}
@@ -169,6 +172,11 @@ func (d *dialogue) call(ctx context.Context, method string, params any, result a
 		}
 		if len(msg.ID) > 0 && string(msg.ID) == strconv.Itoa(d.next) {
 			if len(msg.Error) > 0 && string(msg.Error) != "null" {
+				var detail struct {
+					Code int `json:"code"`
+				}
+				_ = json.Unmarshal(msg.Error, &detail)
+				d.rpcError = detail.Code
 				return ErrClient
 			}
 			if result != nil && json.Unmarshal(msg.Result, result) != nil {
@@ -182,8 +190,8 @@ func (d *dialogue) call(ctx context.Context, method string, params any, result a
 	}
 }
 
-func Run(ctx context.Context, c Config) (Result, error) {
-	r := Result{Protocol: Protocol, Version: Version, Stage: "setup"}
+func Run(ctx context.Context, c Config) (r Result, runErr error) {
+	r = Result{Protocol: Protocol, Version: Version, Stage: "setup"}
 	if c.validate() != nil || CheckVersion(ctx, c.Binary) != nil {
 		return r, ErrClient
 	}
@@ -192,14 +200,32 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if os.Mkdir(workspace, 0700) != nil {
 		return r, ErrClient
 	}
+	root := os.Getenv("CODEX_HOME")
+	probeCatalog := ""
+	if c.Profile == "notes" || c.Profile == "image" {
+		// Activate the fixed client scenario independently of a provider's
+		// catalog declarations. This is controlled client configuration, never
+		// provider capability/capacity evidence. The catalog profile below uses
+		// the actual native directory and does not install this fixture.
+		path := filepath.Join(root, "probe-models.json")
+		model := map[string]any{"slug": c.Model, "display_name": c.Model, "description": "Isolated client activation fixture", "supported_reasoning_levels": []any{}, "shell_type": "shell_command", "visibility": "list", "supported_in_api": true, "priority": 1, "support_verbosity": false, "truncation_policy": map[string]any{"mode": "tokens", "limit": 10000}, "experimental_supported_tools": []any{}, "input_modalities": []string{"text", "image"}, "supports_experimental_context": true, "context_window": 32768, "tool_mode": "direct"}
+		model["model_messages"] = map[string]string{"instructions_template": "Isolated capability probe. Follow the user request and use only declared synthetic tools."}
+		data, _ := json.Marshal(map[string]any{"models": []any{model}})
+		if os.WriteFile(path, data, 0600) != nil {
+			return r, ErrClient
+		}
+		probeCatalog = "model_catalog_json = " + strconv.Quote(path) + "\n"
+	}
 	config := fmt.Sprintf(`model = %q
 model_provider = "openai"
+model_context_window = 32768
 openai_base_url = %q
 chatgpt_base_url = %q
 web_search = "disabled"
 approval_policy = "never"
 sandbox_mode = "read-only"
 cli_auth_credentials_store = "file"
+%s
 [analytics]
 enabled = false
 [features]
@@ -210,8 +236,7 @@ enable_request_compression = false
 [features.token_budget]
 enabled = %t
 use_history_notes_extension = %t
-`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", c.Profile != "standard", c.Profile != "standard")
-	root := os.Getenv("CODEX_HOME")
+`, c.Model, c.Origin+"/backend-api/codex", c.Origin+"/backend-api/", probeCatalog, c.Profile == "notes" || c.Profile == "image", c.Profile == "notes" || c.Profile == "image")
 	auth, _ := json.Marshal(map[string]string{"personal_access_token": c.Token})
 	if os.WriteFile(filepath.Join(root, "config.toml"), []byte(config), 0600) != nil || os.WriteFile(filepath.Join(root, "auth.json"), auth, 0600) != nil {
 		return r, ErrClient
@@ -264,6 +289,7 @@ use_history_notes_extension = %t
 		}
 	}()
 	d := dialogue{in: in, lines: lines}
+	defer func() { r.RPCErrorCode = d.rpcError }()
 	r.Stage = "initialize"
 	if d.call(ctx, "initialize", map[string]any{"clientInfo": map[string]string{"name": "aihub-codex-probe", "version": "1"}, "capabilities": map[string]bool{"experimentalApi": true}}, nil) != nil {
 		return r, ErrClient
@@ -281,6 +307,23 @@ use_history_notes_extension = %t
 		return r, ErrClient
 	}
 	r.PlatformAuth = account.Account.Type == "chatgpt"
+	var models struct {
+		Data []struct {
+			ID    string `json:"id"`
+			Model string `json:"model"`
+		} `json:"data"`
+	}
+	r.Stage = "catalog"
+	if d.call(ctx, "model/list", map[string]any{}, &models) != nil {
+		return r, ErrClient
+	}
+	for _, model := range models.Data {
+		r.CatalogModel = r.CatalogModel || model.ID == c.Model || model.Model == c.Model
+	}
+	if c.Profile == "catalog" {
+		r.Completed, r.Stage = true, "completed"
+		return r, nil
+	}
 	var thread struct {
 		Thread struct {
 			ID string `json:"id"`

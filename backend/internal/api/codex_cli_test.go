@@ -80,7 +80,7 @@ func TestOfficialCodexCLIUsesProductionHandlers(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				switch r.URL.Path {
 				case "/backend-api/codex/models":
-					_, _ = io.WriteString(w, `{"models":[{"slug":"native/model","display_name":"Synthetic model","description":"Isolated fixture","supported_reasoning_levels":[],"shell_type":"shell_command","visibility":"list","supported_in_api":true,"priority":1,"support_verbosity":false,"truncation_policy":{"mode":"tokens","limit":10000},"experimental_supported_tools":[],"input_modalities":["text"],"supports_experimental_context":true,"context_window":32768}]}`)
+					_, _ = io.WriteString(w, `{"models":[{"slug":"native/model","display_name":"Synthetic model","description":"Isolated fixture","model_messages":{"instructions_template":"Use only the declared synthetic tools."},"supported_reasoning_levels":[],"shell_type":"shell_command","visibility":"list","supported_in_api":true,"priority":1,"support_verbosity":false,"truncation_policy":{"mode":"tokens","limit":10000},"experimental_supported_tools":[],"input_modalities":["text"],"supports_experimental_context":true,"context_window":32768}]}`)
 				case "/backend-api/codex/alpha/notes/v2/thread_hint":
 					ctx, _ := body["context"].(map[string]any)
 					session, _ := ctx["session_id"].(string)

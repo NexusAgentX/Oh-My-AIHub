@@ -32,6 +32,9 @@ func TestCodexCatalogFiltersScopeAliasesAndUnprovenMetadata(t *testing.T) {
 		t.Fatal("catalog exposed another scope or lost alias", string(out))
 	}
 	for _, m := range models {
+		if m["model_messages"].(map[string]any)["instructions_template"] != "opaque instructions" {
+			t.Fatal("native instruction template changed")
+		}
 		if _, present := m["context_window"]; present {
 			t.Fatal("declaration became measured context")
 		}
@@ -40,6 +43,11 @@ func TestCodexCatalogFiltersScopeAliasesAndUnprovenMetadata(t *testing.T) {
 		}
 	}
 	c.Evidence["upstream_protocol/service_tier/openai:fast"] = true
+	out, err = filterCodexCatalog(input, records, c, key)
+	if err != nil || len(decode(out)[0]["service_tiers"].([]any)) != 0 {
+		t.Fatal("public API tier evidence authorized a private Codex tier", err)
+	}
+	c.Evidence["upstream_protocol/codex-special.RL24/service_tier/openai:fast"] = true
 	c.Evidence["upstream_protocol/openai-responses.vision/inline_content_recognition"] = true
 	c.VerifiedCapacity["openai-responses.context@upstream_protocol/context"] = 1024
 	out, err = filterCodexCatalog(input, records, c, key)
@@ -60,5 +68,20 @@ func TestCodexCatalogFiltersScopeAliasesAndUnprovenMetadata(t *testing.T) {
 	out, err = filterCodexCatalog(input, records, c, key)
 	if err != nil || len(decode(out)) != 1 || decode(out)[0]["slug"] != "shortcut" {
 		t.Fatal("canonical name overrode explicit Key alias", err, string(out))
+	}
+}
+
+func TestCodexCatalogPreservesCurrentClientNativeLegacyInstructionField(t *testing.T) {
+	c := Candidate{GroupID: "group", GroupModelID: "group-main", ChannelID: "channel", CredentialScope: "scope", UpstreamModel: "native-main", Quotes: groupBook(t, "CNY", 1), Evidence: map[string]bool{}}
+	records := []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}}
+	out, err := filterCodexCatalog([]byte(`{"models":[{"slug":"native-main","base_instructions":"<synthetic-policy> Preserve this native field exactly. </synthetic-policy>"}]}`), records, c, KeyAuth{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Models []map[string]any `json:"models"`
+	}
+	if json.Unmarshal(out, &root) != nil || len(root.Models) != 1 || root.Models[0]["base_instructions"] != "<synthetic-policy> Preserve this native field exactly. </synthetic-policy>" || root.Models[0]["model_messages"] != nil {
+		t.Fatal("current CLI instruction prerequisite was dropped or converted")
 	}
 }

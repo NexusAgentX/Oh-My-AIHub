@@ -390,12 +390,8 @@ func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateR
 						capacity[c.ScenarioID+"/"+c.Kind] = c.VerifiedLower
 					}
 					for _, setting := range p.Settings {
-						configured := setting.Configured
-						if configured == "openai:priority" {
-							configured = "openai:fast"
-						}
-						if setting.Kind == "service_tier" && setting.State == "pass" && setting.Accepted && setting.UsageReliable && setting.Actual != "" && setting.Actual == configured {
-							evidence["upstream_protocol/service_tier/"+setting.Actual] = true
+						if capability := setting.RoutingCapability(); capability != "" {
+							evidence["upstream_protocol/"+capability] = true
 						}
 					}
 				}
