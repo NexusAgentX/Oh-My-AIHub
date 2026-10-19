@@ -39,7 +39,7 @@ import (
 
 var (
 	perfScenarios = flag.String("perf.scenarios", "nonstream,stream,concurrent,saturate,budget,sticky,formats,sweep-nonstream,sweep-stream",
-		"comma separated: nonstream, stream, concurrent, saturate, budget, sticky, formats, sweep-nonstream, sweep-stream")
+		"comma separated: nonstream, stream, concurrent, saturate, budget, sticky, formats, responses, sweep-nonstream, sweep-stream")
 	perfDuration   = flag.Duration("perf.duration", 30*time.Second, "measured window of a scenario run")
 	perfRepeat     = flag.Int("perf.repeat", 1, "run every scenario this many times (the report shows the median)")
 	perfQuiet      = flag.Float64("perf.quiet", 0, "before every run wait (up to 3 minutes) for the 1-minute load average to fall below this; 0 does not wait")
@@ -453,6 +453,9 @@ func (s *perfStack) scenario(sc perfScenario, repeat int) scenarioReport {
 	requestsBefore, backgroundBefore := s.counter.Counts()
 	report.Gateway = s.run(s.perfPlan(sc, true, gatewayChats), s.gateway)
 	t.Logf("  gateway: %s (load average %s)", report.Gateway.Result, report.Gateway.LoadAverage)
+	if sc.sticky && report.Gateway.Result.Failed() != 0 {
+		t.Errorf("response continuation failed; sticky performance results are invalid: %v", report.Gateway.Result.Failures)
+	}
 	requestsAfter, backgroundAfter := s.counter.Counts()
 	whole := gatewaybench.Since(requestsAfter, requestsBefore)
 	report.Background = gatewaybench.Since(backgroundAfter, backgroundBefore)
@@ -651,6 +654,12 @@ func TestGatewayPerfBaseline(t *testing.T) {
 	}
 	if selected["formats"] {
 		chosen = append(chosen, formatScenarios()...)
+	} else if selected["responses"] {
+		for _, sc := range formatScenarios() {
+			if sc.format == channel.FormatOpenAIResponses {
+				chosen = append(chosen, sc)
+			}
+		}
 	}
 	for _, sc := range chosen {
 		for repeat := 1; repeat <= *perfRepeat; repeat++ {

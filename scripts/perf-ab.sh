@@ -8,7 +8,7 @@
 #
 # 环境变量：
 #   PERF_SCENARIOS  逗号分隔，默认与 G8.0 一致。取值同基线工具的 -perf.scenarios：
-#                   nonstream stream concurrent saturate budget sticky formats sweep-nonstream sweep-stream；
+#                   nonstream stream concurrent saturate budget sticky formats responses sweep-nonstream sweep-stream；
 #                   另可写 <场景>@<速率>（场景限 nonstream stream budget sticky），以 -perf.qps=<速率> 单独运行，
 #                   如 nonstream@200 就是 200 次/秒的非流式。
 #   PERF_ROUNDS     轮数，默认 3。每轮把每个场景在 base 与 head 上各测一次；奇数轮 base 先、偶数轮 head 先，
@@ -59,7 +59,7 @@ rates=()
 for token in "${tokens[@]}"; do
   case "$token" in
     sweep-nonstream | sweep-stream) sweeps+=("$token") ;;
-    nonstream | stream | concurrent | saturate | budget | sticky | formats) plain+=("$token") ;;
+    nonstream | stream | concurrent | saturate | budget | sticky | formats | responses) plain+=("$token") ;;
     nonstream@* | stream@* | budget@* | sticky@*)
       rate="${token#*@}"
       [[ "$rate" =~ ^[1-9][0-9]*$ ]] || die "速率必须是正整数：$token"
@@ -106,7 +106,7 @@ fi
 group() { if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::group::$*"; else echo "== $*"; fi; }
 endgroup() { if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::endgroup::"; fi; }
 
-echo "场景：$scenarios；$rounds 轮；阶段："
+echo "场景：${scenarios}；$rounds 轮；阶段："
 for i in "${!phase_name[@]}"; do
   echo "  ${phase_name[$i]}: ${phase_list[$i]}${phase_rate[$i]:+ (-perf.qps=${phase_rate[$i]})}"
 done
@@ -170,7 +170,7 @@ run_pass() {
   local before after started code=0
   started="$(date +%s)"
   before="$(cpu_sample)"
-  group "$side，第 $round 轮，阶段 $name：$list${rate:+ @ $rate/s}"
+  group "${side}，第 $round 轮，阶段 ${name}：$list${rate:+ @ $rate/s}"
   # 测试在包目录里运行，与 go test 一致。
   (cd "$tree/backend/internal/postgres" \
     && "$bin_dir/$side.test" -test.run '^TestGatewayPerfBaseline$' -test.count=1 -test.timeout=90m -test.v "${args[@]}") \

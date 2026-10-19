@@ -72,7 +72,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`sticky`、`formats`、`sweep-nonstream`、`sweep-stream`，逗号分隔 |
+| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`sticky`、`formats`、`responses`、`sweep-nonstream`、`sweep-stream`，逗号分隔；`responses` 是 `formats` 中 Responses 流式/非流式的子集，默认全矩阵已通过 `formats` 覆盖 |
 | `-perf.duration` / `-perf.warmup` | 30s / 3s | 每次运行的测量窗口与预热（流式场景的预热至少是一条流时长的 1.5 倍） |
 | `-perf.repeat` | 1 | 每个场景重复次数，报告给出中位数与范围。机器上有别的负载时建议 3 |
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
@@ -96,6 +96,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 | `key-budget` | 同 `nonstream-small`，Key 带日、月、总预算 | 50 次/秒 |
 | `responses-sticky` | OpenAI Responses 非流式，请求带上一轮的 `previous_response_id` | 50 次/秒 |
 | `formats` | 四种格式的流式与非流式各一个场景 | 非流式 40 次/秒，流式 10 次/秒 |
+| `responses` | 仅复测 `formats` 中的 Responses 流式与非流式，场景参数相同 | 非流式 40 次/秒，流式 10 次/秒 |
 | `sweep-*` | 对 `nonstream-small`、`stream-1k` 逐级提高速率，再在最后一个成功级与第一个失败级之间二分两次 | 见报告 |
 
 每个场景先跑直连模拟上游（压测程序到上游，TLS，连接复用），再跑经过网关（压测程序到网关，明文 HTTP，连接复用）；两次的负载与参数相同。随后做一次数据库语句审计：用同形状的短回答跑几百个请求，缓存已预热，按查询名统计每请求语句数。
