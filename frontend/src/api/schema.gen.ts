@@ -1951,14 +1951,32 @@ export interface paths {
         };
         /**
          * 卖单市场
-         * @description 开放卖单按单价从低到高。
-         *
-         *     由 Feature C 实现；当前处理器返回 501 not_implemented。
+         * @description 开放卖单按单价从低到高，使用游标分页。
          */
         get: operations["listC2COrders"];
         put?: never;
         /** 挂卖单 */
         post: operations["createC2COrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/c2c/orders/{orderID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查看公开卖单
+         * @description 与卖单市场相同的可见范围，不返回收款账号。卖单关闭、可买量为零或属于自己时返回 404。
+         */
+        get: operations["getC2CMarketOrder"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4942,6 +4960,9 @@ export interface components {
             items: components["schemas"]["C2CMyOrder"][];
             /** @description 下一页游标；为 null 表示没有更多。 */
             next_cursor: string | null;
+        };
+        C2COrderEnvelope: {
+            order: components["schemas"]["C2COrder"];
         };
         C2CMyOrderEnvelope: {
             order: components["schemas"]["C2CMyOrder"];
@@ -11515,6 +11536,33 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getC2CMarketOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description C2C 卖单 ID。 */
+                orderID: components["parameters"]["orderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2COrderEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listMyC2COrders: {
         parameters: {
             query?: {
@@ -11618,6 +11666,8 @@ export interface operations {
                 status?: components["parameters"]["tradeStatus"];
                 /** @description 为 true 时只返回待我处理的交易：我是买家且待付款，或我是卖家且已付款待放行。 */
                 pending?: components["parameters"]["tradePending"];
+                /** @description 只返回尚未结束的交易（待付款、已付款、申诉中） */
+                active?: boolean;
                 /** @description 上一页返回的 next_cursor。 */
                 cursor?: components["parameters"]["cursor"];
                 /** @description 每页条数，1～100，默认 20。 */

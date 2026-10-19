@@ -72,7 +72,7 @@ export function CallDetailView({ call, onRefresh }: { call: CallDetail; onRefres
         {call.ledger_transaction_id && (
           <Row label="账本交易">
             <Link
-              to={`${admin ? '/admin/points?tab=transactions' : '/points?tab=bill'}&transaction=${call.ledger_transaction_id}`}
+              to={admin ? `/admin/points?tab=transactions&transaction=${call.ledger_transaction_id}` : `/points?transaction_id=${call.ledger_transaction_id}`}
             >
               {call.ledger_transaction_id}
             </Link>

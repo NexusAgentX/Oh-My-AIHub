@@ -28,6 +28,8 @@ export function DataTable<T>({
   rows,
   rowKey,
   rowHref,
+  rowState,
+  highlight,
   empty,
 }: {
   caption: string
@@ -35,6 +37,8 @@ export function DataTable<T>({
   rows: T[]
   rowKey: (row: T) => string
   rowHref?: (row: T) => string
+  rowState?: (row: T) => unknown
+  highlight?: ReadonlySet<string>
   empty?: ReactNode
 }) {
   if (rows.length === 0) return <>{empty ?? <EmptyState title="暂无数据" />}</>
@@ -61,14 +65,14 @@ export function DataTable<T>({
             {rows.map((row) => {
               const href = rowHref?.(row)
               return (
-                <tr key={rowKey(row)}>
+                <tr key={rowKey(row)} className={highlight?.has(rowKey(row)) ? 'data-row-new' : undefined}>
                   {columns.map((column) => (
                     <td
                       className={column.numeric ? 'cell-numeric' : undefined}
                       key={column.key}
                     >
                       {href && column === primary ? (
-                        <Link className="table-row-link" to={href}>
+                        <Link className="table-row-link" to={href} state={rowState?.(row)}>
                           {column.cell(row)}
                         </Link>
                       ) : (
@@ -103,11 +107,11 @@ export function DataTable<T>({
             </>
           )
           return href ? (
-            <Link className="mobile-data-card mobile-data-card-link" key={rowKey(row)} to={href}>
+            <Link className={`mobile-data-card mobile-data-card-link${highlight?.has(rowKey(row)) ? ' data-row-new' : ''}`} key={rowKey(row)} to={href} state={rowState?.(row)}>
               {body}
             </Link>
           ) : (
-            <article className="mobile-data-card" key={rowKey(row)}>
+            <article className={`mobile-data-card${highlight?.has(rowKey(row)) ? ' data-row-new' : ''}`} key={rowKey(row)}>
               {body}
             </article>
           )
