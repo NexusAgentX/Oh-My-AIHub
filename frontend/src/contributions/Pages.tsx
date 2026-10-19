@@ -99,9 +99,12 @@ export function NewContributionRoute() {
   const location = useLocation(), navigate = useNavigate(), [params] = useSearchParams()
   const admin = location.pathname.startsWith('/admin/')
   const base = admin ? '/admin/contributions' : '/supply/contributions'
-  const kind = params.get('kind') as Kind
+  const kind = (params.get('create_kind') || params.get('kind')) as Kind
   const initialKind = ['supplier', 'group', 'group_model', ...(admin ? ['model_id'] : [])].includes(kind) ? kind : 'supplier'
-  return <NewContribution initialKind={initialKind} initialTarget={params.get('target_id') || params.get('parent_id') || ''} initialMode={params.get('action') || (params.has('target_id') ? 'edit' : undefined)} open close={() => location.state?.overlayFrom ? navigate(-1) : navigate(base, { replace: true })} onCreated={id => navigate(`${base}/${id}`, { replace: true, state: { from: location.state?.from ?? { to: base, label: admin ? '贡献审核' : '我的贡献' } } })} />
+  const host = location.pathname.startsWith('/admin/catalog/') ? '/admin/catalog' : base
+  const originParams = new URLSearchParams(params); for (const key of ['create_kind', 'action', 'target_id']) originParams.delete(key)
+  const origin = host + (host === '/admin/catalog' && originParams.size ? '?' + originParams : '')
+  return <NewContribution initialKind={initialKind} initialTarget={params.get('target_id') || params.get('parent_id') || ''} initialMode={params.get('action') || (params.has('target_id') ? 'edit' : undefined)} open close={() => location.state?.overlayFrom ? navigate(-1) : navigate(origin, { replace: true })} onCreated={id => navigate(`${base}/${id}`, { replace: true, state: { from: location.state?.from ?? { to: origin, label: host === '/admin/catalog' ? '目录治理' : admin ? '贡献审核' : '我的贡献' } } })} />
 }
 export function ContributionQueuePage() {
   return <ContributionsPage queue />
@@ -313,9 +316,10 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   const busy = save.isPending || action.isPending || add.isPending || iconBusy || reloading,
     invalid = Object.values(jsonErrors).some(Boolean)
   const reportIDs = reports.split(/\s+/).filter(Boolean)
-  const conflict = data.draft.revision !== d.revision || (save.error instanceof ApiError && save.error.status === 409)
+  const evaluationPending = data.draft.revision < d.revision
+  const conflict = data.draft.revision > d.revision || (save.error instanceof ApiError && save.error.status === 409)
   const applyDraft = useCallback((latest: Detail['draft']) => { setBaseline(latest); setTitle(latest.title); setC(structuredClone(latest.changes)); setReports(latest.report_ids.join('\n')); setJsonErrors({}); setReason(''); setGeneration(value => value + 1); setConfirm(false) }, [])
-  useEffect(() => { if (!dirty && !invalid && !busy && !reason.trim() && data.draft.revision !== d.revision) applyDraft(data.draft) }, [dirty, invalid, busy, reason, data.draft, d.revision, applyDraft])
+  useEffect(() => { if (!dirty && !invalid && !busy && !reason.trim() && data.draft.revision > d.revision) applyDraft(data.draft) }, [dirty, invalid, busy, reason, data.draft, d.revision, applyDraft])
   useUnsavedGuard(dirty || invalid || Boolean(reason.trim()), { busy })
 
   const saveDraft = (e: FormEvent) => {
@@ -363,6 +367,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   }
   return (
     <>
+      {evaluationPending && <Notice tone="warning">保存成功，提交条件尚未刷新。<Button variant="quiet" onClick={() => { void reload().catch(() => {}) }}>重试刷新</Button></Notice>}
       {conflict && <Notice tone="warning">草稿已被更新，请载入最新内容后继续。<Button variant="quiet" onClick={() => setReloadOpen(true)}>载入最新</Button></Notice>}
       <div className="contribution-status">
         <Status value={data.stage} />
@@ -854,7 +859,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
           {['draft', 'rejected', 'withdrawn'].includes(d.state) && (
             <Button
               type="button"
-              disabled={busy || dirty || conflict || invalid || data.stage !== 'ready'}
+              disabled={busy || dirty || conflict || invalid || data.stage !== 'ready' || evaluationPending}
               loading={action.isPending}
               onClick={() => act('submit')}
             >

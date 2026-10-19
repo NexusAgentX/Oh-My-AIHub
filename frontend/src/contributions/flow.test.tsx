@@ -98,3 +98,13 @@ it('starts from the dedicated page and returns a new task to its originating con
   expect(JSON.stringify(router.state.location.state)).not.toContain('synthetic-secret')
   expect(JSON.stringify(client.getMutationCache().getAll().map(mutation => mutation.state.variables))).not.toContain('synthetic-secret')
 })
+
+it('does not roll a saved draft back when the subsequent detail refresh fails', async () => {
+  await fill('标题', '已成功保存的新标题'); failReload = true
+  await click('保存')
+  await waitForUI(() => expect(saved?.title).toBe('已成功保存的新标题'))
+  await waitForUI(() => expect(host.textContent).toContain('提交条件尚未刷新'))
+  expect(field('标题')?.value).toBe('已成功保存的新标题')
+  expect(host.textContent).not.toContain('草稿已被更新，请载入最新')
+  expect([...host.querySelectorAll('button')].find(button => button.textContent === '提交审核')?.disabled).toBe(true)
+})

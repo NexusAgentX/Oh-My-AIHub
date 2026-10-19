@@ -22,7 +22,7 @@ import { TradeDetailPage } from './points/TradeDetailPage'
 import { KeysPage } from './keys/KeysPage'
 import { KeyCreateDrawer, KeyDetailPage } from './keys/KeyDrawer'
 import { KeyRoutingDrawer } from './keys/KeyRouting'
-import { clearKeySecret } from './keys/secret'
+import { clearSecretHandoffs } from './ui/secretHandoff'
 import { UnsavedGuardProvider } from './ui/UnsavedGuard'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
@@ -61,7 +61,7 @@ function SessionQueryReset() {
     if (previous.current !== accountID) {
       previous.current = accountID
       client.clear()
-      clearKeySecret()
+      clearSecretHandoffs()
     }
   }, [accountID, client])
   return null

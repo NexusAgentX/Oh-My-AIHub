@@ -8286,6 +8286,25 @@ paths:
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /api/admin/accounts/{accountID}:
+    get:
+      operationId: getAdminAccount
+      tags: [admin-accounts]
+      summary: 查看账户
+      x-access: admin
+      x-feature: A
+      security:
+      - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/accountID'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminAccountEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
     patch:
       operationId: updateAdminAccount
       tags: [admin-accounts]
@@ -8503,6 +8522,28 @@ paths:
       operationId: listAdminDisputes
       tags: [admin-c2c]
       summary: 申诉列表
+      x-access: admin
+      x-feature: C
+      security:
+      - {sessionCookie: []}
+      parameters:
+      - {$ref: '#/components/parameters/tradeStatus'}
+      - {$ref: '#/components/parameters/cursor'}
+      - {$ref: '#/components/parameters/limit'}
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/C2CTradePage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/admin/c2c/trades:
+    get:
+      operationId: listAdminC2CTrades
+      tags: [admin-c2c]
+      summary: 管理员浏览全部状态的 C2C 交易
       x-access: admin
       x-feature: C
       security:

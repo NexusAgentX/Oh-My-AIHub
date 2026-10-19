@@ -36,6 +36,7 @@ export const adminApi = {
 
   accounts: (query: QueryOf<'listAdminAccounts'>) =>
     request<ResponseBody<'listAdminAccounts'>>(withQuery('/api/admin/accounts', query)),
+  account: (accountID: string) => request<ResponseBody<'getAdminAccount'>>(`/api/admin/accounts/${id(accountID)}`),
   createAccount: (body: RequestBody<'createAdminAccount'>) =>
     post<'createAdminAccount'>('/api/admin/accounts', body),
   updateAccount: (accountID: string, body: RequestBody<'updateAdminAccount'>) =>
@@ -65,8 +66,8 @@ export const adminApi = {
   audit: (query: QueryOf<'listAdminAudit'>) =>
     request<ResponseBody<'listAdminAudit'>>(withQuery('/api/admin/audit', query)),
 
-  disputes: (query: QueryOf<'listAdminDisputes'>) =>
-    request<ResponseBody<'listAdminDisputes'>>(withQuery('/api/admin/disputes', query)),
+  trades: (query: QueryOf<'listAdminC2CTrades'>) =>
+    request<ResponseBody<'listAdminC2CTrades'>>(withQuery('/api/admin/c2c/trades', query)),
   trade: (tradeID: string) => request<ResponseBody<'getC2CTrade'>>(`/api/c2c/trades/${id(tradeID)}`),
   resolveTrade: (tradeID: string, body: RequestBody<'resolveAdminC2CTrade'>) =>
     post<'resolveAdminC2CTrade'>(`/api/admin/c2c/trades/${id(tradeID)}/resolve`, body),

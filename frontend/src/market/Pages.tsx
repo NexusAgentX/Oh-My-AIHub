@@ -1,3 +1,4 @@
+import { formatDateTime } from '../money/time'
 import { SaveBar } from '../ui/SaveBar'
 import { useUnsavedGuard } from '../ui/UnsavedGuard'
 import { useKeys } from '../keys/queries'
@@ -118,7 +119,7 @@ function TypicalModelCosts({ detail }: { detail: Detail }) {
   const query = useTypicalCosts('', detail.model.id)
   const groups = new Set(detail.offers.map(o => o.group_id)), channels = new Set(detail.channels.map(c => c.id))
   return <Disclosure title="最近一轮用量、参考倍率与样本"><QueryBoundary query={query} errorFallback="典型费用加载失败">{data => <>
-    {(data.status.pending||data.status.running||data.status.last_error)&&<Notice tone="info">画像与报价尚待更新，以下为最近一轮估算；当前候选费用以上方为准。</Notice>}<p className="muted-copy">{data.snapshot ? `估算于 ${new Date(data.snapshot.updated_at).toLocaleString()} · 仅本站样本` : '暂无可靠样本，典型费用与参考倍率未知'}</p>
+    {(data.status.pending||data.status.running||data.status.last_error)&&<Notice tone="info">画像与报价尚待更新，以下为最近一轮估算；当前候选费用以上方为准。</Notice>}<p className="muted-copy">{data.snapshot ? `估算于 ${formatDateTime(data.snapshot.updated_at)} · 仅本站样本` : '暂无可靠样本，典型费用与参考倍率未知'}</p>
     {data.items.filter(row => row.level === 'model' || row.level === 'group' && groups.has(row.group_id ?? '') || row.level === 'channel' && channels.has(row.channel_id ?? '')).map(row => <EstimateCard key={`${row.level}/${row.group_id}/${row.channel_id}`} item={row} />)}
   </>}</QueryBoundary></Disclosure>
 }
@@ -186,7 +187,7 @@ export function MarketReportPage() {
   return <QueryBoundary query={query} errorFallback="报告不存在或未公开">{report => <>
     <PageHeader title="检测报告" back={{ to: `/groups/${report.group_id}`, label: '分组' }} />
     <Notice tone={report.validity === 'current' ? 'info' : 'warning'}>{report.validity === 'current' ? '报告证据与当前配置匹配' : report.validity === 'partial' ? '部分场景的配置或检测范围已变化，仅仍有效的独立证据用于路由' : '配置或检测范围已变化，此报告不再提供当前能力支持证据'}</Notice>
-    <p className="muted-copy">{new Date(report.updated_at).toLocaleString()} · 范围 {report.manifest_version} · {report.complete ? '已完成该版本全测' : '未完成全测'} · 实际 {report.usage.http} 次 HTTP / {report.usage.input_tokens + report.usage.output_tokens} tokens</p>
+    <p className="muted-copy">{formatDateTime(report.updated_at)} · 范围 {report.manifest_version} · {report.complete ? '已完成该版本全测' : '未完成全测'} · 实际 {report.usage.http} 次 HTTP / {report.usage.input_tokens + report.usage.output_tokens} tokens</p>
     {report.scenarios.map(scenario => <Card key={scenario.id} title={scenario.id.split('@')[0]}><p><Badge>{({ upstream_protocol: '上游协议', gateway_proxy: '平台代理', official_cli: '官方 CLI' })[scenario.layer] ?? scenario.layer}</Badge> <Badge tone={scenario.state === 'pass' ? 'success' : 'neutral'}>{status(scenario.state)}</Badge> {!scenario.current && !scenario.aggregate && <Badge tone="warning">当前证据失效</Badge>}</p><p className="muted-copy">{reasons[scenario.reason] ?? scenario.reason} · 预计 HTTP {scenario.estimated_http ?? '未知'} / 实际 {scenario.usage.http}</p><Disclosure title="原检测项与子断言">{scenario.endpoints.map(e=><p key={e.id} className="mono">{e.method} {e.path} · {e.proxy_supported?'平台代理已开放':'平台代理未开放'}</p>)}<p className="mono">{scenario.source_ids.join(' · ')}</p><ul>{scenario.assertions.map(a => <li key={a.id}><span className="mono">{a.label}</span> · {status(a.state)} · {reasons[a.reason] ?? a.reason}</li>)}</ul><p className="market-digest">范围 {scenario.scope_version} · 实现 {scenario.code_version}</p></Disclosure><DetectionObservations result={{ capacity: scenario.capacity ?? undefined, settings: scenario.settings ?? undefined, images: scenario.images ?? undefined, fingerprint: scenario.fingerprint ?? undefined }} /></Card>)}
     <Disclosure title="固定版本与本轮移出范围"><p className="market-digest">报告代码 {report.registry_version}</p>{report.sources.map(s => <p key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.id}</a> · {s.version}</p>)}{report.exclusions.map((e, i) => <p key={i}>{e.protocol} · {e.source_ids.join(' / ')} · {e.reason}</p>)}</Disclosure>
   </>}</QueryBoundary>

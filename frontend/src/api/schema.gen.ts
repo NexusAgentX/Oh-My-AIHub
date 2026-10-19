@@ -2167,7 +2167,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 查看账户 */
+        get: operations["getAdminAccount"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2315,6 +2316,23 @@ export interface paths {
         };
         /** 申诉列表 */
         get: operations["listAdminDisputes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/c2c/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员浏览全部状态的 C2C 交易 */
+        get: operations["listAdminC2CTrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11904,6 +11922,32 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getAdminAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 账户 ID。 */
+                accountID: components["parameters"]["accountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     updateAdminAccount: {
         parameters: {
             query?: never;
@@ -12171,6 +12215,36 @@ export interface operations {
         };
     };
     listAdminDisputes: {
+        parameters: {
+            query?: {
+                /** @description 交易状态。 */
+                status?: components["parameters"]["tradeStatus"];
+                /** @description 上一页返回的 next_cursor。 */
+                cursor?: components["parameters"]["cursor"];
+                /** @description 每页条数，1～100，默认 20。 */
+                limit?: components["parameters"]["limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["C2CTradePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAdminC2CTrades: {
         parameters: {
             query?: {
                 /** @description 交易状态。 */

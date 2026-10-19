@@ -12,6 +12,7 @@ describe('display formatting', () => {
 
   it('formats RMB fen and ratios', () => {
     expect(formatFen(2760)).toBe('¥27.60')
+    expect(formatFen(92.5)).toBe('¥0.93')
     expect(formatFen(123456789)).toBe('¥1,234,567.89')
     expect(parseYuanToFen('0.92')).toBe(92)
     expect(parseYuanToFen('1.2.3')).toBeNull()
