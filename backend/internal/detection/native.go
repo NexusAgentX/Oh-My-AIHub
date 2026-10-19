@@ -30,6 +30,7 @@ type nativeScene struct {
 	requirement gatewaycontract.Requirement
 	result      Result
 	witnesses   []string
+	unsent      map[string]bool
 	checks      map[string]Assertion
 }
 
@@ -218,6 +219,12 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 	if response.AttemptID != "" && !slices.Contains(n.witnesses, response.AttemptID) {
 		n.witnesses = append(n.witnesses, response.AttemptID)
 	}
+	if response.AttemptID != "" && !response.Sent && response.Status == 0 {
+		if n.unsent == nil {
+			n.unsent = map[string]bool{}
+		}
+		n.unsent[response.AttemptID] = true
+	}
 	for _, id := range response.PriorAttempts {
 		if !slices.Contains(n.witnesses, id) {
 			n.witnesses = append(n.witnesses, id)
@@ -379,6 +386,12 @@ func (n *nativeScene) finish() Result {
 		a, ok := n.checks[label]
 		if !ok {
 			a = Assertion{State: "inconclusive", Reason: "prerequisite_failed", AttemptIDs: slices.Clone(n.witnesses[:min(16, len(n.witnesses))])}
+		}
+		// Finalize after linked checks and conditional observations have added
+		// their witnesses. Connection failures remain scene diagnostics, but
+		// cannot prove a later HTTP denial, response shape or capability verdict.
+		if !allowsUnsentAttempt(a.Reason) {
+			a.AttemptIDs = slices.DeleteFunc(slices.Clone(a.AttemptIDs), func(id string) bool { return n.unsent[id] })
 		}
 		a.ID = AssertionID(n.requirement.ID, i)
 		r.Assertions = append(r.Assertions, a)

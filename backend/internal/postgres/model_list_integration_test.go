@@ -8,26 +8,17 @@ import (
 )
 
 func TestModelListsOnlyShowModelsServedInTheEndpointFormat(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
-	// One catalog model per format family; gemini-test has two channels so
+	// One approved model ID per format family; gemini-test has two channels so
 	// the union of their formats counts.
 	e.createChannel(sharer, channelSpec{name: "chat", upstream: relay, model: "gpt-test", formats: []string{"openai_chat"}})
 	e.createChannel(sharer, channelSpec{name: "claude", upstream: relay, model: "claude-test", formats: []string{"anthropic"}})
 	e.createChannel(sharer, channelSpec{name: "gemini", upstream: relay, model: "gemini-test", formats: []string{"gemini"}})
 	e.createChannel(sharer, channelSpec{name: "gemini-responses", upstream: relay, model: "gemini-test", formats: []string{"openai_responses"}})
-	custom := e.apiJSON(sharer, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
-		"name": "custom", "base_url": relay.server.URL, "api_key": "upstream-key-custom",
-		"models": []any{map[string]any{
-			"model_id": "foo-1", "formats": []string{"anthropic"},
-			"custom_prices": map[string]string{"input": "1", "output": "1", "cache_write": "0", "cache_read": "0"},
-		}},
-	})
-	if custom["channel"] == nil {
-		t.Fatalf("custom channel = %v", custom)
-	}
+	e.createChannel(sharer, channelSpec{name: "independent-offering", upstream: relay, model: "foo-1", formats: []string{"anthropic"}})
 	keyID, secret := e.defaultKey(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{
 		"model_aliases": map[string]string{"my-claude": "claude-test", "my-gpt": "gpt-test"},
@@ -70,4 +61,21 @@ func TestModelListsOnlyShowModelsServedInTheEndpointFormat(t *testing.T) {
 			t.Fatalf("%s list = %v, want %v", c.name, got, c.want)
 		}
 	}
+}
+
+func modelIDsOf(t *testing.T, body []byte) []string {
+	t.Helper()
+	var listed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &listed); err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, item := range listed.Data {
+		ids = append(ids, item.ID)
+	}
+	return ids
 }

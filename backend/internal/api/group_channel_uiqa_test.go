@@ -35,7 +35,7 @@ func TestGroupChannelUIHarness(t *testing.T) {
 	}
 	service := &groupchannel.Service{Repository: repo, Runtime: runtime}
 	p := newPlatform(t, func(d *Dependencies) {
-		service.Keyring = d.Channels.Keyring
+		service.Keyring = d.Gateway.Keyring
 		d.GroupChannels = service
 		d.CookieSecure = false
 	})
@@ -101,7 +101,7 @@ func TestGroupChannelUIHarness(t *testing.T) {
 	normalProbes := reviewClone(repo.probes)
 	// Existing statistics/call endpoints resolve the same common channel ID.
 	p.channels.mu.Lock()
-	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Channel: channel.Channel{ID: v.ID, Owner: channel.Owner{ID: owner, Username: "qaadmin", DisplayName: "合成验收管理员"}, Name: v.Name, GroupID: &gid, Status: channel.StatusListed, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, credential: record.Credential})
+	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Record: groupchannel.Record{ID: v.ID, Owner: channel.Owner{ID: owner, Username: "qaadmin", DisplayName: "合成验收管理员"}, Name: v.Name, GroupID: gid, Status: channel.StatusListed, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}})
 	p.channels.mu.Unlock()
 	if os.Getenv("AIHUB_IMAGE_UI_QA") == "1" {
 		p.observeFixtures(owner, v.ID, uuid())

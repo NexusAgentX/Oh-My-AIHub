@@ -34,13 +34,12 @@ type candidateKey struct {
 
 // fleetSet is everything derived from the listed channels and their models:
 // the candidates of each model and format, the models that have any (with the
-// formats they are served in), and the custom ones among them.
+// formats they are served in).
 type fleetSet struct {
-	modelLists   map[channel.Format][]gateway.CandidateRecord
-	auxiliary    map[channel.Format][]gateway.CandidateRecord
-	candidates   map[candidateKey][]gateway.Candidate
-	online       []gateway.OnlineModel
-	customOnline map[string]struct{}
+	modelLists map[channel.Format][]gateway.CandidateRecord
+	auxiliary  map[channel.Format][]gateway.CandidateRecord
+	candidates map[candidateKey][]gateway.Candidate
+	online     []gateway.OnlineModel
 }
 
 // buildFleet indexes candidate records, which come in model order and,
@@ -48,11 +47,10 @@ type fleetSet struct {
 // of online models is in model order with the formats sorted.
 func buildFleet(records []gateway.CandidateRecord) fleetSet {
 	fleet := fleetSet{
-		modelLists:   make(map[channel.Format][]gateway.CandidateRecord),
-		auxiliary:    make(map[channel.Format][]gateway.CandidateRecord),
-		candidates:   make(map[candidateKey][]gateway.Candidate),
-		online:       []gateway.OnlineModel{},
-		customOnline: make(map[string]struct{}),
+		modelLists: make(map[channel.Format][]gateway.CandidateRecord),
+		auxiliary:  make(map[channel.Format][]gateway.CandidateRecord),
+		candidates: make(map[candidateKey][]gateway.Candidate),
+		online:     []gateway.OnlineModel{},
 	}
 	position := map[string]int{}
 	for _, record := range records {
@@ -71,10 +69,6 @@ func buildFleet(records []gateway.CandidateRecord) fleetSet {
 			fleet.online = append(fleet.online, gateway.OnlineModel{ID: record.ModelID, Formats: []channel.Format{}})
 		}
 		online := &fleet.online[index]
-		if record.Candidate.Custom != nil {
-			online.Custom = true
-			fleet.customOnline[record.ModelID] = struct{}{}
-		}
 		for _, format := range record.Formats {
 			if !slices.Contains(online.Formats, format) {
 				online.Formats = append(online.Formats, format)

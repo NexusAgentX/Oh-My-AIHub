@@ -29,7 +29,6 @@ type Record struct {
 	Owner                                    channel.Owner
 	OwnerActive                              bool
 	Name, Summary, Description               string
-	BaseURL                                  string // transitional storage only; runtime uses selected group addresses
 	Status                                   channel.Status
 	SuspendedReason                          *string
 	GroupID                                  string

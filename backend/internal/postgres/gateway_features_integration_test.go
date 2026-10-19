@@ -9,20 +9,22 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
 func TestGatewayAppliesChannelHeaderRulesAndUserAgent(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, advanced: map[string]any{
+	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, advanced: map[string]any{
 		"user_agent":   "relay-agent/1.0",
 		"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-Relay-Tenant", "value": "acme"}, map[string]any{"name": "X-Client", "value": "overwritten"}}, "remove": []any{"X-Strip"}},
 	}})
@@ -45,26 +47,30 @@ func TestGatewayAppliesChannelHeaderRulesAndUserAgent(t *testing.T) {
 	}
 
 	// Rules may not touch credentials or framing.
-	bad := e.api(sharer, http.MethodPost, "/api/channels", map[string]any{
-		"name": "bad", "base_url": relay.server.URL, "api_key": "k", "models": []any{map[string]any{"model_id": "gpt-test", "formats": []string{"openai_chat"}}},
-		"advanced": map[string]any{"header_rules": map[string]any{"set": []any{map[string]any{"name": "Authorization", "value": "x"}}, "remove": []any{}}},
-	})
+	current := e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+channelID, nil)
+	bad := e.api(sharer, "PATCH", "/api/group-channels/"+channelID, map[string]any{"revision": current["revision"], "overrides": map[string]any{"header_rules": map[string]any{"set": []any{map[string]any{"name": "Authorization", "value": "x"}}, "remove": []any{}}}})
 	if bad.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("authorization rule = %d %s", bad.Code, bad.Body.String())
 	}
 }
 
 func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
+	var priceyResponses atomic.Uint64
 	pricey := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
-		_, _ = io.WriteString(w, `{"id":"resp_pricey","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
+		id := "resp_pricey"
+		if sequence := priceyResponses.Add(1); sequence > 1 {
+			id += fmt.Sprintf("_%d", sequence)
+		}
+		_, _ = io.WriteString(w, `{"id":"`+id+`","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
 	})
 	cheap := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		_, _ = io.WriteString(w, `{"id":"resp_cheap","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
 	})
 	priceyID := e.createChannel(sharer, channelSpec{name: "pricey", upstream: pricey, multiplier: "5"})
+	e.declareGroupedCapabilities(priceyID, "upstream_protocol/openai-responses.state/previous_response_id_three_turns")
 	e.createChannel(sharer, channelSpec{name: "cheap", upstream: cheap, multiplier: "1"})
 	_, secret := e.defaultKey(consumer)
 	// Route the first turn to the pricey channel by ticking only it.
@@ -86,7 +92,7 @@ func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
 }
 
 func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	a, b, c := okUpstream(t), okUpstream(t), okUpstream(t)
@@ -133,8 +139,8 @@ func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
 	if hits() != [3]int{1, 2, 2} {
 		t.Fatalf("restored routing hits = %v", hits())
 	}
-	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/models/gpt-test", nil)
-	if model["routing"].(map[string]any)["mode"] != "manual" || len(model["channels"].([]any)) != 3 {
+	model := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/market/models/gpt-test", nil)
+	if model["routing"].(map[string]any)["mode"] != "manual" || len(model["routing_channels"].([]any)) != 3 {
 		t.Fatalf("model detail = %v", model)
 	}
 	if e.apiJSON(consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "fastest"})["mode"] != "fastest" {
@@ -150,7 +156,7 @@ func TestRoutingModesExclusionAndKeyOverride(t *testing.T) {
 // first-token median that the fast routing mode ranks by; success counts keep
 // every call.
 func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	const generation = 250 * time.Millisecond
@@ -217,7 +223,7 @@ func TestChannelFirstTokenMedianCountsOnlyStreamingCalls(t *testing.T) {
 }
 
 func TestGatewayEnforcesRPMAndConcurrencyLimits(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	_, secret := e.defaultKey(consumer)
@@ -260,7 +266,7 @@ func TestGatewayEnforcesRPMAndConcurrencyLimits(t *testing.T) {
 }
 
 func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	stuck := make(chan struct{})
@@ -290,7 +296,7 @@ func TestGatewayFallsBackOnFirstByteTimeout(t *testing.T) {
 // A non-streaming completion sends its first byte only when generation ends,
 // so the first-byte timeout does not apply: only the total timeout does.
 func TestGatewayFirstByteTimeoutDoesNotApplyToNonStreamingRequests(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	slow := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -326,17 +332,23 @@ func TestGatewayFirstByteTimeoutDoesNotApplyToNonStreamingRequests(t *testing.T)
 }
 
 func TestGatewayPricesWithTheTierMatchingTheRealRequest(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	minimum := int64(900)
-	if _, err := e.catalog.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &[]ledger.PriceTier{
-		{Name: "long", MinPromptTokens: &minimum, InputPrice: mustAmount(t, "40"), OutputPrice: mustAmount(t, "20")},
-	}}); err != nil {
+	relay := okUpstream(t)
+	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
+	configuration, err := e.groupStore.Get(context.Background(), channelID)
+	if err != nil {
 		t.Fatal(err)
 	}
-	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, multiplier: "1"})
+	var offering market.GroupModel
+	for _, m := range marketSnapshot(t, e.store).Models {
+		if m.GroupID == configuration.GroupID && m.ModelID == "gpt-test" {
+			offering = m
+		}
+	}
+	e.publishGroupFixture(market.Changes{Quotes: []market.Quote{{ID: marketID(t), GroupModelID: offering.ID, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: mustAmount(t, "10"), Output: mustAmount(t, "20")}, Tiers: []market.Tier{{Name: "long", Conditions: market.Conditions{MinPromptTokens: &minimum}, Prices: market.TokenPrices{Input: mustAmount(t, "40"), Output: mustAmount(t, "20")}}}}}})
 	_, secret := e.defaultKey(consumer)
 	recorder := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil)
 	row := e.callRow(recorder.Header().Get("X-AIHub-Request-Id"))
@@ -352,7 +364,7 @@ func TestGatewayPricesWithTheTierMatchingTheRealRequest(t *testing.T) {
 }
 
 func TestGatewayAppliesKeyAliasesAndAllowedModels(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -403,7 +415,7 @@ func TestGatewayAppliesKeyAliasesAndAllowedModels(t *testing.T) {
 }
 
 func TestGatewayRejectsBadKeysAndDisabledAccounts(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	keyID, secret := e.defaultKey(consumer)
 	for name, key := range map[string]string{"none": "", "unknown": "sk-aih-doesnotexist", "foreign": "sk-other-123"} {
@@ -448,7 +460,7 @@ func (w *brokenWriter) Write(p []byte) (int, error) {
 // usage frame that comes in the end is still billed (see the live-server tests
 // in gateway_drain_integration_test.go for a real hang-up).
 func TestGatewayBillsAnAbandonedStreamForTheUsageItStillReceives(t *testing.T) {
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = time.Second })
+	e := newGroupEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = time.Second })
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	twoFrames := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
@@ -490,75 +502,62 @@ func TestGatewayBillsAnAbandonedStreamForTheUsageItStillReceives(t *testing.T) {
 	e.assertZeroSum()
 }
 
-func TestChannelDiscoveryMatchesCatalogAndFormatTestsCorrectFormats(t *testing.T) {
-	e := newEnv(t)
+func TestGroupKeyProbesPersistNativeFormatsWithoutBilling(t *testing.T) {
+	e := newGroupEnv(t)
 	sharer := e.member("sharer", "0")
-	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
-			_, _ = io.WriteString(w, `{"data":[{"id":"GPT-TEST"},{"id":"claude-test-20250929"},{"id":"unknown-model"},{"id":"gemini-test"}]}`)
-		case r.Method == http.MethodGet:
-			w.WriteHeader(http.StatusNotFound)
-		case strings.HasSuffix(r.URL.Path, "/chat/completions"), strings.HasSuffix(r.URL.Path, "/messages"):
-			_, _ = io.WriteString(w, chatBody)
+		case strings.HasSuffix(r.URL.Path, "/chat/completions"):
+			io.WriteString(w, `{"id":"fixture","object":"chat.completion","created":1,"model":"gpt-test","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`)
+		case strings.HasSuffix(r.URL.Path, "/messages"):
+			io.WriteString(w, `{"id":"fixture","type":"message","role":"assistant","model":"gpt-test","content":[{"type":"text","text":"OK"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}`)
 		default:
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = io.WriteString(w, "no such route key=upstream-key-test")
+			w.WriteHeader(404)
+			io.WriteString(w, "no such route key=upstream-key-test")
 		}
 	})
-	discovered := e.apiJSON(sharer, http.StatusOK, http.MethodPost, "/api/channels/discover", map[string]any{"base_url": relay.server.URL + "/", "api_key": "upstream-key-test"})
-	byID := map[string]map[string]any{}
-	for _, item := range discovered["upstream_models"].([]any) {
-		entry := item.(map[string]any)
-		byID[entry["id"].(string)] = entry
-	}
-	if byID["GPT-TEST"]["matched_model_id"] != "gpt-test" || byID["claude-test-20250929"]["matched_model_id"] != "claude-test" ||
-		byID["unknown-model"]["matched_model_id"] != nil || len(byID) != 4 {
-		t.Fatalf("discovered = %v", byID)
-	}
-	if fmt.Sprint(byID["GPT-TEST"]["suggested_formats"]) != "[openai_chat openai_responses]" ||
-		fmt.Sprint(byID["claude-test-20250929"]["suggested_formats"]) != "[openai_chat anthropic]" ||
-		fmt.Sprint(byID["gemini-test"]["suggested_formats"]) != "[openai_chat gemini]" ||
-		fmt.Sprint(byID["unknown-model"]["suggested_formats"]) != "[openai_chat]" {
-		t.Fatalf("suggested formats = %v", byID)
-	}
-	if empty := e.apiJSON(sharer, http.StatusOK, http.MethodPost, "/api/channels/discover", map[string]any{"base_url": "https://127.0.0.1:1", "api_key": "k"}); len(empty["upstream_models"].([]any)) != 0 {
-		t.Fatalf("unreachable upstream must yield an empty list: %v", empty)
-	}
-
 	id := e.createChannel(sharer, channelSpec{name: "mixed", upstream: relay, key: "upstream-key-test"})
-	tested := e.apiJSON(sharer, http.StatusOK, http.MethodPost, "/api/channels/"+id+"/test", map[string]any{"apply": true})
-	passed := map[string]bool{}
-	for _, item := range tested["results"].([]any) {
-		result := item.(map[string]any)
-		passed[result["format"].(string)] = result["ok"].(bool)
-		if result["ok"] == false && strings.Contains(fmt.Sprint(result["error"]), "upstream-key-test") {
-			t.Fatalf("test error leaks the upstream key: %v", result)
+	prober := groupchannel.NewProber(context.Background(), groupchannel.ProbeConfig{Runtime: e.groups, Repository: e.groupStore, Keyring: e.keyring, Edited: e.engine.ChannelEdited, Outbound: func(context.Context) (channel.Outbound, error) { return e.engine.Outbound, nil }})
+	defer prober.Close()
+	before := e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+id, nil)
+	reply := e.api(sharer, "POST", "/api/group-channels/"+id+"/test", map[string]any{"revision": before["revision"]})
+	if reply.Code != 202 {
+		t.Fatal(reply.Code, reply.Body.String())
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	var view map[string]any
+	for {
+		view = e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+id, nil)
+		model := view["models"].([]any)[0].(map[string]any)
+		if model["probe_state"] != "pending" && len(model["format_tests"].(map[string]any)) == 4 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("key probe did not persist", view)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	model := view["models"].([]any)[0].(map[string]any)
+	tests := model["format_tests"].(map[string]any)
+	for _, format := range []string{"openai_chat", "anthropic", "openai_responses", "gemini"} {
+		result := tests[format].(map[string]any)
+		want := format == "openai_chat" || format == "anthropic"
+		if result["ok"] != want || strings.Contains(fmt.Sprint(result), "upstream-key-test") {
+			t.Fatal("native probe result or redaction", format, result)
 		}
 	}
-	if !passed["openai_chat"] || !passed["anthropic"] || passed["openai_responses"] || passed["gemini"] {
-		t.Fatalf("format results = %v", passed)
+	if len(model["formats"].([]any)) != 2 {
+		t.Fatal("unsupported formats remained routable", model)
 	}
-	model := tested["channel"].(map[string]any)["models"].([]any)[0].(map[string]any)
-	if fmt.Sprint(model["formats"]) != "[openai_chat anthropic]" || len(model["format_tests"].(map[string]any)) != 4 {
-		t.Fatalf("applied model = %v", model)
-	}
-	var calls int
-	_ = e.pool.QueryRow(context.Background(), `SELECT count(*) FROM calls`).Scan(&calls)
-	failed := 0
-	for _, kind := range e.channelEvents(id) {
-		if kind == "test_failed" {
-			failed++
-		}
-	}
-	if calls != 0 || failed != 1 {
-		t.Fatalf("tests must not write calls (%d) and record one test_failed event (%d)", calls, failed)
+	var calls, reports int
+	if err := e.pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM calls),(SELECT count(*) FROM detection_reports)`).Scan(&calls, &reports); err != nil || calls != 0 || reports != 0 {
+		t.Fatal("Key probes must not create billed calls or capability reports", calls, reports, err)
 	}
 }
 
 func TestKeyManagementDefaultKeyLimitSecretAuditAndDeletion(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	home := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/home", nil)
 	defaultKey := home["default_key"].(map[string]any)
@@ -615,7 +614,7 @@ func TestKeyManagementDefaultKeyLimitSecretAuditAndDeletion(t *testing.T) {
 }
 
 func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -623,60 +622,67 @@ func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
 		"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-Tenant", "value": "private-tenant-value"}}, "remove": []any{}},
 	}})
 	_, secret := e.defaultKey(consumer)
-
-	// What other users see must not reveal the Base URL, the key or header rules.
-	for _, path := range []string{"/api/models", "/api/models/gpt-test", "/api/home"} {
-		body := e.api(consumer, http.MethodGet, path, nil).Body.String()
-		for _, forbidden := range []string{relay.server.URL, "upstream-secret-key", "private-tenant-value", "X-Tenant", "api_key_ciphertext"} {
-			if strings.Contains(body, forbidden) {
-				t.Fatalf("%s leaks %q: %s", path, forbidden, body)
+	for _, path := range []string{"/api/market/models", "/api/market/models/gpt-test", "/api/market/channels/" + id, "/api/home"} {
+		reply := e.api(consumer, http.MethodGet, path, nil)
+		if reply.Code != http.StatusOK {
+			t.Fatalf("public %s: %d %s", path, reply.Code, reply.Body.String())
+		}
+		for _, forbidden := range []string{relay.server.URL, strings.Replace(relay.server.URL, "127.0.0.1", "example.com", 1), "upstream-secret-key", "private-tenant-value", "X-Tenant", "api_key_ciphertext"} {
+			if strings.Contains(reply.Body.String(), forbidden) {
+				t.Fatalf("%s leaks %q", path, forbidden)
 			}
 		}
 	}
-	for _, mine := range []string{e.api(sharer, http.MethodGet, "/api/channels", nil).Body.String(), e.api(sharer, http.MethodGet, "/api/channels/"+id, nil).Body.String(),
-		e.api(e.admin, http.MethodGet, "/api/admin/channels", nil).Body.String(), e.api(e.admin, http.MethodGet, "/api/admin/channels/"+id, nil).Body.String()} {
-		if strings.Contains(mine, "upstream-secret-key") {
-			t.Fatalf("a channel read echoes the upstream key: %s", mine)
+	for _, view := range []struct {
+		actor person
+		path  string
+	}{
+		{sharer, "/api/group-channels"}, {sharer, "/api/group-channels/" + id}, {e.admin, "/api/admin/group-channels"}, {e.admin, "/api/admin/group-channels/" + id},
+	} {
+		reply := e.api(view.actor, http.MethodGet, view.path, nil)
+		if reply.Code != http.StatusOK || strings.Contains(reply.Body.String(), "upstream-secret-key") || strings.Contains(reply.Body.String(), "api_key_ciphertext") {
+			t.Fatalf("private metadata read: %d %s", reply.Code, reply.Body.String())
 		}
 	}
-	if recorder := e.api(consumer, http.MethodGet, "/api/channels/"+id, nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("someone else's channel = %d", recorder.Code)
+	if got := e.api(consumer, http.MethodGet, "/api/group-channels/"+id, nil).Code; got != http.StatusNotFound {
+		t.Fatalf("another owner's channel: %d", got)
 	}
-	if recorder := e.api(consumer, http.MethodGet, "/api/admin/channels", nil); recorder.Code != http.StatusForbidden {
-		t.Fatalf("admin list as member = %d", recorder.Code)
+	if got := e.api(consumer, http.MethodGet, "/api/admin/group-channels", nil).Code; got != http.StatusForbidden {
+		t.Fatalf("admin list as member: %d", got)
 	}
-
-	if recorder := e.api(e.admin, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": ""}); recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("suspend without a reason = %d", recorder.Code)
+	moderate := "/api/admin/group-channels/" + id + "/moderate"
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": strings.Repeat("x", 1001)}).Code; got != http.StatusUnprocessableEntity {
+		t.Fatalf("overlong moderation reason: %d", got)
 	}
-	suspended := e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": "abuse report"})
-	if suspended["channel"].(map[string]any)["status"] != "suspended" || suspended["channel"].(map[string]any)["owner"].(map[string]any)["username"] != "sharer" {
-		t.Fatalf("suspended = %v", suspended)
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": "abuse report"}).Code; got != http.StatusNoContent {
+		t.Fatalf("moderation: %d", got)
 	}
-	if recorder := e.api(e.admin, http.MethodPost, "/api/admin/channels/"+id+"/suspend", map[string]any{"reason": "again"}); recorder.Code != http.StatusConflict {
-		t.Fatalf("second suspend = %d", recorder.Code)
+	suspended := e.apiJSON(e.admin, 200, "GET", "/api/admin/group-channels/"+id, nil)
+	if suspended["status"] != "suspended" || suspended["owner"].(map[string]any)["username"] != "sharer" {
+		t.Fatal(suspended)
 	}
-	if recorder := e.api(sharer, http.MethodPatch, "/api/channels/"+id, map[string]any{"status": "listed"}); recorder.Code != http.StatusConflict {
-		t.Fatalf("owner relisting a suspended channel = %d %s", recorder.Code, recorder.Body.String())
+	if got := e.api(sharer, http.MethodPatch, "/api/group-channels/"+id, map[string]any{"revision": suspended["revision"], "status": "listed"}).Code; got != http.StatusConflict {
+		t.Fatalf("owner relisted suspended channel: %d", got)
 	}
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusServiceUnavailable {
-		t.Fatalf("call to a suspended channel = %d", code)
+	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; got != http.StatusServiceUnavailable {
+		t.Fatalf("suspended channel routed: %d", got)
 	}
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+id+"/unsuspend", map[string]any{"reason": "reviewed"})
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","messages":[{"role":"user","content":"SECRET-PROMPT-TEXT"}]}`), nil).Code; code != http.StatusOK {
-		t.Fatalf("call after unsuspend = %d", code)
+	// The fixed group API uses an explicit empty reason to restore a channel.
+	if got := e.api(e.admin, http.MethodPost, moderate, map[string]any{"reason": ""}).Code; got != http.StatusNoContent {
+		t.Fatalf("restore: %d", got)
 	}
+	reply := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","messages":[{"role":"user","content":"SECRET-PROMPT-TEXT"}]}`), nil)
+	if reply.Code != http.StatusOK {
+		t.Fatalf("restored call: %d %s", reply.Code, reply.Body.String())
+	}
+	callID := reply.Header().Get("X-AIHub-Request-Id")
 	var audits int
-	_ = e.pool.QueryRow(context.Background(), `SELECT count(*) FROM audit_log WHERE action IN ('channel.suspended', 'channel.unsuspended') AND target_id = $1`, id).Scan(&audits)
-	if audits != 2 {
-		t.Fatalf("audit rows = %d", audits)
+	if err := e.pool.QueryRow(context.Background(), `SELECT count(*) FROM audit_log WHERE action='group_channel.moderated' AND target_id=$1`, id).Scan(&audits); err != nil || audits != 2 {
+		t.Fatal("moderation audit", audits, err)
 	}
-	events := e.channelEvents(id)
-	if fmt.Sprint(events) != "[listed suspended unsuspended]" {
-		t.Fatalf("channel events = %v", events)
+	if events := e.channelEvents(id); fmt.Sprint(events) != "[listed suspended unsuspended]" {
+		t.Fatalf("events: %v", events)
 	}
-
-	// The structured log lines carry identifiers only: no key, no body.
 	logs := e.logs.String()
 	for _, forbidden := range []string{secret, "upstream-secret-key", "SECRET-PROMPT-TEXT", "private-tenant-value"} {
 		if strings.Contains(logs, forbidden) {
@@ -684,20 +690,24 @@ func TestAdminChannelModerationAndPublicInformationStayPrivate(t *testing.T) {
 		}
 	}
 	if !strings.Contains(logs, `"msg":"gateway request"`) || !strings.Contains(logs, `"key_prefix":"sk-aih-`) {
-		t.Fatalf("expected gateway log lines, got %s", logs)
+		t.Fatal("missing gateway log identifiers")
 	}
-
-	// Deleting hides the channel everywhere.
-	if recorder := e.api(sharer, http.MethodDelete, "/api/channels/"+id, nil); recorder.Code != http.StatusNoContent {
-		t.Fatalf("delete channel = %d", recorder.Code)
+	current := e.apiJSON(sharer, 200, "GET", "/api/group-channels/"+id, nil)
+	if got := e.api(sharer, http.MethodDelete, "/api/group-channels/"+id, map[string]any{"revision": current["revision"]}).Code; got != http.StatusNoContent {
+		t.Fatalf("delete: %d", got)
 	}
-	if code := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; code != http.StatusServiceUnavailable {
-		t.Fatalf("call to a deleted channel = %d", code)
+	if got := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test"}`), nil).Code; got != http.StatusServiceUnavailable {
+		t.Fatalf("deleted channel routed: %d", got)
 	}
+	historical := e.callRow(callID)
+	if historical.FinalChannel != id || !historical.HasLedgerTx {
+		t.Fatalf("business delete removed historical settlement: %+v", historical)
+	}
+	e.assertZeroSum()
 }
 
 func TestHomeAndModelListShowTodayNumbers(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
@@ -720,15 +730,32 @@ func TestHomeAndModelListShowTodayNumbers(t *testing.T) {
 	if channels["today_revenue"] != expectedCost || channels["online"] != float64(1) || channels["total"] != float64(1) {
 		t.Fatalf("sharer home = %v", sharerHome)
 	}
-	models := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/models", nil)["items"].([]any)
+	models := e.apiJSON(consumer, http.StatusOK, http.MethodGet, "/api/market/models", nil)["items"].([]any)
 	var found map[string]any
 	for _, item := range models {
 		if item.(map[string]any)["id"] == "gpt-test" {
 			found = item.(map[string]any)
 		}
 	}
-	if found["online_channels"] != float64(1) || fmt.Sprint(found["formats"]) != "[openai_chat openai_responses anthropic gemini]" ||
-		found["lowest_prices"].(map[string]any)["input"] != "20" {
+	if found["online_channels"] != float64(1) || len(found["formats"].([]any)) != 4 {
 		t.Fatalf("model list entry = %v", found)
+	}
+	detail := e.apiJSON(consumer, 200, "GET", "/api/market/models/gpt-test", nil)
+	if rows := detail["routing_channels"].([]any); len(rows) != 1 || rows[0].(map[string]any)["multiplier"] != "2" {
+		t.Fatal(detail)
+	}
+	var quoted bool
+	for _, raw := range detail["offers"].([]any) {
+		offer := raw.(map[string]any)
+		if offer["quote"] != nil {
+			q := offer["quote"].(map[string]any)
+			if q["currency"] != "CNY" || q["prices"].(map[string]any)["input"] != "10" {
+				t.Fatal("independent quote changed", q)
+			}
+			quoted = true
+		}
+	}
+	if !quoted {
+		t.Fatal("missing approved quote", detail)
 	}
 }

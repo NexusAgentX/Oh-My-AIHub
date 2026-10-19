@@ -37,11 +37,6 @@ func (s *countingStore) OnlineModels(context.Context) ([]gateway.OnlineModel, er
 	return nil, nil
 }
 
-func (s *countingStore) CustomModelOnline(context.Context, string) (bool, error) {
-	s.calls.Add(1)
-	return false, nil
-}
-
 func (s *countingStore) ResponseChannel(_ context.Context, accountID, responseID string) (string, error) {
 	s.lookups.Add(1)
 	if id, found := s.responseChannels[accountID+"/"+responseID]; found {

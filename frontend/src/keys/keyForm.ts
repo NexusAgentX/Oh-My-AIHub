@@ -8,6 +8,7 @@ export type AliasRow = { from: string; to: string }
 export type KeyForm = {
   name: string
   enabled: boolean
+  codexNotes: boolean
   modelScope: 'all' | 'some'
   allowedModels: string[]
   budgetDaily: string
@@ -21,6 +22,7 @@ export type KeyForm = {
 export const emptyKeyForm: KeyForm = {
   name: '',
   enabled: true,
+  codexNotes: false,
   modelScope: 'all',
   allowedModels: [],
   budgetDaily: '',
@@ -42,6 +44,7 @@ export function formFromKey(key: ApiKey): KeyForm {
   return {
     name: key.name,
     enabled: key.status === 'enabled',
+    codexNotes: key.codex_notes,
     modelScope: key.allowed_models.length > 0 ? 'some' : 'all',
     allowedModels: key.allowed_models,
     budgetDaily: key.budget_daily ?? '',
@@ -52,10 +55,10 @@ export function formFromKey(key: ApiKey): KeyForm {
   }
 }
 
-/** 高级设置五项中已改的项数：可用模型、预算、路由、别名、过期时间。 */
+/** 高级设置中已改的项数。 */
 export function advancedChangedCount(form: KeyForm, routedModels = 0) {
   return [
-    form.modelScope === 'some' && form.allowedModels.length > 0,
+    form.codexNotes,    form.modelScope === 'some' && form.allowedModels.length > 0,
     Boolean(form.budgetDaily || form.budgetMonthly || form.budgetTotal),
     routedModels > 0,
     form.aliases.some((row) => row.from.trim() && row.to.trim()),
@@ -92,6 +95,7 @@ function expiresOf(form: KeyForm) {
 export function createRequest(form: KeyForm): ApiKeyCreateRequest {
   return {
     name: form.name.trim(),
+    codex_notes: form.codexNotes,
     status: form.enabled ? 'enabled' : 'disabled',
     allowed_models: form.modelScope === 'some' ? form.allowedModels : [],
     budget_daily: form.budgetDaily || null,
@@ -136,6 +140,7 @@ export function budgetProgress(key: Pick<ApiKey, 'spend' | 'budget_daily' | 'bud
 /** 设置摘要徽标：单独路由 / N 个模型 / 已设别名。 */
 export function keyBadges(key: ApiKey) {
   const badges: string[] = []
+  if (key.codex_notes) badges.push('Codex 笔记')
   if (key.routed_models.length > 0) badges.push('单独路由')
   if (key.allowed_models.length > 0) badges.push(`${key.allowed_models.length} 个模型`)
   if (Object.keys(key.model_aliases).length > 0) badges.push('已设别名')

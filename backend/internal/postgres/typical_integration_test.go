@@ -12,7 +12,7 @@ import (
 )
 
 func TestTypicalDurableIngestionCheckpointRestartAndHistoricalLedgerUnchanged(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer, provider := e.member("typical-consumer", "100"), e.member("typical-provider", "0")
 	key, _ := e.defaultKey(consumer)
@@ -79,7 +79,7 @@ func TestTypicalDurableIngestionCheckpointRestartAndHistoricalLedgerUnchanged(t 
 	}
 }
 func TestTypicalSnapshotRejectsOldConfigAndSettingsAreAudited(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	actor := e.member("typical-settings", "0")
 	ctx := context.Background()
 	repo := typicalpg.NewStore(e.pool)

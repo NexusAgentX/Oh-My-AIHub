@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useFormDefaults } from '../settings/queries'
 import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
-import type { ModelChannel, RoutingMode } from '../api/types'
-import type {components} from '../api/schema.gen'
+import type { ModelRoutingChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
-import { formatPoints } from '../money/format'
+import { formatMultiplier } from '../money/format'
 import { RoutingMetrics } from './RoutingMetrics'
-import { MultiplierText } from '../money/MultiplierText'
 import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
   advancedChanged,
@@ -23,7 +21,7 @@ const modeOptions = (Object.keys(routingModeLabels) as RoutingMode[]).map((key) 
   key,
   label: routingModeLabels[key],
 }))
-type RoutingChannel=Pick<ModelChannel,'id'|'name'|'is_mine'|'formats'|'multiplier'|'state'|'cooldown_remaining_seconds'|'routing_metrics'>&Partial<Pick<ModelChannel,'owner'|'effective_multiplier'|'fx_discount'|'current_prices'>>&{typical_price?:components['schemas']['MarketBrowsePrice']|null}
+type RoutingChannel = ModelRoutingChannel
 
 function parseOptionalInt(value: string) {
   if (value.trim() === '') return null
@@ -127,7 +125,7 @@ export function RoutingEditor({
                 <div className="routing-name">
                   <Link draggable={false} to={`/channel-hall/${channel.id}`}>{channel.name}</Link>
                   <span className="routing-owner muted-copy">
-                    {channel.is_mine ? '由你提供' : channel.owner ? `由 ${channel.owner.display_name} 提供` : '共享渠道'}
+                    {channel.is_mine ? '由你提供' : '共享渠道'}
                   </span>
                   <span className="routing-badges">
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
@@ -137,19 +135,15 @@ export function RoutingEditor({
                 </div>
                 <dl className="routing-metrics">
                   <div>
-                    <dt>{channel.typical_price === undefined ? '倍率' : '分组报价折扣'}</dt>
+                    <dt>分组报价折扣</dt>
                     <dd>
-                      <MultiplierText
-                        effective={channel.effective_multiplier}
-                        fxDiscount={channel.fx_discount}
-                        multiplier={channel.multiplier}
-                      />
+                      {formatMultiplier(channel.multiplier)}
                     </dd>
                   </div>
                   <div>
-                    <dt>{channel.current_prices ? '现价 入/出' : '典型费用'}</dt>
+                    <dt>典型费用</dt>
                     <dd>
-                      {channel.current_prices ? `${formatPoints(channel.current_prices.input, { digits: 2 })} / ${formatPoints(channel.current_prices.output, { digits: 2 })}` : channel.typical_price?.self_net_zero ? '站内净支付 0' : channel.typical_price ? `${channel.typical_price.amount} 积分 / ${channel.typical_price.quantity} ${channel.typical_price.unit}` : '未知'}
+                      {channel.typical_price?.self_net_zero ? '站内净支付 0' : channel.typical_price ? `${channel.typical_price.amount} 积分 / ${channel.typical_price.quantity} ${{tokens:'tokens',successful_images:'张成功图片',requests:'次请求'}[channel.typical_price.unit] ?? channel.typical_price.unit}` : '未知'}
                     </dd>
                   </div>
                 </dl>

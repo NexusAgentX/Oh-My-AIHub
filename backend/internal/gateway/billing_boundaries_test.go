@@ -14,6 +14,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
@@ -24,9 +25,13 @@ func (s billingRestrictedStore) LookupKey(context.Context, []byte) (KeyAuth, err
 	return KeyAuth{KeyID: "key-1", OwnerID: "account-1", Enabled: true, AccountActive: true, AllowedModels: []string{"gpt-test"}}, nil
 }
 
-type unavailableSubmodels struct{ oneModel }
+type unavailableSubmodels struct {
+	oneModel
+	lists *int
+}
 
-func (unavailableSubmodels) ListModels(context.Context, bool) ([]catalog.Model, error) {
+func (s unavailableSubmodels) ListModels(context.Context, bool) ([]catalog.Model, error) {
+	*s.lists++
 	return nil, errors.New("synthetic catalog failure")
 }
 
@@ -51,7 +56,8 @@ func TestSubmodelsNeverBecomeAdmissionRules(t *testing.T) {
 			routes := &billingRoutingStop{}
 			f := newServeFixture(t, 2, routes)
 			f.engine.Store = billingRestrictedStore{f.store}
-			f.engine.Catalog = catalog.NewService(unavailableSubmodels{})
+			lists := 0
+			f.engine.Catalog = catalog.NewService(unavailableSubmodels{lists: &lists})
 			r := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(fmt.Sprintf(`{"model":%q,"tools":%s}`, mainModel, tools)))
 			r.Header.Set("Authorization", "Bearer sk-aih-synthetic")
 			w := httptest.NewRecorder()
@@ -62,6 +68,9 @@ func TestSubmodelsNeverBecomeAdmissionRules(t *testing.T) {
 			}
 			if w.Code != want || strings.Contains(w.Body.String(), "子模型") {
 				t.Fatalf("model=%s tools length=%d: status=%d want=%d body=%s", mainModel, len(tools), w.Code, want, w.Body.String())
+			}
+			if lists != 0 {
+				t.Fatal("tool configuration added a directory read on the inference path")
 			}
 			if routes.reached != (mainModel == "gpt-test") {
 				t.Fatal("submodel pricing failure blocked admission, or main model restriction was bypassed")
@@ -112,13 +121,13 @@ func TestGeminiToolInputsNeedPositiveRequestEvidence(t *testing.T) {
 	}
 }
 
-func TestImageSubmodelUsageIsObservedButNeverCharged(t *testing.T) {
+func TestImageSubmodelWithoutGroupQuoteIsUnpriced(t *testing.T) {
 	raw := `{"usage":{"input_tokens":100,"output_tokens":20},"output":[{"id":"ig_one","type":"image_generation_call","model":"image-model","usage":{"input_tokens":1000000,"output_tokens":1000000}}]}`
 	got := observe(channel.FormatOpenAIResponses, false, "application/json", raw, 7)
 	model := catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000}
-	call := &callState{format: channel.FormatOpenAIResponses, submodels: []catalog.Model{{ID: "image-model", InputPrice: 100_000_000_000, OutputPrice: 100_000_000_000}}}
-	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, model, Candidate{MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, got.Usage, settings.Settings{}, 0)
-	if err != nil || priced.Cost.String() != "0.0002" || !strings.Contains(string(snapshot), "暂不收取图像子模型费用") || got.Usage.Detail.Units["image_generation"] != ledger.FixedPointScale {
+	call := &callState{format: channel.FormatOpenAIResponses, billingFacts: quotepricing.Facts{MainReliable: true}}
+	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, model, quotedCandidate(t, Candidate{MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, model), got.Usage, settings.Settings{}, 0)
+	if err != nil || priced.Cost.String() != "0.0002" || !strings.Contains(string(snapshot), "missing_group_quote") || got.Usage.Detail.Units["image_generation"] != ledger.FixedPointScale {
 		t.Fatalf("cost=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
 	}
 }
@@ -157,7 +166,7 @@ func TestRegionalEndpointRecognitionAndResponsePriority(t *testing.T) {
 		{"", "https://relay.example", "1"},
 	} {
 		u := ledger.Usage{InputTokens: 1_000_000, Detail: &ledger.UsageDetail{InferenceGeo: tc.geo}}
-		priced, _, err := NewEngine(Dependencies{}).priceUsage(&callState{}, model, Candidate{BaseURL: tc.endpoint, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, u, settings.Settings{}, 0)
+		priced, _, err := NewEngine(Dependencies{}).priceUsage(&callState{billingFacts: quotepricing.Facts{MainReliable: true}}, model, quotedCandidate(t, Candidate{BaseURL: tc.endpoint, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, model), u, settings.Settings{}, 0)
 		if err != nil || priced.Cost.String() != tc.want {
 			t.Fatalf("geo=%s endpoint=%s cost=%s want=%s err=%v", tc.geo, tc.endpoint, priced.Cost.String(), tc.want, err)
 		}

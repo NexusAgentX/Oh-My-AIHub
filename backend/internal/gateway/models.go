@@ -242,7 +242,7 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		return nil, err
 	}
 	onlineSet := map[string]bool{}
-	witnesses, strict, err := e.nativeModelWitnesses(ctx, formats)
+	witnesses, err := e.nativeModelWitnesses(ctx, formats)
 	if err != nil {
 		return nil, err
 	}
@@ -253,18 +253,11 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		if !slices.ContainsFunc(model.Formats, func(format channel.Format) bool { return slices.Contains(formats, format) }) {
 			continue
 		}
-		if strict && len(witnesses[model.ID]) == 0 {
+		if len(witnesses[model.ID]) == 0 {
 			continue
 		}
 		onlineSet[model.ID] = true
-		if model.Custom {
-			// Custom models (ADR-0034) are listed under their own name only.
-			custom := catalog.Model{ID: model.ID, DisplayName: model.ID}
-			byID[model.ID] = custom
-			if allowed(model.ID) {
-				result = append(result, listedModel{id: model.ID, model: custom})
-			}
-		}
+
 	}
 	for _, model := range catalogModels {
 		byID[model.ID] = model
@@ -302,26 +295,24 @@ type nativeModelWitness struct {
 	candidate Candidate
 }
 
-// ModelListSource includes every inference candidate in the current snapshot.
-// AuxiliarySource has a narrower state/quote contract and cannot stand in for
-// this index while legacy inference remains live before the final cutover.
+// ModelListSource includes approved inference candidates in the current snapshot.
+// AuxiliarySource has a narrower state/quote contract and cannot stand in for it.
 type ModelListSource interface {
 	ModelListCandidates(context.Context, channel.Format) ([]CandidateRecord, error)
 }
 
-// The production snapshot already contains approved, governed, callable
-// candidates. The optional source keeps old isolated test/legacy stores usable
-// until final cutover; it never consults a provider's shared account catalog.
-func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string][]nativeModelWitness, bool, error) {
+// Only current, callable group offers witness model availability. A missing
+// index cannot fall back to unverified directory or shared provider metadata.
+func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string][]nativeModelWitness, error) {
 	out := map[string][]nativeModelWitness{}
 	source, ok := e.Store.(ModelListSource)
 	if !ok {
-		return out, false, nil
+		return out, nil
 	}
 	for _, format := range formats {
 		rows, err := source.ModelListCandidates(ctx, format)
 		if err != nil {
-			return nil, true, err
+			return nil, err
 		}
 		path := map[channel.Format]string{channel.FormatOpenAIChat: "/v1/chat/completions", channel.FormatOpenAIResponses: "/v1/responses", channel.FormatAnthropic: "/v1/messages", channel.FormatGemini: "/v1beta/models", channel.FormatOpenAIImages: "/v1/images/generations"}[format]
 		for _, row := range rows {
@@ -331,13 +322,9 @@ func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.For
 			out[row.ModelID] = append(out[row.ModelID], nativeModelWitness{format, row.Candidate})
 		}
 	}
-	return out, true, nil
+	return out, nil
 }
 func conservativeListedModel(name listedModel, entries []nativeModelWitness) listedModel {
-	group := slices.ContainsFunc(entries, func(v nativeModelWitness) bool { return v.candidate.GroupID != "" })
-	if !group {
-		return name
-	}
 	// The model ID is the aggregate title. An optional bound is present only
 	// when every eligible witness on these endpoint formats proves it.
 	name.model = catalog.Model{ID: name.model.ID, DisplayName: name.model.ID, Enabled: true}

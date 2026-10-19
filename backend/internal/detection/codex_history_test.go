@@ -14,7 +14,7 @@ import (
 )
 
 func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testing.T) {
-	for _, mode := range []string{"isolated", "shared", "not_yet_observed"} {
+	for _, mode := range []string{"isolated", "shared", "not_yet_observed", "typed_missing_window", "typed_missing_with_content", "unrecognized_error"} {
 		for _, layer := range []string{"upstream_protocol", "gateway_proxy"} {
 			t.Run(layer+"/"+mode, func(t *testing.T) {
 				owner, window, marker := "", "", ""
@@ -38,6 +38,10 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 						}
 						input := list(body["input"])
 						if len(input) == 1 {
+							if owner != "" {
+								_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
+								return
+							}
 							marker = str(object(input[0])["content"])
 							metadata := object(body["client_metadata"])
 							owner, window = str(metadata["session_id"]), str(metadata["x-codex-window-id"])
@@ -45,6 +49,10 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 							if body["store"] != false || turn["history_ingest_requested"] != true || str(turn["session_id"]) != owner || str(turn["thread_id"]) != owner || str(turn["window_id"]) != window {
 								t.Error("actual history ingest metadata was missing or lost namespace consistency")
 							}
+							if window != owner+":0" || str(turn["context_window_id"]) == "" || str(turn["context_window_id"]) == window {
+								t.Error("logical and stored context window identifiers were conflated")
+							}
+							window = str(turn["context_window_id"])
 							_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
 							return
 						}
@@ -104,6 +112,16 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 						}
 						if str(object(body["context"])["session_id"]) == owner || mode == "shared" {
 							value = nativeObject{"content": marker}
+						} else if mode == "typed_missing_window" || mode == "typed_missing_with_content" || mode == "unrecognized_error" {
+							envelope := nativeObject{"error": "Unable to perform operation: Unknown window id. Use list_windows to obtain one."}
+							if mode == "unrecognized_error" {
+								envelope["error"] = str(envelope["error"]) + " unexpected data"
+							}
+							if mode == "typed_missing_with_content" {
+								envelope["content"] = marker
+							}
+							_ = json.NewEncoder(w).Encode(envelope)
+							return
 						}
 					default:
 						t.Error("unknown history operation")
@@ -125,7 +143,7 @@ func TestCodexHistoryReadsOnlyOwnedSeededItemAndDetectsCrossSessionLeak(t *testi
 					if reads != 0 || result.Assertions[2].Reason != "prerequisite_failed" || result.State == "pass" {
 						t.Fatal("missing item evidence was replaced with a guessed read", result)
 					}
-				} else if reads != 2 || (result.State == "pass") != (mode == "isolated") {
+				} else if reads != 2 || (result.State == "pass") != (mode == "isolated" || mode == "typed_missing_window") {
 					t.Fatal("history remote resume/isolation verdict wrong", result)
 				}
 				encoded, _ := json.Marshal(result)

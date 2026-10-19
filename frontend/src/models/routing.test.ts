@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelChannel, RoutingPreference } from '../api/types'
+import type { ModelRoutingChannel, RoutingPreference } from '../api/types'
 import {
   advancedChanged,
   changeMode,
@@ -12,18 +12,14 @@ import {
   toRoutingInput,
 } from './routing'
 
-const channel = (id: string): ModelChannel => ({
+const channel = (id: string): ModelRoutingChannel => ({
   id,
   name: id,
-  owner: { id: 'o', display_name: 'o' },
   is_mine: false,
   formats: ['openai_chat'],
   multiplier: '1',
-  fx_discount: false,
-  effective_multiplier: '1',
-  current_prices: { input: '1', output: '2', cache_read: '0', cache_write: '0' },
-  success_rate_24h: null,
-  ttft_p50_ms: null,
+  routing_metrics: [],
+  typical_price: null,
   state: 'available',
   cooldown_remaining_seconds: null,
 })

@@ -173,7 +173,6 @@ func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (View, er
 	if err = validateChoices(state.Directory, g.ID, in.Models); err != nil {
 		return View{}, err
 	}
-	r.BaseURL = selected(state.Directory, r)[0].BaseURL
 	r.Credential, err = s.Keyring.Encrypt(id, 1, key)
 	if err != nil {
 		return View{}, err

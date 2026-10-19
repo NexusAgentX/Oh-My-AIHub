@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 )
@@ -90,14 +92,16 @@ func TestCallObservationReports(t *testing.T) {
 	t.Parallel()
 	p := newPlatform(t)
 	admin := p.admin(t)
-	seedModel(t, admin, "deepseek-chat")
+	seedModel(t, p, "deepseek-chat")
 	alice, aliceID := p.member(t, "alice")
-	bob, _ := p.member(t, "bob")
+	bob, bobID := p.member(t, "bob")
 	carol, _ := p.member(t, "carol")
-	channelID := bob.expect(t, http.StatusCreated, http.MethodPost, "/api/channels", map[string]any{
-		"name": "阿里中转", "base_url": "https://relay.example", "api_key": "sk-upstream-test-key-0001",
-		"models": []map[string]any{{"model_id": "deepseek-chat", "formats": []string{"openai_chat"}}},
-	})["channel"].(map[string]any)["id"].(string)
+	channelID := bob.expect(t, http.StatusCreated, http.MethodPost, "/api/group-channels", map[string]any{
+		"name": "阿里中转", "group_id": "00000000-0000-4000-8000-000000000062", "api_key": "sk-upstream-test-key-0001",
+	})["id"].(string)
+	// Observation queries also include retained channel identities after deletion.
+	p.channels.channels = append(p.channels.channels, &fakeStoredChannel{Record: groupchannel.Record{ID: channelID, Owner: channel.Owner{ID: bobID}, Name: "阿里中转"}})
+
 	keyID := alice.expect(t, http.StatusCreated, http.MethodPost, "/api/keys", map[string]any{"name": "默认 Key"})["key"].(map[string]any)["id"].(string)
 	ids := p.observeFixtures(aliceID, channelID, keyID)
 

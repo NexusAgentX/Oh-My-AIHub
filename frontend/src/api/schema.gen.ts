@@ -1332,160 +1332,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/suppliers/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 预览地址将关联的已上架渠道数量 */
-        post: operations["previewSupplierImpact"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** listSuppliers */
-        get: operations["listSuppliers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers/{supplierID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** getSupplier */
-        get: operations["getSupplier"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers/recognize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** recognizeSupplier */
-        post: operations["recognizeSupplier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channel-hall": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** listChannelHall */
-        get: operations["listChannelHall"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channel-hall/{channelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** getHallChannel */
-        get: operations["getHallChannel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/suppliers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** adminListSuppliers */
-        get: operations["adminListSuppliers"];
-        put?: never;
-        /** createSupplier */
-        post: operations["createSupplier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/suppliers/{supplierID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** updateSupplier */
-        put: operations["updateSupplier"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/suppliers/icon": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** fetchSupplierIcon */
-        post: operations["fetchSupplierIcon"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/forum/boards": {
         parameters: {
             query?: never;
@@ -1798,40 +1644,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 可用模型列表 */
-        get: operations["listModels"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/{modelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 模型详情、渠道与我的路由 */
-        get: operations["getModel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/routing/{modelID}": {
         parameters: {
             query?: never;
@@ -1925,86 +1737,6 @@ export interface paths {
         post?: never;
         /** 删除该 Key 的单独路由 */
         delete: operations["deleteKeyRouting"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 我的渠道 */
-        get: operations["listChannels"];
-        put?: never;
-        /** 添加渠道 */
-        post: operations["createChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/discover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 读取上游模型列表并匹配目录
-         * @description Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。
-         */
-        post: operations["discoverChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/channels/{channelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 渠道详情 */
-        get: operations["getChannel"];
-        put?: never;
-        post?: never;
-        /** 删除渠道 */
-        delete: operations["deleteChannel"];
-        options?: never;
-        head?: never;
-        /**
-         * 修改渠道
-         * @description 被管理员强制下架的渠道不能由所有者重新上架（409）。
-         */
-        patch: operations["updateChannel"];
-        trace?: never;
-    };
-    "/api/channels/{channelID}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 按模型逐个格式测试
-         * @description 会向上游发出真实请求，可能产生少量费用。
-         */
-        post: operations["testChannel"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2484,48 +2216,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 模型目录（含停用） */
-        get: operations["listAdminModels"];
-        put?: never;
-        /** 上架模型 */
-        post: operations["createAdminModel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/models/{modelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * 删除模型
-         * @description 删除模型、条件价格档及路由偏好；保留历史调用、账单及 Key 的模型限制和别名。有未删除渠道引用时拒绝删除。
-         */
-        delete: operations["deleteAdminModel"];
-        options?: never;
-        head?: never;
-        /**
-         * 修改模型与价格档
-         * @description 只修改提供的字段；price_tiers 提供时整组替换。
-         */
-        patch: operations["updateAdminModel"];
-        trace?: never;
-    };
     "/api/form-defaults": {
         parameters: {
             query?: never;
@@ -2592,74 +2282,6 @@ export interface paths {
         get: operations["listAdminAudit"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 全部渠道 */
-        get: operations["listAdminChannels"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channels/{channelID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 渠道详情 */
-        get: operations["getAdminChannel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channels/{channelID}/suspend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 强制下架 */
-        post: operations["suspendAdminChannel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/channels/{channelID}/unsuspend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 恢复 */
-        post: operations["unsuspendAdminChannel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4369,11 +3991,6 @@ export interface components {
         CallOutcome: "rejected_balance" | "rejected_budget" | "rejected_key" | "rejected_model" | "rejected_format" | "rejected_no_channel" | "rejected_inflight" | "upstream_failed" | "interrupted" | "client_disconnected" | "succeeded" | "succeeded_unbilled" | "in_progress";
         /** @enum {string} */
         AccountStatus: "active" | "disabled";
-        /**
-         * @description 上架、下架（所有者）、强制下架（管理员）。
-         * @enum {string}
-         */
-        ChannelStatus: "listed" | "unlisted" | "suspended";
         /** @enum {string} */
         TransactionType: "api_call" | "c2c_list" | "c2c_release" | "c2c_return" | "admin_adjust" | "bad_debt_writeoff";
         /** @enum {string} */
@@ -4450,17 +4067,6 @@ export interface components {
         TierRef: {
             seq: number;
             name: string;
-        };
-        /** @description 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。 */
-        ModelPrices: {
-            input: components["schemas"]["Price"];
-            output: components["schemas"]["Price"];
-            /** @description 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。 */
-            token_prices?: {
-                [key: string]: components["schemas"]["Price"];
-            };
-            cache_write: components["schemas"]["Price"];
-            cache_read: components["schemas"]["Price"];
         };
         /** @description 乘以渠道倍率后的四个现价，积分/百万 token。 */
         EffectivePrices: {
@@ -4583,135 +4189,6 @@ export interface components {
             pending_c2c_trades: number;
             recent_calls: components["schemas"]["CallSummary"][];
         };
-        /** @description 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。 */
-        PriceTier: {
-            seq: number;
-            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
-            service_tier?: string;
-            name: string;
-            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
-            min_prompt_tokens: number | null;
-            /** @description 输入侧 token 上限，不含。 */
-            max_prompt_tokens: number | null;
-            /** @description IANA 时区，默认 UTC。 */
-            timezone: string;
-            /** @description ISO 星期（1=周一）；null 表示每天。 */
-            weekdays: number[] | null;
-            start_minute_of_day: number | null;
-            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
-            end_minute_of_day: number | null;
-            prices: components["schemas"]["ModelPrices"];
-        };
-        PriceTierInput: {
-            /** @description 实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。 */
-            service_tier?: string;
-            name?: string;
-            /** @description 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。 */
-            min_prompt_tokens?: number | null;
-            /** @description 输入侧 token 上限，不含。 */
-            max_prompt_tokens?: number | null;
-            /** @description IANA 时区，默认 UTC。 */
-            timezone?: string;
-            /** @description ISO 星期（1=周一）；null 表示每天。 */
-            weekdays?: number[] | null;
-            start_minute_of_day?: number | null;
-            /** @description 不含；小于开始分钟表示跨午夜，归属开始日。 */
-            end_minute_of_day?: number | null;
-            prices: components["schemas"]["ModelPrices"];
-        };
-        AdminModel: {
-            id: string;
-            display_name: string;
-            price_currency: components["schemas"]["PriceCurrency"];
-            base_prices: components["schemas"]["ModelPrices"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            enabled: boolean;
-            sort_order: number;
-            provider: string;
-            context_window: number | null;
-            max_output_tokens: number | null;
-            input_modalities: string[];
-            output_modalities: string[];
-            supports_tools: boolean;
-            supports_structured_output: boolean;
-            supports_vision: boolean;
-            parameter_info: string;
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-        };
-        AdminModelList: {
-            items: components["schemas"]["AdminModel"][];
-        };
-        AdminModelEnvelope: {
-            model: components["schemas"]["AdminModel"];
-        };
-        ModelCreateRequest: {
-            /** @description 模型名，即客户端请求中的 model；不含 / 与 :。 */
-            id: string;
-            display_name: string;
-            /** @description 默认 CNY。基准价、细分价与条件价格档都按此币种填写。 */
-            price_currency?: components["schemas"]["PriceCurrency"];
-            base_prices: components["schemas"]["ModelPrices"];
-            price_tiers?: components["schemas"]["PriceTierInput"][];
-            enabled?: boolean;
-            sort_order?: number;
-            provider?: string;
-            context_window?: number | null;
-            max_output_tokens?: number | null;
-            input_modalities?: string[];
-            output_modalities?: string[];
-            supports_tools?: boolean;
-            supports_structured_output?: boolean;
-            supports_vision?: boolean;
-            parameter_info?: string;
-        };
-        ModelUpdateRequest: {
-            display_name?: string;
-            /** @description 改变币种时，提供该模型的全部渠道的汇率优惠随之重设：改为 USD 时开启（数值不变的模型保持原价），改为 CNY 时关闭。 */
-            price_currency?: components["schemas"]["PriceCurrency"];
-            base_prices?: components["schemas"]["ModelPrices"];
-            /** @description 提供时整组替换价格档；空数组表示删除全部档位。 */
-            price_tiers?: components["schemas"]["PriceTierInput"][];
-            enabled?: boolean;
-            sort_order?: number;
-            provider?: string;
-            context_window?: number | null;
-            max_output_tokens?: number | null;
-            input_modalities?: string[];
-            output_modalities?: string[];
-            supports_tools?: boolean;
-            supports_structured_output?: boolean;
-            supports_vision?: boolean;
-            parameter_info?: string;
-        };
-        /** @description 启用模型的列表项。 */
-        CatalogModel: {
-            id: string;
-            display_name: string;
-            provider: string;
-            context_window: number | null;
-            max_output_tokens: number | null;
-            input_modalities: string[];
-            output_modalities: string[];
-            supports_tools: boolean;
-            supports_structured_output: boolean;
-            supports_vision: boolean;
-            parameter_info: string;
-            price_currency: components["schemas"]["PriceCurrency"];
-            /** @description 美元模型换算用的当前汇率；人民币模型为 null。 */
-            usd_cny_rate: components["schemas"]["ExchangeRate"] | null;
-            /** @description 积分价；美元模型已按当前汇率换算。 */
-            base_prices: components["schemas"]["ModelPrices"];
-            current_tier: components["schemas"]["TierRef"] | null;
-            lowest_prices: components["schemas"]["EffectivePrices"] | null;
-            formats: components["schemas"]["Format"][];
-            online_channels: number;
-            /** @description 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。 */
-            custom: boolean;
-        };
-        CatalogModelList: {
-            items: components["schemas"]["CatalogModel"][];
-        };
         ModelRoutingMetric: {
             /**
              * @description 实际入口协议；Codex 原生与公共 Responses/Images 分开计量。
@@ -4733,29 +4210,6 @@ export interface components {
             output_samples: number;
             /** @description 对应统计至少达到此样本数才用于自身指标排序。 */
             min_samples: number;
-        };
-        ModelChannel: {
-            /** @description 该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。 */
-            routing_metrics?: components["schemas"]["ModelRoutingMetric"][];
-            /** Format: uuid */
-            id: string;
-            name: string;
-            owner: components["schemas"]["Party"];
-            is_mine: boolean;
-            formats: components["schemas"]["Format"][];
-            multiplier: components["schemas"]["Multiplier"];
-            /** @description 美元模型开启了汇率优惠。 */
-            fx_discount: boolean;
-            effective_multiplier: components["schemas"]["EffectiveMultiplier"];
-            current_prices: components["schemas"]["EffectivePrices"];
-            success_rate_24h: components["schemas"]["Ratio"] | null;
-            ttft_p50_ms: number | null;
-            /**
-             * @description available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM限制。
-             * @enum {string}
-             */
-            state: "available" | "cooldown" | "limited";
-            cooldown_remaining_seconds: number | null;
         };
         RoutingPreference: {
             model_id: string;
@@ -4785,18 +4239,17 @@ export interface components {
             idle_timeout_ms?: number | null;
             request_timeout_ms?: number | null;
         };
-        ModelDetail: {
-            model: components["schemas"]["CatalogModel"];
-            price_tiers: components["schemas"]["PriceTier"][];
-            channels: components["schemas"]["ModelChannel"][];
-            routing: components["schemas"]["RoutingPreference"];
-        };
         ApiKeySpend: {
             today: components["schemas"]["Amount"];
             month: components["schemas"]["Amount"];
             total: components["schemas"]["Amount"];
         };
         ApiKey: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             /** Format: uuid */
             id: string;
             name: string;
@@ -4828,6 +4281,11 @@ export interface components {
             key: components["schemas"]["ApiKey"];
         };
         ApiKeyCreateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";
@@ -4843,6 +4301,11 @@ export interface components {
             };
         };
         ApiKeyUpdateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name?: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";
@@ -4869,37 +4332,6 @@ export interface components {
         ApiKeySecret: {
             secret: string;
         };
-        /** @description 请求头规则：设置/覆写与删除。 */
-        HeaderRules: {
-            set: {
-                name: string;
-                value: string;
-            }[];
-            remove: string[];
-        };
-        /** @description 高级设置；null 表示使用平台默认。 */
-        ChannelAdvanced: {
-            user_agent: string | null;
-            header_rules: components["schemas"]["HeaderRules"];
-            concurrency_limit: number | null;
-            rpm_limit: number | null;
-            ttft_timeout_ms: number | null;
-            idle_timeout_ms: number | null;
-            request_timeout_ms: number | null;
-            cooldown_failures: number | null;
-            cooldown_seconds: number | null;
-        };
-        ChannelAdvancedInput: {
-            user_agent?: string | null;
-            header_rules?: components["schemas"]["HeaderRules"];
-            concurrency_limit?: number | null;
-            rpm_limit?: number | null;
-            ttft_timeout_ms?: number | null;
-            idle_timeout_ms?: number | null;
-            request_timeout_ms?: number | null;
-            cooldown_failures?: number | null;
-            cooldown_seconds?: number | null;
-        };
         FormatTest: {
             /** @description 最小可调用性实际使用的固定入口标识；省略时为原公共格式入口。 */
             endpoint_id?: string;
@@ -4909,144 +4341,12 @@ export interface components {
             duration_ms: number | null;
             tested_at: components["schemas"]["Timestamp"];
         };
-        ChannelModel: {
-            model_id: string;
-            display_name: string;
-            upstream_model: string;
-            price_currency: components["schemas"]["PriceCurrency"];
-            multiplier: components["schemas"]["Multiplier"];
-            /** @description 汇率优惠，只对美元模型生效。 */
-            fx_discount: boolean;
-            effective_multiplier: components["schemas"]["EffectiveMultiplier"];
-            formats: components["schemas"]["Format"][];
-            /** @description 键为格式。 */
-            format_tests: {
-                [key: string]: components["schemas"]["FormatTest"];
-            };
-            enabled: boolean;
-            current_prices: components["schemas"]["EffectivePrices"];
-            /** @description 自定义模型（不在模型目录中）的四个积分价；官方模型为 null。 */
-            custom_prices: components["schemas"]["CustomPrices"] | null;
-            /** @description 原自定义模型已加入模型目录，停用中；渠道主设置倍率并启用后恢复。 */
-            pending_multiplier: boolean;
-        };
-        /** @description 自定义模型的四个基准价（积分/百万 token），按此价格直接计费，不乘倍率、不乘汇率、无条件价格档。 */
-        CustomPrices: {
-            input: components["schemas"]["Price"];
-            output: components["schemas"]["Price"];
-            cache_write: components["schemas"]["Price"];
-            cache_read: components["schemas"]["Price"];
-        };
-        ChannelModelInput: {
-            model_id: string;
-            /** @description 默认与 model_id 相同（模型重定向）。 */
-            upstream_model?: string;
-            multiplier?: components["schemas"]["Multiplier"];
-            /** @description 汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。 */
-            fx_discount?: boolean;
-            formats: components["schemas"]["Format"][];
-            enabled?: boolean;
-            /** @description 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。 */
-            custom_prices?: components["schemas"]["CustomPrices"];
-        };
-        ChannelToday: {
-            revenue: components["schemas"]["Amount"];
-            calls: number;
-            success_rate: components["schemas"]["Ratio"] | null;
-        };
-        /** @description 我的渠道；上游 Key 不回显。 */
-        Channel: {
-            summary: string;
-            description: string;
-            /** Format: uuid */
-            id: string;
-            name: string;
-            base_url: string;
-            status: components["schemas"]["ChannelStatus"];
-            suspended_reason: string | null;
-            cooldown_until: components["schemas"]["NullableTimestamp"];
-            models: components["schemas"]["ChannelModel"][];
-            advanced: components["schemas"]["ChannelAdvanced"];
-            today: components["schemas"]["ChannelToday"];
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-        };
-        ChannelList: {
-            items: components["schemas"]["Channel"][];
-        };
-        ChannelEnvelope: {
-            channel: components["schemas"]["Channel"];
-        };
         ChannelEvent: {
             id: string;
             /** @enum {string} */
             kind: "cooldown_started" | "cooldown_ended" | "limit_reached" | "suspended" | "unsuspended" | "listed" | "unlisted" | "test_failed" | "model_pending_multiplier" | "anomalous_client_errors";
             reason: string;
             created_at: components["schemas"]["Timestamp"];
-        };
-        ChannelDetail: {
-            channel: components["schemas"]["Channel"];
-            events: components["schemas"]["ChannelEvent"][];
-        };
-        ChannelDiscoverRequest: {
-            base_url: string;
-            api_key: string;
-        };
-        DiscoveredModel: {
-            /** @description 上游模型名。 */
-            id: string;
-            matched_model_id: string | null;
-            suggested_formats: components["schemas"]["Format"][];
-        };
-        ChannelDiscoverResponse: {
-            /** @description 规范化后的 Base URL。 */
-            base_url: string;
-            upstream_models: components["schemas"]["DiscoveredModel"][];
-        };
-        ChannelCreateRequest: {
-            summary?: string;
-            description?: string;
-            name: string;
-            base_url: string;
-            api_key: string;
-            /** @enum {string} */
-            status?: "listed" | "unlisted";
-            models: components["schemas"]["ChannelModelInput"][];
-            advanced?: components["schemas"]["ChannelAdvancedInput"];
-        };
-        ChannelUpdateRequest: {
-            summary?: string;
-            description?: string;
-            name?: string;
-            base_url?: string;
-            /** @description 提供时替换上游 Key。 */
-            api_key?: string;
-            /** @enum {string} */
-            status?: "listed" | "unlisted";
-            /** @description 提供时整组替换。 */
-            models?: components["schemas"]["ChannelModelInput"][];
-            /** @description 提供时整块替换高级设置；省略或为 null 的字段恢复平台默认。 */
-            advanced?: components["schemas"]["ChannelAdvancedInput"];
-        };
-        ChannelTestRequest: {
-            /** @description 省略时测试全部模型。 */
-            model_ids?: string[];
-            /** @description 省略时测试四种格式。 */
-            formats?: components["schemas"]["Format"][];
-            /** @description 为 true 时把通过的格式写回 formats。 */
-            apply?: boolean;
-        };
-        ChannelTestResult: {
-            model_id: string;
-            format: components["schemas"]["Format"];
-            ok: boolean;
-            status_code: number | null;
-            error: string | null;
-            duration_ms: number;
-        };
-        ChannelTestResponse: {
-            results: components["schemas"]["ChannelTestResult"][];
-            channel: components["schemas"]["Channel"];
         };
         ChannelRef: {
             /** Format: uuid */
@@ -5382,8 +4682,9 @@ export interface components {
             currency?: components["schemas"]["PriceCurrency"];
             /** @description 美元模型计费时使用的汇率；人民币模型为 null。 */
             usd_cny_rate?: components["schemas"]["ExchangeRate"] | null;
+            /** @description 仅用于解码历史快照中的 FX 特惠；新分组报价不产生此字段。 */
             fx_discount?: boolean;
-            /** @description 渠道自定义模型按渠道自定价格计费；旧快照无此字段。 */
+            /** @description 仅用于解码历史渠道自定义点价快照；新分组报价不产生此字段。 */
             custom?: boolean;
             effective_multiplier?: components["schemas"]["EffectiveMultiplier"];
             fee_rate_nano: number;
@@ -5844,39 +5145,6 @@ export interface components {
             /** @description 下一页游标；为 null 表示没有更多。 */
             next_cursor: string | null;
         };
-        /** @description 管理员视角的渠道；上游 Key 不回显。 */
-        AdminChannel: {
-            summary: string;
-            description: string;
-            /** Format: uuid */
-            id: string;
-            name: string;
-            base_url: string;
-            status: components["schemas"]["ChannelStatus"];
-            suspended_reason: string | null;
-            cooldown_until: components["schemas"]["NullableTimestamp"];
-            models: components["schemas"]["ChannelModel"][];
-            advanced: components["schemas"]["ChannelAdvanced"];
-            today: components["schemas"]["ChannelToday"];
-            created_at: components["schemas"]["Timestamp"];
-            updated_at: components["schemas"]["Timestamp"];
-            owner: components["schemas"]["AccountRef"];
-        };
-        AdminChannelPage: {
-            items: components["schemas"]["AdminChannel"][];
-            /** @description 下一页游标；为 null 表示没有更多。 */
-            next_cursor: string | null;
-        };
-        AdminChannelEnvelope: {
-            channel: components["schemas"]["AdminChannel"];
-        };
-        AdminChannelDetail: {
-            channel: components["schemas"]["AdminChannel"];
-            events: components["schemas"]["ChannelEvent"][];
-        };
-        ReasonRequest: {
-            reason: string;
-        };
         /** @description 实时现算的零和核对；total 正常为 "0"。 */
         LedgerCheck: {
             balanced: boolean;
@@ -6104,85 +5372,12 @@ export interface components {
             /** Format: uuid */
             transaction_id: string | null;
         };
-        Supplier: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        SupplierEndpoint: {
-            base_url: string;
-            label: string;
-        };
-        AdminSupplier: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            /** Format: date-time */
-            updated_at: string;
-            visible: boolean;
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-            linked_channels: number;
-        };
-        SupplierInput: {
-            name: string;
-            /** @enum {string} */
-            kind: "official" | "relay";
-            summary: string;
-            description: string;
-            website_url: string;
-            docs_url: string;
-            status_url: string;
-            icon_data: string;
-            icon_source: string;
-            visible: boolean;
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-        };
-        SupplierList: {
-            items: components["schemas"]["Supplier"][];
-            next_cursor: string | null;
-        };
-        AdminSupplierList: {
-            items: components["schemas"]["AdminSupplier"][];
-            next_cursor: string | null;
-        };
-        SupplierRecognition: {
-            supplier: components["schemas"]["Supplier"] | null;
-        };
-        SupplierRecognitionInput: {
-            base_url: string;
-        };
         SupplierIcon: {
             icon_data: string;
             icon_source: string;
         };
         SupplierIconInput: {
             website_url: string;
-        };
-        HallOffer: {
-            model: components["schemas"]["CatalogModel"];
-            multiplier: string;
-            effective_multiplier: string;
-            fx_discount: boolean;
         };
         DirectoryValues: {
             cache_samples: number;
@@ -6231,38 +5426,6 @@ export interface components {
             previous: components["schemas"]["DirectoryValues"];
             groups: components["schemas"]["DirectoryRow"][];
             trend: components["schemas"]["DirectoryRow"][];
-        };
-        HallChannel: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            summary: string;
-            description: string;
-            owner: components["schemas"]["Party"];
-            is_mine: boolean;
-            supplier: components["schemas"]["Supplier"] | null;
-            models: components["schemas"]["HallOffer"][];
-            formats: components["schemas"]["Format"][];
-            /** @enum {string} */
-            state: "available" | "cooldown" | "limited";
-            cooldown_remaining_seconds: number | null;
-            success_rate_24h: string | null;
-            ttft_p50_ms: number | null;
-        };
-        HallList: {
-            items: components["schemas"]["HallChannel"][];
-            next_cursor: string | null;
-        };
-        SupplierDetail: {
-            supplier: components["schemas"]["Supplier"];
-            channels: components["schemas"]["HallChannel"][];
-            models: components["schemas"]["CatalogModel"][];
-        };
-        SupplierImpactInput: {
-            endpoints: components["schemas"]["SupplierEndpoint"][];
-        };
-        SupplierImpact: {
-            linked_channels: number;
         };
         /** @enum {string} */
         GroupChannelFormat: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
@@ -6642,8 +5805,6 @@ export interface components {
         exportFormat: "json" | "csv";
         /** @description 账户状态。 */
         accountStatus: components["schemas"]["AccountStatus"];
-        /** @description 渠道状态。 */
-        channelStatus: components["schemas"]["ChannelStatus"];
         /** @description 所有者账户 ID。 */
         ownerID: string;
         /** @description 我的角色。 */
@@ -10814,12 +9975,14 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
-            /** @description 分析查询超时 */
+            /** @description 分析查询超时或市场发布尚未完成 */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
@@ -10859,319 +10022,15 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
-            /** @description 分析查询超时 */
+            /** @description 分析查询超时或市场发布尚未完成 */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-        };
-    };
-    previewSupplierImpact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierImpactInput"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
                 content: {
-                    "application/json": components["schemas"]["SupplierImpact"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    listSuppliers: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SupplierList"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    getSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                supplierID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SupplierDetail"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    recognizeSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierRecognitionInput"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SupplierRecognition"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    listChannelHall: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-                q?: string;
-                supplier?: string;
-                model?: string;
-                format?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HallList"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    getHallChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                channelID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HallChannel"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    adminListSuppliers: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminSupplierList"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    createSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierInput"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminSupplier"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    updateSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                supplierID: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierInput"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminSupplier"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    fetchSupplierIcon: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierIconInput"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SupplierIcon"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
         };
     };
     listForumBoards: {
@@ -11887,54 +10746,15 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-        };
-    };
-    listModels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
+            /** @description 生效分组快照暂不可用。 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CatalogModelList"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 模型名。 */
-                modelID: components["parameters"]["modelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelDetail"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     setRouting: {
@@ -12190,201 +11010,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-        };
-    };
-    listChannels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChannelCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    discoverChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChannelDiscoverRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelDiscoverResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-        };
-    };
-    getChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelDetail"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    deleteChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功，无响应体。 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    updateChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChannelUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    testChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChannelTestRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChannelTestResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
         };
     };
     analyzeCalls: {
@@ -13361,114 +11986,6 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    listAdminModels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminModelList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createAdminModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminModelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    deleteAdminModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 模型名。 */
-                modelID: components["parameters"]["modelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 已删除 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    updateAdminModel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 模型名。 */
-                modelID: components["parameters"]["modelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminModelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
     getFormDefaults: {
         parameters: {
             query?: never;
@@ -13599,132 +12116,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-        };
-    };
-    listAdminChannels: {
-        parameters: {
-            query?: {
-                /** @description 搜索关键字。 */
-                q?: components["parameters"]["q"];
-                /** @description 渠道状态。 */
-                status?: components["parameters"]["channelStatus"];
-                /** @description 所有者账户 ID。 */
-                owner_id?: components["parameters"]["ownerID"];
-                /** @description 上一页返回的 next_cursor。 */
-                cursor?: components["parameters"]["cursor"];
-                /** @description 每页条数，1～100，默认 20。 */
-                limit?: components["parameters"]["limit"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminChannelPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    getAdminChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminChannelDetail"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    suspendAdminChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReasonRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    unsuspendAdminChannel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 渠道 ID。 */
-                channelID: components["parameters"]["channelID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReasonRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminChannelEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
         };
     };
     listAdminDisputes: {

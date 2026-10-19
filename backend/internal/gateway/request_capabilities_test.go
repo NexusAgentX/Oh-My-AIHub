@@ -77,6 +77,49 @@ func TestRequiredCapabilitiesCannotBeUnionedAcrossCandidates(t *testing.T) {
 	}
 }
 
+func TestExplicitSamplingStopsAndInstructionsNeedTheirOwnEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		format channel.Format
+		body   string
+		proof  string
+	}{
+		{channel.FormatOpenAIChat, `{"temperature":0}`, "openai-chat-completions.output/temperature"},
+		{channel.FormatOpenAIChat, `{"top_p":0.8}`, "openai-chat-completions.output/top_p"},
+		{channel.FormatOpenAIChat, `{"stop":["STOP"]}`, "openai-chat-completions.output/stop"},
+		{channel.FormatOpenAIChat, `{"messages":[{"role":"system","content":"Synthetic instruction"}]}`, "openai-chat-completions.base/role_and_instruction_semantics"},
+		{channel.FormatOpenAIChat, `{"messages":[{"role":"developer","content":"Synthetic instruction"}]}`, "openai-chat-completions.base/role_and_instruction_semantics"},
+		{channel.FormatOpenAIResponses, `{"text":{"verbosity":"low"}}`, "openai-responses.output/text.verbosity"},
+		{channel.FormatOpenAIResponses, `{"instructions":"Synthetic instruction"}`, "openai-responses.base/role_and_instruction_semantics"},
+		{channel.FormatOpenAIResponses, `{"input":[{"role":"developer","content":"Synthetic instruction"}]}`, "openai-responses.base/role_and_instruction_semantics"},
+		{channel.FormatGemini, `{"generationConfig":{"temperature":0}}`, "native-generate-content.output/temperature"},
+		{channel.FormatGemini, `{"generationConfig":{"topP":0.8}}`, "native-generate-content.output/topP"},
+		{channel.FormatGemini, `{"generationConfig":{"topK":20}}`, "native-generate-content.output/topK"},
+		{channel.FormatGemini, `{"generationConfig":{"stopSequences":["STOP"]}}`, "native-generate-content.output/stopSequences"},
+		{channel.FormatGemini, `{"systemInstruction":{"parts":[{"text":"Synthetic instruction"}]}}`, "native-generate-content.base/role_and_instruction_semantics"},
+		{channel.FormatAnthropic, `{"stop_sequences":["STOP"]}`, "native-messages.output/stop_sequences"},
+		{channel.FormatAnthropic, `{"system":"Synthetic instruction"}`, "native-messages.base/role_and_instruction_semantics"},
+	} {
+		t.Run(string(tc.format)+"/"+tc.proof, func(t *testing.T) {
+			req := compileNativeRequirements(tc.format, []byte(tc.body), false, "/v1/native")
+			c := Candidate{Evidence: map[string]bool{}}
+			if got := missingRequestCapability(c, req, nil); got != tc.proof {
+				t.Fatal("request escaped its explicit support requirement", got, tc.proof)
+			}
+			c.Evidence["upstream_protocol/"+tc.proof] = true
+			headers := http.Header{"Anthropic-Version": {"2023-06-01"}}
+			if got := missingRequestCapability(c, req, headers); got != "" {
+				t.Fatal("matching independent evidence did not authorize the request", got)
+			}
+		})
+	}
+	for _, format := range []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatGemini, channel.FormatAnthropic} {
+		req := compileNativeRequirements(format, []byte(`{"temperature":null,"top_p":null,"stop":null,"instructions":null,"system":null,"systemInstruction":null,"generationConfig":{"temperature":null,"topP":null,"topK":null,"stopSequences":null},"text":{"verbosity":null}}`), false, "/v1/native")
+		if len(req.capabilities) != 0 {
+			t.Fatal("absent optional values invented a hard capability requirement", format, req)
+		}
+	}
+}
+
 func TestImageTransportMaskAndMultipleInputsRemainIndependent(t *testing.T) {
 	req := compileNativeRequirements(channel.FormatOpenAIImages, []byte(`{"images":[{"image_url":"https://example.invalid/one"},{"image_url":"https://example.invalid/two"}],"mask":{"image_url":"https://example.invalid/mask"}}`), false, "/v1/images/edits")
 	c := Candidate{GroupID: "group", Evidence: map[string]bool{"upstream_protocol/images.edits/actual_image_model": true}}

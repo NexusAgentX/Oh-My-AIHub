@@ -127,7 +127,8 @@ COMMIT;`)
 	}
 	// 0007 lets a channel event record a 4xx anomaly.
 	var eventKinds string
-	if err := db.QueryRowContext(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'channel_events_kind_check'`).Scan(&eventKinds); err != nil ||
+	if err := db.QueryRowContext(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint
+ WHERE conrelid = 'channel_events'::regclass AND conname = 'channel_events_kind_check'`).Scan(&eventKinds); err != nil ||
 		!strings.Contains(eventKinds, "anomalous_client_errors") || !strings.Contains(eventKinds, "model_pending_multiplier") {
 		t.Fatalf("channel event kinds after upgrade = %q %v", eventKinds, err)
 	}

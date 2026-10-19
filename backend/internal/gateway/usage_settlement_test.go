@@ -21,11 +21,11 @@ func TestNormalizedUsageReachesAtomicSettlementAndSnapshot(t *testing.T) {
 	store := &speedStore{}
 	engine := NewEngine(Dependencies{Store: store, Now: func() time.Time { return start.Add(time.Second) }})
 	body := "data: " + `{"usage":{"prompt_tokens":100,"prompt_tokens_details":{"cached_tokens":30,"cache_creation_tokens":10,"cache_creation_token_details":{"ephemeral_5m_input_tokens":4,"ephemeral_1h_input_tokens":6}}}}` + "\n\ndata: " + `{"usage":{"completion_tokens":20}}` + "\n\n"
-	model := catalog.Model{InputPrice: 1_000_000, OutputPrice: 2_000_000, CacheWritePrice: 3_000_000, CacheReadPrice: 4_000_000}
+	model := catalog.Model{ID: "main", InputPrice: 1_000_000, OutputPrice: 2_000_000, CacheWritePrice: 3_000_000, CacheReadPrice: 4_000_000}
 	response := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(""))}
 	call := &callState{id: "normalized", started: start, stream: true, format: channel.FormatOpenAIChat, key: KeyAuth{OwnerID: "consumer"}, attempts: []Attempt{{}}}
 	recorder := httptest.NewRecorder()
-	engine.streamBack(recorder, call, model, Candidate{ChannelID: "channel", OwnerID: "provider", MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, attemptResult{response: response, first: []byte(body), firstErr: io.EOF, cancel: func(error) {}, upstream: context.Background(), watch: watchClient(context.Background(), func(error) {}, drainWindow), started: start}, settings.Settings{})
+	engine.streamBack(recorder, call, model, quotedCandidate(t, Candidate{ChannelID: "channel", OwnerID: "provider", MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate}, model), attemptResult{response: response, first: []byte(body), firstErr: io.EOF, cancel: func(error) {}, upstream: context.Background(), watch: watchClient(context.Background(), func(error) {}, drainWindow), started: start}, settings.Settings{})
 	finish := store.finish
 	if recorder.Body.String() != body || finish.Usage.InputTokens != 60 || finish.Usage.OutputTokens != 20 || finish.Usage.CacheWriteTokens != 10 || finish.Usage.CacheReadTokens != 30 {
 		t.Fatalf("response/usage: %+v", finish)

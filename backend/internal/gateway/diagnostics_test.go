@@ -81,7 +81,8 @@ func TestFlushFailureIsSeparateFromUsage(t *testing.T) {
 	body := `{"usage":{"prompt_tokens":1,"completion_tokens":6},"choices":[{"finish_reason":"stop"}]}`
 	call := &callState{started: time.Now().Add(-time.Second), format: channel.FormatOpenAIChat, attempts: []Attempt{{}}}
 	w := &observedWriter{ResponseWriter: failedFlush{httptest.NewRecorder()}}
-	e.streamBack(w, call, catalog.Model{}, Candidate{}, attemptResult{response: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(""))}, first: []byte(body), firstErr: io.EOF, upstream: context.Background(), cancel: func(error) {}, watch: watchClient(context.Background(), func(error) {}, drainWindow), started: call.started}, settings.Settings{})
+	model := catalog.Model{ID: "main"}
+	e.streamBack(w, call, model, quotedCandidate(t, Candidate{}, model), attemptResult{response: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(""))}, first: []byte(body), firstErr: io.EOF, upstream: context.Background(), cancel: func(error) {}, watch: watchClient(context.Background(), func(error) {}, drainWindow), started: call.started}, settings.Settings{})
 	f := store.finish
 	if f.Outcome != OutcomeClientDisconnect || f.Diagnostics.Delivery != "client_disconnected" || f.Diagnostics.UsageStatus != "reported" || f.Usage.OutputTokens != 6 {
 		t.Fatalf("lost independent outcomes: %+v %+v", f, f.Diagnostics)

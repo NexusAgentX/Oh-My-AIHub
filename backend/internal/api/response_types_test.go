@@ -11,8 +11,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -47,16 +45,6 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"unconfigured routing preference", newRoutingPreferenceJSON(routing.Pref{}), map[string]any{
 			"order": emptyList, "excluded": emptyList, "max_attempts": nil, "ttft_timeout_ms": nil, "idle_timeout_ms": nil, "request_timeout_ms": nil, "updated_at": nil,
 		}},
-		{"model without tiers or prices", newAdminModelJSON(catalog.Model{}), map[string]any{
-			"price_tiers": emptyList, "context_window": nil, "max_output_tokens": nil,
-			"base_prices": map[string]any{
-				"input": "0", "output": "0", "cache_write": "0", "cache_read": "0", "token_prices": emptyObject,
-			},
-		}},
-		{"price tier without weekday predicate", newPriceTierJSON(1, ledger.PriceTier{Weekdays: []int{}}), map[string]any{
-			"seq": float64(1), "min_prompt_tokens": nil, "max_prompt_tokens": nil, "weekdays": nil,
-			"start_minute_of_day": nil, "end_minute_of_day": nil,
-		}},
 		{"unlimited key", newApiKeyJSON(apikey.Key{CreatedAt: time.Unix(0, 0).UTC(), Spend: apikey.Spend{Today: money.FromNano(money.Scale / 4)}}), map[string]any{
 			"expires_at": nil, "last_used_at": nil, "budget_daily": nil, "budget_monthly": nil, "budget_total": nil,
 			"spend": map[string]any{"today": "0.25", "month": "0", "total": "0"},
@@ -90,36 +78,10 @@ func TestResponseTypesKeepNullAndEmptyShapes(t *testing.T) {
 		{"points summary of calls without a key", newPointsEntrySummaryJSON(observe.EntrySummary{ByKey: []observe.KeySpend{{Spend: money.FromNano(money.Scale), Entries: 2}}}), map[string]any{
 			"by_key": []any{map[string]any{"api_key": nil, "spend": "1", "entries": float64(2)}},
 		}},
-		{"model without online channels", newCatalogModelJSON(catalog.Model{}, nil, time.Unix(0, 0), 0), map[string]any{
-			"context_window": nil, "max_output_tokens": nil, "current_tier": nil, "lowest_prices": nil, "formats": emptyList, "online_channels": float64(0), "usd_cny_rate": nil,
-		}},
+
 		{"call that has not finished", newGatewayCallSummaryJSON(gateway.CallSummary{Cost: 3, Fee: 1}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
 			"cost": "0.000000003", "charged": "0",
-		}},
-		{"channel without models or overrides", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(channel.Channel{}, catalogView{}, time.Unix(0, 0)), map[string]any{
-			"suspended_reason": nil, "cooldown_until": nil, "models": emptyList,
-			"advanced": map[string]any{
-				"user_agent": nil, "header_rules": map[string]any{"set": emptyList, "remove": emptyList}, "concurrency_limit": nil, "rpm_limit": nil,
-				"ttft_timeout_ms": nil, "request_timeout_ms": nil, "idle_timeout_ms": nil, "cooldown_failures": nil, "cooldown_seconds": nil,
-			},
-			"today": map[string]any{"revenue": "0", "calls": float64(0), "success_rate": nil},
-		}},
-		{"channel model without recorded format tests", (&app{gateway: gateway.NewEngine(gateway.Dependencies{})}).newChannelJSON(
-			channel.Channel{Models: []channel.Model{{ModelID: "m", Formats: []channel.Format{channel.FormatGemini}}}}, catalogView{}, time.Unix(0, 0),
-		), map[string]any{
-			"models": []any{map[string]any{
-				"model_id": "m", "display_name": "", "upstream_model": "", "price_currency": "CNY", "multiplier": "0", "fx_discount": false,
-				"effective_multiplier": "0", "formats": []any{"gemini"}, "format_tests": emptyObject,
-				"enabled": false, "current_prices": map[string]any{"input": "0", "output": "0", "cache_write": "0", "cache_read": "0"},
-				"custom_prices": nil, "pending_multiplier": false,
-			}},
-		}},
-		{"channel format test with nothing recorded", newFormatTestsJSON(map[channel.Format]channel.FormatTest{channel.FormatGemini: {}})["gemini"], map[string]any{
-			"ok": false, "status_code": nil, "error": nil, "duration_ms": nil,
-		}},
-		{"discovered model without a catalog match", discoveredModelJSON{ID: "x"}, map[string]any{
-			"matched_model_id": nil,
 		}},
 		{"call without key, channel or timings", newCallSummaryJSON(observe.CallRow{}), map[string]any{
 			"completed_at": nil, "model_id": nil, "tag": nil, "api_key": nil, "channel": nil, "ttft_ms": nil, "duration_ms": nil,
@@ -279,25 +241,6 @@ func TestWritePageKeepsEmptyItemsAndCursor(t *testing.T) {
 				t.Fatalf("body = %s, want %s", got, tc.want)
 			}
 		})
-	}
-}
-
-// 管理员视角的渠道是在渠道上多一个 owner，其余字段原样展开。
-func TestAdminChannelAddsOwnerToChannelFields(t *testing.T) {
-	a := &app{gateway: gateway.NewEngine(gateway.Dependencies{})}
-	item := channel.Channel{ID: "c1", Name: "渠道", Owner: channel.Owner{ID: "o1", Username: "owner", DisplayName: "车主"}}
-	raw, err := json.Marshal(a.newAdminChannelJSON(item, catalogView{}, time.Unix(0, 0)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var decoded map[string]any
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		t.Fatal(err)
-	}
-	owner, _ := decoded["owner"].(map[string]any)
-	if decoded["id"] != "c1" || decoded["name"] != "渠道" || len(decoded) != 14 ||
-		!reflect.DeepEqual(owner, map[string]any{"id": "o1", "username": "owner", "display_name": "车主"}) {
-		t.Fatalf("admin channel = %s", raw)
 	}
 }
 

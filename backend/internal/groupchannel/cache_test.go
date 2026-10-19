@@ -89,3 +89,39 @@ func TestGatewayGroupReadsDoNotReloadConfigurationAndFailedInvalidationCloses(t 
 		t.Fatal("in-flight candidate changed during rebuild")
 	}
 }
+
+// Retired directory reads fail: neither empty startup nor publication may use
+// old configuration SQL or recreate default global models.
+type retiredDirectoryBase struct{ cacheBase }
+
+func (retiredDirectoryBase) LoadCandidates(context.Context) ([]gateway.CandidateRecord, error) {
+	return nil, errors.New("retired channel_models queried")
+}
+func (retiredDirectoryBase) LoadModels(context.Context) ([]catalog.Model, error) {
+	return nil, errors.New("retired models queried")
+}
+func TestGroupRuntimeNeverReadsRetiredDirectory(t *testing.T) {
+	ctx := context.Background()
+	d, data := fixture()
+	r := &Runtime{Repository: &countedRepository{data: data}}
+	loader := r.Wrap(retiredDirectoryBase{})
+	records, err := loader.LoadCandidates(ctx)
+	if err != nil || len(records) != 0 {
+		t.Fatal("unpublished startup did not stay empty", err)
+	}
+	models, err := loader.LoadModels(ctx)
+	if err != nil || len(models) != 0 {
+		t.Fatal("startup recreated a global directory", err)
+	}
+	if err = r.Install(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	records, err = loader.LoadCandidates(ctx)
+	if err != nil || len(records) != 1 || records[0].Candidate.GroupID == "" {
+		t.Fatal("approved offering missing", err)
+	}
+	models, err = loader.LoadModels(ctx)
+	if err != nil || len(models) != 1 || models[0].ID != d.Models[0].ModelID || !models[0].Enabled {
+		t.Fatal("approved aggregate missing", err)
+	}
+}

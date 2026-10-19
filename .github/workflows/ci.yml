@@ -111,7 +111,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Fixed SDK/CLI functional round trips run after compilation. Keep enough
+    # headroom for a cold race build; Go's timeout must fire before the job's,
+    # so stalled tests leave a useful stack instead of an opaque cancellation.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
@@ -149,7 +152,7 @@ jobs:
           echo "AIHUB_TEST_CODEX_BINARY=$GITHUB_WORKSPACE/backend/bin/codex" >> "$GITHUB_ENV"
           echo "AIHUB_TEST_CODEX_PROBE=$GITHUB_WORKSPACE/backend/bin/aihub-detection-codex" >> "$GITHUB_ENV"
       - name: Backend tests with race detector
-        run: mise exec -- go -C backend test -race ./...
+        run: mise exec -- go -C backend test -race -timeout 9m ./...
 
   integration:
     name: integration

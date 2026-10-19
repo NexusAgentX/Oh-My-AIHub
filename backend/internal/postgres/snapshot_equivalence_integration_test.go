@@ -18,18 +18,16 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaybench"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
 
-// snapshotWorld is a data set that touches every rule of the snapshots: listed,
-// unlisted, suspended and deleted channels, a channel whose owner is disabled,
-// custom models and a custom model turned official (pending its multiplier),
-// USD models with and without the exchange-rate discount, price tiers, keys
-// that are enabled, disabled, deleted, expired, of a disabled account, with
-// aliases, allowed models and budgets, and routing preferences of the account
-// and of a key.
+// snapshotWorld covers independent group quotes, same-ID offerings, explicit
+// exclusions/governance, every channel/owner status, native formats, keys and
+// account/Key routing overrides. No global model or custom-price takeover exists.
 type snapshotWorld struct {
 	e                                   *env
 	consumer, sharerA, sharerB, sharerC person
@@ -40,65 +38,55 @@ type snapshotWorld struct {
 
 func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 	t.Helper()
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	w := &snapshotWorld{e: e, channels: map[string]string{}, keys: map[string]string{}, keyIDs: map[string]string{}}
 	w.consumer = e.member("consumer", "1000")
 	w.sharerA, w.sharerB, w.sharerC = e.member("sharera", "0"), e.member("sharerb", "0"), e.member("sharerc", "0")
 	relay := okUpstream(t)
-	prices := map[string]string{"input": "1", "output": "2", "cache_write": "0", "cache_read": "0"}
-
-	// Models: a USD one, tiers and fine-grained prices on gpt-test.
-	e.apiJSON(e.admin, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": "usd-model", "display_name": "USD model", "price_currency": "USD", "sort_order": 3, "base_prices": prices,
+	create := func(owner person, name, model, discount string, formats []string, overrides map[string]any) {
+		w.channels[name] = e.createChannel(owner, channelSpec{name: name, model: model, multiplier: discount, formats: formats, upstream: relay, advanced: overrides})
+	}
+	all := []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
+	create(w.sharerA, "a", "gpt-test", "1", []string{"openai_chat", "openai_responses"}, map[string]any{
+		"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "ttft_timeout_ms": 5000, "request_timeout_ms": 20000, "idle_timeout_ms": 3000, "cooldown_failures": 4, "cooldown_seconds": 60,
+		"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-A", "value": "1"}}, "remove": []any{"X-B"}},
 	})
 	minimum := int64(900)
 	specific := map[string]money.Amount{"input_audio": 0, "output_audio": mustAmount(t, "40")}
-	tiers := []ledger.PriceTier{{Name: "long", MinPromptTokens: &minimum, InputPrice: mustAmount(t, "40"), OutputPrice: mustAmount(t, "20"), TokenPrices: specific}}
-	if _, err := e.catalog.Update(context.Background(), e.admin.id, "gpt-test", catalog.ModelPatch{TokenPrices: &specific, PriceTiers: &tiers}); err != nil {
-		t.Fatal(err)
-	}
-
-	create := func(owner person, name string, body map[string]any) {
-		body["name"], body["base_url"], body["api_key"] = name, relay.server.URL, "upstream-key-"+name
-		created := e.apiJSON(owner, http.StatusCreated, http.MethodPost, "/api/channels", body)
-		w.channels[name] = created["channel"].(map[string]any)["id"].(string)
-	}
-	all := []string{"openai_chat", "openai_responses", "anthropic", "gemini"}
-	custom := func(id string, input string, formats ...string) map[string]any {
-		return map[string]any{"model_id": id, "formats": formats, "custom_prices": map[string]string{"input": input, "output": "2", "cache_write": "0", "cache_read": "0"}}
-	}
-	create(w.sharerA, "a", map[string]any{
-		"models": []any{
-			map[string]any{"model_id": "gpt-test", "multiplier": "1", "formats": []string{"openai_chat", "openai_responses"}},
-			map[string]any{"model_id": "claude-test", "multiplier": "3", "formats": []string{"anthropic"}},
-			map[string]any{"model_id": "gemini-test", "multiplier": "2", "upstream_model": "gem-up", "formats": []string{"gemini", "openai_chat"}},
-			map[string]any{"model_id": "usd-model", "multiplier": "1.2", "fx_discount": true, "formats": []string{"openai_chat"}},
-		},
-		"advanced": map[string]any{
-			"user_agent": "ua-a", "concurrency_limit": 3, "rpm_limit": 60, "ttft_timeout_ms": 5000,
-			"request_timeout_ms": 20000, "idle_timeout_ms": 3000, "cooldown_failures": 4, "cooldown_seconds": 60,
-			"header_rules": map[string]any{"set": []any{map[string]any{"name": "X-A", "value": "1"}}, "remove": []any{"X-B"}},
-		},
+	e.reviseGroupedQuote(w.channels["a"], "gpt-test", func(q *market.Quote) {
+		q.Prices.Details = specific
+		q.Tiers = []market.Tier{{Name: "long", Conditions: market.Conditions{MinPromptTokens: &minimum}, Prices: market.TokenPrices{Input: mustAmount(t, "40"), Output: mustAmount(t, "20"), Details: specific}}}
 	})
-	create(w.sharerB, "b", map[string]any{"models": []any{
-		map[string]any{"model_id": "gpt-test", "multiplier": "2", "formats": []string{"openai_chat"}},
-		map[string]any{"model_id": "usd-model", "multiplier": "1", "formats": []string{"openai_chat"}},
-		custom("my-custom", "1", "openai_chat", "anthropic"),
-		custom("convert-me", "1", "openai_chat"),
-	}})
-	create(w.sharerB, "c", map[string]any{"models": []any{custom("my-custom", "3", "openai_chat")}})
-	create(w.sharerA, "unlisted", map[string]any{"status": "unlisted", "models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerA, "suspended", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerA, "deleted", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	create(w.sharerC, "ownerless", map[string]any{"models": []any{map[string]any{"model_id": "gpt-test", "formats": all}}})
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPost, "/api/admin/channels/"+w.channels["suspended"]+"/suspend", map[string]any{"reason": "test"})
-	if recorder := e.api(w.sharerA, http.MethodDelete, "/api/channels/"+w.channels["deleted"], nil); recorder.Code != http.StatusNoContent {
-		t.Fatalf("delete channel = %d", recorder.Code)
+	create(w.sharerA, "a-claude", "claude-test", "3", []string{"anthropic"}, nil)
+	create(w.sharerA, "a-gemini", "gemini-test", "2", []string{"gemini", "openai_chat"}, nil)
+	create(w.sharerA, "a-usd", "usd-model", "1.2", []string{"openai_chat"}, nil)
+	create(w.sharerB, "b", "gpt-test", "2", []string{"openai_chat"}, nil)
+	create(w.sharerB, "b-usd", "usd-model", "1", []string{"openai_chat"}, nil)
+	for _, id := range []string{w.channels["a-usd"], w.channels["b-usd"]} {
+		e.reviseGroupedQuote(id, "usd-model", func(q *market.Quote) {
+			q.Currency = "USD"
+			q.Prices.Input = mustAmount(t, "1")
+			q.Prices.Output = mustAmount(t, "2")
+		})
 	}
-	// A new catalog model takes the custom model of the same name over.
-	e.apiJSON(e.admin, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{"id": "convert-me", "display_name": "Convert", "base_prices": prices})
-	// A disabled model keeps its channels.
-	e.apiJSON(e.admin, http.StatusOK, http.MethodPatch, "/api/admin/models/claude-test", map[string]any{"enabled": false})
+	create(w.sharerB, "b-private", "my-custom", "1", []string{"openai_chat", "openai_responses", "anthropic"}, nil)
+	create(w.sharerB, "c", "my-custom", "1", []string{"openai_chat"}, nil)
+	e.reviseGroupedQuote(w.channels["c"], "my-custom", func(q *market.Quote) { q.Prices.Input = mustAmount(t, "3") })
+	create(w.sharerB, "excluded", "excluded-model", "1", []string{"openai_chat"}, nil)
+	excluded := e.apiJSON(w.sharerB, 200, "GET", "/api/group-channels/"+w.channels["excluded"], nil)["models"].([]any)[0].(map[string]any)["group_model_id"]
+	e.patchGroupedChannel(w.sharerB, w.channels["excluded"], map[string]any{"models": []any{map[string]any{"group_model_id": excluded, "excluded": true, "discount": "1"}}})
+	for _, name := range []string{"unlisted", "suspended", "deleted"} {
+		create(w.sharerA, name, "gpt-test", "1", all, nil)
+	}
+	create(w.sharerC, "ownerless", "gpt-test", "1", all, nil)
+	e.patchGroupedChannel(w.sharerA, w.channels["unlisted"], map[string]any{"status": "unlisted"})
+	if reply := e.api(e.admin, "POST", "/api/admin/group-channels/"+w.channels["suspended"]+"/moderate", map[string]any{"reason": "test"}); reply.Code != 204 {
+		t.Fatal(reply.Code, reply.Body.String())
+	}
+	if reply := e.deleteGroupedChannel(w.sharerA, w.channels["deleted"]); reply.Code != 204 {
+		t.Fatal(reply.Code)
+	}
+	e.publishGroupFixture(market.Changes{Governance: []market.Change[market.ModelRule]{{Value: market.ModelRule{ModelID: "claude-test", Disabled: true, Reason: "synthetic governance"}}}})
 
 	// Keys.
 	defaultID, defaultSecret := e.defaultKey(w.consumer)
@@ -134,65 +122,82 @@ func buildSnapshotWorld(t *testing.T) *snapshotWorld {
 	return w
 }
 
-// compare checks every read the gateway makes through the snapshots against
-// the database store, and reports the differences.
-func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cached) {
+func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cached, source snapshot.Loader) {
 	t.Helper()
 	ctx := context.Background()
 	raw := w.e.store
-	rawCatalog := catalog.NewService(raw.Catalog)
-
-	modelNames := []string{"gpt-test", "claude-test", "gemini-test", "usd-model", "convert-me", "my-custom", "nope"}
+	rows, err := source.LoadCandidates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, err := source.LoadModels(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modelNames := []string{"gpt-test", "claude-test", "gemini-test", "usd-model", "excluded-model", "my-custom", "nope"}
 	formats := []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini, "bogus"}
-
 	nonEmpty := 0
 	for _, model := range modelNames {
 		for _, format := range formats {
-			want, err := raw.Gateway.Candidates(ctx, model, format)
-			if err != nil {
-				t.Fatal(err)
+			want := []gateway.Candidate{}
+			for _, row := range rows {
+				if row.ModelID == model && slices.Contains(row.Formats, format) {
+					want = append(want, row.Candidate)
+				}
 			}
 			got, err := cached.Gateway.Candidates(ctx, model, format)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("%s: candidates of %s/%s differ:\n snapshot %+v\n database %+v", label, model, format, got, want)
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("%s: candidates %s/%s differ: cache=%+v source=%+v err=%v", label, model, format, got, want, err)
 			}
 			if len(want) > 0 {
 				nonEmpty++
 			}
 		}
-		wantCustom, _ := raw.Gateway.CustomModelOnline(ctx, model)
-		if gotCustom, err := cached.Gateway.CustomModelOnline(ctx, model); err != nil || gotCustom != wantCustom {
-			t.Errorf("%s: CustomModelOnline(%s) = %v, %v; database %v", label, model, gotCustom, err, wantCustom)
+		var want catalog.Model
+		wantErr := error(catalog.ErrNotFound)
+		for _, v := range models {
+			if v.ID == model {
+				want = v
+				wantErr = nil
+			}
 		}
-		wantModel, wantErr := rawCatalog.Get(ctx, model)
-		gotModel, gotErr := cached.Models.Get(ctx, model)
-		if !errors.Is(gotErr, wantErr) && !(gotErr == nil && wantErr == nil) || !reflect.DeepEqual(gotModel, wantModel) {
-			t.Errorf("%s: model %s differs:\n snapshot %+v (%v)\n database %+v (%v)", label, model, gotModel, gotErr, wantModel, wantErr)
+		got, gotErr := cached.Models.Get(ctx, model)
+		if !errors.Is(gotErr, wantErr) || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: model %s differs: cache=%+v/%v source=%+v/%v", label, model, got, gotErr, want, wantErr)
 		}
 	}
 	if nonEmpty < 8 {
-		t.Fatalf("%s: only %d (model, format) pairs have candidates: the data set is too thin", label, nonEmpty)
+		t.Fatalf("%s: only %d model/format pairs have candidates", label, nonEmpty)
 	}
 	if got, _ := cached.Models.Get(ctx, "  gpt-test "); got.ID != "gpt-test" {
-		t.Errorf("%s: a padded name is not found", label)
+		t.Errorf("%s: padded internal model lookup", label)
 	}
-	wantOnline, err := raw.Gateway.OnlineModels(ctx)
-	if err != nil {
-		t.Fatal(err)
+	wantOnline := []gateway.OnlineModel{
+		{ID: "gemini-test", Formats: []channel.Format{channel.FormatGemini, channel.FormatOpenAIChat}},
+		{ID: "gpt-test", Formats: []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses}},
+		{ID: "my-custom", Formats: []channel.Format{channel.FormatAnthropic, channel.FormatOpenAIChat, channel.FormatOpenAIResponses}},
+		{ID: "usd-model", Formats: []channel.Format{channel.FormatOpenAIChat}},
 	}
-	if gotOnline, err := cached.Gateway.OnlineModels(ctx); err != nil || !reflect.DeepEqual(gotOnline, wantOnline) {
-		t.Errorf("%s: online models differ:\n snapshot %+v (%v)\n database %+v", label, gotOnline, err, wantOnline)
+	gotOnline, err := cached.Gateway.OnlineModels(ctx)
+	for i := range wantOnline {
+		slices.Sort(wantOnline[i].Formats)
+	}
+	for i := range gotOnline {
+		slices.Sort(gotOnline[i].Formats)
+	}
+	if err != nil || !reflect.DeepEqual(gotOnline, wantOnline) {
+		t.Errorf("%s: online directory differs: cache=%+v want=%+v err=%v", label, gotOnline, wantOnline, err)
 	}
 	for _, includeDisabled := range []bool{false, true} {
-		want, err := rawCatalog.List(ctx, includeDisabled)
-		if err != nil {
-			t.Fatal(err)
+		want := []catalog.Model{}
+		for _, model := range models {
+			if includeDisabled || model.Enabled {
+				want = append(want, model)
+			}
 		}
-		if got, err := cached.Models.List(ctx, includeDisabled); err != nil || !reflect.DeepEqual(got, want) {
-			t.Errorf("%s: catalog list (disabled %v) differs:\n snapshot %+v (%v)\n database %+v", label, includeDisabled, got, err, want)
+		got, err := cached.Models.List(ctx, includeDisabled)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: aggregate IDs disabled=%v: cache=%+v source=%+v err=%v", label, includeDisabled, got, want, err)
 		}
 	}
 
@@ -236,21 +241,32 @@ func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cach
 	}
 }
 
-func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
-	w := buildSnapshotWorld(t)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-	// A snapshot built from scratch.
-	fresh := w.e.store.Cached(logger)
+func (w *snapshotWorld) fresh(t *testing.T, logger *slog.Logger) (*storepg.Cached, snapshot.Loader) {
+	t.Helper()
+	runtime := &groupchannel.Runtime{Repository: w.e.groupStore, CredentialScope: w.e.groups.CredentialScope}
+	var source snapshot.Loader
+	fresh := w.e.store.Cached(logger, func(c *snapshot.Config) {
+		source = groupIntegrationEvidence{Loader: runtime.Wrap(c.Loader), Prices: &groupIntegrationPriceSource{}, Proofs: w.e.groupProofs}
+		c.Loader = source
+	})
+	runtime.Rebuild = func(ctx context.Context) error {
+		return fresh.Cache.InvalidateChecked(ctx, snapshot.DomainModels|snapshot.DomainFleet)
+	}
+	if err := runtime.Install(context.Background(), marketSnapshot(t, w.e.store)); err != nil {
+		t.Fatal(err)
+	}
 	if err := fresh.Cache.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	w.compare(t, "built from the database", fresh)
-	// The one the server kept current through the invalidation calls of every
-	// change that built this data set must be the same.
-	w.compare(t, "kept current by invalidations", w.e.cached)
+	return fresh, source
+}
 
-	// The conditions that exclude a channel really do.
+func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
+	w := buildSnapshotWorld(t)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	fresh, source := w.fresh(t, logger)
+	w.compare(t, "built from group persistence", fresh, source)
+	w.compare(t, "kept current by invalidations", w.e.cached, source)
 	candidates, err := fresh.Gateway.Candidates(context.Background(), "gpt-test", channel.FormatOpenAIChat)
 	if err != nil {
 		t.Fatal(err)
@@ -258,16 +274,19 @@ func TestSnapshotsAnswerLikeTheDatabase(t *testing.T) {
 	var names []string
 	for _, candidate := range candidates {
 		names = append(names, candidate.Name)
+		if candidate.Quotes == nil || !candidate.ValidOffering("gpt-test") {
+			t.Fatal("group candidate lost independent quote", candidate.ChannelID)
+		}
 	}
 	slices.Sort(names)
 	if !slices.Equal(names, []string{"a", "b"}) {
-		t.Fatalf("channels offering gpt-test in openai_chat = %v, want a and b (not unlisted, suspended, deleted, of a disabled owner)", names)
+		t.Fatalf("gpt-test channels=%v; unavailable owners/statuses must be absent", names)
 	}
-	if online, _ := fresh.Gateway.CustomModelOnline(context.Background(), "convert-me"); online {
-		t.Fatal("a custom model turned official is online while it waits for its multiplier")
+	if rows, _ := fresh.Gateway.Candidates(context.Background(), "excluded-model", channel.FormatOpenAIChat); len(rows) != 0 {
+		t.Fatal("persistent model exclusion was lost")
 	}
-	if online, _ := fresh.Gateway.CustomModelOnline(context.Background(), "my-custom"); !online {
-		t.Fatal("a custom model is not online")
+	if model, err := fresh.Models.Get(context.Background(), "claude-test"); err != nil || model.Enabled {
+		t.Fatal("exact-ID governance was lost", model, err)
 	}
 }
 
@@ -285,7 +304,7 @@ func TestGatewayRequestsDoNotReadSnapshotDataFromTheDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(traced.Close)
-	e := newEnvOn(t, traced, storepg.New(traced), nil)
+	e := newGroupEnvOn(t, traced, storepg.New(traced), nil)
 	consumer := e.member("consumer", "1000")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)

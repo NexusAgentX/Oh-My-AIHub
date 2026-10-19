@@ -19,9 +19,8 @@ func TestDirectoryQualityAggregationAndVisibility(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	supplierID := "00000000-0000-4000-8000-000000000420"
-	exec("INSERT INTO suppliers(id,name,kind,website_url) VALUES($1,'quality fixture','relay','https://example.test')", supplierID)
-	exec("INSERT INTO supplier_endpoints(supplier_id,base_url) SELECT $1,base_url FROM channels WHERE id IN ($2,$3)", supplierID, o.brokenID, o.goodID)
+	supplierID := directoryMarketFixture(t, o)
+
 	now := time.Now().UTC().Truncate(time.Hour)
 	from, to := now.Add(-24*time.Hour), now
 	window := "?from=" + url.QueryEscape(from.Format(time.RFC3339)) + "&to=" + url.QueryEscape(to.Format(time.RFC3339))
@@ -83,6 +82,12 @@ func TestDirectoryQualityAggregationAndVisibility(t *testing.T) {
 			t.Fatal("historical snapshot name leaked")
 		}
 	}
+	exec("UPDATE market_groups SET enabled=false,revision=revision+1,updated_at=now() WHERE supplier_id=$1", supplierID)
+	o.apiJSON(o.outsider, 404, http.MethodGet, channelPath+window, nil)
+	if asMap(t, read(path + window)["current"])["attempts"] != float64(0) {
+		t.Fatal("disabled group still counted")
+	}
+	exec("UPDATE market_groups SET enabled=true,revision=revision+1,updated_at=now() WHERE supplier_id=$1", supplierID)
 	// Unlisting, disabling owners, deleting channels and hiding suppliers all restrict aggregates.
 	exec("UPDATE channels SET status='unlisted' WHERE id=$1", o.brokenID)
 	o.apiJSON(o.outsider, 404, http.MethodGet, channelPath+window, nil)
@@ -98,12 +103,13 @@ func TestDirectoryQualityAggregationAndVisibility(t *testing.T) {
 	if asMap(t, read(path + window)["current"])["attempts"] != float64(0) {
 		t.Fatal("deleted channel still counted")
 	}
-	exec("UPDATE suppliers SET visible=false WHERE id=$1", supplierID)
+	exec("UPDATE market_suppliers SET enabled=false,revision=revision+1,updated_at=now() WHERE id=$1", supplierID)
 	o.apiJSON(o.outsider, 404, http.MethodGet, path+window, nil)
 }
 
 func TestDirectoryCacheQualityUsesMeasuredFinalAttempts(t *testing.T) {
 	o := newObserved(t)
+	directoryMarketFixture(t, o)
 	ctx := context.Background()
 	exec := func(sql string, args ...any) {
 		t.Helper()
@@ -137,4 +143,26 @@ func TestDirectoryCacheQualityUsesMeasuredFinalAttempts(t *testing.T) {
 	if v["cache_samples"] != float64(0) || v["cache_hit_rate"] != nil {
 		t.Fatalf("zero input counted as miss=%v", v)
 	}
+}
+
+func directoryMarketFixture(t *testing.T, o *observed) string {
+	t.Helper()
+	directory := marketSnapshot(t, o.store)
+	supplierByGroup := map[string]string{}
+	for _, g := range directory.Groups {
+		supplierByGroup[g.ID] = g.SupplierID
+	}
+	var supplierID string
+	for _, id := range []string{o.brokenID, o.goodID} {
+		row, err := o.groupStore.Get(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		current := supplierByGroup[row.GroupID]
+		if current == "" || supplierID != "" && current != supplierID {
+			t.Fatal("quality fixture must share an approved supplier")
+		}
+		supplierID = current
+	}
+	return supplierID
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -74,6 +75,7 @@ type TypicalPriceLookup interface {
 
 type Dependencies struct {
 	TypicalPrices     func() TypicalPriceLookup
+	CodexSessions     *codexsession.Service
 	ContextNamespace  *gatewaycontract.ContextNamespace
 	Resources         resourcestate.Repository
 	ResourceCursors   *gatewaycontract.CursorCodec
@@ -275,6 +277,7 @@ type callState struct {
 	metricProtocol       string
 	nativeRequired       nativeRequirements
 	requestEncoding      string
+	notesSession         *notesSession
 	codexContext         bool
 	resourceReferences   []gatewaycontract.Reference
 	auxiliaryEndpoint    *gatewaycontract.Endpoint
@@ -307,7 +310,6 @@ type callState struct {
 	// upstream then adds is not for the client (see usageFrameFilter).
 	usageInjected   bool
 	hints           billingHints
-	submodels       []catalog.Model
 	pricedStatement *quotepricing.Statement
 	billingFacts    quotepricing.Facts
 	pending         bool
@@ -511,6 +513,15 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
 		return
 	}
+	if key.CodexNotes && call.codexContext && format == channel.FormatOpenAIResponses {
+		call.notesSession, err = e.loadNotesSession(ctx, r, body, key)
+		if err != nil {
+			status, code, message := notesSessionError(err)
+			e.reject(w, call, OutcomeRejectedNoChannel, status, code, message)
+			return
+		}
+		call.resourceRequired = append(call.resourceRequired, notesRequirements()...)
+	}
 	call.nativeRequired = compileNativeRequirements(format, body, call.stream, r.URL.Path)
 	if call.imageMultipart != nil && !strings.HasPrefix(r.URL.Path, "/backend-api/codex/") {
 		addMultipartImageRequirements(&call.nativeRequired, call.imageMultipart, r.URL.Path)
@@ -558,7 +569,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	w.Header().Set("X-AIHub-Request-Id", id)
 	e.Events.Publish(Event{Kind: EventCallStarted, At: started, CallID: id, AccountID: key.OwnerID, KeyID: key.KeyID, Model: call.requested, Format: string(format)})
 
-	// Model: alias first, then the key's allowed list, then the catalog.
+	// Model: resolve aliases, enforce the Key restriction, then consult the
+	// approved group-ID aggregate. No legacy custom-model fallback exists.
 	call.modelID = call.requested
 	if target, aliased := key.Aliases[call.requested]; aliased {
 		call.modelID = target
@@ -568,19 +580,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	model, err := e.Catalog.Get(ctx, call.modelID)
-	if errors.Is(err, catalog.ErrNotFound) {
-		// A name outside the catalog may be a channel's custom model
-		// (ADR-0034); each candidate then carries its own prices.
-		custom, customErr := e.Store.CustomModelOnline(ctx, call.modelID)
-		if customErr != nil {
-			e.internalError(w, call, customErr)
-			return
-		}
-		if custom {
-			model = catalog.Model{ID: call.modelID, DisplayName: call.modelID, PriceCurrency: ledger.CurrencyCNY, Enabled: true}
-			err = nil
-		}
-	}
 	if errors.Is(err, catalog.ErrNotFound) || (err == nil && !model.Enabled) {
 		e.finishRejected(w, call, OutcomeRejectedModel, http.StatusNotFound, "model_not_found", "模型不存在或未启用")
 		return
@@ -594,11 +593,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if err != nil {
 		e.internalError(w, call, err)
 		return
-	}
-
-	call.submodels, err = e.captureSubmodels(ctx, call.hints)
-	if err != nil {
-		e.Logger.Warn("gateway: submodel prices unavailable; forwarding without submodel charges", "request_id", call.id)
 	}
 	// Balance and budgets are checked, never reserved (Epic #170 decision 6).
 	points, err := e.Store.Points(ctx, key.OwnerID)
@@ -677,10 +671,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	for index := range candidates {
 		pricing := candidates[index].PricingModel(model)
-		candidates[index].RateNano = ledger.ChannelRate(pricing.PriceCurrency, candidates[index].FXDiscount, defaults.USDCNYRateNano)
-		if candidates[index].Quotes != nil {
-			candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
-		}
+		candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
 	}
 	e.applyTypicalPrices(candidates, call.modelID, defaults.USDCNYRateNano)
 	sticky := ""
@@ -698,6 +689,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		switch {
 		case !candidate.ValidOffering(call.modelID):
 			reason = "missing_group_quote"
+		case !notesMatch(candidate, call.notesSession):
+			reason = "notes_session_scope_unavailable"
 		case !resourceMatch(candidate, call.resourceBinding):
 			reason = "resource_scope_unavailable"
 		case !keyProbeMatchesEndpoint(candidate, format, r.URL.Path):
@@ -737,7 +730,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: modelStats,
 		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || missingRequestCapability(c, call.nativeRequired, r.Header) != "" || call.resourceObserver != nil && c.GroupID == "" {
+			if !c.ValidOffering(call.modelID) || !notesMatch(c, call.notesSession) || !resourceMatch(c, call.resourceBinding) || !keyProbeMatchesEndpoint(c, format, r.URL.Path) || !supportsAll(c, call.resourceRequired) || missingRequestCapability(c, call.nativeRequired, r.Header) != "" || call.resourceObserver != nil && c.GroupID == "" {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
@@ -759,6 +752,11 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	call.stage("routing", routingAt, e.Now())
 	if len(ordered) == 0 {
+		if call.notesSession != nil && call.notesSession.route != nil {
+			status, code, message := notesSessionError(gatewaycontract.ErrNotFound)
+			e.finishRejected(w, call, OutcomeRejectedNoChannel, status, code, message)
+			return
+		}
 		if capabilityBlocked {
 			e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "required_capability_evidence_missing", "没有满足请求所需有效能力证据及版本前提的可用渠道")
 			return
@@ -767,6 +765,12 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 
+	ordered, err = e.claimNotesSession(ctx, call.notesSession, ordered)
+	if err != nil {
+		status, code, message := notesSessionError(err)
+		e.finishRejected(w, call, OutcomeRejectedNoChannel, status, code, message)
+		return
+	}
 	var last *upstreamFailure
 	tried := 0
 	// maxAttempts counts attempts actually made: a candidate whose slot was
@@ -1774,10 +1778,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			}
 		}
 	}
-	if candidate.Quotes == nil && !observation.Found && observation.Usage.Detail != nil && len(observation.Usage.Detail.Iterations) > 0 {
-		observation.Usage.Detail.Notes = appendNote(observation.Usage.Detail.Notes, "主模型用量缺失，未计费")
-		finish.PriceSnapshot = priceSnapshot(model, ledger.PriceResult{}, candidate, defaults.USDCNYRateNano, 0, observation.Usage, call.started)
-	}
 	call.stage("pricing", pricingAt, e.Now())
 	e.settle(call, candidate, finish, response.StatusCode, observation.Usage)
 }
@@ -1850,10 +1850,8 @@ func priceSnapshot(model catalog.Model, priced ledger.PriceResult, candidate Can
 		"tier":                 nil,
 		"multiplier":           money.FromNano(multiplierNano).String(),
 		"currency":             model.PriceCurrency,
-		"fx_discount":          model.PriceCurrency == ledger.CurrencyUSD && candidate.FXDiscount,
-		"effective_multiplier": money.FromNano(ledger.EffectiveMultiplier(multiplierNano, candidate.RateNano, model.Rate(usdRateNano))).String(),
+		"effective_multiplier": money.FromNano(multiplierNano).String(),
 		"fee_rate_nano":        feeRateNano,
-		"custom":               candidate.Custom != nil,
 		"prices": map[string]string{
 			"input": multiplier(effective.InputPerMillion), "output": multiplier(effective.OutputPerMillion),
 			"cache_write": multiplier(effective.CacheWritePerMillion), "cache_read": multiplier(effective.CacheReadPerMillion),

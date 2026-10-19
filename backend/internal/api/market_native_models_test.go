@@ -26,6 +26,9 @@ type nativeListingStore struct{ *proxyStore }
 func (nativeListingStore) OnlineModels(context.Context) ([]gateway.OnlineModel, error) {
 	return []gateway.OnlineModel{{ID: "platform/model:2026", Formats: []channel.Format{channel.FormatOpenAIChat, channel.FormatOpenAIResponses, channel.FormatAnthropic, channel.FormatGemini, channel.FormatOpenAIImages}}}, nil
 }
+func (s nativeListingStore) ModelListCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
+	return s.AuxiliaryCandidates(ctx, format)
+}
 func TestGatewayNativeModelGetUsesRegisteredRoutesAndKeyScopedAliases(t *testing.T) {
 	book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "group", GroupRevision: 1, Offers: map[string]quotepricing.Offer{"platform/model:2026": {ModelID: "platform/model:2026", Revision: 1, Quote: market.Quote{ID: "quote", GroupModelID: "offering", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"}}}})
 	if err != nil {

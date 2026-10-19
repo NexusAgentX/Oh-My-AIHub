@@ -85,3 +85,31 @@ func TestCodexCatalogPreservesCurrentClientNativeLegacyInstructionField(t *testi
 		t.Fatal("current CLI instruction prerequisite was dropped or converted")
 	}
 }
+
+func TestCodexCatalogNotesRequireBothUserDeclarationAndActualEvidence(t *testing.T) {
+	c := Candidate{GroupID: "group", GroupModelID: "group-main", ChannelID: "channel", CredentialScope: "scope", UpstreamModel: "native-main", Quotes: groupBook(t, "CNY", 1), Evidence: map[string]bool{}}
+	for _, req := range notesRequirements() {
+		c.Evidence[req.Layer+"/"+req.ID] = true
+	}
+	records := []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}}
+	input := []byte(`{"models":[{"slug":"native-main","supports_experimental_context":true}]}`)
+	for _, enabled := range []bool{false, true} {
+		out, err := filterCodexCatalog(input, records, c, KeyAuth{CodexNotes: enabled})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var data struct {
+			Models []struct {
+				Context bool `json:"supports_experimental_context"`
+			} `json:"models"`
+		}
+		if json.Unmarshal(out, &data) != nil || len(data.Models) != 1 || data.Models[0].Context != enabled {
+			t.Fatal("catalog ignored explicit declaration", string(out))
+		}
+	}
+	delete(c.Evidence, "upstream_protocol/codex-special.RL18/read_file")
+	out, err := filterCodexCatalog(input, records, c, KeyAuth{CodexNotes: true})
+	if err != nil || strings.Contains(string(out), `"supports_experimental_context":true`) {
+		t.Fatal("user declaration fabricated upstream capability")
+	}
+}

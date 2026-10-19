@@ -73,7 +73,7 @@ func TestObserveAnalysisSharedFiltersAndDrill(t *testing.T) {
 }
 
 func TestObserveAnalysisRawPercentilesPeriodsAndStageDuplicates(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	owner := e.member("analysis", "0")
 	ctx := context.Background()
 	from := time.Now().UTC().Truncate(time.Hour)

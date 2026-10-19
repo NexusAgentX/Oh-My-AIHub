@@ -439,7 +439,7 @@ func TestAPostingThatCannotBeBookedLeavesNothingBehind(t *testing.T) {
 // whatever rate the requests arrive, and a call can be finished more than
 // once at the same moment (a timeout racing the end of the answer).
 func TestConcurrentSettlementsBookEveryCallOnceAndLinkIt(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	consumers := []person{e.member("consumer0", "100"), e.member("consumer1", "100"), e.member("consumer2", "100")}

@@ -11,6 +11,8 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
 
 func listed(ids ...string) []listedModel {
@@ -126,6 +128,22 @@ type listingStore struct {
 
 func (s listingStore) OnlineModels(context.Context) ([]OnlineModel, error) { return s.online, nil }
 
+func (s listingStore) ModelListCandidates(_ context.Context, format channel.Format) ([]CandidateRecord, error) {
+	var result []CandidateRecord
+	for _, model := range s.online {
+		if !slices.Contains(model.Formats, format) {
+			continue
+		}
+		quote := market.Quote{ID: "quote-" + model.ID, GroupModelID: "group-" + model.ID, Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"}
+		book, err := quotepricing.Freeze(quotepricing.Book{GroupID: "group", GroupRevision: 1, Offers: map[string]quotepricing.Offer{model.ID: {ModelID: model.ID, Revision: 1, Quote: quote}}})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, CandidateRecord{ModelID: model.ID, Formats: model.Formats, Candidate: Candidate{ChannelID: "channel", GroupID: "group", GroupModelID: quote.GroupModelID, Quotes: book}})
+	}
+	return result, nil
+}
+
 type listingCatalog struct {
 	catalog.Store
 	models []catalog.Model
@@ -160,7 +178,7 @@ func TestListFormatsFollowTheEndpoint(t *testing.T) {
 }
 
 func TestAvailableModelsAreFilteredByFormat(t *testing.T) {
-	models := []catalog.Model{{ID: "gpt-x"}, {ID: "claude-x"}, {ID: "gemini-x"}, {ID: "both-x"}, {ID: "offline-x"}}
+	models := []catalog.Model{{ID: "gpt-x"}, {ID: "claude-x"}, {ID: "gemini-x"}, {ID: "both-x"}, {ID: "offline-x"}, {ID: "custom-claude"}, {ID: "custom-gpt"}}
 	engine := NewEngine(Dependencies{
 		Catalog: catalog.NewService(listingCatalog{models: models}),
 		Store: listingStore{online: []OnlineModel{
@@ -168,8 +186,8 @@ func TestAvailableModelsAreFilteredByFormat(t *testing.T) {
 			{ID: "claude-x", Formats: []channel.Format{channel.FormatAnthropic}},
 			{ID: "gemini-x", Formats: []channel.Format{channel.FormatGemini}},
 			{ID: "both-x", Formats: []channel.Format{channel.FormatOpenAIResponses, channel.FormatAnthropic}},
-			{ID: "custom-claude", Custom: true, Formats: []channel.Format{channel.FormatAnthropic}},
-			{ID: "custom-gpt", Custom: true, Formats: []channel.Format{channel.FormatOpenAIChat}},
+			{ID: "custom-claude", Formats: []channel.Format{channel.FormatAnthropic}},
+			{ID: "custom-gpt", Formats: []channel.Format{channel.FormatOpenAIChat}},
 			{ID: "no-format-x"},
 		}},
 	})
@@ -247,12 +265,12 @@ func TestNativeModelListsKeepAliasPermissionsAndConservativeGroupMetadata(t *tes
 		t.Fatal("unknown witness ignored", names, err)
 	}
 }
-func TestNativeListingIncludesPreCutoverInferenceCandidates(t *testing.T) {
+func TestNativeListingExcludesRetiredUngroupedCandidates(t *testing.T) {
 	source := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatOpenAIChat}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: Candidate{ChannelID: "legacy"}}}}
 	e := NewEngine(Dependencies{Catalog: catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main", DisplayName: "Main"}}}), Store: source})
 	names, err := e.availableModels(context.Background(), KeyAuth{Aliases: map[string]string{"alias": "main"}}, listFormats(DialectOpenAI, false))
-	if err != nil || len(names) != 2 || names[0].id != "alias" || names[1].id != "main" {
-		t.Fatal("pre-cutover inference names disappeared", names, err)
+	if err != nil || len(names) != 0 {
+		t.Fatal("retired candidate entered current model directory", names, err)
 	}
 }
 

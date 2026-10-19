@@ -110,8 +110,8 @@ func BenchmarkStreamBack(b *testing.B) {
 		stream := benchStreams[name].render(b, 1000)
 		b.Run(name, func(b *testing.B) {
 			engine := NewEngine(Dependencies{Store: &speedStore{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
-			model := catalog.Model{}
-			candidate := Candidate{ChannelID: "channel", OwnerID: "sharer"}
+			model := catalog.Model{ID: "main"}
+			candidate := quotedCandidate(b, Candidate{ChannelID: "channel", OwnerID: "sharer"}, model)
 			defaults := settings.Settings{}
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -181,7 +181,7 @@ func BenchmarkJSONSettlement(b *testing.B) {
 	store := &speedStore{}
 	engine := NewEngine(Dependencies{Store: store, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	model := catalog.Model{ID: "m", PriceCurrency: "CNY", InputPrice: 1_000_000_000, OutputPrice: 1_000_000_000}
-	candidate := Candidate{ChannelID: "channel", OwnerID: "sharer", MultiplierNano: 1_000_000_000, RateNano: 1_000_000_000}
+	candidate := quotedCandidate(b, Candidate{ChannelID: "channel", OwnerID: "sharer", MultiplierNano: 1_000_000_000, RateNano: 1_000_000_000}, model)
 	defaults := settings.Settings{}
 	b.ReportAllocs()
 	b.ResetTimer()

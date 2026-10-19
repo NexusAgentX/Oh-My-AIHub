@@ -6509,7 +6509,11 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
-          description: 分析查询超时
+          description: 分析查询超时或市场发布尚未完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/suppliers/{supplierID}/analysis:
     get:
       operationId: analyzeSupplier
@@ -6580,405 +6584,11 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
-          description: 分析查询超时
-  /api/admin/suppliers/preview:
-    post:
-      operationId: previewSupplierImpact
-      tags: [channels]
-      summary: 预览地址将关联的已上架渠道数量
-      x-access: admin
-      x-feature: '407'
-      security: [{sessionCookie: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/SupplierImpactInput'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/SupplierImpact'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-  /api/suppliers:
-    get:
-      operationId: listSuppliers
-      tags:
-        - channels
-      summary: listSuppliers
-      x-access: ready
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
+          description: 分析查询超时或市场发布尚未完成
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SupplierList'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: cursor
-          in: query
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
-  /api/suppliers/{supplierID}:
-    get:
-      operationId: getSupplier
-      tags:
-        - channels
-      summary: getSupplier
-      x-access: ready
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SupplierDetail'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: supplierID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-  /api/suppliers/recognize:
-    post:
-      operationId: recognizeSupplier
-      tags:
-        - channels
-      summary: recognizeSupplier
-      x-access: ready
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SupplierRecognition'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SupplierRecognitionInput'
-  /api/channel-hall:
-    get:
-      operationId: listChannelHall
-      tags:
-        - channels
-      summary: listChannelHall
-      x-access: ready
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HallList'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: cursor
-          in: query
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
-        - name: q
-          in: query
-          schema:
-            type: string
-        - name: supplier
-          in: query
-          schema:
-            type: string
-        - name: model
-          in: query
-          schema:
-            type: string
-        - name: format
-          in: query
-          schema:
-            type: string
-  /api/channel-hall/{channelID}:
-    get:
-      operationId: getHallChannel
-      tags:
-        - channels
-      summary: getHallChannel
-      x-access: ready
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HallChannel'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: channelID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-  /api/admin/suppliers:
-    get:
-      operationId: adminListSuppliers
-      tags:
-        - channels
-      summary: adminListSuppliers
-      x-access: admin
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminSupplierList'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: cursor
-          in: query
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
-    post:
-      operationId: createSupplier
-      tags:
-        - channels
-      summary: createSupplier
-      x-access: admin
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '201':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminSupplier'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SupplierInput'
-  /api/admin/suppliers/{supplierID}:
-    put:
-      operationId: updateSupplier
-      tags:
-        - channels
-      summary: updateSupplier
-      x-access: admin
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminSupplier'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      parameters:
-        - name: supplierID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SupplierInput'
-  /api/admin/suppliers/icon:
-    post:
-      operationId: fetchSupplierIcon
-      tags:
-        - channels
-      summary: fetchSupplierIcon
-      x-access: admin
-      x-feature: '407'
-      security:
-        - sessionCookie: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SupplierIcon'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SupplierIconInput'
+                $ref: '#/components/schemas/ErrorResponse'
   "/api/forum/boards":
     get:
       operationId: listForumBoards
@@ -7802,43 +7412,11 @@ paths:
               schema: {$ref: '#/components/schemas/HomeResponse'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-  /api/models:
-    get:
-      operationId: listModels
-      tags: [models]
-      summary: 可用模型列表
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      responses:
-        '200':
-          description: 成功
+        '503':
+          description: 生效分组快照暂不可用。
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/CatalogModelList'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-  /api/models/{modelID}:
-    get:
-      operationId: getModel
-      tags: [models]
-      summary: 模型详情、渠道与我的路由
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/modelID'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ModelDetail'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
   /api/routing/{modelID}:
     put:
       operationId: setRouting
@@ -8039,164 +7617,6 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-  /api/channels:
-    get:
-      operationId: listChannels
-      tags: [channels]
-      summary: 我的渠道
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelList'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-    post:
-      operationId: createChannel
-      tags: [channels]
-      summary: 添加渠道
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ChannelCreateRequest'}
-      responses:
-        '201':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-  /api/channels/discover:
-    post:
-      operationId: discoverChannel
-      tags: [channels]
-      summary: 读取上游模型列表并匹配目录
-      description: "Base URL 经出站安全校验（HTTPS、DNS/IP、端口白名单、禁用主机）。"
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ChannelDiscoverRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelDiscoverResponse'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-        '502': {$ref: '#/components/responses/BadGateway'}
-  /api/channels/{channelID}:
-    get:
-      operationId: getChannel
-      tags: [channels]
-      summary: 渠道详情
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelDetail'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-    patch:
-      operationId: updateChannel
-      tags: [channels]
-      summary: 修改渠道
-      description: "被管理员强制下架的渠道不能由所有者重新上架（409）。"
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ChannelUpdateRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-    delete:
-      operationId: deleteChannel
-      tags: [channels]
-      summary: 删除渠道
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      responses:
-        '204': {description: 成功，无响应体。}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-  /api/channels/{channelID}/test:
-    post:
-      operationId: testChannel
-      tags: [channels]
-      summary: 按模型逐个格式测试
-      description: "会向上游发出真实请求，可能产生少量费用。"
-      x-access: ready
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ChannelTestRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ChannelTestResponse'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
   /api/calls/analysis:
     get:
       operationId: analyzeCalls
@@ -8952,93 +8372,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
-  /api/admin/models:
-    get:
-      operationId: listAdminModels
-      tags: [admin-models]
-      summary: 模型目录（含停用）
-      x-access: admin
-      x-feature: A
-      security:
-      - {sessionCookie: []}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminModelList'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-    post:
-      operationId: createAdminModel
-      tags: [admin-models]
-      summary: 上架模型
-      x-access: admin
-      x-feature: A
-      security:
-      - {sessionCookie: []}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ModelCreateRequest'}
-      responses:
-        '201':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminModelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-  /api/admin/models/{modelID}:
-    delete:
-      operationId: deleteAdminModel
-      tags: [admin-models]
-      summary: 删除模型
-      description: 删除模型、条件价格档及路由偏好；保留历史调用、账单及 Key 的模型限制和别名。有未删除渠道引用时拒绝删除。
-      x-access: admin
-      x-feature: A
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/modelID'}
-      responses:
-        '204':
-          description: 已删除
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/Conflict'}
-    patch:
-      operationId: updateAdminModel
-      tags: [admin-models]
-      summary: 修改模型与价格档
-      description: 只修改提供的字段；price_tiers 提供时整组替换。
-      x-access: admin
-      x-feature: A
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/modelID'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ModelUpdateRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminModelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
   /api/form-defaults:
     get:
       operationId: getFormDefaults
@@ -9141,106 +8474,6 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
-  /api/admin/channels:
-    get:
-      operationId: listAdminChannels
-      tags: [admin-channels]
-      summary: 全部渠道
-      x-access: admin
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/q'}
-      - {$ref: '#/components/parameters/channelStatus'}
-      - {$ref: '#/components/parameters/ownerID'}
-      - {$ref: '#/components/parameters/cursor'}
-      - {$ref: '#/components/parameters/limit'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminChannelPage'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-  /api/admin/channels/{channelID}:
-    get:
-      operationId: getAdminChannel
-      tags: [admin-channels]
-      summary: 渠道详情
-      x-access: admin
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminChannelDetail'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-  /api/admin/channels/{channelID}/suspend:
-    post:
-      operationId: suspendAdminChannel
-      tags: [admin-channels]
-      summary: 强制下架
-      x-access: admin
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ReasonRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminChannelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
-  /api/admin/channels/{channelID}/unsuspend:
-    post:
-      operationId: unsuspendAdminChannel
-      tags: [admin-channels]
-      summary: 恢复
-      x-access: admin
-      x-feature: B
-      security:
-      - {sessionCookie: []}
-      parameters:
-      - {$ref: '#/components/parameters/channelID'}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/ReasonRequest'}
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/AdminChannelEnvelope'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Unprocessable'}
   /api/admin/disputes:
     get:
       operationId: listAdminDisputes
@@ -10132,12 +9365,6 @@ components:
       required: false
       description: 账户状态。
       schema: {$ref: '#/components/schemas/AccountStatus'}
-    channelStatus:
-      name: status
-      in: query
-      required: false
-      description: 渠道状态。
-      schema: {$ref: '#/components/schemas/ChannelStatus'}
     ownerID:
       name: owner_id
       in: query
@@ -16069,7 +15296,6 @@ components:
       enum: [rejected_balance, rejected_budget, rejected_key, rejected_model, rejected_format, rejected_no_channel, rejected_inflight, upstream_failed, interrupted, client_disconnected, succeeded, succeeded_unbilled, in_progress]
       description: 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
     AccountStatus: {type: string, enum: [active, disabled]}
-    ChannelStatus: {type: string, enum: [listed, unlisted, suspended], description: 上架、下架（所有者）、强制下架（管理员）。}
     TransactionType: {type: string, enum: [api_call, c2c_list, c2c_release, c2c_return, admin_adjust, bad_debt_writeoff]}
     OrderStatus: {type: string, enum: [open, closed, filled]}
     TradeStatus: {type: string, enum: [awaiting_payment, paid, released, cancelled, disputed, resolved_to_buyer, resolved_to_seller]}
@@ -16173,20 +15399,6 @@ components:
         seq: {type: integer, minimum: 1, maximum: 16}
         name: {type: string}
       required: [seq, name]
-      additionalProperties: false
-    ModelPrices:
-      type: object
-      description: 通用及可选细分单价，每百万 token；管理端按模型币种（price_currency），用户端为积分。细分未配置时继承对应通用桶价格，零表示免费。
-      properties:
-        input: {$ref: '#/components/schemas/Price'}
-        output: {$ref: '#/components/schemas/Price'}
-        token_prices:
-          description: 可选键 cache_write_5m、cache_write_1h，以及 input/output/cache_read 与 text/image/audio/video 的下划线组合；缺失继承本组通用价，零表示免费。
-          type: object
-          additionalProperties: {$ref: '#/components/schemas/Price'}
-        cache_write: {$ref: '#/components/schemas/Price'}
-        cache_read: {$ref: '#/components/schemas/Price'}
-      required: [input, output, cache_write, cache_read]
       additionalProperties: false
     EffectivePrices:
       type: object
@@ -16366,200 +15578,6 @@ components:
           maxItems: 5
       required: [points, today, channels, default_key, pending_c2c_trades, recent_calls]
       additionalProperties: false
-    PriceTier:
-      type: object
-      description: 条件价格档（ADR-0012）：按 seq 首个命中，整单生效。
-      properties:
-        seq: {type: integer, minimum: 1, maximum: 16}
-        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。' , not: {const: 'openai:priority'}}
-        name: {type: string, maxLength: 64}
-        min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
-        max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
-        timezone: {type: string, description: IANA 时区，默认 UTC。}
-        weekdays:
-          type: [array, 'null']
-          items: {type: integer, minimum: 1, maximum: 7}
-          description: ISO 星期（1=周一）；null 表示每天。
-        start_minute_of_day: {type: [integer, 'null'], minimum: 0, maximum: 1439}
-        end_minute_of_day: {type: [integer, 'null'], minimum: 1, maximum: 1440, description: 不含；小于开始分钟表示跨午夜，归属开始日。}
-        prices: {$ref: '#/components/schemas/ModelPrices'}
-      required: [seq, name, min_prompt_tokens, max_prompt_tokens, timezone, weekdays, start_minute_of_day, end_minute_of_day, prices]
-      additionalProperties: false
-    PriceTierInput:
-      type: object
-      properties:
-        service_tier: {type: string, maxLength: 64, description: '实际响应档位，含协议前缀；OpenAI priority 按 fast 匹配，ultrafast 独立计价。' , not: {const: 'openai:priority'}}
-        name: {type: string, maxLength: 64}
-        min_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token（输入 + 缓存写 + 缓存读）下限，含。}
-        max_prompt_tokens: {type: [integer, 'null'], minimum: 0, description: 输入侧 token 上限，不含。}
-        timezone: {type: string, description: IANA 时区，默认 UTC。}
-        weekdays:
-          type: [array, 'null']
-          items: {type: integer, minimum: 1, maximum: 7}
-          description: ISO 星期（1=周一）；null 表示每天。
-        start_minute_of_day: {type: [integer, 'null'], minimum: 0, maximum: 1439}
-        end_minute_of_day: {type: [integer, 'null'], minimum: 1, maximum: 1440, description: 不含；小于开始分钟表示跨午夜，归属开始日。}
-        prices: {$ref: '#/components/schemas/ModelPrices'}
-      required: [prices]
-      additionalProperties: false
-    AdminModel:
-      type: object
-      properties:
-        id: {type: string}
-        display_name: {type: string}
-        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
-        base_prices: {$ref: '#/components/schemas/ModelPrices'}
-        price_tiers:
-          type: array
-          items: {$ref: '#/components/schemas/PriceTier'}
-        enabled: {type: boolean}
-        sort_order: {type: integer}
-        provider: {type: string}
-        context_window: {type: [integer, 'null']}
-        max_output_tokens: {type: [integer, 'null']}
-        input_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        output_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        supports_tools: {type: boolean}
-        supports_structured_output: {type: boolean}
-        supports_vision: {type: boolean}
-        parameter_info: {type: string}
-        created_at: {$ref: '#/components/schemas/Timestamp'}
-        updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, display_name, price_currency, base_prices, price_tiers, enabled, sort_order, provider, context_window, max_output_tokens, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, created_at, updated_at]
-      additionalProperties: false
-    AdminModelList:
-      type: object
-      properties:
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/AdminModel'}
-      required: [items]
-      additionalProperties: false
-    AdminModelEnvelope:
-      type: object
-      properties:
-        model: {$ref: '#/components/schemas/AdminModel'}
-      required: [model]
-      additionalProperties: false
-    ModelCreateRequest:
-      type: object
-      properties:
-        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$', description: '模型名，即客户端请求中的 model；不含 / 与 :。'}
-        display_name: {type: string}
-        price_currency:
-          allOf:
-          - {$ref: '#/components/schemas/PriceCurrency'}
-          description: 默认 CNY。基准价、细分价与条件价格档都按此币种填写。
-        base_prices: {$ref: '#/components/schemas/ModelPrices'}
-        price_tiers:
-          type: array
-          items: {$ref: '#/components/schemas/PriceTierInput'}
-          maxItems: 16
-        enabled: {type: boolean}
-        sort_order: {type: integer}
-        provider: {type: string}
-        context_window: {type: [integer, 'null'], minimum: 1}
-        max_output_tokens: {type: [integer, 'null'], minimum: 1}
-        input_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        output_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        supports_tools: {type: boolean}
-        supports_structured_output: {type: boolean}
-        supports_vision: {type: boolean}
-        parameter_info: {type: string}
-      required: [id, display_name, base_prices]
-      additionalProperties: false
-    ModelUpdateRequest:
-      type: object
-      properties:
-        display_name: {type: string}
-        price_currency:
-          allOf:
-          - {$ref: '#/components/schemas/PriceCurrency'}
-          description: 改变币种时，提供该模型的全部渠道的汇率优惠随之重设：改为 USD 时开启（数值不变的模型保持原价），改为 CNY 时关闭。
-        base_prices: {$ref: '#/components/schemas/ModelPrices'}
-        price_tiers:
-          type: array
-          items: {$ref: '#/components/schemas/PriceTierInput'}
-          maxItems: 16
-          description: 提供时整组替换价格档；空数组表示删除全部档位。
-        enabled: {type: boolean}
-        sort_order: {type: integer}
-        provider: {type: string}
-        context_window: {type: [integer, 'null'], minimum: 1}
-        max_output_tokens: {type: [integer, 'null'], minimum: 1}
-        input_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        output_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        supports_tools: {type: boolean}
-        supports_structured_output: {type: boolean}
-        supports_vision: {type: boolean}
-        parameter_info: {type: string}
-      required: []
-      additionalProperties: false
-      minProperties: 1
-    CatalogModel:
-      type: object
-      description: 启用模型的列表项。
-      properties:
-        id: {type: string}
-        display_name: {type: string}
-        provider: {type: string}
-        context_window: {type: [integer, 'null']}
-        max_output_tokens: {type: [integer, 'null']}
-        input_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        output_modalities:
-          type: array
-          items: {type: string, not: {const: file}}
-        supports_tools: {type: boolean}
-        supports_structured_output: {type: boolean}
-        supports_vision: {type: boolean}
-        parameter_info: {type: string}
-        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
-        usd_cny_rate:
-          anyOf:
-          - {$ref: '#/components/schemas/ExchangeRate'}
-          - {type: 'null'}
-          description: 美元模型换算用的当前汇率；人民币模型为 null。
-        base_prices:
-          allOf:
-          - {$ref: '#/components/schemas/ModelPrices'}
-          description: 积分价；美元模型已按当前汇率换算。
-        current_tier:
-          anyOf:
-          - {$ref: '#/components/schemas/TierRef'}
-          - {type: 'null'}
-        lowest_prices:
-          anyOf:
-          - {$ref: '#/components/schemas/EffectivePrices'}
-          - {type: 'null'}
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-        online_channels: {type: integer}
-        custom: {type: boolean, description: 渠道自定义模型（不在模型目录中）：只有名称，base_prices 与 lowest_prices 取 3:1 混合价最低渠道的价格。}
-      required: [id, display_name, provider, context_window, max_output_tokens, input_modalities, output_modalities, supports_tools, supports_structured_output, supports_vision, parameter_info, price_currency, usd_cny_rate, base_prices, current_tier, lowest_prices, formats, online_channels, custom]
-      additionalProperties: false
-    CatalogModelList:
-      type: object
-      properties:
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/CatalogModel'}
-      required: [items]
-      additionalProperties: false
     ModelRoutingMetric:
       type: object
       properties:
@@ -16578,92 +15596,6 @@ components:
         min_samples: {type: integer, minimum: 1, description: 对应统计至少达到此样本数才用于自身指标排序。}
       required: [protocol, format, tier, stream, attempts, successes, excluded, success_rate, first_output_p50_ms, first_output_samples, output_tps_p50, output_samples, min_samples]
       additionalProperties: false
-    ModelChannel:
-      {
-        "type": "object",
-        "properties": {
-          "routing_metrics": {"type":"array","items":{"$ref":"#/components/schemas/ModelRoutingMetric"},"description":"该渠道在当前模型的24h实际观测，按协议、请求档位及流式分层；空表示未知。"},
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "owner": {
-            "$ref": "#/components/schemas/Party"
-          },
-          "is_mine": {
-            "type": "boolean"
-          },
-          "formats": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Format"
-            }
-          },
-          "multiplier": {
-            "$ref": "#/components/schemas/Multiplier"
-          },
-          "fx_discount": {
-            "type": "boolean",
-            "description": "美元模型开启了汇率优惠。"
-          },
-          "effective_multiplier": {
-            "$ref": "#/components/schemas/EffectiveMultiplier"
-          },
-          "current_prices": {
-            "$ref": "#/components/schemas/EffectivePrices"
-          },
-          "success_rate_24h": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Ratio"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ttft_p50_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "available",
-              "cooldown",
-              "limited"
-            ],
-            "description": "available 可用；cooldown 连续失败冷却中；limited 达到并发/RPM限制。"
-          },
-          "cooldown_remaining_seconds": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "owner",
-          "is_mine",
-          "formats",
-          "multiplier",
-          "fx_discount",
-          "effective_multiplier",
-          "current_prices",
-          "success_rate_24h",
-          "ttft_p50_ms",
-          "state",
-          "cooldown_remaining_seconds"
-        ],
-        "additionalProperties": false
-      }
     RoutingPreference:
       type: object
       properties:
@@ -16701,19 +15633,6 @@ components:
         request_timeout_ms: {type: [integer, 'null'], minimum: 1000, maximum: 3600000}
       required: [mode]
       additionalProperties: false
-    ModelDetail:
-      type: object
-      properties:
-        model: {$ref: '#/components/schemas/CatalogModel'}
-        price_tiers:
-          type: array
-          items: {$ref: '#/components/schemas/PriceTier'}
-        channels:
-          type: array
-          items: {$ref: '#/components/schemas/ModelChannel'}
-        routing: {$ref: '#/components/schemas/RoutingPreference'}
-      required: [model, price_tiers, channels, routing]
-      additionalProperties: false
     ApiKeySpend:
       type: object
       properties:
@@ -16725,6 +15644,10 @@ components:
     ApiKey:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         id: {type: string, format: uuid}
         name: {type: string}
         prefix: {type: string}
@@ -16750,7 +15673,7 @@ components:
         last_used_at: {$ref: '#/components/schemas/NullableTimestamp'}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, name, prefix, status, is_default, expires_at, allowed_models, budget_daily, budget_monthly, budget_total, model_aliases, routed_models, spend, last_used_at, created_at, updated_at]
+      required: [codex_notes, id, name, prefix, status, is_default, expires_at, allowed_models, budget_daily, budget_monthly, budget_total, model_aliases, routed_models, spend, last_used_at, created_at, updated_at]
       additionalProperties: false
     ApiKeyList:
       type: object
@@ -16770,6 +15693,10 @@ components:
     ApiKeyCreateRequest:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         name: {type: string, minLength: 1, maxLength: 64}
         status: {type: string, enum: [enabled, disabled]}
         expires_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -16789,6 +15716,10 @@ components:
     ApiKeyUpdateRequest:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         name: {type: string, minLength: 1, maxLength: 64}
         status: {type: string, enum: [enabled, disabled]}
         expires_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -16829,179 +15760,6 @@ components:
         secret: {type: string}
       required: [secret]
       additionalProperties: false
-    HeaderRules:
-      type: object
-      description: 请求头规则：设置/覆写与删除。
-      properties:
-        set:
-          type: array
-          items:
-            type: object
-            properties:
-              name: {type: string}
-              value: {type: string}
-            required: [name, value]
-            additionalProperties: false
-          maxItems: 32
-        remove:
-          type: array
-          items: {type: string}
-          maxItems: 32
-      required: [set, remove]
-      additionalProperties: false
-    ChannelAdvanced:
-      {
-        "type": "object",
-        "description": "高级设置；null 表示使用平台默认。",
-        "properties": {
-          "user_agent": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "header_rules": {
-            "$ref": "#/components/schemas/HeaderRules"
-          },
-          "concurrency_limit": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "rpm_limit": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "ttft_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 600000
-          },
-          "idle_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 3600000
-          },
-          "request_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 3600000
-          },
-          "cooldown_failures": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "maximum": 100
-          },
-          "cooldown_seconds": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 10,
-            "maximum": 86400
-          }
-        },
-        "required": [
-          "user_agent",
-          "header_rules",
-          "concurrency_limit",
-          "rpm_limit",
-          "ttft_timeout_ms",
-          "idle_timeout_ms",
-          "request_timeout_ms",
-          "cooldown_failures",
-          "cooldown_seconds"
-        ],
-        "additionalProperties": false
-      }
-    ChannelAdvancedInput:
-      {
-        "type": "object",
-        "properties": {
-          "user_agent": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "header_rules": {
-            "$ref": "#/components/schemas/HeaderRules"
-          },
-          "concurrency_limit": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "rpm_limit": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "ttft_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 600000
-          },
-          "idle_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 3600000
-          },
-          "request_timeout_ms": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1000,
-            "maximum": 3600000
-          },
-          "cooldown_failures": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "maximum": 100
-          },
-          "cooldown_seconds": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 10,
-            "maximum": 86400
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      }
     FormatTest:
       type: object
       properties:
@@ -17013,108 +15771,6 @@ components:
         tested_at: {$ref: '#/components/schemas/Timestamp'}
       required: [ok, status_code, error, duration_ms, tested_at]
       additionalProperties: false
-    ChannelModel:
-      type: object
-      properties:
-        model_id: {type: string}
-        display_name: {type: string}
-        upstream_model: {type: string}
-        price_currency: {$ref: '#/components/schemas/PriceCurrency'}
-        multiplier: {$ref: '#/components/schemas/Multiplier'}
-        fx_discount: {type: boolean, description: 汇率优惠，只对美元模型生效。}
-        effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-          minItems: 1
-        format_tests:
-          type: object
-          additionalProperties: {$ref: '#/components/schemas/FormatTest'}
-          description: 键为格式。
-        enabled: {type: boolean}
-        current_prices: {$ref: '#/components/schemas/EffectivePrices'}
-        custom_prices:
-          anyOf:
-          - {$ref: '#/components/schemas/CustomPrices'}
-          - {type: 'null'}
-          description: 自定义模型（不在模型目录中）的四个积分价；官方模型为 null。
-        pending_multiplier: {type: boolean, description: 原自定义模型已加入模型目录，停用中；渠道主设置倍率并启用后恢复。}
-      required: [model_id, display_name, upstream_model, price_currency, multiplier, fx_discount, effective_multiplier, formats, format_tests, enabled, current_prices, custom_prices, pending_multiplier]
-      additionalProperties: false
-    CustomPrices:
-      type: object
-      description: 自定义模型的四个基准价（积分/百万 token），按此价格直接计费，不乘倍率、不乘汇率、无条件价格档。
-      properties:
-        input: {$ref: '#/components/schemas/Price'}
-        output: {$ref: '#/components/schemas/Price'}
-        cache_write: {$ref: '#/components/schemas/Price'}
-        cache_read: {$ref: '#/components/schemas/Price'}
-      required: [input, output, cache_write, cache_read]
-      additionalProperties: false
-    ChannelModelInput:
-      type: object
-      properties:
-        model_id: {type: string}
-        upstream_model: {type: string, description: 默认与 model_id 相同（模型重定向）。}
-        multiplier: {$ref: '#/components/schemas/Multiplier'}
-        fx_discount: {type: boolean, description: '汇率优惠，默认 false；只对美元模型生效：按「美元价 × 倍率」直接扣积分，不再乘汇率，适合上游 1 元充 1 美元额度的中转站。'}
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-          minItems: 1
-        enabled: {type: boolean}
-        custom_prices:
-          allOf:
-          - {$ref: '#/components/schemas/CustomPrices'}
-          description: 提供时为自定义模型：model_id 不得与模型目录中任何模型（含停用）同名，且忽略 multiplier 与 fx_discount。
-      required: [model_id, formats]
-      additionalProperties: false
-    ChannelToday:
-      type: object
-      properties:
-        revenue: {$ref: '#/components/schemas/Amount'}
-        calls: {type: integer}
-        success_rate:
-          anyOf:
-          - {$ref: '#/components/schemas/Ratio'}
-          - {type: 'null'}
-      required: [revenue, calls, success_rate]
-      additionalProperties: false
-    Channel:
-      type: object
-      description: 我的渠道；上游 Key 不回显。
-      properties:
-        summary: {type: string, maxLength: 160}
-        description: {type: string, maxLength: 8000}
-        id: {type: string, format: uuid}
-        name: {type: string}
-        base_url: {type: string}
-        status: {$ref: '#/components/schemas/ChannelStatus'}
-        suspended_reason: {type: [string, 'null']}
-        cooldown_until: {$ref: '#/components/schemas/NullableTimestamp'}
-        models:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelModel'}
-        advanced: {$ref: '#/components/schemas/ChannelAdvanced'}
-        today: {$ref: '#/components/schemas/ChannelToday'}
-        created_at: {$ref: '#/components/schemas/Timestamp'}
-        updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [summary, description, id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at]
-      additionalProperties: false
-    ChannelList:
-      type: object
-      properties:
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/Channel'}
-      required: [items]
-      additionalProperties: false
-    ChannelEnvelope:
-      type: object
-      properties:
-        channel: {$ref: '#/components/schemas/Channel'}
-      required: [channel]
-      additionalProperties: false
     ChannelEvent:
       type: object
       properties:
@@ -17125,112 +15781,6 @@ components:
         reason: {type: string}
         created_at: {$ref: '#/components/schemas/Timestamp'}
       required: [id, kind, reason, created_at]
-      additionalProperties: false
-    ChannelDetail:
-      type: object
-      properties:
-        channel: {$ref: '#/components/schemas/Channel'}
-        events:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelEvent'}
-      required: [channel, events]
-      additionalProperties: false
-    ChannelDiscoverRequest:
-      type: object
-      properties:
-        base_url: {type: string}
-        api_key: {type: string}
-      required: [base_url, api_key]
-      additionalProperties: false
-    DiscoveredModel:
-      type: object
-      properties:
-        id: {type: string, description: 上游模型名。}
-        matched_model_id: {type: [string, 'null']}
-        suggested_formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-      required: [id, matched_model_id, suggested_formats]
-      additionalProperties: false
-    ChannelDiscoverResponse:
-      type: object
-      properties:
-        base_url: {type: string, description: 规范化后的 Base URL。}
-        upstream_models:
-          type: array
-          items: {$ref: '#/components/schemas/DiscoveredModel'}
-      required: [base_url, upstream_models]
-      additionalProperties: false
-    ChannelCreateRequest:
-      type: object
-      properties:
-        summary: {type: string, maxLength: 160}
-        description: {type: string, maxLength: 8000}
-        name: {type: string, minLength: 1, maxLength: 64}
-        base_url: {type: string}
-        api_key: {type: string}
-        status: {type: string, enum: [listed, unlisted]}
-        models:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelModelInput'}
-          minItems: 1
-        advanced: {$ref: '#/components/schemas/ChannelAdvancedInput'}
-      required: [name, base_url, api_key, models]
-      additionalProperties: false
-    ChannelUpdateRequest:
-      type: object
-      properties:
-        summary: {type: string, maxLength: 160}
-        description: {type: string, maxLength: 8000}
-        name: {type: string, minLength: 1, maxLength: 64}
-        base_url: {type: string}
-        api_key: {type: string, description: 提供时替换上游 Key。}
-        status: {type: string, enum: [listed, unlisted]}
-        models:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelModelInput'}
-          minItems: 1
-          description: 提供时整组替换。
-        advanced:
-          allOf:
-          - {$ref: '#/components/schemas/ChannelAdvancedInput'}
-          description: 提供时整块替换高级设置；省略或为 null 的字段恢复平台默认。
-      required: []
-      additionalProperties: false
-      minProperties: 1
-    ChannelTestRequest:
-      type: object
-      properties:
-        model_ids:
-          type: array
-          items: {type: string}
-          description: 省略时测试全部模型。
-        formats:
-          type: array
-          items: {$ref: '#/components/schemas/Format'}
-          description: 省略时测试四种格式。
-        apply: {type: boolean, description: 为 true 时把通过的格式写回 formats。}
-      required: []
-      additionalProperties: false
-    ChannelTestResult:
-      type: object
-      properties:
-        model_id: {type: string}
-        format: {$ref: '#/components/schemas/Format'}
-        ok: {type: boolean}
-        status_code: {type: [integer, 'null']}
-        error: {type: [string, 'null']}
-        duration_ms: {type: integer}
-      required: [model_id, format, ok, status_code, error, duration_ms]
-      additionalProperties: false
-    ChannelTestResponse:
-      type: object
-      properties:
-        results:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelTestResult'}
-        channel: {$ref: '#/components/schemas/Channel'}
-      required: [results, channel]
       additionalProperties: false
     ChannelRef:
       type: object
@@ -17595,8 +16145,8 @@ components:
           - {$ref: '#/components/schemas/ExchangeRate'}
           - {type: 'null'}
           description: 美元模型计费时使用的汇率；人民币模型为 null。
-        fx_discount: {type: boolean}
-        custom: {type: boolean, description: 渠道自定义模型按渠道自定价格计费；旧快照无此字段。}
+        fx_discount: {type: boolean, description: 仅用于解码历史快照中的 FX 特惠；新分组报价不产生此字段。}
+        custom: {type: boolean, description: 仅用于解码历史渠道自定义点价快照；新分组报价不产生此字段。}
         effective_multiplier: {$ref: '#/components/schemas/EffectiveMultiplier'}
         fee_rate_nano: {type: integer}
         prices: {$ref: '#/components/schemas/EffectivePrices'}
@@ -18355,58 +16905,6 @@ components:
         next_cursor: {type: [string, 'null'], description: 下一页游标；为 null 表示没有更多。}
       required: [items, next_cursor]
       additionalProperties: false
-    AdminChannel:
-      type: object
-      description: 管理员视角的渠道；上游 Key 不回显。
-      properties:
-        summary: {type: string, maxLength: 160}
-        description: {type: string, maxLength: 8000}
-        id: {type: string, format: uuid}
-        name: {type: string}
-        base_url: {type: string}
-        status: {$ref: '#/components/schemas/ChannelStatus'}
-        suspended_reason: {type: [string, 'null']}
-        cooldown_until: {$ref: '#/components/schemas/NullableTimestamp'}
-        models:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelModel'}
-        advanced: {$ref: '#/components/schemas/ChannelAdvanced'}
-        today: {$ref: '#/components/schemas/ChannelToday'}
-        created_at: {$ref: '#/components/schemas/Timestamp'}
-        updated_at: {$ref: '#/components/schemas/Timestamp'}
-        owner: {$ref: '#/components/schemas/AccountRef'}
-      required: [summary, description, id, name, base_url, status, suspended_reason, cooldown_until, models, advanced, today, created_at, updated_at, owner]
-      additionalProperties: false
-    AdminChannelPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/AdminChannel'}
-        next_cursor: {type: [string, 'null'], description: 下一页游标；为 null 表示没有更多。}
-      required: [items, next_cursor]
-      additionalProperties: false
-    AdminChannelEnvelope:
-      type: object
-      properties:
-        channel: {$ref: '#/components/schemas/AdminChannel'}
-      required: [channel]
-      additionalProperties: false
-    AdminChannelDetail:
-      type: object
-      properties:
-        channel: {$ref: '#/components/schemas/AdminChannel'}
-        events:
-          type: array
-          items: {$ref: '#/components/schemas/ChannelEvent'}
-      required: [channel, events]
-      additionalProperties: false
-    ReasonRequest:
-      type: object
-      properties:
-        reason: {type: string, minLength: 1, maxLength: 500}
-      required: [reason]
-      additionalProperties: false
     LedgerCheck:
       type: object
       description: 实时现算的零和核对；total 正常为 "0"。
@@ -18717,210 +17215,6 @@ components:
         transaction_id: {type: [string, 'null'], format: uuid}
       required: [call, transaction_id]
       additionalProperties: false
-    Supplier:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        kind:
-          type: string
-          enum:
-            - official
-            - relay
-        summary:
-          type: string
-        description:
-          type: string
-        website_url:
-          type: string
-        docs_url:
-          type: string
-        status_url:
-          type: string
-        icon_data:
-          type: string
-        icon_source:
-          type: string
-        updated_at:
-          type: string
-          format: date-time
-      required:
-        - id
-        - name
-        - kind
-        - summary
-        - description
-        - website_url
-        - docs_url
-        - status_url
-        - icon_data
-        - icon_source
-        - updated_at
-      additionalProperties: false
-    SupplierEndpoint:
-      type: object
-      properties:
-        base_url:
-          type: string
-        label:
-          type: string
-      required:
-        - base_url
-        - label
-      additionalProperties: false
-    AdminSupplier:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        kind:
-          type: string
-          enum:
-            - official
-            - relay
-        summary:
-          type: string
-        description:
-          type: string
-        website_url:
-          type: string
-        docs_url:
-          type: string
-        status_url:
-          type: string
-        icon_data:
-          type: string
-        icon_source:
-          type: string
-        updated_at:
-          type: string
-          format: date-time
-        visible:
-          type: boolean
-        endpoints:
-          type: array
-          items:
-            $ref: '#/components/schemas/SupplierEndpoint'
-        linked_channels:
-          type: integer
-      required:
-        - id
-        - name
-        - kind
-        - summary
-        - description
-        - website_url
-        - docs_url
-        - status_url
-        - icon_data
-        - icon_source
-        - updated_at
-        - visible
-        - endpoints
-        - linked_channels
-      additionalProperties: false
-    SupplierInput:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 64
-        kind:
-          type: string
-          enum:
-            - official
-            - relay
-        summary:
-          type: string
-          maxLength: 160
-        description:
-          type: string
-          maxLength: 8000
-        website_url:
-          type: string
-        docs_url:
-          type: string
-        status_url:
-          type: string
-        icon_data:
-          type: string
-        icon_source:
-          type: string
-        visible:
-          type: boolean
-        endpoints:
-          type: array
-          items:
-            $ref: '#/components/schemas/SupplierEndpoint'
-          maxItems: 32
-      required:
-        - name
-        - kind
-        - summary
-        - description
-        - website_url
-        - docs_url
-        - status_url
-        - icon_data
-        - icon_source
-        - visible
-        - endpoints
-      additionalProperties: false
-    SupplierList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/Supplier'
-        next_cursor:
-          type:
-            - string
-            - 'null'
-      required:
-        - items
-        - next_cursor
-      additionalProperties: false
-    AdminSupplierList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminSupplier'
-        next_cursor:
-          type:
-            - string
-            - 'null'
-      required:
-        - items
-        - next_cursor
-      additionalProperties: false
-    SupplierRecognition:
-      type: object
-      properties:
-        supplier:
-          anyOf:
-            - $ref: '#/components/schemas/Supplier'
-            - type: 'null'
-      required:
-        - supplier
-      additionalProperties: false
-    SupplierRecognitionInput:
-      type: object
-      properties:
-        base_url:
-          type: string
-      required:
-        - base_url
-      additionalProperties: false
     SupplierIcon:
       type: object
       properties:
@@ -18939,23 +17233,6 @@ components:
           type: string
       required:
         - website_url
-      additionalProperties: false
-    HallOffer:
-      type: object
-      properties:
-        model:
-          $ref: '#/components/schemas/CatalogModel'
-        multiplier:
-          type: string
-        effective_multiplier:
-          type: string
-        fx_discount:
-          type: boolean
-      required:
-        - model
-        - multiplier
-        - effective_multiplier
-        - fx_discount
       additionalProperties: false
     DirectoryValues:
       type: object
@@ -19010,113 +17287,6 @@ components:
         previous: {$ref: '#/components/schemas/DirectoryValues'}
         groups: {type: array, items: {$ref: '#/components/schemas/DirectoryRow'}}
         trend: {type: array, items: {$ref: '#/components/schemas/DirectoryRow'}}
-    HallChannel:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        summary:
-          type: string
-        description:
-          type: string
-        owner:
-          $ref: '#/components/schemas/Party'
-        is_mine:
-          type: boolean
-        supplier:
-          anyOf:
-            - $ref: '#/components/schemas/Supplier'
-            - type: 'null'
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/HallOffer'
-        formats:
-          type: array
-          items:
-            $ref: '#/components/schemas/Format'
-        state:
-          type: string
-          enum:
-            - available
-            - cooldown
-            - limited
-        cooldown_remaining_seconds:
-          type:
-            - integer
-            - 'null'
-        success_rate_24h:
-          type:
-            - string
-            - 'null'
-        ttft_p50_ms:
-          type:
-            - integer
-            - 'null'
-      required:
-        - id
-        - name
-        - summary
-        - description
-        - owner
-        - is_mine
-        - supplier
-        - models
-        - formats
-        - state
-        - cooldown_remaining_seconds
-        - success_rate_24h
-        - ttft_p50_ms
-      additionalProperties: false
-    HallList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/HallChannel'
-        next_cursor:
-          type:
-            - string
-            - 'null'
-      required:
-        - items
-        - next_cursor
-      additionalProperties: false
-    SupplierDetail:
-      type: object
-      properties:
-        supplier:
-          $ref: '#/components/schemas/Supplier'
-        channels:
-          type: array
-          items:
-            $ref: '#/components/schemas/HallChannel'
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/CatalogModel'
-      required:
-        - supplier
-        - channels
-        - models
-      additionalProperties: false
-    SupplierImpactInput:
-      type: object
-      properties:
-        endpoints: {type: array, maxItems: 32, items: {$ref: '#/components/schemas/SupplierEndpoint'}}
-      required: [endpoints]
-      additionalProperties: false
-    SupplierImpact:
-      type: object
-      properties:
-        linked_channels: {type: integer, minimum: 0}
-      required: [linked_channels]
-      additionalProperties: false
-
 # Discovery metadata only: these entries do not register live HTTP routes.
     GroupChannelFormat:
       {
@@ -19884,7 +18054,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-19.6",
+    "version": "2026-10-19.8",
     "stage": "discovery",
     "sources": [
       {
@@ -23687,8 +21857,8 @@ x-aihub-gateway-contract:
       "gateway/item-reference": "原生item_reference可能仅含id：按可信索引的账号/Key与原始父级元数据解析，唯一才绑定；有显式父级时严格校验。跨父级/来源同ID无法消歧时拒绝，不以空父级错误拒绝所有已登记项。",
       "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
       "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。",
-      "codex-special/context-wire-mapping": "只处理固定CLI的context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。固定CLI的传输窗口元数据window_id、client_metadata.x-codex-window-id与HTTP x-codex-window-id，只有明确的thread-UUID:无符号计数格式时，将UUID前缀用同一会话映射，保留计数；不把它与context_window_id或history接口的opaque窗口ID混同。未知格式原样保留；不递归改input/opaque item id、history窗口/item引用、notes路径、正文、密文或current_agent_name。只在Codex上下文协议启用；重复标识/头拒绝，可选metadata空值保留。解压/映射/模型替换后重建编码与长度；单请求映射缓存至多16项，不引入来源路由绑定或SQL。",
-      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。",
+      "codex-special/context-wire-mapping": "只处理固定CLI的prompt_cache_key（客户端同样将其用作Responses的session-id）、context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。固定CLI的传输窗口元数据window_id、client_metadata.x-codex-window-id与HTTP x-codex-window-id，只有明确的thread-UUID:无符号计数格式时，将UUID前缀用同一会话映射，保留计数；不把它与context_window_id或history接口的opaque窗口ID混同。未知格式原样保留；不递归改input/opaque item id、history窗口/item引用、notes路径、正文、密文或current_agent_name。只在Codex上下文协议启用；重复标识/头拒绝，可选metadata空值保留。解压/映射/模型替换后重建编码与长度；单请求映射缓存至多16项，不引入来源路由绑定或SQL。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "detection/native-evidence": "F4 按原生协议逐项验证结构、语义与可靠用量；真实长度与参数接受独立，搜索额外计数请求纳入实际消耗。SSE 使用原生流式端点，计数/压缩场景允许调用对应原生生成端点验证完整窗口续用。指纹固定 lmfpd 0.0.1792242250521 / 50a364bc686279094265f34f18f5501eac1d73f4，三条完整样本、离线 Go 等价评分，只保存库内相对排名，不证明身份。",
       "detection/native-applicability": "保留每个原始 ID 的场景归属，将通用模板断言细化为实际原生字段。Messages 不虚构 json_object/custom/namespace；Gemini 使用 allowedFunctionNames、VALIDATED、parametersJsonSchema 和 responseJsonSchema，不加入旧 responseSchema 专项；Chat SSE 不虚构原生推理事件。OpenAI custom、allowed_tools 及 Responses namespace 分别验证，temperature/top_p/effort/verbosity 分开投影。缺少偶发多调用或可选 thinking/签名事件只按明确条件断言记录未观测，不代替主动适用检测。",
       "detection/group-negative-prerequisite": "分组基础负例先复用同一凭据/协议的有界模型目录，从实际返回的模型 ID 构造合法基础体，再分别执行无效/缺失鉴权、随机未知模型和无效 JSON。模型元数据仅作请求构造和元数据结构证据，不提升为容量支持；Gemini 多候选额外使用其原生流式端点。",
@@ -23697,7 +21867,7 @@ x-aihub-gateway-contract:
       "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
       "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。",
       "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
-      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
+      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
       "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
       "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
@@ -23727,17 +21897,18 @@ x-aihub-gateway-contract:
       "codex-rl24-operational-scope": "Operational assertions retain this original scope: [\"实际服务档位\", \"每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。\", \"降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6\"]",
       "codex-rl13-operational-scope": "Operational assertions retain this original scope: [\"客户端接入前置\", \"固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。\", \"三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported\"]",
       "codex-rl15-operational-scope": "Operational assertions retain this original scope: [\"Codex 能力目录\", \"固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。\", \"不暴露共享账号目录或存完整提示词；目录声明不自动证明能力\"]",
-      "codex-rl17-operational-scope": "Operational assertions retain this original scope: [\"notes thread_hint\", \"新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。\", \"会话上下文辅助；不登记来源渠道粘性，不存提示正文\"]",
+      "codex-rl17-operational-scope": "Operational assertions retain this original scope: [\"notes thread_hint\", \"新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。\", \"会话上下文辅助；不登记来源渠道粘性，不存提示正文\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "codex-rl18-operational-scope": "Operational assertions retain this original scope: [\"notes 写读/列表及固定范围内操作\", \"固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。\", \"F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文\"]",
-      "codex-rl19-operational-scope": "Operational assertions retain this original scope: [\"history 窗口/条目及固定范围内操作\", \"list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。\", \"F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据\"]",
-      "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"]",
-      "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"]",
+      "codex-rl19-operational-scope": "Operational assertions retain this original scope: [\"history 窗口/条目及固定范围内操作\", \"list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。\", \"F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "codex-rl25-operational-scope": "Operational assertions retain this original scope: [\"Codex 专用原生生图\", \"固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。\", \"F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源\", \"固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。\"]",
       "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement.",
       "codex-rl14-endpoint-evidence": "RL14 separately tests the native Codex and public Responses entrances; neither endpoint supplies transport capability evidence for the other. Public assertions are upstream/gateway only; the pinned CLI compression profile uses its actual native endpoint.",
       "codex-notes-model-prerequisites": "RL18 uses the actual native catalog for an explicit group model prerequisite and actual native model-produced encrypted arguments/output consumption. No invented ciphertext, notes body persistence, resource management API, timed consistency wait or source-channel binding.",
       "codex-history-seed-scope": "RL19 seeds only a synthetic session and known window using pinned CLI history_ingest_requested metadata. It reads only item IDs recovered from that window and matching the unpredictable seeded content, performs immediate observations without waiting, and records missing IDs as failed prerequisites rather than guessing resources or binding source channels.",
       "codex_compaction_proof": "固定官方 CLI 0.163.0 / 83086188 的 RemoteCompactionSupport 仅 Unsupported/V2；V1 standalone 保留直接上游与平台代理完整窗口检测，不编造不存在的 CLI V1 配置。RL22 使用 V2 协议；配置启用属客户端，重叠/取消/续用分层核验，单次结算属平台代理。原 ID 与全部功能断言保留。",
-      "codex-platform-proof": "RL23/26 are CI-controlled synthetic platform regressions, separate from supplier creation. Fixed CLI HTTP ResponsesApiRequest has no previous_response_id (the similarly named field is WebSocket-only), and does not emit Messages thinking signatures; these remain gateway HTTP proofs. Forged/colliding identifiers, arbitrary egress and secret-bearing error injection are adversarial HTTP proofs. CLI proofs cover actual cross-channel reasoning/compaction/notes/history, account/Key isolation of its actual contexts, credential rotation and revocation. Every original functional assertion remains mandatory in its applicable layer; no synthetic result projects supplier support."
+      "codex-platform-proof": "RL23/26 are CI-controlled synthetic platform regressions, separate from supplier creation. Fixed CLI HTTP ResponsesApiRequest has no previous_response_id (the similarly named field is WebSocket-only), and does not emit Messages thinking signatures; these remain gateway HTTP proofs. Forged/colliding identifiers, arbitrary egress and secret-bearing error injection are adversarial HTTP proofs. CLI proofs cover actual cross-channel reasoning/compaction/notes/history, account/Key isolation of its actual contexts, credential rotation and revocation. Every original functional assertion remains mandatory in its applicable layer; no synthetic result projects supplier support. 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-special/user-notes-declaration": "维护者2026-10-19决定：由用户在每个平台 Key 的 codex_notes 布尔设置声明使用笔记/历史工具，默认false。true时，已识别Codex上下文的Responses推理及notes/history辅助请求从首个相关请求起持久绑定原分组/渠道/凭据版本和受保护真实凭据范围；并发首请求须在出站前原子确定同一落点；重启/缓存淘汰不能换源，同组地址按用户顺序fallback。以账号/平台Key隔离后的实际context/session元数据为会话标识，prompt_cache_key不独立触发硬粘性，也不合并不同真实会话。false保留既定无来源粘性；工具是否已调用/启用不得替代平台声明。更改声明只影响后续请求，不迁移已有历史，建议新会话；重新开启同一会话保留其旧绑定。所有模式/能力/权限和独立标准远端资源约束继续生效，不存正文，不因原渠道不支持新模型而换源。独立图片调用及模型目录不因主对话会话套用错误的模型权限或报价。平台目录supports_experimental_context同时受用户声明与有效能力证据约束。"
     }
   }

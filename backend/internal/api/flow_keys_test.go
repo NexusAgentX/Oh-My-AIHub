@@ -11,8 +11,7 @@ import (
 func TestKeysAndRoutingPreferences(t *testing.T) {
 	t.Parallel()
 	p := newPlatform(t)
-	admin := p.admin(t)
-	seedModel(t, admin, "deepseek-chat")
+	seedModel(t, p, "deepseek-chat")
 	alice, _ := p.member(t, "alice")
 	bob, _ := p.member(t, "bob")
 

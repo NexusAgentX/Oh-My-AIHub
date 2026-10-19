@@ -44,6 +44,8 @@ use_history_notes_extension = true
 
 受控 CLI 使用独立 HOME/CODEX_HOME/临时目录和显式环境，不继承宿主登录或代理。标准输出/错误各限 1 MiB；临时输入、运行目录和子进程组有有限资源保护。实际固定 CLI、网络接线、配置及三层证据由 Codex 专项核验；子进程日志不能直接写入报告。
 
+笔记、历史和图片生命周期包含多次真实推理/工具/恢复操作，不能将单次 HTTP 时限套作整个 CLI 场景的时限。驱动的有界执行窗口由 `codexprobe.ProbeTimeout` 统一定义，父进程另留收尾时间；每次出站仍应用原 HTTP 超时，子进程和文件保护不放宽。本地驱动到时不是上游不支持证据，未完成的场景仍不能用于创建审核。
+
 `mise run build-detection-codex` 构建固定 Go 驱动器并安装官方 `0.163.0` 原生制品；Linux/macOS 的 amd64/arm64 包 SHA-512 固定在安装脚本中，每次均验证，只提取 CLI 可执行文件。源码固定为 `83086188ae0614bd882818ff1aa23f3194962012`，Apache-2.0 LICENSE 与原 NOTICE 位于 `backend/licenses/codex/`。Linux amd64 可执行文件约 283 MiB，下载包约 155 MiB；不安装 npm launcher、语音库或额外工具。制品供后台隔离检测使用，不进入普通网关请求流程。
 
 官方 CLI→正式网关→合成上游回归以 `AIHUB_TEST_CODEX_BINARY` 和 `AIHUB_TEST_CODEX_PROBE` 显式指定上述两个制品，运行 `go -C backend test ./internal/api -run TestOfficialCodexCLIUsesProductionHandlers`。CI 会运行普通推理、平台 PAT 身份与 notes 启用、独立图片模型和工具结果回填；图片另校验独立报价且仅结算一次。驱动器只接受回环桥、固定 profile 和受控临时目录，禁止审批/任意客户端命令；官方 CLI 原始输出只在内存解析，返回固定阶段和布尔结论，取消后清理整个进程组及目录。机制验收不构成真实供应商通过，也不消除仍未注册套件的 pending。
@@ -61,6 +63,8 @@ RL17 复用 notes 生命周期的实际 CLI 请求。固定客户端会缓存初
 RL07 分别运行真实 Namespace 动态回调与内置 freeform apply_patch 的空补丁闭环；后者校验实际无操作诊断、参数分片和 call/result，不宣称文件写入能力。私有桥只交付规范空补丁，任何改变文件的内容或其他客户端工具在执行前拒绝。RL12 先复用标准/Lite 独立工具证据，再在同一个隔离官方客户端中用两个本地协议配置别名指向同一实际上游模型，分别把工具历史续用到另一格式。CLI 自身生成对应原生声明，网关不转换；两个方向均须识别到同一实际 call/result 的格式切换，不以两次独立工具成功代替兼容回放。
 
 RL19 使用 TokenBudget/history-notes 配置进行实际 history ingest，随后由 CLI 完成 list_windows/list_items/read_item/search_contents、另开会话的隔离及恢复后的新读取；只跟随本次写入元数据中的逻辑窗口或 context-window 标识，实际选择的 opaque ID 原样用于后续操作。固定客户端的 [传输窗口生成](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/mod.rs) 与 [上下文窗口展示](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/context/token_budget_context.rs) 使用不同标识，不能强行把所有窗口当 UUID。查不到刚写入条目时不猜 item ID、不等索引延迟，记录未观测；外国上下文的真实 403/404 拒绝与空结果分别观测，拒绝不能被算成对应操作的支持证据。
+
+原生 notes/history 准备请求同样使用固定客户端的完整 turn 初始化与对应请求头；只有自报 session ID 时，上游可能尚未建立上下文，不能据此判断读写不支持。逻辑窗口为线程 ID 加序号，历史读取使用本任务生成的独立 context-window ID。后续加密参数生成和结果解释不重新 ingest 辅助提示，避免替换已知历史；隔离验证先初始化另一合成会话，再尝试读取本人的已验证记录。初始化元数据仅留有界 worker 内存，不建立来源渠道映射。
 
 官方 CLI 的 notes/history 验证以实际上下文中的合成待办任务完成情况核验恢复，不要求客户端引用或复述其内置工具规则要求保密的正文。上游工具输出仍须有真实 HTTP 回执、结果哈希及后续推理中的对应回填，不能仅靠最终文本成功。请求/响应、私有笔记/历史和密文不进入报告。
 

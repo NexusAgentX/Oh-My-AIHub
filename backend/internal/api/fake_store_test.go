@@ -350,70 +350,6 @@ func (s *fakeStore) WriteOff(_ context.Context, writeOff ledger.WriteOff) (ledge
 	return posted, nil
 }
 
-// --- catalog.Store ---
-
-func (s *fakeStore) ListModels(_ context.Context, includeDisabled bool) ([]catalog.Model, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var result []catalog.Model
-	for _, model := range s.models {
-		if model.Enabled || includeDisabled {
-			result = append(result, model)
-		}
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
-	return result, nil
-}
-
-func (s *fakeStore) GetModel(_ context.Context, id string) (catalog.Model, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	model, ok := s.models[id]
-	if !ok {
-		return catalog.Model{}, catalog.ErrNotFound
-	}
-	return model, nil
-}
-
-func (s *fakeStore) CreateModel(_ context.Context, actorID string, model catalog.Model) (catalog.Model, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, exists := s.models[model.ID]; exists {
-		return catalog.Model{}, catalog.ErrConflict
-	}
-	model.CreatedAt, model.UpdatedAt = s.clock, s.clock
-	s.models[model.ID] = model
-	s.record(actorID, audit.ActionModelCreated, "model", model.ID, "")
-	return model, nil
-}
-
-func (s *fakeStore) UpdateModel(_ context.Context, actorID, id string, mutate func(catalog.Model) (catalog.Model, error)) (catalog.Model, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	current, ok := s.models[id]
-	if !ok {
-		return catalog.Model{}, catalog.ErrNotFound
-	}
-	next, err := mutate(current)
-	if err != nil {
-		return catalog.Model{}, err
-	}
-	s.models[id] = next
-	s.record(actorID, audit.ActionModelUpdated, "model", id, "")
-	return next, nil
-}
-
-func (s *fakeStore) DeleteModel(_ context.Context, actorID, id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.models[id]; !ok {
-		return catalog.ErrNotFound
-	}
-	delete(s.models, id)
-	s.record(actorID, audit.ActionModelDeleted, "model", id, "")
-	return nil
-}
-
 // --- settings.Store and audit.Store ---
 
 func (s *fakeStore) GetSettings(context.Context) (settings.Settings, error) {
@@ -478,7 +414,7 @@ func newFakeHandler(store *fakeStore) http.Handler {
 		panic(err)
 	}
 	return NewHandler(Dependencies{
-		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
+		Identity: identityService, Ledger: ledger.NewService(store),
 		Settings: settings.NewService(store), Audit: audit.NewService(store), CookieSecure: true,
 		Observe: observe.NewService(&fakeObserveStore{exported: []observe.ExportEntry{
 			{CreatedAt: time.Date(2026, 10, 8, 4, 30, 0, 0, time.UTC), Type: "admin_adjust", Reason: "=SUM(A1)", RelatedType: "account", RelatedID: "00000000-0000-4000-8000-000000000001", Amount: money.FromNano(-30_030_000_000), BalanceAfter: money.FromNano(-30_030_000_000)},

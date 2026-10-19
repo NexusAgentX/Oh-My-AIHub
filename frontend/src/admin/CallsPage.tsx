@@ -12,7 +12,9 @@ import {
 } from '../calls'
 import { Card, PageHeader } from '../ui'
 import { withQuery } from './api'
-import { useAdminAccounts, useAdminChannels, useAdminModels } from './queries'
+import { useAdminAccounts } from './queries'
+import { useGroupChannels } from '../group-channels/queries'
+import { useMarketNames } from '../market/queries'
 import type { AdminCall } from './types'
 
 export const adminCallsPath = '/api/admin/calls'
@@ -72,8 +74,8 @@ export function CallsPage() {
   const channelID = search.get('channel_id') ?? ''
   const openCall = search.get('call')
   const accounts = useAdminAccounts({})
-  const channels = useAdminChannels({})
-  const models = useAdminModels()
+  const channels = useGroupChannels(true)
+  const models = useMarketNames()
   const params = useMemo(
     () => ({ ...filtersToParams(filters), account_id: accountID || undefined, channel_id: channelID || undefined }),
     [filters, accountID, channelID],
@@ -117,7 +119,7 @@ export function CallsPage() {
                 label="渠道"
                 onChange={(value) => setParam('channel_id', value)}
                 options={withSelected(
-                  channels.data?.map((channel) => ({ value: channel.id, label: channel.name })) ?? [],
+                  channels.data?.items.map((channel) => ({ value: channel.id, label: channel.name })) ?? [],
                   channelID,
                 )}
                 value={channelID}

@@ -102,6 +102,42 @@ func TestPrivateCodexGatewayProofUsesRealHandlerAndRealWitnesses(t *testing.T) {
 	}
 }
 
+func TestPrivateCodexGatewayContinuesIndependentRequestsAfterUpstreamRejections(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, state string
+		status            int
+	}{
+		{"unstructured_missing_route", "404 page not found", "inconclusive", 404},
+		{"typed_unsupported_route", `{"error":{"type":"invalid_request_error","message":"not supported"}}`, "unsupported", 404},
+		{"ordinary_rate_limit", `{"error":{"type":"rate_limit_error","message":"try later"}}`, "inconclusive", 429},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requests := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requests++
+				w.Header().Set("Retry-After", "300")
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer up.Close()
+			r, s, service := codexTestSession(t, up.URL)
+			if err := r.RegisterCodexGateway(); err != nil {
+				t.Fatal(err)
+			}
+			item := codexLayerItem(t, r, s, "codex-special.RL14", "gateway_proxy")
+			result := service.run(context.Background(), s, item, nil)
+			if result.State != tc.state || requests != 5 || len(result.Assertions) != 5 {
+				t.Fatal("fixture cooldown prevented complete negative evidence", requests, result)
+			}
+			for _, assertion := range result.Assertions {
+				if len(assertion.AttemptIDs) == 0 {
+					t.Fatal("independent request has no upstream witness", assertion.ID)
+				}
+			}
+		})
+	}
+}
+
 func TestPrivateCodexIdentityAndCatalogKeepIndependentLayerAssertions(t *testing.T) {
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"models":[{"slug":"synthetic-model","display_name":"private name","input_modalities":["text","image"],"context_window":999999,"use_responses_lite":true,"supports_experimental_context":true,"supports_search_tool":true,"service_tiers":[{"id":"ultrafast","name":"Ultra"}]},{"slug":"foreign-model","display_name":"foreign"}],"accounts":["upstream-owner"]}`)

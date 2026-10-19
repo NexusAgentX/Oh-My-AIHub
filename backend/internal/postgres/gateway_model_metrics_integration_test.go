@@ -9,7 +9,7 @@ import (
 )
 
 func TestModelMetricHistoryUsesCompletedTimeVersionAndSelectionBoundary(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("model-metric-consumer", "100")
 	const candidate = "a0000000-0000-4000-8000-000000000001"
 	// This call began outside the window but finished inside it. Its first

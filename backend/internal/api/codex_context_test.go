@@ -12,6 +12,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -128,7 +129,7 @@ func newCodexContextFixture(t *testing.T, upstream *httptest.Server) (http.Handl
 		t.Fatal(err)
 	}
 	records := &proxyRecords{}
-	engine := gateway.NewEngine(gateway.Dependencies{ContextNamespace: namespace, Store: store, Catalog: codexFixtureModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream), Resources: records})
+	engine := gateway.NewEngine(gateway.Dependencies{CodexSessions: codexsession.New(&notesRouteRepository{rows: map[codexsession.Identity]codexsession.Route{}}), ContextNamespace: namespace, Store: store, Catalog: codexFixtureModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream), Resources: records})
 	return NewHandler(Dependencies{Gateway: engine}), store, records
 }
 

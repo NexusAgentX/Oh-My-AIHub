@@ -19,7 +19,7 @@ func TestCodexNamespaceIsolatesOwnersAndPreservesNativeContents(t *testing.T) {
 		t.Fatal(err)
 	}
 	actor := gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}
-	body := []byte(`{ "context":{"session_id":"client-session","current_agent_name":"root"},"client_metadata":{"session_id":"client-session","thread_id":"client-thread","x-codex-turn-metadata":"{\"session_id\":\"client-session\",\"thread_id\":\"client-thread\",\"parent_thread_id\":null,\"extra\":7}"},"input":[{"type":"reasoning","id":"do-not-map","encrypted_content":"opaque+/=="},{"type":"compaction","id":"also-unchanged","encrypted_content":"full-window"}],"text":"client-session is ordinary content","unknown":{"session_id":"client-session"} }`)
+	body := []byte(`{ "prompt_cache_key":"client-session","context":{"session_id":"client-session","current_agent_name":"root"},"client_metadata":{"session_id":"client-session","thread_id":"client-thread","x-codex-turn-metadata":"{\"session_id\":\"client-session\",\"thread_id\":\"client-thread\",\"parent_thread_id\":null,\"extra\":7}"},"input":[{"type":"reasoning","id":"do-not-map","encrypted_content":"opaque+/=="},{"type":"compaction","id":"also-unchanged","encrypted_content":"full-window"}],"text":"client-session is ordinary content","unknown":{"session_id":"client-session"} }`)
 	headers := http.Header{"session-id": {"client-session"}, "Thread-Id": {"client-thread"}, "X-Client-Request-Id": {"client-thread"}, "X-Codex-Turn-Metadata": {`{"session_id":"client-session","thread_id":"client-thread"}`}}
 	got, next, err := RewriteCodexContext(body, headers, actor, namespace)
 	if err != nil {
@@ -28,12 +28,13 @@ func TestCodexNamespaceIsolatesOwnersAndPreservesNativeContents(t *testing.T) {
 	session, _ := namespace.Identifier(actor, "client-session")
 	thread, _ := namespace.Identifier(actor, "client-thread")
 	var parsed struct {
+		Cache   string `json:"prompt_cache_key"`
 		Context struct {
 			Session string `json:"session_id"`
 		}
 		Client map[string]string `json:"client_metadata"`
 	}
-	if json.Unmarshal(got, &parsed) != nil || parsed.Context.Session != session || parsed.Client["session_id"] != session || parsed.Client["thread_id"] != thread || next.Get("Session-Id") != session || next.Get("Thread-Id") != thread || next.Get("X-Client-Request-Id") != thread {
+	if json.Unmarshal(got, &parsed) != nil || parsed.Cache != session || parsed.Context.Session != session || parsed.Client["session_id"] != session || parsed.Client["thread_id"] != thread || next.Get("Session-Id") != session || next.Get("Thread-Id") != thread || next.Get("X-Client-Request-Id") != thread {
 		t.Fatal("context fields and headers disagree")
 	}
 	for _, raw := range []string{`"encrypted_content":"opaque+/=="`, `"id":"do-not-map"`, `"encrypted_content":"full-window"`, `"text":"client-session is ordinary content"`, `"unknown":{"session_id":"client-session"}`} {
@@ -70,7 +71,7 @@ func TestCodexNamespaceIsolatesOwnersAndPreservesNativeContents(t *testing.T) {
 func TestCodexNamespaceRejectsAmbiguousOrInvalidContext(t *testing.T) {
 	n, _ := gatewaycontract.NewContextNamespace(make([]byte, 32))
 	actor := gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}
-	for _, body := range []string{`{"context":{"session_id":"x","session_id":"y"}}`, `{"context":{"session_id":1}}`, `{"context":{"session_id":""}}`, `{"client_metadata":{"x-codex-turn-metadata":"not-json"}}`, `[]`} {
+	for _, body := range []string{`{"context":{"session_id":"x","session_id":"y"}}`, `{"context":{"session_id":1}}`, `{"context":{"session_id":""}}`, `{"client_metadata":{"x-codex-turn-metadata":"not-json"}}`, `{"prompt_cache_key":"x","prompt_cache_key":"y"}`, `{"prompt_cache_key":1}`, `[]`} {
 		if _, _, err := RewriteCodexContext([]byte(body), nil, actor, n); err == nil {
 			t.Fatal("invalid namespace input accepted", body)
 		}
@@ -143,7 +144,7 @@ func TestCodexLogicalWindowUsesSameProtectedThreadAndPreservesResourceIDs(t *tes
 func BenchmarkCodexLogicalWindowNamespace(b *testing.B) {
 	n, _ := gatewaycontract.NewContextNamespace(bytes.Repeat([]byte{11}, 32))
 	actor := gatewaycontract.Principal{AccountID: "a", KeyID: "k", Active: true}
-	body := []byte(`{"model":"m","client_metadata":{"session_id":"019abcde-1234-7abc-8123-123456789abc","thread_id":"019abcde-1234-7abc-8123-123456789abc","x-codex-window-id":"019abcde-1234-7abc-8123-123456789abc:1"},"input":[]}`)
+	body := []byte(`{"model":"m","prompt_cache_key":"019abcde-1234-7abc-8123-123456789abc","client_metadata":{"session_id":"019abcde-1234-7abc-8123-123456789abc","thread_id":"019abcde-1234-7abc-8123-123456789abc","x-codex-window-id":"019abcde-1234-7abc-8123-123456789abc:1"},"input":[]}`)
 	b.ReportAllocs()
 	for b.Loop() {
 		if _, _, err := RewriteCodexContext(body, nil, actor, n); err != nil {

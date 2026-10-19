@@ -27,9 +27,9 @@ func groupBook(t *testing.T, currency string, price int64) *quotepricing.Book {
 	}
 	return b
 }
-func TestGroupCandidateNeverBorrowsCatalogPriceOrFXDiscount(t *testing.T) {
+func TestGroupCandidateNeverBorrowsDirectoryPrice(t *testing.T) {
 	model := catalog.Model{ID: "main", InputPrice: 999_000_000_000, PriceCurrency: "CNY"}
-	candidate := Candidate{Quotes: groupBook(t, "USD", 2_000_000_000), MultiplierNano: ledger.UnitRate / 2, RateNano: 7 * ledger.UnitRate, FXDiscount: true}
+	candidate := Candidate{GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "USD", 2_000_000_000), MultiplierNano: ledger.UnitRate / 2, RateNano: 7 * ledger.UnitRate}
 	// A timestamp can contain the catalog's decimal digits; only inspect the
 	// pricing fields when asserting that catalog pricing was not borrowed.
 	call := &callState{started: time.Date(2026, 10, 18, 0, 0, 0, 999361686, time.UTC), billingFacts: quotepricing.Facts{MainReliable: true}}
@@ -45,6 +45,9 @@ func TestGroupCandidateNeverBorrowsCatalogPriceOrFXDiscount(t *testing.T) {
 		} `json:"group_quote"`
 	}
 	decodeErr := json.Unmarshal(snapshot, &saved)
+	if strings.Contains(string(snapshot), `"fx_discount"`) || strings.Contains(string(snapshot), `"custom"`) {
+		t.Fatal("new group quote emitted retired pricing configuration")
+	}
 	if err != nil || decodeErr != nil || priced.Cost.String() != "7" || saved.BasePrices["input"] != "2" || saved.Currency != "USD" || saved.FXDiscount || len(saved.GroupQuote.Components) != 1 || saved.GroupQuote.Components[0].QuoteID != "quote-v1" {
 		t.Fatalf("cost=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
 	}
@@ -61,12 +64,12 @@ func TestTextRequestQuoteUsesOneReliableRequestRatherThanTokenVolume(t *testing.
 		t.Fatal(err)
 	}
 	call := &callState{started: time.Now(), billingFacts: quotepricing.Facts{MainReliable: true}}
-	priced, _, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate / 2}, ledger.Usage{InputTokens: 99_000_000}, settings.Settings{}, 0)
+	priced, _, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{GroupID: "group", GroupModelID: "main", Quotes: book, MultiplierNano: ledger.UnitRate / 2}, ledger.Usage{InputTokens: 99_000_000}, settings.Settings{}, 0)
 	if err != nil || priced.Cost.String() != "1" {
 		t.Fatalf("one request price=%s err=%v", priced.Cost.String(), err)
 	}
 	call.billingFacts.MainReliable = false
-	priced, _, err = NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate}, ledger.Usage{}, settings.Settings{}, 0)
+	priced, _, err = NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{GroupID: "group", GroupModelID: "main", Quotes: book, MultiplierNano: ledger.UnitRate}, ledger.Usage{}, settings.Settings{}, 0)
 	if err != nil || priced.Cost != 0 {
 		t.Fatal("missing main usage bypassed existing billing rule", err)
 	}
@@ -116,7 +119,7 @@ func TestGroupPriceProtocolFailureTransportInterruptionAndSelfUse(t *testing.T) 
 		t.Run(run.name, func(t *testing.T) {
 			store := &speedStore{}
 			engine := NewEngine(Dependencies{Store: store})
-			candidate := Candidate{ChannelID: "channel", OwnerID: "provider", Quotes: groupBook(t, "CNY", 2_000_000_000), MultiplierNano: ledger.UnitRate}
+			candidate := Candidate{ChannelID: "channel", OwnerID: "provider", GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 2_000_000_000), MultiplierNano: ledger.UnitRate}
 			if run.self {
 				candidate.OwnerID = "consumer"
 			}
@@ -153,7 +156,7 @@ func TestImageToolUnitsExcludeFailedSubcallsAndOldNoChargeNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	call := &callState{started: time.Now(), billingFacts: quotepricing.Facts{MainReliable: true, Units: observed.Units}}
-	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{Quotes: book, MultiplierNano: ledger.UnitRate}, observed.Usage, settings.Settings{}, 0)
+	priced, snapshot, err := NewEngine(Dependencies{}).priceUsage(call, catalog.Model{ID: "main"}, Candidate{GroupID: "group", GroupModelID: "gm-main", Quotes: book, MultiplierNano: ledger.UnitRate}, observed.Usage, settings.Settings{}, 0)
 	if err != nil || priced.Cost.String() != "5" || strings.Contains(string(snapshot), "暂不收取") || strings.Contains(string(snapshot), "private-image") {
 		t.Fatalf("price=%s err=%v snapshot=%s", priced.Cost.String(), err, snapshot)
 	}

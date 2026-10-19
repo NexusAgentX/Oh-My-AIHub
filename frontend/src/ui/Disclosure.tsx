@@ -9,15 +9,19 @@ export function Disclosure({
   title,
   changed = 0,
   defaultOpen,
+  lazy = false,
   children,
 }: {
   title: string
   /** 已偏离默认值的项数；0 时不显示徽标 */
   changed?: number
   defaultOpen?: boolean
+  /** Mount on first opening; retain the content and its state afterwards. */
+  lazy?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false)
+  const [visited, setVisited] = useState(defaultOpen ?? false)
   const panelID = useId()
   return (
     <section className={`disclosure ${open ? 'disclosure-open' : ''}`}>
@@ -25,7 +29,7 @@ export function Disclosure({
         aria-controls={panelID}
         aria-expanded={open}
         className="disclosure-toggle"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => { setOpen(value => !value); if (lazy) setVisited(true) }}
         type="button"
       >
         <Icon name="chevron-down" />
@@ -33,7 +37,7 @@ export function Disclosure({
         {changed > 0 && <span className="badge badge-accent">已改 {changed} 项</span>}
       </button>
       <div className="disclosure-panel" hidden={!open} id={panelID}>
-        {children}
+        {!lazy || visited ? children : null}
       </div>
     </section>
   )

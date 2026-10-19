@@ -125,7 +125,7 @@ func (s *Store) Create(ctx context.Context, r groupchannel.Record, choices []gro
 		if err != nil {
 			return err
 		}
-		err = q.InsertChannel(ctx, InsertChannelParams{ID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, Summary: r.Summary, Description: r.Description, BaseUrl: r.BaseURL, ApiKeyCiphertext: r.Credential.Ciphertext, ApiKeyNonce: r.Credential.Nonce, ApiKeyKeyID: r.Credential.KeyID, Status: string(r.Status), MarketGroupID: &r.GroupID})
+		err = q.InsertChannel(ctx, InsertChannelParams{ID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, Summary: r.Summary, Description: r.Description, ApiKeyCiphertext: r.Credential.Ciphertext, ApiKeyNonce: r.Credential.Nonce, ApiKeyKeyID: r.Credential.KeyID, Status: string(r.Status), MarketGroupID: &r.GroupID})
 		if err != nil {
 			return err
 		}

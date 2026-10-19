@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -49,19 +50,37 @@ func openPool(ctx context.Context, databaseURL string, maxConnections int32) (*p
 }
 
 func Migrate(ctx context.Context, databaseURL string) error {
+	return MigrateWithOptions(ctx, databaseURL, MigrationOptions{})
+}
+
+func MigrateWithOptions(ctx context.Context, databaseURL string, options MigrationOptions) error {
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		return fmt.Errorf("open migration database: %w", err)
 	}
 	defer db.Close()
+	// One session retains the explicit authorization setting for Goose. A
+	// replacement connection loses it and the SQL guard fails closed.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping migration database: %w", err)
 	}
-	goose.SetBaseFS(migrationFiles)
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("configure migration dialect: %w", err)
+	if err := migrationPreflight(ctx, db, options); err != nil {
+		return fmt.Errorf("migration preflight: %w", err)
 	}
-	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
+	if err := configureCleanup(ctx, db, options); err != nil {
+		return err
+	}
+	files, err := fs.Sub(migrationFiles, "migrations")
+	if err != nil {
+		return err
+	}
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, files)
+	if err != nil {
+		return fmt.Errorf("configure migrations: %w", err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("apply database migrations: %w", err)
 	}
 	return nil

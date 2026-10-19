@@ -48,6 +48,7 @@ type KeyAuth struct {
 	BudgetTotal   *money.Amount
 	Aliases       map[string]string
 	AccountActive bool
+	CodexNotes    bool
 }
 
 // Candidate is one channel offering the requested model in the requested
@@ -80,16 +81,10 @@ type Candidate struct {
 	BaseURL        string
 	UpstreamModel  string
 	MultiplierNano int64
-	FXDiscount     bool
-	// RateNano converts the model's prices into points for this channel
-	// (ledger.ChannelRate); the engine sets it from the settings snapshot
-	// before ranking so ranking and billing use the same rate.
+	// RateNano converts the frozen group quote currency into platform points.
 	RateNano   int64
 	Advanced   channel.Advanced
 	Credential channel.EncryptedCredential
-	// Custom is set for a custom model (ADR-0034): the channel's own point
-	// prices, charged without multiplier, exchange rate or tiers.
-	Custom *channel.CustomPrices
 }
 
 // Entrance is a selected stable group-address relationship. The sequence is
@@ -99,35 +94,22 @@ type Entrance struct {
 	BaseURL string
 }
 
-// PricingModel is the model a candidate bills: the catalog model itself, or
-// for a custom model the channel's own point prices without tiers.
+// PricingModel projects the candidate's frozen group quote for historical
+// snapshots. Missing or mismatched offers never borrow directory prices.
 func (c Candidate) PricingModel(model catalog.Model) catalog.Model {
-	if c.GroupID != "" && !c.ValidOffering(model.ID) {
+	if !c.ValidOffering(model.ID) {
 		return catalog.Model{ID: model.ID}
 	}
-	if c.Quotes != nil {
-		offer, ok := c.Quotes.Offers[model.ID]
-		if !ok {
-			return catalog.Model{ID: model.ID}
-		}
-		quote := offer.Quote
-		result := catalog.Model{ID: model.ID, DisplayName: model.ID, Enabled: true, PriceCurrency: quote.Currency, InputPrice: quote.Prices.Input, OutputPrice: quote.Prices.Output, CacheWritePrice: quote.Prices.CacheWrite, CacheReadPrice: quote.Prices.CacheRead, TokenPrices: quote.Prices.Details}
-		for _, tier := range quote.Tiers {
-			result.PriceTiers = append(result.PriceTiers, tier.Ledger())
-		}
-		return result
+	quote := c.Quotes.Offers[model.ID].Quote
+	result := catalog.Model{ID: model.ID, DisplayName: model.ID, Enabled: true, PriceCurrency: quote.Currency, InputPrice: quote.Prices.Input, OutputPrice: quote.Prices.Output, CacheWritePrice: quote.Prices.CacheWrite, CacheReadPrice: quote.Prices.CacheRead, TokenPrices: quote.Prices.Details}
+	for _, tier := range quote.Tiers {
+		result.PriceTiers = append(result.PriceTiers, tier.Ledger())
 	}
-	if c.Custom == nil {
-		return model
-	}
-	return c.Custom.Model(model.ID)
+	return result
 }
 
 func (c Candidate) ValidOffering(modelID string) bool {
-	if c.GroupID == "" {
-		return true
-	}
-	if c.Quotes == nil || c.Quotes.GroupID != c.GroupID {
+	if c.GroupID == "" || c.GroupModelID == "" || c.Quotes == nil || c.Quotes.GroupID != c.GroupID {
 		return false
 	}
 	offer, ok := c.Quotes.Offers[modelID]
@@ -284,15 +266,11 @@ type Store interface {
 	// OnlineModels lists, for the model list endpoints, the models that have
 	// at least one listed channel, with the formats those channels serve.
 	OnlineModels(ctx context.Context) ([]OnlineModel, error)
-	// CustomModelOnline reports whether a listed channel offers a custom
-	// model of that name.
-	CustomModelOnline(ctx context.Context, modelID string) (bool, error)
 }
 
-// Models is the model catalog as the engine reads it. *catalog.Service reads
-// the database; the snapshot cache (internal/snapshot, ADR-0040) answers from
-// memory. What comes back may be shared between callers and must not be
-// modified.
+// Models reads the approved group-ID aggregate from the snapshot. It owns
+// no global model entities or prices. Returned metadata may be shared and
+// must not be modified.
 type Models interface {
 	Get(ctx context.Context, id string) (catalog.Model, error)
 	// List returns the catalog in display order; disabled models only when
@@ -323,22 +301,7 @@ type CandidateRecord struct {
 // state such as cooldown is not considered).
 type OnlineModel struct {
 	ID      string
-	Custom  bool
 	Formats []channel.Format
-}
-
-// OnlineChannel is one listed channel offering one model, for browsing.
-type OnlineChannel struct {
-	ModelID        string
-	ChannelID      string
-	ChannelName    string
-	OwnerID        string
-	OwnerName      string
-	Formats        []channel.Format
-	MultiplierNano int64
-	FXDiscount     bool
-	Advanced       channel.Advanced
-	Custom         *channel.CustomPrices
 }
 
 // HomeStats are the counters on the home page.
@@ -380,7 +343,6 @@ type CallSummary struct {
 
 // Browse is the read side behind the model pages and the home page.
 type Browse interface {
-	OnlineChannels(ctx context.Context) ([]OnlineChannel, error)
 	Home(ctx context.Context, accountID string, dayStart time.Time) (HomeStats, error)
 	RecentCalls(ctx context.Context, accountID string, limit int) ([]CallSummary, error)
 }

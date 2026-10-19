@@ -1,3 +1,4 @@
+import { MarketQualitySection } from './Quality'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { components } from '../api/schema.gen'
 import { FormatTags } from '../calls'
@@ -20,5 +21,5 @@ export function MarketHallPage(){
 }
 export function MarketHallChannelPage(){
   const {id=''}=useParams(),query=useMarketChannel(id)
-  return <QueryBoundary query={query} errorFallback="渠道不存在或已下架">{c=><><PageHeader title={c.name} back={{to:'/channel-hall',label:'渠道大厅'}} actions={c.is_mine?<ButtonLink to={`/channels/${c.id}`}>管理渠道</ButtonLink>:undefined}/><Card><Parents channel={c}/><p>{c.summary}</p><MarkdownContent value={c.description}/><FormatTags formats={c.formats}/></Card><Card title="分组模型">{c.models.map(id=><div className="market-channel" key={id}><Link className="mono" to={`/models/${encodeURIComponent(id)}?group_id=${encodeURIComponent(c.group_id)}`}>{id}</Link></div>)}</Card></>}</QueryBoundary>
+  return <QueryBoundary query={query} errorFallback="渠道不存在或已下架">{c=><><PageHeader title={c.name} back={{to:'/channel-hall',label:'渠道大厅'}} actions={c.is_mine?<ButtonLink to={`/channels/${c.id}`}>管理渠道</ButtonLink>:undefined}/><Card><Parents channel={c}/><p>{c.summary}</p><MarkdownContent value={c.description}/><FormatTags formats={c.formats}/></Card><Card title="分组模型">{c.models.map(id=><div className="market-channel" key={id}><Link className="mono" to={`/models/${encodeURIComponent(id)}?group_id=${encodeURIComponent(c.group_id)}`}>{id}</Link></div>)}</Card><MarketQualitySection key={c.id} kind="channel" id={c.id}/></>}</QueryBoundary>
 }

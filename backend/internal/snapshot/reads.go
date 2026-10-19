@@ -91,15 +91,6 @@ func (s gatewayStore) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, 
 	return fleet.online, nil
 }
 
-func (s gatewayStore) CustomModelOnline(ctx context.Context, modelID string) (bool, error) {
-	fleet, err := s.c.fleet.get(ctx)
-	if err != nil {
-		return false, err
-	}
-	_, online := fleet.customOnline[modelID]
-	return online, nil
-}
-
 // ResponseChannel answers from the recent Responses turns this process has
 // closed, and asks the database for older ones.
 func (s gatewayStore) ResponseChannel(ctx context.Context, accountID, responseID string) (string, error) {
@@ -130,7 +121,7 @@ func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish)
 // reaches the balance cache through the ledger's Books).
 // TestEveryStoreMethodIsClassified keeps both lists complete.
 var (
-	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "CustomModelOnline", "ResponseChannel", "Points"}
+	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "ResponseChannel", "Points"}
 	gatewayStoreOthers   = []string{
 		"TouchKey", "KeySpend", "AttemptHistory", "InsertCall", "FinishCall",
 		"SweepStaleCalls", "RecordChannelEvent",

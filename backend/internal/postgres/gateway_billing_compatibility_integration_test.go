@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +21,7 @@ import (
 )
 
 func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer, sharer := e.member("consumer", "100"), e.member("sharer", "0")
 	upstream := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		if r.Header.Get("Authorization") != "Bearer frozen-secret" {
@@ -29,7 +29,7 @@ func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/v1/responses" {
-			io.WriteString(w, `{"id":"resp_durable","background":true,"status":"queued"}`)
+			io.WriteString(w, `{"id":"resp_durable","object":"response","background":true,"status":"queued"}`)
 		} else if strings.HasSuffix(r.URL.Path, "/cancel") {
 			io.WriteString(w, `{"id":"resp_durable","status":"cancelled"}`)
 		} else {
@@ -37,6 +37,10 @@ func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
 		}
 	})
 	channelID := e.createChannel(sharer, channelSpec{name: "background", upstream: upstream, key: "frozen-secret"})
+	e.declareGroupedCapabilities(channelID,
+		"upstream_protocol/openai-responses.background/background_create",
+		"upstream_protocol/openai-responses.background/owned_cancel",
+		"upstream_protocol/openai-responses.state/owned_response_retrieve_input_items_delete")
 	_, secret := e.defaultKey(consumer)
 	ack := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","background":true,"input":"private synthetic input"}`), nil)
 	if ack.Code != 200 {
@@ -53,7 +57,7 @@ func TestGatewayBackgroundSurvivesRestartAndCredentialEdit(t *testing.T) {
 	if !json.Valid(metadata) || strings.Contains(string(metadata), "frozen-secret") || strings.Contains(string(metadata), "private synthetic input") {
 		t.Fatal("sensitive plaintext persisted")
 	}
-	e.apiJSON(sharer, 200, http.MethodPatch, "/api/channels/"+channelID, map[string]any{"api_key": "new-secret"})
+	e.replaceGroupedChannelKey(sharer, channelID, "new-secret")
 	e.restartGateway()
 	if err := e.engine.RestoreBackground(context.Background()); err != nil {
 		t.Fatal(err)
@@ -107,7 +111,7 @@ func (s concurrentBackgroundFinish) FinishCall(ctx context.Context, finish gatew
 }
 
 func TestBackgroundStreamAndPollSettleConcurrentlyInOneLedgerTransaction(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer, sharer := e.member("parallel-consumer", "100"), e.member("parallel-sharer", "0")
 	releaseBodies, releaseSettlement := make(chan struct{}), make(chan struct{})
 	var bodyOnce, settlementOnce sync.Once
@@ -130,7 +134,10 @@ func TestBackgroundStreamAndPollSettleConcurrentlyInOneLedgerTransaction(t *test
 			io.WriteString(w, final)
 		}
 	})
-	e.createChannel(sharer, channelSpec{name: "parallel-background", upstream: upstream})
+	channelID := e.createChannel(sharer, channelSpec{name: "parallel-background", upstream: upstream})
+	e.declareGroupedCapabilities(channelID,
+		"upstream_protocol/openai-responses.background/background_create",
+		"upstream_protocol/openai-responses.state/owned_response_retrieve_input_items_delete")
 	_, secret := e.defaultKey(consumer)
 	finishEntered := make(chan struct{}, 2)
 	e.engine.Store = concurrentBackgroundFinish{Store: e.engine.Store, entered: finishEntered, release: releaseSettlement}
@@ -226,7 +233,7 @@ func (*backgroundCredentialQueries) TraceQueryEnd(context.Context, *pgx.Conn, pg
 }
 
 func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer, sharer := e.member("history-consumer", "100"), e.member("history-sharer", "0")
 	upstream := newUpstream(t, func(http.ResponseWriter, *http.Request, []byte) {})
 	channelID := e.createChannel(sharer, channelSpec{name: "historical", upstream: upstream})
@@ -305,14 +312,9 @@ func TestBackgroundHistoricalCredentialsAreVerifiedAcrossPages(t *testing.T) {
 }
 
 func TestServiceTierPricesFreezeAtCallStartAndRegionRemainsObservation(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	ctx := context.Background()
 	consumer, sharer := e.member("region-consumer", "100"), e.member("region-sharer", "0")
-	tiers := []ledger.PriceTier{{Name: "priority us", ServiceTier: "anthropic:priority", InputPrice: mustAmount(t, "1"), OutputPrice: mustAmount(t, "2")}}
-	saved, err := e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &tiers})
-	if err != nil || len(saved.PriceTiers) != 1 || saved.PriceTiers[0].ServiceTier != "anthropic:priority" {
-		t.Fatalf("save=%+v %v", saved, err)
-	}
 	entered, release := make(chan struct{}), make(chan struct{})
 	upstream := newUpstream(t, func(w http.ResponseWriter, _ *http.Request, _ []byte) {
 		close(entered)
@@ -320,7 +322,13 @@ func TestServiceTierPricesFreezeAtCallStartAndRegionRemainsObservation(t *testin
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `{"usage":{"input_tokens":1000,"output_tokens":500,"service_tier":"priority","inference_geo":"us","server_tool_use":{"web_search_requests":2}}}`)
 	})
-	e.createChannel(sharer, channelSpec{name: "regional", upstream: upstream, multiplier: "1"})
+	channelID := e.createChannel(sharer, channelSpec{name: "regional", upstream: upstream, multiplier: "1"})
+	saved := e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) {
+		q.Tiers = []market.Tier{{Name: "priority us", Conditions: market.Conditions{ServiceTier: "anthropic:priority"}, Prices: market.TokenPrices{Input: mustAmount(t, "1"), Output: mustAmount(t, "2")}}}
+	})
+	if len(saved.Tiers) != 1 || saved.Tiers[0].Conditions.ServiceTier != "anthropic:priority" {
+		t.Fatal("tier quote lost", saved)
+	}
 	_, secret := e.defaultKey(consumer)
 	done := make(chan string, 1)
 	go func() {
@@ -338,11 +346,8 @@ func TestServiceTierPricesFreezeAtCallStartAndRegionRemainsObservation(t *testin
 		close(release)
 		t.Fatal("upstream was not reached")
 	}
-	_, err = e.catalog.Update(ctx, e.admin.id, "gpt-test", catalog.ModelPatch{PriceTiers: &[]ledger.PriceTier{}})
+	e.reviseGroupedQuote(channelID, "gpt-test", func(q *market.Quote) { q.Tiers = nil })
 	close(release)
-	if err != nil {
-		t.Fatal(err)
-	}
 	id := <-done
 	row := e.callRow(id)
 	if !row.HasLedgerTx || row.CostNano != mustAmount(t, "0.002").Nano() {

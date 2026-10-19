@@ -54,7 +54,6 @@ type backgroundMetadata struct {
 	Key                  KeyAuth
 	Candidate            Candidate
 	Model                catalog.Model
-	Submodels            []catalog.Model
 	Settings             settings.Settings
 	Requested            string
 	ModelID              string
@@ -134,7 +133,7 @@ func (e *Engine) keepBackground(call *callState, model catalog.Model, candidate 
 	if e.Jobs == nil || !responseIDPattern.MatchString(id) {
 		return errors.New("invalid background response metadata")
 	}
-	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Submodels: call.submodels, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
+	metadata := backgroundMetadata{RequestedServiceTier: call.requestedServiceTier, Mode: call.mode, Source: call.source, Started: call.started, Key: call.key, Candidate: candidate, Model: model, Settings: defaults, Requested: call.requested, ModelID: call.modelID, Stream: call.stream, Attempts: call.attempts, Diagnostics: call.diagnostics, Hints: call.hints, Location: call.authLocation, Headers: call.upstreamHeaders}
 	defer func() {
 		if saveErr == nil {
 			return
@@ -224,7 +223,7 @@ func (e *Engine) pollBackgroundJob(ctx context.Context, job BackgroundJob) {
 		e.Logger.Error("gateway: invalid task metadata", "request_id", job.CallID)
 		return
 	}
-	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, submodels: metadata.Submodels, polling: true, pending: true}
+	call := &callState{requestedServiceTier: metadata.RequestedServiceTier, mode: metadata.Mode, source: metadata.Source, id: job.CallID, started: metadata.Started, key: metadata.Key, format: channel.FormatOpenAIResponses, stream: metadata.Stream, requested: metadata.Requested, modelID: metadata.ModelID, attempts: metadata.Attempts, diagnostics: metadata.Diagnostics, hints: metadata.Hints, polling: true, pending: true}
 	if e.Resources != nil && metadata.Candidate.GroupID != "" {
 		// The durable background registration is a trusted producer chain and
 		// can finish a failed initial ownership write without replaying creation.
@@ -386,10 +385,28 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 		WriteError(w, DialectOf(r), 500, "internal_error", "读取响应失败", "")
 		return
 	}
+	e.serveResponseJob(w, r, key, id, cancel, job, nil)
+}
+
+func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key KeyAuth, id string, cancel bool, job BackgroundJob, owned *resourcestate.Record) {
 	var metadata backgroundMetadata
 	if json.Unmarshal(job.Metadata, &metadata) != nil {
 		WriteError(w, DialectOf(r), 500, "internal_error", "读取响应失败", "")
 		return
+	}
+	if owned != nil {
+		if job.CallID != owned.CreationID || job.ResponseID != id || job.ChannelID != metadata.Candidate.ChannelID || metadata.Key.OwnerID != key.OwnerID || metadata.Key.KeyID != key.KeyID || metadata.ModelID != owned.ModelID || !resourceMatch(metadata.Candidate, owned) || !metadata.Candidate.ValidOffering(metadata.ModelID) {
+			WriteError(w, DialectOf(r), 404, "resource_unavailable", "资源不存在、归属冲突或已不可用", "")
+			return
+		}
+		endpoint := "responses.get"
+		if cancel {
+			endpoint = "responses.cancel"
+		}
+		if !supportsAll(metadata.Candidate, endpointRequirement(endpoint)) {
+			WriteError(w, DialectOf(r), 503, "required_capability_evidence_missing", "原任务缺少所需操作的支持证据", "")
+			return
+		}
 	}
 	if len(key.AllowedModels) > 0 && !containsString(key.AllowedModels, metadata.ModelID) {
 		WriteError(w, DialectOf(r), 403, "model_not_allowed", "该 API Key 不允许使用此模型", "")
@@ -427,12 +444,22 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	}
 	ctx, stop := context.WithTimeout(r.Context(), e.CallTimeLimit)
 	defer stop()
-	timeouts := resolveTimeouts(metadata.Settings, routing.Pref{}).withChannel(metadata.Candidate.Advanced)
-	var timer *time.Timer
-	if timeouts.ttft > 0 {
-		timer = time.AfterFunc(timeouts.ttft, stop)
-		defer timer.Stop()
+	timeouts := frozenBackgroundTimeouts(metadata)
+	stream := r.URL.Query().Get("stream") == "true"
+	var firstByte, total, idle *time.Timer
+	if stream && timeouts.ttft > 0 {
+		firstByte = time.AfterFunc(timeouts.ttft, stop)
 	}
+	if !stream && timeouts.request > 0 {
+		total = time.AfterFunc(timeouts.request, stop)
+	}
+	defer func() {
+		for _, timer := range []*time.Timer{firstByte, total, idle} {
+			if timer != nil {
+				timer.Stop()
+			}
+		}
+	}()
 	response, secret, err := e.backgroundExchange(ctx, metadata, id, method, operation, r.URL.RawQuery, body)
 	if err != nil {
 		var limitErr *http.MaxBytesError
@@ -445,8 +472,39 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		// Error bodies use the non-streaming request bound after headers, like
+		// ordinary inference. They cannot consume an unbounded stream read.
+		if firstByte != nil {
+			firstByte.Stop()
+		}
+		if stream && timeouts.request > 0 {
+			total = time.AfterFunc(timeouts.request, stop)
+		}
+
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, maxFailureBody))
 		newUpstreamFailure(response, payload, secret).write(w, job.CallID)
+		return
+	}
+	// Headers are not a first response byte. Track every actual body read,
+	// including bounded JSON buffering, with the same timeout stages as inference.
+	response.Body = backgroundReadBody{ReadCloser: response.Body, ctx: ctx, read: func() {
+		if firstByte != nil {
+			firstByte.Stop()
+			firstByte = nil
+		}
+		if stream && timeouts.idle > 0 {
+			if idle == nil {
+				idle = time.AfterFunc(timeouts.idle, stop)
+			} else {
+				idle.Reset(timeouts.idle)
+			}
+		}
+	}}
+	if owned != nil {
+		err := e.forwardBackgroundResource(w, r, response, key, metadata, job, owned, cancel)
+		if err != nil {
+			WriteError(w, DialectOf(r), 502, "upstream_failed", "读取上游响应失败", job.CallID)
+		}
 		return
 	}
 	for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
@@ -454,23 +512,11 @@ func (e *Engine) ServeResponse(w http.ResponseWriter, r *http.Request, cancel bo
 	}
 	w.Header().Set("X-AIHub-Request-Id", job.CallID)
 	w.WriteHeader(response.StatusCode)
-	if timer != nil {
-		timer.Stop()
-	}
-	if timeouts.idle > 0 && r.URL.Query().Get("stream") == "true" {
-		timer = time.AfterFunc(timeouts.idle, stop)
-		defer timer.Stop()
-	} else {
-		timer = nil
-	}
 	buffer := getChunk()
 	defer putChunk(buffer)
 	for {
 		n, readErr := response.Body.Read(*buffer)
 		if n > 0 {
-			if timer != nil {
-				timer.Reset(timeouts.idle)
-			}
 			_ = http.NewResponseController(w).SetWriteDeadline(e.Now().Add(clientWriteLimit))
 			if _, err := w.Write((*buffer)[:n]); err != nil {
 				return

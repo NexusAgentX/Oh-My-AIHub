@@ -13,6 +13,10 @@ func terminal(state string) bool {
 	return slices.Contains([]string{"pass", "partial", "fail", "unsupported", "inconclusive"}, state)
 }
 
+func allowsUnsentAttempt(reason string) bool {
+	return slices.Contains([]string{"external_error", "network_error", "timeout", "prerequisite_failed", "body_limit"}, reason)
+}
+
 // ValidateResult checks independent assertions and real request witnesses. It
 // never accepts skipped/untested/cancelled as a terminal capability conclusion.
 // Dependency failures may be inconclusive only with an actual prerequisite
@@ -38,7 +42,7 @@ func ValidateResult(item Planned, result Result, witnesses map[string]Attempt) e
 		}
 		for _, id := range a.AttemptIDs {
 			attempt, ok := witnesses[id]
-			if !ok || (!attempt.Sent && a.Reason != "external_error" && a.Reason != "network_error" && a.Reason != "timeout" && a.Reason != "prerequisite_failed" && a.Reason != "body_limit") {
+			if !ok || !attempt.Sent && !allowsUnsentAttempt(a.Reason) {
 				return ErrInvalid
 			}
 		}

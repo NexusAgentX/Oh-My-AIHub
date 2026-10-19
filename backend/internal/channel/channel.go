@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"context"
 	"errors"
 	"regexp"
 	"slices"
@@ -9,20 +8,9 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-var (
-	ErrNotFound = errors.New("channel not found")
-	ErrConflict = errors.New("channel state conflict")
-	// ErrSuspended rejects owner changes of a channel an administrator took down.
-	ErrSuspended    = errors.New("channel is suspended")
-	ErrGroupManaged = errors.New("channel is managed through a supplier group")
-	// ErrModelNameTaken rejects a custom model whose name is in the catalog.
-	ErrModelNameTaken = errors.New("custom model name is a catalog model")
-)
+var ErrNotFound = errors.New("channel not found")
 
 type Status string
 
@@ -36,9 +24,6 @@ const (
 var Formats = []Format{FormatOpenAIChat, FormatOpenAIResponses, FormatAnthropic, FormatGemini}
 
 func (f Format) Valid() bool { return slices.Contains(Formats, f) }
-
-// MaxModels bounds the models one channel can carry.
-const MaxModels = 200
 
 type HeaderSet struct {
 	Name  string
@@ -75,81 +60,10 @@ type FormatTest struct {
 	TestedAt   time.Time `json:"tested_at"`
 }
 
-// CustomPrices are the four per-million-token point prices of a custom model
-// (ADR-0034); they are charged as is, without multiplier, exchange rate or
-// tiers.
-type CustomPrices struct {
-	Input      money.Amount
-	Output     money.Amount
-	CacheWrite money.Amount
-	CacheRead  money.Amount
-}
-
-// Blended is the 3:1 input/output blend that orders channels of a custom
-// model by price (cheapest first and the lowest reference price, ADR-0034);
-// cache prices do not count.
-func (p CustomPrices) Blended() float64 {
-	return (3*float64(p.Input.Nano()) + float64(p.Output.Nano())) / 4
-}
-
-// Model is the catalog-shaped model a channel bills for a custom model: the
-// four prices in points without tiers or fine-grained prices.
-func (p CustomPrices) Model(id string) catalog.Model {
-	return catalog.Model{
-		ID: id, DisplayName: id, PriceCurrency: "CNY", Enabled: true,
-		InputModalities: []string{"text"}, OutputModalities: []string{"text"},
-		InputPrice: p.Input, OutputPrice: p.Output, CacheWritePrice: p.CacheWrite, CacheReadPrice: p.CacheRead,
-	}
-}
-
-// Model is one model offered by a channel: the upstream name it maps to, the
-// price multiplier and the formats the upstream actually serves. A model with
-// Custom prices is not in the catalog (ADR-0034).
-type Model struct {
-	ModelID        string
-	UpstreamModel  string
-	MultiplierNano int64
-	// FXDiscount sells a USD model at "USD price × multiplier" points without
-	// the exchange rate (ledger.ChannelRate); CNY models ignore it.
-	FXDiscount  bool
-	Formats     []Format
-	FormatTests map[Format]FormatTest
-	Enabled     bool
-	Custom      *CustomPrices
-	// PendingMultiplier marks a former custom model that the catalog now
-	// lists: it stays disabled until the owner enables it with a multiplier.
-	PendingMultiplier bool
-}
-
 type Owner struct {
 	ID          string
 	Username    string
 	DisplayName string
-}
-
-// Today is the channel's revenue and success statistics since local midnight
-// (Asia/Shanghai).
-type Today struct {
-	Revenue     money.Amount
-	Calls       int64
-	SuccessRate *float64
-}
-
-type Channel struct {
-	GroupID         *string
-	ID              string
-	Owner           Owner
-	Name            string
-	Summary         string
-	Description     string
-	BaseURL         string
-	Status          Status
-	SuspendedReason *string
-	Advanced        Advanced
-	Models          []Model
-	Today           Today
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
 }
 
 type Event struct {
@@ -179,67 +93,6 @@ const (
 )
 
 // NewChannel is a validated creation request.
-type NewChannel struct {
-	ID          string
-	OwnerID     string
-	Name        string
-	Summary     string
-	Description string
-	BaseURL     string
-	Credential  EncryptedCredential
-	Status      Status
-	Advanced    Advanced
-	Models      []Model
-}
-
-// Update changes the given fields; nil fields stay unchanged. Advanced and
-// Models replace the whole block.
-type Update struct {
-	Name        *string
-	Summary     *string
-	Description *string
-	BaseURL     *string
-	Credential  *EncryptedCredential
-	Status      *Status
-	Advanced    *Advanced
-	Models      *[]Model
-}
-
-type AdminFilter struct {
-	Query    string
-	Status   Status
-	OwnerID  string
-	AfterKey string // created_at/id cursor of the previous page
-	Limit    int
-}
-
-// TestOutcome is the result of one model × format probe.
-type TestOutcome struct {
-	ModelID    string
-	Format     Format
-	OK         bool
-	StatusCode *int
-	Error      *string
-	DurationMS int
-}
-
-type Store interface {
-	Create(ctx context.Context, channel NewChannel) (Channel, error)
-	Get(ctx context.Context, id string) (Channel, error)
-	ListByOwner(ctx context.Context, ownerID string) ([]Channel, error)
-	ListAll(ctx context.Context, filter AdminFilter) ([]Channel, error)
-	Update(ctx context.Context, id string, update Update) (Channel, error)
-	SoftDelete(ctx context.Context, id string) error
-	Credential(ctx context.Context, id string) (EncryptedCredential, error)
-	Events(ctx context.Context, id string, limit int) ([]Event, error)
-	RecordEvent(ctx context.Context, id, kind, reason string) error
-	// SaveTests stores the probe results in format_tests and, when apply is
-	// set, rewrites the tested formats of each model to the passing ones.
-	SaveTests(ctx context.Context, id string, results []TestOutcome, testedAt time.Time, apply bool) (Channel, error)
-	Suspend(ctx context.Context, actorID, id, reason string) (Channel, error)
-	Unsuspend(ctx context.Context, actorID, id, reason string) (Channel, error)
-}
-
 var (
 	headerNamePattern = regexp.MustCompile("^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,64}$")
 
@@ -292,67 +145,4 @@ func ValidateAdvanced(advanced Advanced) error {
 		return ErrInvalidInput
 	}
 	return nil
-}
-
-// MaxMultiplierNano is the 1000x ceiling of the database constraint.
-const MaxMultiplierNano int64 = 1000 * money.Scale
-
-// NormalizeModels trims and validates the offered models. known reports
-// whether a model ID exists in the catalog: official models must, custom
-// models must not.
-func NormalizeModels(models []Model, known func(string) bool) ([]Model, error) {
-	if len(models) == 0 || len(models) > MaxModels {
-		return nil, ErrInvalidInput
-	}
-	seen := map[string]bool{}
-	result := make([]Model, 0, len(models))
-	for _, model := range models {
-		model.ModelID = strings.TrimSpace(model.ModelID)
-		model.UpstreamModel = strings.TrimSpace(model.UpstreamModel)
-		if model.UpstreamModel == "" {
-			model.UpstreamModel = model.ModelID
-		}
-		if model.ModelID == "" || seen[model.ModelID] ||
-			utf8.RuneCountInString(model.UpstreamModel) > 256 || hasControl(model.UpstreamModel) ||
-			model.MultiplierNano < 0 || model.MultiplierNano > MaxMultiplierNano {
-			return nil, ErrInvalidInput
-		}
-		if model.Custom != nil {
-			prices := *model.Custom
-			if known(model.ModelID) {
-				return nil, ErrModelNameTaken
-			}
-			if !catalog.ValidModelID(model.ModelID) || !catalog.ValidPrice(prices.Input) || !catalog.ValidPrice(prices.Output) ||
-				!catalog.ValidPrice(prices.CacheWrite) || !catalog.ValidPrice(prices.CacheRead) {
-				return nil, ErrInvalidInput
-			}
-			model.Custom = &prices
-			model.MultiplierNano, model.FXDiscount, model.PendingMultiplier = money.Scale, false, false
-		} else if !known(model.ModelID) {
-			return nil, ErrInvalidInput
-		}
-		seen[model.ModelID] = true
-		formats := make([]Format, 0, len(model.Formats))
-		for _, format := range Formats {
-			if slices.Contains(model.Formats, format) {
-				formats = append(formats, format)
-			}
-		}
-		if len(formats) == 0 || len(formats) != len(uniqueFormats(model.Formats)) {
-			return nil, ErrInvalidInput
-		}
-		model.Formats = formats
-		result = append(result, model)
-	}
-	return result, nil
-}
-
-func uniqueFormats(formats []Format) []Format {
-	var result []Format
-	for _, format := range formats {
-		if !slices.Contains(result, format) {
-			result = append(result, format)
-		}
-	}
-	return result
 }

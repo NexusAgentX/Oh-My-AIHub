@@ -6,64 +6,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 )
 
 const browseTestChannelID = "00000000-0000-4000-8000-0000000000f1"
-
-type oneOnlineChannel struct{ gateway.Browse }
-
-func (oneOnlineChannel) OnlineChannels(context.Context) ([]gateway.OnlineChannel, error) {
-	return []gateway.OnlineChannel{{ModelID: "deepseek-chat", ChannelID: browseTestChannelID, ChannelName: "渠道一", OwnerID: "00000000-0000-4000-8000-0000000000f2", OwnerName: "车主", Formats: []channel.Format{channel.FormatOpenAIResponses}, MultiplierNano: 1_000_000_000}}, nil
-}
-
-type noRoutingPreferences struct{ routing.Store }
-
-func (noRoutingPreferences) Get(context.Context, string, string, string) (routing.Pref, error) {
-	return routing.Pref{}, routing.ErrNotFound
-}
 
 // The model page reads the channel statistics the gateway counts in memory:
 // attempts recorded after the page was first served show up once the engine
 // republishes them (RunRefresh does it every few seconds), and serving the page
 // never waits on a refresh.
 func TestModelPageReadsOnlyVersionedModelStatistics(t *testing.T) {
-	spec := loadOpenAPI(t)
-	store := newFakeStore()
-	policy, err := channel.NewOutboundPolicy(nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	book := gateway.NewStatsBook()
-	engine := gateway.NewEngine(gateway.Dependencies{Settings: settings.NewService(store), Outbound: policy, StatsBook: book})
-	identityService, err := identitytest.NewService(store, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := NewHandler(Dependencies{
-		Identity: identityService, Catalog: catalog.NewService(store), Ledger: ledger.NewService(store),
-		Settings: settings.NewService(store), Audit: audit.NewService(store), CookieSecure: true,
-		Gateway: engine, Browse: oneOnlineChannel{}, Routing: noRoutingPreferences{},
-	})
-	admin := bootstrap(t, spec, handler)
-	admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": "deepseek-chat", "display_name": "DeepSeek Chat",
-		"base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_write": "0", "cache_read": "0.15"},
-	})
+	p, engine := marketModelFixture(t, "deepseek-chat", []groupchannel.Record{{ID: browseTestChannelID, Name: "Synthetic channel"}})
+	admin := p.admin(t)
+	book := p.stats
 
 	successRate := func() any {
-		channels := admin.expect(t, http.StatusOK, http.MethodGet, "/api/models/deepseek-chat", nil)["channels"].([]any)
+		channels := admin.expect(t, http.StatusOK, http.MethodGet, "/api/market/models/deepseek-chat", nil)["routing_channels"].([]any)
 		if len(channels) != 1 {
-			t.Fatalf("channels = %v", channels)
+			t.Fatalf("channels=%v", channels)
 		}
-		return channels[0].(map[string]any)["success_rate_24h"]
+		metrics := channels[0].(map[string]any)["routing_metrics"].([]any)
+		if len(metrics) == 0 {
+			return nil
+		}
+		if len(metrics) != 1 {
+			t.Fatalf("metric scopes=%v", metrics)
+		}
+		metric := metrics[0].(map[string]any)
+		if metric["protocol"] != "openai-responses" || metric["format"] != "openai_responses" || metric["stream"] != false {
+			t.Fatal("scope lost", metric)
+		}
+		return metric["success_rate"]
 	}
 	now := time.Now()
 	for range 3 {
@@ -77,19 +52,19 @@ func TestModelPageReadsOnlyVersionedModelStatistics(t *testing.T) {
 	if err := engine.LoadStats(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := successRate(); got != "0.750000" {
-		t.Fatalf("success rate = %v, want 0.750000", got)
+	if got := successRate(); got != float64(0.75) {
+		t.Fatalf("success rate = %v, want 0.75", got)
 	}
 
 	// Legacy channel-only observations cannot contaminate a model scope,
 	// including after the next snapshot refresh.
 	book.Record(browseTestChannelID, "deepseek-chat", false, gateway.Attempt{EndReason: gateway.EndUpstreamError}, now)
-	if got := successRate(); got != "0.750000" {
-		t.Fatalf("success rate = %v before the refresh, want the published 0.750000", got)
+	if got := successRate(); got != float64(0.75) {
+		t.Fatalf("success rate = %v before the refresh, want the published 0.75", got)
 	}
 	engine.RefreshStats()
-	if got := successRate(); got != "0.750000" {
-		t.Fatalf("success rate = %v after the refresh, want model-only 0.750000", got)
+	if got := successRate(); got != float64(0.75) {
+		t.Fatalf("success rate = %v after the refresh, want model-only 0.75", got)
 	}
 }
 

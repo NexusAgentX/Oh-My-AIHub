@@ -235,7 +235,8 @@ func startDrainRun(t *testing.T, format channel.Format, window time.Duration, fi
 	if mutate != nil {
 		mutate(run)
 	}
-	model := catalog.Model{InputPrice: money.FromNano(10_000_000_000), OutputPrice: money.FromNano(20_000_000_000)}
+	model := catalog.Model{ID: "main", InputPrice: money.FromNano(10_000_000_000), OutputPrice: money.FromNano(20_000_000_000)}
+	run.candid = quotedCandidate(t, run.candid, model)
 	// A cooldown threshold of one makes any failure counted against the channel visible.
 	defaults := settings.Settings{DefaultCooldownFailures: 1, DefaultCooldownSeconds: 60}
 	run.started = time.Now()

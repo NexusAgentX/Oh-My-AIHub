@@ -3,7 +3,6 @@ package catalog
 import (
 	"strings"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -42,22 +41,5 @@ func TestValidateModelPriceCeilingProtectsChannelPriceProjection(t *testing.T) {
 	base.InputPrice = money.FromNano(MaxPriceNanoPerMillion.Nano() + 1)
 	if err := Validate(base); err == nil {
 		t.Fatal("catalog price above the representable channel ceiling was accepted")
-	}
-}
-
-func TestModelPatchReplacesTiersOnlyWhenProvided(t *testing.T) {
-	model := Model{ID: "m", DisplayName: "M", PriceTiers: []ledger.PriceTier{validTier()}}
-	name := "Renamed"
-	patched := ModelPatch{DisplayName: &name}.Apply(model)
-	if patched.DisplayName != "Renamed" || len(patched.PriceTiers) != 1 {
-		t.Fatalf("patched = %+v", patched)
-	}
-	empty := []ledger.PriceTier{}
-	cleared := Normalize(ModelPatch{PriceTiers: &empty}.Apply(model))
-	if len(cleared.PriceTiers) != 0 {
-		t.Fatalf("tiers not replaced: %+v", cleared.PriceTiers)
-	}
-	if (ModelPatch{}).empty() != true {
-		t.Fatal("zero patch is not empty")
 	}
 }

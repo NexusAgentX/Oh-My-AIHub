@@ -159,7 +159,7 @@ func TestGroupChannelAPIInheritanceChoicesACLAndContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := &groupchannel.Service{Repository: repo, Runtime: runtime}
-	p := newPlatform(t, func(deps *Dependencies) { service.Keyring = deps.Channels.Keyring; deps.GroupChannels = service })
+	p := newPlatform(t, func(deps *Dependencies) { service.Keyring = deps.Gateway.Keyring; deps.GroupChannels = service })
 	owner, _ := p.member(t, "group-owner")
 	other, _ := p.member(t, "group-other")
 	admin := p.admin(t)

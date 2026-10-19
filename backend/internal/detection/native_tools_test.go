@@ -153,3 +153,74 @@ func TestNativeToolProfilesAndOpaqueResultAssociation(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeToolRoundTripDoesNotRequireNamedToolSelection(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		body, _ := decodeNative(raw)
+		choice := object(body["tool_choice"])
+		w.Header().Set("Content-Type", "application/json")
+		if str(choice["type"]) == "tool" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"Named selection is not supported"}}`)
+			return
+		}
+		text := "No tool selected."
+		var calls []nativeCall
+		if strings.Contains(string(raw), nativeToolResult) {
+			text = nativeToolResult
+		} else if str(choice["type"]) != "none" {
+			calls = []nativeCall{{ID: "call_a", Name: "synthetic_echo"}}
+		}
+		if body["stream"] == true {
+			w.Header().Set("Content-Type", "text/event-stream")
+			if text == nativeToolResult {
+				_, _ = io.WriteString(w, strings.ReplaceAll(messageStreamFixture(), "你好 🌍", nativeToolResult))
+				return
+			}
+			if len(list(body["tools"])) == 0 {
+				_, _ = io.WriteString(w, strings.ReplaceAll(messageStreamFixture(), "你好 🌍", nativeMarker))
+				return
+			}
+			block := nativeObject{"type": "tool_use", "id": "call_a", "name": "synthetic_echo", "input": nativeObject{}}
+			wire := typedEvent("message_start", nativeObject{"message": nativeObject{"id": "msg_fixture", "type": "message", "role": "assistant", "model": "synthetic-model", "content": []any{}, "usage": nativeObject{"input_tokens": 10, "output_tokens": 1}}}) +
+				typedEvent("content_block_start", nativeObject{"index": 0, "content_block": block}) +
+				typedEvent("content_block_delta", nativeObject{"index": 0, "delta": nativeObject{"type": "input_json_delta", "partial_json": `{"label":"violet","meta":{"ok":true},"items":[{"value":7}]}`}}) +
+				typedEvent("content_block_stop", nativeObject{"index": 0}) +
+				typedEvent("message_delta", nativeObject{"delta": nativeObject{"stop_reason": "tool_use", "stop_sequence": nil}, "usage": nativeObject{"output_tokens": 4}}) +
+				typedEvent("message_stop", nativeObject{})
+			_, _ = io.WriteString(w, wire)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("native-messages", text, calls))
+	}))
+	defer up.Close()
+	r, s, service := nativeTestSession(t, up.URL)
+	item := nativeItem(t, r, s, "native-messages.tools")
+	result := service.run(context.Background(), s, item, nil)
+	if !terminal(result.State) {
+		t.Fatal("negative named selection invalidated the scenario", result)
+	}
+	for _, a := range result.Assertions {
+		switch item.AssertionLabels[a.ID] {
+		case "named_tool":
+			if a.State == "pass" {
+				t.Fatal("named selection rejection was hidden", a)
+			}
+		case "call_result_association", "strict_schema", "parallel_tool_calls_false", "parallel_tool_calls_true":
+			if a.State != "pass" {
+				t.Fatal("independent tool capability depended on named selection", item.AssertionLabels[a.ID], a)
+			}
+		}
+	}
+	streamItem := nativeItem(t, r, s, "native-messages.stream")
+	streamResult := service.run(context.Background(), s, streamItem, nil)
+	if !terminal(streamResult.State) {
+		t.Fatal("streaming scenario was invalid", streamResult)
+	}
+	for _, a := range streamResult.Assertions {
+		if streamItem.AssertionLabels[a.ID] == "tool_lifecycle_when_applicable" && a.State != "pass" {
+			t.Fatal("tool streaming depended on named selection", a)
+		}
+	}
+}

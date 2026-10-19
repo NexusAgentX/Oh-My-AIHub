@@ -61,6 +61,7 @@ type Key struct {
 	Prefix        string
 	Status        Status
 	IsDefault     bool
+	CodexNotes    bool
 	ExpiresAt     *time.Time
 	AllowedModels []string
 	BudgetDaily   *money.Amount
@@ -87,6 +88,7 @@ type Sealed struct {
 
 // Settings are the user-editable fields.
 type Settings struct {
+	CodexNotes    bool
 	Status        Status
 	ExpiresAt     *time.Time
 	AllowedModels []string
@@ -99,6 +101,7 @@ type Settings struct {
 // Update changes the given fields; for the nullable ones a non-nil outer
 // pointer with a nil inner value clears the field.
 type Update struct {
+	CodexNotes    *bool
 	Name          *string
 	Status        *Status
 	ExpiresAt     **time.Time
@@ -110,7 +113,7 @@ type Update struct {
 }
 
 func (u Update) Empty() bool {
-	return u.Name == nil && u.Status == nil && u.ExpiresAt == nil && u.AllowedModels == nil &&
+	return u.CodexNotes == nil && u.Name == nil && u.Status == nil && u.ExpiresAt == nil && u.AllowedModels == nil &&
 		u.BudgetDaily == nil && u.BudgetMonthly == nil && u.BudgetTotal == nil && u.ModelAliases == nil
 }
 
@@ -161,7 +164,8 @@ type Service struct {
 	models  func(context.Context) ([]string, error)
 }
 
-// NewService wires the key service; models returns every catalog model ID.
+// NewService wires the key service; models returns approved model IDs from the
+// current market aggregate, including offline offerings.
 func NewService(store Store, keyring *channel.Keyring, models func(context.Context) ([]string, error)) *Service {
 	return &Service{store: store, keyring: keyring, models: models}
 }
@@ -210,6 +214,13 @@ func (s *Service) known(ctx context.Context) (map[string]bool, error) {
 func validBudget(value *money.Amount) bool { return value == nil || *value > 0 }
 
 func (s *Service) validateSettings(ctx context.Context, settings *Settings) error {
+	return s.validateSettingsWithExisting(ctx, settings, nil)
+}
+
+// Existing ID restrictions and exact alias mappings survive directory removal.
+// Only their unchanged entries may be retained; new IDs/targets still require
+// a current approved offering. This never makes an unknown model callable.
+func (s *Service) validateSettingsWithExisting(ctx context.Context, settings *Settings, existing *Key) error {
 	if settings.Status != StatusEnabled && settings.Status != StatusDisabled {
 		return ErrInvalidInput
 	}
@@ -223,7 +234,7 @@ func (s *Service) validateSettings(ctx context.Context, settings *Settings) erro
 	allowed := make([]string, 0, len(settings.AllowedModels))
 	for _, id := range settings.AllowedModels {
 		id = strings.TrimSpace(id)
-		if !known[id] {
+		if !known[id] && (existing == nil || !slices.Contains(existing.AllowedModels, id)) {
 			return ErrInvalidInput
 		}
 		if !slices.Contains(allowed, id) {
@@ -238,7 +249,7 @@ func (s *Service) validateSettings(ctx context.Context, settings *Settings) erro
 	aliases := make(map[string]string, len(settings.ModelAliases))
 	for alias, target := range settings.ModelAliases {
 		alias, target = strings.TrimSpace(alias), strings.TrimSpace(target)
-		if !aliasPattern.MatchString(alias) || !known[target] {
+		if !aliasPattern.MatchString(alias) || !known[target] && (existing == nil || existing.ModelAliases[alias] != target || target == "") {
 			return ErrInvalidInput
 		}
 		aliases[alias] = target
@@ -312,7 +323,11 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, update Update)
 		if update.ModelAliases != nil {
 			settings.ModelAliases = *update.ModelAliases
 		}
-		if err := s.validateSettings(ctx, &settings); err != nil {
+		existing, err := s.store.Get(ctx, ownerID, id)
+		if err != nil {
+			return Key{}, err
+		}
+		if err := s.validateSettingsWithExisting(ctx, &settings, &existing); err != nil {
 			return Key{}, err
 		}
 		if update.AllowedModels != nil {

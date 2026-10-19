@@ -1,4 +1,4 @@
-import type { ModelChannel, RoutingMode, RoutingPreference, RoutingPreferenceInput } from '../api/types'
+import type { ModelRoutingChannel, RoutingMode, RoutingPreference, RoutingPreferenceInput } from '../api/types'
 
 /** 路由编辑器的本地草稿。order 只在手动模式下提交。 */
 export type RoutingDraft = {
@@ -15,7 +15,7 @@ export type RoutingDraft = {
  * 从已保存的偏好生成草稿：order 去掉已不存在的渠道，并把新渠道追加到末尾；
  * 手动模式下新上架的渠道默认不勾选。
  */
-export function draftFromPreference(preference: RoutingPreference, channels: Pick<ModelChannel,'id'>[]): RoutingDraft {
+export function draftFromPreference(preference: RoutingPreference, channels: Pick<ModelRoutingChannel,'id'>[]): RoutingDraft {
   const ids = channels.map((channel) => channel.id)
   const known = preference.order.filter((id) => ids.includes(id))
   const added = ids.filter((id) => !known.includes(id))
@@ -33,7 +33,7 @@ export function draftFromPreference(preference: RoutingPreference, channels: Pic
 }
 
 /** 编辑器中的渠道顺序：手动模式按 order，其余模式保持服务端顺序。 */
-export function orderedChannels<T extends Pick<ModelChannel,'id'>>(channels: T[], draft: RoutingDraft) {
+export function orderedChannels<T extends Pick<ModelRoutingChannel,'id'>>(channels: T[], draft: RoutingDraft) {
   if (draft.mode !== 'manual') return channels
   const position = new Map(draft.order.map((id, index) => [id, index]))
   return channels
@@ -65,7 +65,7 @@ export function setUsed(draft: RoutingDraft, id: string, used: boolean): Routing
   return { ...draft, excluded }
 }
 
-export function changeMode(draft: RoutingDraft, mode: RoutingMode, channels: Pick<ModelChannel,'id'>[]): RoutingDraft {
+export function changeMode(draft: RoutingDraft, mode: RoutingMode, channels: Pick<ModelRoutingChannel,'id'>[]): RoutingDraft {
   if (mode !== 'manual' || draft.order.length > 0) return { ...draft, mode }
   return { ...draft, mode, order: channels.map((channel) => channel.id) }
 }
@@ -91,7 +91,7 @@ export function advancedChanged(draft: RoutingDraft) {
   return [draft.max_attempts, draft.ttft_timeout_ms, draft.idle_timeout_ms, draft.request_timeout_ms].filter((value) => value !== null).length
 }
 
-export function channelStateLabel(channel: Pick<ModelChannel,'state'|'cooldown_remaining_seconds'>) {
+export function channelStateLabel(channel: Pick<ModelRoutingChannel,'state'|'cooldown_remaining_seconds'>) {
   if (channel.state === 'cooldown') {
     const minutes = Math.max(1, Math.ceil((channel.cooldown_remaining_seconds ?? 60) / 60))
     return { label: `冷却中 ${minutes} 分钟`, tone: 'warning' as const }

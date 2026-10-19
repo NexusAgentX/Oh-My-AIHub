@@ -30,6 +30,7 @@ type ApiKey struct {
 	DeletedAt         *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	CodexNotes        bool
 }
 
 type RoutePrefChannel struct {

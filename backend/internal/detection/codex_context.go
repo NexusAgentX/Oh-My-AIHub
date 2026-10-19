@@ -42,31 +42,33 @@ func (n *nativeScene) codexContextArguments(ctx context.Context, model, session,
 }
 
 func (n *nativeScene) codexContextArgumentsFor(ctx context.Context, model, session, namespace, operation string, desired nativeObject) (nativeObject, nativeOutcome) {
-	properties, required := nativeObject{}, []any{}
-	for name := range desired {
-		property := nativeObject{"type": "string"}
-		if name == "text" || name == "query" {
-			property["encrypted"] = true
-		}
-		properties[name], required = property, append(required, name)
+	parameters := codexContextArgumentSchema(namespace, operation)
+	if parameters == nil {
+		return nil, nativeOutcome{State: "inconclusive", Reason: "detector_error"}
 	}
-	slices.SortFunc(required, func(a, b any) int { return strings.Compare(str(a), str(b)) })
 	body := codexBase(model)
-	body["client_metadata"] = nativeObject{"session_id": session}
+	if _, err := n.codexContextInitialize(body, model, session); err != nil {
+		return nil, nativeOutcome{State: "inconclusive", Reason: "detector_error"}
+	}
 	body["input"] = []any{nativeObject{"role": "user", "content": "Call only " + namespace + "." + operation + " on this isolated synthetic context, using these exact values. Preserve the required encrypted argument representation. Do not invent a result: " + string(mustNativeJSON(desired))}}
-	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "parameters": nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}}}}}
+	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "description": "Isolated synthetic context tools.", "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "strict": false, "parameters": parameters}}}}
 	body["tool_choice"] = "required"
 	out := n.codexInfer(ctx, body, "")
 	if out.State != "pass" || len(out.Reply.Candidates) != 1 || len(out.Reply.Candidates[0].Calls) != 1 {
 		return nil, out
 	}
 	call := out.Reply.Candidates[0].Calls[0]
-	if call.Namespace != namespace || call.Name != operation || call.ID == "" || len(call.Arguments) != len(desired) {
+	if call.Namespace != namespace || call.Name != operation || call.ID == "" || len(call.Arguments) > len(object(parameters["properties"])) {
 		return nil, out
 	}
 	for name, value := range desired {
 		actual := str(call.Arguments[name])
 		if actual == "" || len(actual) > 64<<10 || ((name != "query" && name != "text") && actual != str(value)) {
+			return nil, out
+		}
+	}
+	for name, value := range call.Arguments {
+		if _, exists := desired[name]; !exists && !codexContextOptionalArgument(name, value, object(parameters["properties"])) {
 			return nil, out
 		}
 	}
@@ -220,6 +222,11 @@ func (n *nativeScene) codexNotes(ctx context.Context) {
 	reopened := n.codexContextCall(ctx, session, "notes", "read_file", readArgs)
 	reopenText := n.codexContextText(ctx, model, session, "notes", "read_file", "Return only the full actual note text, without labels or formatting.", readArgs, reopened)
 	n.linkedCheck("reopen_session", reopened, reopenText, valid && contentMatches(reopenText, marker+"\n"+appended) && nativeEndedNormally(reopenText.Reply))
+	initialized := n.codexFreshContext(ctx, model, other)
+	if initialized.State != "pass" || !nativeEndedNormally(initialized.Reply) {
+		n.check("context_isolation", initialized, false)
+		return
+	}
 	foreign := n.codexContextCall(ctx, other, "notes", "read_file", readArgs)
 	foreignText := n.codexContextText(ctx, model, other, "notes", "read_file", "Return only the full actual note text, without labels or formatting.", readArgs, foreign)
 	denied := foreign.Response.Status == http.StatusNotFound && nativeError(n.protocol, foreign.Reply.Object)

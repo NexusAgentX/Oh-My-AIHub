@@ -13,6 +13,103 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
+func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
+	for _, namespace := range []string{"notes", "history"} {
+		t.Run(namespace, func(t *testing.T) {
+			requests := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests++
+				raw, _ := io.ReadAll(r.Body)
+				body, _ := decodeNative(raw)
+				metadata := object(body["client_metadata"])
+				if r.Header.Get("Session-Id") != "synthetic-session" || r.Header.Get("Thread-Id") != "synthetic-session" || r.Header.Get("Originator") != "aihub-codex-probe" || r.Header.Get("Version") != "0.163.0" || r.Header.Get("X-Codex-Beta-Features") != "remote_compaction_v2" {
+					t.Error("context initialization omitted the pinned client headers")
+				}
+				if requests == 1 {
+					turn, err := decodeNative([]byte(str(metadata["x-codex-turn-metadata"])))
+					if err != nil || turn["history_initialization"] != "new" || turn["history_ingest_requested"] != true || turn["request_kind"] != "turn" || turn["model"] != "synthetic-model" || turn["agent_name"] != "/root" || str(turn["installation_id"]) == "" || str(turn["turn_id"]) == "" || turn["turn_id"] != turn["root_turn_id"] || str(turn["context_window_id"]) == "" || str(turn["window_id"]) != "synthetic-session:0" || metadata["x-codex-window-id"] != turn["window_id"] || str(metadata["x-codex-turn-metadata"]) != r.Header.Get("X-Codex-Turn-Metadata") || r.Header.Get("X-Codex-Window-Id") != "synthetic-session:0" {
+						t.Error("synthetic context used incomplete turn initialization")
+					}
+				} else if metadata["x-codex-turn-metadata"] != nil || r.Header.Get("X-Codex-Turn-Metadata") != "" {
+					t.Error("a later tool request overwrote the known seeded history")
+				}
+				tools := list(body["tools"])
+				if len(tools) != 1 || str(object(tools[0])["description"]) == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"Missing required parameter: tools[0].description"}}`)
+					return
+				}
+				parameters := object(object(list(object(tools[0])["tools"])[0])["parameters"])
+				if object(list(object(tools[0])["tools"])[0])["strict"] != false {
+					t.Error("reserved context tool must preserve the pinned non-strict mode")
+				}
+				properties := object(parameters["properties"])
+				for _, raw := range object(parameters["properties"]) {
+					if _, leaked := object(raw)["minimum"]; leaked {
+						t.Error("raw-source minimum leaked into the pinned CLI wire schema")
+					}
+				}
+				filter, count := "path_prefix", 5
+				if namespace == "history" {
+					filter, count = "window_id", 8
+				}
+				if len(properties) != count || len(list(object(properties[filter])["anyOf"])) != 2 || len(list(parameters["required"])) != 1 || list(parameters["required"])[0] != "query" {
+					t.Error("reserved search tool schema lost optional nullable fields")
+				}
+				out := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-context-call", Name: "search_contents", Namespace: namespace}})
+				args := nativeObject{"query": "sealed:synthetic-query", "max_files": 2, "recent_file_first": true}
+				if namespace == "history" {
+					args = nativeObject{"query": "sealed:synthetic-query", "limit": 2, "recent_first": true, "agent_name": nil}
+				}
+				object(list(out["output"])[0])["arguments"] = string(mustNativeJSON(args))
+				_ = json.NewEncoder(w).Encode(out)
+			}))
+			defer up.Close()
+			_, s, _ := codexTestSession(t, up.URL)
+			s.allowed = map[string]bool{"codex.responses": true}
+			n := nativeScene{s: s, protocol: "openai-responses"}
+			for range 2 {
+				args, out := n.codexContextArgumentsFor(context.Background(), "synthetic-model", "synthetic-session", namespace, "search_contents", nativeObject{"query": "synthetic-query"})
+				if out.State != "pass" || str(args["query"]) != "sealed:synthetic-query" {
+					t.Fatal("malformed namespace declaration prevented the real context probe", out.State, out.Reason)
+				}
+			}
+		})
+	}
+}
+
+func TestCodexReservedWritesUseThePinnedCompleteSchema(t *testing.T) {
+	for _, operation := range []string{"write_file", "append_to_file"} {
+		t.Run(operation, func(t *testing.T) {
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				body, _ := decodeNative(raw)
+				tool := object(list(object(list(body["tools"])[0])["tools"])[0])
+				parameters := object(tool["parameters"])
+				properties := object(parameters["properties"])
+				required := list(parameters["required"])
+				_, extra := parameters["additionalProperties"]
+				if extra || len(required) != 2 || required[0] != "text" || required[1] != "path" || len(properties) != 2 || object(properties["text"])["encrypted"] != true || str(object(properties["path"])["description"]) == "" || str(object(properties["text"])["description"]) == "" || tool["strict"] != false {
+					w.WriteHeader(400)
+					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"reserved function must match the configured schema"}}`)
+					return
+				}
+				out := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-write", Name: operation, Namespace: "notes"}})
+				object(list(out["output"])[0])["arguments"] = `{"path":"synthetic-note","text":"sealed:synthetic-text"}`
+				_ = json.NewEncoder(w).Encode(out)
+			}))
+			defer up.Close()
+			_, s, _ := codexTestSession(t, up.URL)
+			s.allowed = map[string]bool{"codex.responses": true}
+			n := nativeScene{s: s, protocol: "openai-responses"}
+			args, out := n.codexContextArguments(context.Background(), "synthetic-model", "synthetic-session", operation, nativeObject{"path": "synthetic-note", "text": "synthetic-text"})
+			if args == nil || out.State != "pass" {
+				t.Fatal("valid provider rejected the detector's reserved write schema", out.State, out.Reason)
+			}
+		})
+	}
+}
+
 func TestCodexEmptyThreadHintsCannotProveContextIsolation(t *testing.T) {
 	for _, mode := range []string{"isolated", "empty", "shared"} {
 		t.Run(mode, func(t *testing.T) {
@@ -94,6 +191,7 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 		for _, layer := range []string{"upstream_protocol", "gateway_proxy"} {
 			t.Run(layer+map[bool]string{false: "/isolated", true: "/shared"}[brokenIsolation], func(t *testing.T) {
 				notes := map[string]string{}
+				initialized := map[string]bool{}
 				seen := map[string]int{}
 				up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					seen[r.URL.Path]++
@@ -104,6 +202,15 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 					raw, _ := io.ReadAll(r.Body)
 					body, _ := decodeNative(raw)
 					if r.URL.Path == "/backend-api/codex/responses" {
+						metadata := object(body["client_metadata"])
+						if str(metadata["x-codex-turn-metadata"]) != "" {
+							id := str(metadata["session_id"])
+							if id != r.Header.Get("Session-Id") || body["prompt_cache_key"] != id {
+								t.Error("context initialization and cache/session identifiers disagree")
+							} else {
+								initialized[id] = true
+							}
+						}
 						if declarations := list(body["tools"]); len(declarations) > 0 {
 							tool := object(list(object(declarations[0])["tools"])[0])
 							operation := str(tool["name"])
@@ -126,6 +233,10 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 							return
 						}
 						input := list(body["input"])
+						if len(input) == 1 {
+							_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", "OK", nil))
+							return
+						}
 						output := object(input[len(input)-1])["output"]
 						var value any
 						if str(output) != "" {
@@ -150,6 +261,11 @@ func TestCodexNotesRequiresRealReadAppendReopenAndDifferentSessionIsolation(t *t
 						t.Error("notes escaped its fixed context RPC or omitted truncation policy")
 					}
 					session := str(object(body["context"])["session_id"])
+					if !initialized[session] {
+						t.Error("notes accessed a context not initialized by its own actual model turn")
+						_, _ = io.WriteString(w, `{"error":"no stored context"}`)
+						return
+					}
 					if brokenIsolation {
 						session = "shared-incorrectly"
 					}

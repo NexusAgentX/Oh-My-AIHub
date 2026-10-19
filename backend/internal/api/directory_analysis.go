@@ -60,10 +60,28 @@ func (a *app) analyzeDirectory(w http.ResponseWriter, r *http.Request, supplier 
 			return
 		}
 	}
+	// Production shares the contribution publication barrier with the catalog.
+	// The store still independently enforces approved group/supplier visibility.
+	if a.groupChannels != nil {
+		runtime := a.groupChannels.Runtime
+		if runtime == nil {
+			writeError(w, 503, "market_publication_unavailable", "生效快照尚未发布，请稍后重试")
+			return
+		}
+		if _, err := runtime.Current(); err != nil {
+			writeError(w, 503, "market_publication_unavailable", "生效快照尚未发布，请稍后重试")
+			return
+		}
+	}
 	report, err := a.observe.DirectoryAnalysis(r.Context(), observe.DirectoryFilter{TargetID: id, Supplier: supplier, From: from, To: to, Model: q.Get("model"), Format: q.Get("format"), Stream: q.Get("stream"), Channel: q.Get("channel"), Result: q.Get("result"), Status: status, Group: q.Get("group_by"), Bucket: bucket})
 	if err != nil {
 		writeObserveError(w, err)
 		return
 	}
 	writeJSON(w, 200, report)
+}
+
+func (a *app) registerDirectoryAnalysisRoutes(r *router) {
+	r.implement("407", "GET /api/channel-hall/{channelID}/analysis", accessReady, a.analyzeHallChannel)
+	r.implement("407", "GET /api/suppliers/{supplierID}/analysis", accessReady, a.analyzeSupplier)
 }

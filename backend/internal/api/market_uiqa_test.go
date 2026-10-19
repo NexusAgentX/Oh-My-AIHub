@@ -43,7 +43,7 @@ func TestMarketUIHarness(t *testing.T) {
 		d.CookieSecure = false
 		engine = d.Gateway
 		d.GroupChannels = &groupchannel.Service{Runtime: runtime, Repository: repo}
-		d.Keys = apikey.NewService(newFakeKeyStore(), d.Channels.Keyring, func(context.Context) ([]string, error) {
+		d.Keys = apikey.NewService(newFakeKeyStore(), d.Gateway.Keyring, func(context.Context) ([]string, error) {
 			return []string{"fixture/model:2026", "fixture/image:2026", "fixture/unknown:2026"}, nil
 		})
 	})

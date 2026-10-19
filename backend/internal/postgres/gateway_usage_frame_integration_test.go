@@ -58,7 +58,7 @@ func TestGatewayKeepsTheUsageOnlyFrameItAskedForFromClientsThatDidNot(t *testing
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			e := newEnv(t)
+			e := newGroupEnv(t)
 			consumer := e.member("consumer", "100")
 			sharer := e.member("sharer", "0")
 			relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {

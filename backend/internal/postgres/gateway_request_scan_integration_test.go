@@ -14,10 +14,16 @@ import (
 // body of every format, the Gemini one included, and reach the price snapshot
 // of the call the way a full decode of the body would have delivered them.
 func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
+	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
+	e.declareGroupedCapabilities(channelID,
+		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast",
+		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:flex",
+		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:scale",
+		"upstream_protocol/openai-responses.cache_tier/service_tier/openai:fast",
+		"upstream_protocol/native-generate-content.cache_tier/service_tier/gemini:priority")
 	_, secret := e.defaultKey(consumer)
 
 	snapshotDetail := func(id string) ledger.UsageDetail {
@@ -65,11 +71,12 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 // byte else changed: the request is read into a buffer sized by its announced
 // length, in one stage or two, and spliced from the one scan.
 func TestGatewayForwardsLargeRequestBodiesUnchanged(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
-	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
+	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
+	e.declareGroupedCapabilities(channelID, "upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast")
 	_, secret := e.defaultKey(consumer)
 
 	for _, size := range []int{100, 70_000, 300_000, 2_000_000} {

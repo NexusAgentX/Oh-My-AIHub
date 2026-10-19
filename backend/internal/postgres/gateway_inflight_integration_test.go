@@ -99,7 +99,7 @@ func (e *env) countOutcome(accountID, outcome string) int {
 }
 
 func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	e.setInflightLimit(1)
 	consumer := e.member("consumer", "100")
 	bystander := e.member("bystander", "100")
@@ -184,7 +184,7 @@ func TestGatewayRefusesAnAccountsCallsOverTheInflightLimitWithoutCharge(t *testi
 }
 
 func TestGatewayDoesNotLimitInflightCallsWhenTheLimitIsZero(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	e.setInflightLimit(0)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
@@ -213,7 +213,7 @@ func TestGatewayDoesNotLimitInflightCallsWhenTheLimitIsZero(t *testing.T) {
 }
 
 func TestGatewayInflightLimitDefaultsToTwentyAndIsAuditedWhenChanged(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	current := e.apiJSON(e.admin, http.StatusOK, http.MethodGet, "/api/admin/settings", nil)["settings"].(map[string]any)
 	if current["account_max_inflight_calls"] != float64(20) {
 		t.Fatalf("default in-flight limit = %v", current["account_max_inflight_calls"])
@@ -249,7 +249,7 @@ func TestGatewayInflightLimitDefaultsToTwentyAndIsAuditedWhenChanged(t *testing.
 // call has been booked. Both ways the reading ends are covered: the upstream
 // finishes inside the drain window, and the drain window runs out.
 func TestGatewayKeepsTheInflightSlotWhileItReadsOnAfterTheClientLeftUntilTheCallIsBooked(t *testing.T) {
-	e := newEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 2 * time.Second })
+	e := newGroupEnvWith(t, func(d *gateway.Dependencies) { d.DrainWindow = 2 * time.Second })
 	e.setInflightLimit(1)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")

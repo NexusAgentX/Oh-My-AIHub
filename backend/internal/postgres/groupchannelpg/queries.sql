@@ -15,8 +15,8 @@ FROM market_channels mc JOIN channels c ON c.id=mc.channel_id JOIN accounts a ON
 WHERE c.id=$1 AND c.deleted_at IS NULL FOR UPDATE OF c,mc;
 
 -- name: InsertChannel :exec
-INSERT INTO channels(id,owner_id,name,summary,description,base_url,api_key_ciphertext,api_key_nonce,api_key_key_id,status,market_group_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+INSERT INTO channels(id,owner_id,name,summary,description,api_key_ciphertext,api_key_nonce,api_key_key_id,status,market_group_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
 -- name: InsertConfiguration :exec
 INSERT INTO market_channels(channel_id,address_ids,overrides) VALUES($1,$2,$3);

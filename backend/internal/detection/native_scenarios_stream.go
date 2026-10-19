@@ -20,7 +20,7 @@ func (n *nativeScene) streams(ctx context.Context) {
 	n.check("text_lifecycle", text, text.Stream.Valid && text.Stream.TextLifecycle && contentMatches(text, nativeMarker))
 	n.check("indexes_utf8_and_terminal_usage", text, text.Stream.Valid && text.Reply.Usage.Reliable)
 	n.check("no_induced_network_failure", text, true)
-	body := toolBody(n.protocol, n.s.Target.Model, "named", false)
+	body := toolBody(n.protocol, n.s.Target.Model, "required", false)
 	tools := n.infer(ctx, body, true, true)
 	n.check("tool_lifecycle_when_applicable", tools, tools.Stream.Valid && tools.Stream.ToolLifecycle && validCalls(tools, true))
 	if tools.Stream.Valid && validCalls(tools, true) {

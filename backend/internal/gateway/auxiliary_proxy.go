@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -194,6 +195,14 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(400, "invalid_context", "请求需要有效的会话编号和代理名称")
 		return
 	}
+	var notes *notesSession
+	if key.CodexNotes && ep.Scope == "context_acl_only" {
+		notes, err = e.loadNotesSession(r.Context(), r, body, key)
+		if err != nil {
+			fail(notesSessionError(err))
+			return
+		}
+	}
 	refs, parent := endpointPathRef(ep, r)
 	pathRefs := append([]gatewaycontract.Reference(nil), refs...)
 	var explicitRefs []gatewaycontract.Reference
@@ -225,6 +234,30 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		target, err = resourcestate.Resolve(r.Context(), e.Resources, actor, pathRefs)
 		if err != nil {
 			fail(404, "resource_unavailable", "资源不存在或归属冲突")
+			return
+		}
+	}
+	// A durable background call already owns its admission and original sealed
+	// snapshot. It cannot switch to a replacement credential for a follow-up.
+	if target != nil && e.Jobs != nil && (ep.ID == "responses.get" || ep.ID == "responses.cancel") {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		job, err := e.Jobs.LookupBackground(ctx, key.OwnerID, key.KeyID, r.PathValue("responseID"))
+		cancel()
+		if err == nil {
+			// readNativeRequest consumed the caller's body. Restore its native
+			// bytes before the frozen follow-up path forwards cancellation.
+			wire, encodeErr := nativeencoding.Encode(r.Context(), encoding, body)
+			if encodeErr != nil {
+				fail(400, "invalid_request", "请求编码无效")
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(wire))
+			r.ContentLength = int64(len(wire))
+			e.serveResponseJob(w, r, key, r.PathValue("responseID"), ep.ID == "responses.cancel", job, target)
+			return
+		}
+		if !errors.Is(err, ErrBackgroundNotFound) {
+			fail(503, "response_service_unavailable", "响应状态读取失败")
 			return
 		}
 	}
@@ -291,6 +324,9 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	records = filtered
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
+	if notes != nil {
+		selection.Required = append(selection.Required, notesRequirements()...)
+	}
 	if encoding != "" {
 		selection.Required = append(selection.Required, nativeZstdRequirement(r.URL.Path))
 	}
@@ -357,7 +393,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	candidates := make([]Candidate, 0, len(selected))
 	for _, v := range selected {
-		if !resourceMatch(v.Candidate, owned) || !resourceMatch(v.Candidate, listBoundary) {
+		if !notesMatch(v.Candidate, notes) || !resourceMatch(v.Candidate, owned) || !resourceMatch(v.Candidate, listBoundary) {
 			continue
 		}
 		state, _ := e.Runtime.Check(v.Candidate.ChannelID, EffectiveLimits(v.Candidate.Advanced, defaults), e.Now())
@@ -404,6 +440,11 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	operationID, err := uuidids.NewUUID()
 	if err != nil {
 		fail(500, "internal_error", "无法创建操作标识")
+		return
+	}
+	candidates, err = e.claimNotesSession(r.Context(), notes, candidates)
+	if err != nil {
+		fail(notesSessionError(err))
 		return
 	}
 	for slot := range e.reservations(candidates, budget, defaults) {

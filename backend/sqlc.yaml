@@ -131,13 +131,6 @@ sql:
           - column: "c2c_orders.max_per_trade_nano"
             go_type: { import: "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money", type: "Amount", pointer: true }
   - <<: *domain
-    queries: internal/postgres/catalogpg/queries.sql
-    gen:
-      go:
-        <<: *gen
-        package: catalogpg
-        out: internal/postgres/catalogpg
-  - <<: *domain
     queries: internal/postgres/settingspg/queries.sql
     gen:
       go:
@@ -158,13 +151,6 @@ sql:
         <<: *gen
         package: ledgerpg
         out: internal/postgres/ledgerpg
-  - <<: *domain
-    queries: internal/postgres/channelpg/queries.sql
-    gen:
-      go:
-        <<: *gen
-        package: channelpg
-        out: internal/postgres/channelpg
   - <<: *domain
     queries: internal/postgres/keypg/queries.sql
     gen:
@@ -202,13 +188,6 @@ sql:
         <<: *gen
         package: forumpg
         out: internal/postgres/forumpg
-  - <<: *domain
-    queries: internal/postgres/supplierpg/queries.sql
-    gen:
-      go:
-        <<: *gen
-        package: supplierpg
-        out: internal/postgres/supplierpg
   - <<: *domain
     queries: internal/postgres/marketpg/queries.sql
     gen:

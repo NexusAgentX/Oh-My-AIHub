@@ -5,7 +5,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
@@ -28,41 +27,12 @@ type RankInput struct {
 	// Sticky is the channel that served the previous Responses turn, if any.
 	Sticky string
 	// Available reports whether a candidate can take a request now
-	// (cooldown, concurrency, RPM, daily revenue cap).
+	// (cooldown, concurrency, RPM).
 	Available func(Candidate) bool
 }
 
-// price orders candidates by what they charge: the channel multiplier and
-// currency conversion applied to the model's current tier price (identical for
-// every candidate of one model, so multiplier × rate alone orders them). The
-// channels of a custom model each set their own prices and are ordered by the
-// 3:1 blend of them; a model's candidates are never mixed. Channels of the
-// caller cost 0.
-func price(candidate Candidate, consumerID string) float64 {
-	if candidate.OwnerID == consumerID {
-		return 0
-	}
-	if candidate.Custom != nil {
-		return candidate.Custom.Blended()
-	}
-	rate := candidate.RateNano
-	if rate == 0 {
-		rate = ledger.UnitRate
-	}
-	return float64(candidate.MultiplierNano) * float64(rate)
-}
-
 func compareCandidatePrice(a, b Candidate, consumer string, comparable bool) int {
-	if a.GroupID == "" && b.GroupID == "" {
-		left, right := price(a, consumer), price(b, consumer)
-		if left < right {
-			return -1
-		}
-		if left > right {
-			return 1
-		}
-		return 0
-	}
+
 	left, right := a.TypicalCost, b.TypicalCost
 	knownLeft, knownRight := a.TypicalCostKnown && comparable, b.TypicalCostKnown && comparable
 	if consumer != "" && a.OwnerID == consumer {

@@ -861,6 +861,9 @@ func (s *codexProbeStore) Candidates(_ context.Context, model string, format cha
 func (s *codexProbeStore) AuxiliaryCandidates(context.Context, channel.Format) ([]gateway.CandidateRecord, error) {
 	return append([]gateway.CandidateRecord{s.row}, s.extraRows...), nil
 }
+func (s *codexProbeStore) ModelListCandidates(ctx context.Context, format channel.Format) ([]gateway.CandidateRecord, error) {
+	return s.AuxiliaryCandidates(ctx, format)
+}
 func (*codexProbeStore) AttemptHistory(context.Context, time.Time) ([]gateway.AttemptHistoryRow, error) {
 	return nil, nil
 }
@@ -895,7 +898,7 @@ func (s *codexProbeStore) OnlineModels(context.Context) ([]gateway.OnlineModel, 
 	}
 	return rows, nil
 }
-func (*codexProbeStore) CustomModelOnline(context.Context, string) (bool, error) { return false, nil }
+
 func (s *codexProbeStore) Get(_ context.Context, model string) (catalog.Model, error) {
 	for _, row := range append([]gateway.CandidateRecord{s.row}, s.extraRows...) {
 		if model == row.ModelID {
@@ -915,7 +918,11 @@ func (s *codexProbeStore) List(ctx context.Context, _ bool) ([]catalog.Model, er
 type codexProbeSettings struct{}
 
 func (codexProbeSettings) GetSettings(context.Context) (settings.Settings, error) {
-	return settings.Settings{DefaultMaxAttempts: 1, DefaultTTFTTimeoutMS: 30000, DefaultRequestTimeoutMS: 180000, DefaultIdleTimeoutMS: 30000, DefaultCooldownFailures: 3, DefaultCooldownSeconds: 300, USDCNYRateNano: ledger.UnitRate, AccountMaxInflightCalls: 2}, nil
+	// This private, bounded fixture must send every independent capability
+	// request even after ordinary upstream rejections. A synthetic channel's
+	// cooldown is not evidence about the next protocol/encoding. Production
+	// channel cooldown settings and retry limits are unaffected.
+	return settings.Settings{DefaultMaxAttempts: 1, DefaultTTFTTimeoutMS: 30000, DefaultRequestTimeoutMS: 180000, DefaultIdleTimeoutMS: 30000, USDCNYRateNano: ledger.UnitRate, AccountMaxInflightCalls: 2}, nil
 }
 func (codexProbeSettings) UpdateSettings(context.Context, string, settings.Settings) (settings.Settings, error) {
 	return settings.Settings{}, ErrInvalid

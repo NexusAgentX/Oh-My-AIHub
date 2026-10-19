@@ -18,8 +18,8 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
@@ -44,7 +44,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/typicalpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
@@ -120,7 +119,7 @@ func main() {
 	// surface when someone uses the channel, API key or order.
 	checkContext, cancelCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	checked, err := keyringcheck.Verify(checkContext,
-		keyringcheck.Sources{Channels: store.Channels, APIKeys: store.Keys, C2COrders: store.C2C},
+		keyringcheck.Sources{Channels: store.ChannelHistory, APIKeys: store.Keys, C2COrders: store.C2C},
 		keyringcheck.Keyrings{Upstream: credentialKeyring, C2C: c2cKeyring})
 	cancelCheck()
 	if err != nil {
@@ -155,7 +154,6 @@ func main() {
 		fatal(logger, "creating the identity service failed", err)
 	}
 
-	catalogService := catalog.NewService(cached.Catalog)
 	settingsService := settings.NewService(store.Settings)
 	modelIDs := func(ctx context.Context) ([]string, error) {
 		models, err := cached.Models.List(ctx, true)
@@ -168,15 +166,7 @@ func main() {
 		}
 		return ids, nil
 	}
-	// Keys may also name custom models of channels (ADR-0034).
-	keyModelIDs := func(ctx context.Context) ([]string, error) {
-		ids, err := modelIDs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		custom, err := store.Channels.CustomModelNames(ctx)
-		return append(ids, custom...), err
-	}
+	keyModelIDs := modelIDs
 	bus := gateway.NewBus()
 	var platformMetrics *metrics.Metrics
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
@@ -242,6 +232,7 @@ func main() {
 		fatal(logger, "initializing Codex context namespace failed", err)
 	}
 	engine := gateway.NewEngine(gateway.Dependencies{
+		CodexSessions:    codexsession.New(resourcepg.NewStore(resourcePool)),
 		ContextNamespace: contextNamespace,
 		Resources:        resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
@@ -259,7 +250,6 @@ func main() {
 	// An edit of a channel (settings, models, formats, suspension) clears what the
 	// 4xx anomaly rule counted against it before, and a channel ranked last for
 	// those answers is ranked on its merits again before the edit returns.
-	cached.Cache.OnChannelEdited(engine.ChannelEdited)
 	groupRuntime.Edited = engine.ChannelEdited
 	engineContext, stopEngine := context.WithCancel(context.Background())
 	defer stopEngine()
@@ -474,24 +464,15 @@ func main() {
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
 			Typical: typicalCosts, GroupChannels: groupService, DetectionMCP: mcpFixture,
-			Contributions: contributions,
-			Detection:     detector,
-			Suppliers:     &supplier.Service{Store: store.Suppliers, Outbound: outboundPolicy},
-			Identity:      identityService,
-			Forum:         forumService,
-			Catalog:       catalogService,
-			Ledger:        ledger.NewService(store.Ledger),
-			Settings:      settingsService,
-			RateSync:      rateSyncer,
-			Audit:         audit.NewService(store.Audit),
-			Keys:          apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
-			Channels: channel.NewService(channel.Dependencies{
-				Store: cached.Channels, Keyring: credentialKeyring, Outbound: outboundPolicy, KnownModels: modelIDs,
-				BlockedHosts: func(ctx context.Context) ([]string, error) {
-					value, err := settingsService.Get(ctx)
-					return value.ExtraBlockedHosts, err
-				},
-			}),
+			Contributions:     contributions,
+			Detection:         detector,
+			Identity:          identityService,
+			Forum:             forumService,
+			Ledger:            ledger.NewService(store.Ledger),
+			Settings:          settingsService,
+			RateSync:          rateSyncer,
+			Audit:             audit.NewService(store.Audit),
+			Keys:              apikey.NewService(cached.Keys, credentialKeyring, keyModelIDs),
 			Routing:           cached.Routing,
 			Gateway:           engine,
 			Browse:            store.Gateway,

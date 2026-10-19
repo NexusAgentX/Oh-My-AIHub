@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -18,6 +19,21 @@ import (
 type browseMarketRepository struct {
 	groupchannel.Repository
 	data groupchannel.Data
+}
+
+func TestMarketRoutingPreferencesCannotRestoreRetiredGlobalModels(t *testing.T) {
+	p, _ := marketModelFixture(t, "approved-model", nil)
+	p.store.models["retired-model"] = catalog.Model{ID: "retired-model", Enabled: true}
+	member, _ := p.member(t, "routing-market-only")
+	key := member.expect(t, 201, "POST", "/api/keys", map[string]any{"name": "routing-only"})["key"].(map[string]any)["id"].(string)
+	for _, prefix := range []string{"/api/routing/", "/api/keys/" + key + "/routing/"} {
+		member.expect(t, 200, "PUT", prefix+"approved-model", map[string]any{"mode": "speed"})
+		member.expect(t, 404, "PUT", prefix+"retired-model", map[string]any{"mode": "speed"})
+		member.expect(t, 404, "PUT", prefix+"unknown-model", map[string]any{"mode": "speed"})
+	}
+	if count := len(p.store.models); count != 1 {
+		t.Fatal("fixture must retain one historical global model", count)
+	}
 }
 
 func (r *browseMarketRepository) Snapshot(context.Context) (groupchannel.Data, error) {

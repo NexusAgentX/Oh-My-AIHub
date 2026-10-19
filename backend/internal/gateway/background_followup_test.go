@@ -41,6 +41,7 @@ func followupFixture(t *testing.T, handler http.HandlerFunc) (*Engine, *backgrou
 		Candidate: Candidate{ChannelID: "channel", OwnerID: "seller", BaseURL: upstream.URL, Credential: credential, MultiplierNano: ledger.FixedPointScale, RateNano: ledger.UnitRate},
 		Model:     catalog.Model{ID: "main", InputPrice: 1_000_000_000, OutputPrice: 5_000_000_000},
 	}
+	metadata.Candidate = quotedCandidate(t, metadata.Candidate, metadata.Model)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		t.Fatal(err)

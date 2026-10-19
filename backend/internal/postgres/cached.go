@@ -6,7 +6,6 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -35,8 +34,6 @@ type Cached struct {
 
 	// For the services that change the data behind the snapshots.
 	Keys     apikey.Store
-	Channels channel.Store
-	Catalog  catalog.Store
 	Identity identity.Store
 }
 
@@ -58,13 +55,13 @@ func (s *Store) Cached(logger *slog.Logger, options ...func(*snapshot.Config)) *
 		Models:   cache.Models(),
 		Routing:  cache.Routing(s.Routes),
 		Keys:     cache.Keys(s.Keys),
-		Channels: cache.Channels(s.Channels),
-		Catalog:  cache.Catalog(s.Catalog),
 		Identity: cache.Identity(s.Identity),
 	}
 }
 
-// snapshotLoader reads the snapshots' contents with the domain stores.
+// snapshotLoader reads authentication, preferences and balances. Market
+// models/candidates are supplied only by groupchannel.Wrap; an unwired market
+// remains empty instead of reading retired global configuration.
 type snapshotLoader struct{ store *Store }
 
 func (l snapshotLoader) LoadKeys(ctx context.Context) ([]gateway.KeyRecord, error) {
@@ -72,7 +69,7 @@ func (l snapshotLoader) LoadKeys(ctx context.Context) ([]gateway.KeyRecord, erro
 }
 
 func (l snapshotLoader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
-	return l.store.Gateway.LoadCandidates(ctx)
+	return []gateway.CandidateRecord{}, nil
 }
 
 func (l snapshotLoader) LoadRoutePrefs(ctx context.Context) ([]routing.Scoped, error) {
@@ -80,7 +77,7 @@ func (l snapshotLoader) LoadRoutePrefs(ctx context.Context) ([]routing.Scoped, e
 }
 
 func (l snapshotLoader) LoadModels(ctx context.Context) ([]catalog.Model, error) {
-	return l.store.Catalog.ListModels(ctx, true)
+	return []catalog.Model{}, nil
 }
 
 func (l snapshotLoader) LoadPoints(ctx context.Context, accountIDs []string) (map[string]ledger.Points, error) {

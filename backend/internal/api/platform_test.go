@@ -13,16 +13,16 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity/identitytest"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/supplier"
 )
 
 // platform 是装配了全部领域的内存实现的处理器：密钥与路由、渠道与模型浏览、
@@ -38,6 +38,7 @@ type platform struct {
 	bus      *fakeEvents
 	stats    *gateway.StatsBook
 	handler  http.Handler
+	groups   *groupchannel.Service
 }
 
 // fakeEvents 是进程内网关事件总线的替身，用于驱动实时流。
@@ -82,29 +83,32 @@ func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogService := catalog.NewService(store)
+	groupRepo := &apiGroupChannels{rows: map[string]groupchannel.Record{}, choices: map[string][]groupchannel.Choice{}}
+	groupRuntime := &groupchannel.Runtime{Repository: groupRepo}
+	groupRuntime.Rebuild = func(ctx context.Context) error {
+		_, err := groupRuntime.Wrap(groupBaseLoader{}).LoadCandidates(ctx)
+		return err
+	}
+	if err := groupRuntime.Install(context.Background(), market.Directory{}); err != nil {
+		t.Fatal(err)
+	}
+	groupService := &groupchannel.Service{Runtime: groupRuntime, Repository: groupRepo, Keyring: keyring}
+	models := platformModelReader{runtime: groupRuntime}
 	settingsService := settings.NewService(store)
 	outbound := newTestOutbound(t, newFakeUpstream(t))
 	channelStore := newFakeChannelStore(store)
 	routingStore := newFakeRoutingStore()
 	knownModels := func(ctx context.Context) ([]string, error) {
-		models, err := catalogService.List(ctx, true)
+		models, err := models.List(ctx, true)
 		ids := make([]string, 0, len(models))
 		for _, model := range models {
 			ids = append(ids, model.ID)
 		}
 		return ids, err
 	}
-	channelService := channel.NewService(channel.Dependencies{
-		Store: channelStore, Keyring: keyring, Outbound: outbound, KnownModels: knownModels,
-		BlockedHosts: func(ctx context.Context) ([]string, error) {
-			value, err := settingsService.Get(ctx)
-			return value.ExtraBlockedHosts, err
-		},
-	})
 	stats := gateway.NewStatsBook()
 	engine := gateway.NewEngine(gateway.Dependencies{
-		Catalog: catalogService, Settings: settingsService, Routing: routingStore, Keyring: keyring, Outbound: outbound, StatsBook: stats,
+		Catalog: models, Settings: settingsService, Routing: routingStore, Keyring: keyring, Outbound: outbound, StatsBook: stats,
 	})
 	observeStore := &fakeObserveStore{channels: channelStore}
 	observeService := observe.NewService(observeStore)
@@ -119,10 +123,9 @@ func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 	c2cStore := newFakeC2CStore(store)
 	rates := &fakeRateSource{rateNano: 7_100_000_000}
 	dependencies := Dependencies{
-		Suppliers: &supplier.Service{Store: &fakeSupplierStore{channels: channelStore}, Outbound: outbound},
-		Identity:  identityService, Catalog: catalogService, Ledger: ledger.NewService(store), Settings: settingsService,
+		Identity: identityService, GroupChannels: groupService, Ledger: ledger.NewService(store), Settings: settingsService,
 		RateSync: settings.NewRateSyncer(store, rates),
-		Audit:    audit.NewService(store), Keys: apikey.NewService(newFakeKeyStore(), keyring, knownModels), Channels: channelService,
+		Audit:    audit.NewService(store), Keys: apikey.NewService(newFakeKeyStore(), keyring, knownModels),
 		Routing: routingStore, Gateway: engine, Browse: browse, C2C: c2c.NewService(c2cStore, c2cKeyring),
 		Observe: observeService, Feed: feed, Forum: forum.NewService(newFakeForumStore(store)), CookieSecure: true,
 	}
@@ -130,7 +133,7 @@ func newPlatform(t *testing.T, options ...func(*Dependencies)) *platform {
 		option(&dependencies)
 	}
 	handler := NewHandler(dependencies)
-	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, stats: stats, handler: handler}
+	return &platform{spec: loadOpenAPI(t), rates: rates, store: store, channels: channelStore, browse: browse, observe: observeStore, c2c: c2cStore, bus: bus, stats: stats, handler: handler, groups: groupService}
 }
 
 func (p *platform) admin(t *testing.T) *client {
@@ -157,13 +160,4 @@ func (p *platform) member(t *testing.T, username string) (*client, string) {
 		t.Fatal(err)
 	}
 	return &client{spec: p.spec, handler: p.handler, cookie: &http.Cookie{Name: defaultSessionCookie, Value: token}}, account.ID
-}
-
-// seedModel 由管理员创建一个带两档价格的模型。
-func seedModel(t *testing.T, admin *client, id string) {
-	t.Helper()
-	admin.expect(t, http.StatusCreated, http.MethodPost, "/api/admin/models", map[string]any{
-		"id": id, "display_name": "DeepSeek Chat", "provider": "DeepSeek", "context_window": 128000,
-		"base_prices": map[string]string{"input": "1.5", "output": "4.5", "cache_write": "0", "cache_read": "0.15"},
-	})
 }

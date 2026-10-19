@@ -133,7 +133,7 @@ func TestContributionAPIPrivateReviewRevisionAndSchema(t *testing.T) {
 	}))
 	defer upstream.Close()
 	policy := newTestOutbound(t, upstream)
-	p := newPlatform(t, func(d *Dependencies) { d.Contributions = service; d.Suppliers.Outbound = policy })
+	p := newPlatform(t, func(d *Dependencies) { d.Contributions = service; d.Gateway.Outbound = policy })
 	admin := p.admin(t)
 	owner, _ := p.member(t, "contributor")
 	other, _ := p.member(t, "other-contributor")

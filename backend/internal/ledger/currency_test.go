@@ -13,25 +13,24 @@ func TestUSDModelPricing(t *testing.T) {
 	cases := []struct {
 		name       string
 		currency   string
-		discount   bool
 		multiplier int64
 		want       string
 	}{
-		{"usd without discount pays the converted price", CurrencyUSD, false, FixedPointScale, "6.8"},
-		{"usd with discount pays the dollar figure", CurrencyUSD, true, FixedPointScale, "1"},
-		{"discount keeps the relay multiplier", CurrencyUSD, true, 130_000_000, "0.13"},
-		{"cny ignores the discount", CurrencyCNY, true, FixedPointScale, "1"},
+		{"usd at the converted price", CurrencyUSD, FixedPointScale, "6.8"},
+		{"usd with a channel discount", CurrencyUSD, 130_000_000, "0.884"},
+		{"cny at the point price", CurrencyCNY, FixedPointScale, "1"},
+		{"cny with a channel discount", CurrencyCNY, 130_000_000, "0.13"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := CalculatePriceAt(usage, prices, nil, pricingTime, tc.multiplier, ChannelRate(tc.currency, tc.discount, rate), 0)
+			result, err := CalculatePriceAt(usage, prices, nil, pricingTime, tc.multiplier, ModelRate(tc.currency, rate), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if got := result.Cost.String(); got != tc.want {
 				t.Fatalf("cost = %s, want %s", got, tc.want)
 			}
-			shown := ScalePriceAt(prices.InputPerMillion, tc.multiplier, ChannelRate(tc.currency, tc.discount, rate))
+			shown := ScalePriceAt(prices.InputPerMillion, tc.multiplier, ModelRate(tc.currency, rate))
 			if shown.String() != tc.want {
 				t.Fatalf("display price = %s, want %s", shown, tc.want)
 			}
@@ -48,18 +47,5 @@ func TestUSDModelRoundsUpOnce(t *testing.T) {
 	}
 	if result.Cost != money.FromNano(7) {
 		t.Fatalf("cost = %d nano, want 7", result.Cost.Nano())
-	}
-}
-
-func TestEffectiveMultiplier(t *testing.T) {
-	const rate = 6_800_000_000
-	if got := EffectiveMultiplier(130_000_000, ChannelRate(CurrencyUSD, true, rate), ModelRate(CurrencyUSD, rate)); got != 19_117_647 {
-		t.Fatalf("effective = %d, want 19117647 (0.13 / 6.8)", got)
-	}
-	if got := EffectiveMultiplier(130_000_000, ChannelRate(CurrencyUSD, false, rate), ModelRate(CurrencyUSD, rate)); got != 130_000_000 {
-		t.Fatalf("effective without discount = %d", got)
-	}
-	if got := EffectiveMultiplier(2_000_000_000, ChannelRate(CurrencyCNY, true, rate), ModelRate(CurrencyCNY, rate)); got != 2_000_000_000 {
-		t.Fatalf("cny effective = %d", got)
 	}
 }

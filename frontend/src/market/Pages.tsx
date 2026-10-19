@@ -1,3 +1,4 @@
+import { MarketQualitySection } from './Quality'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
@@ -160,7 +161,7 @@ export function MarketSupplierDetailPage() {
   return <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
     const s = data.items.find(s => s.id === id)
     if (!s) return <EmptyState title="供应商不存在或已停用" />
-    return <><PageHeader title={s.name} back={{ to: '/suppliers', label: '供应商' }} /><Card><div className="sharing-title"><SupplierIcon supplier={s} /><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><MarkdownContent value={s.description} /><div className="sharing-line">{s.website_url && <a href={s.website_url} target="_blank" rel="noopener noreferrer">官网 ↗</a>}{s.docs_url && <a href={s.docs_url} target="_blank" rel="noopener noreferrer">文档 ↗</a>}{s.icon_source && <a href={s.icon_source} target="_blank" rel="noopener noreferrer">图标来源 ↗</a>}</div></Card><Card title="分组">{data.groups.filter(g => g.supplier_id === id).map(g => <div className="market-channel" key={g.id}><Link to={`/groups/${g.id}`}>{g.name}</Link><p className="muted-copy">{g.model_ids.length} 个模型</p></div>)}</Card><MarketModelGrid supplierID={id} /></>
+    return <><PageHeader title={s.name} back={{ to: '/suppliers', label: '供应商' }} /><Card><div className="sharing-title"><SupplierIcon supplier={s} /><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><MarkdownContent value={s.description} /><div className="sharing-line">{s.website_url && <a href={s.website_url} target="_blank" rel="noopener noreferrer">官网 ↗</a>}{s.docs_url && <a href={s.docs_url} target="_blank" rel="noopener noreferrer">文档 ↗</a>}{s.icon_source && <a href={s.icon_source} target="_blank" rel="noopener noreferrer">图标来源 ↗</a>}</div></Card><Card title="分组">{data.groups.filter(g => g.supplier_id === id).map(g => <div className="market-channel" key={g.id}><Link to={`/groups/${g.id}`}>{g.name}</Link><p className="muted-copy">{g.model_ids.length} 个模型</p></div>)}</Card><MarketModelGrid supplierID={id} /><MarketQualitySection key={id} kind="supplier" id={id} /></>
   }}</QueryBoundary>
 }
 export function MarketGroupPage() {

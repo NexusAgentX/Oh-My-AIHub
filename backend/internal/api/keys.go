@@ -55,6 +55,7 @@ type apiKeyJSON struct {
 	Prefix        string            `json:"prefix"`
 	Status        apikey.Status     `json:"status"`
 	IsDefault     bool              `json:"is_default"`
+	CodexNotes    bool              `json:"codex_notes"`
 	ExpiresAt     *time.Time        `json:"expires_at"`
 	AllowedModels []string          `json:"allowed_models"`
 	BudgetDaily   *string           `json:"budget_daily"`
@@ -116,6 +117,7 @@ func newApiKeyJSON(key apikey.Key) apiKeyJSON {
 		Prefix:        key.Prefix,
 		Status:        key.Status,
 		IsDefault:     key.IsDefault,
+		CodexNotes:    key.CodexNotes,
 		ExpiresAt:     key.ExpiresAt,
 		AllowedModels: key.AllowedModels,
 		BudgetDaily:   nullableAmount(key.BudgetDaily),
@@ -151,6 +153,7 @@ func newRoutingPreferenceJSON(pref routing.Pref) routingPreferenceJSON {
 }
 
 type keyRequest struct {
+	CodexNotes    optional[bool]      `json:"codex_notes"`
 	Name          *string             `json:"name"`
 	Status        *string             `json:"status"`
 	ExpiresAt     optional[time.Time] `json:"expires_at"`
@@ -192,11 +195,18 @@ func (a *app) createKey(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
+	if request.CodexNotes.Set && request.CodexNotes.Value == nil {
+		writeDomainError(w, apikey.ErrInvalidInput)
+		return
+	}
 	if request.Name == nil {
 		writeDomainError(w, apikey.ErrInvalidInput)
 		return
 	}
 	input := apikey.CreateInput{Name: *request.Name, Settings: apikey.Settings{ExpiresAt: request.ExpiresAt.Value}}
+	if request.CodexNotes.Value != nil {
+		input.CodexNotes = *request.CodexNotes.Value
+	}
 	if request.Status != nil {
 		input.Status = apikey.Status(*request.Status)
 	}
@@ -266,7 +276,11 @@ func (a *app) updateKey(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
-	update := apikey.Update{Name: request.Name, AllowedModels: request.AllowedModels, ModelAliases: request.ModelAliases}
+	if request.CodexNotes.Set && request.CodexNotes.Value == nil {
+		writeDomainError(w, apikey.ErrInvalidInput)
+		return
+	}
+	update := apikey.Update{CodexNotes: request.CodexNotes.Value, Name: request.Name, AllowedModels: request.AllowedModels, ModelAliases: request.ModelAliases}
 	if request.Status != nil {
 		status := apikey.Status(*request.Status)
 		update.Status = &status
@@ -373,35 +387,20 @@ func (a *app) saveRouting(w http.ResponseWriter, r *http.Request, keyID string) 
 	writeJSON(w, http.StatusOK, newRoutingPreferenceJSON(saved))
 }
 
-// routable accepts a catalog model or a custom model a listed channel offers
-// (ADR-0034).
+// Once the market service is installed, only its approved model IDs may be
+// configured. An unknown ID must never recover a retired global offering.
 func (a *app) routable(ctx context.Context, modelID string) error {
-	if a.groupChannels != nil && a.groupChannels.Runtime != nil {
-		state, err := a.groupChannels.Runtime.Current()
-		if err != nil {
-			return err
-		}
-		if known, enabled := state.ModelState(modelID); known {
-			if enabled {
-				return nil
-			}
-			return catalog.ErrNotFound
-		}
+	if a.groupChannels == nil || a.groupChannels.Runtime == nil {
+		return groupchannel.ErrUnavailable
 	}
-	_, err := a.catalog.Get(ctx, modelID)
-	if !errors.Is(err, catalog.ErrNotFound) {
+	state, err := a.groupChannels.Runtime.Current()
+	if err != nil {
 		return err
 	}
-	online, onlineErr := a.browse.OnlineChannels(ctx)
-	if onlineErr != nil {
-		return onlineErr
+	if known, enabled := state.ModelState(modelID); known && enabled {
+		return nil
 	}
-	for _, entry := range online {
-		if entry.ModelID == modelID && entry.Custom != nil {
-			return nil
-		}
-	}
-	return err
+	return catalog.ErrNotFound
 }
 
 func (a *app) setRouting(w http.ResponseWriter, r *http.Request) {

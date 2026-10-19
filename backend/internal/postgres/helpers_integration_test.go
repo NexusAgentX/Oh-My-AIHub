@@ -29,8 +29,8 @@ const maxParallelDatabases = 4
 
 var (
 	databaseSlots = make(chan struct{}, maxParallelDatabases)
-	// database.Migrate configures goose's package-level state (base FS and
-	// dialect), so concurrent migrations would race on it.
+	// Keep test-schema initialization serialized; migration and pool startup
+	// should not amplify concurrent fixture setup on the shared test server.
 	migrateMu sync.Mutex
 )
 

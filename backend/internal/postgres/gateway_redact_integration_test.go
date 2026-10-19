@@ -77,7 +77,7 @@ func TestGatewayDoesNotShowTheConsumerTheKeyAnUpstreamEchoesInAnError(t *testing
 	} {
 		for _, request := range allFormats {
 			t.Run(tc.name+"/"+request.name, func(t *testing.T) {
-				e := newEnv(t)
+				e := newGroupEnv(t)
 				consumer := e.member("consumer", "100")
 				sharer := e.member("sharer", "0")
 				relay := echoingUpstream(t, tc.status, tc.escapeSlashes)
@@ -128,7 +128,7 @@ func TestGatewayDoesNotShowTheConsumerTheKeyAnUpstreamEchoesInAnError(t *testing
 }
 
 func TestGatewayHidesAKeyTheUpstreamQuotesFromTheRequestURL(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := echoingUpstream(t, http.StatusBadRequest, false)
@@ -154,7 +154,7 @@ func TestGatewayHidesAKeyTheUpstreamQuotesFromTheRequestURL(t *testing.T) {
 }
 
 func TestGatewayHidesEachChannelsKeyWhenEveryCandidateFails(t *testing.T) {
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	first := echoingUpstream(t, http.StatusInternalServerError, false)
@@ -194,7 +194,7 @@ func TestGatewayHidesEachChannelsKeyWhenEveryCandidateFails(t *testing.T) {
 
 func TestGatewayLeavesAnErrorWithoutTheKeyUntouchedEvenWhenItLooksLikeOne(t *testing.T) {
 	const answer = "{\n  \"error\": {\"message\": \"Incorrect API key provided: up-secret/KEY+*****. Find yours at https:\\/\\/example.test\\/keys\"}\n}\n"
-	e := newEnv(t)
+	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := newUpstream(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {

@@ -30,16 +30,16 @@ func TestMigrationsCreateTheCurrentSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedTables := []string{"accounts", "api_keys", "audit_log", "c2c_orders", "c2c_trades", "call_execution_receipts", "calls", "channel_events", "channel_models", "channels", "detection_artifacts", "detection_attempts", "detection_reports", "detection_results", "detection_tasks", "forum_attachments", "forum_boards", "forum_replies", "forum_topics", "gateway_background_jobs", "gateway_resources", "geoip_cache", "geoip_daily_usage", "ledger_accounts", "ledger_entries", "ledger_transactions", "market_addresses", "market_capability_evidence", "market_channel_model_choices", "market_channel_model_probes", "market_channels", "market_contributions", "market_group_addresses", "market_group_models", "market_groups", "market_model_governance", "market_object_versions", "market_protected_keys", "market_quote_tier_token_prices", "market_quote_tiers", "market_quote_token_prices", "market_quote_unit_prices", "market_quotes", "market_report_bindings", "market_search_settings", "market_suppliers", "model_price_tiers", "models", "route_pref_channels", "route_prefs", "sessions", "settings", "supplier_endpoints", "suppliers", "typical_samples", "typical_settings", "typical_state"}
+	expectedTables := []string{"accounts", "api_keys", "audit_log", "c2c_orders", "c2c_trades", "call_execution_receipts", "calls", "channel_events", "channels", "codex_session_routes", "detection_artifacts", "detection_attempts", "detection_reports", "detection_results", "detection_tasks", "forum_attachments", "forum_boards", "forum_replies", "forum_topics", "gateway_background_jobs", "gateway_resources", "geoip_cache", "geoip_daily_usage", "ledger_accounts", "ledger_entries", "ledger_transactions", "market_addresses", "market_capability_evidence", "market_channel_model_choices", "market_channel_model_probes", "market_channels", "market_contributions", "market_group_addresses", "market_group_models", "market_groups", "market_model_governance", "market_object_versions", "market_protected_keys", "market_quote_tier_token_prices", "market_quote_tiers", "market_quote_token_prices", "market_quote_unit_prices", "market_quotes", "market_report_bindings", "market_search_settings", "market_suppliers", "route_pref_channels", "route_prefs", "sessions", "settings", "typical_samples", "typical_settings", "typical_state"}
 	if !slices.Equal(tables, expectedTables) {
 		t.Fatalf("schema tables = %v, want %v", tables, expectedTables)
 	}
-	var suppliers, supplierEndpoints int
-	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM suppliers), (SELECT count(*) FROM supplier_endpoints)`).Scan(&suppliers, &supplierEndpoints); err != nil {
+	var suppliers, addresses int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM market_suppliers), (SELECT count(*) FROM market_addresses)`).Scan(&suppliers, &addresses); err != nil {
 		t.Fatal(err)
 	}
-	if suppliers != 0 || supplierEndpoints != 0 {
-		t.Fatalf("supplier directory must start empty: %d suppliers, %d endpoints", suppliers, supplierEndpoints)
+	if suppliers != 0 || addresses != 0 {
+		t.Fatalf("group supplier directory must start empty: %d suppliers, %d addresses", suppliers, addresses)
 	}
 	var systemAccounts, settingsRows, feeRate int64
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ledger_accounts WHERE kind = 'system'`).Scan(&systemAccounts); err != nil {

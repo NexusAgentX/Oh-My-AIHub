@@ -50,3 +50,22 @@ export function useSetMarketRouting(id:string){
   const client=useQueryClient()
   return useMutation({mutationFn:(body:RoutingPreferenceInput)=>apiSend<'setRouting'>('PUT',`/api/routing/${pathSegment(id)}`,body),onSuccess:()=>client.invalidateQueries({queryKey:marketKeys.model(id)})})
 }
+
+/** Supplier quality filters need every visible channel name, across pages. */
+export async function loadMarketChannelNames(supplierID: string, signal?: AbortSignal) {
+  const items: { id: string; name: string }[] = [], seen = new Set<string>()
+  let cursor = ''
+  do {
+    const params = new URLSearchParams({ supplier_id: supplierID, limit: '100' })
+    if (cursor) params.set('cursor', cursor)
+    const page = await request<ResponseBody<'listMarketChannels'>>(`/api/market/channels?${params}`, { signal })
+    items.push(...page.items.map(({ id, name }) => ({ id, name })))
+    cursor = page.next_cursor ?? ''
+    if (cursor && seen.has(cursor)) throw new Error('渠道目录分页已变化，请重试')
+    seen.add(cursor)
+  } while (cursor)
+  return items
+}
+export function useMarketChannelNames(supplierID: string) {
+  return useQuery({ queryKey: ['market', 'channel-names', supplierID], queryFn: ({ signal }) => loadMarketChannelNames(supplierID, signal) })
+}
