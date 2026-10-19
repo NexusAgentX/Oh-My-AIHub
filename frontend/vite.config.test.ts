@@ -2,13 +2,26 @@ import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import config, { sanitizeProxyErrorResponse } from './vite.config'
 
+const gatewayPaths = [...readFileSync(new URL('../backend/api/openapi.yaml', import.meta.url), 'utf8').matchAll(/^  (\/\S+):$/gm)]
+	.map((match) => match[1])
+	.filter((path) => /^\/(?:v1(?:beta)?|backend-api)\//.test(path))
+
 describe('gateway proxy log safety', () => {
 	it('disables Nginx request and error logging for every external gateway prefix', () => {
 		const nginx = readFileSync(new URL('./nginx.conf', import.meta.url), 'utf8')
 		expect(nginx).not.toContain('log_format gateway_safe')
 		expect(nginx).toContain('access_log off;')
 		expect(nginx).toContain('error_log /dev/null emerg;')
-		expect(nginx).toContain('location ~* ^/v1(?:beta)?(?:/|$)')
+		const namespace = nginx.match(/location ~\* (.+) \{/)
+		expect(namespace).not.toBeNull()
+		const pattern = new RegExp(namespace![1], 'i')
+		for (const path of gatewayPaths) expect(pattern.test(path), path).toBe(true)
+	})
+
+	it('proxies every contracted gateway endpoint in the development server', () => {
+		expect(gatewayPaths.length).toBeGreaterThan(40)
+		const patterns = Object.keys(config.server?.proxy ?? {}).filter((key) => key.startsWith('^')).map((key) => new RegExp(key))
+		for (const path of gatewayPaths) expect(patterns.some((pattern) => pattern.test(path)), path).toBe(true)
 	})
 
 	it('replaces dynamic path and query secrets in Vite proxy error URLs', () => {
@@ -19,10 +32,16 @@ describe('gateway proxy log safety', () => {
 		expect(response.req.url).not.toContain('oma_live_query')
   })
 
+	it('redacts Codex auxiliary query and path details in proxy errors', () => {
+		const response = { req: { url: '/backend-api/codex/alpha/notes/v2/read_file?session_id=private-session&path=private-note' } }
+		sanitizeProxyErrorResponse(response)
+		expect(response.req.url).toBe('/backend-api')
+	})
+
   it('registers the sanitizer before Vite can add its default listener', () => {
     const listeners: Array<{ event: string; listener: (...args: any[]) => void }> = []
     const proxy = { on: vi.fn((event: string, listener: (...args: any[]) => void) => listeners.push({ event, listener })) }
-		const entry = config.server?.proxy?.['^/v1(?:beta)?(?:/|$)']
+		const entry = Object.entries(config.server?.proxy ?? {}).find(([key]) => key.startsWith('^') && new RegExp(key).test('/v1beta/models/example:generateContent'))?.[1]
     expect(entry && typeof entry !== 'string').toBe(true)
     if (!entry || typeof entry === 'string') throw new Error('missing Gemini proxy')
     entry.configure?.(proxy as never, entry as never)
