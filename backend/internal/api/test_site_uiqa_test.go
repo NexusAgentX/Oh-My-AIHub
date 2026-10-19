@@ -12,6 +12,7 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
@@ -25,7 +26,7 @@ func TestTestSiteUIHarness(t *testing.T) {
 	if err := service.EnsureFixedAdministrator(context.Background(), fixedTestPassword); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewHandler(Dependencies{Identity: service, Ledger: ledger.NewService(store), Settings: settings.NewService(store), Audit: audit.NewService(store)})
+	handler := NewHandler(Dependencies{Identity: service, Ledger: ledger.NewService(store), Settings: settings.NewService(store), Audit: audit.NewService(store), Observe: observe.NewService(&fakeObserveStore{})})
 	stopped := make(chan struct{}, 1)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
