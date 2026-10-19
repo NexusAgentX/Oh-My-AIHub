@@ -9,6 +9,53 @@ import (
 	"context"
 )
 
+const claimCodexSession = `-- name: ClaimCodexSession :one
+INSERT INTO codex_session_routes(account_id,key_id,session_id,group_id,channel_id,credential_version,credential_scope)
+VALUES($1,$2,$3,$4,$5,$6,$7)
+ON CONFLICT(account_id,key_id,session_id) DO UPDATE SET session_id=codex_session_routes.session_id
+RETURNING group_id,channel_id,credential_version,credential_scope
+`
+
+type ClaimCodexSessionParams struct {
+	AccountID         string
+	KeyID             string
+	SessionID         string
+	GroupID           string
+	ChannelID         string
+	CredentialVersion string
+	CredentialScope   string
+}
+
+type ClaimCodexSessionRow struct {
+	GroupID           string
+	ChannelID         string
+	CredentialVersion string
+	CredentialScope   string
+}
+
+// Claim before sending anything upstream. The no-op update returns the winner
+// even when concurrent first requests propose different channels; no binding
+// field can be replaced. No post-response write or SQL in streaming loops.
+func (q *Queries) ClaimCodexSession(ctx context.Context, arg ClaimCodexSessionParams) (ClaimCodexSessionRow, error) {
+	row := q.db.QueryRow(ctx, claimCodexSession,
+		arg.AccountID,
+		arg.KeyID,
+		arg.SessionID,
+		arg.GroupID,
+		arg.ChannelID,
+		arg.CredentialVersion,
+		arg.CredentialScope,
+	)
+	var i ClaimCodexSessionRow
+	err := row.Scan(
+		&i.GroupID,
+		&i.ChannelID,
+		&i.CredentialVersion,
+		&i.CredentialScope,
+	)
+	return i, err
+}
+
 const deleteOwnedResource = `-- name: DeleteOwnedResource :exec
 UPDATE gateway_resources SET deleted=true,updated_at=now()
 WHERE kind=$1 AND remote_id=$2 AND ($8::text='' OR parent_id=$8::text)
@@ -38,6 +85,36 @@ func (q *Queries) DeleteOwnedResource(ctx context.Context, arg DeleteOwnedResour
 		arg.ParentFilter,
 	)
 	return err
+}
+
+const lookupCodexSession = `-- name: LookupCodexSession :one
+SELECT group_id,channel_id,credential_version,credential_scope FROM codex_session_routes
+WHERE account_id=$1 AND key_id=$2 AND session_id=$3
+`
+
+type LookupCodexSessionParams struct {
+	AccountID string
+	KeyID     string
+	SessionID string
+}
+
+type LookupCodexSessionRow struct {
+	GroupID           string
+	ChannelID         string
+	CredentialVersion string
+	CredentialScope   string
+}
+
+func (q *Queries) LookupCodexSession(ctx context.Context, arg LookupCodexSessionParams) (LookupCodexSessionRow, error) {
+	row := q.db.QueryRow(ctx, lookupCodexSession, arg.AccountID, arg.KeyID, arg.SessionID)
+	var i LookupCodexSessionRow
+	err := row.Scan(
+		&i.GroupID,
+		&i.ChannelID,
+		&i.CredentialVersion,
+		&i.CredentialScope,
+	)
+	return i, err
 }
 
 const lookupResource = `-- name: LookupResource :many

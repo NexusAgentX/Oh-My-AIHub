@@ -48,6 +48,7 @@ type KeyAuth struct {
 	BudgetTotal   *money.Amount
 	Aliases       map[string]string
 	AccountActive bool
+	CodexNotes    bool
 }
 
 // Candidate is one channel offering the requested model in the requested

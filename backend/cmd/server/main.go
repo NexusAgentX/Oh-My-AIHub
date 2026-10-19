@@ -19,6 +19,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
@@ -231,6 +232,7 @@ func main() {
 		fatal(logger, "initializing Codex context namespace failed", err)
 	}
 	engine := gateway.NewEngine(gateway.Dependencies{
+		CodexSessions:    codexsession.New(resourcepg.NewStore(resourcePool)),
 		ContextNamespace: contextNamespace,
 		Resources:        resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),

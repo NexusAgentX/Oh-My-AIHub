@@ -61,6 +61,7 @@ type Key struct {
 	Prefix        string
 	Status        Status
 	IsDefault     bool
+	CodexNotes    bool
 	ExpiresAt     *time.Time
 	AllowedModels []string
 	BudgetDaily   *money.Amount
@@ -87,6 +88,7 @@ type Sealed struct {
 
 // Settings are the user-editable fields.
 type Settings struct {
+	CodexNotes    bool
 	Status        Status
 	ExpiresAt     *time.Time
 	AllowedModels []string
@@ -99,6 +101,7 @@ type Settings struct {
 // Update changes the given fields; for the nullable ones a non-nil outer
 // pointer with a nil inner value clears the field.
 type Update struct {
+	CodexNotes    *bool
 	Name          *string
 	Status        *Status
 	ExpiresAt     **time.Time
@@ -110,7 +113,7 @@ type Update struct {
 }
 
 func (u Update) Empty() bool {
-	return u.Name == nil && u.Status == nil && u.ExpiresAt == nil && u.AllowedModels == nil &&
+	return u.CodexNotes == nil && u.Name == nil && u.Status == nil && u.ExpiresAt == nil && u.AllowedModels == nil &&
 		u.BudgetDaily == nil && u.BudgetMonthly == nil && u.BudgetTotal == nil && u.ModelAliases == nil
 }
 

@@ -4245,6 +4245,11 @@ export interface components {
             total: components["schemas"]["Amount"];
         };
         ApiKey: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             /** Format: uuid */
             id: string;
             name: string;
@@ -4276,6 +4281,11 @@ export interface components {
             key: components["schemas"]["ApiKey"];
         };
         ApiKeyCreateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";
@@ -4291,6 +4301,11 @@ export interface components {
             };
         };
         ApiKeyUpdateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name?: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";

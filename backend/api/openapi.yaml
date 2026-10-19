@@ -15644,6 +15644,10 @@ components:
     ApiKey:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         id: {type: string, format: uuid}
         name: {type: string}
         prefix: {type: string}
@@ -15669,7 +15673,7 @@ components:
         last_used_at: {$ref: '#/components/schemas/NullableTimestamp'}
         created_at: {$ref: '#/components/schemas/Timestamp'}
         updated_at: {$ref: '#/components/schemas/Timestamp'}
-      required: [id, name, prefix, status, is_default, expires_at, allowed_models, budget_daily, budget_monthly, budget_total, model_aliases, routed_models, spend, last_used_at, created_at, updated_at]
+      required: [codex_notes, id, name, prefix, status, is_default, expires_at, allowed_models, budget_daily, budget_monthly, budget_total, model_aliases, routed_models, spend, last_used_at, created_at, updated_at]
       additionalProperties: false
     ApiKeyList:
       type: object
@@ -15689,6 +15693,10 @@ components:
     ApiKeyCreateRequest:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         name: {type: string, minLength: 1, maxLength: 64}
         status: {type: string, enum: [enabled, disabled]}
         expires_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -15708,6 +15716,10 @@ components:
     ApiKeyUpdateRequest:
       type: object
       properties:
+        codex_notes:
+          type: boolean
+          default: false
+          description: 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
         name: {type: string, minLength: 1, maxLength: 64}
         status: {type: string, enum: [enabled, disabled]}
         expires_at: {$ref: '#/components/schemas/NullableTimestamp'}
@@ -18042,7 +18054,7 @@ components:
       additionalProperties: false
 x-aihub-gateway-contract:
   {
-    "version": "2026-10-19.7",
+    "version": "2026-10-19.8",
     "stage": "discovery",
     "sources": [
       {
@@ -21845,8 +21857,8 @@ x-aihub-gateway-contract:
       "gateway/item-reference": "原生item_reference可能仅含id：按可信索引的账号/Key与原始父级元数据解析，唯一才绑定；有显式父级时严格校验。跨父级/来源同ID无法消歧时拒绝，不以空父级错误拒绝所有已登记项。",
       "gateway/entry-contract": "正式入口由F7/F8同时接入Nginx/Vite；外部/v1、/v1beta与/backend-api命名空间统一Key鉴权、无正文/凭据请求日志、32MiB JSON/SSE/multipart上界、关闭磁盘临时缓冲和流式缓冲。网页同源/Origin规则继续用于/api会话写请求，不把它误用于SDK平台代理。固定出站不从model/资源ID/返回URL构造任意主机。",
       "gateway/reference-extraction": "仅识别协议定义的previous_response_id、conversation、item_reference、cachedContent等明确远端引用。完整reasoning/compaction及thinking签名和未知扩展不递归猜测为资源；单独prompt_cache_key/session/thread不引入来源绑定。",
-      "codex-special/context-wire-mapping": "只处理固定CLI的prompt_cache_key（客户端同样将其用作Responses的session-id）、context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。固定CLI的传输窗口元数据window_id、client_metadata.x-codex-window-id与HTTP x-codex-window-id，只有明确的thread-UUID:无符号计数格式时，将UUID前缀用同一会话映射，保留计数；不把它与context_window_id或history接口的opaque窗口ID混同。未知格式原样保留；不递归改input/opaque item id、history窗口/item引用、notes路径、正文、密文或current_agent_name。只在Codex上下文协议启用；重复标识/头拒绝，可选metadata空值保留。解压/映射/模型替换后重建编码与长度；单请求映射缓存至多16项，不引入来源路由绑定或SQL。",
-      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。",
+      "codex-special/context-wire-mapping": "只处理固定CLI的prompt_cache_key（客户端同样将其用作Responses的session-id）、context.session_id、client_metadata的session_id/thread_id/x-codex-parent-thread-id及x-codex-turn-metadata内session_id/thread_id/parent_thread_id/forked_from_thread_id；对应HTTP头session-id/thread-id/x-client-request-id/x-codex-parent-thread-id/x-codex-turn-metadata使用同一映射。固定CLI的传输窗口元数据window_id、client_metadata.x-codex-window-id与HTTP x-codex-window-id，只有明确的thread-UUID:无符号计数格式时，将UUID前缀用同一会话映射，保留计数；不把它与context_window_id或history接口的opaque窗口ID混同。未知格式原样保留；不递归改input/opaque item id、history窗口/item引用、notes路径、正文、密文或current_agent_name。只在Codex上下文协议启用；重复标识/头拒绝，可选metadata空值保留。解压/映射/模型替换后重建编码与长度；单请求映射缓存至多16项，不引入来源路由绑定或SQL。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-special/context-key-lifecycle": "保护根密钥以现有渠道密钥环加密持久化，重启/轮换只重新封装，不能随activeKeyID变化重新生成；解密失败拒绝相关入口启动。新实现不得存请求/笔记/密文正文来补隔离，也不得加入来源路由粘性。F1提供保护密钥元数据，F7/F8实现初始化/加载/轮换与实际入口；F0提供可重复权限原型。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "detection/native-evidence": "F4 按原生协议逐项验证结构、语义与可靠用量；真实长度与参数接受独立，搜索额外计数请求纳入实际消耗。SSE 使用原生流式端点，计数/压缩场景允许调用对应原生生成端点验证完整窗口续用。指纹固定 lmfpd 0.0.1792242250521 / 50a364bc686279094265f34f18f5501eac1d73f4，三条完整样本、离线 Go 等价评分，只保存库内相对排名，不证明身份。",
       "detection/native-applicability": "保留每个原始 ID 的场景归属，将通用模板断言细化为实际原生字段。Messages 不虚构 json_object/custom/namespace；Gemini 使用 allowedFunctionNames、VALIDATED、parametersJsonSchema 和 responseJsonSchema，不加入旧 responseSchema 专项；Chat SSE 不虚构原生推理事件。OpenAI custom、allowed_tools 及 Responses namespace 分别验证，temperature/top_p/effort/verbosity 分开投影。缺少偶发多调用或可选 thinking/签名事件只按明确条件断言记录未观测，不代替主动适用检测。",
       "detection/group-negative-prerequisite": "分组基础负例先复用同一凭据/协议的有界模型目录，从实际返回的模型 ID 构造合法基础体，再分别执行无效/缺失鉴权、随机未知模型和无效 JSON。模型元数据仅作请求构造和元数据结构证据，不提升为容量支持；Gemini 多候选额外使用其原生流式端点。",
@@ -21855,7 +21867,7 @@ x-aihub-gateway-contract:
       "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
       "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。",
       "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
-      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。",
+      "detection/replay-evidence-owner": "F4 upstream_protocol 层证明当前原生配置、完整 opaque/签名/压缩内容可原样提交并继续，字段命名明确为 self_contained_replay_without_resource_reference；真正的跨渠道正常路由/故障转移由既定 F7/F8/F10/F12 网关验收证明。不把单个上游成功冒充平台已无粘性，不改变维护者无粘性决定。 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "detection/partial-rollout": "部分套件已实现时执行其原生场景并保存真实证据，未实现套件保留在同一完整计划内，最终为 suite_pending 且 complete=false，不能审核创建。不因 F8 尚未落地阻止 F4 直接上游验收，也不靠删掉 F8 分母完成报告。完全没有可执行套件时仍直接待实现；恢复不重复已完成场景。",
       "detection/owned-state": "Responses previous_response_id 三轮、conversation 流和 item_reference 分别投影，覆盖自己刚创建的响应/会话/条目取改删及有限分页；Stored Chat 同理。列表只用于当前任务已知资源的观察/分页，不据返回列表接管或清理其他 ID。查询/取消/续流不会重复统计此前推理用量；background 轮询至多8次，starting_after 从已知序号恢复验证有限片段和权威终态，不能用片段冒充完整 SSE 生命周期。只清理已由本次创建响应及持久元数据证明归属的资源；不等待 TTL，不保存正文。",
       "detection/group-entrance-fallback": "同组入口仍共用唯一能力结论，单次调用共享一个超时。未写出请求头的连接失败可按顺序换入口；已经写出推理/写请求不自动重发，只读 GET 可在自然连接错误/502/503/504 后按顺序尝试。非法/缺失认证负例和正文保护不靠换地址绕过。每个实际尝试保留 entry_url/HTTP/发送状态诊断，精确请求缓存不按地址拆分；地址变更继续不使能力报告失效。0020 仅追加检测追溯列，不改历史账本/用户/余额。",
@@ -21885,17 +21897,18 @@ x-aihub-gateway-contract:
       "codex-rl24-operational-scope": "Operational assertions retain this original scope: [\"实际服务档位\", \"每个启用档位用有意义请求核验请求值、实际返回档位和可靠计量；UI/参数宣称与实际返档分别记录。\", \"降到 default 不记成 ultrafast/priority 实际通过，不由标记宣称性能提升；报价/计费接 F6\"]",
       "codex-rl13-operational-scope": "Operational assertions retain this original scope: [\"客户端接入前置\", \"固定认证/provider/base URL/目录/开关，隔离启动官方 CLI，验证实际模式与工具/请求是否启用；不得读取宿主登录。\", \"三层证据；客户端未启用、配置错、平台未实现不是上游 unsupported\"]",
       "codex-rl15-operational-scope": "Operational assertions retain this original scope: [\"Codex 能力目录\", \"固定版本请求目录，按账号/Key、模型别名/治理和候选能力过滤；由 CLI 实际读取，核验工具、模态、上下文和服务档位元数据与有效证据一致。\", \"不暴露共享账号目录或存完整提示词；目录声明不自动证明能力\"]",
-      "codex-rl17-operational-scope": "Operational assertions retain this original scope: [\"notes thread_hint\", \"新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。\", \"会话上下文辅助；不登记来源渠道粘性，不存提示正文\"]",
+      "codex-rl17-operational-scope": "Operational assertions retain this original scope: [\"notes thread_hint\", \"新会话/有权会话分别调用固定 thread_hint，核验空/非空结构与客户端使用；无 model 依既定候选规则。\", \"会话上下文辅助；不登记来源渠道粘性，不存提示正文\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "codex-rl18-operational-scope": "Operational assertions retain this original scope: [\"notes 写读/列表及固定范围内操作\", \"固定客户端实际注册的范围内操作逐项登记子断言；以 thread_hint→write_file→read_file→list_files_by_prefix 及退出恢复为已观测起点。append/search 等源码操作如属本轮固定清单须单独命名/留证，不能由写读通过推导。密文只原样往返并用合成标记核验。\", \"F0 冻结有限操作/方法/路径/必需头清单；文件名接口仍限会话笔记，不恢复 Files；不存正文\"]",
-      "codex-rl19-operational-scope": "Operational assertions retain this original scope: [\"history 窗口/条目及固定范围内操作\", \"list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。\", \"F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据\"]",
-      "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"]",
-      "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"]",
+      "codex-rl19-operational-scope": "Operational assertions retain this original scope: [\"history 窗口/条目及固定范围内操作\", \"list_windows→list_items→read_item 验证真实远端历史和恢复、筛选/分页/父子关系；固定清单的 search 等操作独立取证，不能只由本地重放宣布远端历史通过。\", \"F0 冻结有限操作清单；归属只校验账号/Key，不锁定原渠道/凭据\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-rl23-operational-scope": "Operational assertions retain this original scope: [\"自包含状态/history-notes 跨渠道\", \"明确受控 A 产生/B 续用、A 写/B 读和排序变化；覆盖同组不同凭据及跨组，标准资源引用负例仍受限。\", \"平台机制/真实上游兼容性分列；无任意供应商两两创建前置，不因失败恢复粘性\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-rl26-operational-scope": "Operational assertions retain this original scope: [\"专项权限与隔离\", \"两账号/两 Key 共用上游凭据，验证 session/agent/path/window/item 冲突、猜测/未知引用、列表、凭据轮换及 Key 撤销；验证实际入口认证/固定出站和脱敏。\", \"归属元数据不变成来源粘性；未知/冲突不能读取共享账号他人内容；不复制正文补兼容\"] 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
       "codex-rl25-operational-scope": "Operational assertions retain this original scope: [\"Codex 专用原生生图\", \"固定 CLI 实际调用已研究 images/generations 路径，检查图像模型权限/候选、请求/产物/可靠计量与后续工具使用；上游不支持记录真实负向结果。\", \"F8 负责专用入口，复用 F7/F6；不能以通用生图或主对话权限/报价代证，不恢复文件资源\", \"固定CLI原生JSON edits使用images[].image_url（inline/合法URL），与通用multipart edits分别验证；未知file_id不因资源接口移出获得共享凭据权限。\"]",
       "codex-proof-layer-assertions": "RL13 and RL15 assign platform/CLI assertions to their actual proof layer. All three layers remain mandatory. IDs keep their original positions; source mappings, RL10 aggregation, RL11 exclusion and endpoint scope remain intact. Notes/history context isolation remains a hard privacy requirement.",
       "codex-rl14-endpoint-evidence": "RL14 separately tests the native Codex and public Responses entrances; neither endpoint supplies transport capability evidence for the other. Public assertions are upstream/gateway only; the pinned CLI compression profile uses its actual native endpoint.",
       "codex-notes-model-prerequisites": "RL18 uses the actual native catalog for an explicit group model prerequisite and actual native model-produced encrypted arguments/output consumption. No invented ciphertext, notes body persistence, resource management API, timed consistency wait or source-channel binding.",
       "codex-history-seed-scope": "RL19 seeds only a synthetic session and known window using pinned CLI history_ingest_requested metadata. It reads only item IDs recovered from that window and matching the unpredictable seeded content, performs immediate observations without waiting, and records missing IDs as failed prerequisites rather than guessing resources or binding source channels.",
       "codex_compaction_proof": "固定官方 CLI 0.163.0 / 83086188 的 RemoteCompactionSupport 仅 Unsupported/V2；V1 standalone 保留直接上游与平台代理完整窗口检测，不编造不存在的 CLI V1 配置。RL22 使用 V2 协议；配置启用属客户端，重叠/取消/续用分层核验，单次结算属平台代理。原 ID 与全部功能断言保留。",
-      "codex-platform-proof": "RL23/26 are CI-controlled synthetic platform regressions, separate from supplier creation. Fixed CLI HTTP ResponsesApiRequest has no previous_response_id (the similarly named field is WebSocket-only), and does not emit Messages thinking signatures; these remain gateway HTTP proofs. Forged/colliding identifiers, arbitrary egress and secret-bearing error injection are adversarial HTTP proofs. CLI proofs cover actual cross-channel reasoning/compaction/notes/history, account/Key isolation of its actual contexts, credential rotation and revocation. Every original functional assertion remains mandatory in its applicable layer; no synthetic result projects supplier support."
+      "codex-platform-proof": "RL23/26 are CI-controlled synthetic platform regressions, separate from supplier creation. Fixed CLI HTTP ResponsesApiRequest has no previous_response_id (the similarly named field is WebSocket-only), and does not emit Messages thinking signatures; these remain gateway HTTP proofs. Forged/colliding identifiers, arbitrary egress and secret-bearing error injection are adversarial HTTP proofs. CLI proofs cover actual cross-channel reasoning/compaction/notes/history, account/Key isolation of its actual contexts, credential rotation and revocation. Every original functional assertion remains mandatory in its applicable layer; no synthetic result projects supplier support. 用户显式声明 notes/history 的粘性规则以 codex-special/user-notes-declaration 为准；本项旧无粘性/跨渠道断言仅适用于声明关闭，编号隔离始终保留。",
+      "codex-special/user-notes-declaration": "维护者2026-10-19决定：由用户在每个平台 Key 的 codex_notes 布尔设置声明使用笔记/历史工具，默认false。true时，已识别Codex上下文的Responses推理及notes/history辅助请求从首个相关请求起持久绑定原分组/渠道/凭据版本和受保护真实凭据范围；并发首请求须在出站前原子确定同一落点；重启/缓存淘汰不能换源，同组地址按用户顺序fallback。以账号/平台Key隔离后的实际context/session元数据为会话标识，prompt_cache_key不独立触发硬粘性，也不合并不同真实会话。false保留既定无来源粘性；工具是否已调用/启用不得替代平台声明。更改声明只影响后续请求，不迁移已有历史，建议新会话；重新开启同一会话保留其旧绑定。所有模式/能力/权限和独立标准远端资源约束继续生效，不存正文，不因原渠道不支持新模型而换源。独立图片调用及模型目录不因主对话会话套用错误的模型权限或报价。平台目录supports_experimental_context同时受用户声明与有效能力证据约束。"
     }
   }

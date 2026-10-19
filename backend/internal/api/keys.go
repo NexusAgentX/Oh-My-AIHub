@@ -55,6 +55,7 @@ type apiKeyJSON struct {
 	Prefix        string            `json:"prefix"`
 	Status        apikey.Status     `json:"status"`
 	IsDefault     bool              `json:"is_default"`
+	CodexNotes    bool              `json:"codex_notes"`
 	ExpiresAt     *time.Time        `json:"expires_at"`
 	AllowedModels []string          `json:"allowed_models"`
 	BudgetDaily   *string           `json:"budget_daily"`
@@ -116,6 +117,7 @@ func newApiKeyJSON(key apikey.Key) apiKeyJSON {
 		Prefix:        key.Prefix,
 		Status:        key.Status,
 		IsDefault:     key.IsDefault,
+		CodexNotes:    key.CodexNotes,
 		ExpiresAt:     key.ExpiresAt,
 		AllowedModels: key.AllowedModels,
 		BudgetDaily:   nullableAmount(key.BudgetDaily),
@@ -151,6 +153,7 @@ func newRoutingPreferenceJSON(pref routing.Pref) routingPreferenceJSON {
 }
 
 type keyRequest struct {
+	CodexNotes    optional[bool]      `json:"codex_notes"`
 	Name          *string             `json:"name"`
 	Status        *string             `json:"status"`
 	ExpiresAt     optional[time.Time] `json:"expires_at"`
@@ -192,11 +195,18 @@ func (a *app) createKey(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
+	if request.CodexNotes.Set && request.CodexNotes.Value == nil {
+		writeDomainError(w, apikey.ErrInvalidInput)
+		return
+	}
 	if request.Name == nil {
 		writeDomainError(w, apikey.ErrInvalidInput)
 		return
 	}
 	input := apikey.CreateInput{Name: *request.Name, Settings: apikey.Settings{ExpiresAt: request.ExpiresAt.Value}}
+	if request.CodexNotes.Value != nil {
+		input.CodexNotes = *request.CodexNotes.Value
+	}
 	if request.Status != nil {
 		input.Status = apikey.Status(*request.Status)
 	}
@@ -266,7 +276,11 @@ func (a *app) updateKey(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w)
 		return
 	}
-	update := apikey.Update{Name: request.Name, AllowedModels: request.AllowedModels, ModelAliases: request.ModelAliases}
+	if request.CodexNotes.Set && request.CodexNotes.Value == nil {
+		writeDomainError(w, apikey.ErrInvalidInput)
+		return
+	}
+	update := apikey.Update{CodexNotes: request.CodexNotes.Value, Name: request.Name, AllowedModels: request.AllowedModels, ModelAliases: request.ModelAliases}
 	if request.Status != nil {
 		status := apikey.Status(*request.Status)
 		update.Status = &status

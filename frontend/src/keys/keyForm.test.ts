@@ -8,6 +8,7 @@ const key: ApiKey = {
   prefix: 'oma_ab12',
   status: 'enabled',
   is_default: true,
+  codex_notes: false,
   expires_at: null,
   allowed_models: [],
   budget_daily: '10',
@@ -28,7 +29,7 @@ describe('API key form', () => {
     expect(budgetProgress({ ...key, budget_daily: null, budget_monthly: null })).toBeNull()
   })
 
-  it('counts the five advanced items that differ from defaults', () => {
+  it('counts the advanced items that differ from defaults', () => {
     expect(advancedChangedCount(emptyKeyForm)).toBe(0)
     const form = { ...formFromKey(key), aliases: [{ from: 'gpt-4', to: 'gpt-5' }], expiresAt: '2027-01-01T00:00' }
     expect(advancedChangedCount(form, 2)).toBe(4)
@@ -38,6 +39,14 @@ describe('API key form', () => {
     const original = formFromKey(key)
     expect(updateRequest(original, original)).toEqual({})
     expect(updateRequest(original, { ...original, name: '新名字', budgetDaily: '' })).toEqual({ name: '新名字', budget_daily: null })
+  })
+
+  it('persists the explicit notes declaration, including turning it off', () => {
+    const original = formFromKey({ ...key, codex_notes: true })
+    expect(original.codexNotes).toBe(true)
+    expect(updateRequest(original, { ...original, codexNotes: false })).toEqual({ codex_notes: false })
+    expect(createRequest({ ...emptyKeyForm, name: 'Codex', codexNotes: true }).codex_notes).toBe(true)
+    expect(advancedChangedCount({ ...emptyKeyForm, codexNotes: true })).toBe(1)
   })
 
   it('validates budgets, model scope and aliases', () => {

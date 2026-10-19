@@ -57,13 +57,14 @@ type keyColumns struct {
 	BudgetTotal                       *money.Amount
 	ModelAliases                      []byte
 	AccountStatus                     string
+	CodexNotes                        bool
 }
 
 func lookupColumns(row LookupKeyRow) keyColumns {
 	return keyColumns{
 		ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Status: row.Status, ExpiresAt: row.ExpiresAt,
 		AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDailyNano, BudgetMonthly: row.BudgetMonthlyNano,
-		BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
+		CodexNotes: row.CodexNotes, BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
 	}
 }
 
@@ -74,7 +75,7 @@ func keyAuth(row keyColumns) gateway.KeyAuth {
 		KeyID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Enabled: row.Status == "enabled",
 		ExpiresAt: row.ExpiresAt, AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDaily,
 		BudgetMonthly: row.BudgetMonthly, BudgetTotal: row.BudgetTotal, Aliases: aliases,
-		AccountActive: row.AccountStatus == "active",
+		CodexNotes: row.CodexNotes, AccountActive: row.AccountStatus == "active",
 	}
 }
 
@@ -91,7 +92,7 @@ func (s *Store) LoadKeys(ctx context.Context) ([]gateway.KeyRecord, error) {
 		records = append(records, gateway.KeyRecord{Hash: row.KeyHash, Auth: keyAuth(keyColumns{
 			ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Status: row.Status, ExpiresAt: row.ExpiresAt,
 			AllowedModels: row.AllowedModels, BudgetDaily: row.BudgetDailyNano, BudgetMonthly: row.BudgetMonthlyNano,
-			BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
+			CodexNotes: row.CodexNotes, BudgetTotal: row.BudgetTotalNano, ModelAliases: row.ModelAliases, AccountStatus: row.AccountStatus,
 		})})
 	}
 	return records, nil

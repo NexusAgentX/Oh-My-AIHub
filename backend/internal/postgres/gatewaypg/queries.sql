@@ -1,6 +1,6 @@
 -- name: LookupKey :one
 SELECT k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
-       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases, k.codex_notes,
        a.status AS account_status
 FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id
@@ -30,7 +30,7 @@ WHERE api_key_id = sqlc.arg(key_id);
 -- same row as LookupKey for each undeleted key, with the hash it is found by.
 -- name: ListAllKeys :many
 SELECT k.key_hash, k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
-       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases, k.codex_notes,
        a.status AS account_status
 FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id

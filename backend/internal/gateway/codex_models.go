@@ -90,7 +90,7 @@ func filterCodexCatalog(payload []byte, records []CandidateRecord, selected Cand
 				}
 				flag("use_responses_lite", codexProof(c, "RL01", "native_lite_request") && codexProof(c, "RL03", "lite_tools_roundtrip") && codexProof(c, "RL08", "sse_lifecycle"))
 				flag("supports_search_tool", codexProof(c, "RL16", "native_search"))
-				contextOK := true
+				contextOK := key.CodexNotes
 				for _, op := range []string{"thread_hint"} {
 					for _, required := range codexContextRequirements("codex.notes." + op) {
 						contextOK = contextOK && c.Evidence[required.Layer+"/"+required.ID]
