@@ -273,6 +273,10 @@ func (s *perfStack) populate(channels, consumers int) {
 	for i := range channels {
 		sharer := e.member(fmt.Sprintf("sharer%d", i), "0")
 		s.channelIDs = append(s.channelIDs, e.createChannel(sharer, channelSpec{name: fmt.Sprintf("channel%d", i), baseURL: s.upstreamURL(i), multiplier: "1"}))
+		// The synthetic upstream supports response continuation. Explicitly
+		// declare that fixture capability, as the ordinary integration test does;
+		// production routing must keep rejecting unproven stateful requests.
+		e.declareGroupedCapabilities(s.channelIDs[i], "upstream_protocol/openai-responses.state/previous_response_id_three_turns")
 	}
 	for i := range consumers {
 		consumer := e.member(fmt.Sprintf("consumer%d", i), "1000000")
