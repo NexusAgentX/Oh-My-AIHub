@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { CommittedInput } from '../ui/CommittedInput'
 import { rangeFrom, type RangePreset } from '../money/time'
 import { Button, Icon, Segmented } from '../ui'
 import { formatLabels, formats, outcomeLabels, outcomeOptions } from './labels'
@@ -136,15 +137,22 @@ export function CallFilterBar({
   onChange,
   models,
   keys,
+  onClear,
 }: {
   value: CallFilterState
   onChange: (value: CallFilterState) => void
   models?: string[]
   keys?: Array<{ id: string; name: string }>
+  onClear?: () => void
 }) {
   const [requestId, setRequestId] = useState(value.requestId)
   const [idError, setIdError] = useState('')
   const [tag, setTag] = useState(value.tag)
+  useEffect(() => setTag(value.tag), [value.tag])
+  useEffect(() => setRequestId(value.requestId), [value.requestId])
+  const advancedCount = Object.entries(value).filter(([key, item]) =>
+    !['range', 'model', 'apiKeyId', 'format', 'outcome', 'tag', 'requestId'].includes(key) && item !== undefined && item !== '',
+  ).length
   const set = (patch: Partial<CallFilterState>) => onChange({ ...value, ...patch })
   const submitId = (event: FormEvent) => {
     event.preventDefault()
@@ -209,7 +217,7 @@ export function CallFilterBar({
         />
       </form>
       <details className="call-advanced">
-        <summary>高级筛选</summary>
+        <summary>更多筛选{advancedCount > 0 && `（${advancedCount}）`}</summary>
         <div className="call-advanced-grid">
           <FilterSelect
             label="响应方式"
@@ -253,166 +261,166 @@ export function CallFilterBar({
           />
           <label>
             最短耗时 ms
-            <input
+            <CommittedInput
               className="input"
               aria-label="最短耗时 ms"
               type="number"
               min="0"
               step="1"
               value={value.min_duration_ms ?? ''}
-              onChange={(e) => set({ min_duration_ms: e.target.value })}
+              onCommit={(input) => set({ min_duration_ms: input })}
             />
           </label>
           <label>
             最长耗时 ms
-            <input
+            <CommittedInput
               className="input"
               aria-label="最长耗时 ms"
               type="number"
               min="0"
               step="1"
               value={value.max_duration_ms ?? ''}
-              onChange={(e) => set({ max_duration_ms: e.target.value })}
+              onCommit={(input) => set({ max_duration_ms: input })}
             />
           </label>
           <label>
             最少 tokens
-            <input
+            <CommittedInput
               className="input"
               aria-label="最少 tokens"
               type="number"
               min="0"
               step="1"
               value={value.min_tokens ?? ''}
-              onChange={(e) => set({ min_tokens: e.target.value })}
+              onCommit={(input) => set({ min_tokens: input })}
             />
           </label>
           <label>
             最多 tokens
-            <input
+            <CommittedInput
               className="input"
               aria-label="最多 tokens"
               type="number"
               min="0"
               step="1"
               value={value.max_tokens ?? ''}
-              onChange={(e) => set({ max_tokens: e.target.value })}
+              onCommit={(input) => set({ max_tokens: input })}
             />
           </label>
           <label>
             最低费用
-            <input
+            <CommittedInput
               className="input"
               aria-label="最低费用"
               type="number"
               min="0"
               step="any"
               value={value.min_cost ?? ''}
-              onChange={(e) => set({ min_cost: e.target.value })}
+              onCommit={(input) => set({ min_cost: input })}
             />
           </label>
           <label>
             最高费用
-            <input
+            <CommittedInput
               className="input"
               aria-label="最高费用"
               type="number"
               min="0"
               step="any"
               value={value.max_cost ?? ''}
-              onChange={(e) => set({ max_cost: e.target.value })}
+              onCommit={(input) => set({ max_cost: input })}
             />
           </label>
           <label>
             最少尝试
-            <input
+            <CommittedInput
               className="input"
               aria-label="最少尝试"
               type="number"
               min="0"
               step="1"
               value={value.min_attempts ?? ''}
-              onChange={(e) => set({ min_attempts: e.target.value })}
+              onCommit={(input) => set({ min_attempts: input })}
             />
           </label>
           <label>
             最多尝试
-            <input
+            <CommittedInput
               className="input"
               aria-label="最多尝试"
               type="number"
               min="0"
               step="1"
               value={value.max_attempts ?? ''}
-              onChange={(e) => set({ max_attempts: e.target.value })}
+              onCommit={(input) => set({ max_attempts: input })}
             />
           </label>
           <label>
             尝试渠道 ID
-            <input
+            <CommittedInput
               className="input"
               aria-label="尝试渠道 ID"
               value={value.attempt_channel_id ?? ''}
-              onChange={(e) => set({ attempt_channel_id: e.target.value.trim() })}
+              onCommit={(input) => set({ attempt_channel_id: input.trim() })}
             />
           </label>
           <label>
             上游状态码
-            <input
+            <CommittedInput
               className="input"
               aria-label="上游状态码"
               type="number"
               min="0"
               step="1"
               value={value.status_code ?? ''}
-              onChange={(e) => set({ status_code: e.target.value })}
+              onCommit={(input) => set({ status_code: input })}
             />
           </label>
           <label>
             上游错误码
-            <input
+            <CommittedInput
               className="input"
               aria-label="上游错误码"
               type="text"
               min="0"
               step="1"
               value={value.error_code ?? ''}
-              onChange={(e) => set({ error_code: e.target.value })}
+              onCommit={(input) => set({ error_code: input })}
             />
           </label>
           <label>
             尝试结束原因
-            <input
+            <CommittedInput
               className="input"
               aria-label="尝试结束原因"
               type="text"
               min="0"
               step="1"
               value={value.end_reason ?? ''}
-              onChange={(e) => set({ end_reason: e.target.value })}
+              onCommit={(input) => set({ end_reason: input })}
             />
           </label>
           <label>
             开始时间
-            <input
+            <CommittedInput
               className="input"
               aria-label="开始时间"
               type="datetime-local"
               value={toLocalInput(value.from)}
-              onChange={(e) => set({ from: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+              onCommit={(input) => set({ from: input ? new Date(input).toISOString() : '' })}
             />
           </label>
           <label>
             结束时间
-            <input
+            <CommittedInput
               className="input"
               aria-label="结束时间"
               type="datetime-local"
               value={toLocalInput(value.to)}
-              onChange={(e) => set({ to: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+              onCommit={(input) => set({ to: input ? new Date(input).toISOString() : '' })}
             />
           </label>
-          <Button variant="quiet" onClick={() => { setTag(''); setRequestId(''); setIdError(''); onChange({ ...emptyCallFilters }) }}>
+          <Button variant="quiet" onClick={() => { setTag(''); setRequestId(''); setIdError(''); if (onClear) onClear(); else onChange({ ...emptyCallFilters }) }}>
             清除筛选
           </Button>
         </div>

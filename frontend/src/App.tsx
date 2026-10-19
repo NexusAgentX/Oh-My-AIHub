@@ -26,6 +26,7 @@ import { adminRoutes } from './admin/routes'
 import { RouteErrorPage } from './layouts/RouteErrorPage'
 import { NotFoundPage } from './layouts/NotFoundPage'
 import { ProductLayout } from './layouts/ProductLayout'
+import { LegacyRedirect } from './layouts/LegacyRedirect'
 import { PageLoading } from './ui'
 import { LandingRoute, WelcomePage } from './welcome/WelcomePage'
 
@@ -107,7 +108,10 @@ export const appRoutes = createRoutesFromElements(
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/:id" />
           <Route element={<PointsPage />} path="/points" />
           <Route element={<TradeDetailPage />} path="/points/trades/:id" />
-          <Route element={<UsagePage />} path="/usage" />
+          <Route element={<LegacyRedirect from="/usage" to="/calls" />} path="/usage" />
+          <Route element={<UsagePage />} path="/calls" />
+          <Route lazy={async () => ({ Component: (await import('./calls/Pages')).CallInsightsPage })} path="/calls/insights" />
+          <Route lazy={async () => ({ Component: (await import('./calls/Pages')).CallPage })} path="/calls/:id" />
           <Route element={<MePage />} path="/me" />
           <Route element={<AccountPage />} path="/account" />
           <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).ForumPage })} path="/forum" />

@@ -1,14 +1,9 @@
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import {
   CallExplorer,
   CallFilterBar,
-  emptyCallFilters,
-  filtersToParams,
   summaryColumns,
   userCallsPath,
   type CallColumn,
-  type CallFilterState,
 } from '../calls'
 import { Card, PageHeader } from '../ui'
 import { withQuery } from './api'
@@ -16,6 +11,10 @@ import { useAdminAccounts } from './queries'
 import { useGroupChannels } from '../group-channels/queries'
 import { useMarketNames } from '../market/queries'
 import type { AdminCall } from './types'
+import { CallSectionNav } from '../calls/CallSectionNav'
+import { useCallFilters } from '../calls/urlFilters'
+import { useQueryOverlay } from '../ui/urlState'
+import { CallFacet } from '../calls/CallFacet'
 
 export const adminCallsPath = '/api/admin/calls'
 export const adminCallsStreamPath = '/api/admin/calls/stream'
@@ -65,26 +64,15 @@ function FilterSelect({
 }
 
 export function CallsPage() {
-  const [search, setSearch] = useSearchParams()
-  const [filters, setFilters] = useState<CallFilterState>(() => ({
-    ...emptyCallFilters,
-    outcome: search.get('outcome') ?? '',
-  }))
-  const accountID = search.get('account_id') ?? ''
-  const channelID = search.get('channel_id') ?? ''
-  const openCall = search.get('call')
+  const { filters, setFilters, params, url, update, clear } = useCallFilters()
+  const accountID = url.account_id
+  const channelID = filters.channel_id ?? ''
+  const [openCall, setOpenCall] = useQueryOverlay('call')
   const accounts = useAdminAccounts({})
   const channels = useGroupChannels(true)
   const models = useMarketNames()
-  const params = useMemo(
-    () => ({ ...filtersToParams(filters), account_id: accountID || undefined, channel_id: channelID || undefined }),
-    [filters, accountID, channelID],
-  )
   const setParam = (key: string, value: string | null) => {
-    const next = new URLSearchParams(search)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    setSearch(next, { replace: true })
+    update({ [key]: value ?? '' })
   }
   const withSelected = (options: Array<{ value: string; label: string }>, selected: string) =>
     selected && !options.some((option) => option.value === selected)
@@ -94,16 +82,19 @@ export function CallsPage() {
   return (
     <>
       <PageHeader title="调用" />
+      <CallSectionNav admin />
+      <CallFacet params={params} onClear={() => update({ dimension: '', dimension_value: '', second_dimension: '', second_value: '' })} />
       <Card>
         <CallExplorer<AdminCall>
           caption="全部调用"
           columns={adminColumns()}
           detailPath={userCallsPath}
           listPath={adminCallsPath}
-          onOpenCall={(id) => setParam('call', id)}
+          onOpenCall={setOpenCall}
           openCallId={openCall}
           params={params}
           streamPath={adminStreamPath(accountID, channelID)}
+          liveDisabledReason={filters.to ? '固定结束时间不支持实时' : filters.requestId ? '精确查找不支持实时' : undefined}
           toolbar={
             <div className="admin-call-filters">
               <FilterSelect
@@ -124,7 +115,7 @@ export function CallsPage() {
                 )}
                 value={channelID}
               />
-              <CallFilterBar
+              <CallFilterBar onClear={clear}
                 models={models.data?.items.map((model) => model.id)}
                 onChange={setFilters}
                 value={filters}
