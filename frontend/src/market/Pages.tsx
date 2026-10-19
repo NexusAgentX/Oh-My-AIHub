@@ -5,7 +5,7 @@ import { formatClockTime } from '../money/time'
 import { DomainNav } from '../layouts/DomainNav'
 import { MarketQualitySection } from './Quality'
 import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { components } from '../api/schema.gen'
 import { FormatTags } from '../calls'
@@ -93,6 +93,7 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
 export function MarketModelsPage() { return <><PageHeader title="模型" /><DomainNav domain="市场" /><MarketModelGrid /></> }
 
 function RoutingCard({ detail }: { detail: Detail }) {
+  const location = useLocation()
   const [base, setBase] = useState(() => draftFromPreference(detail.routing, detail.routing_channels))
   const [draft, setDraft] = useState(base)
   const [savedAt, setSavedAt] = useState('')
@@ -105,7 +106,7 @@ function RoutingCard({ detail }: { detail: Detail }) {
     <SaveBar dirtyCount={dirty ? 1 : 0} busy={mutation.isPending} savedAt={savedAt} onDiscard={() => setDraft(base)} onSave={() => mutation.mutate(toRoutingInput(draft), { onSuccess: result => { const latest = draftFromPreference(result, detail.routing_channels); setBase(latest); setDraft(latest); setSavedAt(formatClockTime(new Date())) } })} />
     <InlineError>{mutation.isError ? errorMessage(mutation.error, '保存失败') : ''}</InlineError>
     <RoutingEditor channels={detail.routing_channels} draft={draft} onChange={setDraft} scopeHint="该模型的全部渠道，对你所有 Key 生效；单把 Key 的覆盖优先" />
-    {(keys.data?.items ?? []).filter(key => key.routed_models.includes(detail.model.id)).map(key => <Link key={key.id} to={`/keys/${key.id}/routing/${encodeURIComponent(detail.model.id)}`}>Key「{key.name}」单独设置了此模型 →</Link>)}
+    {(keys.data?.items ?? []).filter(key => key.routed_models.includes(detail.model.id)).map(key => <Link key={key.id} to={`/keys/${key.id}/routing/${encodeURIComponent(detail.model.id)}`} state={{ from: { to: location.pathname + location.search, label: '模型' } }}>Key「{key.name}」单独设置了此模型 →</Link>)}
     </div>
   </Card>
 }

@@ -36,7 +36,7 @@ export function KeyRoutingDrawer() {
   const { id = '', model = '' } = useParams(), detail = useKey(id), query = useMarketModel(model, new URLSearchParams())
   const navigate = useNavigate(), location = useLocation()
   const [busy, setBusy] = useState(false)
-  const close = () => { if (location.state?.overlayFrom === `/keys/${id}`) navigate(-1); else navigate(`/keys/${id}`, { replace: true }) }
+  const close = () => { if (location.state?.overlayFrom === `/keys/${id}`) navigate(-1); else navigate(`/keys/${id}`, { replace: true, state: location.state?.from ? { from: location.state.from } : null }) }
   return <Drawer open busy={busy} title={model} onClose={close}><QueryBoundary query={detail} errorFallback="Key 加载失败">{key => <QueryBoundary query={query} errorFallback="模型与渠道加载失败">{data => {
     const preference = key.routing.find(item => item.model_id === model)
     return <ModelForm key={model} keyId={id} saved={Boolean(preference)} preference={preference ?? data.routing} channels={data.routing_channels} onClose={close} onBusy={setBusy} />
@@ -46,6 +46,7 @@ export function KeyRoutingDrawer() {
 type Removal = { model: string; status: 'pending' | 'success' | 'error'; error?: string }
 /** 覆盖是独立对象；列表只负责进入单模型编辑器与报告批量操作结果。 */
 export function KeyRoutingSection({ keyId, routing }: { keyId: string; routing: RoutingPreference[] }) {
+  const location = useLocation()
   const models = useMarketNames(), { remove } = useKeyRouting(keyId)
   const [adding, setAdding] = useState(''), [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false)
   const [results, setResults] = useState<Removal[]>([])
@@ -63,8 +64,8 @@ export function KeyRoutingSection({ keyId, routing }: { keyId: string; routing: 
   }
   const failed = results.filter(result => result.status === 'error')
   return <div className="key-routing">
-    {!routing.length ? <p className="muted-copy">全部跟随账号设置</p> : <ul className="key-route-list">{routing.map(preference => <li key={preference.model_id}><Link to={`/keys/${keyId}/routing/${encodeURIComponent(preference.model_id)}`} state={{ overlayFrom: `/keys/${keyId}` }}><strong className="mono">{preference.model_id}</strong><span><Badge tone="info">覆盖账号设置</Badge> {routingModeLabels[preference.mode]}</span></Link></li>)}</ul>}
-    <div className="key-route-add"><SuggestInput aria-label="模型 ID" placeholder="选择或输入模型 ID" value={adding} onChange={event => setAdding(event.target.value)} suggestions={(models.data?.items ?? []).filter(model => !routing.some(item => item.model_id === model.id)).map(model => ({ value: model.id }))} /><ButtonLink to={`/keys/${keyId}/routing/${encodeURIComponent(adding.trim())}`} aria-disabled={!adding.trim()} onClick={event => { if (!adding.trim()) event.preventDefault() }} state={{ overlayFrom: `/keys/${keyId}` }}>单独设置</ButtonLink></div>
+    {!routing.length ? <p className="muted-copy">全部跟随账号设置</p> : <ul className="key-route-list">{routing.map(preference => <li key={preference.model_id}><Link to={`/keys/${keyId}/routing/${encodeURIComponent(preference.model_id)}`} state={{ ...location.state, overlayFrom: `/keys/${keyId}` }}><strong className="mono">{preference.model_id}</strong><span><Badge tone="info">覆盖账号设置</Badge> {routingModeLabels[preference.mode]}</span></Link></li>)}</ul>}
+    <div className="key-route-add"><SuggestInput aria-label="模型 ID" placeholder="选择或输入模型 ID" value={adding} onChange={event => setAdding(event.target.value)} suggestions={(models.data?.items ?? []).filter(model => !routing.some(item => item.model_id === model.id)).map(model => ({ value: model.id }))} /><ButtonLink to={`/keys/${keyId}/routing/${encodeURIComponent(adding.trim())}`} aria-disabled={!adding.trim()} onClick={event => { if (!adding.trim()) event.preventDefault() }} state={{ ...location.state, overlayFrom: `/keys/${keyId}` }}>单独设置</ButtonLink></div>
     {models.isError && <p className="muted-copy">模型选项加载失败，可直接输入模型 ID。</p>}
     {routing.length > 0 && <Button variant="quiet" type="button" disabled={busy} onClick={() => { setResults([]); setConfirm(true) }}>全部恢复跟随账号</Button>}
     {results.length > 0 && <div role="status"><p>已移除 {results.filter(result => result.status === 'success').length}/{results.length}{busy ? ' · 处理中' : ''}</p><ul>{results.map(result => <li key={result.model}>{result.model}：{result.status === 'pending' ? '处理中' : result.error || '已移除'}</li>)}</ul>{failed.length > 0 && !busy && <Button variant="secondary" onClick={() => void run(failed.map(item => item.model))}>重试失败的 {failed.length} 项</Button>}</div>}

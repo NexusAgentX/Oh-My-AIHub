@@ -7,7 +7,8 @@ import { ContentComposer } from './ContentComposer'
 import { NewTicketPage } from './TopicEditorPage'
 import { forumApi } from './queries'
 import { ApiError } from '../api/client'
-import { createMemoryRouter, RouterProvider, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { createMemoryRouter, Outlet, RouterProvider, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { UnsavedGuardProvider } from '../ui/UnsavedGuard'
 
 const state = vi.hoisted(() => ({ editor: {} as MarkdownEditorProps, save: vi.fn() }))
 vi.mock('../markdown', () => ({ MarkdownEditor: (props: MarkdownEditorProps) => { state.editor = props; return <textarea value={props.value} readOnly /> } }))
@@ -76,28 +77,28 @@ describe('forum content submission', () => {
 
 describe('unsaved forum navigation', () => {
   it('blocks links and history back, keeps a cancelled draft and permits confirmed discard', async () => {
-    const router = createMemoryRouter([
+    const router = createMemoryRouter([{ element: <UnsavedGuardProvider><Outlet /></UnsavedGuardProvider>, children: [
       { path: '/edit', element: <ContentComposer onSave={vi.fn()} submitLabel="Save" /> },
       { path: '/away', element: <p>Away</p> },
-    ], { initialEntries: ['/away', '/edit'] })
+    ] }], { initialEntries: ['/away', '/edit'] })
     await act(async () => root.render(<RouterProvider router={router} />))
     await act(async () => state.editor.onChange('unsaved body'))
     await act(async () => { void router.navigate(-1) })
-    expect(host.textContent).toContain('丢弃未保存的正文')
+    expect(host.textContent).toContain('放弃未保存的修改')
     await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '取消')!.click() })
     expect(state.editor.value).toBe('unsaved body')
     expect(router.state.location.pathname).toBe('/edit')
     await act(async () => { void router.navigate('/away') })
-    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '丢弃并离开')!.click() })
+    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '放弃并离开')!.click() })
     expect(router.state.location.pathname).toBe('/away')
   })
   it('allows blank drafts and successful submit navigation without a discard dialog', async () => {
     let router: ReturnType<typeof createMemoryRouter>
     const save = vi.fn(async () => { await router.navigate('/away') })
-    router = createMemoryRouter([
+    router = createMemoryRouter([{ element: <UnsavedGuardProvider><Outlet /></UnsavedGuardProvider>, children: [
       { path: '/edit', element: <ContentComposer onSave={save} submitLabel="Save" /> },
       { path: '/away', element: <p>Away</p> },
-    ], { initialEntries: ['/edit'] })
+    ] }], { initialEntries: ['/edit'] })
     await act(async () => root.render(<RouterProvider router={router} />))
     await act(async () => state.editor.onChange('   '))
     await act(async () => { await router.navigate('/away') })

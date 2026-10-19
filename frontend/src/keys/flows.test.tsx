@@ -20,7 +20,7 @@ async function mount(element: React.ReactNode) {
 }
 it('hands the creation secret to the detail once without retaining it in mutation data', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ key: { id: 'key' }, secret: 'synthetic-key-secret' }), { status: 201 }))
-  function Create() { const create = useCreateKey(); return <button onClick={() => create.mutate({ name: 'Test' })}>创建</button> }
+  function Create() { const create = useCreateKey(); return <button onClick={() => create.mutate({ name: 'Test', codex_notes: false })}>创建</button> }
   const { host, client, close } = await mount(<Create />)
   try {
     await act(async () => { host.querySelector('button')!.click(); await flush() })
