@@ -54,6 +54,19 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
 | `keyringcheck` | 启动时逐条解密仍可能被读取的密文，缺失或损坏即拒绝启动 |
 | `forum` | 板块、主题、回复、工单与附件校验（ADR-0031） |
+| `contribution` | 成员贡献工作流：私有草稿与生效目录分离、提交与管理员审核发布 |
+| `groupchannel` | 分组渠道配置、Key 探针、网关候选快照与运行时 |
+| `marketbrowse` | 从已发布目录派生的公开成员目录与报告投影 |
+| `quotepricing` | 不可变报价簿：调用开始时固定汇率、折扣与时间，主模型及子推理均不跨组借价 |
+| `resourcestate` | 原生会话资源状态跟踪：标识归属、保护游标、父子关系（`resourcepg`） |
+| `typical` | 典型费用估算：基于可靠结算样本的派生画像，`typicalpg` 持久保存有界样本与快照 |
+| `geolocation` | IP 定位与缓存；向 ipwho.is 查询公网 IP，结果按每日预算有界 |
+| `clientip` | 从可信转发头提取客户端 IP |
+| `cutover` | 分组市场切换逻辑（`cmd/cutover-check` 使用） |
+| `fingerprint` | 模型指纹 |
+| `nativeencoding` | zstd 解码、字节替换与重新编码（Codex 请求） |
+| `codexprobe` | Codex 模型探测 |
+| `codexsession` | Codex 会话命名空间隔离（按账号/平台 Key 分隔编号） |
 | `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据精确匹配与抹除（ADR-0041） |
 
 ## API 约定
@@ -68,7 +81,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 ### 分组市场持久契约
 
-`market_*` 是追加的数据结构，尚未接入公开贡献接口或网关快照。批准写入由 `marketpg.Apply` 接受调用方事务，供贡献审核在同一事务校验权限、修订和报告后发布；它本身不提供 HTTP 审批绕过入口。`marketpg.Read` 用固定批量查询构建一致目录，调用方负责权限和运行时可见性。当前旧消费者继续运行，清理与切换不能提前执行。
+`market_*` 是追加的数据结构，已接入公开贡献接口与网关候选快照。批准写入由 `marketpg.Apply` 接受调用方事务，供贡献审核在同一事务校验权限、修订和报告后发布；它本身不提供 HTTP 审批绕过入口。`marketpg.Read` 用固定批量查询构建一致目录，调用方负责权限和运行时可见性。旧全局模型、供应商与独立渠道管理接口已退役，旧业务配置已随 `0026_retire_legacy_configuration.sql` 清理。
 
 供应商、分组、模型和地址采用稳定 UUID 与乐观修订；分组地址关系独立于顺序。规范化地址全站唯一，同供应商可跨组引用，复合外键阻止跨供应商挂接。模型仅存在于分组中，按原生 `model_id` 精确聚合；原厂参考源唯一性与模型类型冲突由数据库串行校验，不增加全局模型主表。
 
