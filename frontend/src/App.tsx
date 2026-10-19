@@ -20,6 +20,10 @@ import { UsagePage } from './usage/UsagePage'
 import { BuyRouteDrawer, MyOrdersPage, MyTradesPage, PointsMarketPage, PointsPage, SellRouteDrawer } from './points/PointsPage'
 import { TradeDetailPage } from './points/TradeDetailPage'
 import { KeysPage } from './keys/KeysPage'
+import { KeyCreateDrawer, KeyDetailPage } from './keys/KeyDrawer'
+import { KeyRoutingDrawer } from './keys/KeyRouting'
+import { clearKeySecret } from './keys/secret'
+import { UnsavedGuardProvider } from './ui/UnsavedGuard'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
 import { RouteErrorPage } from './layouts/RouteErrorPage'
@@ -57,6 +61,7 @@ function SessionQueryReset() {
     if (previous.current !== accountID) {
       previous.current = accountID
       client.clear()
+      clearKeySecret()
     }
   }, [accountID, client])
   return null
@@ -68,7 +73,7 @@ function AppProviders() {
       <InstanceProvider>
         <AuthProvider>
           <SessionQueryReset />
-          <Outlet />
+          <UnsavedGuardProvider><Outlet /></UnsavedGuardProvider>
         </AuthProvider>
       </InstanceProvider>
     </QueryClientProvider>
@@ -94,7 +99,8 @@ export const appRoutes = createRoutesFromElements(
           <Route element={<LegacyRedirect from="/forum/tickets" to="/tickets" />} path="/forum/tickets/*" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelsPage})} path="/models" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelDetailPage})} path="/models/:model" />
-          <Route element={<KeysPage />} path="/keys" />
+          <Route element={<KeysPage />} path="/keys"><Route element={<KeyCreateDrawer />} path="new" /></Route>
+          <Route element={<KeyDetailPage />} path="/keys/:id"><Route element={<KeyRoutingDrawer />} path="routing/:model" /></Route>
           <Route element={<MarketHallPage />} path="/channel-hall" />
           <Route element={<MarketHallChannelPage />} path="/channel-hall/:id" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSuppliersPage})} path="/suppliers" />

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, pathSegment } from '../api/client'
 import type { ApiKeyCreateRequest, ApiKeyUpdateRequest, RoutingPreferenceInput } from '../api/types'
+import { handoffKeySecret } from './secret'
 
 export const keyKeys = {
   all: ['keys'] as const,
@@ -40,7 +41,11 @@ function useInvalidateKeys() {
 export function useCreateKey() {
   const invalidate = useInvalidateKeys()
   return useMutation({
-    mutationFn: (input: ApiKeyCreateRequest) => apiSend<'createKey'>('POST', '/api/keys', input),
+    mutationFn: async (input: ApiKeyCreateRequest) => {
+      const result = await apiSend<'createKey'>('POST', '/api/keys', input)
+      handoffKeySecret(result.key.id, result.secret)
+      return { key: result.key }
+    },
     onSuccess: invalidate,
   })
 }

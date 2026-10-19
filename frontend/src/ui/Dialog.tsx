@@ -14,6 +14,9 @@ type OverlayProps = {
   footer?: ReactNode
 }
 
+let scrollLocks = 0
+let originalOverflow = ''
+
 /**
  * 基于原生 <dialog>.showModal()：浏览器提供焦点陷阱、背景惰性与 Esc，
  * 关闭后焦点自动回到触发元素。这里补充：遮罩点击关闭、滚动锁定、busy 保护。
@@ -36,10 +39,10 @@ function useModalDialog({
 
   useEffect(() => {
     if (!open) return
-    const previous = document.body.style.overflow
+    if (scrollLocks++ === 0) originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = previous
+      if (--scrollLocks === 0) document.body.style.overflow = originalOverflow
     }
   }, [open])
 

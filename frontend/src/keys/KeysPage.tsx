@@ -1,10 +1,11 @@
 import { CallSectionNav } from '../calls/CallSectionNav'
-import { useState } from 'react'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { formatTime } from '../money/time'
 import type { ApiKey } from '../api/types'
 import { formatPoints } from '../money/format'
 import {
   Badge,
-  Button,
+  ButtonLink,
   EmptyState,
   Icon,
   Notice,
@@ -13,18 +14,17 @@ import {
   QueryBoundary,
 } from '../ui'
 import { budgetProgress, keyBadges } from './keyForm'
-import { KeyDrawer, type KeyDrawerState } from './KeyDrawer'
 import { maxKeys, useKeys } from './queries'
 
-function KeyRow({ apiKey, onOpen }: { apiKey: ApiKey; onOpen: () => void }) {
+function KeyRow({ apiKey }: { apiKey: ApiKey }) {
   const progress = budgetProgress(apiKey)
   const expired = apiKey.expires_at !== null && new Date(apiKey.expires_at).getTime() < Date.now()
   return (
     <li className="key-row">
-      <button className="key-row-button" onClick={onOpen} type="button">
+      <Link className="key-row-button" to={`/keys/${apiKey.id}`}>
         <span className="key-row-name">
           <strong>{apiKey.name}</strong>
-          <code className="mono">{apiKey.prefix}…</code>
+          <code className="mono">{apiKey.prefix}…</code><small className="muted">{apiKey.last_used_at ? `最近使用 ${formatTime(apiKey.last_used_at)}` : '从未使用'}</small>
           <span className="key-row-badges">
             {keyBadges(apiKey).map((badge) => (
               <Badge key={badge} tone="info">
@@ -45,7 +45,7 @@ function KeyRow({ apiKey, onOpen }: { apiKey: ApiKey; onOpen: () => void }) {
         </dl>
         <span className="key-row-budget">
           <span className="key-row-budget-label">{progress ? `${progress.label}预算` : '预算'}</span>
-          <strong className="num">{progress ? `已用 ${Math.round(progress.percent)}%` : '不限'}</strong>
+          <strong className="num">{progress ? progress.percent >= 100 ? '超预算，调用将被拒' : `已用 ${Math.round(progress.percent)}%` : '不限'}</strong>
           {progress && (
             <ProgressBar label={`${progress.label}预算已用 ${Math.round(progress.percent)}%`} value={progress.percent} warn={progress.warn} />
           )}
@@ -60,23 +60,23 @@ function KeyRow({ apiKey, onOpen }: { apiKey: ApiKey; onOpen: () => void }) {
           )}
           <Icon name="chevron-right" />
         </span>
-      </button>
+      </Link>
     </li>
   )
 }
 
 export function KeysPage() {
   const keys = useKeys()
-  const [open, setOpen] = useState<KeyDrawerState>(null)
+  const location = useLocation()
   const count = keys.data?.items.length ?? 0
   const full = count >= maxKeys
   return (
     <>
       <PageHeader
         actions={
-          <Button disabled={!keys.data || full} icon={<Icon name="plus" />} onClick={() => setOpen({ mode: 'create' })} type="button">
+          <ButtonLink aria-disabled={!keys.data || full} onClick={event => { if (!keys.data || full) event.preventDefault() }} icon={<Icon name="plus" />} to="/keys/new" state={{ overlayFrom: location.pathname + location.search }} variant="primary">
             新建 Key
-          </Button>
+          </ButtonLink>
         }
         title="API Key"
       />
@@ -91,12 +91,12 @@ export function KeysPage() {
         {(data) => (
           <ul className="key-list" aria-label="API Key">
             {data.items.map((item) => (
-              <KeyRow apiKey={item} key={item.id} onOpen={() => setOpen({ mode: 'edit', id: item.id })} />
+              <KeyRow apiKey={item} key={item.id} />
             ))}
           </ul>
         )}
       </QueryBoundary>
-      <KeyDrawer onChange={setOpen} state={open} />
+      <Outlet />
     </>
   )
 }
