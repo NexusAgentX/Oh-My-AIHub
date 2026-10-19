@@ -4,6 +4,7 @@ import { useId, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { ModelRoutingChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
 import { formatMultiplier } from '../money/format'
+import { formatTypicalPrice } from '../typical/format'
 import { RoutingMetrics } from './RoutingMetrics'
 import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
@@ -143,7 +144,7 @@ export function RoutingEditor({
                   <div>
                     <dt>典型费用</dt>
                     <dd>
-                      {channel.typical_price?.self_net_zero ? '站内净支付 0' : channel.typical_price ? `${channel.typical_price.amount} 积分 / ${channel.typical_price.quantity} ${{tokens:'tokens',successful_images:'张成功图片',requests:'次请求'}[channel.typical_price.unit] ?? channel.typical_price.unit}` : '未知'}
+                      {formatTypicalPrice(channel.typical_price)}
                     </dd>
                   </div>
                 </dl>

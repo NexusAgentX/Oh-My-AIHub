@@ -11,6 +11,7 @@ import { draftFromPreference, sameDraft, toRoutingInput } from '../models/routin
 import { SupplierIcon } from '../sharing/components'
 import { EstimateCard } from '../typical/Page'
 import { useTypicalCosts } from '../typical/queries'
+import { formatTypicalPrice } from '../typical/format'
 import { Badge, Button, ButtonLink, Card, Checkbox, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, TextField, Toolbar } from '../ui'
 import { useMarketGroup, useMarketModel, useMarketModels, useMarketReport, useMarketSuppliers,useSetMarketRouting } from './queries'
 import './market.css'
@@ -31,7 +32,7 @@ const reasons: Record<string, string> = { ok: '已核验', unsupported: '上游�
 function status(value: string) { return states[value] ?? value }
 function bounds(value: number | null) { return value && value > 0 ? value.toLocaleString() : '未知' }
 export function PriceText({ value }: { value: Price | null }) {
-  return <>{value === null ? '未知' : value.self_net_zero ? '站内净支付 0' : `${value.amount} 积分 / ${value.quantity.toLocaleString()} ${{ tokens: 'tokens', successful_images: '张成功图片', requests: '次请求' }[value.unit] ?? value.unit}`}</>
+  return <>{formatTypicalPrice(value)}</>
 }
 function ModelCard({ model, search }: { model: Model; search: string }) {
   return <Link className="model-card" to={`/models/${encodeURIComponent(model.id)}${search ? `?${search}` : ''}`}>
