@@ -14,7 +14,8 @@ export const adminRoutes = (
     <Route lazy={async () => ({ Component: (await import('./AdminFrame')).AdminFrame })} path="/admin">
       <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"/>
  <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionDetailPage})} path="contributions/:draftID"/>
- <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />
+ <Route lazy={async () => ({ Component: (await import('../forum/BoardsPage')).BoardsPage })} path="forum/boards" />
+      <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />
       <Route lazy={async () => ({ Component: (await import('./CallsPage')).CallsPage })} path="calls" />
       <Route lazy={async () => ({ Component: (await import('../calls/Pages')).AdminCallInsightsPage })} path="calls/insights" />
       <Route lazy={async () => ({ Component: (await import('../calls/Pages')).CallPage })} path="calls/:id" />

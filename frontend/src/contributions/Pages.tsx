@@ -1,3 +1,4 @@
+import { DomainNav } from '../layouts/DomainNav'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
@@ -96,6 +97,7 @@ export function ContributionsPage({ queue = false, initialKind='supplier',title 
           </Button>
         }
       />
+      {!queue && <DomainNav domain="供应" />}
       <Card>
         <QueryBoundary
           query={query}
@@ -126,7 +128,7 @@ export function ContributionsPage({ queue = false, initialKind='supplier',title 
                     <Status value={v.state} />
                     <ButtonLink
                       size="sm"
-                      to={`${queue ? '/admin' : ''}/contributions/${v.id}`}
+                      to={`${queue ? '/admin/contributions' : '/supply/contributions'}/${v.id}`}
                     >
                       查看
                     </ButtonLink>
@@ -160,7 +162,7 @@ export function ContributionsPage({ queue = false, initialKind='supplier',title 
         open={creating}
         close={() => setCreating(false)}
         onCreated={(id) =>
-          navigate(`${queue ? '/admin' : ''}/contributions/${id}`)
+          navigate(`${queue ? '/admin/contributions' : '/supply/contributions'}/${id}`)
         }
       />
     </>
@@ -400,7 +402,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => void }) {
     setJsonErrors((v) => ({ ...v, [id]: bad }))
   const act = (type: 'submit' | 'withdraw' | 'approve' | 'reject') =>
     action.mutate({ action: type, revision: d.revision, reason })
-  const basePath = admin ? '/admin/contributions' : '/contributions'
+  const basePath = admin ? '/admin/contributions' : '/supply/contributions'
   const fetchIcon = async (index: number) => {
     const source = c.suppliers[index].value.website_url
     setIconBusy(true)
@@ -964,14 +966,14 @@ function Editor({ data, reload }: { data: Detail; reload: () => void }) {
               {target.report ? (
                 <ButtonLink
                   size="sm"
-                  to={`/detection/reports/${target.report.report_id}`}
+                  to={`/supply/detection/reports/${target.report.report_id}`}
                 >
                   {target.report.reused ? '查看复用报告' : '查看报告'}
                 </ButtonLink>
               ) : (
                 <ButtonLink
                   size="sm"
-                  to={`/detection?draft_id=${d.id}&target_kind=${target.kind}&target_id=${target.id}`}
+                  to={`/supply/detection?draft_id=${d.id}&target_kind=${target.kind}&target_id=${target.id}`}
                   aria-disabled={dirty}
                   onClick={(e) => {
                     if (dirty) e.preventDefault()
@@ -991,7 +993,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => void }) {
         </div>
         {d.task_ids.map((id) => (
           <p key={id}>
-            <ButtonLink variant="quiet" to={`/detection/${id}`}>
+            <ButtonLink variant="quiet" to={`/supply/detection/${id}`}>
               查看关联检测任务
             </ButtonLink>
           </p>

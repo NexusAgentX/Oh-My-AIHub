@@ -1,3 +1,4 @@
+import { CallSectionNav } from '../calls/CallSectionNav'
 import { useState } from 'react'
 import type { ApiKey } from '../api/types'
 import { formatPoints } from '../money/format'
@@ -79,6 +80,7 @@ export function KeysPage() {
         }
         title="API Key"
       />
+      <CallSectionNav />
       {full && <Notice tone="info">已达到 {maxKeys} 把上限，删除不用的 Key 后再新建</Notice>}
       <QueryBoundary
         empty={<EmptyState title="还没有 Key" />}

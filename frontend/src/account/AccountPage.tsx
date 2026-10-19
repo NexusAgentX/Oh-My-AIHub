@@ -3,18 +3,24 @@ import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { PasswordChangeForm } from '../auth/PasswordChangeForm'
 import { useUpdateDisplayNameMutation } from '../auth/queries'
-import { Button, Card, PageHeader, SuccessMessage } from '../ui'
+import { useSignOut } from '../layouts/AppFrame'
+import { WorkspaceSwitcher } from '../layouts/WorkspaceSwitcher'
+import { ThemeSegmented } from '../theme/ThemeSwitcher'
+import { Button, ButtonLink, Card, InlineError, PageHeader, SuccessMessage } from '../ui'
+import { useBack } from '../ui/urlState'
 
 /** 账户设置：显示名（点击可改）、用户名、角色与修改密码。 */
 export function AccountPage() {
   const { account } = useAuth()
   const [message, setMessage] = useState('')
+  const { signOut, error } = useSignOut()
+  const back = useBack('/home', '首页')
   if (!account) return null
   return (
     <>
-      <PageHeader title="账户设置" />
+      <PageHeader title="账户" back={back} />
       <div className="account-grid">
-        <Card flush title="账户">
+        <Card flush title="资料">
           <dl className="detail-list">
             <DisplayNameRow current={account.display_name} />
             <div>
@@ -27,11 +33,16 @@ export function AccountPage() {
             </div>
           </dl>
         </Card>
-        <Card title="修改密码">
+        <Card title="修改密码" className="account-password">
           <SuccessMessage>{message}</SuccessMessage>
           <PasswordChangeForm onChanged={() => setMessage('密码已更新')} submitLabel="更新密码" />
         </Card>
+        <Card title="主题"><ThemeSegmented /></Card>
+        <Card title="社区"><div className="account-links"><ButtonLink to="/forum">论坛</ButtonLink><ButtonLink to="/tickets">{account.is_admin ? '全部工单' : '我的工单'}</ButtonLink></div></Card>
+        {account.is_admin && <Card><WorkspaceSwitcher /></Card>}
       </div>
+      <InlineError>{error}</InlineError>
+      <div className="form-actions"><Button variant="quiet" onClick={() => void signOut()}>退出登录</Button></div>
     </>
   )
 }

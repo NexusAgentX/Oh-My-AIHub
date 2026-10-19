@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
-import { SharingNav } from '../sharing/components'
+import { DomainNav } from '../layouts/DomainNav'
 import { Badge, Button, ButtonLink, Card, Checkbox, ConfirmDialog, EmptyState, FormSection, Icon, IconButton, InlineError, Notice, PageHeader, PasswordField, QueryBoundary, SelectField, TextareaField, TextField, Tabs, SuccessMessage } from '../ui'
 import { useGroupAction, useGroupEvents, useGroupChannel, useGroupChannels, useGroupSources, useSaveGroupChannel, type Choice, type GroupChannel, type GroupSource, type Overrides } from './queries'
 import { ChannelStatsPanel, ChannelHealth } from '../channels/ChannelStatsPanel'
@@ -23,11 +23,11 @@ function ModelState({ model }: { model: GroupChannel['models'][number] }) {
 export function GroupChannelsPage({ admin = false }: { admin?: boolean }) {
   const channels = useGroupChannels(admin)
   return <>
-    <PageHeader title={admin ? '渠道治理' : '我的渠道'} actions={!admin && <ButtonLink to="/channels/new" variant="primary" icon={<Icon name="plus" />}>添加渠道</ButtonLink>} />
-    {!admin && <SharingNav />}
-    <QueryBoundary query={channels} errorFallback="渠道加载失败" isEmpty={(data) => data.items.length === 0} empty={<EmptyState title="还没有分组渠道" action={!admin && <ButtonLink to="/channels/new">添加渠道</ButtonLink>} />}>
+    <PageHeader title={admin ? '渠道治理' : '我的渠道'} actions={!admin && <ButtonLink to="/supply/channels/new" variant="primary" icon={<Icon name="plus" />}>添加渠道</ButtonLink>} />
+    {!admin && <DomainNav domain="供应" />}
+    <QueryBoundary query={channels} errorFallback="渠道加载失败" isEmpty={(data) => data.items.length === 0} empty={<EmptyState title="还没有分组渠道" action={!admin && <ButtonLink to="/supply/channels/new">添加渠道</ButtonLink>} />}>
       {(data) => <div className="channel-grid">{data.items.map((channel) => <Card key={channel.id} className="group-channel-card">
-        <div className="group-channel-heading"><Link to={`${admin ? '/admin/channels' : '/channels'}/${channel.id}`}>{channel.name}</Link><Badge tone={channel.status === 'suspended' ? 'danger' : channel.available ? 'success' : 'warning'}>{channel.status === 'suspended' ? '已下架' : channel.status === 'unlisted' ? '未上架' : channel.available ? '可用' : '待处理'}</Badge></div>
+        <div className="group-channel-heading"><Link to={`${admin ? '/admin/channels' : '/supply/channels'}/${channel.id}`}>{channel.name}</Link><Badge tone={channel.status === 'suspended' ? 'danger' : channel.available ? 'success' : 'warning'}>{channel.status === 'suspended' ? '已下架' : channel.status === 'unlisted' ? '未上架' : channel.available ? '可用' : '待处理'}</Badge></div>
         <p className="muted-copy">{channel.supplier_name} · {channel.group_name}</p>
         {admin && <p>提供者：{channel.owner.display_name}</p>}
         <dl className="channel-card-stats"><div><dt>可用模型</dt><dd className="num">{channel.models.filter((m) => m.enabled && !m.excluded && m.probe_state === 'available').length}</dd></div><div><dt>回退地址</dt><dd className="num">{channel.selected_address_ids.length}</dd></div></dl>
@@ -95,7 +95,7 @@ function Editor({ sources, channel }: { sources: GroupSource[]; channel?: GroupC
     event.preventDefault(); setLocalError('')
     if (!source || !addressIDs.length) { setLocalError('请选择生效分组和至少一个地址'); return }
     if ((!channel || channel.group_id !== groupID) && !apiKey.trim()) { setLocalError('请填写所选分组的 API Key'); return }
-    try { const body = { group_id: groupID, name: name || undefined, summary, description, address_ids: addressIDs, overrides, models: choices, ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}) }; const saved = await save.mutateAsync(channel ? { ...body, revision: baseline?.revision ?? channel.revision, ...(channel.status!=='suspended' ? { status } : {}) } : { ...body, api_key: apiKey.trim() }); setBaseline(saved);setName(saved.name);setSummary(saved.summary);setDescription(saved.description);setAddressIDs(saved.selected_address_ids);setOverrides(saved.overrides);setChoices(saved.models.map(m=>({group_model_id:m.group_model_id,excluded:m.excluded,discount:m.discount})));setAPIKey(''); void navigate(`/channels/${saved.id}`, { replace: !channel }) } catch { /* mutation exposes the safe API error */ }
+    try { const body = { group_id: groupID, name: name || undefined, summary, description, address_ids: addressIDs, overrides, models: choices, ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}) }; const saved = await save.mutateAsync(channel ? { ...body, revision: baseline?.revision ?? channel.revision, ...(channel.status!=='suspended' ? { status } : {}) } : { ...body, api_key: apiKey.trim() }); setBaseline(saved);setName(saved.name);setSummary(saved.summary);setDescription(saved.description);setAddressIDs(saved.selected_address_ids);setOverrides(saved.overrides);setChoices(saved.models.map(m=>({group_model_id:m.group_model_id,excluded:m.excluded,discount:m.discount})));setAPIKey(''); void navigate(`/supply/channels/${saved.id}`, { replace: !channel }) } catch { /* mutation exposes the safe API error */ }
   }
   const busy = save.isPending || action.isPending
   const orderedAddresses = [...(source?.addresses ?? channel?.addresses ?? [])].sort((a, b) => { const ai = addressIDs.indexOf(a.id), bi = addressIDs.indexOf(b.id); return (ai < 0 ? 100 : ai) - (bi < 0 ? 100 : bi) })
@@ -134,7 +134,7 @@ function Editor({ sources, channel }: { sources: GroupSource[]; channel?: GroupC
       <div className="group-channel-actions"><Button loading={save.isPending} disabled={busy || !source || !addressIDs.length} type="submit">{channel ? '保存配置' : '创建渠道'}</Button>{channel && <Button type="button" variant="danger" disabled={busy} onClick={() => setDeleteOpen(true)}>删除渠道</Button>}</div>
     </form>
     </div></DetailTabs>
-    {channel && <ConfirmDialog title="删除渠道" description="渠道将停止接收新调用，历史调用和账本保留。" open={deleteOpen} onClose={() => setDeleteOpen(false)} confirmLabel="删除渠道" danger busy={action.isPending} error={action.isError ? errorMessage(action.error, '删除失败') : ''} onConfirm={() => { void action.mutateAsync({ action: 'delete', revision: channel.revision }).then(() => navigate('/channels')).catch(() => {}) }} />}
+    {channel && <ConfirmDialog title="删除渠道" description="渠道将停止接收新调用，历史调用和账本保留。" open={deleteOpen} onClose={() => setDeleteOpen(false)} confirmLabel="删除渠道" danger busy={action.isPending} error={action.isError ? errorMessage(action.error, '删除失败') : ''} onConfirm={() => { void action.mutateAsync({ action: 'delete', revision: channel.revision }).then(() => navigate('/supply/channels')).catch(() => {}) }} />}
   </>
 }
 
@@ -142,7 +142,7 @@ export function GroupChannelEditorPage() {
   const { id = '' } = useParams()
   const detail = useGroupChannel(id)
   const sources = useGroupSources()
-  return <><PageHeader title={id ? '渠道配置' : '添加分组渠道'} back={{ to: '/channels', label: '分组渠道' }} /><QueryBoundary query={sources} errorFallback="分组加载失败">{(data) => id ? <QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Editor key={channel.id} channel={channel} sources={data.items} />}</QueryBoundary> : data.items.length ? <Editor sources={data.items} /> : <EmptyState title="还没有可用分组" action={<ButtonLink to="/contributions">贡献供应商分组</ButtonLink>} />}</QueryBoundary></>
+  return <><PageHeader title={id ? '渠道配置' : '添加分组渠道'} back={{ to: '/supply/channels', label: '分组渠道' }} /><QueryBoundary query={sources} errorFallback="分组加载失败">{(data) => id ? <QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Editor key={channel.id} channel={channel} sources={data.items} />}</QueryBoundary> : data.items.length ? <Editor sources={data.items} /> : <EmptyState title="还没有可用分组" action={<ButtonLink to="/supply/contributions">贡献供应商分组</ButtonLink>} />}</QueryBoundary></>
 }
 
 function Governance({ channel }: { channel: GroupChannel }) {

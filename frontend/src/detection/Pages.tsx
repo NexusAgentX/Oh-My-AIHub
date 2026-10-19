@@ -1,3 +1,4 @@
+import { DomainNav } from '../layouts/DomainNav'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
@@ -24,9 +25,9 @@ export function DetectionPage() {
   const action = useDetectionAction()
   const navigate = useNavigate()
   const { account } = useAuth()
-  const submit = (event: FormEvent) => { event.preventDefault(); if (!canStart) return; const secret = key; setKey(''); action.mutate({ action: 'start', key: secret, target: { target_id: targetID, target_kind: kind, draft_id: params.get("draft_id")??undefined } }, { onSuccess: ({ job }) => navigate(`/detection/${job.id}`) }) }
+  const submit = (event: FormEvent) => { event.preventDefault(); if (!canStart) return; const secret = key; setKey(''); action.mutate({ action: 'start', key: secret, target: { target_id: targetID, target_kind: kind, draft_id: params.get("draft_id")??undefined } }, { onSuccess: ({ job }) => navigate(`/supply/detection/${job.id}`) }) }
   return <>
-    <PageHeader title="检测报告" actions={account?.is_admin && <ButtonLink to="/admin/detection-search">搜索参数</ButtonLink>} />
+    <PageHeader title="检测任务" actions={account?.is_admin && <ButtonLink to="/admin/detection-search">搜索参数</ButtonLink>} /><DomainNav domain="供应" />
     {canStart && <Card title="创建检测"><form className="stack-form" onSubmit={submit}>
       <Notice tone="info">检测将调用上游，请自行在上游设置消费限额。</Notice>
       <PasswordField autoComplete="off" label="本次检测使用的上游 API Key" onChange={(e) => setKey(e.target.value)} value={key} required />
@@ -34,7 +35,7 @@ export function DetectionPage() {
       <Button disabled={!key} loading={action.isPending}>开始全量检测</Button>
     </form></Card>}
     <Card title="任务记录"><QueryBoundary query={query} isEmpty={(data) => data.items.length === 0} empty={<EmptyState title="还没有检测记录" description="从供应商分组或模型页面发起检测。" action={<ButtonLink to="/suppliers">浏览供应商</ButtonLink>} />}>
-      {(data) => <><div className="detection-list">{data.items.map((job) => <article className="detection-row" key={job.id}><div><strong>{job.target.model || '分组检测'}</strong><p className="muted-copy">{stamp(job.created_at)} · {job.finished_scenarios}/{job.scenarios} 场景</p></div><State state={job.state} /><ButtonLink size="sm" to={`/detection/${job.id}`}>查看报告</ButtonLink></article>)}</div><div className="form-actions"><Button variant="quiet" onClick={() => setCursor('')} disabled={!cursor}>回到最新</Button><Button variant="secondary" onClick={() => setCursor(data.next_cursor ?? '')} disabled={!data.next_cursor}>下一页</Button></div></>}
+      {(data) => <><div className="detection-list">{data.items.map((job) => <article className="detection-row" key={job.id}><div><strong>{job.target.model || '分组检测'}</strong><p className="muted-copy">{stamp(job.created_at)} · {job.finished_scenarios}/{job.scenarios} 场景</p></div><State state={job.state} /><ButtonLink size="sm" to={`/supply/detection/${job.id}`}>查看报告</ButtonLink></article>)}</div><div className="form-actions"><Button variant="quiet" onClick={() => setCursor('')} disabled={!cursor}>回到最新</Button><Button variant="secondary" onClick={() => setCursor(data.next_cursor ?? '')} disabled={!data.next_cursor}>下一页</Button></div></>}
     </QueryBoundary></Card>
   </>
 }
@@ -48,16 +49,16 @@ function Report({ job,readOnly=false }: { job: Job;readOnly?:boolean }) {
   const active = !readOnly && job.execution_active
   const resumable = !readOnly && !active && ['interrupted', 'cancelled', 'failed'].includes(job.state)
   const rerunnable = !readOnly && !active && (resumable || job.state === 'finished')
-  const run = (mode: 'resume' | 'retest') => { const secret = key; setKey(''); action.mutate({ action: mode, id: job.id, key: secret, scenarios: selected },{onSuccess:({job:next})=>{if(next.id!==job.id)navigate(`/detection/${next.id}`)}}) }
+  const run = (mode: 'resume' | 'retest') => { const secret = key; setKey(''); action.mutate({ action: mode, id: job.id, key: secret, scenarios: selected },{onSuccess:({job:next})=>{if(next.id!==job.id)navigate(`/supply/detection/${next.id}`)}}) }
   const results = new Map(job.results.map((r) => [r.scenario_id, r]))
   const estimated = job.plan.items.every((item) => item.estimated_http !== null) ? job.plan.items.reduce((sum, item) => sum + (item.estimated_http ?? 0), 0) : null
   return <>
-    <PageHeader title={job.target.model || '分组检测'} back={{ to: '/detection', label: '检测报告' }} actions={<State state={job.state} />} />
+    <PageHeader title={job.target.model || '分组检测'} back={{ to: '/supply/detection', label: '检测任务' }} actions={<State state={job.state} />} />
     {job.state === 'suite_pending' && <Notice>检测套件尚未就绪，当前记录不能用于创建审核。</Notice>}
     {job.state === 'outdated' && <Notice>配置已变化，请从分组或模型页面新建检测。</Notice>}
     {job.state === 'finished' && <Notice tone={job.complete ? 'success' : 'warning'}>{job.complete ? '完整检测已结束，负向结论仍可提交审核。' : '此记录未满足创建全测条件，请查看未执行项与证据来源。'}</Notice>}
     {readOnly && <Notice tone="info">历史报告只读，后续复测保留独立的新报告。</Notice>}
- {job.continued_from_id && <Notice tone="info" action={<ButtonLink to={`/detection/${job.continued_from_id}`}>查看上一任务</ButtonLink>}>已记录新的凭据来源，保留可复用的历史证据。</Notice>}
+ {job.continued_from_id && <Notice tone="info" action={<ButtonLink to={`/supply/detection/${job.continued_from_id}`}>查看上一任务</ButtonLink>}>已记录新的凭据来源，保留可复用的历史证据。</Notice>}
  <div className="detection-metrics"><MetricGrid><Metric label="场景覆盖" value={`${job.results.length}/${job.plan.items.length}`} progress={job.results.length / Math.max(1, job.plan.items.length) * 100} /><Metric label="HTTP 尝试" value={job.usage.http} hint={`预计 ${estimated ?? '未知'}`} /><Metric label="已观测 token" value={job.usage.input_tokens + job.usage.output_tokens || '未知'} hint="费用估算：未知" /></MetricGrid></div>
     <Card title="执行与复测"><div className="stack-form">
       {job.state === 'cancelled' && active && <Notice tone="info">正在结束请求并清理检测资源…</Notice>}
@@ -80,5 +81,5 @@ function Report({ job,readOnly=false }: { job: Job;readOnly?:boolean }) {
 }
 export function DetectionDetailPage() { const { taskID = '' } = useParams(); const query = useDetectionJob(taskID); return <QueryBoundary query={query}>{({ job }) => <Report job={job} />}</QueryBoundary> }
 
-function ReportHistory({taskID,version}:{taskID:string;version:string}) { const [cursor,setCursor]=useState('');const query=useDetectionReports(taskID,cursor,version);return <Card title="历史报告"><QueryBoundary query={query}>{(data)=><><div className="detection-list">{data.items.length===0&&<p className="muted-copy">尚无已固化的报告</p>}{data.items.map((item)=><div key={item.id} className="detection-row"><span>{stamp(item.created_at)}</span><State state={item.state}/><ButtonLink size="sm" to={`/detection/reports/${item.id}`}>查看此轮</ButtonLink></div>)}</div><div className="form-actions"><Button variant="quiet" disabled={!cursor} onClick={()=>setCursor('')}>回到最新</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={()=>setCursor(data.next_cursor??'')}>下一页</Button></div></>}</QueryBoundary></Card>}
+function ReportHistory({taskID,version}:{taskID:string;version:string}) { const [cursor,setCursor]=useState('');const query=useDetectionReports(taskID,cursor,version);return <Card title="历史报告"><QueryBoundary query={query}>{(data)=><><div className="detection-list">{data.items.length===0&&<p className="muted-copy">尚无已固化的报告</p>}{data.items.map((item)=><div key={item.id} className="detection-row"><span>{stamp(item.created_at)}</span><State state={item.state}/><ButtonLink size="sm" to={`/supply/detection/reports/${item.id}`}>查看此轮</ButtonLink></div>)}</div><div className="form-actions"><Button variant="quiet" disabled={!cursor} onClick={()=>setCursor('')}>回到最新</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={()=>setCursor(data.next_cursor??'')}>下一页</Button></div></>}</QueryBoundary></Card>}
 export function SavedDetectionReportPage(){const {reportID=''}=useParams();const query=useSavedDetectionReport(reportID);return <QueryBoundary query={query}>{({job})=><Report job={job} readOnly/>}</QueryBoundary>}
