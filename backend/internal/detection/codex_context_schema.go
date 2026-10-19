@@ -5,6 +5,23 @@ package detection
 // (it is not a supported struct field); copy the wire schema, not raw source.
 // Source: Codex 83086188, ext/history-notes/src/tools.rs
 // (Apache-2.0; license and notice in backend/licenses/codex).
+func codexContextArgumentSchema(namespace, operation string) nativeObject {
+	if operation == "search_contents" && (namespace == "notes" || namespace == "history") {
+		return codexContextSearchSchema(namespace)
+	}
+	if namespace != "notes" || operation != "write_file" && operation != "append_to_file" {
+		return nil
+	}
+	text, path := "Complete replacement text for the file.", "Note file path to create or replace."
+	if operation == "append_to_file" {
+		text, path = "Text appended exactly as provided.", "Note file path to append to."
+	}
+	return nativeObject{"type": "object", "properties": nativeObject{
+		"text": nativeObject{"type": "string", "encrypted": true, "description": text},
+		"path": nativeObject{"type": "string", "description": path},
+	}, "required": []any{"text", "path"}}
+}
+
 func codexContextSearchSchema(namespace string) nativeObject {
 	if namespace == "history" {
 		return nativeObject{"type": "object", "properties": nativeObject{

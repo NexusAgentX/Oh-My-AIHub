@@ -78,6 +78,38 @@ func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
 	}
 }
 
+func TestCodexReservedWritesUseThePinnedCompleteSchema(t *testing.T) {
+	for _, operation := range []string{"write_file", "append_to_file"} {
+		t.Run(operation, func(t *testing.T) {
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				body, _ := decodeNative(raw)
+				tool := object(list(object(list(body["tools"])[0])["tools"])[0])
+				parameters := object(tool["parameters"])
+				properties := object(parameters["properties"])
+				required := list(parameters["required"])
+				_, extra := parameters["additionalProperties"]
+				if extra || len(required) != 2 || required[0] != "text" || required[1] != "path" || len(properties) != 2 || object(properties["text"])["encrypted"] != true || str(object(properties["path"])["description"]) == "" || str(object(properties["text"])["description"]) == "" || tool["strict"] != false {
+					w.WriteHeader(400)
+					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"reserved function must match the configured schema"}}`)
+					return
+				}
+				out := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-write", Name: operation, Namespace: "notes"}})
+				object(list(out["output"])[0])["arguments"] = `{"path":"synthetic-note","text":"sealed:synthetic-text"}`
+				_ = json.NewEncoder(w).Encode(out)
+			}))
+			defer up.Close()
+			_, s, _ := codexTestSession(t, up.URL)
+			s.allowed = map[string]bool{"codex.responses": true}
+			n := nativeScene{s: s, protocol: "openai-responses"}
+			args, out := n.codexContextArguments(context.Background(), "synthetic-model", "synthetic-session", operation, nativeObject{"path": "synthetic-note", "text": "synthetic-text"})
+			if args == nil || out.State != "pass" {
+				t.Fatal("valid provider rejected the detector's reserved write schema", out.State, out.Reason)
+			}
+		})
+	}
+}
+
 func TestCodexEmptyThreadHintsCannotProveContextIsolation(t *testing.T) {
 	for _, mode := range []string{"isolated", "empty", "shared"} {
 		t.Run(mode, func(t *testing.T) {

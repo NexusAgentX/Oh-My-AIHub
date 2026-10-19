@@ -74,11 +74,18 @@ func (n *nativeScene) codexHistory(ctx context.Context) {
 	}
 	foreign := n.codexContextCall(ctx, other, "history", "read_item", readArgs)
 	foreignText := n.codexContextText(ctx, model, other, "history", "read_item", "Return only the full actual original user-message text without metadata or ID markers.", readArgs, foreign)
-	denied := foreign.Response.Status == http.StatusNotFound && nativeError(n.protocol, foreign.Reply.Object)
+	denied := foreign.Response.Status == http.StatusNotFound && nativeError(n.protocol, foreign.Reply.Object) || codexUnknownWindow(foreign)
 	if denied {
 		foreignText = nativeOutcome{State: "pass", Reason: "ok", Response: foreign.Response}
 	}
 	n.linkedCheck("context_isolation", read, foreignText, valid && (denied || contentMatches(foreignText, "{}") && nativeEndedNormally(foreignText.Reply)))
+}
+
+// The native history service also returns this exact error envelope with HTTP
+// 200. It is expected only after a successful owned read, when probing a fresh
+// session. Never accept arbitrary errors or an envelope carrying extra content.
+func codexUnknownWindow(out nativeOutcome) bool {
+	return out.Response.Status == http.StatusOK && len(out.Reply.Object) == 1 && strings.EqualFold(strings.TrimSpace(str(out.Reply.Object["error"])), "Unable to perform operation: Unknown window id. Use list_windows to obtain one.")
 }
 
 func (n *nativeScene) contextObserved(label string, first, interpreted nativeOutcome, observed bool) {

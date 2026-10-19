@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,36 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
+
+func TestCodexContextModelRepliesAreFreshWhileStatelessRequestsCanShareEvidence(t *testing.T) {
+	for _, contextTurn := range []bool{false, true} {
+		t.Run(fmt.Sprint(contextTurn), func(t *testing.T) {
+			requests := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests++
+				// Identical requests can see changed server-side notes/history.
+				_ = json.NewEncoder(w).Encode(nativeFixtureWithCalls("openai-responses", fmt.Sprint(requests), nil))
+			}))
+			defer up.Close()
+			_, s, _ := codexTestSession(t, up.URL)
+			s.allowed = map[string]bool{"codex.responses": true}
+			n := nativeScene{s: s, protocol: "openai-responses"}
+			body := codexBase("synthetic-model")
+			if contextTurn {
+				body["client_metadata"] = nativeObject{"session_id": "synthetic-session"}
+			}
+			first := n.codexInfer(context.Background(), body, "")
+			second := n.codexInfer(context.Background(), body, "")
+			want := "1"
+			if contextTurn {
+				want = "2"
+			}
+			if first.State != "pass" || second.State != "pass" || second.Reply.Text != want {
+				t.Fatal("context reply reused stale state or stateless evidence sharing broke", requests, first.State, second.State)
+			}
+		})
+	}
+}
 
 func codexTestSession(t *testing.T, base string) (*Registry, *Session, *Service) {
 	t.Helper()

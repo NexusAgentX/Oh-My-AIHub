@@ -42,18 +42,9 @@ func (n *nativeScene) codexContextArguments(ctx context.Context, model, session,
 }
 
 func (n *nativeScene) codexContextArgumentsFor(ctx context.Context, model, session, namespace, operation string, desired nativeObject) (nativeObject, nativeOutcome) {
-	properties, required := nativeObject{}, []any{}
-	for name := range desired {
-		property := nativeObject{"type": "string"}
-		if name == "text" || name == "query" {
-			property["encrypted"] = true
-		}
-		properties[name], required = property, append(required, name)
-	}
-	slices.SortFunc(required, func(a, b any) int { return strings.Compare(str(a), str(b)) })
-	parameters := nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}
-	if operation == "search_contents" {
-		parameters = codexContextSearchSchema(namespace)
+	parameters := codexContextArgumentSchema(namespace, operation)
+	if parameters == nil {
+		return nil, nativeOutcome{State: "inconclusive", Reason: "detector_error"}
 	}
 	body := codexBase(model)
 	if _, err := n.codexContextInitialize(body, model, session); err != nil {

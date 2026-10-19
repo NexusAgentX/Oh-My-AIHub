@@ -4,6 +4,7 @@ package codexsession
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -32,17 +33,21 @@ type Repository interface {
 // Service caches only positive immutable bindings. FIFO eviction forgets the
 // cache entry, never its durable binding. SQL uses the isolated metadata pool.
 type Service struct {
-	repo  Repository
-	mu    sync.Mutex
-	cache map[Identity]Route
-	order []Identity
-	next  int
+	repo    Repository
+	ioSlots chan struct{}
+	mu      sync.Mutex
+	cache   map[Identity]Route
+	order   []Identity
+	next    int
 }
 
 const cacheCapacity = 4096
+const repositoryConcurrency = 32
+
+var ErrBusy = errors.New("codex session metadata busy")
 
 func New(repo Repository) *Service {
-	return &Service{repo: repo, cache: make(map[Identity]Route)}
+	return &Service{repo: repo, cache: make(map[Identity]Route), ioSlots: make(chan struct{}, repositoryConcurrency)}
 }
 
 func valid(id Identity) bool {
@@ -82,6 +87,12 @@ func (s *Service) Lookup(ctx context.Context, id Identity) (Route, error) {
 	if ok {
 		return route, nil
 	}
+	select {
+	case s.ioSlots <- struct{}{}:
+		defer func() { <-s.ioSlots }()
+	default:
+		return Route{}, ErrBusy
+	}
 	route, err := s.repo.LookupSession(ctx, id)
 	if err != nil {
 		return Route{}, err
@@ -92,6 +103,12 @@ func (s *Service) Lookup(ctx context.Context, id Identity) (Route, error) {
 func (s *Service) Claim(ctx context.Context, id Identity, proposed Route) (Route, error) {
 	if !valid(id) || !proposed.Valid() || s == nil || s.repo == nil {
 		return Route{}, gatewaycontract.ErrConflict
+	}
+	select {
+	case s.ioSlots <- struct{}{}:
+		defer func() { <-s.ioSlots }()
+	default:
+		return Route{}, ErrBusy
 	}
 	route, err := s.repo.ClaimSession(ctx, id, proposed)
 	if err != nil {

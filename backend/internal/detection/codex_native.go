@@ -128,7 +128,10 @@ func (n *nativeScene) codexInfer(ctx context.Context, body nativeObject, encodin
 	if encoding != "" {
 		headers.Set("Content-Encoding", encoding)
 	}
-	return n.call(ctx, Request{EndpointID: "codex.responses", Path: "/backend-api/codex/responses", Headers: headers, Body: wire, Category: "generate"}, true)
+	// A stored-context turn can read changed notes/history despite identical
+	// wire bytes (including an opaque result handle). Only stateless requests
+	// are eligible for exact-request reuse.
+	return n.call(ctx, Request{EndpointID: "codex.responses", Path: "/backend-api/codex/responses", Headers: headers, Body: wire, Category: "generate"}, object(body["client_metadata"]) == nil)
 }
 
 func codexMarker(out nativeOutcome) bool {

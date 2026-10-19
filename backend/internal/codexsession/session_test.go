@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 )
@@ -37,7 +38,7 @@ func testIdentity(n int) Identity {
 	return Identity{"account", "key", fmt.Sprintf("10000000-0000-4000-8000-%012d", n)}
 }
 func testRoute(n int) Route {
-	return Route{gatewaycontract.Binding{"group", fmt.Sprint(n), "1"}, "scope"}
+	return Route{Binding: gatewaycontract.Binding{GroupID: "group", ChannelID: fmt.Sprint(n), CredentialVersion: "1"}, CredentialScope: "scope"}
 }
 
 func TestConcurrentFirstRequestsAndRestartKeepOneRoute(t *testing.T) {
@@ -45,8 +46,8 @@ func TestConcurrentFirstRequestsAndRestartKeepOneRoute(t *testing.T) {
 	s := New(repo)
 	id := testIdentity(1)
 	var wg sync.WaitGroup
-	routes := make(chan Route, 64)
-	for i := 0; i < 64; i++ {
+	routes := make(chan Route, 16)
+	for i := 0; i < 16; i++ {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
@@ -113,5 +114,43 @@ func BenchmarkActiveSessionLookup(b *testing.B) {
 		if _, err := s.Lookup(context.Background(), id); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+type blockedRepository struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (r *blockedRepository) LookupSession(ctx context.Context, _ Identity) (Route, error) {
+	r.started <- struct{}{}
+	select {
+	case <-r.release:
+		return Route{}, gatewaycontract.ErrNotFound
+	case <-ctx.Done():
+		return Route{}, ctx.Err()
+	}
+}
+func (r *blockedRepository) ClaimSession(context.Context, Identity, Route) (Route, error) {
+	panic("unused")
+}
+func TestMetadataSaturationRejectsWithoutWaitingOrGrowingTheQueue(t *testing.T) {
+	repo := &blockedRepository{started: make(chan struct{}, repositoryConcurrency), release: make(chan struct{})}
+	s := New(repo)
+	var wg sync.WaitGroup
+	for i := 0; i < repositoryConcurrency; i++ {
+		wg.Add(1)
+		go func(n int) { defer wg.Done(); _, _ = s.Lookup(context.Background(), testIdentity(n)) }(i)
+	}
+	for i := 0; i < repositoryConcurrency; i++ {
+		<-repo.started
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_, err := s.Lookup(ctx, testIdentity(repositoryConcurrency+1))
+	close(repo.release)
+	wg.Wait()
+	if err != ErrBusy {
+		t.Fatal("saturated metadata work was queued", err)
 	}
 }
