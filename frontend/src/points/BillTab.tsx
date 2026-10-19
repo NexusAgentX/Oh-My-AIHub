@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import type { PointsEntry, PointsPeriod, TransactionType } from '../api/types'
 import { useKeys } from '../keys/queries'
 import { amountSign, formatPoints } from '../money/format'
@@ -8,8 +8,12 @@ import { BarChart, Button, DataTable, EmptyState, Icon, InlineError, QueryBounda
 import { transactionTypeLabels } from './c2c'
 import { downloadEntriesCsv, usePointsEntries, usePointsPeriod, type EntryParams } from './queries'
 import { reconcileItems } from './reconcile'
+import { enumField, stringField, useQueryOverlay, useUrlState } from '../ui/urlState'
+import { useShanghaiDay } from '../ui/clock'
+import { Pager } from '../ui/Pager'
+import { errorMessage } from '../api/query'
 
-type SummaryMode = 'entries' | 'day' | 'key'
+const billSchema = { month: { defaultValue: '', parse: (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : '' }, type: enumField(['', ...Object.keys(transactionTypeLabels) as TransactionType[]], ''), api_key_id: stringField(), group: enumField(['', 'day', 'key'] as const, ''), transaction_id: stringField() }
 
 function Signed({ value }: { value: string }) {
   const sign = amountSign(value)
@@ -23,11 +27,11 @@ function Signed({ value }: { value: string }) {
 function relatedLink(entry: PointsEntry) {
   if (!entry.related) return null
   if (entry.related.type === 'c2c_trade') return `/points/trades/${entry.related.id}`
-  if (entry.related.type === 'call') return `/usage?call=${entry.related.id}`
+  if (entry.related.type === 'call') return `/calls/${entry.related.id}`
   return null
 }
 
-const columns: Column<PointsEntry>[] = [
+const columns = (onCall: (id: string) => void): Column<PointsEntry>[] => [
   { key: 'time', header: '时间', cell: (entry) => <span className="num">{formatTime(entry.created_at)}</span> },
   { key: 'type', header: '类型', primary: true, cell: (entry) => entry.type === 'api_call' ? (amountSign(entry.amount) > 0 ? '渠道收入' : '调用支出') : transactionTypeLabels[entry.type] },
   {
@@ -36,6 +40,7 @@ const columns: Column<PointsEntry>[] = [
     cell: (entry) => {
       const href = relatedLink(entry)
       const text = [entry.reason, entry.api_key?.name].filter(Boolean).join(' · ') || '—'
+      if (entry.related?.type === 'call') return <Button variant="quiet" size="sm" onClick={() => onCall(entry.related!.id)}>{text}</Button>
       return href ? <Link to={href}>{text}</Link> : text
     },
   },
@@ -70,17 +75,18 @@ export function ReconcileBar({ period }: { period: PointsPeriod }) {
 
 function Reconciliation({ from, to }: { from?: string; to?: string }) {
   const period = usePointsPeriod(from, to)
-  if (!period.data) return null
+  if (period.isError) return <InlineError>{errorMessage(period.error, '本期对账加载失败')}<Button variant="quiet" size="sm" onClick={() => void period.refetch()}>重试核对</Button></InlineError>
+  if (!period.data) return <p role="status">正在核对本期账单…</p>
   return <ReconcileBar period={period.data} />
 }
 
 export function BillTab() {
- const [search,setSearch]=useSearchParams()
- const transactionID=search.get('transaction')||undefined
-  const [month, setMonth] = useState(currentMonth())
-  const [type, setType] = useState<'' | TransactionType>('')
-  const [keyId, setKeyId] = useState('')
-  const [mode, setMode] = useState<SummaryMode>('entries')
+  const [filters, update] = useUrlState(billSchema)
+  const [, setCall] = useQueryOverlay('call')
+  const day = useShanghaiDay()
+  const month = filters.month || day.slice(0, 7), type = filters.type, keyId = filters.api_key_id
+  const mode = filters.group || 'entries'
+  const transactionID = filters.transaction_id || undefined
   const [exportError, setExportError] = useState('')
   const [exporting, setExporting] = useState(false)
   const keys = useKeys()
@@ -103,17 +109,17 @@ export function BillTab() {
   }
 
   return (
-    <div className="bill-tab">
+    <div className="bill-tab" aria-busy={entries.isPlaceholderData}>
       {!transactionID&&<Reconciliation from={range.from} to={range.to} />}
- {transactionID&&<div className="call-drill"><span>交易 {transactionID}</span><Button variant="quiet" onClick={()=>{const next=new URLSearchParams(search);next.delete("transaction");setSearch(next)}}>清除交易筛选</Button></div>}
+ {transactionID&&<div className="call-drill"><span>交易 {transactionID}</span><Button variant="quiet" onClick={() => update({ transaction_id: '' })}>清除交易筛选</Button></div>}
       <div className="call-filters">
         <label className="filter-select">
           <span className="visually-hidden">月份</span>
-          <input disabled={Boolean(transactionID)} aria-label="月份" className="input" onChange={(event) => setMonth(event.target.value)} type="month" value={month} />
+          <input disabled={Boolean(transactionID)} aria-label="月份" className="input" onChange={event => update({ month: event.target.value === currentMonth() ? '' : event.target.value })} type="month" value={month} />
         </label>
         <label className="filter-select">
           <span className="visually-hidden">类型</span>
-          <select aria-label="类型" className="input select-input" onChange={(event) => setType(event.target.value as TransactionType | '')} value={type}>
+          <select aria-label="类型" className="input select-input" onChange={event => update({ type: event.target.value as TransactionType | '' })} value={type}>
             <option value="">类型：全部</option>
             {(Object.keys(transactionTypeLabels) as TransactionType[]).map((item) => (
               <option key={item} value={item}>
@@ -124,7 +130,7 @@ export function BillTab() {
         </label>
         <label className="filter-select">
           <span className="visually-hidden">Key</span>
-          <select aria-label="Key" className="input select-input" onChange={(event) => setKeyId(event.target.value)} value={keyId}>
+          <select aria-label="Key" className="input select-input" onChange={event => update({ api_key_id: event.target.value })} value={keyId}>
             <option value="">Key：全部</option>
             {(keys.data?.items ?? []).map((key) => (
               <option key={key.id} value={key.id}>
@@ -135,7 +141,7 @@ export function BillTab() {
         </label>
         <Segmented
           label="汇总方式"
-          onChange={setMode}
+          onChange={value => update({ group: value === 'entries' ? '' : value })}
           options={[
             { key: 'entries', label: '逐笔' },
             { key: 'day', label: '按天' },
@@ -183,14 +189,9 @@ export function BillTab() {
           }
           return (
             <div className="panel panel-flush">
-              <DataTable caption="账单" columns={columns} empty={<EmptyState title={transactionID?"没有匹配的账单":"本月没有账单"} />} rowKey={(entry) => entry.id} rows={data} />
-              {entries.hasNextPage && (
-                <div className="table-pagination">
-                  <Button loading={entries.isFetchingNextPage} onClick={() => void entries.fetchNextPage()} size="sm" type="button" variant="secondary">
-                    加载更多
-                  </Button>
-                </div>
-              )}
+              <DataTable caption="账单" columns={columns(id => setCall(id))} empty={<EmptyState title={transactionID?"没有匹配的账单":"本月没有账单"} />} rowKey={(entry) => entry.id} rows={data} />
+              <Pager hasMore={Boolean(entries.hasNextPage)} loading={entries.isFetchingNextPage} limited={(entries.data?.pages.length ?? 0) >= 10}
+                error={entries.isFetchNextPageError ? errorMessage(entries.error, '加载下一页失败') : undefined} onMore={() => void entries.fetchNextPage()} />
             </div>
           )
         }}

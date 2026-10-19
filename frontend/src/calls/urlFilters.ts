@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { usePageVisible } from '../api/visibility'
-import { shanghaiDate } from '../money/time'
+import { useMemo } from 'react'
+import { useShanghaiDay } from '../ui/clock'
 import { enumField, stringField, useUrlState } from '../ui/urlState'
 import { emptyCallFilters, filtersToParams, type CallFilterState } from './CallFilterBar'
 
@@ -28,16 +27,7 @@ export function readCallFilters(search: URLSearchParams): CallFilterState {
 
 export function useCallFilters() {
   const [url, update] = useUrlState(callFilterSchema)
-  const visible = usePageVisible()
-  const [day, setDay] = useState(() => shanghaiDate(new Date()))
-  useEffect(() => {
-    if (!visible) return
-    const refresh = () => setDay(shanghaiDate(new Date()))
-    refresh()
-    const timer = window.setInterval(refresh, 60_000)
-    window.addEventListener('focus', refresh)
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh) }
-  }, [visible])
+  const day = useShanghaiDay()
   const filters = useMemo(() => readCallFilters(new URLSearchParams(Object.entries(url))), [url])
   const setFilters = (next: CallFilterState) => {
     const patch: Record<string, string> = {}

@@ -1,18 +1,17 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import type { C2COrder, C2CTrade } from '../api/types'
 import { formatFen, formatPoints, isPositiveAmount, tradeTotalFen } from '../money/format'
-import { Button, Drawer, InlineError, TextField } from '../ui'
+import { Button, InlineError, TextField } from '../ui'
 import { validateBuyAmount } from './c2c'
-import { newIdempotencyKey, useC2CTrade, useCreateTrade } from './queries'
-import { PaymentCountdown, PaymentInfo, TradeActions, TradeStatusBadge } from './TradeParts'
+import { newIdempotencyKey, useCreateTrade } from './queries'
 
-function BuyForm({ order, onCreated }: { order: C2COrder; onCreated: (trade: C2CTrade) => void }) {
+export function BuyForm({ order, onCreated, onBusy }: { order: C2COrder; onCreated: (trade: C2CTrade) => void; onBusy: (busy: boolean) => void }) {
   const [amount, setAmount] = useState('')
   const [error, setError] = useState('')
   const [idempotencyKey] = useState(newIdempotencyKey)
   const create = useCreateTrade()
+  useEffect(() => onBusy(create.isPending), [create.isPending, onBusy])
   const payable = isPositiveAmount(amount) ? tradeTotalFen(amount, order.unit_price_fen) : 0
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -69,36 +68,3 @@ function BuyForm({ order, onCreated }: { order: C2COrder; onCreated: (trade: C2C
   )
 }
 
-/** 下单后的付款面板：收款信息、备注交易号、倒计时、我已付款、取消。 */
-function TradePayment({ initial }: { initial: C2CTrade }) {
-  const query = useC2CTrade(initial.id)
-  const trade = query.data ?? initial
-  return (
-    <div className="stack-form">
-      <div className="trade-head">
-        <TradeStatusBadge status={trade.status} />
-        {trade.status === 'awaiting_payment' && <PaymentCountdown deadline={trade.payment_deadline} />}
-        <Link className="trade-head-link" to={`/points/trades/${trade.id}`}>
-          交易详情
-        </Link>
-      </div>
-      <PaymentInfo trade={trade} />
-      <TradeActions trade={trade} />
-    </div>
-  )
-}
-
-/** 买积分右侧抽屉。 */
-export function BuyDrawer({ order, onClose }: { order: C2COrder | null; onClose: () => void }) {
-  const [trade, setTrade] = useState<C2CTrade | null>(null)
-  const close = () => {
-    setTrade(null)
-    onClose()
-  }
-  return (
-    <Drawer onClose={close} open={order !== null} title={trade ? '付款' : '买积分'}>
-      {order && !trade && <BuyForm key={order.id} onCreated={setTrade} order={order} />}
-      {trade && <TradePayment initial={trade} />}
-    </Drawer>
-  )
-}

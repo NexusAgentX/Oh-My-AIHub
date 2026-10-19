@@ -17,7 +17,7 @@ import { LoginPage } from './auth/LoginPage'
 import { AccountPage } from './account/AccountPage'
 import { HomePage } from './home/HomePage'
 import { UsagePage } from './usage/UsagePage'
-import { PointsPage } from './points/PointsPage'
+import { BuyRouteDrawer, MyOrdersPage, MyTradesPage, PointsMarketPage, PointsPage, SellRouteDrawer } from './points/PointsPage'
 import { TradeDetailPage } from './points/TradeDetailPage'
 import { KeysPage } from './keys/KeysPage'
 import { KeyCreateDrawer, KeyDetailPage } from './keys/KeyDrawer'
@@ -116,6 +116,9 @@ export const appRoutes = createRoutesFromElements(
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/supply/channels/new" />
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/supply/channels/:id" />
           <Route element={<PointsPage />} path="/points" />
+          <Route element={<PointsMarketPage />} path="/points/market"><Route element={<BuyRouteDrawer />} path=":orderID" /></Route>
+          <Route element={<MyTradesPage />} path="/points/trades" />
+          <Route element={<MyOrdersPage />} path="/points/orders"><Route element={<SellRouteDrawer />} path="new" /></Route>
           <Route element={<TradeDetailPage />} path="/points/trades/:id" />
           <Route element={<LegacyRedirect from="/usage" to="/calls" />} path="/usage" />
           <Route element={<UsagePage />} path="/calls" />

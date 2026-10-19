@@ -38,6 +38,7 @@ type Store interface {
 	// inserts the order. A repeated order ID returns the stored order.
 	CreateOrder(ctx context.Context, order NewOrder) (Order, error)
 	ListMarket(ctx context.Context, viewerID string, after *Cursor, limit int) ([]Order, error)
+	GetMarketOrder(ctx context.Context, viewerID, orderID string) (Order, error)
 	ListSellerOrders(ctx context.Context, sellerID string, status OrderStatus, after *Cursor, limit int) ([]Order, error)
 	CloseOrder(ctx context.Context, orderID, sellerID string) (Order, error)
 
@@ -160,17 +161,34 @@ func (s *Service) ListMarket(ctx context.Context, viewerID, cursor string, limit
 	})
 	page := Page[MarketOrder]{Items: make([]MarketOrder, 0, len(orders)), Next: next}
 	for _, order := range orders {
-		methods, err := s.openMethods(order.ID, order.Methods)
+		public, err := s.marketOrder(order)
 		if err != nil {
 			return Page[MarketOrder]{}, err
 		}
-		channels := make([]string, 0, len(methods))
-		for _, method := range methods {
-			channels = append(channels, method.Channel)
-		}
-		page.Items = append(page.Items, MarketOrder{Order: order, Channels: channels})
+		page.Items = append(page.Items, public)
 	}
 	return page, nil
+}
+
+// GetMarketOrder uses the same public visibility as the market, independently of its first page.
+func (s *Service) GetMarketOrder(ctx context.Context, viewerID, orderID string) (MarketOrder, error) {
+	order, err := s.store.GetMarketOrder(ctx, viewerID, orderID)
+	if err != nil {
+		return MarketOrder{}, err
+	}
+	return s.marketOrder(order)
+}
+
+func (s *Service) marketOrder(order Order) (MarketOrder, error) {
+	methods, err := s.openMethods(order.ID, order.Methods)
+	if err != nil {
+		return MarketOrder{}, err
+	}
+	channels := make([]string, 0, len(methods))
+	for _, method := range methods {
+		channels = append(channels, method.Channel)
+	}
+	return MarketOrder{Order: order, Channels: channels}, nil
 }
 
 func (s *Service) ListMyOrders(ctx context.Context, sellerID string, status OrderStatus, cursor string, limit int) (Page[MyOrder], error) {
