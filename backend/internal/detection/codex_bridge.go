@@ -918,7 +918,11 @@ func (s *codexProbeStore) List(ctx context.Context, _ bool) ([]catalog.Model, er
 type codexProbeSettings struct{}
 
 func (codexProbeSettings) GetSettings(context.Context) (settings.Settings, error) {
-	return settings.Settings{DefaultMaxAttempts: 1, DefaultTTFTTimeoutMS: 30000, DefaultRequestTimeoutMS: 180000, DefaultIdleTimeoutMS: 30000, DefaultCooldownFailures: 3, DefaultCooldownSeconds: 300, USDCNYRateNano: ledger.UnitRate, AccountMaxInflightCalls: 2}, nil
+	// This private, bounded fixture must send every independent capability
+	// request even after ordinary upstream rejections. A synthetic channel's
+	// cooldown is not evidence about the next protocol/encoding. Production
+	// channel cooldown settings and retry limits are unaffected.
+	return settings.Settings{DefaultMaxAttempts: 1, DefaultTTFTTimeoutMS: 30000, DefaultRequestTimeoutMS: 180000, DefaultIdleTimeoutMS: 30000, USDCNYRateNano: ledger.UnitRate, AccountMaxInflightCalls: 2}, nil
 }
 func (codexProbeSettings) UpdateSettings(context.Context, string, settings.Settings) (settings.Settings, error) {
 	return settings.Settings{}, ErrInvalid
