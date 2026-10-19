@@ -184,7 +184,7 @@ type ReportSummary struct {
 type Store interface {
 	Create(context.Context, Job) error
 	Get(context.Context, string) (Job, error)
-	List(context.Context, string, bool, *Cursor, int) ([]Job, error)
+	List(context.Context, string, bool, string, *Cursor, int) ([]Job, error)
 	Save(context.Context, Job) error
 	Finish(context.Context, Job) (Job, error)
 	GetReport(context.Context, string) (Job, error)

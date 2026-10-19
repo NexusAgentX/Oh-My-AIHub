@@ -9647,6 +9647,8 @@ export interface operations {
     listDetectionJobs: {
         parameters: {
             query?: {
+                /** @description Filter tasks belonging to this contribution draft without changing access scope. */
+                draft_id?: string;
                 cursor?: string;
                 limit?: number;
             };

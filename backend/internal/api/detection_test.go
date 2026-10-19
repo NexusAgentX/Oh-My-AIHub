@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
@@ -50,12 +51,12 @@ func (s *apiDetectorStore) Save(_ context.Context, job detection.Job) error {
 	s.jobs[job.ID] = job
 	return nil
 }
-func (s *apiDetectorStore) List(_ context.Context, owner string, admin bool, cursor *detection.Cursor, limit int) ([]detection.Job, error) {
+func (s *apiDetectorStore) List(_ context.Context, owner string, admin bool, draftID string, cursor *detection.Cursor, limit int) ([]detection.Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	jobs := []detection.Job{}
 	for _, job := range s.jobs {
-		if (owner == job.OwnerID || admin) && (cursor == nil || job.CreatedAt.Before(cursor.At) || (job.CreatedAt.Equal(cursor.At) && job.ID < cursor.ID)) {
+		if (owner == job.OwnerID || admin) && (draftID == "" || job.Target.DraftID == draftID) && (cursor == nil || job.CreatedAt.Before(cursor.At) || (job.CreatedAt.Equal(cursor.At) && job.ID < cursor.ID)) {
 			jobs = append(jobs, job)
 		}
 	}
@@ -190,6 +191,31 @@ func TestDetectionTaskAndSettingsAPIContract(t *testing.T) {
 	owner.expect(t, 400, http.MethodGet, base+"?cursor=invalid", nil)
 	owner.expect(t, 422, http.MethodPost, base, map[string]string{"target_kind": "group_model", "target_id": "not-uuid", "api_key": "key"})
 	other.expect(t, 404, http.MethodPost, base, input)
+	draftID := "00000000-0000-4000-8000-000000000528"
+	store.mu.Lock()
+	for index, taskID := range []string{"00000000-0000-4000-8000-000000000530", "00000000-0000-4000-8000-000000000531"} {
+		item := job
+		item.ID = taskID
+		item.Target.DraftID = draftID
+		item.CreatedAt = job.CreatedAt.Add(time.Duration(index+1) * time.Second)
+		store.jobs[taskID] = item
+	}
+	store.mu.Unlock()
+	filtered := owner.expect(t, 200, http.MethodGet, base+"?draft_id="+draftID+"&limit=1", nil)
+	if len(filtered["items"].([]any)) != 1 || filtered["items"].([]any)[0].(map[string]any)["id"] != "00000000-0000-4000-8000-000000000531" {
+		t.Fatal("draft filter did not precede pagination")
+	}
+	next := owner.expect(t, 200, http.MethodGet, base+"?draft_id="+draftID+"&limit=1&cursor="+filtered["next_cursor"].(string), nil)
+	if len(next["items"].([]any)) != 1 || next["next_cursor"] != nil {
+		t.Fatal("draft pagination includes unrelated tasks")
+	}
+	if len(other.expect(t, 200, http.MethodGet, base+"?draft_id="+draftID, nil)["items"].([]any)) != 0 {
+		t.Fatal("draft filter widened ownership")
+	}
+	if len(admin.expect(t, 200, http.MethodGet, base+"?draft_id="+draftID, nil)["items"].([]any)) != 2 {
+		t.Fatal("admin draft scope lost")
+	}
+	owner.expect(t, 400, http.MethodGet, base+"?draft_id=not-uuid", nil)
 }
 
 func (s *apiDetectorStore) Finish(ctx context.Context, job detection.Job) (detection.Job, error) {

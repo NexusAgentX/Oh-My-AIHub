@@ -7,7 +7,7 @@ INSERT INTO detection_tasks(id,owner_id,state,complete,metadata,created_at,updat
 SELECT t.*,b.credential_scope FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id WHERE t.id=$1;
 -- name: ListTasks :many
 SELECT t.*,b.credential_scope FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
-WHERE (t.owner_id=sqlc.arg(owner_id) OR sqlc.arg(is_admin)::boolean) AND (sqlc.narg(after_at)::timestamptz IS NULL OR (t.created_at,t.id)<(sqlc.narg(after_at)::timestamptz,sqlc.narg(after_id)::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT sqlc.arg(page_limit);
+WHERE (t.owner_id=sqlc.arg(owner_id) OR sqlc.arg(is_admin)::boolean) AND (sqlc.arg(draft_id)::text = '' OR t.metadata->'target'->>'draft_id' = sqlc.arg(draft_id)::text) AND (sqlc.narg(after_at)::timestamptz IS NULL OR (t.created_at,t.id)<(sqlc.narg(after_at)::timestamptz,sqlc.narg(after_id)::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT sqlc.arg(page_limit);
 -- name: UpdateTask :execrows
 UPDATE detection_tasks SET state=$2,complete=$3,metadata=$4,updated_at=$5 WHERE id=$1;
 -- name: InterruptTasks :exec
