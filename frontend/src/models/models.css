@@ -102,3 +102,5 @@
 .model-filter-summary-end { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; color: var(--body); }
 @media (max-width: 960px) { .model-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .model-filters { grid-template-columns: minmax(0, 1fr); } }
+
+.routing-move { display: flex; gap: var(--space-1); }
