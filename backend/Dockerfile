@@ -15,6 +15,7 @@ RUN CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /o
 
 FROM alpine:3.24
 LABEL io.oh-my-aihub.schema-epoch="26"
+LABEL io.oh-my-aihub.fixed-test-admin="1"
 RUN addgroup -S app && adduser -S -G app app
 COPY --from=build /out/server /out/migrate /out/cutover-check /out/aihub-detection-sdk /out/aihub-detection-codex /out/codex /usr/local/bin/
 COPY licenses/codex/ /usr/share/licenses/codex/

@@ -7,28 +7,34 @@ import { PageLoading } from '../ui'
 type InstanceState = {
   ready: boolean
   initialized: boolean | null
+  testSite: boolean
+  fixedAdminUsername: string | null
   refresh: () => Promise<void>
 }
 
 const InstanceContext = createContext<InstanceState>({
   ready: false,
   initialized: null,
+  testSite: false,
+  fixedAdminUsername: null,
   refresh: async () => undefined,
 })
 
 export function InstanceProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ ready: boolean; initialized: boolean | null }>({
+  const [state, setState] = useState<Omit<InstanceState, 'refresh'>>({
     ready: false,
     initialized: null,
+    testSite: false,
+    fixedAdminUsername: null,
   })
 
   const refresh = useCallback(async () => {
     try {
       const instance = await api.instanceState()
-      setState({ ready: true, initialized: instance.initialized })
+      setState({ ready: true, initialized: instance.initialized, testSite: instance.test_site, fixedAdminUsername: instance.fixed_admin_username })
     } catch {
       // 探测失败时按已初始化处理，交由会话门卫接管，避免整站卡死。
-      setState({ ready: true, initialized: true })
+      setState(previous => ({ ...previous, ready: true, initialized: true }))
     }
   }, [])
 
@@ -37,7 +43,8 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   return (
-    <InstanceContext.Provider value={{ ready: state.ready, initialized: state.initialized, refresh }}>
+    <InstanceContext.Provider value={{ ...state, refresh }}>
+      {state.testSite && <aside className="test-site-notice" aria-label="测试环境">测试站 · 数据可能随时清空</aside>}
       {children}
     </InstanceContext.Provider>
   )

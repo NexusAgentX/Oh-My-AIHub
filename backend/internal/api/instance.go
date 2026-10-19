@@ -11,7 +11,9 @@ import (
 
 // instanceStateJSON is the OpenAPI InstanceState schema.
 type instanceStateJSON struct {
-	Initialized bool `json:"initialized"`
+	Initialized        bool    `json:"initialized"`
+	TestSite           bool    `json:"test_site"`
+	FixedAdminUsername *string `json:"fixed_admin_username"`
 }
 
 // healthJSON is the OpenAPI Health schema.
@@ -26,10 +28,18 @@ func (a *app) instanceState(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, instanceStateJSON{Initialized: initialized})
+	var fixedAdmin *string
+	if username := a.identity.FixedAdministrator(); username != "" {
+		fixedAdmin = &username
+	}
+	writeJSON(w, http.StatusOK, instanceStateJSON{Initialized: initialized, TestSite: fixedAdmin != nil, FixedAdminUsername: fixedAdmin})
 }
 
 func (a *app) instanceInitialize(w http.ResponseWriter, r *http.Request) {
+	if a.identity.FixedAdministrator() != "" {
+		writeDomainError(w, identity.ErrProtectedAccount)
+		return
+	}
 	var request struct {
 		Username    string `json:"username"`
 		DisplayName string `json:"display_name"`

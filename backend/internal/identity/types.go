@@ -22,6 +22,7 @@ var (
 	ErrConflict           = errors.New("conflict")
 	ErrForbidden          = errors.New("forbidden")
 	ErrInvalidInput       = errors.New("invalid input")
+	ErrProtectedAccount   = errors.New("fixed test administrator is protected")
 	// ErrLastAdministrator protects the instance from losing its last active administrator.
 	ErrLastAdministrator = errors.New("last active administrator")
 	// ErrSelfModification rejects administrators disabling, demoting or resetting themselves.

@@ -1,0 +1,180 @@
+name: test-site
+
+run-name: test-site ${{ inputs.mode }} · ${{ inputs.source_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: '部署的分支、tag 或提交 SHA'
+        required: true
+        default: main
+        type: string
+      mode:
+        description: 'update 保留数据；reset 清空 test-ai.isok.dev 全部业务数据后重建'
+        required: true
+        default: update
+        type: choice
+        options: [update, reset]
+
+permissions:
+  contents: read
+
+# Every manual run shares the same test instance, including reset runs.
+concurrency:
+  group: test-site-deploy
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: ghcr.io/nexusagentx/oh-my-aihub-backend
+  FRONTEND_IMAGE: ghcr.io/nexusagentx/oh-my-aihub-frontend
+
+jobs:
+  prepare:
+    if: github.repository == 'NexusAgentX/Oh-My-AIHub'
+    name: Resolve and check test version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - name: Resolve immutable commit and reuse main CI
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DEPLOY_MODE: ${{ inputs.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_MODE" == update || "$DEPLOY_MODE" == reset ]]
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          reused=false
+          if runs="$(gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&branch=main&per_page=100")" \
+            && printf '%s' "$runs" | scripts/ci-reuse-check.sh "$sha"; then
+            reused=true
+          fi
+          echo "reused=$reused" >> "$GITHUB_OUTPUT"
+          printf 'Target: `%s` · mode: `%s` · reused main CI: `%s`\n' "$sha" "$DEPLOY_MODE" "$reused" >> "$GITHUB_STEP_SUMMARY"
+      - uses: jdx/mise-action@v5
+        if: steps.target.outputs.reused != 'true'
+        with:
+          install: true
+      - uses: actions/cache@v6
+        if: steps.target.outputs.reused != 'true'
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-deps-${{ hashFiles('frontend/package-lock.json', 'backend/go.sum') }}
+          restore-keys: ${{ runner.os }}-deps-
+      - name: Check candidate without reusable CI
+        if: steps.target.outputs.reused != 'true'
+        run: mise run check-release
+
+  images:
+    name: Publish test images
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend_digest: ${{ steps.backend.outputs.digest }}
+      frontend_digest: ${{ steps.frontend.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish backend
+        id: backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.BACKEND_IMAGE }}:test-${{ needs.prepare.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:test-buildcache
+          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:test-buildcache,mode=max
+      - name: Publish frontend
+        id: frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.FRONTEND_IMAGE }}:test-${{ needs.prepare.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/NexusAgentX/Oh-My-AIHub
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:test-buildcache
+          cache-to: type=registry,ref=${{ env.FRONTEND_IMAGE }}:test-buildcache,mode=max
+
+  deploy:
+    name: Deploy test site
+    needs: [prepare, images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: test-hub
+      url: https://test-ai.isok.dev
+    env:
+      TEST_HOST: ${{ secrets.TEST_HOST }}
+      TEST_SSH_USER: ${{ secrets.TEST_SSH_USER }}
+      TEST_SSH_HOST_KEY: ${{ secrets.TEST_SSH_HOST_KEY }}
+      TEST_SSH_PRIVATE_KEY: ${{ secrets.TEST_SSH_PRIVATE_KEY }}
+      DEPLOY_MODE: ${{ inputs.mode }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.sha }}
+      BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
+      FRONTEND_DIGEST: ${{ needs.images.outputs.frontend_digest }}
+    steps:
+      - name: Configure restricted test deploy identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$TEST_SSH_PRIVATE_KEY" > "$HOME/.ssh/aihub-test"
+          chmod 0600 "$HOME/.ssh/aihub-test"
+          printf '%s\n' "$TEST_SSH_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/known_hosts"
+      - name: Check and deploy only the test stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_MODE" == update || "$DEPLOY_MODE" == reset ]]
+          connection=(-i "$HOME/.ssh/aihub-test" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
+          ssh "${connection[@]}" "${TEST_SSH_USER}@${TEST_HOST}" \
+            check "$SOURCE_SHA" "$BACKEND_DIGEST" "$FRONTEND_DIGEST"
+          ssh "${connection[@]}" "${TEST_SSH_USER}@${TEST_HOST}" \
+            "$DEPLOY_MODE" "$SOURCE_SHA" "$BACKEND_DIGEST" "$FRONTEND_DIGEST"
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            printf 'Test site: https://test-ai.isok.dev\n\n'
+            printf 'Mode: `%s`\n\nCommit: `%s`\n\n' "$DEPLOY_MODE" "$SOURCE_SHA"
+            printf 'Backend: `%s:test-%s@%s`\n\n' "$BACKEND_IMAGE" "$SOURCE_SHA" "$BACKEND_DIGEST"
+            printf 'Frontend: `%s:test-%s@%s`\n' "$FRONTEND_IMAGE" "$SOURCE_SHA" "$FRONTEND_DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -72,6 +72,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
 	case errors.Is(err, identity.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "没有执行该操作的权限")
+	case errors.Is(err, identity.ErrProtectedAccount):
+		writeError(w, http.StatusForbidden, "fixed_administrator", "测试站固定管理员的密码、启用状态和管理员身份不可更改")
 	case errors.Is(err, identity.ErrNotFound), errors.Is(err, catalog.ErrNotFound), errors.Is(err, ledger.ErrNotFound), errors.Is(err, c2c.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "资源不存在")
 	case errors.Is(err, identity.ErrLastAdministrator):
