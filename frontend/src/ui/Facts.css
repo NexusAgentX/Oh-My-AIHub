@@ -1,0 +1,4 @@
+.facts { display: grid; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 2fr); gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--hairline); }
+.facts dt { color: var(--muted); font-size: var(--text-sm); }
+.facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }

@@ -179,7 +179,7 @@ export function MarketSupplierDetailPage() {
 }
 export function MarketGroupPage() {
   const { id = '' } = useParams(), query = useMarketGroup(id)
-  return <QueryBoundary query={query} errorFallback="分组不存在或已停用">{data => <><PageHeader title={data.group.name} back={{ to: `/suppliers/${data.supplier.id}`, label: data.supplier.name }} /><Card><MarkdownContent value={data.group.description} />{data.group.status_url && <a href={data.group.status_url} target="_blank" rel="noopener noreferrer">服务状态 ↗</a>}<div className="sharing-line">{data.reports.map(id => <ButtonLink key={id} to={`/reports/${id}`} variant="secondary">查看检测报告</ButtonLink>)}</div>{data.reports.length === 0 && <p className="muted-copy">暂无已批准检测报告</p>}</Card><MarketModelGrid groupID={id} /></>}</QueryBoundary>
+  return <QueryBoundary query={query} errorFallback="分组不存在或已停用">{data => <><PageHeader title={data.group.name} back={{ to: `/suppliers/${data.supplier.id}`, label: data.supplier.name }} actions={<ButtonLink to={`/supply/channels/new?group=${encodeURIComponent(id)}`} state={{ from: { to: `/groups/${id}`, label: data.group.name } }}>用此分组共享渠道</ButtonLink>} /><Card><MarkdownContent value={data.group.description} />{data.group.status_url && <a href={data.group.status_url} target="_blank" rel="noopener noreferrer">服务状态 ↗</a>}<div className="sharing-line">{data.reports.map(id => <ButtonLink key={id} to={`/reports/${id}`} variant="secondary">查看检测报告</ButtonLink>)}</div>{data.reports.length === 0 && <p className="muted-copy">暂无已批准检测报告</p>}</Card><MarketModelGrid groupID={id} /></>}</QueryBoundary>
 }
 export function MarketReportPage() {
   const { id = '' } = useParams(), query = useMarketReport(id)

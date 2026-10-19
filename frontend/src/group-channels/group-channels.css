@@ -2,8 +2,6 @@
 .group-channel-heading, .group-channel-actions, .group-address-order, .group-model-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .group-channel-heading { justify-content: space-between; }
 .group-channel-heading > a { font-weight: 700; font-size: var(--text-lg); overflow-wrap: anywhere; }
-.group-channel-advanced { padding-top: var(--space-4); border-top: 1px solid var(--hairline); }
-.group-channel-advanced > summary { cursor: pointer; font-weight: 700; margin-bottom: var(--space-4); }
 .group-addresses, .group-models { list-style: none; margin: 0; padding: 0; }
 .group-addresses > li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--hairline); }
 .group-addresses .checkbox-control { min-width: 0; flex: 1; align-items: flex-start; }
@@ -17,3 +15,5 @@
 @media (max-width: 640px) { .group-models > li { grid-template-columns: minmax(0, 1fr); } .group-addresses > li { flex-wrap: wrap; } .group-address-order { margin-left: auto; } }
 
 .group-advanced-fields { display: grid; gap: var(--space-4); }
+
+.revenue-results[aria-busy="true"] { opacity: 0.6; }

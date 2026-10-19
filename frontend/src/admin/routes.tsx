@@ -26,7 +26,7 @@ export const adminRoutes = (
       <Route lazy={async()=>({Component:(await import('../group-channels/Pages')).AdminGroupChannelsPage})} path="channels" />
       <Route
         lazy={async () => ({ Component: (await import('../group-channels/Pages')).AdminGroupChannelPage })}
-        path="channels/:id"
+        path="channels/:id/*"
       />
       <Route lazy={async () => ({ Component: (await import('./DisputesPage')).DisputesPage })} path="disputes" />
       <Route
