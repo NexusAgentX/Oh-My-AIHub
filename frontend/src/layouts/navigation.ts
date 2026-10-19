@@ -10,7 +10,7 @@ export type NavGroup = {
 
 /** 一份分组配置驱动侧栏与移动端域；相关对象路径归入所属域。 */
 export const productNavigation: NavGroup[] = [
-  { label: '', items: [{ label: '首页', to: '/home', icon: 'home' }], mobile: { label: '首页', to: '/home', icon: 'home' } },
+  { label: '', items: [{ label: '首页', to: '/home', icon: 'home' }], mobile: { label: '首页', to: '/home', icon: 'home' }, related: ['/inbox'] },
   { label: '使用', items: [{ label: 'API Key', to: '/keys', icon: 'key' }, { label: '调用', to: '/calls', icon: 'list' }], mobile: { label: '使用', to: '/calls', icon: 'list' }, related: ['/usage'] },
   { label: '市场', items: [{ label: '模型', to: '/models', icon: 'store' }, { label: '渠道大厅', to: '/channel-hall', icon: 'layers' }, { label: '供应商', to: '/suppliers', icon: 'globe' }], mobile: { label: '市场', to: '/models', icon: 'store' }, related: ['/groups', '/reports'] },
   { label: '积分', items: [{ label: '钱包', to: '/points', icon: 'wallet' }, { label: '买积分', to: '/points/market', icon: 'coins' }, { label: '我的交易', to: '/points/trades', icon: 'swap' }, { label: '我的卖单', to: '/points/orders', icon: 'sell-order' }], mobile: { label: '积分', to: '/points', icon: 'wallet' } },

@@ -10,5 +10,5 @@ export const homeKeys = {
 export function useHome() {
   const visible = usePageVisible()
   return useQuery({ queryKey: homeKeys.summary, queryFn: () => apiGet<'getHome'>('/api/home'), refetchOnWindowFocus: true,
-    refetchInterval: query => visible ? query.state.data?.pending_c2c_trades ? 30_000 : 60_000 : false })
+    refetchInterval: visible ? 60_000 : false })
 }

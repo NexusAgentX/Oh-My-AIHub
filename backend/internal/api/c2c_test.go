@@ -179,6 +179,9 @@ func (s *fakeC2CStore) ListTrades(_ context.Context, f c2c.TradeFilter) ([]c2c.T
 			mine = trade.Seller.ID == f.UserID
 		}
 		pending := (trade.Buyer.ID == f.UserID && trade.Status == c2c.TradeAwaitingPayment) || (trade.Seller.ID == f.UserID && trade.Status == c2c.TradePaid)
+		if f.After != nil && (!trade.CreatedAt.Before(f.After.Time) && !(trade.CreatedAt.Equal(f.After.Time) && trade.ID < f.After.ID)) {
+			continue
+		}
 		if mine && (f.Status == "" || trade.Status == f.Status) && (!f.Pending || pending) && (!f.Active || trade.Status.Unfinished()) {
 			trades = append(trades, trade)
 		}

@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryClient } from '@tanstack/react-query'
 import { ApiError } from './client'
 
 /**
@@ -25,7 +25,8 @@ export function shouldRetry(failureCount: number, error: unknown) {
 }
 
 export function createQueryClient() {
-  return new QueryClient({
+  const client = new QueryClient({
+    mutationCache: new MutationCache({ onSuccess: () => { void client.invalidateQueries({ queryKey: ['inbox'] }) } }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,
@@ -35,4 +36,5 @@ export function createQueryClient() {
       mutations: { retry: false },
     },
   })
+  return client
 }

@@ -310,3 +310,39 @@ func TestContributionRecoveryFenceWaitsForEarlierTransaction(t *testing.T) {
 		t.Fatal("publication fence leaked after transaction", err)
 	}
 }
+
+func TestContributionPreviewHasNoPublicationFenceAndCannotWrite(t *testing.T) {
+	pool, s := isolatedDatabase(t)
+	_, _, members := accounts(t, s, "0", "0")
+	ctx := context.Background()
+	service := &contribution.Service{Store: s.Contributions, Live: s.Market}
+	draft, err := service.New(ctx, contribution.Actor{ID: members[0].ID}, contribution.NewInput{Kind: "supplier"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocker, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Rollback(ctx)
+	if _, err = blocker.Exec(ctx, "SELECT pg_advisory_xact_lock(4704367245194902356)"); err != nil {
+		t.Fatal(err)
+	}
+	bounded, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if _, err = s.Contributions.Preview(bounded, draft.ID, func(d *contribution.Draft, u contribution.UnitOfWork) error {
+		_, err := u.Directory(bounded)
+		return err
+	}); err != nil {
+		t.Fatal("read-only preview waited for publication fence", err)
+	}
+	if _, err = s.Contributions.Preview(ctx, draft.ID, func(d *contribution.Draft, u contribution.UnitOfWork) error {
+		return u.Audit(ctx, members[0].ID, "must-not-write", nil)
+	}); err == nil {
+		t.Fatal("read-only preview wrote an audit record")
+	}
+	got, err := service.Get(ctx, contribution.Actor{ID: members[0].ID}, draft.ID)
+	if err != nil || got.Revision != draft.Revision {
+		t.Fatal("preview changed draft", err)
+	}
+}

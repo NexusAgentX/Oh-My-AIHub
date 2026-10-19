@@ -164,5 +164,6 @@ func (a *app) getHome(w http.ResponseWriter, r *http.Request) {
 
 // registerBrowseRoutes registers the account home page. Market browsing has its own routes.
 func (a *app) registerBrowseRoutes(r *router) {
+	r.implement("530", "GET /api/inbox", accessReady, a.getInbox)
 	r.implement("B", "GET /api/home", accessReady, a.getHome)
 }

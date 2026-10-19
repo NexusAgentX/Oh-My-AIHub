@@ -27,7 +27,13 @@ type impactReader interface {
 
 func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, error) {
 	out := Detail{Addresses: []market.Address{}, Evaluation: Evaluation{Targets: []TargetReview{}}}
-	draft, err := s.Store.Edit(ctx, id, func(d *Draft, u UnitOfWork) error {
+	read := s.Store.Edit
+	if preview, ok := s.Store.(interface {
+		Preview(context.Context, string, func(*Draft, UnitOfWork) error) (Draft, error)
+	}); ok {
+		read = preview.Preview
+	}
+	draft, err := read(ctx, id, func(d *Draft, u UnitOfWork) error {
 		if !authorized(actor, *d) {
 			return ErrNotFound
 		}

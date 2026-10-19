@@ -1,3 +1,4 @@
+import { statusRegistry } from '../ui/status'
 import { errorMessage } from '../api/query'
 import { Facts } from '../ui/Facts'
 import { FinanceNav } from './SectionNav'
@@ -24,15 +25,7 @@ import { useAdminTrades, useAdminTrade, useAdminTransactions, useResolveTrade } 
 import { TransactionTypeLabel, transactionVolume } from './transactions'
 import type { C2CTrade, TradeStatus } from './types'
 
-export const tradeStatusLabels: Record<TradeStatus, [string, BadgeTone]> = {
-  awaiting_payment: ['待付款', 'info'],
-  paid: ['已付款', 'info'],
-  released: ['已放行', 'success'],
-  cancelled: ['已取消', 'neutral'],
-  disputed: ['申诉中', 'danger'],
-  resolved_to_buyer: ['判给买家', 'success'],
-  resolved_to_seller: ['退回卖家', 'neutral'],
-}
+export const tradeStatusLabels = Object.fromEntries(Object.entries(statusRegistry.trade).map(([value, meta]) => [value, [meta.label, meta.tone]])) as Record<TradeStatus, [string, BadgeTone]>
 
 function TradeStatusBadge({ status }: { status: TradeStatus }) {
   const [label, tone] = tradeStatusLabels[status]

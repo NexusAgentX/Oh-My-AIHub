@@ -1,3 +1,4 @@
+import { statusMeta } from '../ui/status'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, pathSegment, request, withQuery, type QueryParams } from '../api/client'
 import type { RequestBody } from '../api/types'
@@ -114,7 +115,7 @@ export function useC2CTrade(id: string | null) {
     queryKey: c2cKeys.trade(id ?? ''),
     queryFn: async () => (await apiGet<'getC2CTrade'>(`/api/c2c/trades/${pathSegment(id ?? '')}`)).trade,
     enabled: Boolean(id),
-    refetchInterval: query => visible && query.state.data && !['released', 'cancelled', 'resolved_to_buyer', 'resolved_to_seller'].includes(query.state.data.status) ? 15_000 : false,
+    refetchInterval: query => visible && query.state.data && !statusMeta('trade', query.state.data.status).terminal ? 15_000 : false,
     refetchOnWindowFocus: true,
   })
 }
