@@ -1,3 +1,4 @@
+import { DomainStatusBadge } from '../ui/status'
 import { SaveBar } from '../ui/SaveBar'
 import { Pager } from '../ui/Pager'
 import { useBack } from '../ui/urlState'
@@ -12,7 +13,6 @@ import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 're
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
 import {
-  Badge,
   Button,
   ButtonLink,
   Card,
@@ -46,46 +46,13 @@ import {
 import './contributions.css'
 import { DetectionSection } from './DetectionSection'
 
-const stateNames: Record<string, string> = {
-  draft: '草稿',
-  detecting: '检测中',
-  invalid: '请补充内容',
-  ready: '可提交',
-  submitted: '待审核',
-  rejected: '已驳回',
-  withdrawn: '已撤回',
-  publication_pending: '发布待完成',
-  approved: '已批准',
-  conflict: '生效版本已变化',
-  supplier_has_groups: '供应商仍有分组',
-  suite_pending: '检测套件待实现',
-  report_required: '需要完整报告',
-}
 const kinds: Record<Kind, string> = {
   supplier: '供应商',
   group: '分组',
   group_model: '模型报价',
   model_id: '模型 ID 治理',
 }
-function Status({ value }: { value: string }) {
-  return (
-    <Badge
-      tone={
-        value === 'approved' || value === 'ready'
-          ? 'success'
-          : value === 'submitted' ||
-              value === 'publication_pending' ||
-              value === 'detecting'
-            ? 'info'
-            : value === 'conflict'
-              ? 'danger'
-              : 'neutral'
-      }
-    >
-      {stateNames[value] ?? value}
-    </Badge>
-  )
-}
+function Status({ value }: { value: string }) { return <DomainStatusBadge domain="contribution" value={value} /> }
 function stamp(v: string) {
   return formatDateTime(v)
 }

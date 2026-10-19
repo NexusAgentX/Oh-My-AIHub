@@ -7396,6 +7396,35 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/inbox:
+    get:
+      operationId: getInbox
+      tags: [home]
+      summary: 本人待办与治理提醒
+      description: >-
+        本人来源始终限于当前账户，即使当前账户是管理员。治理来源仅管理员可见。
+        提醒分为 action、anomaly、progress；首页仅突出带截止时间的行动与 blocker。
+        complete 来源的 counts 是完整扫描后的提醒条数，不是首屏数量；治理概况每条聚合提醒算一条，不把尝试次数当作对象数。
+        unavailable 或 limited 来源保留已读条目但 counts 为 null，客户端必须显示数量未知并提供来源入口。
+        每进程最多 2 个聚合请求，每请求最多 4 个读取器并行，总超时 6 秒；分页来源最多扫描 1000 个对象，超过后返回 limited。
+        不返回密钥、支付信息、陈述正文、原始上游错误或其他账户的私有对象。
+      x-access: ready
+      x-feature: '530'
+      security:
+      - {sessionCookie: []}
+      responses:
+        '200':
+          description: 各来源独立报告完整性
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InboxResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429':
+          description: 聚合读取预算已满
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
   /api/home:
     get:
       operationId: getHome
@@ -15612,6 +15641,49 @@ components:
         prefix: {type: string}
       required: [id, name, prefix]
       additionalProperties: false
+    InboxItem:
+      type: object
+      additionalProperties: false
+      required: [id, category, title, message, href, blocker, deadline, updated_at]
+      properties:
+        id: {type: string}
+        category: {type: string, enum: [action, anomaly, progress]}
+        title: {type: string}
+        message: {type: string}
+        href: {type: string}
+        blocker: {type: boolean}
+        deadline: {type: [string, 'null'], format: date-time}
+        updated_at: {type: string, format: date-time}
+    InboxCounts:
+      type: object
+      additionalProperties: false
+      required: [action, anomaly, progress]
+      properties:
+        action: {type: integer, minimum: 0}
+        anomaly: {type: integer, minimum: 0}
+        progress: {type: integer, minimum: 0}
+    InboxSource:
+      type: object
+      additionalProperties: false
+      required: [id, label, workspace, href, state, counts, items]
+      properties:
+        id: {type: string, enum: [trades, channels, keys, points, contributions, detection, reviews, governance]}
+        label: {type: string}
+        workspace: {type: string, enum: [member, admin]}
+        href: {type: string}
+        state: {type: string, enum: [complete, unavailable, limited]}
+        counts:
+          oneOf:
+          - {$ref: '#/components/schemas/InboxCounts'}
+          - {type: 'null'}
+        items: {type: array, items: {$ref: '#/components/schemas/InboxItem'}}
+    InboxResponse:
+      type: object
+      additionalProperties: false
+      required: [generated_at, sources]
+      properties:
+        generated_at: {type: string, format: date-time}
+        sources: {type: array, items: {$ref: '#/components/schemas/InboxSource'}}
     HomeResponse:
       type: object
       properties:

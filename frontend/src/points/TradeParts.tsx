@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+export { useCountdown } from '../ui/countdown'
+import { useCountdown } from '../ui/countdown'
+import { useState } from 'react'
 import { errorMessage } from '../api/query'
 import type { C2CTrade } from '../api/types'
-import { usePageVisible } from '../api/visibility'
 import { formatFen, formatPoints } from '../money/format'
 import { formatCountdown } from '../money/time'
 import { Badge, Button, ConfirmDialog, CopyButton, InlineError, TextareaField } from '../ui'
@@ -10,25 +11,6 @@ import { useTradeAction } from './queries'
 
 export function TradeStatusBadge({ status }: { status: C2CTrade['status'] }) {
   return <Badge tone={tradeStatusLabels[status].tone}>{tradeStatusLabels[status].label}</Badge>
-}
-
-/** 付款倒计时（秒），到期后为 0。 */
-export function useCountdown(deadline?: string | null) {
-  const [now, setNow] = useState(() => Date.now())
-  const visible = usePageVisible()
-  const end = deadline ? new Date(deadline).getTime() : 0
-  useEffect(() => {
-    if (!visible || !end) return
-    setNow(Date.now())
-    if (end <= Date.now()) return
-    const timer = window.setInterval(() => {
-      const time = Date.now()
-      setNow(time)
-      if (time >= end) window.clearInterval(timer)
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [visible, end])
-  return Math.max(0, (end - now) / 1000)
 }
 
 /** 收款信息：方式 + 文字账号（只对交易双方可见）、备注交易号与应付金额。 */

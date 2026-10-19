@@ -1,3 +1,4 @@
+import { usePageVisible } from '../api/visibility'
 import { formDefaultsKey } from '../settings/queries'
 import { secretSession } from '../ui/secretHandoff'
 import { handoffAdminSecret } from './secret'
@@ -51,7 +52,8 @@ function usePagedQuery<T>(
 }
 
 export function useAdminOverview() {
-  return useQuery({ queryKey: adminKeys.overview, queryFn: adminApi.overview })
+  const visible = usePageVisible()
+  return useQuery({ queryKey: adminKeys.overview, queryFn: adminApi.overview, refetchOnWindowFocus: true, refetchInterval: visible ? 60_000 : false })
 }
 
 /** 积分全局；days 为走势时间窗（7 / 30 / 90），切换时保留上一份数据避免整页闪烁。 */

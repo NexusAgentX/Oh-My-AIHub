@@ -1627,6 +1627,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 本人待办与治理提醒
+         * @description 本人来源始终限于当前账户，即使当前账户是管理员。治理来源仅管理员可见。 提醒分为 action、anomaly、progress；首页仅突出带截止时间的行动与 blocker。 complete 来源的 counts 是完整扫描后的提醒条数，不是首屏数量；治理概况每条聚合提醒算一条，不把尝试次数当作对象数。 unavailable 或 limited 来源保留已读条目但 counts 为 null，客户端必须显示数量未知并提供来源入口。 每进程最多 2 个聚合请求，每请求最多 4 个读取器并行，总超时 6 秒；分页来源最多扫描 1000 个对象，超过后返回 limited。 不返回密钥、支付信息、陈述正文、原始上游错误或其他账户的私有对象。
+         */
+        get: operations["getInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/home": {
         parameters: {
             query?: never;
@@ -4207,6 +4227,41 @@ export interface components {
             id: string;
             name: string;
             prefix: string;
+        };
+        InboxItem: {
+            id: string;
+            /** @enum {string} */
+            category: "action" | "anomaly" | "progress";
+            title: string;
+            message: string;
+            href: string;
+            blocker: boolean;
+            /** Format: date-time */
+            deadline: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InboxCounts: {
+            action: number;
+            anomaly: number;
+            progress: number;
+        };
+        InboxSource: {
+            /** @enum {string} */
+            id: "trades" | "channels" | "keys" | "points" | "contributions" | "detection" | "reviews" | "governance";
+            label: string;
+            /** @enum {string} */
+            workspace: "member" | "admin";
+            href: string;
+            /** @enum {string} */
+            state: "complete" | "unavailable" | "limited";
+            counts: components["schemas"]["InboxCounts"] | null;
+            items: components["schemas"]["InboxItem"][];
+        };
+        InboxResponse: {
+            /** Format: date-time */
+            generated_at: string;
+            sources: components["schemas"]["InboxSource"][];
         };
         HomeResponse: {
             points: components["schemas"]["PointsSummary"];
@@ -10765,6 +10820,37 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getInbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 各来源独立报告完整性 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description 聚合读取预算已满 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     getHome: {

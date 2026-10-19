@@ -1,3 +1,6 @@
+import { useInbox } from '../inbox/InboxProvider'
+import { InboxList, InboxRefreshState } from '../inbox/Components'
+import { inboxRows } from '../inbox/model'
 import { Badge, ButtonLink, Card, Metric, PageHeader, QueryBoundary, type BadgeTone } from '../ui'
 import { formatCount, formatFen, formatExactPoints as formatPoints, formatRatio, pointsRatio } from '../money'
 import { useAdminOverview } from './queries'
@@ -86,15 +89,19 @@ export function Indicators({ overview }: { overview: AdminOverview }) {
 
 export function OverviewPage() {
   const overview = useAdminOverview()
+  const inbox = useInbox(), sources = inbox.data?.sources.filter(source => source.workspace === 'admin') ?? []
+  const rows = inboxRows(sources)
   return (
     <>
-      <PageHeader title="概览" />
+      <PageHeader title="治理待处理" />
+      <Card title="需要处理" actions={<ButtonLink size="sm" variant="quiet" to="/inbox?workspace=admin&category=all">全部治理提醒</ButtonLink>}>
+        <QueryBoundary query={inbox} errorFallback="治理提醒加载失败">{() => rows.length ? <InboxList items={rows.slice(0, 5)} /> : sources.every(source => source.state === 'complete') ? <p className="muted-copy">暂无需要处理的事</p> : null}</QueryBoundary>
+        {rows.length > 5 && <p className="muted-copy">另有 {rows.length - 5} 条已读取提醒，请查看全部。</p>}
+        <InboxRefreshState sources={sources} />
+      </Card>
       <QueryBoundary query={overview}>
         {(data) => (
           <div className="admin-stack">
-            <Card title="需要处理">
-              <AttentionList items={data.attention} />
-            </Card>
             <Indicators overview={data} />
           </div>
         )}
