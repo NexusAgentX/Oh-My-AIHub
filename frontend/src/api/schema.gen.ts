@@ -4070,6 +4070,10 @@ export interface components {
         };
         InstanceState: {
             initialized: boolean;
+            /** @description 是否为业务数据可随时清空的内测实例。 */
+            test_site: boolean;
+            /** @description 受保护的公开管理员用户名；普通实例为 null，不包含密码。 */
+            fixed_admin_username: string | null;
         };
         InstanceInitializeRequest: {
             username: string;

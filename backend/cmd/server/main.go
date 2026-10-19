@@ -149,9 +149,25 @@ func main() {
 	if err != nil {
 		fatal(logger, "loading the gateway snapshots failed", err)
 	}
-	identityService, err := identity.NewService(cached.Identity, 24*time.Hour)
+	testSite, err := parseTestSite(os.Getenv)
+	if err != nil {
+		fatal(logger, "invalid test site configuration", err)
+	}
+	var identityOptions []identity.Option
+	if testSite.enabled {
+		identityOptions = append(identityOptions, identity.WithFixedAdministrator(testSite.username))
+	}
+	identityService, err := identity.NewService(cached.Identity, 24*time.Hour, identityOptions...)
 	if err != nil {
 		fatal(logger, "creating the identity service failed", err)
+	}
+	if testSite.enabled {
+		adminContext, cancelAdmin := context.WithTimeout(context.Background(), 15*time.Second)
+		err = identityService.EnsureFixedAdministrator(adminContext, testSite.password)
+		cancelAdmin()
+		if err != nil {
+			fatal(logger, "initializing the fixed test administrator failed", err)
+		}
 	}
 
 	settingsService := settings.NewService(store.Settings)

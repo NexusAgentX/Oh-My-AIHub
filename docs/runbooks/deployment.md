@@ -44,3 +44,17 @@
 3. 重跑或回滚：对 `release` workflow 使用 `workflow_dispatch` 并填入既有 tag，直接复用已发布镜像 digest 部署，不重新构建。
 4. 运行时事实（生产 Compose、Nginx、备份与发布脚本副本）以个人运维仓库 `remote-hosts/hk-vps/sites/oh-my-aihub/` 为准；首次部署与新环境自举使用该仓库的 `bin/deploy-oh-my-aihub`。
 
+## 内测部署（test-ai.isok.dev）
+
+完整业务实例，与生产使用独立 Compose 项目、容器、网络、数据库卷、密钥及 `test-hub` Environment 发布身份。运行配置与受限脚本维护在个人运维仓库 `remote-hosts/hk-vps/sites/oh-my-aihub-test/`，数据清理规则和部署失败处理以该目录为准。
+
+仅手动触发 `.github/workflows/test-site.yml`，默认部署 `main`、保留数据更新；可选择分支、tag 或提交 SHA。工作流解析确定提交，复用该提交成功的 main CI 或补跑门禁，构建相同 Dockerfile 的 `test-<SHA>` 镜像并以 digest 发布到内测实例，不创建正式 Release，不触发生产部署。
+
+```bash
+gh workflow run test-site.yml -f source_ref=main -f mode=update
+# 显式选择 reset，授权删除该测试站全部业务数据；部署配置和固定管理员凭据保留。
+gh workflow run test-site.yml -f source_ref=main -f mode=reset
+```
+
+`update` 保留数据库并运行编号迁移，容器替换期间会短暂中断；`reset` 删除测试站专属数据卷后从空库迁移，恢复同一组固定管理员。两种模式由同一测试部署锁串行保护。固定管理员凭据放在 BWS 与远端受限 `.env`，不通过工作流参数或日志传递；部署与验收不得复制生产数据或凭据。公开管理员对测试站拥有正常管理权限，因此内测成员应知晓管理员可见数据也对其他测试者开放。
+

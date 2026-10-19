@@ -10,6 +10,7 @@ import { takeAdminSecret } from './secret'
 import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
+import { useInstance } from '../auth/InstanceProvider'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import {
   Badge,
@@ -190,6 +191,8 @@ function UserDrawerBody({
 }) {
   const { account: me } = useAuth(), location = useLocation()
   const self = me?.id === account.id
+  const { fixedAdminUsername } = useInstance()
+  const protectedAdmin = account.username === fixedAdminUsername
   const update = useUpdateAccount()
   const reset = useResetPassword()
   const adjust = useAdjustAccount()
@@ -277,8 +280,8 @@ function UserDrawerBody({
         <h3 className="section-title">资料与额度</h3>
         <TextField disabled={busy} label="显示名" maxLength={64} onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
         <TextField disabled={busy} inputMode="decimal" label="信用额度（积分）" onChange={(event) => setCreditLimit(event.target.value)} value={creditLimit} />
-        <Checkbox checked={active} disabled={self || busy} label="启用（停用后立即退出全部会话）" onChange={(event) => setActive(event.target.checked)} />
-        <Checkbox checked={isAdmin} disabled={self || busy} label="管理员" onChange={(event) => setIsAdmin(event.target.checked)} />
+        <Checkbox checked={active} disabled={self || protectedAdmin || busy} label="启用（停用后立即退出全部会话）" onChange={(event) => setActive(event.target.checked)} />
+        <Checkbox checked={isAdmin} disabled={self || protectedAdmin || busy} label="管理员" onChange={(event) => setIsAdmin(event.target.checked)} />
         <InlineError>{formError || (update.isError ? errorMessage(update.error, '保存失败，请重试') : '')}</InlineError>
       </form>
 
@@ -291,11 +294,11 @@ function UserDrawerBody({
           <Button disabled={!negative || busy} onClick={() => openAction('write-off')} size="sm" type="button" variant="secondary">
             坏账核销
           </Button>
-          <Button disabled={self || busy} onClick={() => openAction('reset')} size="sm" type="button" variant="secondary">
+          <Button disabled={self || protectedAdmin || busy} onClick={() => openAction('reset')} size="sm" type="button" variant="secondary">
             重置密码
           </Button>
         </div>
-        {self && <p className="muted-copy">不能停用、撤销或重置自己的账户。</p>}
+        {protectedAdmin ? <p className="muted-copy">测试站固定管理员，不能停用、降级或重置密码。</p> : self && <p className="muted-copy">不能停用、撤销或重置自己的账户。</p>}
       </div>
 
       <ConfirmActionDialog

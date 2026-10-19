@@ -1,4 +1,20 @@
 /* 应用外壳：侧边栏 + 顶栏 + 内容区 + 移动端底部 Tab 栏 */
+html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
+.test-site-notice {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-topbar);
+  display: flex;
+  height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--space-3);
+  border-bottom: var(--sticker-border);
+  color: var(--on-color);
+  background: var(--mustard);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
 .app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
 
 .skip-link {
@@ -29,10 +45,10 @@
 /* 侧边栏 */
 .sidebar {
   position: sticky;
-  top: 0;
+  top: var(--test-site-offset, 0px);
   display: flex;
   height: 100vh;
-  height: 100dvh;
+  height: calc(100dvh - var(--test-site-offset, 0px));
   flex-direction: column;
   gap: 22px;
   padding: var(--space-5) 14px var(--space-2); /* 底部账户块贴近窗口底边 */
@@ -146,7 +162,7 @@
 .topbar {
   position: sticky;
   z-index: var(--z-topbar);
-  top: 0;
+  top: var(--test-site-offset, 0px);
   display: flex;
   height: var(--topbar-height);
   align-items: center;
@@ -287,6 +303,6 @@
   }
 }
 
-html { scroll-padding-top: calc(var(--topbar-height) + var(--space-3)); }
+html { scroll-padding-top: calc(var(--topbar-height) + var(--test-site-offset, 0px) + var(--space-3)); }
 .model-card { scroll-margin-block: var(--space-3); }
 @media (max-width: 767px) { html { scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + var(--space-3)); } }

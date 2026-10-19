@@ -22,6 +22,7 @@ type Service struct {
 	sessionLifetime time.Duration
 	passwordParams  PasswordParams
 	dummyHash       string
+	fixedAdmin      string
 }
 
 // Option 调整 Service 的可选行为；生产装配不传任何 Option。
@@ -43,6 +44,9 @@ func NewService(store Store, sessionLifetime time.Duration, options ...Option) (
 	}
 	for _, option := range options {
 		option(s)
+	}
+	if s.fixedAdmin != "" && !usernamePattern.MatchString(s.fixedAdmin) {
+		return nil, fmt.Errorf("%w: invalid fixed administrator username", ErrInvalidInput)
 	}
 	if err := s.passwordParams.validate(); err != nil {
 		return nil, err
@@ -119,6 +123,9 @@ func (s *Service) ChangePassword(ctx context.Context, accountID, currentPassword
 	if err != nil {
 		return LoginResult{}, err
 	}
+	if s.isFixedAdministrator(account.Username) {
+		return LoginResult{}, ErrProtectedAccount
+	}
 	if !VerifyPassword(account.PasswordHash, currentPassword) {
 		return LoginResult{}, ErrInvalidCredentials
 	}
@@ -153,6 +160,9 @@ func (s *Service) AdminResetPassword(ctx context.Context, actor Account, account
 	}
 	if accountID == "" {
 		return CreatedAccount{}, ErrInvalidInput
+	}
+	if err := s.protectAdministrator(ctx, accountID); err != nil {
+		return CreatedAccount{}, err
 	}
 	if accountID == actor.ID {
 		return CreatedAccount{}, ErrSelfModification
@@ -257,6 +267,11 @@ func (s *Service) GetAccount(ctx context.Context, actor Account, accountID strin
 func (s *Service) UpdateAccount(ctx context.Context, actor Account, accountID string, update AccountUpdate) (AdminAccount, error) {
 	if !actor.IsAdmin {
 		return AdminAccount{}, ErrForbidden
+	}
+	if (update.Status != nil && *update.Status == StatusDisabled) || (update.IsAdmin != nil && !*update.IsAdmin) {
+		if err := s.protectAdministrator(ctx, accountID); err != nil {
+			return AdminAccount{}, err
+		}
 	}
 	if update.DisplayName == nil && update.Status == nil && update.CreditLimit == nil && update.IsAdmin == nil {
 		return AdminAccount{}, ErrInvalidInput

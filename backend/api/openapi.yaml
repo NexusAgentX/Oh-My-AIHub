@@ -15413,7 +15413,9 @@ components:
       type: object
       properties:
         initialized: {type: boolean}
-      required: [initialized]
+        test_site: {type: boolean, description: 是否为业务数据可随时清空的内测实例。}
+        fixed_admin_username: {type: [string, 'null'], description: 受保护的公开管理员用户名；普通实例为 null，不包含密码。}
+      required: [initialized, test_site, fixed_admin_username]
       additionalProperties: false
     InstanceInitializeRequest:
       type: object
