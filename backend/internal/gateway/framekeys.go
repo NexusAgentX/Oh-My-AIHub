@@ -11,7 +11,7 @@ import (
 // worth decoding: in a long stream nearly every event is a few words of text
 // that carry none of them, and decoding those into maps and structs was most of
 // what a stream allocated.
-type frameKeys uint8
+type frameKeys uint16
 
 const (
 	// keyUsage: a "usage" member with a value other than null, at any depth.
@@ -30,6 +30,8 @@ const (
 	keyError
 	// keyEnvelope marks only recognized type/status values, not ordinary deltas.
 	keyEnvelope
+	// keyContainerID is a native producer identity observed before forwarding.
+	keyContainerID
 
 	// nullableKeys are the keys that are ignored when their value is null.
 	nullableKeys = keyUsage | keyUsageMetadata | keyServiceTier | keyStop | keyError | keyEnvelope
@@ -47,6 +49,7 @@ var frameKeyNames = [...]struct {
 	keys frameKeys
 }{
 	{"id", keyID},
+	{"container_id", keyContainerID},
 	{"error", keyError},
 	{"type", keyEnvelope}, {"status", keyEnvelope},
 	{"finish_reason", keyStop}, {"stop_reason", keyStop}, {"finishreason", keyStop},

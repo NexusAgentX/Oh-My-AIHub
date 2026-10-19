@@ -170,6 +170,7 @@ func (e *Engine) registerResources(call *callState, c Candidate, raw []byte) err
 // This runs only on requests capable of producing persistent resources.
 type resourceEventGate struct {
 	event      []byte
+	data       []byte // reused only for multiline data; single-line data aliases event
 	lineStart  int
 	pendingCR  bool
 	closedLine bool
@@ -180,18 +181,31 @@ type resourceEventGate struct {
 
 func (g *resourceEventGate) flush() error {
 	var data []byte
-	lines := bytes.FieldsFunc(g.event, func(r rune) bool { return r == '\r' || r == '\n' })
-	for _, l := range lines {
+	joined := false
+	for rest := g.event; len(rest) > 0; {
+		end := bytes.IndexAny(rest, "\r\n")
+		if end < 0 {
+			end = len(rest)
+		}
+		l := rest[:end]
+		rest = rest[min(end+1, len(rest)):]
 		if v, ok := bytes.CutPrefix(l, []byte("data:")); ok {
 			v = bytes.TrimPrefix(v, []byte(" "))
 			if len(data) > 0 {
-				data = append(data, '\n')
+				if !joined {
+					g.data = append(g.data[:0], data...)
+					joined = true
+				}
+				g.data = append(g.data, '\n')
+				g.data = append(g.data, v...)
+				data = g.data
+			} else {
+				data = v
 			}
-			data = append(data, v...)
 		}
 	}
-	if len(data) > 0 && data[0] == '{' {
-		if err := g.observe(data); err != nil {
+	if payload := bytes.TrimSpace(data); len(payload) > 0 && payload[0] == '{' {
+		if err := g.observe(payload); err != nil {
 			g.failed = err
 			return err
 		}

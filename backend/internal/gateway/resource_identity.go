@@ -21,8 +21,18 @@ type resourceObserver struct {
 }
 
 func (o *resourceObserver) observe(raw []byte) ([]nativeResource, error) {
+	if len(raw) > maxRequestBytes || !json.Valid(raw) {
+		return nil, errors.New("invalid resource response")
+	}
+	// Ordinary text deltas cannot produce remote resources. Check decoded
+	// member names conservatively (including escaped names) without building
+	// a second JSON tree for every event. Producer envelopes still take the
+	// full parser and are registered before any identifier reaches the client.
+	if raw[skipSpace(raw, 0)] == '{' && scanFrameKeys(raw)&(keyID|keyContainerID) == 0 {
+		return nil, nil
+	}
 	var root map[string]json.RawMessage
-	if len(raw) > maxRequestBytes || json.Unmarshal(raw, &root) != nil {
+	if json.Unmarshal(raw, &root) != nil {
 		return nil, errors.New("invalid resource response")
 	}
 	text := func(v json.RawMessage) string { var s string; _ = json.Unmarshal(v, &s); return s }

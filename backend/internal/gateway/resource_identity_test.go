@@ -61,6 +61,82 @@ func TestNativeResourceProducerIgnoresOpaqueIDsAndTracksActualRemoteAudio(t *tes
 		t.Fatal("owned read accepted another response identity")
 	}
 }
+
+func TestResourceSSEMultilineAndEscapedProducerIdentities(t *testing.T) {
+	for _, newline := range []string{"\n", "\r\n", "\r"} {
+		// A leading JSON space, multiline data and escaped member names must
+		// never let a producer bypass the durable ownership gate.
+		raw := []byte("data:  {\"type\":\"response.output_item.done\"," + newline + `data: "item":{"type":"code_interpreter_call","container_\u0069d":"cntr-owned"}}` + newline + newline)
+		o := resourceObserver{format: channel.FormatOpenAIResponses}
+		var sent bytes.Buffer
+		registered := false
+		gate := resourceEventGate{observe: func(payload []byte) error {
+			rows, err := o.observe(payload)
+			if err != nil || len(rows) != 1 || rows[0] != (nativeResource{Kind: "container", ID: "cntr-owned"}) {
+				t.Fatalf("producer identity lost: %v %v", rows, err)
+			}
+			registered = true
+			return nil
+		}, send: func(data []byte) {
+			if !registered {
+				t.Fatal("producer emitted before ownership")
+			}
+			sent.Write(data)
+		}}
+		for _, b := range raw {
+			if err := gate.write([]byte{b}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := gate.finish(); err != nil || !registered || !bytes.Equal(sent.Bytes(), raw) {
+			t.Fatalf("multiline wire changed: %v", err)
+		}
+	}
+	o := resourceObserver{format: channel.FormatOpenAIResponses, store: true, expectedResponseID: "resp-owned"}
+	if _, err := o.observe([]byte(`{"object":"response","\u0069d":"resp-other"}`)); err == nil {
+		t.Fatal("escaped response identity bypassed ownership")
+	}
+	for _, invalid := range []string{`{"type":"response.output_text.delta","delta":`, `[]`, `42`} {
+		if _, err := o.observe([]byte(invalid)); err == nil {
+			t.Fatalf("invalid resource envelope accepted: %s", invalid)
+		}
+	}
+}
+
+func TestResourceSSETextDeltaHasNoPerEventAllocations(t *testing.T) {
+	o := resourceObserver{format: channel.FormatOpenAIResponses, store: true}
+	var observed, sent int
+	gate := resourceEventGate{observe: func(raw []byte) error {
+		observed++
+		rows, err := o.observe(raw)
+		if len(rows) != 0 {
+			t.Fatal("text became a resource", rows)
+		}
+		return err
+	}, send: func([]byte) { sent++ }}
+	raw := []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\n")
+	allocs := testing.AllocsPerRun(100, func() {
+		if err := gate.write(raw); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs != 0 || observed != 101 || sent != 101 {
+		t.Fatalf("ordinary text event cost: %.0f allocations, observed=%d sent=%d", allocs, observed, sent)
+	}
+}
+
+func BenchmarkResourceSSETextDelta(b *testing.B) {
+	o := resourceObserver{format: channel.FormatOpenAIResponses, store: true}
+	gate := resourceEventGate{observe: func(raw []byte) error { _, err := o.observe(raw); return err }, send: func([]byte) {}}
+	raw := []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\n")
+	b.ReportAllocs()
+	b.SetBytes(int64(len(raw)))
+	for b.Loop() {
+		if err := gate.write(raw); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
 func TestImageMultipartOnlyModelBytesChange(t *testing.T) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
