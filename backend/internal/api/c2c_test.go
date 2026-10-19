@@ -190,6 +190,27 @@ func (s *fakeC2CStore) ListTrades(_ context.Context, f c2c.TradeFilter) ([]c2c.T
 	return trades, nil
 }
 
+func (s *fakeC2CStore) ListAdminTrades(_ context.Context, status c2c.TradeStatus, after *c2c.Cursor, limit int) ([]c2c.Trade, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	trades := []c2c.Trade{}
+	for _, trade := range s.trades {
+		if (status == "" || trade.Status == status) && (after == nil || trade.CreatedAt.Before(after.Time) || trade.CreatedAt.Equal(after.Time) && trade.ID < after.ID) {
+			trades = append(trades, trade)
+		}
+	}
+	sort.Slice(trades, func(i, j int) bool {
+		if trades[i].CreatedAt.Equal(trades[j].CreatedAt) {
+			return trades[i].ID > trades[j].ID
+		}
+		return trades[i].CreatedAt.After(trades[j].CreatedAt)
+	})
+	if len(trades) > limit {
+		trades = trades[:limit]
+	}
+	return trades, nil
+}
+
 func (s *fakeC2CStore) ListDisputes(_ context.Context, status c2c.TradeStatus, _ *c2c.Cursor, limit int) ([]c2c.Trade, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -427,6 +448,39 @@ func TestC2CHandlers(t *testing.T) {
 	if recorder := buyer.call(t, http.MethodPost, tradesPath, map[string]string{"amount": "5"}); recorder.Code != http.StatusConflict || errorCode(t, recorder) != "duplicate_trade" {
 		t.Fatalf("duplicate = %d %s", recorder.Code, recorder.Body.String())
 	}
+
+	adminTradesPath := "/api/admin/c2c/trades"
+	adminList := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment", nil)["items"].([]any)
+	if len(adminList) != 1 || adminList[0].(map[string]any)["id"] != tradeID {
+		t.Fatal("ordinary trade absent from admin browser")
+	}
+	if len(admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=disputed", nil)["items"].([]any)) != 0 {
+		t.Fatal("trade status filter ignored")
+	}
+	buyer.expect(t, http.StatusForbidden, http.MethodGet, adminTradesPath, nil)
+	other.expect(t, http.StatusForbidden, http.MethodGet, adminTradesPath, nil)
+	admin.expect(t, http.StatusBadRequest, http.MethodGet, adminTradesPath+"?status=bogus", nil)
+	admin.expect(t, http.StatusBadRequest, http.MethodGet, adminTradesPath+"?cursor=bogus", nil)
+
+	cloneID := "00000000-0000-4000-8000-000000000529"
+	c2cStore.mu.Lock()
+	clone := c2cStore.trades[tradeID]
+	clone.ID, clone.CreatedAt = cloneID, clone.CreatedAt.Add(time.Second)
+	c2cStore.trades[cloneID] = clone
+	c2cStore.mu.Unlock()
+	firstAdminPage := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment&limit=1", nil)
+	if firstAdminPage["items"].([]any)[0].(map[string]any)["id"] != cloneID || firstAdminPage["next_cursor"] == nil {
+		t.Fatal("admin page did not use creation order")
+	}
+	nextAdminPage := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment&limit=1&cursor="+firstAdminPage["next_cursor"].(string), nil)
+	if len(nextAdminPage["items"].([]any)) != 1 || nextAdminPage["items"].([]any)[0].(map[string]any)["id"] != tradeID || nextAdminPage["next_cursor"] != nil {
+		t.Fatal("admin trade cursor repeated or skipped a trade")
+	}
+	c2cStore.mu.Lock()
+	delete(c2cStore.trades, cloneID)
+	c2cStore.mu.Unlock()
+	admin.expect(t, http.StatusUnauthorized, http.MethodGet, adminTradesPath, nil, withoutCookie)
+	admin.expect(t, http.StatusConflict, http.MethodPost, "/api/admin/c2c/trades/"+tradeID+"/resolve", map[string]string{"result": "buyer", "reason": "Cannot arbitrate an ordinary trade"})
 
 	// Visibility: parties and administrators only.
 	tradePath := "/api/c2c/trades/" + tradeID

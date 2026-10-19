@@ -195,3 +195,5 @@
 
 /* 调用页：用户与渠道筛选放在共享筛选条之前 */
 .admin-call-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+
+.table-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

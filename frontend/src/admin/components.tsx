@@ -1,33 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { errorMessage } from '../api/query'
-import { Badge, Button, Dialog, Icon, InlineError, TextareaField } from '../ui'
+import { Button, CopyButton, Dialog, Icon, InlineError, TextareaField } from '../ui'
 import { advanceConfirm, initialConfirmState, type SecretReveal } from './confirm'
-
-/** 复制到剪贴板，按钮文字短暂变为「已复制」。 */
-export function CopyButton({ value, label = '复制' }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
-  const [failed, setFailed] = useState(false)
-  return (
-    <Button
-      icon={<Icon name={copied ? 'check' : 'copy'} />}
-      onClick={() => {
-        void navigator.clipboard
-          ?.writeText(value)
-          .then(() => {
-            setCopied(true)
-            setFailed(false)
-            window.setTimeout(() => setCopied(false), 1600)
-          })
-          .catch(() => setFailed(true))
-      }}
-      size="sm"
-      type="button"
-      variant="secondary"
-    >
-      {copied ? '已复制' : failed ? '复制失败，请手动选择' : label}
-    </Button>
-  )
-}
 
 /**
  * 只展示一次的密码：关闭后由调用方丢弃（secretReducer dismiss），界面上无法再次取回。
@@ -202,68 +176,5 @@ export function ConfirmActionDialog({
       )}
       {!editing && <InlineError>{submitError}</InlineError>}
     </Dialog>
-  )
-}
-
-/**
- * 折叠区（「高级设置」「条件价格档」）：原生 details，标题显示已改项数。
- */
-export function Collapsible({
-  title,
-  changed,
-  badge,
-  defaultOpen = false,
-  children,
-}: {
-  title: string
-  changed?: number
-  /** 自定义徽标文字（替代「已改 N 项」） */
-  badge?: string
-  defaultOpen?: boolean
-  children: ReactNode
-}) {
-  return (
-    <details className="collapsible" open={defaultOpen || undefined}>
-      <summary>
-        <Icon name="chevron-right" />
-        <span>{title}</span>
-        {badge ? <Badge tone="accent">{badge}</Badge> : changed !== undefined && changed > 0 && <Badge tone="accent">已改 {changed} 项</Badge>}
-      </summary>
-      <div className="collapsible-body">{children}</div>
-    </details>
-  )
-}
-
-/** 游标分页「加载更多」。 */
-export function LoadMore({
-  hasMore,
-  loading,
-  onLoad,
-}: {
-  hasMore: boolean
-  loading: boolean
-  onLoad: () => void
-}) {
-  if (!hasMore) return null
-  return (
-    <div className="table-pagination">
-      <Button loading={loading} onClick={onLoad} size="sm" type="button" variant="secondary">
-        加载更多
-      </Button>
-    </div>
-  )
-}
-
-/** 键值摘要列表（抽屉与详情页）。 */
-export function DetailList({ items }: { items: Array<[string, ReactNode]> }) {
-  return (
-    <dl className="detail-list compact-list">
-      {items.map(([label, value]) => (
-        <div key={label}>
-          <dt>{label}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
   )
 }

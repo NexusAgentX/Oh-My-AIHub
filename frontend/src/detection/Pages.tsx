@@ -21,7 +21,7 @@ export function DetectionPage() {
   const [cursor, setCursor] = useState(''), [params] = useSearchParams(), location = useLocation()
   const query = useDetectionJobs(cursor), { account } = useAuth()
   if (params.has('target_id')) return <Navigate to={`/supply/detection/new${location.search}`} state={location.state} replace />
-  return <><PageHeader title="检测任务" actions={account?.is_admin && <ButtonLink to="/admin/detection-search">搜索参数</ButtonLink>} /><DomainNav domain="供应" />
+  return <><PageHeader title="检测任务" actions={account?.is_admin && <ButtonLink to="/admin/settings/detection">搜索参数</ButtonLink>} /><DomainNav domain="供应" />
     <Card title="任务记录"><QueryBoundary query={query} isEmpty={data => data.items.length === 0} empty={<EmptyState title="还没有检测记录" description="从贡献、供应商分组或模型页面发起检测。" action={<ButtonLink to="/suppliers">浏览供应商</ButtonLink>} />}>
       {data => <><div className="detection-list" aria-busy={query.isFetching}>{data.items.map(job => <article className="detection-row" key={job.id}><div><strong>{job.target.model || '分组检测'}</strong><p className="muted-copy">{stamp(job.created_at)} · {job.finished_scenarios}/{job.scenarios} 场景</p></div><State state={job.state} /><ButtonLink size="sm" to={`/supply/detection/${job.id}`} state={{ from: { to: location.pathname + location.search, label: '检测任务' } }}>查看任务</ButtonLink></article>)}</div><div className="form-actions"><Button variant="quiet" disabled={!cursor || query.isFetching} onClick={() => setCursor('')}>回到最新</Button><Button variant="secondary" disabled={!data.next_cursor || query.isFetching} onClick={() => setCursor(data.next_cursor ?? '')}>更早任务</Button></div></>}
     </QueryBoundary></Card></>

@@ -1,5 +1,11 @@
+import { errorMessage } from '../api/query'
+import { Facts } from '../ui/Facts'
+import { FinanceNav } from './SectionNav'
+import { Pager } from '../ui/Pager'
+import { enumField, useBack, useUrlState } from '../ui/urlState'
+import { useUnsavedGuard } from '../ui/UnsavedGuard'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -7,14 +13,14 @@ import {
   DataTable,
   PageHeader,
   QueryBoundary,
-  Segmented,
+  SelectField,
   Toolbar,
   type BadgeTone,
   type Column,
 } from '../ui'
-import { ConfirmActionDialog, DetailList, LoadMore } from './components'
-import { formatDateTime, formatFen, formatPoints, shortID } from './format'
-import { useAdminDisputes, useAdminTrade, useAdminTransactions, useResolveTrade } from './queries'
+import { ConfirmActionDialog } from './components'
+import { formatDateTime, formatFen, formatExactPoints as formatPoints, shortID } from '../money'
+import { useAdminTrades, useAdminTrade, useAdminTransactions, useResolveTrade } from './queries'
 import { TransactionTypeLabel, transactionVolume } from './transactions'
 import type { C2CTrade, TradeStatus } from './types'
 
@@ -64,49 +70,13 @@ const columns: Column<C2CTrade>[] = [
   { key: 'status', header: '状态', cell: (trade) => <TradeStatusBadge status={trade.status} /> },
 ]
 
-type DisputeFilter = 'disputed' | 'resolved_to_buyer' | 'resolved_to_seller'
-
-export function DisputesPage() {
-  const [status, setStatus] = useState<DisputeFilter>('disputed')
-  const disputes = useAdminDisputes({ status })
-  return (
-    <>
-      <PageHeader title="申诉" />
-      <Toolbar>
-        <Segmented
-          label="状态"
-          onChange={setStatus}
-          options={[
-            { key: 'disputed', label: '待处理' },
-            { key: 'resolved_to_buyer', label: '判给买家' },
-            { key: 'resolved_to_seller', label: '退回卖家' },
-          ]}
-          value={status}
-        />
-      </Toolbar>
-      <Card flush>
-        <QueryBoundary query={disputes}>
-          {(rows) => (
-            <>
-              <DataTable
-                caption="申诉列表"
-                columns={columns}
-                empty={<p className="muted-copy empty-pad">{status === 'disputed' ? '没有待处理的申诉' : '暂无记录'}</p>}
-                rowHref={(trade) => `/admin/disputes/${trade.id}`}
-                rowKey={(trade) => trade.id}
-                rows={rows}
-              />
-              <LoadMore
-                hasMore={Boolean(disputes.hasNextPage)}
-                loading={disputes.isFetchingNextPage}
-                onLoad={() => void disputes.fetchNextPage()}
-              />
-            </>
-          )}
-        </QueryBoundary>
-      </Card>
-    </>
-  )
+const tradeSchema = { status: enumField(['all', 'disputed', 'awaiting_payment', 'paid', 'released', 'cancelled', 'resolved_to_buyer', 'resolved_to_seller'] as const, 'disputed') }
+export function AdminTradesPage() {
+  const [filters, setFilters] = useUrlState(tradeSchema), location = useLocation()
+  const query = useAdminTrades({ status: filters.status === 'all' ? undefined : filters.status })
+  const from = { to: location.pathname + location.search, label: 'C2C 交易' }
+  return <><PageHeader title="C2C 交易" /><FinanceNav /><Toolbar><SelectField label="状态" value={filters.status} onChange={event => setFilters({ status: event.target.value as typeof filters.status })}><option value="all">全部状态</option>{Object.entries(tradeStatusLabels).map(([value, [label]]) => <option key={value} value={value}>{label}</option>)}</SelectField></Toolbar>
+    <Card flush><QueryBoundary query={query}>{rows => <div aria-busy={query.isFetching}><DataTable caption="C2C 交易列表" columns={columns} empty={<p className="muted-copy empty-pad">没有符合条件的交易</p>} rowHref={trade => `/admin/trades/${trade.id}`} rowState={() => ({ from })} rowKey={trade => trade.id} rows={rows} /><Pager hasMore={query.hasNextPage || query.limited} limited={query.limited} error={query.isFetchNextPageError ? errorMessage(query.error, '加载失败，请重试') : undefined} loading={query.isFetchingNextPage} onMore={() => void query.fetchNextPage()} /></div>}</QueryBoundary></Card></>
 }
 
 /** 交易时间线：只列出已经发生的节点。 */
@@ -154,7 +124,7 @@ function RelatedLedger({ trade }: { trade: C2CTrade }) {
                   {formatDateTime(transaction.created_at)} · {formatPoints(transactionVolume(transaction))} 积分
                   {transaction.related?.type === 'c2c_order' ? ' · 卖单' : ''}
                 </span>
-                <Link to={`/admin/points?tab=transactions&transaction=${transaction.id}`}>查看分录</Link>
+                <Link to={`/admin/points/transactions?tx=${transaction.id}`}>查看分录</Link>
               </li>
             ))}
           </ul>
@@ -164,31 +134,16 @@ function RelatedLedger({ trade }: { trade: C2CTrade }) {
   )
 }
 
-function DisputeDetail({ trade }: { trade: C2CTrade }) {
+function TradeDetail({ trade }: { trade: C2CTrade }) {
   const resolve = useResolveTrade()
   const [result, setResult] = useState<'buyer' | 'seller' | null>(null)
   const open = trade.status === 'disputed'
+  useUnsavedGuard(result !== null, { busy: resolve.isPending })
   return (
     <>
-      <PageHeader
-        actions={
-          open && (
-            <>
-              <Button onClick={() => setResult('seller')} type="button" variant="secondary">
-                退回卖家
-              </Button>
-              <Button onClick={() => setResult('buyer')} type="button">
-                判给买家
-              </Button>
-            </>
-          )
-        }
-        back={{ to: '/admin/disputes', label: '申诉' }}
-        title={`交易 ${shortID(trade.id)}`}
-      />
       <div className="admin-two-column">
-        <Card title="交易">
-          <DetailList
+        <Card title="交易" actions={open && <><Button onClick={() => setResult('seller')} variant="secondary">退回卖家</Button><Button onClick={() => setResult('buyer')}>判给买家</Button></>}>
+          <Facts
             items={[
               /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
               ['状态', <TradeStatusBadge status={trade.status} />],
@@ -252,19 +207,7 @@ function DisputeDetail({ trade }: { trade: C2CTrade }) {
   )
 }
 
-export function DisputeDetailPage() {
-  const { tradeID = '' } = useParams()
-  const trade = useAdminTrade(tradeID)
-  if (trade.data) return <DisputeDetail trade={trade.data.trade} />
-  return (
-    <>
-      <PageHeader
-        back={{ to: '/admin/disputes', label: '申诉' }}
-        title="申诉详情"
-      />
-      <Card>
-        <QueryBoundary query={trade}>{() => null}</QueryBoundary>
-      </Card>
-    </>
-  )
+export function AdminTradeDetailPage() {
+  const { tradeID = '' } = useParams(), query = useAdminTrade(tradeID), back = useBack('/admin/trades', 'C2C 交易')
+  return <><PageHeader title={`交易 ${shortID(tradeID)}`} back={back} actions={query.data && query.data.trade.status !== 'disputed' && <Badge>只读</Badge>} /><QueryBoundary query={query}>{({ trade }) => <TradeDetail key={trade.id} trade={trade} />}</QueryBoundary></>
 }

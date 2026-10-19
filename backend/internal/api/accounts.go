@@ -82,6 +82,19 @@ func newAdminAccountJSON(account identity.AdminAccount) adminAccountJSON {
 	}
 }
 
+func (a *app) getAdminAccount(w http.ResponseWriter, r *http.Request) {
+	accountID, ok := pathAccountID(w, r)
+	if !ok {
+		return
+	}
+	account, err := a.identity.GetAccount(r.Context(), accountFromContext(r.Context()), accountID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, adminAccountEnvelopeJSON{Account: newAdminAccountJSON(account)})
+}
+
 func (a *app) listAdminAccounts(w http.ResponseWriter, r *http.Request) {
 	limit, ok := pageLimit(r)
 	if !ok {
@@ -286,6 +299,7 @@ func (a *app) writeOffAdminAccount(w http.ResponseWriter, r *http.Request) {
 // registerAdminAccountRoutes 注册管理员账户路由。
 func (a *app) registerAdminAccountRoutes(r *router) {
 	r.admin("GET /api/admin/accounts", a.listAdminAccounts)
+	r.admin("GET /api/admin/accounts/{accountID}", a.getAdminAccount)
 	r.admin("POST /api/admin/accounts", a.createAdminAccount)
 	r.admin("PATCH /api/admin/accounts/{accountID}", a.updateAdminAccount)
 	r.admin("POST /api/admin/accounts/{accountID}/reset-password", a.resetAdminAccountPassword)

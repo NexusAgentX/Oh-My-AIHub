@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import './Facts.css'
 
-export function Facts({ items }: { items: { label: string; value?: ReactNode }[] }) {
-  return <dl className="facts">{items.filter(item => item.value !== null && item.value !== undefined && item.value !== '' && item.value !== false).map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
+export function Facts({ items }: { items: readonly [label: string, value?: ReactNode][] }) {
+  return <dl className="facts">{items.filter(([, value]) => value !== null && value !== undefined && value !== '' && value !== false).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
 }

@@ -1,5 +1,5 @@
 import { Badge, ButtonLink, Card, Metric, PageHeader, QueryBoundary, type BadgeTone } from '../ui'
-import { formatCount, formatFen, formatPoints, formatRatio, pointsRatio } from './format'
+import { formatCount, formatFen, formatExactPoints as formatPoints, formatRatio, pointsRatio } from '../money'
 import { useAdminOverview } from './queries'
 import type { AdminOverview, AttentionItem } from './types'
 

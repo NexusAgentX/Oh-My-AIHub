@@ -1,4 +1,6 @@
 import { formDefaultsKey } from '../settings/queries'
+import { secretSession } from '../ui/secretHandoff'
+import { handoffAdminSecret } from './secret'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -14,9 +16,10 @@ export const adminKeys = {
   overview: ['admin', 'overview'] as const,
   points: (days: number) => ['admin', 'points', days] as const,
   accounts: (query: object) => ['admin', 'accounts', query] as const,
+  account: (id: string) => ['admin', 'account', id] as const,
   settings: ['admin', 'settings'] as const,
   audit: (query: object) => ['admin', 'audit', query] as const,
-  disputes: (query: object) => ['admin', 'disputes', query] as const,
+  trades: (query: object) => ['admin', 'trades', query] as const,
   trade: (tradeID: string) => ['admin', 'trade', tradeID] as const,
   calls: (query: object) => ['admin', 'calls', query] as const,
   transactions: (query: object) => ['admin', 'transactions', query] as const,
@@ -35,12 +38,14 @@ function usePagedQuery<T>(
     queryKey,
     queryFn: ({ pageParam }) => fetchPage(pageParam),
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    getNextPageParam: (last, pages) => pages.length < 10 ? last.next_cursor ?? undefined : undefined,
     placeholderData: keepPreviousData,
     enabled,
+    refetchOnWindowFocus: true,
   })
   return {
     ...query,
+    limited: query.data?.pages.length === 10 && Boolean(query.data.pages.at(-1)?.next_cursor),
     data: query.data ? query.data.pages.flatMap((page) => page.items) : undefined,
   }
 }
@@ -63,6 +68,9 @@ export function useAdminAccounts(query: Omit<AdminQuery<'listAdminAccounts'>, 'c
     adminApi.accounts({ ...query, cursor, limit: 50 }),
   )
 }
+export function useAdminAccount(id: string) {
+  return useQuery({ queryKey: adminKeys.account(id), queryFn: () => adminApi.account(id) })
+}
 
 
 export function useAdminSettings() {
@@ -79,9 +87,9 @@ export function useAdminAudit(query: Omit<AdminQuery<'listAdminAudit'>, 'cursor'
 
 
 
-export function useAdminDisputes(query: Omit<AdminQuery<'listAdminDisputes'>, 'cursor'>) {
-  return usePagedQuery(adminKeys.disputes(query), (cursor) =>
-    adminApi.disputes({ ...query, cursor }),
+export function useAdminTrades(query: Omit<AdminQuery<'listAdminC2CTrades'>, 'cursor'>) {
+  return usePagedQuery(adminKeys.trades(query), (cursor) =>
+    adminApi.trades({ ...query, cursor }),
   )
 }
 
@@ -127,7 +135,11 @@ function useAdminMutation<TInput, TResult>(mutationFn: (input: TInput) => Promis
 }
 
 export function useCreateAccount() {
-  return useAdminMutation((body: RequestBody<'createAdminAccount'>) => adminApi.createAccount(body))
+  return useAdminMutation(async (body: RequestBody<'createAdminAccount'>) => {
+    const session = secretSession(), result = await adminApi.createAccount(body)
+    handoffAdminSecret(result.account.id, result.initial_password, session)
+    return { account: result.account }
+  })
 }
 
 export function useUpdateAccount() {
@@ -137,7 +149,11 @@ export function useUpdateAccount() {
 }
 
 export function useResetPassword() {
-  return useAdminMutation((accountID: string) => adminApi.resetPassword(accountID))
+  return useAdminMutation(async (accountID: string) => {
+    const session = secretSession(), result = await adminApi.resetPassword(accountID)
+    handoffAdminSecret(result.account.id, result.initial_password, session)
+    return { account: result.account }
+  })
 }
 
 export function useAdjustAccount() {

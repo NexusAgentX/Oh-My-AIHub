@@ -1,5 +1,5 @@
 import { formatPointAmount } from '../money/format'
-import { feeRateToPercent, isAmount, percentToFeeRate } from './format'
+import { feeRateToPercent, isAmount, percentToFeeRate } from '../money'
 import type { Settings, SettingsUpdateRequest } from './types'
 
 export type SettingsForm = {
