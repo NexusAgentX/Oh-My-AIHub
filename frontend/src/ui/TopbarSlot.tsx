@@ -34,9 +34,9 @@ export function TopbarContext({ back, title, heading }: { back?: PageBack; title
   const slot = useContext(TopbarSlot)
   const scrolledPast = useScrolledPast(heading, slot)
   const link = back && (
-    <Link aria-label={`返回${back.label}`} className="page-back" to={back.to} state={back.state}>
+    <Link aria-label={`返回${back.label}`} title={back.label} className="page-back" to={back.to} state={back.state}>
       <Icon name="chevron-left" />
-      {back.label}
+      <span className="page-back-label">{back.label}</span>
     </Link>
   )
   if (!slot) return link || null

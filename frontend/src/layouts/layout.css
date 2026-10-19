@@ -161,7 +161,7 @@
  * 顶栏左侧：详情页的“‹ 上一级”；页面标题滚出屏幕后再淡入显示标题（页面顶部时标题只出现一次）。
  * 右侧是主题切换。
  */
-.topbar-context { display: flex; min-width: 0; align-items: center; gap: var(--space-2); }
+.topbar-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-2); }
 .topbar-context:empty { display: none; }
 .topbar-title { display: flex; min-width: 0; align-items: center; gap: var(--space-2); color: var(--ink); font-weight: 700; white-space: nowrap; animation: topbar-title-in 160ms ease; }
 .topbar-title-sep { color: var(--hairline-strong); font-weight: 400; }
@@ -171,7 +171,8 @@
 .page-back {
   display: inline-flex;
   min-width: 0;
-  min-height: 36px;
+  max-width: 100%;
+  min-height: 44px;
   align-items: center;
   gap: 2px;
   margin-left: -8px;
@@ -183,7 +184,8 @@
   white-space: nowrap;
 }
 .page-back:hover { color: var(--ink); background: var(--hover); text-decoration: none; }
-.page-back .icon { color: var(--muted); }
+.page-back-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.page-back .icon { flex-shrink: 0; color: var(--muted); }
 .theme-toggle { margin-left: auto; }
 
 .wallet-chip {
