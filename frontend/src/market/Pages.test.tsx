@@ -9,7 +9,7 @@ type Schemas=components['schemas']
 describe('approved group market presentation',()=>{
   it('keeps unknown, measured zero and self net payment distinct',()=>{
     expect(renderToStaticMarkup(<PriceText value={null}/>)).toBe('未知')
-    expect(renderToStaticMarkup(<PriceText value={{amount:'0',unit:'tokens',quantity:1_000_000,self_net_zero:false}}/>)).toContain('0 积分 / 1,000,000 tokens')
+    expect(renderToStaticMarkup(<PriceText value={{amount:'0',unit:'tokens',quantity:1_000_000,self_net_zero:false}}/>)).toContain('0 积分 / M')
     expect(renderToStaticMarkup(<PriceText value={{amount:'0',unit:'',quantity:0,self_net_zero:true}}/>)).toBe('站内净支付 0')
   })
   it('uses ID titles and server-filtered totals without synthesizing an aggregate capability',()=>{

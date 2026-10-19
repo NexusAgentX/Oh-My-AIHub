@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import { formatDateTime } from '../admin/format'
+import { formatTypicalAmount, formatTypicalUnit } from './format'
 import { Button, Card, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SelectField, SuccessMessage, TextField } from '../ui'
 import { useRefreshTypicalCosts, useTypicalCosts, useTypicalSettings, useUpdateTypicalSettings, type TypicalConfig, type TypicalEstimate } from './queries'
 
@@ -30,15 +31,14 @@ function SettingsEditor({ value }: { value: TypicalConfig }) {
   </form></Card>
 }
 export function EstimateCard({ item }: { item: TypicalEstimate }) {
-  const unit = ({successful_images:'张成功图片',requests:'次请求',tokens:'tokens'})[item.unit] ?? item.unit
   const name = item.level === 'channel' ? item.channel_name : item.level === 'group' ? item.group_name : '站内整体'
   return <Card title={`${name || (item.level === 'channel' ? '渠道' : '分组')} · ${item.model_id}`}>
     {item.supplier_name && <p className="muted-copy">{item.supplier_name}</p>}
     <dl className="detail-list compact-list">
-      <div><dt>典型费用 / {item.quantity.toLocaleString()} {unit}</dt><dd>{item.cost === null ? '未知' : `${item.cost} 积分`}</dd></div>
-      <div><dt>手续费（另计）</dt><dd>{item.fee === null ? '未知' : `${item.fee} 积分`}</dd></div>
+      <div><dt>典型费用 / {formatTypicalUnit(item.unit, item.quantity)}</dt><dd>{formatTypicalAmount(item.cost)}</dd></div>
+      <div><dt>手续费（另计）</dt><dd>{formatTypicalAmount(item.fee)}</dd></div>
       <div><dt>原厂参考倍率</dt><dd>{item.ratio === null ? '未知' : `${Number(item.ratio).toLocaleString(undefined, { maximumFractionDigits: 4 })}×`}</dd></div>
-      <div><dt>{item.request_quantity.toLocaleString()} 次请求估算</dt><dd>{item.request_cost === null ? '未知' : `${item.request_cost} 积分`}</dd></div>
+      <div><dt>{item.request_quantity.toLocaleString()} 次请求估算</dt><dd>{formatTypicalAmount(item.request_cost)}</dd></div>
       <div><dt>样本 / 当前分组</dt><dd>{item.samples} / {item.own_samples}</dd></div>
       <div><dt>缓存读占提示侧 token</dt><dd>{item.cache_read_share === null ? '未知' : `${(Number(item.cache_read_share) * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}</dd></div>
     </dl>
