@@ -190,6 +190,8 @@ type TradeFilter struct {
 	// Pending keeps trades waiting for this user: awaiting payment as the
 	// buyer, or paid as the seller.
 	Pending bool
-	After   *Cursor
-	Limit   int
+	// Active keeps all unfinished trades, including disputes.
+	Active bool
+	After  *Cursor
+	Limit  int
 }

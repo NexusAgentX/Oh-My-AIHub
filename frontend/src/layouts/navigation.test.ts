@@ -28,7 +28,7 @@ describe('navigation', () => {
     expect(findNavItem(productNavigation, '/home')?.label).toBe('首页')
     expect(findNavItem(productNavigation, '/models/gpt-5')?.label).toBe('模型')
     expect(findNavItem(productNavigation, '/supply/channels/new')?.label).toBe('我的渠道')
-    expect(findNavItem(productNavigation, '/points/trades/abc')?.label).toBe('积分')
+    expect(findNavItem(productNavigation, '/points/trades/abc')?.label).toBe('我的交易')
     expect(findNavItem(productNavigation, '/account/password')).toBeUndefined()
     expect(findNavItem(productNavigation, '/modelsx')).toBeUndefined()
     expect(findNavItem(productNavigation, '/tickets/new')?.label).toBe('工单')

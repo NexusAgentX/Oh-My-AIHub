@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/query'
 import type { C2CTrade } from '../api/types'
+import { usePageVisible } from '../api/visibility'
 import { formatFen, formatPoints } from '../money/format'
 import { formatCountdown } from '../money/time'
 import { Badge, Button, ConfirmDialog, CopyButton, InlineError, TextareaField } from '../ui'
@@ -12,13 +13,22 @@ export function TradeStatusBadge({ status }: { status: C2CTrade['status'] }) {
 }
 
 /** 付款倒计时（秒），到期后为 0。 */
-export function useCountdown(deadline: string) {
+export function useCountdown(deadline?: string | null) {
   const [now, setNow] = useState(() => Date.now())
+  const visible = usePageVisible()
+  const end = deadline ? new Date(deadline).getTime() : 0
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    if (!visible || !end) return
+    setNow(Date.now())
+    if (end <= Date.now()) return
+    const timer = window.setInterval(() => {
+      const time = Date.now()
+      setNow(time)
+      if (time >= end) window.clearInterval(timer)
+    }, 1000)
     return () => window.clearInterval(timer)
-  }, [])
-  return Math.max(0, (new Date(deadline).getTime() - now) / 1000)
+  }, [visible, end])
+  return Math.max(0, (end - now) / 1000)
 }
 
 /** 收款信息：方式 + 文字账号（只对交易双方可见）、备注交易号与应付金额。 */
@@ -78,6 +88,7 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
   const [confirm, setConfirm] = useState<Confirm>(null)
   const buyer = trade.viewer_role === 'buyer'
   const seller = trade.viewer_role === 'seller'
+  const left = useCountdown(trade.status === 'awaiting_payment' ? trade.payment_deadline : null)
   const run = (kind: 'paid' | 'release' | 'cancel' | 'dispute', text?: string) =>
     action.mutate(
       { id: trade.id, action: kind, text },
@@ -100,10 +111,11 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
             <Button onClick={() => setConfirm('cancel')} type="button" variant="secondary">
               取消交易
             </Button>
-            <Button loading={action.isPending && action.variables?.action === 'paid'} onClick={() => run('paid', note.trim() || undefined)} type="button">
+            <Button disabled={left === 0} loading={action.isPending && action.variables?.action === 'paid'} onClick={() => { if (Date.now() < new Date(trade.payment_deadline).getTime()) run('paid', note.trim() || undefined) }} type="button">
               我已付款
             </Button>
           </div>
+          {left === 0 && <p className="muted-copy" role="status">已超时，等待系统取消</p>}
         </>
       )}
       {((seller && trade.status === 'paid') || canDispute) && (
