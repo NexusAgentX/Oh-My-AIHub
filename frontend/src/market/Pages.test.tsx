@@ -15,7 +15,7 @@ describe('approved group market presentation',()=>{
   it('uses ID titles and server-filtered totals without synthesizing an aggregate capability',()=>{
     const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}})
     const model:Schemas['MarketBrowseModel']={id:'vendor/model:v1',model_types:['text'],formats:['openai_responses'],protocols:['openai-responses'],online_channels:1,price:null,offers:[{group_model_id:'offering',group_id:'group',supplier_id:'supplier',format:'openai_responses',protocol:'openai-responses',channel_ids:['channel'],online_channel_ids:['channel']}]}
-    client.setQueryData(['market','models',''],{items:[model],total:1,next_cursor:null,price_sort_fallback:false,suppliers:[],groups:[]})
+    client.setQueryData(['market','models',''],{pages:[{items:[model],total:1,next_cursor:null,price_sort_fallback:false,suppliers:[],groups:[]}],pageParams:['']})
     client.setQueryData(['market','suppliers'],{items:[],groups:[]})
     const html=renderToStaticMarkup(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/models']}><MarketModelsPage/></MemoryRouter></QueryClientProvider>)
     expect(html).toContain('vendor/model:v1')
