@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePageVisible } from '../api/visibility'
 
 export type StreamStatus = 'off' | 'connecting' | 'open' | 'error'
 
@@ -15,40 +16,59 @@ export function mergeStreamItem<T extends { id: string }>(items: T[], item: T, m
 
 /**
  * 订阅调用实时流（SSE，每个 event 的 data 为一条 JSON）。
- * url 为 null 时关闭。连接失败（含接口尚未实现）时不自动重连，状态变为 error，由用户重试。
+ * 隐藏页面断开；失败最多自动重连三次，随后由用户重试。
  */
 export function useCallStream<T extends { id: string }>(url: string | null) {
   const [items, setItems] = useState<T[]>([])
   const [status, setStatus] = useState<StreamStatus>('off')
   const [attempt, setAttempt] = useState(0)
   const source = useRef<EventSource | null>(null)
+  const visible = usePageVisible()
 
   useEffect(() => {
-    if (!url || typeof EventSource === 'undefined') {
+    setItems([])
+    if (!url || !visible || typeof EventSource === 'undefined') {
       setStatus('off')
       return
     }
-    setStatus('connecting')
-    const events = new EventSource(url, { withCredentials: true })
-    source.current = events
-    events.onopen = () => setStatus('open')
-    events.onmessage = (event: MessageEvent<string>) => {
-      try {
-        const item = JSON.parse(event.data) as T
-        if (item && typeof item.id === 'string') setItems((current) => mergeStreamItem(current, item))
-      } catch {
-        // 非 JSON 的心跳等消息直接忽略
+    let stopped = false
+    let retries = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const connect = () => {
+      if (stopped) return
+      setStatus('connecting')
+      const events = new EventSource(url, { withCredentials: true })
+      source.current = events
+      events.onopen = () => { if (!stopped) setStatus('open') }
+      const receive = (event: MessageEvent<string>) => {
+        if (stopped) return
+        try {
+          const item = JSON.parse(event.data) as T
+          if (item && typeof item.id === 'string') setItems(current => mergeStreamItem(current, item))
+        } catch {
+          // 心跳等非 JSON 消息不进入列表。
+        }
+      }
+      events.onmessage = receive
+      events.addEventListener('call.started', receive as EventListener)
+      events.addEventListener('call.finished', receive as EventListener)
+      events.onerror = () => {
+        events.close()
+        if (stopped) return
+        if (retries < 3) {
+          setStatus('connecting')
+          timer = setTimeout(connect, 1000 * 2 ** retries++)
+        } else setStatus('error')
       }
     }
-    events.onerror = () => {
-      events.close()
-      setStatus('error')
-    }
+    connect()
     return () => {
-      events.close()
+      stopped = true
+      clearTimeout(timer)
+      source.current?.close()
       source.current = null
     }
-  }, [url, attempt])
+  }, [url, attempt, visible])
 
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
   const clear = useCallback(() => setItems([]), [])

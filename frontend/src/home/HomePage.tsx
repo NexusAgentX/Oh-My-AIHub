@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useQueryOverlay } from '../ui/urlState'
 import { useAuth } from '../auth/AuthProvider'
 import { CallDetailDrawer, CallTable, summaryColumns, useCall } from '../calls'
 import type { CallSummary } from '../api/types'
@@ -87,7 +87,7 @@ function TodayCard() {
 
 function RecentCalls() {
   const home = useHome()
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useQueryOverlay('call')
   const detail = useCall(selected)
   return (
     <Card

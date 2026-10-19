@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { request, withQuery } from '../api/client'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ApiError, request, withQuery } from '../api/client'
 import type { components } from '../api/schema.gen'
 import { formatDateTime } from '../money/time'
 import { Button, EmptyState, QueryBoundary, Segmented } from '../ui'
 import { diagnosticLabel } from './CallDiagnostics'
-import { formatLabels, outcomeLabels } from './labels'
+import { analysisDimensions as dimensions, formatLabels, outcomeLabels } from './labels'
 import type { CallListParams } from './queries'
 
 type Values = components['schemas']['AnalysisValues']
@@ -111,21 +111,7 @@ const groupOptions = [
   { key: 'tokens', label: '用量' },
   { key: 'cost', label: '费用' },
 ]
-const dimensions: Record<string, string> = {
-  model: '模型',
-  channel: '最终渠道',
-  format: '协议',
-  stream: '响应方式',
-  key: 'Key',
-  tag: '标签',
-  account: '账户',
-  outcome: '调用结果',
-  error: '最后尝试原因',
-  error_code: '最后上游错误码',
-  status: '最后上游状态',
-  stop: '模型结束原因',
-  service_tier: '服务档位',
-}
+
 function display(value: number | null, unit?: string) {
   return value === null
     ? '—'
@@ -151,17 +137,26 @@ export function CallAnalysis({
   params,
   onDrill,
   live,
+  options,
+  onOptionsChange,
 }: {
   path: string
   params: CallListParams
   onDrill: (p: CallListParams, label: string) => void
   live: boolean
+  options?: { category: string; metric: string; group_by: string; split_by: string; bucket_seconds: string }
+  onOptionsChange?: (patch: Partial<NonNullable<typeof options>>) => void
 }) {
-  const [category, setCategory] = useState('reliability')
-  const [selected, setSelected] = useState('calls')
-  const [group, setGroup] = useState('model')
-  const [split, setSplit] = useState('all')
-  const [bucket, setBucket] = useState('0')
+  const [local, setLocal] = useState({ category: 'reliability', metric: 'calls', group_by: 'model', split_by: 'all', bucket_seconds: '0' })
+  const settings = options ?? local
+  const change = onOptionsChange ?? ((patch: Partial<typeof local>) => setLocal(current => ({ ...current, ...patch })))
+  const category = metricGroups[settings.category] ? settings.category : 'reliability'
+  const selected = settings.metric, group = settings.group_by, split = settings.split_by, bucket = settings.bucket_seconds
+  const setCategory = (category: string) => change({ category, metric: metricGroups[category][0].key })
+  const setSelected = (metric: string) => change({ metric })
+  const setGroup = (group_by: string) => change({ group_by })
+  const setSplit = (split_by: string) => change({ split_by })
+  const setBucket = (bucket_seconds: string) => change({ bucket_seconds })
   const [page, setPage] = useState(0)
   const [trendIndex, setTrendIndex] = useState(0)
   const metrics = metricGroups[category]
@@ -169,18 +164,20 @@ export function CallAnalysis({
   const eligible = Boolean(params.from && params.to && !params.request_id)
   const query = useQuery({
     queryKey: ['calls', 'analysis', path, params, group, split, bucket],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       request<Report>(
-        withQuery(`${path}/analysis`, { ...params, group_by: group, split_by: split, bucket_seconds: Number(bucket) }),
+        withQuery(`${path}/analysis`, { ...params, group_by: group, split_by: split, bucket_seconds: Number(bucket) }), { signal },
       ),
     enabled: eligible,
     refetchInterval: live ? 15_000 : false,
-    retry: false,
+    retry: (count, error) => error instanceof ApiError && error.status === 429 && count < 1,
+    retryDelay: 2000,
+    placeholderData: keepPreviousData,
   })
   const dims = Object.entries(dimensions).filter(([key]) => key !== 'account' || path.startsWith('/api/admin/'))
   if (!eligible) return <p className="muted-copy">选择起止时间可查看趋势与分组对比（最长 366 天）。</p>
   return (
-    <section className="call-analysis" aria-label="调用分析">
+    <section className={`call-analysis${query.isPlaceholderData ? ' query-updating' : ''}`} aria-label="调用分析" aria-busy={query.isFetching}>
       <div className="call-analysis-controls">
         <Segmented
           label="分析方向"
@@ -188,7 +185,6 @@ export function CallAnalysis({
           value={category}
           onChange={(v) => {
             setCategory(v)
-            setSelected(metricGroups[v][0].key)
           }}
         />
         <label>

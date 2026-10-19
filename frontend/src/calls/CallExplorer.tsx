@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { withQuery } from '../api/client'
 import { errorMessage } from '../api/query'
+import { usePageVisible } from '../api/visibility'
 import type { CallDetail, CallStats } from '../api/types'
-import { Button, InlineError, QueryBoundary } from '../ui'
-import { CallAnalysis } from './CallAnalysis'
+import { Button, InlineError, Notice, QueryBoundary } from '../ui'
 import { CallDetailDrawer } from './CallDetail'
 import { CallStatsBar } from './CallStatsBar'
 import { CallTable, type CallColumn, type CallRowBase } from './CallTable'
@@ -11,93 +12,114 @@ import { useCall, useCallPages, type CallListParams, type CursorPage } from './q
 import { useCallStream } from './useCallStream'
 
 type Page<T> = CursorPage<T> & { summary?: CallStats }
+const liveFields = new Set(['request_id', 'model', 'outcome', 'format', 'tag', 'api_key_id', 'channel_id', 'account_id', 'stream', 'from', 'to'])
+export function canMergeLive(params: CallListParams) {
+  return Object.entries(params).every(([key, value]) => value === undefined || liveFields.has(key))
+}
 
-/** 实时到达的一条是否符合当前筛选（时间范围由服务端流保证为最新，不再比较）。 */
+/** 只判断实时 DTO 中有完整事实的条件；其余条件通过列表补拉执行。 */
 export function matchesFilters(row: CallRowBase & Record<string, unknown>, params: CallListParams) {
   if (params.request_id && row.id !== params.request_id) return false
   if (params.model && row.model_id !== params.model) return false
   if (params.outcome && row.outcome !== params.outcome) return false
   if (params.format && row.format !== params.format) return false
   if (params.tag && row.tag !== params.tag) return false
-  if (params.api_key_id) {
-    const key = row.api_key as { id?: string } | null | undefined
-    if (key?.id !== params.api_key_id) return false
+  if (params.stream !== undefined && row.stream !== params.stream) return false
+  if (params.from && Date.parse(row.created_at) < Date.parse(params.from)) return false
+  if (params.to && Date.parse(row.created_at) >= Date.parse(params.to)) return false
+  for (const [filter, field] of [['api_key_id', 'api_key'], ['channel_id', 'channel'], ['account_id', 'account']] as const) {
+    if (params[filter] && (row[field] as { id?: string } | undefined)?.id !== params[filter]) return false
   }
   return true
 }
 
-/**
- * 调用浏览器：汇总 + 实时开关 + 列表 + 加载更多 + 详情抽屉。
- * 用户用量页、渠道编辑页与管理员调用页共用；接口路径与列由调用方决定。
- */
+/** 列表与轻量汇总；分析由单独页面按需加载。 */
 export function CallExplorer<T extends CallRowBase>({
-  pageSize,
-  caption,
-  listPath,
-  streamPath,
-  detailPath,
-  params,
-  columns,
-  toolbar,
-  chargedLabel,
-  openCallId,
-  onOpenCall,
+  pageSize, caption, listPath, streamPath, detailPath, params, columns, toolbar, chargedLabel,
+  openCallId, onOpenCall, liveDisabledReason,
 }: {
-  /** 有值时每页固定条数，翻页替换列表；省略时加载更多。 */
   pageSize?: number
   caption: string
   listPath: string
-  /** 提供时显示「实时」开关 */
   streamPath?: string
-  /** 提供时行可点击并打开详情抽屉（GET {detailPath}/{id}） */
   detailPath?: string
   params: CallListParams
   columns: CallColumn<T>[]
   toolbar?: ReactNode
   chargedLabel?: string
-  /** 受控的已打开调用 ID（例如按请求 ID 搜索） */
   openCallId?: string | null
   onOpenCall?: (id: string | null) => void
+  liveDisabledReason?: string
 }) {
-  const [showAnalysis, setShowAnalysis] = useState(false)
   const [live, setLive] = useState(false)
-  const [liveAt, setLiveAt] = useState(0)
-  useEffect(() => {
-    if (!live) return
-    const timer = window.setInterval(() => setLiveAt(Date.now()), 15_000)
-    return () => window.clearInterval(timer)
-  }, [live])
-  const [drill, setDrill] = useState<{ base: string; params: CallListParams; label: string } | null>(null)
-  const baseKey = JSON.stringify(params)
-  const drillParams = useMemo(() => (drill?.base === baseKey ? drill.params : {}), [drill, baseKey])
-  const activeParams = useMemo(() => {
-    const result = { ...params, ...drillParams }
-    if (live && liveAt && params.to && !drillParams.to) {
-      const offset = liveAt - Date.parse(params.to)
-      result.to = new Date(liveAt).toISOString()
-      if (params.from) result.from = new Date(Date.parse(params.from) + offset).toISOString()
-    }
-    return result
-  }, [params, drillParams, live, liveAt])
-  const pages = useCallPages<Page<T>>(listPath, activeParams, {
-    limit: pageSize,
-    refetchInterval: live && (!params.to || drillParams.to) ? 15_000 : false,
-  })
+  const visible = usePageVisible()
+  const activeLive = live && !liveDisabledReason
+  const pages = useCallPages<Page<T>>(listPath, params, { limit: pageSize, refetchInterval: activeLive ? 15_000 : false })
+  const { refetch } = pages
   const [page, setPage] = useState(0)
-  const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
-  const stream = useCallStream<T>(live && streamPath ? streamPath : null)
   const [localOpen, setLocalOpen] = useState<string | null>(null)
   const selected = openCallId !== undefined ? openCallId : localOpen
   const setSelected = onOpenCall ?? setLocalOpen
   const detail = useCall(detailPath ? selected : null, detailPath)
-
-  const loaded = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data])
-  const rows = loaded
-  const displayed = pageSize
-    ? currentPage === 0
-      ? rows.slice(0, pageSize)
-      : (pages.data?.pages[currentPage]?.items ?? [])
-    : rows
+  const root = useRef<HTMLDivElement>(null)
+  const [reading, setReading] = useState(false)
+  useEffect(() => {
+    const check = () => setReading(window.scrollY >= 100 || Boolean(document.activeElement?.closest('.data-table, .mobile-card-list')))
+    window.addEventListener('scroll', check, { passive: true })
+    document.addEventListener('focusin', check)
+    document.addEventListener('focusout', check)
+    check()
+    return () => { window.removeEventListener('scroll', check); document.removeEventListener('focusin', check); document.removeEventListener('focusout', check) }
+  }, [])
+  const mergeable = canMergeLive(params)
+  const liveURL = streamPath ? withQuery(streamPath.split('?')[0], {
+    ...Object.fromEntries(new URLSearchParams(streamPath.split('?')[1])),
+    model: params.model, api_key_id: params.api_key_id, channel_id: params.channel_id, outcome: params.outcome,
+  }) : null
+  const stream = useCallStream<T>(activeLive ? liveURL : null)
+  const fetched = useMemo(() => pages.data?.pages.flatMap(p => p.items) ?? [], [pages.data])
+  const filterKey = JSON.stringify(params)
+  const [base, setBase] = useState<{ key: string; rows: T[] }>({ key: '', rows: [] })
+  const freeze = activeLive && (reading || Boolean(selected))
+  const loaded = freeze && base.key === filterKey ? base.rows : fetched
+  useEffect(() => {
+    if (!freeze || base.key !== filterKey) setBase({ key: filterKey, rows: fetched })
+  }, [freeze, base.key, filterKey, fetched])
+  const loadedIDs = useMemo(() => new Set(loaded.map(row => row.id)), [loaded])
+  const [shown, setShown] = useState<ReadonlySet<string>>(new Set())
+  const seen = useRef(new Set<string>())
+  useEffect(() => { setPage(0); setShown(new Set()); seen.current.clear() }, [filterKey, activeLive])
+  useEffect(() => {
+    const fresh = stream.items.filter(item => !seen.current.has(item.id))
+    for (const item of fresh) seen.current.add(item.id)
+    if (seen.current.size > 1000) seen.current = new Set(stream.items.map(item => item.id))
+    if (fresh.length && mergeable && !selected && !reading) {
+      setShown(current => new Set([...current, ...fresh.map(item => item.id)].slice(-200)))
+    }
+  }, [stream.items, mergeable, selected, reading])
+  const previousVisibility = useRef(visible)
+  const previousStatus = useRef(stream.status)
+  useEffect(() => {
+    if (activeLive && visible && (!previousVisibility.current || (stream.status === 'open' && previousStatus.current !== 'open'))) void refetch()
+    previousVisibility.current = visible
+    previousStatus.current = stream.status
+  }, [activeLive, visible, stream.status, refetch])
+  const matches = (row: T) => matchesFilters(row as T & Record<string, unknown>, params)
+  const rows = useMemo(() => {
+    if (!activeLive || !mergeable || pages.isPlaceholderData) return loaded
+    const updates = new Map(stream.items.map(row => [row.id, row]))
+    const matches = (row: T) => matchesFilters(row as T & Record<string, unknown>, params)
+    const existing = loaded.map(row => updates.get(row.id) ?? row).filter(matches)
+    const inserted = stream.items.filter(row => !loadedIDs.has(row.id) && shown.has(row.id) && matches(row))
+    return [...inserted, ...existing].slice(0, 500)
+  }, [loaded, loadedIDs, stream.items, shown, params, activeLive, mergeable, pages.isPlaceholderData])
+  const pending = new Set([
+    ...fetched.filter(row => !loadedIDs.has(row.id) && !shown.has(row.id)).map(row => row.id),
+    ...stream.items.filter(row => !loadedIDs.has(row.id) && !shown.has(row.id) && (!mergeable || matches(row))).map(row => row.id),
+  ]).size
+  const currentPage = Math.min(page, Math.max(0, (pages.data?.pages.length ?? 1) - 1))
+  const displayed = pageSize ? currentPage === 0 ? rows.slice(0, pageSize) : pages.data?.pages[currentPage]?.items ?? [] : rows
+  const capped = (pages.data?.pages.length ?? 0) >= 10
   const nextPage = async () => {
     if (currentPage + 1 < (pages.data?.pages.length ?? 0)) setPage(currentPage + 1)
     else {
@@ -105,116 +127,30 @@ export function CallExplorer<T extends CallRowBase>({
       if (!result.isError && (result.data?.pages.length ?? 0) > currentPage + 1) setPage(currentPage + 1)
     }
   }
-  const summary = pages.data?.pages[0]?.summary
-
-  return (
-    <div className="call-explorer">
-      <div className="call-explorer-bar">
-        {toolbar}
-        {streamPath && (
-          <LiveToggle
-            enabled={live}
-            onChange={(value) => {
-              setPage(0)
-              setLiveAt(Date.now())
-              setLive(value)
-              if (!value) stream.clear()
-            }}
-            onRetry={stream.retry}
-            status={stream.status}
-          />
-        )}
-      </div>
-      {Object.keys(drillParams).length > 0 && (
-        <div className="call-drill">
-          <span>
-            已下钻 · {drill?.label}
-          </span>
-          <Button variant="quiet" onClick={() => setDrill(null)}>
-            返回全部筛选结果
-          </Button>
-        </div>
-      )}
-      {listPath === '/api/calls' && <div className="mobile-analysis-toggle"><Button variant="secondary" aria-expanded={showAnalysis} aria-controls="usage-analysis" onClick={() => setShowAnalysis(!showAnalysis)}>{showAnalysis ? '收起分析' : '展开分析'}</Button></div>}
-      <div id="usage-analysis" className={listPath === '/api/calls' && !showAnalysis ? 'usage-analysis-collapsed' : undefined}>
-      {(listPath === '/api/calls' || listPath === '/api/admin/calls') && (
-        <CallAnalysis
-          path={listPath}
-          params={activeParams}
-          live={live && (!params.to || Boolean(drillParams.to))}
-          onDrill={(next, label) => {
-            setPage(0)
-            setDrill({ base: baseKey, params: { ...drillParams, ...next }, label })
-          }}
-        />
-      )}
-      {summary && <CallStatsBar chargedLabel={chargedLabel} stats={summary} />}
-      </div>
-      <QueryBoundary errorFallback="调用记录加载失败" query={{ ...pages, data: pages.data ? rows : undefined }}>
-        {(data) => (
-          <>
-            <CallTable
-              caption={caption}
-              columns={columns}
-              onSelect={detailPath ? (row) => setSelected(row.id) : undefined}
-              rows={pageSize ? displayed : data}
-            />
-            {pageSize && pages.isFetchNextPageError && (
-              <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>
-            )}
-            {pageSize && (
-              <nav aria-label="调用记录分页" className="channel-record-pages">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={currentPage === 0 || pages.isFetchingNextPage}
-                  onClick={() => setPage(currentPage - 1)}
-                >
-                  上一页
-                </Button>
-                <span className="muted num">第 {currentPage + 1} 页</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={pages.isFetchingNextPage}
-                  disabled={live || (!pages.hasNextPage && currentPage + 1 >= (pages.data?.pages.length ?? 0))}
-                  onClick={() => void nextPage()}
-                >
-                  下一页
-                </Button>
-              </nav>
-            )}
-            {!pageSize && pages.hasNextPage && (
-              <div className="table-pagination">
-                <Button
-                  loading={pages.isFetchingNextPage}
-                  onClick={() => void pages.fetchNextPage()}
-                  size="sm"
-                  type="button"
-                  variant="secondary"
-                >
-                  加载更多
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </QueryBoundary>
-      {detailPath && (
-        <CallDetailDrawer
-          onClose={() => setSelected(null)}
-          open={Boolean(selected)}
-          query={
-            detail as {
-              data: CallDetail | undefined
-              isPending: boolean
-              isError: boolean
-              error: unknown
-              refetch: () => unknown
-            }
-          }
-        />
-      )}
+  return <div className="call-explorer" ref={root}>
+    <div className="call-explorer-bar">
+      {toolbar}
+      <Button variant="quiet" size="sm" loading={pages.isFetching && !pages.isFetchingNextPage} onClick={() => void pages.refetch()}>刷新</Button>
+      {streamPath && <LiveToggle enabled={activeLive} onChange={value => { setLive(value); setPage(0); stream.clear() }} status={stream.status} onRetry={stream.retry} disabledReason={liveDisabledReason} />}
     </div>
-  )
+    {pages.data?.pages[0]?.summary && <CallStatsBar chargedLabel={chargedLabel} stats={pages.data.pages[0].summary} />}
+    {activeLive && pending > 0 && <Notice tone="info" action={<Button size="sm" variant="quiet" onClick={() => {
+      if (mergeable) { setBase({ key: filterKey, rows: fetched }); setShown(new Set(stream.items.map(item => item.id))); window.scrollTo({ top: 0 }) }
+      else { void pages.refetch(); stream.clear() }
+    }}>{mergeable ? '显示' : '刷新'}</Button>}>{mergeable ? `${pending} 条新调用` : '调用有更新'}</Notice>}
+    {pages.isRefetchError && pages.data && <InlineError>刷新失败，正在显示上次结果。<Button size="sm" variant="quiet" onClick={() => void pages.refetch()}>重试</Button></InlineError>}
+    <div aria-busy={pages.isFetching} className={pages.isPlaceholderData ? 'query-updating' : undefined}>
+      <QueryBoundary errorFallback="调用记录加载失败" query={{ ...pages, data: pages.data ? rows : undefined }}>{() => <>
+        <CallTable caption={caption} columns={columns} rows={displayed} highlight={activeLive ? shown : undefined} onSelect={detailPath ? row => setSelected(row.id) : undefined} />
+        {pages.isFetchNextPageError && <InlineError>{errorMessage(pages.error, '加载下一页失败，请重试')}</InlineError>}
+        {pageSize ? <nav className="channel-record-pages" aria-label="调用记录分页">
+          <Button size="sm" variant="secondary" disabled={currentPage === 0 || pages.isFetchingNextPage} onClick={() => setPage(currentPage - 1)}>上一页</Button>
+          <span className="num">第 {currentPage + 1} 页</span>
+          <Button size="sm" variant="secondary" loading={pages.isFetchingNextPage} disabled={activeLive || (!pages.hasNextPage && currentPage + 1 >= (pages.data?.pages.length ?? 0)) || (capped && currentPage + 1 >= (pages.data?.pages.length ?? 0))} onClick={() => void nextPage()}>下一页</Button>
+        </nav> : pages.hasNextPage && !capped && <div className="table-pagination"><Button variant="secondary" size="sm" loading={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>加载更多</Button></div>}
+        {capped && pages.hasNextPage && <p className="muted-copy">已显示 10 页，请缩小筛选范围。</p>}
+      </>}</QueryBoundary>
+    </div>
+    {detailPath && <CallDetailDrawer onClose={() => setSelected(null)} open={Boolean(selected)} query={detail as { data: CallDetail | undefined; isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown }} />}
+  </div>
 }
