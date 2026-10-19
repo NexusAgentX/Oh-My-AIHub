@@ -15,7 +15,6 @@ import { InstanceProvider, RequireInitialized } from './auth/InstanceProvider'
 import { FirstPasswordChangePage } from './auth/FirstPasswordChangePage'
 import { LoginPage } from './auth/LoginPage'
 import { AccountPage } from './account/AccountPage'
-import { MePage } from './account/MePage'
 import { HomePage } from './home/HomePage'
 import { UsagePage } from './usage/UsagePage'
 import { PointsPage } from './points/PointsPage'
@@ -89,6 +88,10 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireReadyAccount />}>
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
+          <Route element={<LegacyRedirect from="/channels" to="/supply/channels" />} path="/channels/*" />
+          <Route element={<LegacyRedirect from="/contributions" to="/supply/contributions" />} path="/contributions/*" />
+          <Route element={<LegacyRedirect from="/detection" to="/supply/detection" />} path="/detection/*" />
+          <Route element={<LegacyRedirect from="/forum/tickets" to="/tickets" />} path="/forum/tickets/*" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelsPage})} path="/models" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketModelDetailPage})} path="/models/:model" />
           <Route element={<KeysPage />} path="/keys" />
@@ -98,27 +101,28 @@ export const appRoutes = createRoutesFromElements(
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSupplierDetailPage})} path="/suppliers/:id" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketGroupPage})} path="/groups/:id" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketReportPage})} path="/reports/:id" />
-          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/channels" />
- <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionsPage})} path="/contributions"/>
- <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionDetailPage})} path="/contributions/:draftID"/>
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/detection" />
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionDetailPage})} path="/detection/:taskID" />
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).SavedDetectionReportPage})} path="/detection/reports/:reportID" />
-          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/new" />
-          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/:id" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/supply/channels" />
+ <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionsPage})} path="/supply/contributions"/>
+ <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionDetailPage})} path="/supply/contributions/:draftID"/>
+ <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/supply/detection" />
+ <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionDetailPage})} path="/supply/detection/:taskID" />
+ <Route lazy={async()=>({Component:(await import('./detection/Pages')).SavedDetectionReportPage})} path="/supply/detection/reports/:reportID" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/supply/channels/new" />
+          <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/supply/channels/:id" />
           <Route element={<PointsPage />} path="/points" />
           <Route element={<TradeDetailPage />} path="/points/trades/:id" />
           <Route element={<LegacyRedirect from="/usage" to="/calls" />} path="/usage" />
           <Route element={<UsagePage />} path="/calls" />
           <Route lazy={async () => ({ Component: (await import('./calls/Pages')).CallInsightsPage })} path="/calls/insights" />
           <Route lazy={async () => ({ Component: (await import('./calls/Pages')).CallPage })} path="/calls/:id" />
-          <Route element={<MePage />} path="/me" />
+          <Route element={<LegacyRedirect from="/me" to="/account" />} path="/me" />
           <Route element={<AccountPage />} path="/account" />
           <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).ForumPage })} path="/forum" />
-          <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).TicketsPage })} path="/forum/tickets" />
+          <Route lazy={async () => ({ Component: (await import('./forum/ForumPage')).TicketsPage })} path="/tickets" />
           <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).NewTopicPage })} path="/forum/new" />
-          <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).NewTicketPage })} path="/forum/tickets/new" />
-          <Route lazy={async () => ({ Component: (await import('./forum/BoardsPage')).BoardsPage })} path="/forum/boards" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).NewTicketPage })} path="/tickets/new" />
+          <Route lazy={async () => ({ Component: (await import('./forum/TopicPage')).TopicPage })} path="/tickets/:id" />
+          <Route element={<LegacyRedirect from="/forum/boards" to="/admin/forum/boards" />} path="/forum/boards" />
           <Route lazy={async () => ({ Component: (await import('./forum/TopicPage')).TopicPage })} path="/forum/topics/:id" />
           <Route lazy={async () => ({ Component: (await import('./forum/TopicEditorPage')).EditTopicPage })} path="/forum/topics/:id/edit" />
         </Route>

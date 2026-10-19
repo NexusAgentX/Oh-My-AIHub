@@ -1,3 +1,4 @@
+import { DomainNav } from '../layouts/DomainNav'
 import { MarketQualitySection } from './Quality'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -80,12 +81,12 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="muted-copy" role="status">共 {data.total} 个模型 · 能力和费用来自符合筛选的候选</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
-      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" action={<ButtonLink to="/contributions">贡献供应商分组</ButtonLink>} />}
+      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" action={<ButtonLink to="/supply/contributions">贡献供应商分组</ButtonLink>} />}
       <div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={() => update('cursor', '')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })}>下一页</Button></div>
     </>}</QueryBoundary>
   </>
 }
-export function MarketModelsPage() { return <><PageHeader title="模型" /><MarketModelGrid /></> }
+export function MarketModelsPage() { return <><PageHeader title="模型" /><DomainNav domain="市场" /><MarketModelGrid /></> }
 
 function RoutingCard({ detail }: { detail: Detail }) {
   const saved = draftFromPreference(detail.routing, detail.routing_channels)
@@ -152,7 +153,7 @@ function CodexSetup({ model }: { model: string }) {
 
 export function MarketSuppliersPage() {
   const query = useMarketSuppliers(), [params, setParams] = useSearchParams()
-  return <><PageHeader title="供应商" actions={<ButtonLink to="/contributions">贡献供应商</ButtonLink>} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
+  return <><PageHeader title="供应商" actions={<ButtonLink to="/supply/contributions">贡献供应商</ButtonLink>} /><DomainNav domain="市场" /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
     <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
       const rows = data.items.filter(s => (!params.get('kind') || s.kind === params.get('kind')) && `${s.name} ${s.summary}`.toLowerCase().includes((params.get('q') ?? '').toLowerCase()))
       return rows.length ? <div className="sharing-grid">{rows.map(s => <Card key={s.id}><div className="sharing-title"><SupplierIcon supplier={s} /><h2><Link to={`/suppliers/${s.id}`}>{s.name}</Link></h2><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><p className="muted-copy">{s.groups.length} 个分组</p></Card>)}</div> : <EmptyState title="暂无符合条件的供应商" />

@@ -97,7 +97,7 @@ export function ReportPicker({
                   )
                 }
               />
-              <ButtonLink size="sm" to={`/detection/reports/${r.id}`}>
+              <ButtonLink size="sm" to={`/supply/detection/reports/${r.id}`}>
                 查看
               </ButtonLink>
             </div>
@@ -131,7 +131,7 @@ export function ReportPicker({
       )}
       {value.map((id, index) => (
         <div className="contribution-order" key={id}>
-          <ButtonLink variant="quiet" to={`/detection/reports/${id}`}>
+          <ButtonLink variant="quiet" to={`/supply/detection/reports/${id}`}>
             已关联报告 {index + 1}
           </ButtonLink>
           <Button
