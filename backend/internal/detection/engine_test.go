@@ -53,12 +53,12 @@ func (m *memoryStore) Get(_ context.Context, id string) (Job, error) {
 	}
 	return cloneJob(v), nil
 }
-func (m *memoryStore) List(_ context.Context, owner string, admin bool, _ *Cursor, limit int) ([]Job, error) {
+func (m *memoryStore) List(_ context.Context, owner string, admin bool, draftID string, _ *Cursor, limit int) ([]Job, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := []Job{}
 	for _, j := range m.jobs {
-		if j.OwnerID == owner || admin {
+		if (j.OwnerID == owner || admin) && (draftID == "" || j.Target.DraftID == draftID) {
 			out = append(out, cloneJob(j))
 			if len(out) == limit {
 				break

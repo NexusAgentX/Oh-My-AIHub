@@ -67,7 +67,7 @@ func (s *Store) Get(ctx context.Context, id string) (detection.Job, error) {
 	}
 	return decodeTask(r.Metadata, r.ID, r.OwnerID, r.State, r.CredentialScope, r.Complete)
 }
-func (s *Store) List(ctx context.Context, owner string, admin bool, cursor *detection.Cursor, limit int) ([]detection.Job, error) {
+func (s *Store) List(ctx context.Context, owner string, admin bool, draftID string, cursor *detection.Cursor, limit int) ([]detection.Job, error) {
 	if limit < 1 || limit > 101 {
 		return nil, detection.ErrInvalid
 	}
@@ -77,7 +77,7 @@ func (s *Store) List(ctx context.Context, owner string, admin bool, cursor *dete
 		at = &cursor.At
 		afterID = &cursor.ID
 	}
-	rows, err := New(s.pool).ListTasks(ctx, ListTasksParams{OwnerID: owner, IsAdmin: admin, PageLimit: int32(limit), AfterAt: at, AfterID: afterID})
+	rows, err := New(s.pool).ListTasks(ctx, ListTasksParams{OwnerID: owner, IsAdmin: admin, DraftID: draftID, PageLimit: int32(limit), AfterAt: at, AfterID: afterID})
 	if err != nil {
 		return nil, err
 	}

@@ -5770,6 +5770,7 @@ paths:
           }
         ],
         "parameters": [
+          {"name": "draft_id", "in": "query", "description": "Filter tasks belonging to this contribution draft without changing access scope.", "schema": {"type": "string", "format": "uuid"}},
           {
             "name": "cursor",
             "in": "query",
