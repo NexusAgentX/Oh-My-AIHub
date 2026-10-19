@@ -1,10 +1,12 @@
+import { usePageVisible } from '../api/visibility'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend } from '../api/client'
 import type { components } from '../api/schema.gen'
 export type TypicalConfig = components['schemas']['TypicalConfig']
 export type TypicalEstimate = components['schemas']['TypicalEstimate']
 export function useTypicalCosts(level = 'group', model = '', cursor = '') {
-  return useQuery({ queryKey: ['typical-costs', level, model, cursor], queryFn: () => apiGet<'listTypicalCosts'>('/api/typical-costs', { level, model_id: model, cursor, limit: 20 }), refetchInterval: (query) => query.state.data?.status.running || query.state.data?.status.pending ? 3000 : false })
+  const visible = usePageVisible()
+  return useQuery({ queryKey: ['typical-costs', level, model, cursor], queryFn: () => apiGet<'listTypicalCosts'>('/api/typical-costs', { level, model_id: model, cursor, limit: 20 }), refetchInterval: (query) => visible && (query.state.data?.status.running || query.state.data?.status.pending) ? 3000 : false })
 }
 export function useTypicalSettings() {
   return useQuery({ queryKey: ['typical-settings'], queryFn: () => apiGet<'getTypicalSettings'>('/api/admin/typical-costs/settings') })

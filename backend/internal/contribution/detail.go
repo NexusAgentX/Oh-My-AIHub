@@ -219,7 +219,7 @@ func (s *Service) Choices(ctx context.Context, actor Actor, kind, after string, 
 		return nil, false, ErrInvalid
 	}
 	slices.SortFunc(items, func(a, b TargetChoice) int { return strings.Compare(a.ID, b.ID) })
-	items = slices.DeleteFunc(items, func(v TargetChoice) bool { return v.ID <= after })
+	items = slices.DeleteFunc(items, func(v TargetChoice) bool { return v.ID <= after || parentID != "" && v.ParentID != parentID })
 	more := len(items) > limit
 	if more {
 		items = items[:limit]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { feeRateToPercent, formatPoints, formatRatio, percentToFeeRate } from './format'
+import { feeRateToPercent, formatExactPoints as formatPoints, formatRatio, percentToFeeRate } from '../money'
 import { changedAdvancedCount, formToSettings, settingsToForm } from './settingsForm'
 import type { Settings } from './types'
 

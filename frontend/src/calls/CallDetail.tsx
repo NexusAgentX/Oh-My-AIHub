@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { CallNetwork } from './CallNetwork'
 import { CallDiagnostics } from './CallDiagnostics'
-import { PriceSnapshotView } from '../admin/transactions'
+import { PriceSnapshotView } from '../money/PriceSnapshotView'
 import type { CallDetail } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
 import { MultiplierText } from '../money/MultiplierText'

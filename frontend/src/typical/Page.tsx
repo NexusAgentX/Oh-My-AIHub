@@ -1,8 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
+import { SaveBar } from '../ui/SaveBar'
+import { useUnsavedGuard } from '../ui/UnsavedGuard'
+import { formatClockTime } from '../money/time'
+import { SettingsNav } from '../admin/SectionNav'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
-import { formatDateTime } from '../admin/format'
+import { formatDateTime } from '../money/time'
 import { formatTypicalAmount, formatTypicalUnit } from './format'
-import { Button, Card, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SelectField, SuccessMessage, TextField } from '../ui'
+import { Button, Card, ConfirmDialog, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SelectField, TextField } from '../ui'
 import { useRefreshTypicalCosts, useTypicalCosts, useTypicalSettings, useUpdateTypicalSettings, type TypicalConfig, type TypicalEstimate } from './queries'
 
 const fields = [
@@ -15,20 +20,23 @@ const fields = [
 ] as const
 const reasons: Record<string, string> = { no_samples: '无可靠样本', missing_reliable_conversion: '缺少用量换算依据', unpriced_workload_component: '工作负载有未计价分量', no_reference: '无原厂参考价', zero_reference: '原厂参考价为零', reference_workload_unpriced: '参考价未覆盖全部用量', estimate_overflow: '费用超过估算范围' }
 const sources: Record<string, string> = { group_current_quote: '本分组当前报价样本', model_site_fallback: '站内同模型结构推算', site_active_groups_weighted: '站内有效分组加权', site_no_samples: '站内暂无样本' }
-function SettingsEditor({ value }: { value: TypicalConfig }) {
+function SettingsEditor({ value, reload }: { value: TypicalConfig; reload: () => Promise<TypicalConfig | undefined> }) {
+  const [reloadOpen, setReloadOpen] = useState(false), [reloading, setReloading] = useState(false), [reloadError, setReloadError] = useState('')
+  const lastRemote = useRef(value)
   const [form, setForm] = useState(value)
-  const [saved, setSaved] = useState(false)
-  useEffect(() => { setForm(value) }, [value])
+  const [saved, setSaved] = useState(''), [baseline, setBaseline] = useState(value)
+  const dirtyCount = fields.filter(([key]) => form[key] !== baseline[key]).length
   const update = useUpdateTypicalSettings()
+  const busy = update.isPending || reloading, conflict = value.version > baseline.version || update.error instanceof ApiError && update.error.status === 409
+  useUnsavedGuard(dirtyCount > 0, { busy })
+  useEffect(() => { if (lastRemote.current === value) return; lastRemote.current = value; if (!dirtyCount && !busy && value.version >= baseline.version) { setForm(value); setBaseline(value) } }, [value, dirtyCount, busy, baseline.version])
   const valid = fields.every(([key, , min, max]) => Number.isSafeInteger(form[key]) && form[key] >= min && form[key] <= max)
-  const submit = (event: FormEvent) => { event.preventDefault(); if (valid) update.mutate(form, { onSuccess: (data) => { setForm(data); setSaved(true) } }) }
-  return <Card title="估算参数"><form className="stack-form" onSubmit={submit}>
-    {[0, 2, 4].map((start) => <div className="field-row" key={start}>{fields.slice(start, start + 2).map(([key, label, min, max]) => <TextField key={key} label={label} type="number" min={min} max={max} step={1} required value={form[key]} onChange={(event) => { setSaved(false); setForm((old) => ({ ...old, [key]: Number(event.target.value) })) }} />)}</div>)}
+  const submit = (event: FormEvent) => { event.preventDefault(); if (valid && !busy && !conflict) update.mutate(form, { onSuccess: (data) => { setForm(data); setBaseline(data); setSaved(formatClockTime(new Date())) } }) }
+  return <Card title="估算参数">{conflict && <Notice tone="warning">配置已被更新。<Button variant="quiet" onClick={() => setReloadOpen(true)}>载入最新</Button></Notice>}<form className="stack-form" onSubmit={submit}><SaveBar dirtyCount={dirtyCount} busy={busy} disabled={!valid || conflict} savedAt={saved} onDiscard={() => { if (conflict) setReloadOpen(true); else { setForm(baseline); update.reset() } }} /><fieldset className="flat-fieldset stack-form" disabled={busy}>
+    {[0, 2, 4].map((start) => <div className="field-row" key={start}>{fields.slice(start, start + 2).map(([key, label, min, max]) => <TextField key={key} label={label} type="number" min={min} max={max} step={1} required value={form[key]} onChange={(event) => { setSaved(''); setForm((old) => ({ ...old, [key]: Number(event.target.value) })) }} />)}</div>)}
     <p className="muted-copy">参数版本 {form.version} · 报价变更后重新累计分组样本，不足时采用站内同模型结构。</p>
     <InlineError>{!valid ? '请输入范围内的正整数。' : update.isError ? errorMessage(update.error, '保存失败') : ''}</InlineError>
-    <SuccessMessage>{saved ? '已保存，正在更新估算' : ''}</SuccessMessage>
-    <div className="form-actions"><Button loading={update.isPending} disabled={!valid}>保存参数</Button></div>
-  </form></Card>
+  </fieldset></form><ConfirmDialog open={reloadOpen} busy={reloading} error={reloadError} title="载入最新参数？" description="未保存的修改将被丢弃。" confirmLabel="载入最新" onClose={() => setReloadOpen(false)} onConfirm={() => { setReloading(true); setReloadError(''); void reload().then(latest => { if (!latest) { setReloadError('载入失败，请重试'); return }; setForm(latest); setBaseline(latest); lastRemote.current = latest; update.reset(); setReloadOpen(false) }).catch(error => setReloadError(errorMessage(error, '载入失败，请重试'))).finally(() => setReloading(false)) }} /></Card>
 }
 export function EstimateCard({ item }: { item: TypicalEstimate }) {
   const name = item.level === 'channel' ? item.channel_name : item.level === 'group' ? item.group_name : '站内整体'
@@ -57,7 +65,8 @@ export function TypicalCostsPage() {
   return <>
     <PageHeader title="典型费用" description="按可靠业务样本估算，用于报价比较。实际账单按每次可靠用量结算。" actions={<Button variant="secondary" loading={refresh.isPending} disabled={costs.data?.status.running || costs.data?.status.pending} onClick={() => refresh.mutate()}>立即更新</Button>} />
     <InlineError>{refresh.isError ? errorMessage(refresh.error, '请求更新失败') : ''}</InlineError>
-    <QueryBoundary query={settings}>{(data) => <SettingsEditor value={data} />}</QueryBoundary>
+    <SettingsNav />
+    <QueryBoundary query={settings}>{(data) => <SettingsEditor value={data} reload={async () => (await settings.refetch({ throwOnError: true })).data} />}</QueryBoundary>
     <Card title="估算结果"><form className="stack-form" onSubmit={(event) => { event.preventDefault(); setModel(draft.trim()); setCursor('') }}>
       <div className="field-row"><SelectField label="层级" value={level} onChange={(event) => { setLevel(event.target.value); setCursor('') }}><option value="model">模型站内整体</option><option value="group">分组模型</option><option value="channel">渠道模型</option></SelectField><TextField label="模型 ID" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="全部模型" /></div>
       <div className="form-actions"><Button variant="secondary">筛选</Button></div>
