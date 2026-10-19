@@ -61,11 +61,12 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
   }, { replace: true })
   const search = new URLSearchParams(effective); search.delete('cursor'); search.delete('limit')
   return <>
-    <Toolbar>
+    <div className="model-filter-toolbar"><Toolbar>
       <SearchInput label="搜索模型 ID" value={params.get('q') ?? ''} onChange={e => update('q', e.target.value)} />
       <SelectField label="模型类型" value={params.get('model_type') ?? ''} onChange={e => update('model_type', e.target.value)}><option value="">全部</option><option value="text">文本推理</option><option value="image">图片生成</option></SelectField>
       <SelectField label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
-    </Toolbar>
+      <SelectField label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
+    </Toolbar></div>
     <Disclosure title="能力与分组筛选" defaultOpen={features.length > 0}>
       <div className="model-filters">
         {!supplierID && <SelectField label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
@@ -75,7 +76,7 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
       </div>
       <fieldset className="model-filter-capabilities"><legend>同一候选同时满足</legend>{Object.entries(featureLabels).map(([id, label]) => <Checkbox key={id} label={label} checked={features.includes(id)} onChange={e => update('features', (e.target.checked ? [...features, id] : features.filter(f => f !== id)).join(','))} />)}</fieldset>
     </Disclosure>
-    <div className="model-filter-summary"><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><SelectField label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></div>
+    <div className="model-filter-summary"><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></div>
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="muted-copy" role="status">共 {data.total} 个模型 · 能力和费用来自符合筛选的候选</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
