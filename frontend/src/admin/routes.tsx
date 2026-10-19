@@ -12,7 +12,7 @@ function RequireAdmin() {
 export const adminRoutes = (
   <Route element={<RequireAdmin />}>
     <Route lazy={async () => ({ Component: (await import('./AdminFrame')).AdminFrame })} path="/admin">
-      <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"/>
+      <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"><Route lazy={async()=>({Component:(await import("../contributions/Pages")).NewContributionRoute})} path="new" /></Route>
  <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionDetailPage})} path="contributions/:draftID"/>
  <Route lazy={async () => ({ Component: (await import('../forum/BoardsPage')).BoardsPage })} path="forum/boards" />
       <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />

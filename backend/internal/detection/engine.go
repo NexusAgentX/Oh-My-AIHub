@@ -208,11 +208,11 @@ func (s *Service) Get(ctx context.Context, actor Actor, id string) (Job, error) 
 	}
 	return job, nil
 }
-func (s *Service) List(ctx context.Context, actor Actor, cursor *Cursor, limit int) ([]Job, error) {
+func (s *Service) List(ctx context.Context, actor Actor, draftID string, cursor *Cursor, limit int) ([]Job, error) {
 	if actor.ID == "" || limit < 1 || limit > 101 {
 		return nil, ErrInvalid
 	}
-	return s.store.List(ctx, actor.ID, actor.Admin, cursor, limit)
+	return s.store.List(ctx, actor.ID, actor.Admin, draftID, cursor, limit)
 }
 func (s *Service) Cancel(ctx context.Context, actor Actor, id string) (Job, error) {
 	s.mu.Lock()

@@ -1,3 +1,4 @@
+import { emptyOverrides } from '../settings/overrides'
 import { Facts } from '../ui/Facts'
 import { Advanced, headerMode, numericFields, type HeaderMode } from './SettingsFields'
 import { SaveBar } from '../ui/SaveBar'
@@ -22,7 +23,6 @@ import './group-channels.css'
 const formatNames: Record<string, string> = { openai_chat: 'Chat', openai_responses: 'Responses', anthropic: 'Messages', gemini: 'GenerateContent', openai_images: 'Images' }
 const probeReasons:Record<string,string>={upstream_rejected_probe:'上游拒绝请求',upstream_server_error:'上游服务错误',upstream_unreachable:'上游不可达',probe_cancelled_or_timed_out:'探针取消或超时',upstream_transport_error:'上游连接失败',outbound_validation_failed:'出站校验未通过',invalid_upstream_endpoint:'上游端点配置无效',invalid_probe_request:'探针请求配置无效',invalid_or_oversize_reply:'响应格式或大小无效',invalid_native_reply:'响应不符合原生协议'}
 const sourceNames: Record<string, string> = { channel: '渠道', group: '分组', platform: '平台', model_route_or_platform: '模型路由／平台' }
-export const emptyOverrides: Overrides = { user_agent: null, header_rules: null, concurrency_limit: null, rpm_limit: null, ttft_timeout_ms: null, request_timeout_ms: null, idle_timeout_ms: null, cooldown_failures: null, cooldown_seconds: null }
 
 function ModelState({ model }: { model: GroupChannel['models'][number] }) {
   if (model.excluded) return <Badge>已排除</Badge>
