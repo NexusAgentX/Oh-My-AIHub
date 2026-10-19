@@ -197,12 +197,16 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 				if err != nil || len(differences) != 0 {
 					t.Fatal("protected history changed", differences, err)
 				}
-				if after.MigrationVersion != 26 {
+				if after.MigrationVersion != 27 {
 					t.Fatal("wrong final migration", after.MigrationVersion)
 				}
 				if err := Migrate(ctx, target); err != nil {
 					t.Fatal("repeated migration", err)
 				}
+			}
+			var notesEnabled bool
+			if err := db.QueryRowContext(ctx, "SELECT codex_notes FROM api_keys WHERE id=$1", key).Scan(&notesEnabled); err != nil || notesEnabled {
+				t.Fatal("upgrade silently enabled notes affinity on an existing Key", err)
 			}
 			var absent, deleted bool
 			if err := db.QueryRowContext(ctx, "SELECT to_regclass('models') IS NULL AND to_regclass('model_price_tiers') IS NULL AND to_regclass('channel_models') IS NULL AND to_regclass('suppliers') IS NULL AND to_regclass('supplier_endpoints') IS NULL").Scan(&absent); err != nil || !absent {
