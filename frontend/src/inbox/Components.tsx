@@ -40,7 +40,7 @@ export function InboxList({ items }: { items: (InboxItem & { sourceID: string; s
 export function InboxRefreshState({ sources }: { sources?: InboxSource[] }) {
   const query = useInbox(), failed = sources?.filter(source => source.state !== 'complete') ?? []
   return <div className="inbox-refresh-state">
-    {query.isError && <InlineError>待办刷新失败：{errorMessage(query.error, '请稍后重试')}{query.data ? '，以下保留上次读取的内容。' : '，当前数量未知。'}</InlineError>}
+    {query.isError && <InlineError>{errorMessage(query.error, '待办刷新失败，请重试')}{query.data ? '，以下保留上次读取的内容。' : '，当前数量未知。'}</InlineError>}
     {failed.length > 0 && <p role="status">以下来源{failed.some(source => source.state === 'limited') ? '未读完整' : '暂不可用'}，数量未知：{failed.map((source, index) => <span key={source.id}>{index > 0 && '、'}<Link to={source.href}>{source.label}</Link></span>)}。</p>}
     <div className="inbox-refresh-actions">{query.data && <small className="muted-copy">读取于 {formatDateTime(query.data.generated_at)}</small>}<Button size="sm" variant="quiet" loading={query.isFetching} onClick={() => void query.refetch()}>刷新待办</Button></div>
   </div>
