@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"sync"
@@ -81,49 +82,7 @@ func (a *app) getInbox(w http.ResponseWriter, r *http.Request) {
 	for range 4 {
 		wg.Go(func() {
 			for index := range jobs {
-				loader := loaders[index]
-				source := loader.source
-				source.Items, source.State = []inboxItem{}, "complete"
-				items, err := loader.load(ctx)
-				if items != nil {
-					source.Items = items
-				}
-				if err != nil {
-					source.State = "unavailable"
-					if errors.Is(err, errInboxLimited) {
-						source.State = "limited"
-					}
-				} else {
-					counts := &inboxCounts{}
-					for _, item := range source.Items {
-						switch item.Category {
-						case "action":
-							counts.Action++
-						case "anomaly":
-							counts.Anomaly++
-						case "progress":
-							counts.Progress++
-						}
-					}
-					source.Counts = counts
-				}
-				sort.SliceStable(source.Items, func(i, j int) bool {
-					left, right := source.Items[i], source.Items[j]
-					if left.Deadline != nil && right.Deadline != nil {
-						return left.Deadline.Before(*right.Deadline)
-					}
-					if left.Deadline != nil {
-						return true
-					}
-					if right.Deadline != nil {
-						return false
-					}
-					if left.Blocker != right.Blocker {
-						return left.Blocker
-					}
-					return left.UpdatedAt.After(right.UpdatedAt)
-				})
-				response.Sources[index] = source
+				response.Sources[index] = readInboxSource(ctx, loaders[index])
 			}
 		})
 	}
@@ -133,6 +92,61 @@ func (a *app) getInbox(w http.ResponseWriter, r *http.Request) {
 	close(jobs)
 	wg.Wait()
 	writeJSON(w, 200, response)
+}
+
+// Keep the request recovery boundary when source reads run concurrently.
+func readInboxSource(ctx context.Context, loader inboxLoader) (source inboxSource) {
+	source = loader.source
+	source.Items, source.State = []inboxItem{}, "complete"
+
+	defer func() {
+		if recover() != nil {
+			source.State = "unavailable"
+			source.Counts = nil
+			source.Items = []inboxItem{}
+			slog.ErrorContext(ctx, "inbox source panicked", "source", source.ID)
+		}
+	}()
+	items, err := loader.load(ctx)
+	if items != nil {
+		source.Items = items
+	}
+	if err != nil {
+		source.State = "unavailable"
+		if errors.Is(err, errInboxLimited) {
+			source.State = "limited"
+		}
+	} else {
+		counts := &inboxCounts{}
+		for _, item := range source.Items {
+			switch item.Category {
+			case "action":
+				counts.Action++
+			case "anomaly":
+				counts.Anomaly++
+			case "progress":
+				counts.Progress++
+			}
+		}
+		source.Counts = counts
+	}
+	sort.SliceStable(source.Items, func(i, j int) bool {
+		left, right := source.Items[i], source.Items[j]
+		if left.Deadline != nil && right.Deadline != nil {
+			return left.Deadline.Before(*right.Deadline)
+		}
+		if left.Deadline != nil {
+			return true
+		}
+		if right.Deadline != nil {
+			return false
+		}
+		if left.Blocker != right.Blocker {
+			return left.Blocker
+		}
+		return left.UpdatedAt.After(right.UpdatedAt)
+	})
+	return source
 }
 func (a *app) inboxLoaders(account identity.Account, now time.Time) []inboxLoader {
 	id := account.ID
@@ -309,7 +323,7 @@ func (a *app) inboxContributions(ctx context.Context, account identity.Account, 
 	return items, errInboxLimited
 }
 func inboxTrade(trade c2c.TradeSignal, now time.Time) (inboxItem, bool) {
-	item := inboxItem{ID: trade.ID, Title: "积分交易", Category: "progress", Message: "等待交易对方处理", Href: "/points/trades/" + trade.ID, UpdatedAt: trade.CreatedAt}
+	item := inboxItem{ID: trade.ID, Title: fmt.Sprintf("积分交易 · %.8s", trade.ID), Category: "progress", Message: "等待交易对方处理", Href: "/points/trades/" + trade.ID, UpdatedAt: trade.CreatedAt}
 	switch trade.Status {
 	case c2c.TradeAwaitingPayment:
 		item.Deadline = &trade.PaymentDeadline
@@ -415,7 +429,11 @@ func inboxKey(row apikey.Key, now time.Time) (inboxItem, bool) {
 	return item, false
 }
 func inboxDetection(job detection.Job) (inboxItem, bool) {
-	item := inboxItem{ID: job.ID, Title: "检测任务 · " + job.Target.Model, Category: "anomaly", Href: "/supply/detection/" + job.ID, UpdatedAt: job.UpdatedAt}
+	title := job.Target.Model + " 检测"
+	if job.Target.Model == "" {
+		title = "分组检测"
+	}
+	item := inboxItem{ID: job.ID, Title: title, Category: "anomaly", Href: "/supply/detection/" + job.ID, UpdatedAt: job.UpdatedAt}
 	if job.ExecutionActive && (job.State == "queued" || job.State == "running") {
 		item.Category = "progress"
 		item.Message = fmt.Sprintf("检测进行中 %d/%d", min(len(job.Results), len(job.Plan.Items)), len(job.Plan.Items))

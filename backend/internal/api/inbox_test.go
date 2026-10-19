@@ -196,3 +196,10 @@ func TestInboxRejectsRequestsInsteadOfQueuingWhenBusy(t *testing.T) {
 		t.Fatalf("status=%d", recorder.Code)
 	}
 }
+
+func TestInboxContainsSourcePanicsWithinTheRequestBoundary(t *testing.T) {
+	source := readInboxSource(context.Background(), inboxLoader{source: inboxSource{ID: "contributions", Label: "my contributions", Workspace: "member"}, load: func(context.Context) ([]inboxItem, error) { panic("private fixture detail") }})
+	if source.State != "unavailable" || source.Counts != nil || len(source.Items) != 0 || source.ID != "contributions" {
+		t.Fatalf("source panic pretended success: %+v", source)
+	}
+}
