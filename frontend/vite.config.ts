@@ -20,6 +20,7 @@ export function gatewayRouteLabel(pathname: string) {
 	if (pathname === '/v1/responses') return '/v1/responses'
 	if (pathname === '/v1/messages') return '/v1/messages'
 	if (pathname.startsWith('/v1beta/models/')) return '/v1beta/models/:model'
+	if (pathname === '/backend-api' || pathname.startsWith('/backend-api/')) return '/backend-api'
 	if (pathname === '/api' || pathname.startsWith('/api/')) return '/api'
 	return '/proxy'
 }
@@ -51,7 +52,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': { ...backendProxy },
-			'^/v1(?:beta)?(?:/|$)': { ...backendProxy },
+			'^/(?:v1(?:beta)?|backend-api)(?:/|$)': { ...backendProxy },
     },
   },
 })
