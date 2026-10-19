@@ -41,9 +41,9 @@ function TimeField({ label, value, onChange, end = false }: { label: string; val
 const emptyPrices = (): Prices => ({ input: '', output: '', cache_write: '', cache_read: '', details: {} })
 const emptyConditions = (): Schema['ContributionPriceConditions'] => ({ service_tier: '', min_prompt_tokens: null, max_prompt_tokens: null, timezone: '', weekdays: [], start_minute: null, end_minute: null })
 function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value) }
-function tokenPrices(value: unknown) { return record(value) && Object.keys(priceNames).every(key => typeof value[key] === 'string') && record(value.details) && Object.values(value.details).every(price => typeof price === 'string') }
+function tokenPrices(value: unknown) { return record(value) && Object.keys(priceNames).every(key => typeof value[key] === 'string') && record(value.details) && Object.keys(value.details).length <= 16 && Object.values(value.details).every(price => typeof price === 'string') }
 export function validRawQuote(value: unknown) {
-  if (!record(value) || !tokenPrices(value.prices) || !Array.isArray(value.tiers) || !Array.isArray(value.unit_prices)) return false
+  if (!record(value) || !tokenPrices(value.prices) || !Array.isArray(value.tiers) || value.tiers.length > 16 || !Array.isArray(value.unit_prices) || value.unit_prices.length > 128) return false
   return value.tiers.every(tier => {
     if (!record(tier) || typeof tier.name !== 'string' || !tokenPrices(tier.prices) || !record(tier.conditions)) return false
     const conditions = tier.conditions

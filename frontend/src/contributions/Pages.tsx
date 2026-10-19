@@ -121,8 +121,9 @@ function NewContribution({
 }) {
   const { account } = useAuth(),
     action = useNewContribution()
+  const startingMode = initialMode && (initialKind === 'model_id' ? ['disable', 'restore'] : ['new', 'edit', 'disable', 'restore', 'delete']).includes(initialMode) ? initialMode : initialKind === 'model_id' ? 'disable' : 'new'
   const [kind, setKind] = useState<Kind>(initialKind),
-    [mode, setMode] = useState(initialMode && (initialKind === 'model_id' ? ['disable', 'restore'] : ['new', 'edit', 'disable', 'restore', 'delete']).includes(initialMode) ? initialMode : initialKind === 'model_id' ? 'disable' : 'new'),
+    [mode, setMode] = useState(startingMode),
     [selected, setSelected] = useState(initialTarget),
     [cursor, setCursor] = useState(''),
     [starter, setStarter] = useState(true)
@@ -139,7 +140,7 @@ function NewContribution({
     cursor,
     open && (mode !== 'new' || kind === 'group' || kind === 'group_model'),
   )
-  const allowNavigation = useUnsavedGuard(selected !== initialTarget || kind !== initialKind || mode !== (initialMode || (initialKind === 'model_id' ? 'disable' : 'new')) || !starter, { busy: action.isPending })
+  const allowNavigation = useUnsavedGuard(selected !== initialTarget || kind !== initialKind || mode !== startingMode || !starter, { busy: action.isPending })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     action.mutate(
