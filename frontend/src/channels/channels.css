@@ -78,6 +78,7 @@
 .channel-edit-actions { justify-content: space-between; }
 .channel-stats { display: grid; gap: var(--space-5); }
 .channel-stats .metric-grid { margin-bottom: 0; }
+.channel-stats .metric-card { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .channel-events { display: grid; margin: 0; padding: 0; list-style: none; }
 .channel-events li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
 .channel-events li:last-child { border-bottom: 0; }
@@ -127,11 +128,6 @@
 .channel-health,
 .channel-settings { display: grid; gap: var(--space-4); }
 .channel-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
-.channel-save-bar { position: sticky; top: calc(var(--topbar-height) + var(--space-2)); z-index: 10; padding: var(--space-3); border: var(--sticker-border); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--shadow-sm); }
-.channel-save-bar .form-actions { margin: 0; }
-.channel-save-actions { display: flex; align-items: center; gap: var(--space-3); }
-.channel-save-actions .success-message { padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); font-size: var(--text-sm); white-space: nowrap; }
-.channel-save-bar > .inline-error { margin-top: var(--space-3); }
 .channel-record-pages { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); }
 .channel-record-pages > span { font-size: var(--text-xs); }
 @media (max-width: 960px) {
