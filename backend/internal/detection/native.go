@@ -359,12 +359,6 @@ func (n *nativeScene) check(label string, out nativeOutcome, valid bool) {
 		} else if old.State == "pass" && a.State != "pass" {
 			a.State = "partial"
 		}
-		// A later real HTTP rejection can establish a negative assertion even
-		// when an earlier matrix request failed before sending. Keep that failed
-		// attempt in the scene diagnostics, not as proof of the HTTP conclusion.
-		if a.Reason == "assertion_failed" || a.Reason == "invalid_response" || a.Reason == "unsupported" || a.Reason == "ok" {
-			a.AttemptIDs = slices.DeleteFunc(a.AttemptIDs, func(id string) bool { return n.unsent[id] })
-		}
 	}
 	n.checks[label] = a
 }
@@ -392,6 +386,12 @@ func (n *nativeScene) finish() Result {
 		a, ok := n.checks[label]
 		if !ok {
 			a = Assertion{State: "inconclusive", Reason: "prerequisite_failed", AttemptIDs: slices.Clone(n.witnesses[:min(16, len(n.witnesses))])}
+		}
+		// Finalize after linked checks and conditional observations have added
+		// their witnesses. Connection failures remain scene diagnostics, but
+		// cannot prove a later HTTP denial, response shape or capability verdict.
+		if !allowsUnsentAttempt(a.Reason) {
+			a.AttemptIDs = slices.DeleteFunc(slices.Clone(a.AttemptIDs), func(id string) bool { return n.unsent[id] })
 		}
 		a.ID = AssertionID(n.requirement.ID, i)
 		r.Assertions = append(r.Assertions, a)

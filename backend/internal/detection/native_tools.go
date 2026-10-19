@@ -164,7 +164,7 @@ func (n *nativeScene) linkedCheck(label string, first, out nativeOutcome, valid 
 	n.checks[label] = a
 }
 func (n *nativeScene) roundTrip(ctx context.Context, label string, body nativeObject, first nativeOutcome) nativeOutcome {
-	if first.State != "pass" || len(first.Reply.Candidates) != 1 || len(first.Reply.Candidates[0].Calls) == 0 {
+	if body == nil || first.State != "pass" || len(first.Reply.Candidates) != 1 || len(first.Reply.Candidates[0].Calls) == 0 {
 		n.uncertain(label, first)
 		return first
 	}
@@ -179,10 +179,14 @@ func (n *nativeScene) roundTrip(ctx context.Context, label string, body nativeOb
 }
 func (n *nativeScene) tools(ctx context.Context) {
 	var named nativeOutcome
-	var namedBody nativeObject
+	var firstCall nativeOutcome
+	var firstBody nativeObject
 	for _, mode := range []string{"auto", "none", "required", "named"} {
 		body := toolBody(n.protocol, n.s.Target.Model, mode, false)
 		out := n.infer(ctx, body, false, true)
+		if mode != "none" && firstBody == nil && out.State == "pass" && validCalls(out, true) {
+			firstCall, firstBody = out, body
+		}
 		if mode == "auto" {
 			n.check("native_declarations", out, out.Reply.Structure)
 			n.check("auto", out, validCalls(out, false))
@@ -194,11 +198,16 @@ func (n *nativeScene) tools(ctx context.Context) {
 		}
 		n.check(map[string]string{"named": "named_tool", "required": "required"}[mode], out, validCalls(out, true))
 		if mode == "named" {
-			named, namedBody = out, body
+			named = out
 		}
 	}
-	resumed := n.roundTrip(ctx, "call_result_association", namedBody, named)
-	strictBody := toolBody(n.protocol, n.s.Target.Model, "named", true)
+	// Any observed valid native call can prove result association. Named tool
+	// selection is independent and must not block an auto/required round trip.
+	if firstBody == nil {
+		firstCall = named
+	}
+	resumed := n.roundTrip(ctx, "call_result_association", firstBody, firstCall)
+	strictBody := toolBody(n.protocol, n.s.Target.Model, "required", true)
 	strictLabel := "strict_schema"
 	if n.protocol == "native-generate-content" {
 		strictLabel = "VALIDATED"
@@ -213,19 +222,19 @@ func (n *nativeScene) tools(ctx context.Context) {
 	if n.protocol == "native-generate-content" {
 		n.check("allowedFunctionNames", named, validCalls(named, true))
 		observed := false
-		for _, c := range named.Reply.Candidates {
+		for _, c := range firstCall.Reply.Candidates {
 			for _, call := range c.Calls {
 				observed = observed || call.ID != ""
 			}
 		}
 		if observed {
-			n.linkedCheck("function_call_id_echo_when_present", named, resumed, validCalls(named, true) && contentMatches(resumed, nativeToolResult))
+			n.linkedCheck("function_call_id_echo_when_present", firstCall, resumed, validCalls(firstCall, true) && contentMatches(resumed, nativeToolResult))
 		} else {
-			n.unobserved("function_call_id_echo_when_present", named)
+			n.unobserved("function_call_id_echo_when_present", firstCall)
 		}
 	} else {
 		for _, enabled := range []bool{false, true} {
-			body := toolBody(n.protocol, n.s.Target.Model, "named", false)
+			body := toolBody(n.protocol, n.s.Target.Model, "required", false)
 			label := "parallel_tool_calls_false"
 			if enabled {
 				label = "parallel_tool_calls_true"
