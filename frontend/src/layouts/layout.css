@@ -171,7 +171,8 @@
 .page-back {
   display: inline-flex;
   min-width: 0;
-  min-height: 36px;
+  max-width: 100%;
+  min-height: 44px;
   align-items: center;
   gap: 2px;
   margin-left: -8px;
@@ -183,7 +184,8 @@
   white-space: nowrap;
 }
 .page-back:hover { color: var(--ink); background: var(--hover); text-decoration: none; }
-.page-back .icon { color: var(--muted); }
+.page-back-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.page-back .icon { flex-shrink: 0; color: var(--muted); }
 .theme-toggle { margin-left: auto; }
 
 .wallet-chip {
