@@ -39,8 +39,29 @@ func TestCodexContextArgumentsDeclaresNamespaceDescription(t *testing.T) {
 					_, _ = io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"Missing required parameter: tools[0].description"}}`)
 					return
 				}
+				parameters := object(object(list(object(tools[0])["tools"])[0])["parameters"])
+				if object(list(object(tools[0])["tools"])[0])["strict"] != false {
+					t.Error("reserved context tool must preserve the pinned non-strict mode")
+				}
+				properties := object(parameters["properties"])
+				for _, raw := range object(parameters["properties"]) {
+					if _, leaked := object(raw)["minimum"]; leaked {
+						t.Error("raw-source minimum leaked into the pinned CLI wire schema")
+					}
+				}
+				filter, count := "path_prefix", 5
+				if namespace == "history" {
+					filter, count = "window_id", 8
+				}
+				if len(properties) != count || len(list(object(properties[filter])["anyOf"])) != 2 || len(list(parameters["required"])) != 1 || list(parameters["required"])[0] != "query" {
+					t.Error("reserved search tool schema lost optional nullable fields")
+				}
 				out := nativeFixtureWithCalls("openai-responses", "", []nativeCall{{ID: "synthetic-context-call", Name: "search_contents", Namespace: namespace}})
-				object(list(out["output"])[0])["arguments"] = `{"query":"sealed:synthetic-query"}`
+				args := nativeObject{"query": "sealed:synthetic-query", "max_files": 2, "recent_file_first": true}
+				if namespace == "history" {
+					args = nativeObject{"query": "sealed:synthetic-query", "limit": 2, "recent_first": true, "agent_name": nil}
+				}
+				object(list(out["output"])[0])["arguments"] = string(mustNativeJSON(args))
 				_ = json.NewEncoder(w).Encode(out)
 			}))
 			defer up.Close()

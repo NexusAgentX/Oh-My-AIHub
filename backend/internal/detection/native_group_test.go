@@ -3,13 +3,60 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"slices"
 	"strings"
 	"testing"
 )
+
+func TestGroupErrorMatrixRetainsUnsentFailuresWithoutInvalidatingRealHTTPConclusions(t *testing.T) {
+	r, s, service := nativeTestSession(t, "https://synthetic.example")
+	s.Target.Binding.TargetKind, s.Target.Model, s.Target.ModelType = "group", "", ""
+	s.outbound = fixtureOutbound{&http.Client{Transport: detectorRoundTrip(func(req *http.Request) (*http.Response, error) {
+		if strings.Contains(req.URL.Path, "aihub-unknown-") {
+			return nil, errors.New("synthetic network failure before headers")
+		}
+		httptrace.ContextClientTrace(req.Context()).WroteHeaders()
+		status, body := http.StatusUnauthorized, `{"error":{"type":"authentication_error","message":"Synthetic incompatible error shape"}}`
+		if req.Method == http.MethodGet {
+			status, body = http.StatusOK, `{"models":[{"name":"models/synthetic-model"}]}`
+		}
+		return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+	})}}
+	item := nativeItem(t, r, s, "native-generate-content.errors")
+	result := service.run(context.Background(), s, item, nil)
+	if !terminal(result.State) || result.State == "pass" || len(result.Attempts) != 5 {
+		t.Fatal("mixed HTTP and network observations aborted the whole job", result.State, result.Reason)
+	}
+	unsent := ""
+	for _, attempt := range result.Attempts {
+		if !attempt.Sent {
+			unsent = attempt.ID
+			if attempt.Reason != "network_error" || attempt.Status != 0 {
+				t.Fatal("unsent attempt diagnostics changed")
+			}
+		}
+	}
+	if unsent == "" {
+		t.Fatal("network attempt disappeared from diagnostics")
+	}
+	for _, assertion := range result.Assertions {
+		switch item.AssertionLabels[assertion.ID] {
+		case "unknown_model":
+			if assertion.State != "inconclusive" || assertion.Reason != "network_error" || !slices.Contains(assertion.AttemptIDs, unsent) {
+				t.Fatal("network failure became a model capability conclusion", assertion)
+			}
+		case "native_error_structure":
+			if assertion.State == "pass" || assertion.Reason != "assertion_failed" || len(assertion.AttemptIDs) != 3 || slices.Contains(assertion.AttemptIDs, unsent) {
+				t.Fatal("unsent request was used as HTTP structure evidence", assertion)
+			}
+		}
+	}
+}
 
 func TestNativeGroupCatalogSharesReadWithNegativeMatrix(t *testing.T) {
 	for _, protocol := range []string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content"} {

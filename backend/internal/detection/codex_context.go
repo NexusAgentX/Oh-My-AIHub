@@ -51,24 +51,33 @@ func (n *nativeScene) codexContextArgumentsFor(ctx context.Context, model, sessi
 		properties[name], required = property, append(required, name)
 	}
 	slices.SortFunc(required, func(a, b any) int { return strings.Compare(str(a), str(b)) })
+	parameters := nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}
+	if operation == "search_contents" {
+		parameters = codexContextSearchSchema(namespace)
+	}
 	body := codexBase(model)
 	if _, err := n.codexContextInitialize(body, model, session); err != nil {
 		return nil, nativeOutcome{State: "inconclusive", Reason: "detector_error"}
 	}
 	body["input"] = []any{nativeObject{"role": "user", "content": "Call only " + namespace + "." + operation + " on this isolated synthetic context, using these exact values. Preserve the required encrypted argument representation. Do not invent a result: " + string(mustNativeJSON(desired))}}
-	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "description": "Isolated synthetic context tools.", "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "parameters": nativeObject{"type": "object", "properties": properties, "required": required, "additionalProperties": false}}}}}
+	body["tools"] = []any{nativeObject{"type": "namespace", "name": namespace, "description": "Isolated synthetic context tools.", "tools": []any{nativeObject{"type": "function", "name": operation, "description": "Isolated synthetic context capability probe.", "strict": false, "parameters": parameters}}}}
 	body["tool_choice"] = "required"
 	out := n.codexInfer(ctx, body, "")
 	if out.State != "pass" || len(out.Reply.Candidates) != 1 || len(out.Reply.Candidates[0].Calls) != 1 {
 		return nil, out
 	}
 	call := out.Reply.Candidates[0].Calls[0]
-	if call.Namespace != namespace || call.Name != operation || call.ID == "" || len(call.Arguments) != len(desired) {
+	if call.Namespace != namespace || call.Name != operation || call.ID == "" || len(call.Arguments) > len(object(parameters["properties"])) {
 		return nil, out
 	}
 	for name, value := range desired {
 		actual := str(call.Arguments[name])
 		if actual == "" || len(actual) > 64<<10 || ((name != "query" && name != "text") && actual != str(value)) {
+			return nil, out
+		}
+	}
+	for name, value := range call.Arguments {
+		if _, exists := desired[name]; !exists && !codexContextOptionalArgument(name, value, object(parameters["properties"])) {
 			return nil, out
 		}
 	}

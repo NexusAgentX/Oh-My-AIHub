@@ -30,6 +30,7 @@ type nativeScene struct {
 	requirement gatewaycontract.Requirement
 	result      Result
 	witnesses   []string
+	unsent      map[string]bool
 	checks      map[string]Assertion
 }
 
@@ -218,6 +219,12 @@ func (n *nativeScene) call(ctx context.Context, req Request, memo bool) nativeOu
 	if response.AttemptID != "" && !slices.Contains(n.witnesses, response.AttemptID) {
 		n.witnesses = append(n.witnesses, response.AttemptID)
 	}
+	if response.AttemptID != "" && !response.Sent && response.Status == 0 {
+		if n.unsent == nil {
+			n.unsent = map[string]bool{}
+		}
+		n.unsent[response.AttemptID] = true
+	}
 	for _, id := range response.PriorAttempts {
 		if !slices.Contains(n.witnesses, id) {
 			n.witnesses = append(n.witnesses, id)
@@ -351,6 +358,12 @@ func (n *nativeScene) check(label string, out nativeOutcome, valid bool) {
 			a.Reason = old.Reason
 		} else if old.State == "pass" && a.State != "pass" {
 			a.State = "partial"
+		}
+		// A later real HTTP rejection can establish a negative assertion even
+		// when an earlier matrix request failed before sending. Keep that failed
+		// attempt in the scene diagnostics, not as proof of the HTTP conclusion.
+		if a.Reason == "assertion_failed" || a.Reason == "invalid_response" || a.Reason == "unsupported" || a.Reason == "ok" {
+			a.AttemptIDs = slices.DeleteFunc(a.AttemptIDs, func(id string) bool { return n.unsent[id] })
 		}
 	}
 	n.checks[label] = a
