@@ -1,51 +1,55 @@
 # Google Stitch 设计交接
 
-本目录面向生产产品的原型探索，记录维护者在本轮确认的核心能力、贡献方式与设计自由度。产品设计的重点是骨架和主要交互；当前网站的完整功能与实现事实继续由 `PRODUCT.md`、`DESIGN.md` 和源码维护。
+首版围绕用 API、共享 API、买卖积分三条主流程组织骨架。页面、导航、布局与交互由 Stitch 发挥，账户、余额、实体编辑与管理操作融入相关任务。桌面与移动分别设计。
 
-## 交接内容
+## 两类输入
+
+| 输入 | 内容与用途 |
+| --- | --- |
+| `DESIGN.md` | 品牌、配色、字体和贴纸视觉语言，用于导入视觉系统；两端共用 |
+| `desktop/prompt.txt` / `mobile/prompt.txt` | 本端设计任务与核心业务，粘贴到相应项目的设计对话 |
+
+`DESIGN.md` 按 [Google 的格式说明](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) 组织：YAML 品牌配色与 Markdown 视觉章节。业务任务独立保存，输入时各就其位。
+
+## 源文件
 
 | 文件 | 用途 |
 | --- | --- |
-| [product-spec.md](product-spec.md) | 业务背景、七项核心能力、实体详情内编辑公共资料、外围功能的取舍空间 |
-| [visual-language.md](visual-language.md) | 保留的贴纸品牌识别与可发展的视觉方向 |
-| [desktop.md](desktop.md) | 桌面应用与安装后独立窗口的体验方向 |
-| [mobile.md](mobile.md) | 独立移动结构、单手操作和原生感 PWA 的体验方向 |
+| [product-spec.md](product-spec.md) | 七项核心能力、实体内编辑与三条主流程 |
+| [visual-language.md](visual-language.md) | 视觉章节，导出时填入现有双主题配色 |
+| [desktop.md](desktop.md) | 桌面应用与独立窗口的设计任务 |
+| [mobile.md](mobile.md) | 原生感移动 PWA 的设计任务 |
 
-核心能力固定，外围功能可由 Stitch 增加、精简、合并、替换或删除。页面数量、导航、布局、操作步骤、字段和状态的细节由 Stitch 发挥。两端分别设计，各自让核心任务成立。
+贡献融入实体维护：在相应详情编辑，从目录或父实体创建，审核结果与对象关联。交接以自然语言说明首版任务；当前实现事实继续由产品文档与源码维护。本次更新只修改设计输入。
 
-贡献融入实体维护：在相应详情发起编辑，从目录或父实体创建新对象，审核结果与对象关联。“我的贡献”可由 Stitch 取舍为辅助历史；创建和编辑都直接从相关业务对象开始。
-
-交接以自然语言说明业务，测试站配置、客户端兼容内部细节和旧路由清单留在工程资料中。原型里的新增能力和删减选择会成为后续实现的讨论依据。本次更新只修改设计输入。
-
-## 导出上传文件
+## 导出
 
 在仓库根目录运行（Python 3.9 或更新版本，使用标准库）：
 
 ```sh
-python3 scripts/export-stitch-briefs.py --output /tmp/oh-my-aihub-stitch-v2
+python3 scripts/export-stitch-briefs.py --output /tmp/oh-my-aihub-stitch-v4
 ```
 
 选择尚未使用的输出目录与同名 ZIP 路径，得到：
 
 ```text
-oh-my-aihub-stitch-v2/
+oh-my-aihub-stitch-v4/
   README.md
+  DESIGN.md
   product-spec.md
-  desktop/design.md
-  mobile/design.md
-oh-my-aihub-stitch-v2.zip
+  desktop/prompt.txt
+  mobile/prompt.txt
+oh-my-aihub-stitch-v4.zip
 ```
 
-每份 `design.md` 都包含本端方向、产品简报、共享视觉和品牌配色参考，单文件即可独立使用。配色从现有 `tokens.css` 提取。
+配色从现有 `tokens.css` 提取。每份 `prompt.txt` 都带有本端任务和完整的首版业务简报，可以独立粘贴使用。
 
-## 两个项目的起始提示
+## 对应 Stitch 界面
 
-桌面项目上传 `desktop/design.md`：
+在 `Start with your design` 页面：
 
-> 请以产品设计师和交互设计师的判断，为 Oh-My-AIHub 构想新的桌面应用。保留核心业务和贴纸品牌，其余页面、功能、导航与流程充分发挥，可以增加新能力，也可以精简外围能力。先给出你的产品组织思路，再生成表达主要任务的原型骨架，考虑 PWA 安装后的独立窗口体验。
+1. `Upload a DESIGN.md file` 上传导出的 `DESIGN.md`。
+2. `Additional instructions` 可填“保留芥末与墨的贴纸风，以此建立适合新页面的视觉系统”。
+3. 完成风格导入后，将相应端的 `prompt.txt` 全文粘贴到项目设计对话中，开始首版原型设计。
 
-移动项目上传 `mobile/design.md`：
-
-> 请为 Oh-My-AIHub 独立构想一款有原生应用体验的移动 PWA。保留核心业务和贴纸品牌，从手机使用情境重新设计首页、导航、页面和流程，充分发挥产品判断，允许增加、合并或精简外围能力。先说明组织思路，再用主要页面和连续流程表达顺手的移动应用骨架。
-
-核对交付时关注核心任务的自然落点、实体内编辑流程、两端特点和整体可用性；其余细节随原型完善。
+核对原型时关注三条主流程是否贯通、实体内编辑是否顺手，以及两端各自的整体体验。

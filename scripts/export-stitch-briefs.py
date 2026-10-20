@@ -2,6 +2,7 @@
 """Export self-contained Stitch inputs without duplicating maintained sources."""
 
 import argparse
+import json
 from pathlib import Path
 import re
 import shutil
@@ -36,28 +37,36 @@ def main():
               ("line", "描边"), ("shadow-ink", "硬投影"), ("mustard", "芥末主色"),
               ("on-color", "色块上文字"), ("mint", "薄荷"), ("sky", "浅蓝"),
               ("rose", "粉色")]
-    palette = ["# 品牌配色参考", "",
-               "这组配色提供现有品牌的起点，可围绕贴纸识别感与可读性继续发展。",
+    palette = ["这组配色提供现有品牌的起点，可围绕贴纸识别感与可读性继续发展。",
                "", "| 用途 | 浅色 | 墨夜 |", "| --- | --- | --- |"]
     palette.extend(f"| {label} | `{light['--' + name].strip()}` | "
                    f"`{dark['--' + name].strip()}` |" for name, label in colors)
     palette = "\n".join(palette) + "\n"
 
-    files = {"product-spec.md": spec}
+    if visual.count("\n## Colors\n") != 1:
+        parser.error("Visual source must have exactly one Colors section")
+    brand_colors = {"primary": "mustard", "secondary": "ink", "tertiary": "mint",
+                    "neutral": "paper", "surface": "canvas", "on-surface": "body"}
+    metadata = ["---", "name: Oh-My-AIHub", "colors:"]
+    metadata.extend(f"  {name}: {json.dumps(light['--' + token].strip())}"
+                    for name, token in brand_colors.items())
+    metadata.append("---")
+    design = "\n".join(metadata) + "\n\n" + visual.replace(
+        "\n## Colors\n", "\n## Colors\n\n" + palette)
+    files = {"DESIGN.md": design, "product-spec.md": spec}
     for platform in ("desktop", "mobile"):
         brief = (source / (platform + ".md")).read_text(encoding="utf-8")
-        files[f"{platform}/design.md"] = "\n\n---\n\n".join(
-            part.rstrip() for part in (brief, spec, visual, palette)) + "\n"
+        files[f"{platform}/prompt.txt"] = "\n\n".join(
+            part.rstrip() for part in (brief, spec)) + "\n"
     files["README.md"] = (
         "# Oh-My-AIHub · Google Stitch 交接\n\n"
-        "建立两个独立项目：桌面项目上传 desktop/design.md，"
-        "移动项目上传 mobile/design.md。\n\n"
-        "每份 design.md 都包含核心产品简报、贴纸品牌与本端体验方向，"
-        "单文件即可使用。product-spec.md 供单独阅读。\n\n"
-        "请 Stitch 发挥产品与交互设计判断：保留核心能力，"
-        "自由增加、精简、合并、替换或删除外围功能，独立决定两端结构。\n\n"
-        "公共资料从相应实体详情发起编辑，新增从目录或父实体开始。"
-        "先说明产品组织，再生成主要页面和任务流程，细节后续补充。\n"
+        "在 Start with your design 页面，Upload a DESIGN.md file 上传 DESIGN.md。\n\n"
+        "Additional instructions 可填写：保留芥末与墨的贴纸风，"
+        "以此建立适合新页面的视觉系统。\n\n"
+        "完成风格导入后，在项目设计对话中粘贴 prompt.txt 全文："
+        "桌面项目使用 desktop/prompt.txt，移动项目使用 mobile/prompt.txt。\n\n"
+        "两个项目共用 DESIGN.md，各自的 prompt.txt 包含本端任务与核心业务。"
+        "product-spec.md 供单独阅读。\n"
     )
     output.mkdir(parents=True)
     for name, content in files.items():
@@ -65,7 +74,7 @@ def main():
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(content, encoding="utf-8")
     shutil.make_archive(str(output), "zip", root_dir=output)
-    print(f"Exported {len(files)} Markdown files to {output}")
+    print(f"Exported {len(files)} files to {output}")
     print(f"ZIP: {archive}")
 
 
