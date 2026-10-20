@@ -48,4 +48,3 @@ export function ChannelCalls({ channelId }: { channelId: string }) {
     </Card>
   )
 }
-
